@@ -62,14 +62,14 @@ class SetCmd(GetGoal):
             else:
                 self.god_map.set_data(identifier.check_reachability, False)
 
-            self.god_map.set_data(identifier.execute, self.is_execute(self.goal.type))
+            self.god_map.set_data(identifier.execute, self.is_goal_msg_type_execute(self.goal.type))
             self.god_map.set_data(identifier.skip_failures, self.is_skip_failures(self.goal.type))
             self.god_map.set_data(identifier.cut_off_shaking, self.is_cut_off_shaking(self.goal.type))
 
     def is_plan(self, goal_type, plan_code=1):
         return plan_code in self.get_set_bits(goal_type)
 
-    def is_execute(self, goal_type, execute_code=4):
+    def is_goal_msg_type_execute(self, goal_type, execute_code=4):
         return execute_code in self.get_set_bits(goal_type)
 
     def is_skip_failures(self, goal_type, skip_failures_code=8):

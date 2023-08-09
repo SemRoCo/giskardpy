@@ -17,16 +17,17 @@ from giskardpy.goals.collision_avoidance import SelfCollisionAvoidance, External
 from giskardpy.goals.goal import Goal
 from giskardpy.my_types import PrefixName
 from giskardpy.tree.behaviors.get_goal import GetGoal
+from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.logging import loginfo
 from giskardpy.utils.utils import convert_dictionary_to_ros_message, get_all_classes_in_package, raise_to_blackboard
 from giskardpy.utils.decorators import catch_and_raise_to_blackboard, record_time
 
 
-class RosMsgToGoal(GetGoal):
+class RosMsgToGoal(GiskardBehavior):
     @record_time
     @profile
-    def __init__(self, name, as_name):
-        GetGoal.__init__(self, name, as_name)
+    def __init__(self, name):
+        super().__init__(name)
         goal_package_paths = self.god_map.get_data(identifier.goal_package_paths)
         self.allowed_constraint_types = {}
         for path in goal_package_paths:
@@ -43,9 +44,7 @@ class RosMsgToGoal(GetGoal):
     @profile
     def update(self):
         loginfo('Parsing goal message.')
-        move_cmd = self.god_map.get_data(identifier.next_move_goal)  # type: MoveCmd
-        if not move_cmd:
-            return Status.FAILURE
+        move_cmd: MoveCmd = self.god_map.get_data(identifier.goal_msg).move_cmd
         self.god_map.set_data(identifier.goals, {})
         try:
             self.parse_constraints(move_cmd)

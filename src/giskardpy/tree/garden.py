@@ -678,22 +678,23 @@ class StandAlone(TreeManager):
         process_move_goal.add_child(success_is_failure(PublishFeedback)('publish feedback2',
                                                                         self.action_server_name,
                                                                         MoveFeedback.PLANNING))
-        process_move_goal.add_child(self.grow_process_move_commands())
+        process_move_goal.add_child(self.grow_planning())
+        process_move_goal.add_child(success_is_failure(SetErrorCode)('set error code1', 'Planning'))
         process_move_goal.add_child(ExceptionToExecute('clear exception'))
-        process_move_goal.add_child(failure_is_running(CommandsRemaining)('commands remaining?'))
+        # process_move_goal.add_child(failure_is_running(CommandsRemaining)('commands remaining?'))
         return process_move_goal
 
-    def grow_process_move_commands(self):
-        process_move_cmd = success_is_failure(Sequence)('Process move commands')
-        process_move_cmd.add_child(SetCmd('set move cmd', self.action_server_name))
-        process_move_cmd.add_child(self.grow_planning())
-        process_move_cmd.add_child(SetErrorCode('set error code1', 'Planning'))
-        return process_move_cmd
+    # def grow_process_move_commands(self):
+    #     process_move_cmd = success_is_failure(Sequence)('Process move commands')
+    #     # process_move_cmd.add_child(SetCmd('set move cmd', self.action_server_name))
+    #     process_move_cmd.add_child(self.grow_planning())
+    #     process_move_cmd.add_child(SetErrorCode('set error code1', 'Planning'))
+    #     return process_move_cmd
 
     def grow_planning(self):
-        planning = failure_is_success(Sequence)('planning')
-        planning.add_child(IF('command set?', identifier.next_move_goal))
-        planning.add_child(RosMsgToGoal('RosMsgToGoal', self.action_server_name))
+        planning = success_is_failure(Sequence)('planning')
+        # planning.add_child(IF('command set?', identifier.next_move_goal))
+        planning.add_child(RosMsgToGoal('RosMsgToGoal'))
         planning.add_child(InitQPController('InitQPController'))
         planning.add_child(self.grow_planning2())
         # planning.add_child(planning_1)

@@ -40,7 +40,6 @@ class GiskardWrapper:
             self.dye_group_srv = rospy.ServiceProxy(f'{node_name}/dye_group', DyeGroup)
             rospy.wait_for_service(f'{node_name}/update_world')
             self._client.wait_for_server()
-        self.collisions = []
         self.clear_cmds()
         self._object_js_topics = {}
         rospy.sleep(.3)
@@ -59,7 +58,7 @@ class GiskardWrapper:
         req.group_name = new_group_name
         req.parent_group_name = root_link_group_name
         req.root_link_name = root_link_name
-        res = self._register_groups_srv.call(req)  # type: RegisterGroupResponse
+        res: RegisterGroupResponse = self._register_groups_srv.call(req)
         if res.error_codes == res.DUPLICATE_GROUP_ERROR:
             raise DuplicateNameException(f'Group with name {new_group_name} already exists.')
         if res.error_codes == res.BUSY:
@@ -484,14 +483,14 @@ class GiskardWrapper:
                 kwargs[k] = convert_ros_message_to_dictionary(v)
         kwargs = replace_prefix_name_with_str(kwargs)
         constraint.parameter_value_pair = json.dumps(kwargs)
-        self.cmd_seq[-1].constraints.append(constraint)
+        self.move_cmd.constraints.append(constraint)
 
     def _set_collision_entries(self, collisions: List[CollisionEntry]):
         """
         Adds collision entries to the current goal
         :param collisions: list of CollisionEntry
         """
-        self.cmd_seq[-1].collisions.extend(collisions)
+        self.move_cmd.collisions.extend(collisions)
 
     def allow_collision(self, group1: str = CollisionEntry.ALL, group2: str = CollisionEntry.ALL):
         """
@@ -591,24 +590,11 @@ class GiskardWrapper:
         collision_entry.distance = min_distance
         self._set_collision_entries([collision_entry])
 
-    def add_cmd(self):
-        """
-        Adds another command to the goal sequence. Any set_something_goal calls will be added this new goal.
-        This is used, if you want Giskard to plan multiple goals in succession.
-        """
-        move_cmd = MoveCmd()
-        self.cmd_seq.append(move_cmd)
-
     def clear_cmds(self):
         """
         Removes all move commands from the current goal, collision entries are left untouched.
         """
-        self.cmd_seq = []
-        self.add_cmd()
-
-    @property
-    def number_of_cmds(self):
-        return len(self.cmd_seq)
+        self.move_cmd = MoveCmd()
 
     def plan_and_execute(self, wait: bool = True) -> MoveResult:
         """
@@ -623,7 +609,7 @@ class GiskardWrapper:
         :param wait: this function blocks if wait=True
         :return: result from Giskard
         """
-        return self.send_goal(MoveGoal.PLAN_ONLY, wait)
+        return self.send_goal(MoveGoal.PROJECTION, wait)
 
     def send_goal(self, goal_type: int, wait: bool = True) -> Optional[MoveResult]:
         """
@@ -641,12 +627,9 @@ class GiskardWrapper:
         else:
             self._client.send_goal(goal, feedback_cb=self._feedback_cb)
 
-    def get_collision_entries(self) -> List[CollisionEntry]:
-        return self.cmd_seq
-
     def _get_goal(self) -> MoveGoal:
         goal = MoveGoal()
-        goal.cmd_seq = self.cmd_seq
+        goal.move_cmd = self.move_cmd
         goal.type = MoveGoal.PLAN_AND_EXECUTE
         self.clear_cmds()
         return goal
@@ -912,7 +895,7 @@ class GiskardWrapper:
         """
         Returns the names of every group in the world.
         """
-        resp = self._get_group_names_srv()  # type: GetGroupNamesResponse
+        resp: GetGroupNamesResponse = self._get_group_names_srv()
         return resp.group_names
 
     def get_group_info(self, group_name: str) -> GetGroupInfoResponse:

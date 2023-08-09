@@ -1,7 +1,11 @@
 from __future__ import annotations
+
+from giskard_msgs.msg import MoveGoal
 from giskardpy import identifier
 from giskardpy.god_map import GodMap
 from typing import TYPE_CHECKING
+
+from giskardpy.utils.utils import int_to_bit_list
 
 if TYPE_CHECKING:
     from giskardpy.configs.collision_avoidance_config import CollisionAvoidanceConfig
@@ -42,3 +46,19 @@ class GodMapWorshipper:
     @property
     def collision_avoidance_config(self) -> CollisionAvoidanceConfig:
         return self.god_map.get_data(identifier.collision_avoidance_config)
+
+    @property
+    def goal_msg_type(self) -> int:
+        return self.god_map.get_data(identifier.goal_msg).type
+
+    def is_goal_msg_type_execute(self):
+        return MoveGoal.EXECUTE in int_to_bit_list(self.goal_msg_type)
+
+    def is_goal_msg_type_projection(self):
+        return MoveGoal.PROJECTION in int_to_bit_list(self.goal_msg_type)
+
+    def is_goal_msg_type_local_minimum_is_success(self):
+        return MoveGoal.LOCAL_MINIMUM_IS_SUCCESS in int_to_bit_list(self.goal_msg_type)
+
+    def is_goal_msg_type_undefined(self):
+        return MoveGoal.UNDEFINED in int_to_bit_list(self.goal_msg_type)

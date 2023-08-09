@@ -266,7 +266,7 @@ class GiskardTestWrapper(GiskardWrapper, GodMapWorshipper):
         super().__init__(node_name='tests')
         self.results = Queue(100)
         self.default_root = str(self.world.root_link_name)
-        self.goal_checks = defaultdict(list)
+        self.goal_checks = []
 
         def create_publisher(topic):
             p = rospy.Publisher(topic, JointState, queue_size=10)
@@ -690,7 +690,7 @@ class GiskardTestWrapper(GiskardWrapper, GodMapWorshipper):
                 AlignPlanesGoalChecker(self, full_tip_link, tip_normal, full_root_link, goal_normal))
 
     def add_goal_check(self, goal_checker):
-        self.goal_checks[self.number_of_cmds - 1].append(goal_checker)
+        self.goal_checks.append(goal_checker)
 
     def set_straight_cart_goal(self,
                                goal_pose: PoseStamped,
@@ -734,17 +734,17 @@ class GiskardTestWrapper(GiskardWrapper, GodMapWorshipper):
     # GENERAL GOAL STUFF ###############################################################################################
     #
 
-    def plan_and_execute(self, expected_error_codes: List[int] = None, stop_after: float = None,
+    def plan_and_execute(self, expected_error_code: int = MoveResult.SUCCESS, stop_after: float = None,
                          wait: bool = True) -> MoveResult:
-        return self.send_goal(expected_error_codes=expected_error_codes, stop_after=stop_after, wait=wait)
+        return self.send_goal(expected_error_code=expected_error_code, stop_after=stop_after, wait=wait)
 
-    def plan(self, expected_error_codes: List[int] = None, wait: bool = True) -> MoveResult:
-        return self.send_goal(expected_error_codes=expected_error_codes,
-                              goal_type=MoveGoal.PLAN_ONLY,
+    def plan(self, expected_error_codes: int = MoveResult.SUCCESS, wait: bool = True) -> MoveResult:
+        return self.send_goal(expected_error_code=expected_error_codes,
+                              goal_type=MoveGoal.PROJECTION,
                               wait=wait)
 
     def send_goal(self,
-                  expected_error_codes: Optional[List[int]] = None,
+                  expected_error_code: int = MoveResult.SUCCESS,
                   goal_type: int = MoveGoal.PLAN_AND_EXECUTE,
                   goal: Optional[MoveGoal] = None,
                   stop_after: Optional[float] = None,
@@ -768,30 +768,22 @@ class GiskardTestWrapper(GiskardWrapper, GodMapWorshipper):
             self.total_time_spend_moving += len(self.god_map.get_data(identifier.trajectory).keys()) * \
                                             self.god_map.get_data(identifier.sample_period)
             logging.logwarn(f'Goal processing took {diff}')
-            error_code = MoveResult.SUCCESS
-            cmd_id = 0
-            for cmd_id in range(len(r.error_codes)):
-                error_code = r.error_codes[cmd_id]
-                error_message = r.error_messages[cmd_id]
-                if expected_error_codes is None:
-                    expected_error_code = MoveResult.SUCCESS
-                else:
-                    expected_error_code = expected_error_codes[cmd_id]
-                assert error_code == expected_error_code, \
-                    f'in goal {cmd_id}; ' \
-                    f'got: {move_result_error_code(error_code)}, ' \
-                    f'expected: {move_result_error_code(expected_error_code)} | error_massage: {error_message}'
+            error_code = r.error_code
+            error_message = r.error_message
+            assert error_code == expected_error_code, \
+                f'got: {move_result_error_code(error_code)}, ' \
+                f'expected: {move_result_error_code(expected_error_code)} | error_massage: {error_message}'
             if error_code == MoveResult.SUCCESS:
                 try:
                     self.wait_heartbeats(30)
-                    for goal_checker in self.goal_checks[len(r.error_codes) - 1]:
+                    for goal_checker in self.goal_checks:
                         goal_checker()
                 except:
-                    logging.logerr(f'Goal #{cmd_id} did\'t pass test.')
+                    logging.logerr(f'Goal did\'t pass test.')
                     raise
             # self.are_joint_limits_violated()
         finally:
-            self.goal_checks = defaultdict(list)
+            self.goal_checks = []
             self.sync_world_with_trajectory()
         return r
 

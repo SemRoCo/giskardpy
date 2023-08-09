@@ -1817,9 +1817,9 @@ class TestWayPoints:
         zero_pose.add_cmd()
         zero_pose.set_joint_goal(zero_pose.better_pose)
 
-        traj = zero_pose.send_goal(expected_error_codes=[MoveResult.SUCCESS,
-                                                         MoveResult.UNKNOWN_CONSTRAINT,
-                                                         MoveResult.SUCCESS],
+        traj = zero_pose.send_goal(expected_error_code=[MoveResult.SUCCESS,
+                                                        MoveResult.UNKNOWN_CONSTRAINT,
+                                                        MoveResult.SUCCESS],
                                    goal_type=MoveGoal.PLAN_AND_EXECUTE_AND_SKIP_FAILURES).trajectory
 
         for i, p in enumerate(traj.points):
@@ -1850,9 +1850,9 @@ class TestWayPoints:
         zero_pose.add_cmd()
         zero_pose.set_joint_goal(zero_pose.better_pose)
 
-        traj = zero_pose.send_goal(expected_error_codes=[MoveResult.UNKNOWN_CONSTRAINT,
-                                                         MoveResult.SUCCESS,
-                                                         MoveResult.SUCCESS],
+        traj = zero_pose.send_goal(expected_error_code=[MoveResult.UNKNOWN_CONSTRAINT,
+                                                        MoveResult.SUCCESS,
+                                                        MoveResult.SUCCESS],
                                    goal_type=MoveGoal.PLAN_AND_EXECUTE_AND_SKIP_FAILURES).trajectory
 
         for i, p in enumerate(traj.points):
@@ -1883,9 +1883,9 @@ class TestWayPoints:
         zero_pose.add_cmd()
         zero_pose.set_json_goal('muh')
 
-        traj = zero_pose.send_goal(expected_error_codes=[MoveResult.SUCCESS,
-                                                         MoveResult.SUCCESS,
-                                                         MoveResult.UNKNOWN_CONSTRAINT, ],
+        traj = zero_pose.send_goal(expected_error_code=[MoveResult.SUCCESS,
+                                                        MoveResult.SUCCESS,
+                                                        MoveResult.UNKNOWN_CONSTRAINT, ],
                                    goal_type=MoveGoal.PLAN_AND_EXECUTE_AND_SKIP_FAILURES).trajectory
 
         for i, p in enumerate(traj.points):
@@ -1916,9 +1916,9 @@ class TestWayPoints:
         zero_pose.add_cmd()
         zero_pose.set_joint_goal(zero_pose.better_pose)
 
-        traj = zero_pose.send_goal(expected_error_codes=[MoveResult.SUCCESS,
-                                                         MoveResult.UNKNOWN_CONSTRAINT,
-                                                         MoveResult.ERROR],
+        traj = zero_pose.send_goal(expected_error_code=[MoveResult.SUCCESS,
+                                                        MoveResult.UNKNOWN_CONSTRAINT,
+                                                        MoveResult.ERROR],
                                    goal_type=MoveGoal.PLAN_AND_EXECUTE).trajectory
 
         for i, p in enumerate(traj.points):
@@ -1933,12 +1933,12 @@ class TestWayPoints:
 
     def test_skip_failures1(self, zero_pose: PR2TestWrapper):
         zero_pose.set_json_goal('muh')
-        zero_pose.send_goal(expected_error_codes=[MoveResult.UNKNOWN_CONSTRAINT, ],
+        zero_pose.send_goal(expected_error_code=[MoveResult.UNKNOWN_CONSTRAINT, ],
                             goal_type=MoveGoal.PLAN_AND_EXECUTE_AND_SKIP_FAILURES)
 
     def test_skip_failures2(self, zero_pose: PR2TestWrapper):
         zero_pose.set_joint_goal(pocky_pose)
-        traj = zero_pose.send_goal(expected_error_codes=[MoveResult.SUCCESS, ],
+        traj = zero_pose.send_goal(expected_error_code=[MoveResult.SUCCESS, ],
                                    goal_type=MoveGoal.PLAN_AND_EXECUTE_AND_SKIP_FAILURES).trajectory
 
         for i, p in enumerate(traj.points):
@@ -2757,7 +2757,7 @@ class TestSelfCollisionAvoidance:
         zero_pose.set_cart_goal(p, zero_pose.l_tip, 'base_footprint')
         zero_pose.allow_all_collisions()
         zero_pose.send_goal()
-        zero_pose.send_goal(expected_error_codes=[MoveResult.SELF_COLLISION_VIOLATED])
+        zero_pose.send_goal(expected_error_code=[MoveResult.SELF_COLLISION_VIOLATED])
 
 
 class TestCollisionAvoidanceGoals:

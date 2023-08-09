@@ -2,6 +2,7 @@ from copy import deepcopy
 from typing import Optional
 
 import numpy as np
+from numpy import pi
 import pytest
 import rospy
 from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, PointStamped
@@ -13,7 +14,7 @@ import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import MoveResult, MoveGoal
 from giskardpy.configs.behavior_tree_config import ClosedLoopBTConfig
 from giskardpy.configs.giskard import Giskard
-from giskardpy.configs.iai_robots.pr2 import PR2CollisionAvoidance, PR2VelocityMujocoInterface
+from giskardpy.configs.iai_robots.pr2 import PR2CollisionAvoidance, PR2VelocityMujocoInterface, WorldWithPR2Config
 from giskardpy.configs.qp_controller_config import QPControllerConfig
 from giskardpy.configs.world_config import WorldWithOmniDriveRobot
 from giskardpy.data_types import JointStates
@@ -55,7 +56,7 @@ class PR2TestWrapperMujoco(PR2TestWrapper):
         # self.l_gripper = rospy.ServiceProxy('l_gripper_simulator/set_joint_states', SetJointState)
         self.mujoco_reset = rospy.ServiceProxy('mujoco/reset', Trigger)
         self.odom_root = 'odom_combined'
-        giskard = Giskard(world_config=WorldWithOmniDriveRobot(),
+        giskard = Giskard(world_config=WorldWithPR2Config(),
                           collision_avoidance_config=PR2CollisionAvoidance(),
                           robot_interface_config=PR2VelocityMujocoInterface(),
                           behavior_tree_config=ClosedLoopBTConfig(),
@@ -569,7 +570,7 @@ class TestActionServerEvents:
     def test_undefined_type(self, zero_pose: PR2TestWrapper):
         zero_pose.allow_all_collisions()
         zero_pose.send_goal(goal_type=MoveGoal.UNDEFINED,
-                            expected_error_codes=[MoveResult.INVALID_GOAL])
+                            expected_error_code=[MoveResult.INVALID_GOAL])
 
     def test_empty_goal(self, zero_pose: PR2TestWrapper):
         zero_pose.cmd_seq = []

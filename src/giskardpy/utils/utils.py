@@ -13,7 +13,7 @@ import sys
 from collections import OrderedDict
 from contextlib import contextmanager
 from functools import cached_property
-from typing import Type, Optional, Dict, Any
+from typing import Type, Optional, Dict, Any, List
 
 import numpy as np
 import roslaunch
@@ -439,3 +439,7 @@ def publish_pose(pose: PoseStamped):
     ms = MarkerArray()
     ms.markers.append(m)
     _pose_publisher.publish(ms)
+
+
+def int_to_bit_list(number: int) -> List[int]:
+    return [2 ** i * int(bit) for i, bit in enumerate(reversed("{0:b}".format(number))) if int(bit) != 0]

@@ -33,55 +33,27 @@ class GiskardBehavior(Behaviour, GodMapWorshipper):
     def collision_avoidance_configs(self) -> Dict[str, CollisionAvoidanceGroupThresholds]:
         return self.god_map.unsafe_get_data(identifier.collision_avoidance_configs)
 
-    def get_god_map(self):
-        """
-        :rtype: giskardpy.god_map.GodMap
-        """
-        return self.god_map
-
     def get_runtime(self):
         return time() - self.get_blackboard().runtime
 
-    def robot(self, robot_name=''):
-        """
-        :rtype: giskardpy.model.world.WorldBranch
-        """
-        return self.collision_scene.robot(robot_name=robot_name)
-
-    def robot_names(self):
-        return self.collision_scene.robot_names
-
-    def robot_namespaces(self):
-        """
-        :rtype: list of str
-        """
-        return self.collision_scene.robot_namespaces
-
-    def get_world(self):
-        """
-        :rtype: giskardpy.model.world.WorldTree
-        """
-        return self.world
-
-    def unsafe_get_world(self):
-        """
-        :rtype: giskardpy.model.world.WorldTree
-        """
-        return self.world
-
-    def raise_to_blackboard(self, exception):
+    @staticmethod
+    def raise_to_blackboard(exception):
         Blackboard().set('exception', exception)
 
-    def get_blackboard(self):
+    @staticmethod
+    def get_blackboard():
         return Blackboard()
 
-    def has_blackboard_exception(self):
+    @staticmethod
+    def has_blackboard_exception():
         return has_blackboard_exception()
 
-    def get_blackboard_exception(self):
+    @staticmethod
+    def get_blackboard_exception():
         return get_blackboard_exception()
 
-    def clear_blackboard_exception(self):
+    @staticmethod
+    def clear_blackboard_exception():
         clear_blackboard_exception()
 
     def transform_msg(self, target_frame, msg, timeout=1):

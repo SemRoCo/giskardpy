@@ -8,7 +8,7 @@ from geometry_msgs.msg import Vector3Stamped, PointStamped, Point, PoseStamped
 import giskardpy.utils.tfwrapper as tf
 from giskardpy import casadi_wrapper as w
 from giskardpy.goals.cartesian_goals import CartesianPose
-from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA
+from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
 from giskardpy.model.links import BoxGeometry
 from giskardpy.utils.tfwrapper import np_to_pose, vector_to_np, point_to_np
 
@@ -177,28 +177,45 @@ class GraspBox(Goal):
         r_P_g = map_T_grasp_goal.to_position()
         r_R_g = map_T_grasp_goal.to_rotation()
         r_P_c = self.get_fk(self.root_link, self.tip_link).to_position()
+        r_P_c_eval = self.get_fk_evaluated(self.root_link, self.tip_link).to_position()
         r_R_c = self.get_fk(self.root_link, self.tip_link).to_rotation()
         c_R_r_eval = self.get_fk_evaluated(self.tip_link, self.root_link).to_rotation()
 
         map_V_pre_grasp_direction = r_R_g[:, 2]
-        map_P_pre_grasp_goal = r_P_g - map_V_pre_grasp_direction * 0.2
-        distance_error = w.norm(map_P_pre_grasp_goal - r_P_c)
+        map_P_pre_grasp_goal = r_P_g - map_V_pre_grasp_direction * 0.5
+        distance_error = w.norm(r_P_g - r_P_c)
         # self.add_debug_expr('distance_error', distance_error)
-        distance_to_line, root_P_on_line = w.distance_point_to_line_segment(r_P_c,
-                                                                            r_P_g,
-                                                                            map_P_pre_grasp_goal)
-        weight_pregrasp = w.if_less(distance_to_line, 0.01, 0, self.weight)
-        weight_grasp = w.if_eq(weight_pregrasp, 0, self.weight, 0)
-        self.add_point_goal_constraints(frame_P_current=r_P_c,
-                                        frame_P_goal=root_P_on_line,
-                                        reference_velocity=0.1,
-                                        weight=weight_pregrasp,
-                                        name='pregrasp')
+        # distance_to_line, root_P_on_line = w.distance_point_to_line_segment(r_P_c,
+        #                                                                     r_P_g,
+        #                                                                     map_P_pre_grasp_goal)
+        # weight_pregrasp = w.if_less(distance_to_line, 0.01, 0, self.weight)
+        # weight_grasp = w.if_eq(weight_pregrasp, 0, self.weight, 0)
+        # self.add_point_goal_constraints(frame_P_current=r_P_c,
+        #                                 frame_P_goal=root_P_on_line,
+        #                                 reference_velocity=0.1,
+        #                                 weight=weight_pregrasp,
+        #                                 name='pregrasp')
 
+        start_distance = self.god_map.evaluate_expr(distance_error)
+        t = 1 - distance_error / start_distance
+        bezier_curve = (1 - t) ** 2 * w.Expression(r_P_c_eval)[:3] + \
+                       2 * (1 - t) * t * w.Expression(map_P_pre_grasp_goal)[:3] + \
+                       t ** 2 * w.Expression(r_P_g)[:3]
+        map_P_interpolated_goal = w.Point3([bezier_curve[0], bezier_curve[1], bezier_curve[2]])
+        self.add_debug_expr('r_P_c_eval', r_P_c_eval)
+        self.add_debug_expr('map_P_pre_grasp_goal', map_P_pre_grasp_goal)
+        self.add_debug_expr('r_P_g', r_P_g)
+        self.add_debug_expr('map_P_interpolated_goal', map_P_interpolated_goal)
+        self.add_debug_expr('t', t)
+        self.add_point_goal_constraints(frame_P_goal=map_P_interpolated_goal,
+                                        frame_P_current=r_P_c,
+                                        reference_velocity=self.trans_vel,
+                                        weight=self.weight,
+                                        name='bezier position')
         self.add_point_goal_constraints(frame_P_goal=r_P_g,
                                         frame_P_current=r_P_c,
                                         reference_velocity=self.trans_vel,
-                                        weight=weight_grasp,
+                                        weight=self.weight,
                                         name='grasp position')
 
         # self.add_debug_expr('trans', w.norm(r_P_c))

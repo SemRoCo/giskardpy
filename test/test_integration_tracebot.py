@@ -85,6 +85,7 @@ class TestTracebot:
 
         better_pose.set_json_goal('InsertCylinder',
                                   cylinder_name=cylinder_name,
+                                  cylinder_height=0.121,
                                   hole_point=hole_point)
         better_pose.allow_all_collisions()
         better_pose.plan_and_execute()

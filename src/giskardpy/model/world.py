@@ -559,8 +559,8 @@ class WorldTree(WorldTreeInterface, GodMapWorshipper):
     def update_state(self, next_commands: NextCommands, dt: float):
         max_derivative = self.god_map.get_data(identifier.max_derivative)
         for free_variable_name, command in next_commands.free_variable_data.items():
-            self.state[free_variable_name][Derivatives.position] += command[0] * dt
-            self.state[free_variable_name][Derivatives.velocity:max_derivative + 1] = command
+            self.state[free_variable_name][:max_derivative] += command * dt
+            self.state[free_variable_name][max_derivative] = command[-1]
         for joint in self.joints.values():
             if isinstance(joint, VirtualFreeVariables):
                 joint.update_state(dt)

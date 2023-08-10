@@ -44,6 +44,9 @@ class BehaviorTreeConfig(ABC):
         """
         self.tree_tick_rate = rate
 
+    def add_sleeper(self, time: float):
+        self.tree_manager.add_sleeper(time)
+
     def add_visualization_marker_publisher(self,
                                            add_to_sync: Optional[bool] = None,
                                            add_to_planning: Optional[bool] = None,
@@ -114,20 +117,28 @@ class BehaviorTreeConfig(ABC):
 
 
 class StandAloneBTConfig(BehaviorTreeConfig):
-    def __init__(self):
+    def __init__(self, planning_sleep: Optional[float] = None):
         super().__init__(ControlModes.standalone)
+        self.planning_sleep = planning_sleep
 
     def setup(self):
         self.add_visualization_marker_publisher(add_to_sync=True, add_to_planning=False, add_to_control_loop=True)
         self.add_tf_publisher(include_prefix=True, mode=TfPublishingModes.all)
+        # self.add_trajectory_plotter()
+        # self.add_debug_marker_publisher()
+        if self.planning_sleep is not None:
+            self.add_sleeper(self.planning_sleep)
 
 
 class OpenLoopBTConfig(BehaviorTreeConfig):
-    def __init__(self):
+    def __init__(self, planning_sleep: Optional[float] = None):
         super().__init__(ControlModes.open_loop)
+        self.planning_sleep = planning_sleep
 
     def setup(self):
         self.add_visualization_marker_publisher(add_to_sync=True, add_to_planning=True, add_to_control_loop=False)
+        if self.planning_sleep is not None:
+            self.add_sleeper(self.planning_sleep)
 
 
 class ClosedLoopBTConfig(BehaviorTreeConfig):

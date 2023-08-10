@@ -1,6 +1,7 @@
 import math
 
 import numpy as np
+from actionlib import SimpleActionClient
 
 from giskardpy import identifier
 from giskardpy.hand_model import Hand, Finger
@@ -39,6 +40,11 @@ class PlotGoal(Goal):
 #       - different parameters for the objects that are used to plan the approach movement and to check collisions
 #       to fingers (plan_object, collision_object)
 
+# class HSRGripper:
+#     def __init__(self):
+#         self._gripper_apply_force_client = SimpleActionClient('/hsrb/gripper_controller/grasp',
+#                                                               GripperApplyEffortAction)
+
 
 class GraspBoxMalte(Goal):
     def __init__(self, hand: Hand, object_name, root_link, grasp_distance=0.02, grasp_radius=0.2,
@@ -72,7 +78,10 @@ class GraspBoxMalte(Goal):
         self.group = group
 
     def approach_hint_to_blocked_directions(self, approach_hint: PointStamped):
-        object_P_hint = self.transform_msg(self.world_object.root_link_name, approach_hint)
+        map_P_hint = self.transform_msg(self.world.root_link_name, approach_hint)
+        z = self.world.compute_fk_pose(self.world.root_link_name, self.world_object.root_link_name).pose.position.z
+        map_P_hint.point.z = max(z, map_P_hint.point.z)
+        object_P_hint = self.transform_msg(self.world_object.root_link_name, map_P_hint)
         object_P_hint = point_to_np(object_P_hint.point)[:3]
         geometry: BoxGeometry = self.world_object.root_link.collisions[0]
         directions = [(np.array([1, 0, 0]), geometry.x_size, [0, 1, 1, 1, 1, 1]),

@@ -474,7 +474,8 @@ class TestConstraints:
         approach_direction = PointStamped()
         approach_direction.header.frame_id = 'base_footprint'
         approach_direction.point.x = 1
-        approach_direction.point.y = -1
+        approach_direction.point.y = 0
+        approach_direction.point.z = 5
         # box_setup.set_json_goal('GraspBox',
         #                         UUID=box_name,
         #                         tip_link=box_setup.tip,
@@ -486,6 +487,7 @@ class TestConstraints:
                                 root_link='map',
                                 approach_hint=approach_direction)
         box_setup.allow_collision(box_setup.robot_name, box_name)
+        # box_setup.allow_all_collisions()
         box_setup.plan_and_execute()
         box_setup.update_parent_link_of_group(box_name, box_setup.tip)
 

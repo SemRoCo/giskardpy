@@ -13,6 +13,7 @@ from giskardpy.configs.iai_robots.hsr import HSRCollisionAvoidanceConfig, WorldW
 from giskardpy.configs.qp_controller_config import QPControllerConfig
 from giskardpy.utils.utils import launch_launchfile
 from utils_for_tests import compare_poses, GiskardTestWrapper
+from giskardpy.hand_model import Hand, Finger
 
 
 class HSRTestWrapper(GiskardTestWrapper):
@@ -25,7 +26,27 @@ class HSRTestWrapper(GiskardTestWrapper):
         'wrist_flex_joint': 0.0,
         'wrist_roll_joint': 0.0,
     }
-    better_pose = default_pose
+    better_pose = {
+        'arm_flex_joint': -0.7,
+        'arm_lift_joint': 0.2,
+        'arm_roll_joint': 0.0,
+        'head_pan_joint': -0.1,
+        'head_tilt_joint': 0.1,
+        'wrist_flex_joint': -0.9,
+        'wrist_roll_joint': -0.4,
+    }
+
+    hand = Hand(hand_tool_frame='hsrb/hand_gripper_tool_frame',
+                palm_link='hsrb/hand_palm_link',
+                thumb=Finger(tip_tool_frame='hsrb/hand_l_finger_tip_frame',
+                             collision_links=['hsrb/hand_l_distal_link',
+                                              'hsrb/hand_l_proximal_link']),
+                fingers=[Finger(tip_tool_frame='hsrb/hand_r_finger_tip_frame',
+                                collision_links=['hsrb/hand_l_distal_link',
+                                                 'hsrb/hand_l_proximal_link'])
+                         ],
+                finger_js={'hand_motor_joint': 0.7},
+                opening_width=0.06)
 
     def __init__(self, giskard=None):
         self.tip = 'hand_gripper_tool_frame'
@@ -71,9 +92,9 @@ class HSRTestWrapper(GiskardTestWrapper):
         self.clear_world()
         # self.close_gripper()
         self.reset_base()
-        self.register_group('gripper',
-                            root_link_group_name=self.robot_name,
-                            root_link_name='hand_palm_link')
+        # self.register_group('gripper',
+        #                     root_link_group_name=self.robot_name,
+        #                     root_link_name='hand_palm_link')
 
     def teleport_base(self, goal_pose, group_name: Optional[str] = None):
         self.set_seed_odometry(base_pose=goal_pose, group_name=group_name)
@@ -597,3 +618,23 @@ class TestAddObject:
 
         zero_pose.set_joint_goal({'arm_flex_joint': -0.7})
         zero_pose.plan_and_execute()
+
+
+class TestGrasping:
+    def test_box_grasp(self, better_pose: HSRTestWrapper):
+        box_pose = PoseStamped()
+        box_pose.header.frame_id = 'map'
+        box_pose.pose.position.z = 0.3
+        box_pose.pose.position.x = 2
+        box_pose.pose.position.y = 0
+        box_pose.pose.orientation.w = 1
+        better_pose.add_box('box', (0.03, 0.2, 0.3), box_pose)
+
+        better_pose.set_json_goal('GraspBoxMalte',
+                                  hand=better_pose.hand,
+                                  object_name='box',
+                                  root_link='map',
+                                  blocked_directions=[1, 0, 0, 1, 0, 0])
+
+        better_pose.allow_all_collisions()
+        better_pose.plan_and_execute()

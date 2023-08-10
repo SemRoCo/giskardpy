@@ -1,5 +1,7 @@
 import math
 
+import numpy as np
+
 from giskardpy import identifier
 from giskardpy.hand_model import Hand, Finger
 from giskardpy import casadi_wrapper as w
@@ -9,6 +11,9 @@ from geometry_msgs.msg import Vector3Stamped, PointStamped, QuaternionStamped
 from giskardpy.goals.cartesian_goals import CartesianOrientation, RotationVelocityLimit
 from giskardpy.goals.align_planes import AlignPlanes
 from copy import deepcopy
+
+from giskardpy.model.links import BoxGeometry
+from giskardpy.utils.tfwrapper import point_to_np
 
 
 class PlotGoal(Goal):
@@ -26,6 +31,7 @@ class PlotGoal(Goal):
         s = super(PlotGoal, self).__str__()
         return '{}/{}/{}'.format(s, self.root, self.tip)
 
+
 # TODO: re-implent the FreeGraspBoxFinger goal from my Thesis.
 #       - improve on smoother transitions
 #       - do I need to implement the heuristic decision? it is nice to have for online adaptation
@@ -37,9 +43,11 @@ class PlotGoal(Goal):
 class GraspBoxMalte(Goal):
     def __init__(self, hand: Hand, object_name, root_link, grasp_distance=0.02, grasp_radius=0.2,
                  max_linear_velocity=0.1, group='robot',
-                 weight=WEIGHT_BELOW_CA, map_link='map', blocked_directions=None, object_root=None):
+                 weight=WEIGHT_BELOW_CA, map_link='map', blocked_directions=None,
+                 approach_hint: PointStamped = None, object_root=None):
         super().__init__()
         self.object = object_name
+        self.world_object = self.world.groups[object_name]
         self.object_root = object_root
         self.weight = weight
         self.max_velocity = max_linear_velocity
@@ -54,13 +62,27 @@ class GraspBoxMalte(Goal):
         all_finger = deepcopy(self.fingers)
         all_finger.append(self.thumb)
         self.all_finger = all_finger
-        if blocked_directions is not None and len(blocked_directions) == 6:
-            self.blocked = blocked_directions
-        else:
-            self.blocked = [0] * 6
+        self.blocked = self.approach_hint_to_blocked_directions(approach_hint)
+        # if blocked_directions is not None and len(blocked_directions) == 6:
+        #     self.blocked = blocked_directions
+        # else:
+        #     self.blocked = [0] * 6
         self.finger_js = hand['finger_js']
         self.grasp_radius = grasp_radius
         self.group = group
+
+    def approach_hint_to_blocked_directions(self, approach_hint: PointStamped):
+        object_P_hint = self.transform_msg(self.world_object.root_link_name, approach_hint)
+        object_P_hint = point_to_np(object_P_hint.point)[:3]
+        geometry: BoxGeometry = self.world_object.root_link.collisions[0]
+        directions = [(np.array([1, 0, 0]), geometry.x_size, [0, 1, 1, 1, 1, 1]),
+                      (np.array([-1, 0, 0]), geometry.x_size, [1, 1, 1, 0, 1, 1]),
+                      (np.array([0, 1, 0]), geometry.y_size, [1, 0, 1, 1, 1, 1]),
+                      (np.array([0, -1, 0]), geometry.y_size, [1, 1, 1, 1, 0, 1]),
+                      (np.array([0, 0, 1]), geometry.z_size, [1, 1, 0, 1, 1, 1]),
+                      (np.array([0, 0, -1]), geometry.z_size, [1, 1, 1, 1, 1, 0])]
+        possible_axis = sorted(directions, key=lambda x: x[1])[2:]
+        return max(possible_axis, key=lambda x: np.dot(x[0], object_P_hint))[2]
 
     def get_actual_distance(self, link):
         return self.god_map.to_symbol(identifier.closest_point + ['get_external_collisions_long_key',
@@ -95,7 +117,8 @@ class GraspBoxMalte(Goal):
 
     def get_map_v_n(self, coll_link):
         return self.god_map.to_expr(identifier.closest_point + ['get_external_collisions_long_key',
-                                                                (coll_link, self.world.search_for_link_name(self.object)),
+                                                                (coll_link,
+                                                                 self.world.search_for_link_name(self.object)),
                                                                 'map_V_n'])
 
     def get_map_v_n_object(self, coll_link, obj):
@@ -104,10 +127,11 @@ class GraspBoxMalte(Goal):
                                                                 'map_V_n'])
 
     def stop_non_grasp_object(self):
+        return 0
         all_objects = self.world.group_names
         if len(all_objects) > 2:
             for name in all_objects:
-                if not name == self.group and not name == self.object:
+                if name != self.group and name != self.object:
                     sum_finger = 0
                     for finger in self.fingers:
                         tip_coll = finger['collision_links'][0]

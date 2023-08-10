@@ -62,15 +62,11 @@ def rpy_from_quaternion(qx, qy, qz, qw):
     return rpy_from_matrix(quaternion_matrix([qx, qy, qz, qw]))
 
 
-def rotation_matrix_from_rpy(roll, pitch, yaw):
+def rotation_matrix_from_rpy(roll: float, pitch: float, yaw: float) -> np.ndarray:
     """
     Conversion of roll, pitch, yaw to 4x4 rotation matrix according to:
     https://github.com/orocos/orocos_kinematics_dynamics/blob/master/orocos_kdl/src/frames.cpp#L167
-    :type roll: Union[float, Symbol]
-    :type pitch: Union[float, Symbol]
-    :type yaw: Union[float, Symbol]
     :return: 4x4 Matrix
-    :rtype: Matrix
     """
     rx = np.array([[1, 0, 0, 0],
                    [0, np.cos(roll), -np.sin(roll), 0],

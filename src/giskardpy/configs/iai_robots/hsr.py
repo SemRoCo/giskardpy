@@ -4,6 +4,7 @@ from giskardpy.configs.collision_avoidance_config import CollisionAvoidanceConfi
 from giskardpy.configs.robot_interface_config import StandAloneRobotInterfaceConfig, RobotInterfaceConfig
 from giskardpy.configs.world_config import WorldConfig
 from giskardpy.my_types import PrefixName, Derivatives
+import giskardpy.utils.math as giskard_math
 
 
 class WorldWithHSRConfig(WorldConfig):
@@ -51,6 +52,23 @@ class WorldWithHSRConfig(WorldConfig):
                                       Derivatives.jerk: 6
                                   },
                                   robot_group_name=self.robot_group_name)
+
+        # %% finger joints
+        hand_palm_link_T_hand_tool_frame = giskard_math.rotation_matrix_from_rpy(0, 0, -np.pi / 2)
+        hand_palm_link_T_hand_tool_frame[3, 2] = 0.07
+        self.add_fixed_joint('hsrb/hand_palm_link', 'hsrb/hand_tool_frame',
+                             homogenous_transform=hand_palm_link_T_hand_tool_frame)
+        self.add_empty_link('hsrb/hand_tool_frame')
+
+        hand_r_finger_tip_frame_T_finger_tool_frame = giskard_math.rotation_matrix_from_rpy(0, -np.pi / 2, 0)
+        self.add_fixed_joint('hsrb/hand_r_finger_tip_frame', 'hsrb/finger_tool_frame',
+                             homogenous_transform=hand_r_finger_tip_frame_T_finger_tool_frame)
+        self.add_empty_link('hsrb/finger_tool_frame')
+
+        hand_l_finger_tip_frame_T_thumb_tool_frame = giskard_math.rotation_matrix_from_rpy(0, -np.pi / 2, 0)
+        self.add_fixed_joint('hsrb/hand_l_finger_tip_frame', 'hsrb/thumb_tool_frame',
+                             homogenous_transform=hand_l_finger_tip_frame_T_thumb_tool_frame)
+        self.add_empty_link('hsrb/thumb_tool_frame')
 
 
 class HSRCollisionAvoidanceConfig(CollisionAvoidanceConfig):

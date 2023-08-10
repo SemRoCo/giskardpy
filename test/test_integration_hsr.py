@@ -36,12 +36,12 @@ class HSRTestWrapper(GiskardTestWrapper):
         'wrist_roll_joint': -0.4,
     }
 
-    hand = Hand(hand_tool_frame='hsrb/hand_gripper_tool_frame',
+    hand = Hand(hand_tool_frame='hsrb/hand_tool_frame',
                 palm_link='hsrb/hand_palm_link',
-                thumb=Finger(tip_tool_frame='hsrb/hand_l_finger_tip_frame',
+                thumb=Finger(tip_tool_frame='hsrb/thumb_tool_frame',
                              collision_links=['hsrb/hand_l_distal_link',
                                               'hsrb/hand_l_proximal_link']),
-                fingers=[Finger(tip_tool_frame='hsrb/hand_r_finger_tip_frame',
+                fingers=[Finger(tip_tool_frame='hsrb/finger_tool_frame',
                                 collision_links=['hsrb/hand_l_distal_link',
                                                  'hsrb/hand_l_proximal_link'])
                          ],
@@ -55,7 +55,7 @@ class HSRTestWrapper(GiskardTestWrapper):
             giskard = Giskard(world_config=WorldWithHSRConfig(),
                               collision_avoidance_config=HSRCollisionAvoidanceConfig(),
                               robot_interface_config=HSRStandaloneInterface(),
-                              behavior_tree_config=StandAloneBTConfig(),
+                              behavior_tree_config=StandAloneBTConfig(planning_sleep=0.01),
                               qp_controller_config=QPControllerConfig())
         super().__init__(giskard)
         self.gripper_group = 'gripper'
@@ -317,10 +317,17 @@ class TestConstraints:
                                                                           [0, -1, 0, 0],
                                                                           [1, 0, 0, 0],
                                                                           [0, 0, 0, 1]]))
-        box_setup.set_json_goal('GraspBox',
-                                UUID=box_name,
-                                tip_link=box_setup.tip,
-                                root_link=box_setup.default_root)
+        # box_setup.set_json_goal('GraspBox',
+        #                         UUID=box_name,
+        #                         tip_link=box_setup.tip,
+        #                         root_link=box_setup.default_root)
+        box_setup.set_json_goal('GraspBoxMalte',
+                                hand=box_setup.hand,
+                                object_name='box',
+                                root_link='map',
+                                approach_hint=approach_hint,
+                                blocked_directions=[1, 0, 0, 1, 0, 0])
+        box_setup.allow_all_collisions()
         box_setup.plan_and_execute()
         box_setup.update_parent_link_of_group(box_name, box_setup.tip)
 
@@ -393,7 +400,7 @@ class TestConstraints:
         box_pose = PoseStamped()
         box_pose.header.frame_id = 'map'
         box_pose.pose.position = Point(0.85, 0.3, .7)
-        box_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi*1.25, [0, 0, 1]))
+        box_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi * 1.25, [0, 0, 1]))
 
         box_setup.add_box(box_name, (0.07, 0.04, 0.1), box_pose)
         box_setup.open_gripper()
@@ -422,7 +429,7 @@ class TestConstraints:
         box_pose = PoseStamped()
         box_pose.header.frame_id = 'map'
         box_pose.pose.position = Point(0.8, 0.3, .7)
-        box_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi/8, [0, 1, 0]))
+        box_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 8, [0, 1, 0]))
 
         box_setup.add_box(box_name, (0.04, 0.07, 0.15), box_pose)
         box_setup.open_gripper()
@@ -452,7 +459,7 @@ class TestConstraints:
         box_pose = PoseStamped()
         box_pose.header.frame_id = 'map'
         box_pose.pose.position = Point(0.8, 0.3, .7)
-        box_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi/8, [0, 1, 0]))
+        box_pose.pose.orientation = Quaternion(*quaternion_about_axis(-np.pi / 8, [0, 1, 0]))
 
         box_setup.add_box(box_name, (0.04, 0.07, 0.15), box_pose)
         box_setup.open_gripper()
@@ -467,13 +474,18 @@ class TestConstraints:
         approach_direction = PointStamped()
         approach_direction.header.frame_id = 'base_footprint'
         approach_direction.point.x = 1
-        approach_direction.point.y = 1
-        box_setup.set_json_goal('GraspBox',
-                                UUID=box_name,
-                                tip_link=box_setup.tip,
-                                root_link=box_setup.default_root,
-                                approach_direction=approach_direction)
-        box_setup.allow_all_collisions()
+        approach_direction.point.y = -1
+        # box_setup.set_json_goal('GraspBox',
+        #                         UUID=box_name,
+        #                         tip_link=box_setup.tip,
+        #                         root_link=box_setup.default_root,
+        #                         approach_direction=approach_direction)
+        box_setup.set_json_goal('GraspBoxMalte',
+                                hand=box_setup.hand,
+                                object_name=box_name,
+                                root_link='map',
+                                approach_hint=approach_direction)
+        box_setup.allow_collision(box_setup.robot_name, box_name)
         box_setup.plan_and_execute()
         box_setup.update_parent_link_of_group(box_name, box_setup.tip)
 
@@ -629,11 +641,15 @@ class TestGrasping:
         box_pose.pose.position.y = 0
         box_pose.pose.orientation.w = 1
         better_pose.add_box('box', (0.03, 0.2, 0.3), box_pose)
-
+        approach_hint = PointStamped()
+        approach_hint.header.frame_id = 'map'
+        approach_hint.point.x = 1
+        approach_hint.point.y = 1
         better_pose.set_json_goal('GraspBoxMalte',
                                   hand=better_pose.hand,
                                   object_name='box',
                                   root_link='map',
+                                  approach_hint=approach_hint,
                                   blocked_directions=[1, 0, 0, 1, 0, 0])
 
         better_pose.allow_all_collisions()

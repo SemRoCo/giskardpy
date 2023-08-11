@@ -150,6 +150,8 @@ class JointPositionPrismatic(Goal):
         self.hard = hard
         super().__init__()
         self.joint_name = self.world.search_for_joint_name(joint_name, group_name)
+        ll, ul = self.world.get_joint_position_limits(self.joint_name)
+        self.goal = min(ul, max(ll, self.goal))
         if not self.world.is_joint_prismatic(self.joint_name):
             raise ConstraintException(f'{self.__class__.__name__} called with non prismatic joint {joint_name}')
 

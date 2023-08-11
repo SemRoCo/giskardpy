@@ -83,8 +83,10 @@ def b_profile(current_pos, current_vel, current_acc,
     shifted_vel_profile_ub, shifted_acc_profile_ub = shifted_velocity_profile(vel_profile_mpc,
                                                                               acc_profile_mpc, pos_error_ub, dt)
     one_step_change_ = jerk_limit * dt ** 2
-    one_step_change_lb = cas.limit(one_step_change_, -vel_limit, vel_limit)
-    one_step_change_ub = cas.limit(-one_step_change_, -vel_limit, vel_limit)
+    one_step_change_lb = cas.min(cas.max(0, pos_error_lb), one_step_change_)
+    one_step_change_lb = cas.limit(one_step_change_lb, -vel_limit, vel_limit)
+    one_step_change_ub = cas.max(cas.min(0, pos_error_ub), -one_step_change_)
+    one_step_change_ub = cas.limit(one_step_change_ub, -vel_limit, vel_limit)
     shifted_vel_profile_lb[0] = cas.if_greater(pos_error_lb, 0, one_step_change_lb, shifted_vel_profile_lb[0])
     shifted_vel_profile_ub[0] = cas.if_less(pos_error_ub, 0, one_step_change_ub, shifted_vel_profile_ub[0])
 

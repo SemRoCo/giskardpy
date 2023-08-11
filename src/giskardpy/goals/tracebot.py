@@ -14,6 +14,7 @@ class InsertCylinder(Goal):
     def __init__(self,
                  cylinder_name: str,
                  hole_point: PointStamped,
+                 cylinder_height: Optional[float] = None,
                  up: Vector3Stamped = None,
                  pre_grasp_height: float = 0.1,
                  tilt: float = np.pi / 10,
@@ -23,6 +24,10 @@ class InsertCylinder(Goal):
         self.get_straight_after = get_straight_after
         self.root = self.world.root_link_name
         self.tip = self.world.search_for_link_name(self.cylinder_name)
+        if cylinder_height is None:
+            self.cylinder_height = self.world.links[self.tip].collisions[0].height
+        else:
+            self.cylinder_height = cylinder_height
         self.tilt = tilt
         self.pre_grasp_height = pre_grasp_height
         self.root_P_hole = self.transform_msg(self.root, hole_point)
@@ -39,12 +44,11 @@ class InsertCylinder(Goal):
         return f'{s}/{self.root}/{self.tip}'
 
     def make_constraints(self):
-        cylinder_height = self.world.links[self.tip].collisions[0].height
         root_P_hole = cas.Point3(self.root_P_hole)
         root_V_up = cas.Vector3(self.root_V_up)
         root_T_tip = self.get_fk(self.root, self.tip)
         root_P_tip = root_T_tip.to_position()
-        tip_P_cylinder_bottom = cas.Vector3([0, 0, cylinder_height / 2])
+        tip_P_cylinder_bottom = cas.Vector3([0, 0, self.cylinder_height / 2])
         root_P_cylinder_bottom = root_T_tip.dot(tip_P_cylinder_bottom)
         root_P_tip = root_P_tip + root_P_cylinder_bottom
         root_V_cylinder_z = root_T_tip.dot(cas.Vector3([0, 0, -1]))

@@ -69,6 +69,7 @@ from giskardpy.tree.behaviors.set_cmd import SetCmd
 from giskardpy.tree.behaviors.set_error_code import SetErrorCode
 from giskardpy.tree.behaviors.set_tracking_start_time import SetTrackingStartTime
 from giskardpy.tree.behaviors.setup_base_traj_constraints import SetDriveGoals
+from giskardpy.tree.behaviors.sleep import Sleep
 from giskardpy.tree.behaviors.sync_configuration import SyncConfiguration
 from giskardpy.tree.behaviors.sync_configuration2 import SyncConfiguration2
 from giskardpy.tree.behaviors.sync_odometry import SyncOdometry, SyncOdometryNoLock
@@ -281,6 +282,10 @@ class TreeManager(ABC):
                                           add_to_planning: Optional[bool] = None,
                                           add_to_control_loop: Optional[bool] = None,
                                           use_decomposed_meshes: bool = True):
+        ...
+
+    @abc.abstractmethod
+    def add_sleeper(self, time: float):
         ...
 
     @abc.abstractmethod
@@ -739,6 +744,10 @@ class StandAlone(TreeManager):
         plan_postprocessing.add_child(running_is_success(LogTrajPlugin)('log post processing'))
         plan_postprocessing.add_child(GoalCleanUp('clean up goals'))
         return plan_postprocessing
+
+    def add_sleeper(self, time: float):
+        sleep_node = success_is_running(Sleep)('sleeper', time)
+        self.insert_node_behind_node_of_type(self.closed_loop_control_name, ControllerPlugin, sleep_node)
 
     def add_visualization_marker_behavior(self,
                                           add_to_sync: Optional[bool] = None,

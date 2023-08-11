@@ -230,6 +230,7 @@ class QPSolverQPalm(QPSolver):
         lb = self.lb_bE_lbA[:num_b]
         ub = self.ub_bE_ubA[:num_b]
         lb, ub = self.lb_ub_with_inf(lb, ub)
+        lb = -lb
         bE = self.lb_bE_lbA[num_b:num_b + num_bE]
         lbA = self.lb_bE_lbA[num_b + num_bE:]
         ubA = self.ub_bE_ubA[num_b + num_bE:]

@@ -51,6 +51,10 @@ class WorldWithHSRConfig(WorldConfig):
                                       Derivatives.jerk: 6
                                   },
                                   robot_group_name=self.robot_group_name)
+        self.set_joint_limits(limit_map={
+                                      Derivatives.jerk: 10,
+                                  },
+            joint_name='arm_lift_joint')
 
 
 class HSRCollisionAvoidanceConfig(CollisionAvoidanceConfig):

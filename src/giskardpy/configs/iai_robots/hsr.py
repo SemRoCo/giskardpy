@@ -52,6 +52,10 @@ class WorldWithHSRConfig(WorldConfig):
                                       Derivatives.jerk: 6
                                   },
                                   robot_group_name=self.robot_group_name)
+        self.set_joint_limits(limit_map={
+                                      Derivatives.jerk: 10,
+                                  },
+            joint_name='arm_lift_joint')
 
         # %% finger joints
         hand_palm_link_T_hand_tool_frame = giskard_math.rotation_matrix_from_rpy(0, 0, -np.pi / 2)

@@ -47,11 +47,22 @@ class PlotGoal(Goal):
 
 
 class GraspBoxMalte(Goal):
-    def __init__(self, hand: Hand, object_name, root_link, grasp_distance=0.02, grasp_radius=0.2,
+    def __init__(self, object_name, root_link: str = 'map', grasp_distance=0.02, grasp_radius=0.2,
                  max_linear_velocity=0.1, group='robot',
                  weight=WEIGHT_BELOW_CA, map_link='map', blocked_directions=None,
                  approach_hint: PointStamped = None, object_root=None):
         super().__init__()
+        hand = Hand(hand_tool_frame='hsrb/hand_tool_frame',
+                    palm_link='hsrb/hand_palm_link',
+                    thumb=Finger(tip_tool_frame='hsrb/thumb_tool_frame',
+                                 collision_links=['hsrb/hand_l_distal_link',
+                                                  'hsrb/hand_l_proximal_link']),
+                    fingers=[Finger(tip_tool_frame='hsrb/finger_tool_frame',
+                                    collision_links=['hsrb/hand_l_distal_link',
+                                                     'hsrb/hand_l_proximal_link'])
+                             ],
+                    finger_js={'hand_motor_joint': 0.7},
+                    opening_width=0.06)
         self.object = object_name
         self.world_object = self.world.groups[object_name]
         self.object_root = object_root
@@ -69,6 +80,7 @@ class GraspBoxMalte(Goal):
         all_finger.append(self.thumb)
         self.all_finger = all_finger
         self.blocked = self.approach_hint_to_blocked_directions(approach_hint)
+        print(self.blocked)
         # if blocked_directions is not None and len(blocked_directions) == 6:
         #     self.blocked = blocked_directions
         # else:
@@ -201,17 +213,22 @@ class GraspBoxMalte(Goal):
         root_T_object = self.get_fk_evaluated(self.root_link, self.world.search_for_link_name(self.object))
         root_P_object = root_T_object.to_position()
         root_V_goal = w.dot(root_T_object, w.Vector3(directions[0]))
-        root_P_goal = root_P_object + w.dot(root_T_object,
-                                            (self.grasp_radius + w.abs(
-                                                w.Vector3(directions[0]).dot(w.Vector3(object_dims))) / 2)
-                                            * root_V_goal)
+        root_V_goal.vis_frame = self.world_object.root_link_name
+        self.add_debug_expr('root_V_goal', root_V_goal)
+        root_P_goal = root_P_object + (self.grasp_radius + w.abs(w.Vector3(directions[0]).dot(w.Vector3(object_dims)))
+                                       / 2) * root_V_goal
+        self.add_debug_expr('v_goal0', root_P_goal)
+        self.add_debug_expr('object', root_P_object)
         root_V_orientation = w.dot(root_T_object, grasp_orientations[0])
         object_finger_plane = finger_planes[0]
         distance_old = (root_P_goal - root_P_hand).norm() + penalty[0] + self.blocked[0] * 100
         for i, direction in enumerate(directions):
+            # self.add_debug_expr('v_goal' + str(i), V_goal)
             if i == 0:
                 continue
+
             V_goal = w.dot(root_T_object, w.Vector3(direction))
+            V_goal.vis_frame = self.world_object.root_link_name
             goal = root_P_object + (
                     (self.grasp_radius + w.abs(w.Vector3(direction).dot(w.Vector3(object_dims))) / 2) * V_goal)
             distance_new = (goal - root_P_hand).norm() + penalty[i] + self.blocked[i] * 100
@@ -256,7 +273,7 @@ class GraspBoxMalte(Goal):
         # radius=max(object_dims-object_finger_plane)/2.
         # calculate distance of root_P_hand to the axis of the cylinder.
         # if distance < radius, then stop the prepositioning and start the contact
-        radius = 0.1  # 0.02
+        radius = 0.08  # 0.02
         dist, nearest = w.distance_point_to_line_segment(root_P_hand, root_P_object, root_P_goal + root_V_goal * 0.5)
 
         weight_outside_expr1 = w.if_greater_eq(dist, radius, self.weight, 0)
@@ -264,14 +281,14 @@ class GraspBoxMalte(Goal):
         weight_outside_cylinder = w.if_eq(weight_outside_expr1, weight_outside_expr2, weight_outside_expr1, self.weight)
         weight_inside_cylinder = w.if_eq(weight_outside_cylinder, 0, self.weight, 0)
         # self.add_debug_expr('weight_outside', weight_outside_cylinder/weight*1000)
-        # self.add_debug_expr('angle', angle*10000)
-        # self.add_debug_expr('dist', w.min(dist, 0.05)*10000)
+        self.add_debug_expr('angle', angle)
+        self.add_debug_expr('dist', dist)
         # self.add_debug_vector('root_V_orientation', root_V_orientation[:3])
 
         root_T_hand = self.get_fk(self.root_link, self.hand_frame)
         root_V_current = w.dot(root_T_hand, w.Vector3([0, 0, 1]))
         error_direction = -root_V_goal[:3] - root_V_current[:3]
-        error = root_P_goal[:3] - root_T_hand.to_position()[:3]
+        error = root_P_goal - root_T_hand.to_position()
 
         self.add_equality_constraint_vector(reference_velocities=[self.max_velocity * 1] * 3,
                                             equality_bounds=error_direction,
@@ -279,22 +296,23 @@ class GraspBoxMalte(Goal):
                                             weights=[weight_outside_cylinder] * 3,
                                             names=['orthoAxisx1', 'orthoAxisy1', 'orthoAxisz1'])
 
-        self.add_debug_expr('handGoal', root_P_goal[:3])
-        # self.add_equality_constraint_vector(reference_velocities=[self.max_velocity / 1] * 3,
-        #                                     equality_bounds=error,
-        #                                     task_expression=root_T_hand.to_position()[:3],
-        #                                     weights=[weight_outside_cylinder, weight_outside_cylinder,
-        #                                              weight_outside_cylinder],
-        #                                     names=['orthoPointx', 'orthoPointy', 'orthoPointz'])
-        self.add_inequality_constraint_vector(reference_velocities=[self.max_velocity / 1] * 3,
-                                              lower_errors=error - 0.05,
-                                              upper_errors=error + 0.05,
-                                              task_expression=root_T_hand.to_position()[:3],
-                                              weights=[weight_outside_cylinder,
-                                                       weight_outside_cylinder,
-                                                       weight_outside_cylinder],
-                                              names=['orthoPointx', 'orthoPointy',
-                                                     'orthoPointz'])
+        self.add_debug_expr('handGoal', root_P_goal)
+        # self.add_debug_expr('V_goal', root_V_goal)
+        self.add_equality_constraint_vector(reference_velocities=[self.max_velocity / 1] * 3,
+                                            equality_bounds=error[:3],
+                                            task_expression=root_T_hand.to_position()[:3],
+                                            weights=[weight_outside_cylinder, weight_outside_cylinder,
+                                                     weight_outside_cylinder],
+                                            names=['orthoPointx', 'orthoPointy', 'orthoPointz'])
+        # self.add_inequality_constraint_vector(reference_velocities=[self.max_velocity / 1] * 3,
+        #                                       lower_errors=error[:3] - 0.05,
+        #                                       upper_errors=error[:3] + 0.05,
+        #                                       task_expression=root_T_hand.to_position()[:3],
+        #                                       weights=[weight_outside_cylinder,
+        #                                                weight_outside_cylinder,
+        #                                                weight_outside_cylinder],
+        #                                       names=['orthoPointx', 'orthoPointy',
+        #                                              'orthoPointz'])
 
         # orient the line between the fingers parallel to the line of the smallest width
         self.add_equality_constraint_vector(reference_velocities=[self.max_velocity * 3] * 3,

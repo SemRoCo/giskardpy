@@ -170,7 +170,7 @@ class CarryMyBullshit(Goal):
     def __init__(self,
                  patrick_topic_name: str = '/robokudovanessa/human_position',
                  laser_topic_name: str = '/hsrb/base_scan',
-                 point_cloud_laser_topic_name: str = '/scan',
+                 point_cloud_laser_topic_name: str = '',
                  odom_joint_name: str = 'brumbrum',
                  root_link: Optional[str] = None,
                  camera_link: str = 'head_rgbd_sensor_link',

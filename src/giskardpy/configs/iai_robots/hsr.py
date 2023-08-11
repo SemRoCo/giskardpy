@@ -42,7 +42,7 @@ class WorldWithHSRConfig(WorldConfig):
                                   y_name=PrefixName('odom_y', self.robot_group_name),
                                   yaw_vel_name=PrefixName('odom_t', self.robot_group_name),
                                   translation_limits={
-                                      Derivatives.velocity: 0.2,
+                                      Derivatives.velocity: 0.1,
                                       Derivatives.acceleration: 1,
                                       Derivatives.jerk: 6,
                                   },
@@ -59,7 +59,7 @@ class WorldWithHSRConfig(WorldConfig):
 
         # %% finger joints
         hand_palm_link_T_hand_tool_frame = giskard_math.rotation_matrix_from_rpy(0, 0, -np.pi / 2)
-        hand_palm_link_T_hand_tool_frame[3, 2] = 0.07
+        hand_palm_link_T_hand_tool_frame[2, 3] = 0.07
         self.add_fixed_joint('hsrb/hand_palm_link', 'hsrb/hand_tool_frame',
                              homogenous_transform=hand_palm_link_T_hand_tool_frame)
         self.add_empty_link('hsrb/hand_tool_frame')

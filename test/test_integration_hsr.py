@@ -474,8 +474,8 @@ class TestConstraints:
         approach_direction = PointStamped()
         approach_direction.header.frame_id = 'base_footprint'
         approach_direction.point.x = 1
-        approach_direction.point.y = 0
-        approach_direction.point.z = 5
+        approach_direction.point.y = 1
+        approach_direction.point.z = 0
         # box_setup.set_json_goal('GraspBox',
         #                         UUID=box_name,
         #                         tip_link=box_setup.tip,

@@ -14,6 +14,7 @@ from visualization_msgs.msg import MarkerArray, Marker
 from giskardpy import casadi_wrapper as w, identifier
 from giskardpy.exceptions import GiskardException, ConstraintInitalizationException
 from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE
+from giskardpy.goals.set_prediction_horizon import EndlessMode
 from giskardpy.model.joints import OmniDrive, OmniDrivePR22
 from giskardpy.my_types import my_string, Derivatives, PrefixName
 from giskardpy.utils import logging
@@ -153,6 +154,51 @@ class BaseTrajFollower(Goal):
         return f'{super().__str__()}/{self.joint_name}'
 
 
+def transform_points(points: np.ndarray, T: np.ndarray) -> np.ndarray:
+    """
+    Transform a set of points using a transformation matrix.
+    """
+    homogeneous_points = np.hstack([points, np.ones((points.shape[0], 1))])
+    return (T @ homogeneous_points.T).T[:, :3]
+
+
+def laser_points_in_rectangle(laser_scan: LaserScan,
+                              base_footprint_T_laser: np.ndarray,
+                              base_footprint_P_destination: Tuple[float, float, float],
+                              width: float) -> np.ndarray:
+    # Convert laser_scan to numpy array using the attributes of the LaserScan message
+    angles = np.linspace(laser_scan.angle_min, laser_scan.angle_max, len(laser_scan.ranges))
+    x = np.cos(angles) * np.array(laser_scan.ranges)
+    y = np.sin(angles) * np.array(laser_scan.ranges)
+    laser_points = np.stack([x, y, np.zeros_like(x)], axis=1)
+
+    # Transform laser points to base_footprint frame
+    transformed_points = transform_points(laser_points, base_footprint_T_laser)
+
+    # Construct rectangle
+    dest_x, dest_y, _ = base_footprint_P_destination
+    half_width = width / 2
+    goal_v = np.array([dest_x, dest_y, 0])
+    goal_v_norm = goal_v / np.linalg.norm(goal_v)
+    goal_perpendicular = np.cross(np.array([0, 0, 1]), goal_v_norm)
+
+    A = (goal_perpendicular * -half_width)[:2]
+    B = (goal_perpendicular * half_width)[:2]
+    C = A + goal_v[:2]
+    D = B + goal_v[:2]
+
+    # Using numpy magic to determine if points are inside the rectangle
+    AB = B - A
+    AD = D - A
+    AP = transformed_points[:, :2] - A
+
+    inside_AB = (0 <= np.dot(AP, AB)) & (np.dot(AP, AB) <= np.dot(AB, AB))
+    inside_AD = (0 <= np.dot(AP, AD)) & (np.dot(AP, AD) <= np.dot(AD, AD))
+    inside = inside_AB & inside_AD
+
+    return inside
+
+
 class CarryMyBullshit(Goal):
     trajectory: np.ndarray = np.array([])
     traj_data: List[np.ndarray] = None
@@ -160,12 +206,14 @@ class CarryMyBullshit(Goal):
     thresholds_pc: np.ndarray = None
     human_point: PointStamped = None
     pub: rospy.Publisher = None
+    laser_debug_pub: rospy.Publisher = None
     laser_sub: rospy.Subscriber = None
     point_cloud_laser_sub: rospy.Subscriber = None
     target_sub: rospy.Subscriber = None
     traj_flipped: bool = False
     last_scan: LaserScan = None
     last_scan_pc: LaserScan = None
+    ignore_obstructions = False
 
     def __init__(self,
                  patrick_topic_name: str = '/robokudovanessa/human_position',
@@ -178,10 +226,10 @@ class CarryMyBullshit(Goal):
                  laser_scan_age_threshold: float = 2,
                  laser_distance_threshold: float = 0.5,
                  laser_distance_threshold_width: float = 0.8,
-                 laser_avoidance_angle_cutout: float = np.pi/4,
+                 laser_avoidance_angle_cutout: float = np.pi / 4,
                  laser_avoidance_sideways_buffer: float = 0.04,
                  base_orientation_threshold: float = np.pi / 16,
-                 wait_for_patrick_timeout: int = 30,
+                 wait_for_patrick_timeout: int = 10000,
                  max_rotation_velocity: float = 0.5,
                  max_rotation_velocity_head: float = 1,
                  max_translation_velocity: float = 0.38,
@@ -215,8 +263,8 @@ class CarryMyBullshit(Goal):
         self.closest_laser_right_pc = -self.laser_distance_threshold_width
         self.closest_laser_reading_pc = 0
         self.laser_frame = laser_frame_id
-        self.last_scan = LaserScan()
-        self.last_scan.header.stamp = rospy.get_rostime()
+        self.laser_link_name = self.world.search_for_link_name(self.laser_frame)
+        self.last_scan = rospy.wait_for_message(self.laser_topic_name, LaserScan)
         self.last_scan_pc = LaserScan()
         self.last_scan_pc.header.stamp = rospy.get_rostime()
         self.laser_scan_age_threshold = laser_scan_age_threshold
@@ -234,7 +282,8 @@ class CarryMyBullshit(Goal):
         self.camera_link = self.world.search_for_link_name(camera_link)
         self.tip_V_camera_axis = Vector3()
         self.tip_V_camera_axis.z = 1
-        self.tip = self.odom_joint.child_link_name
+        self.base_footprint = self.odom_joint.child_link_name
+        self.base_footprint_T_laser_scanner = self.world.compute_fk_np(self.base_footprint, self.laser_link_name)
         self.odom = self.odom_joint.parent_link_name
         self.tip_V_pointing_axis = Vector3()
         self.tip_V_pointing_axis.x = 1
@@ -263,6 +312,8 @@ class CarryMyBullshit(Goal):
             CarryMyBullshit.point_cloud_laser_sub = rospy.Subscriber(self.point_cloud_laser_topic_name,
                                                                      LaserScan, self.point_cloud_laser_cb,
                                                                      queue_size=10)
+        if CarryMyBullshit.laser_debug_pub is None:
+            CarryMyBullshit.laser_debug_pub = rospy.Publisher('debug_laser', LaserScan, queue_size=10)
         self.publish_tracking_radius()
         self.publish_distance_to_target()
         if not self.drive_back:
@@ -287,6 +338,7 @@ class CarryMyBullshit(Goal):
                 CarryMyBullshit.trajectory = np.flip(CarryMyBullshit.trajectory, axis=0)
                 CarryMyBullshit.traj_flipped = True
             self.publish_trajectory()
+        self.add_constraints_of_goal(EndlessMode())
 
     def clean_up(self):
         if CarryMyBullshit.target_sub is not None:
@@ -298,6 +350,14 @@ class CarryMyBullshit(Goal):
         if CarryMyBullshit.point_cloud_laser_sub is not None:
             CarryMyBullshit.point_cloud_laser_sub.unregister()
             CarryMyBullshit.point_cloud_laser_sub = None
+
+    def point_obstructed(self, sample: PointStamped) -> bool:
+        violations = laser_points_in_rectangle(self.last_scan,
+                                               self.base_footprint_T_laser_scanner,
+                                               (sample.point.x, sample.point.y, sample.point.z),
+                                               width=self.traj_tracking_radius * 2)
+        self.publish_laser_points(self.last_scan, violations)
+        return np.any(violations)
 
     def init_laser_stuff(self, laser_scan: LaserScan):
         thresholds = []
@@ -349,7 +409,6 @@ class CarryMyBullshit(Goal):
         x_start = x_positive[0]
         x_end = x_positive[-1]
 
-
         front_violation = xs_error[x_start:x_end][violations[x_start:x_end]]
         if len(closest_laser_left) > 0:
             closest_laser_left = min(closest_laser_left)
@@ -381,7 +440,7 @@ class CarryMyBullshit(Goal):
             scan, self.thresholds_pc)
 
     def get_current_point(self) -> np.ndarray:
-        root_T_tip = self.world.compute_fk_np(self.root, self.tip)
+        root_T_tip = self.world.compute_fk_np(self.root, self.base_footprint)
         x = root_T_tip[0, 3]
         y = root_T_tip[1, 3]
         return np.array([x, y])
@@ -458,6 +517,14 @@ class CarryMyBullshit(Goal):
             logging.logwarn('failed to create traj marker')
         self.pub.publish(ms)
 
+    def publish_laser_points(self, laser_scan: LaserScan, ids: np.ndarray):
+        debug_laser_scan = deepcopy(laser_scan)
+        ranges = np.array(laser_scan.ranges)
+        ranges[np.invert(ids)] = 100
+        debug_laser_scan.ranges = ranges.tolist()
+
+        self.laser_debug_pub.publish(debug_laser_scan)
+
     def publish_laser_thresholds(self):
         ms = MarkerArray()
         m_line = Marker()
@@ -488,9 +555,9 @@ class CarryMyBullshit(Goal):
         # p.y = self.thresholds[0, 1]
         # square.points.append(p)
         p = Point()
-        idx = np.where(self.thresholds[:,-1] < -self.laser_avoidance_angle_cutout)[0][-1]
-        p.x = self.thresholds[idx,0]
-        p.y = self.thresholds[idx,1]
+        idx = np.where(self.thresholds[:, -1] < -self.laser_avoidance_angle_cutout)[0][-1]
+        p.x = self.thresholds[idx, 0]
+        p.y = self.thresholds[idx, 1]
         square.points.append(p)
         p = Point()
         square.points.append(p)
@@ -518,7 +585,7 @@ class CarryMyBullshit(Goal):
         m_line.ns = 'traj_tracking_radius'
         m_line.id = 1332
         m_line.type = m_line.CYLINDER
-        m_line.header.frame_id = str(self.tip.short_name)
+        m_line.header.frame_id = str(self.base_footprint.short_name)
         m_line.scale.x = self.traj_tracking_radius * 2
         m_line.scale.y = self.traj_tracking_radius * 2
         m_line.scale.z = 0.05
@@ -536,7 +603,7 @@ class CarryMyBullshit(Goal):
         m_line.ns = 'distance_to_target_stop_threshold'
         m_line.id = 1332
         m_line.type = m_line.CYLINDER
-        m_line.header.frame_id = str(self.tip.short_name)
+        m_line.header.frame_id = str(self.base_footprint.short_name)
         m_line.scale.x = self.distance_to_target * 2
         m_line.scale.y = self.distance_to_target * 2
         m_line.scale.z = 0.01
@@ -548,6 +615,9 @@ class CarryMyBullshit(Goal):
         self.pub.publish(ms)
 
     def target_cb(self, point: PointStamped):
+        if not self.ignore_obstructions and self.point_obstructed(point):
+            return
+        self.ignore_obstructions = True
         try:
             current_point = np.array([point.point.x, point.point.y])
             last_point = CarryMyBullshit.traj_data[-1]
@@ -571,7 +641,7 @@ class CarryMyBullshit(Goal):
         self.publish_trajectory()
 
     def make_constraints(self):
-        root_T_bf = self.get_fk(self.root, self.tip)
+        root_T_bf = self.get_fk(self.root, self.base_footprint)
         root_T_odom = self.get_fk(self.root, self.odom)
         root_T_camera = self.get_fk(self.root, self.camera_link)
         root_P_tip = root_T_bf.to_position()
@@ -626,8 +696,8 @@ class CarryMyBullshit(Goal):
         distance_to_human = w.norm(root_V_goal_axis)
         root_V_goal_axis.scale(1)
         root_V_pointing_axis = root_T_bf.dot(tip_V_pointing_axis)
-        root_V_pointing_axis.vis_frame = self.tip
-        root_V_goal_axis.vis_frame = self.tip
+        root_V_pointing_axis.vis_frame = self.base_footprint
+        root_V_goal_axis.vis_frame = self.base_footprint
         map_goal_angle = w.angle_between_vector(w.Vector3([1, 0, 0]), root_V_goal_axis)
         map_goal_angle = w.if_greater(root_V_goal_axis.y, 0, map_goal_angle, -map_goal_angle)
         # self.add_debug_expr('goal_point', root_P_goal_point)

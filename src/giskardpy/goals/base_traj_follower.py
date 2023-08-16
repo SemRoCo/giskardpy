@@ -1,5 +1,6 @@
 from __future__ import division
 
+import giskardpy.utils.tfwrapper as tf
 from copy import deepcopy
 from typing import Optional, List, Tuple
 
@@ -19,6 +20,7 @@ from giskardpy.model.joints import OmniDrive, OmniDrivePR22
 from giskardpy.my_types import my_string, Derivatives, PrefixName
 from giskardpy.utils import logging
 from giskardpy.utils.decorators import memoize_with_counter, clear_memo
+from giskardpy.utils.math import inverse_frame
 from giskardpy.utils.tfwrapper import point_to_np
 from giskardpy.utils.utils import raise_to_blackboard
 
@@ -162,43 +164,6 @@ def transform_points(points: np.ndarray, T: np.ndarray) -> np.ndarray:
     return (T @ homogeneous_points.T).T[:, :3]
 
 
-def laser_points_in_rectangle(laser_scan: LaserScan,
-                              base_footprint_T_laser: np.ndarray,
-                              base_footprint_P_destination: Tuple[float, float, float],
-                              width: float) -> np.ndarray:
-    # Convert laser_scan to numpy array using the attributes of the LaserScan message
-    angles = np.linspace(laser_scan.angle_min, laser_scan.angle_max, len(laser_scan.ranges))
-    x = np.cos(angles) * np.array(laser_scan.ranges)
-    y = np.sin(angles) * np.array(laser_scan.ranges)
-    laser_points = np.stack([x, y, np.zeros_like(x)], axis=1)
-
-    # Transform laser points to base_footprint frame
-    transformed_points = transform_points(laser_points, base_footprint_T_laser)
-
-    # Construct rectangle
-    dest_x, dest_y, _ = base_footprint_P_destination
-    half_width = width / 2
-    goal_v = np.array([dest_x, dest_y, 0])
-    goal_v_norm = goal_v / np.linalg.norm(goal_v)
-    goal_perpendicular = np.cross(np.array([0, 0, 1]), goal_v_norm)
-
-    A = (goal_perpendicular * -half_width)[:2]
-    B = (goal_perpendicular * half_width)[:2]
-    C = A + goal_v[:2]
-    D = B + goal_v[:2]
-
-    # Using numpy magic to determine if points are inside the rectangle
-    AB = B - A
-    AD = D - A
-    AP = transformed_points[:, :2] - A
-
-    inside_AB = (0 <= np.dot(AP, AB)) & (np.dot(AP, AB) <= np.dot(AB, AB))
-    inside_AD = (0 <= np.dot(AP, AD)) & (np.dot(AP, AD) <= np.dot(AD, AD))
-    inside = inside_AB & inside_AD
-
-    return inside
-
-
 class CarryMyBullshit(Goal):
     trajectory: np.ndarray = None
     traj_data: List[np.ndarray] = None
@@ -340,6 +305,99 @@ class CarryMyBullshit(Goal):
             self.publish_trajectory()
         self.add_constraints_of_goal(EndlessMode())
 
+    def laser_points_in_rectangle(self,
+                                  laser_scan: LaserScan,
+                                  base_footprint_T_laser: np.ndarray,
+                                  base_footprint_P_destination: Tuple[float, float, float],
+                                  width: float,
+                                  offset: float = 0.3) -> np.ndarray:
+        # Convert laser_scan to numpy array using the attributes of the LaserScan message
+        angles = np.linspace(laser_scan.angle_min, laser_scan.angle_max, len(laser_scan.ranges))
+        x = np.cos(angles) * np.array(laser_scan.ranges)
+        y = np.sin(angles) * np.array(laser_scan.ranges)
+        laser_points = np.stack([x, y, np.zeros_like(x)], axis=1)
+
+        # Transform laser points to base_footprint frame
+        transformed_points = transform_points(laser_points, base_footprint_T_laser)
+        transformed_points = np.vstack([transformed_points.T, np.ones(transformed_points.shape[0])]).T
+
+        # Construct rectangle
+        dest_x, dest_y, _ = base_footprint_P_destination
+        half_width = width / 2
+        goal_v = np.array([dest_x, dest_y, 0])
+        goal_v_length = np.linalg.norm(goal_v)
+        goal_v_normed = goal_v / goal_v_length
+        goal_v_length_capped = max(0, goal_v_length - offset)
+        goal_v_capped = goal_v_normed * goal_v_length_capped
+        goal_perpendicular = np.cross(np.array([0, 0, 1]), goal_v_normed)
+
+        bf_T_new = np.vstack([np.vstack([goal_v_normed,
+                                         goal_perpendicular,
+                                         [0, 0, 1],
+                                         np.zeros(3)]).T, [0, 0, 0, 1]])
+        new_T_bf = inverse_frame(bf_T_new)
+        bf_transformed_points = np.dot(new_T_bf, transformed_points.T).T
+
+        A = (goal_perpendicular * -half_width)[:2]
+        B = (goal_perpendicular * half_width)[:2]
+        C = A + goal_v_capped[:2]
+        D = B + goal_v_capped[:2]
+        self.publish_rectangle([A, C, D, B])
+
+        # Using numpy magic to determine if points are inside the rectangle
+        A = np.array((0, -half_width))
+        B = np.array((goal_v_length_capped, -half_width))
+        C = np.array((goal_v_length_capped, half_width))
+        D = np.array((0, half_width))
+
+        return self.is_inside_rectangle(bf_transformed_points[:, :2], A, B, C, D)
+
+    def is_inside_rectangle(self, points, A, B, C, D):
+        # Convert points to numpy array
+        points = np.array(points).reshape(-1, 2)
+
+        # Compute vectors for rectangle sides
+        AB = B - A
+        BC = C - B
+        CD = D - C
+        DA = A - D
+
+        # Compute vectors from A to the points
+        AP = points - A
+        BP = points - B
+        CP = points - C
+        DP = points - D
+
+        # Compute 2D cross products (determinants)
+        cross_AB = AB[0] * AP[:, 1] - AB[1] * AP[:, 0]
+        cross_BC = BC[0] * BP[:, 1] - BC[1] * BP[:, 0]
+        cross_CD = CD[0] * CP[:, 1] - CD[1] * CP[:, 0]
+        cross_DA = DA[0] * DP[:, 1] - DA[1] * DP[:, 0]
+
+        # Modify condition to include points on the edge
+        return (cross_AB >= 0) & (cross_BC >= 0) & (cross_CD >= 0) & (cross_DA >= 0)
+
+
+    def publish_rectangle(self, points):
+        ms = MarkerArray()
+        m_line = Marker()
+        m_line.action = m_line.ADD
+        m_line.ns = 'laser_thresholds'
+        m_line.id = 1333
+        m_line.type = m_line.LINE_STRIP
+        m_line.header.frame_id = self.base_footprint.short_name
+        m_line.scale.x = 0.05
+        m_line.color.a = 1
+        m_line.color.r = 1
+        m_line.frame_locked = True
+        for point in points:
+            p = Point()
+            p.x = point[0]
+            p.y = point[1]
+            m_line.points.append(p)
+        ms.markers.append(m_line)
+        self.pub.publish(ms)
+
     def clean_up(self):
         if CarryMyBullshit.target_sub is not None:
             CarryMyBullshit.target_sub.unregister()
@@ -352,10 +410,11 @@ class CarryMyBullshit(Goal):
             CarryMyBullshit.point_cloud_laser_sub = None
 
     def point_obstructed(self, sample: PointStamped) -> bool:
-        violations = laser_points_in_rectangle(self.last_scan,
-                                               self.base_footprint_T_laser_scanner,
-                                               (sample.point.x, sample.point.y, sample.point.z),
-                                               width=self.traj_tracking_radius * 2)
+        sample = tf.transform_point(self.base_footprint.short_name, sample)
+        violations = self.laser_points_in_rectangle(self.last_scan,
+                                                    self.base_footprint_T_laser_scanner,
+                                                    (sample.point.x, sample.point.y, sample.point.z),
+                                                    width=self.traj_tracking_radius * 2)
         self.publish_laser_points(self.last_scan, violations)
         return np.any(violations)
 

@@ -1,7 +1,9 @@
+import sys
 from enum import Enum
 from typing import Dict
 
 from tf.transformations import quaternion_from_matrix
+from tf2_py import LookupException, ConnectivityException, ExtrapolationException
 from tmc_control_msgs.msg import GripperApplyEffortAction, GripperApplyEffortGoal
 
 from fancylog import Logger
@@ -211,7 +213,6 @@ class CRAM:
                              pose=table_pose,
                              parent_link=self.map)
         self.giskard.set_joint_goal(default_pose)
-        self.giskard.plan_and_execute()
         base_pose = PoseStamped()
         base_pose.header.frame_id = self.map
         base_pose.pose.position = Point(12.008, 1.939, 0.000)
@@ -333,6 +334,7 @@ class CRAM:
                                        tip_link=head,
                                        root_link=self.map,
                                        pointing_axis=pointing_axis)
+        self.giskard.set_joint_goal({'arm_lift_joint': 0.5})
         self.giskard.plan_and_execute()
 
     def carry_my_bs(self):
@@ -340,7 +342,7 @@ class CRAM:
                                    patrick_topic_name='robokudo/human_position')
         self.giskard.allow_all_collisions()
         self.giskard.set_json_goal('EndlessMode')
-        self.giskard.plan_and_execute()
+        self.giskard.plan_and_execute(wait=False)
 
     def place_carried_object(self, goal_point: PointStamped):
         map_T_place_pose = PoseStamped()
@@ -391,11 +393,60 @@ class CRAM:
         return self.region_points[
             self.rm.position_with_most_trues_final(self.rm.region_free)]
 
+    def goto_perceive_shelf_pose(self):
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = self.map
+        base_goal.pose.position = Point(7.918, 1.531, 0.000)
+        base_goal.pose.orientation = Quaternion(0.000, 0.000, -0.720, 0.694)
+        self.giskard.set_cart_goal(goal_pose=base_goal, tip_link=self.tip_link, root_link=self.map)
+        self.giskard.set_joint_goal({
+            'head_pan_joint': 0,
+            'head_tilt_joint': 0,
+        })
+        self.giskard.plan_and_execute()
+
+    def stop_carry_my_bs(self):
+        self.giskard.cancel_all_goals()
+        self.rk_client.abort_goal()
+
+    def wait_for_position_reached(self):
+        # Parameters
+        frame_p = "base_footprint"
+        frame_x = "map"
+        goal_position = [8.8, 1.505, 0.000]  # Example goal position
+        threshold = 0.5  # Example threshold
+
+        # tf_listener = tf.TransformListener()
+
+        rate = rospy.Rate(10)  # 10 Hz
+        while not rospy.is_shutdown():
+            try:
+                # Look up the translation between frame P and frame X
+                x_P_p = tf.lookup_pose(frame_x, frame_p)
+                trans = [x_P_p.pose.position.x, x_P_p.pose.position.y, x_P_p.pose.position.z]
+
+                # Calculate the Euclidean distance to the goal position
+                distance = np.linalg.norm(np.array(trans) - np.array(goal_position))
+                rospy.loginfo(f"Distance to goal: {distance}")
+
+                # Check if the distance is below the threshold
+                if distance < threshold:
+                    rospy.loginfo("Reached the goal!")
+                    return True
+
+            except (LookupException, ConnectivityException, ExtrapolationException):
+                continue
+
+            rate.sleep()
+
+        return False
+
 
 rospy.init_node('cram')
 tf.init(10)
 
 cram = CRAM()
+
 cram.reset()
 cram.fancylogger.log_event("crampylog.csv", "experiment", "START")
 cram.detect_objects_on_table()
@@ -412,14 +463,12 @@ hsr_say(cram.talker_pub, "I'll now follow you")
 cram.fancylogger.log_event("crampylog.csv", "human_tracking", "START")
 cram.trigger_human_tracking()
 cram.carry_my_bs()
-
-# TODO How do we know that we can abort giskard?
-#      1) Use tf abort code from below
-#      2) Use CMBS+Pointing tree
+cram.wait_for_position_reached()
+cram.stop_carry_my_bs()
 
 cram.fancylogger.log_event("crampylog.csv", "human_tracking", "END")
 
-# TODO Drive in front of shelf
+cram.goto_perceive_shelf_pose()
 
 hsr_say(cram.talker_pub, "Let me take a look for some space, to put this.")
 cram.check_shelf_regions()

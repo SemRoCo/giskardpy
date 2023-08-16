@@ -11,4 +11,12 @@
         </rosparam>
     </node>
 
+  <node pkg="giskardpy" type="joystick_e_stop.py" name="giskard_e_stop" output="screen">
+    <remap from="joy" to="hsrb/joy"/>
+    <rosparam param="button_ids">
+        [0, 1, 2, 3, 4, 5, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+    </rosparam>
+  </node>
+
+
 </launch>

@@ -14,27 +14,30 @@ class RegionManager:
         self.region_free = [None, None, None, None]
 
         # in map coordinates
-        self.region_points = [geometry_msgs.msg.Point(), geometry_msgs.msg.Point(),
-                              geometry_msgs.msg.Point(), geometry_msgs.msg.Point(), ]
+        self.region_points = [geometry_msgs.msg.PointStamped(), geometry_msgs.msg.PointStamped(),
+                              geometry_msgs.msg.PointStamped(), geometry_msgs.msg.PointStamped()]
 
         region_std_place_y = 0.2
         region_std_place_z = 0.79
 
-        self.region_points[0].x = 8.15
-        self.region_points[0].y = region_std_place_y
-        self.region_points[0].z = region_std_place_z
+        self.region_points[0].point.x = 8.15
+        self.region_points[0].point.y = region_std_place_y
+        self.region_points[0].point.z = region_std_place_z
 
-        self.region_points[1].x = 7.97
-        self.region_points[1].y = region_std_place_y
-        self.region_points[1].z = region_std_place_z
+        self.region_points[1].point.x = 7.97
+        self.region_points[1].point.y = region_std_place_y
+        self.region_points[1].point.z = region_std_place_z
 
-        self.region_points[2].x = 7.79
-        self.region_points[2].y = region_std_place_y
-        self.region_points[2].z = region_std_place_z
+        self.region_points[2].point.x = 7.79
+        self.region_points[2].point.y = region_std_place_y
+        self.region_points[2].point.z = region_std_place_z
 
-        self.region_points[3].x = 7.61
-        self.region_points[3].y = region_std_place_y
-        self.region_points[3].z = region_std_place_z
+        self.region_points[3].point.x = 7.61
+        self.region_points[3].point.y = region_std_place_y
+        self.region_points[3].point.z = region_std_place_z
+
+        for p in self.region_points:
+            p.header.frame_id = 'map'
 
         # Region vis marker
         self.marker_pub = rospy.Publisher('region_placing_visualization_marker', Marker, queue_size=10)
@@ -50,7 +53,7 @@ class RegionManager:
         marker.action = Marker.ADD
 
         # Define points
-        marker.points.append(self.region_points[region_idx])
+        marker.points.append(self.region_points[region_idx].point)
 
         # Set the scale of the marker
         marker.scale.x = 0.1  # Point width

@@ -198,7 +198,7 @@ class CarryMyBullshit(Goal):
                  max_rotation_velocity: float = 0.5,
                  max_rotation_velocity_head: float = 1,
                  max_translation_velocity: float = 0.38,
-                 traj_tracking_radius: float = 0.4,
+                 traj_tracking_radius: float = 0.6,
                  height_for_camera_target: float = 1,
                  laser_frame_id: str = 'base_range_sensor_link',
                  target_age_threshold: float = 2,
@@ -310,7 +310,7 @@ class CarryMyBullshit(Goal):
                                   base_footprint_T_laser: np.ndarray,
                                   base_footprint_P_destination: Tuple[float, float, float],
                                   width: float,
-                                  offset: float = 0.3) -> np.ndarray:
+                                  offset: float = 0.2) -> np.ndarray:
         # Convert laser_scan to numpy array using the attributes of the LaserScan message
         angles = np.linspace(laser_scan.angle_min, laser_scan.angle_max, len(laser_scan.ranges))
         x = np.cos(angles) * np.array(laser_scan.ranges)
@@ -327,7 +327,7 @@ class CarryMyBullshit(Goal):
         goal_v = np.array([dest_x, dest_y, 0])
         goal_v_length = np.linalg.norm(goal_v)
         goal_v_normed = goal_v / goal_v_length
-        goal_v_length_capped = max(0, goal_v_length - offset)
+        goal_v_length_capped = self.distance_to_target
         goal_v_capped = goal_v_normed * goal_v_length_capped
         goal_perpendicular = np.cross(np.array([0, 0, 1]), goal_v_normed)
 
@@ -414,7 +414,7 @@ class CarryMyBullshit(Goal):
         violations = self.laser_points_in_rectangle(self.last_scan,
                                                     self.base_footprint_T_laser_scanner,
                                                     (sample.point.x, sample.point.y, sample.point.z),
-                                                    width=self.traj_tracking_radius * 2)
+                                                    width=self.traj_tracking_radius)
         self.publish_laser_points(self.last_scan, violations)
         return np.any(violations)
 

@@ -225,7 +225,7 @@ class CRAM:
     def detect_objects_on_table(self):
         self.giskard.set_joint_goal(detect_pose)
         self.giskard.plan_and_execute()
-        hsr_say(self.talker_pub, "Welcome back home. Let me take a look at the new objects you brought.")
+
         self.fancylogger.log_event("crampylog.csv", "object_detection3d", "START")
         # client.send_goal(PerceptionTask.OBJECT_DETECTION2D)
         self.rk_client.send_goal(PerceptionTask.OBJECT_DETECTION3D, location="sofa_table")
@@ -338,7 +338,10 @@ class CRAM:
 
     def carry_my_bs(self):
         self.giskard.set_json_goal('CarryMyBullshit',
-                                   patrick_topic_name='robokudo/human_position')
+                                   patrick_topic_name='robokudo/human_position',
+                                   distance_to_target_stop_threshold=1.6,
+                                   traj_tracking_radius=0.75,
+                                   clear_path=True)
         self.giskard.allow_all_collisions()
         self.giskard.plan_and_execute(wait=False)
 
@@ -366,7 +369,7 @@ class CRAM:
                                    root_link=self.map)
         self.giskard.allow_all_collisions()
         self.giskard.plan_and_execute()
-        
+
         self.giskard.set_joint_goal(default_pose)
         self.giskard.plan_and_execute()
 
@@ -387,8 +390,8 @@ class CRAM:
         self.fancylogger.log_event("crampylog.csv", "storage_check", "END")
         print(f"Region state: {self.rm.region_free}")
 
-    def get_placing_point(self):
-        return self.region_points[
+    def get_placing_point(self) -> PointStamped:
+        return self.rm.region_points[
             self.rm.position_with_most_trues_final(self.rm.region_free)]
 
     def goto_perceive_shelf_pose(self):
@@ -396,7 +399,7 @@ class CRAM:
         base_goal.header.frame_id = self.map
         base_goal.pose.position = Point(7.918, 1.531, 0.000)
         base_goal.pose.orientation = Quaternion(0.000, 0.000, -0.720, 0.694)
-        self.giskard.set_cart_goal(goal_pose=base_goal, tip_link=self.tip_link, root_link=self.map)
+        self.giskard.set_cart_goal(goal_pose=base_goal, tip_link='base_footprint', root_link=self.map)
         self.giskard.set_joint_goal({
             'head_pan_joint': 0,
             'head_tilt_joint': 0,
@@ -444,13 +447,14 @@ rospy.init_node('cram')
 tf.init(10)
 
 cram = CRAM()
-
+rospy.sleep(1)
+hsr_say(cram.talker_pub, "Welcome back home. Let me take a look at the new objects you brought.")
 cram.reset()
 cram.fancylogger.log_event("crampylog.csv", "experiment", "START")
 cram.detect_objects_on_table()
-
-cram.point_at_sofa(True)
 hsr_say(cram.talker_pub, "If you want, point at one object, and i will carry it for you to a storage place.")
+cram.point_at_sofa(True)
+
 uuid = cram.detect_human_pointing()
 
 hsr_say(cram.talker_pub, "OK. I'll now grasp this object.")
@@ -461,51 +465,29 @@ hsr_say(cram.talker_pub, "I'll now follow you")
 cram.fancylogger.log_event("crampylog.csv", "human_tracking", "START")
 cram.trigger_human_tracking()
 cram.carry_my_bs()
-cram.wait_for_position_reached()
+
+cram.rk_client.handle_result() # block until RK condition met
+hsr_say(cram.talker_pub, "Alright. I'll place the object in that shelf.")
+# cram.wait_for_position_reached()
 cram.stop_carry_my_bs()
 
 cram.fancylogger.log_event("crampylog.csv", "human_tracking", "END")
-
+rospy.loginfo("Going to perceive pose")
+rospy.sleep(1.0) # necessary after canceling the old goal?
 cram.goto_perceive_shelf_pose()
 
 hsr_say(cram.talker_pub, "Let me take a look for some space, to put this.")
+rospy.loginfo("Let me take a look for some space, to put this.")
+rospy.sleep(0.5)
 cram.check_shelf_regions()
-point = cram.get_placing_point()
+region_idx = cram.rm.position_with_most_trues_final(cram.rm.region_free)
+rospy.sleep(0.5)
+region_place_name = "left"
+if region_idx == 2 or region_idx == 3:
+    region_place_name = "right"
+hsr_say(cram.talker_pub, f"I'll now place the object on the {region_place_name}.")
 
-# TODO Place
-hsr_say(cram.talker_pub, "I'll now place the object.")
+point = cram.get_placing_point()
+cram.place_carried_object(point)
 
 cram.fancylogger.log_event("crampylog.csv", "experiment", "END")
-
-# def euclidean_distance(point1, point2):
-#    return np.linalg.norm(np.array(point1) - np.array(point2))
-#
-# def main():
-#    rospy.init_node('tf_lookup_and_check_distance', anonymous=True)
-#
-#    # Parameters
-#    frame_p = "P"
-#    frame_x = "X"
-#    goal_position = [1.0, 1.0, 1.0]  # Example goal position
-#    threshold = 0.5  # Example threshold
-#
-#    tf_listener = tf.TransformListener()
-#
-#    rate = rospy.Rate(10)  # 10 Hz
-#    while not rospy.is_shutdown():
-#        try:
-#            # Look up the translation between frame P and frame X
-#            (trans, _) = tf_listener.lookupTransform(frame_x, frame_p, rospy.Time(0))
-#
-#            # Calculate the Euclidean distance to the goal position
-#            distance = euclidean_distance(trans, goal_position)
-#            rospy.loginfo("Distance to goal: %f", distance)
-#
-#            # Check if the distance is below the threshold
-#            if distance < threshold:
-#                rospy.loginfo("Reached the goal!")
-#
-#        except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
-#            continue
-#
-#        rate.sleep()

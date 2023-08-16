@@ -4,6 +4,7 @@ from typing import Dict
 from tmc_control_msgs.msg import GripperApplyEffortAction, GripperApplyEffortGoal
 
 from fancylog import Logger
+from fancyregionmgmt import RegionManager
 import geometry_msgs.msg
 import numpy as np
 import robokudo_msgs.msg
@@ -171,6 +172,12 @@ class QueryActionClient:
         rospy.loginfo(f"Received result: {result}")  # Adjust this based on your actual result message structure
         return result
 
+    def state(self):
+        """
+        Check the state (success, preempted, etc.) of the action client.
+        """
+        return self.client.get_state()
+
 # https://code-with-me.global.jetbrains.com/hpxgM92M7ll5zM1diHf1qw#p=PY&fp=33941BA9C6BFF38413D50109535838B64587A7952FCF9BC2D7E883808E7DAE7A&newUi=true
 
 class CRAM:
@@ -184,6 +191,8 @@ class CRAM:
         self.map = 'map'
         self.fancylogger = Logger("/home/toya/rkop_experiments/")
         self.grasped_uuid = None
+        self.rm = RegionManager()
+        self.rm.publish_all_markers_for_regions()
 
     def reset(self):
         self.gripper.open()
@@ -302,12 +311,14 @@ class CRAM:
         self.fancylogger.log_event("crampylog.csv", "grasp_object_from_table", "END")
 
     def point_at_sofa(self, height: float = 0.75):
+        cram.fancylogger.log_event("crampylog.csv", "move_head", "START")
         goal_point = PointStamped()
         goal_point.header.frame_id = self.map
         goal_point.point.x = 13.711359024047852
         goal_point.point.y = 4.189180374145508
         goal_point.point.z = height
         self.point_at(goal_point)
+        cram.fancylogger.log_event("crampylog.csv", "move_head", "END")
 
     def point_at(self, goal_point: PointStamped):
         head = 'head_rgbd_sensor_link'
@@ -333,6 +344,25 @@ class CRAM:
     def end_logging(self):
         self.fancylogger.log_event("crampylog.csv", "experiment", "END")
 
+    def check_shelf_regions(self):
+        self.fancylogger.log_event("crampylog.csv", "storage_check", "START")
+        # When in front of shelf, detect states
+        for (idx, region_name) in enumerate(self.rm.region_names):
+            self.rk_client.send_goal(PerceptionTask.FREE_SPACE, region_name)
+            result = self.rk_client.handle_result()
+            state = self.rk_client.state()
+            self.rm.update_region_free(idx, result, state)
+            self.rm.publish_all_markers_for_regions()
+            rospy.sleep(0.1)
+
+        self.fancylogger.log_event("crampylog.csv", "storage_check", "END")
+        print(f"Region state: {self.rm.region_free}")
+
+    def get_placing_point(self):
+        return self.region_points[
+                self.rm.position_with_most_trues_final(self.rm.region_free)]
+
+
 
 
 rospy.init_node('cram')
@@ -342,25 +372,72 @@ cram = CRAM()
 cram.reset()
 cram.fancylogger.log_event("crampylog.csv", "experiment", "START")
 cram.detect_objects_on_table()
+
 cram.point_at_sofa()
+hsr_say(cram.talker_pub, "If you want, point at one object, and i will carry it for you to a storage place.")
 uuid = cram.detect_human_pointing()
+
+hsr_say(cram.talker_pub, "OK. I'll now grasp this object.")
 cram.grasp_object_from_table(uuid)
 cram.point_at_sofa()
+
 hsr_say(cram.talker_pub,"I'll now follow you")
+cram.fancylogger.log_event("crampylog.csv", "human_tracking", "START")
 cram.trigger_human_tracking()
 cram.carry_my_bs()
 
+# TODO How do we know that we can abort giskard?
+#      1) Use tf abort code from below
+#      2) Use CMBS+Pointing tree
 
+cram.fancylogger.log_event("crampylog.csv", "human_tracking", "END")
 
-cram.fancylogger.log_event("crampylog.csv", "move_start_pose", "START")
+# TODO Drive in front of shelf
 
+hsr_say(cram.talker_pub,"Let me take a look for some space, to put this.")
+cram.check_shelf_regions()
+point = cram.get_placing_point()
 
+# TODO Place
+hsr_say(cram.talker_pub,"I'll now place the object.")
 
-
-
-
-cram.fancylogger.log_event("crampylog.csv", "move_start_pose","END")
 
 
 
 cram.fancylogger.log_event("crampylog.csv", "experiment", "END")
+
+
+
+
+#def euclidean_distance(point1, point2):
+#    return np.linalg.norm(np.array(point1) - np.array(point2))
+#
+#def main():
+#    rospy.init_node('tf_lookup_and_check_distance', anonymous=True)
+#
+#    # Parameters
+#    frame_p = "P"
+#    frame_x = "X"
+#    goal_position = [1.0, 1.0, 1.0]  # Example goal position
+#    threshold = 0.5  # Example threshold
+#
+#    tf_listener = tf.TransformListener()
+#
+#    rate = rospy.Rate(10)  # 10 Hz
+#    while not rospy.is_shutdown():
+#        try:
+#            # Look up the translation between frame P and frame X
+#            (trans, _) = tf_listener.lookupTransform(frame_x, frame_p, rospy.Time(0))
+#
+#            # Calculate the Euclidean distance to the goal position
+#            distance = euclidean_distance(trans, goal_position)
+#            rospy.loginfo("Distance to goal: %f", distance)
+#
+#            # Check if the distance is below the threshold
+#            if distance < threshold:
+#                rospy.loginfo("Reached the goal!")
+#
+#        except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+#            continue
+#
+#        rate.sleep()

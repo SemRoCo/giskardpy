@@ -150,3 +150,4 @@ class ClosedLoopBTConfig(BehaviorTreeConfig):
     def setup(self):
         self.add_visualization_marker_publisher(add_to_sync=True, add_to_planning=False, add_to_control_loop=False)
         #self.add_qp_data_publisher(publish_xdot=True, publish_lb=True, publish_ub=True)
+        # self.add_debug_marker_publisher()

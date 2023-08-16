@@ -200,7 +200,7 @@ def laser_points_in_rectangle(laser_scan: LaserScan,
 
 
 class CarryMyBullshit(Goal):
-    trajectory: np.ndarray = np.array([])
+    trajectory: np.ndarray = None
     traj_data: List[np.ndarray] = None
     thresholds: np.ndarray = None
     thresholds_pc: np.ndarray = None
@@ -321,15 +321,15 @@ class CarryMyBullshit(Goal):
                 CarryMyBullshit.target_sub = rospy.Subscriber(patrick_topic_name, PointStamped, self.target_cb,
                                                               queue_size=10)
             rospy.sleep(0.5)
-            for i in range(int(wait_for_patrick_timeout)):
-                if CarryMyBullshit.trajectory.shape[0] > 5:
-                    break
-                print(f'waiting for at least 5 traj points, current length {len(CarryMyBullshit.trajectory)}')
-                rospy.sleep(1)
-            else:
-                raise ConstraintInitalizationException(
-                    f'didn\'t receive enough points after {wait_for_patrick_timeout}s')
-            logging.loginfo(f'waiting for one more target point for {wait_for_patrick_timeout}s')
+            # for i in range(int(wait_for_patrick_timeout)):
+            #     if CarryMyBullshit.trajectory.shape[0] > 5:
+            #         break
+            #     print(f'waiting for at least 5 traj points, current length {len(CarryMyBullshit.trajectory)}')
+            #     rospy.sleep(1)
+            # else:
+            #     raise ConstraintInitalizationException(
+            #         f'didn\'t receive enough points after {wait_for_patrick_timeout}s')
+            # logging.loginfo(f'waiting for one more target point for {wait_for_patrick_timeout}s')
             rospy.wait_for_message(patrick_topic_name, PointStamped, rospy.Duration(wait_for_patrick_timeout))
             logging.loginfo('received target point.')
 
@@ -448,6 +448,8 @@ class CarryMyBullshit(Goal):
     @memoize_with_counter(4)
     def get_current_target(self):
         self.check_laser_scan_age()
+        if len(CarryMyBullshit.trajectory) == 0:
+            return
         traj = CarryMyBullshit.trajectory.copy()
         current_point = self.get_current_point()
         error = traj - current_point
@@ -614,28 +616,31 @@ class CarryMyBullshit(Goal):
         ms.markers.append(m_line)
         self.pub.publish(ms)
 
-    def target_cb(self, point: PointStamped):
-        if not self.ignore_obstructions and self.point_obstructed(point):
-            return
-        self.ignore_obstructions = True
-        try:
-            current_point = np.array([point.point.x, point.point.y])
-            last_point = CarryMyBullshit.traj_data[-1]
-            error_vector = current_point - last_point
-            distance = np.linalg.norm(error_vector)
-            if distance < self.interpolation_step_size * 2:
-                CarryMyBullshit.traj_data[-1] = 0.5 * CarryMyBullshit.traj_data[-1] + 0.5 * current_point
-            else:
-                error_vector /= distance
-                ranges = np.arange(self.interpolation_step_size, distance, self.interpolation_step_size)
-                interpolated_distance = distance / len(ranges)
-                for i, dt in enumerate(ranges):
-                    interpolated_point = last_point + error_vector * interpolated_distance * (i + 1)
-                    CarryMyBullshit.traj_data.append(interpolated_point)
-                CarryMyBullshit.traj_data.append(current_point)
+    def add_human_to_traj(self, point: PointStamped):
+        current_point = np.array([point.point.x, point.point.y])
+        last_point = CarryMyBullshit.traj_data[-1]
+        error_vector = current_point - last_point
+        distance = np.linalg.norm(error_vector)
+        if distance < self.interpolation_step_size * 2:
+            CarryMyBullshit.traj_data[-1] = 0.5 * CarryMyBullshit.traj_data[-1] + 0.5 * current_point
+        else:
+            error_vector /= distance
+            ranges = np.arange(self.interpolation_step_size, distance, self.interpolation_step_size)
+            interpolated_distance = distance / len(ranges)
+            for i, dt in enumerate(ranges):
+                interpolated_point = last_point + error_vector * interpolated_distance * (i + 1)
+                CarryMyBullshit.traj_data.append(interpolated_point)
+            CarryMyBullshit.traj_data.append(current_point)
 
-            CarryMyBullshit.trajectory = np.array(CarryMyBullshit.traj_data)
-            self.human_point = point
+        CarryMyBullshit.trajectory = np.array(CarryMyBullshit.traj_data)
+
+    def target_cb(self, point: PointStamped):
+        self.human_point = point
+        try:
+            if not self.ignore_obstructions and self.point_obstructed(point):
+                return
+            self.ignore_obstructions = True
+            self.add_human_to_traj(point)
         except Exception as e:
             logging.logwarn(f'rejected new target because: {e}')
         self.publish_trajectory()
@@ -666,6 +671,7 @@ class CarryMyBullshit(Goal):
         last_target_age = self.get_parameter_as_symbolic_expression('last_target_age')
         target_lost = w.greater_equal(last_target_age, self.target_age_threshold)
         map_P_human = w.Point3(self.get_parameter_as_symbolic_expression('human_point'))
+        map_P_human.reference_frame = 'map'
         map_P_human_projected = w.Point3(map_P_human)
         map_P_human_projected.z = 0
         next_x = self.god_map.to_expr(self._get_identifier() + ['get_current_target', tuple(), 'next_x'])

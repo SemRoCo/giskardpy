@@ -1,6 +1,7 @@
 from enum import Enum
 from typing import Dict
 
+from tf.transformations import quaternion_from_matrix
 from tmc_control_msgs.msg import GripperApplyEffortAction, GripperApplyEffortGoal
 
 from fancylog import Logger
@@ -65,6 +66,7 @@ class ObjectEntry:
                          self.pose.pose.position.y,
                          self.pose.pose.position.z])
 
+
 class PerceptionTask(Enum):
     HUMAN_POINTING = 1
     OBJECT_DETECTION3D = 2
@@ -112,7 +114,8 @@ carry_pose = {
     'wrist_roll_joint': 0,
 }
 
-def hsr_say(pub, message:str=""):
+
+def hsr_say(pub, message: str = ""):
     goal_msg = TalkRequestActionGoal()
     goal_msg.header.stamp = rospy.Time.now()
     goal_msg.goal.data.language = 1
@@ -178,6 +181,7 @@ class QueryActionClient:
         """
         return self.client.get_state()
 
+
 # https://code-with-me.global.jetbrains.com/hpxgM92M7ll5zM1diHf1qw#p=PY&fp=33941BA9C6BFF38413D50109535838B64587A7952FCF9BC2D7E883808E7DAE7A&newUi=true
 
 class CRAM:
@@ -223,7 +227,7 @@ class CRAM:
         hsr_say(self.talker_pub, "Welcome back home. Let me take a look at the new objects you brought.")
         self.fancylogger.log_event("crampylog.csv", "object_detection3d", "START")
         # client.send_goal(PerceptionTask.OBJECT_DETECTION2D)
-        self.rk_client.send_goal(PerceptionTask.OBJECT_DETECTION3D,location="sofa_table")
+        self.rk_client.send_goal(PerceptionTask.OBJECT_DETECTION3D, location="sofa_table")
         rk_result = self.rk_client.handle_result()
         self.fancylogger.log_event("crampylog.csv", "object_detection3d", "END")
 
@@ -241,16 +245,16 @@ class CRAM:
             ]), object_id=detected_object.uid)
             self.objbelief_state[detected_object.uid] = oe
             self.giskard.add_box(name=detected_object.uid,
-                            size=(oe.size[0], oe.size[1], oe.size[2]),
-                            pose=detected_object.pose[0],
-                            parent_link=self.map)
+                                 size=(oe.size[0], oe.size[1], oe.size[2]),
+                                 pose=detected_object.pose[0],
+                                 parent_link=self.map)
 
     def detect_human_pointing(self):
         self.fancylogger.log_event("crampylog.csv", "human_pointing", "START")
         self.rk_client.send_goal(PerceptionTask.HUMAN_POINTING)
         rk_result = self.rk_client.handle_result()
         self.fancylogger.log_event("crampylog.csv", "human_pointing", "END")
-        assert(len(rk_result.res)>0)
+        assert (len(rk_result.res) > 0)
         obj_pointed_at = rk_result.res[0].uid
         return obj_pointed_at
 
@@ -288,9 +292,9 @@ class CRAM:
         #                       root_link=map,
         #                       approach_direction=approach_direction)
         self.giskard.set_json_goal('GraspBoxMalte',
-                              object_name=object_to_grasp.uuid,
-                              root_link=self.map,
-                              approach_hint=approach_direction)
+                                   object_name=object_to_grasp.uuid,
+                                   root_link=self.map,
+                                   approach_hint=approach_direction)
         self.giskard.allow_collision('hsrb', object_to_grasp.uuid)
         self.giskard.plan()
         self.gripper.close()
@@ -338,8 +342,33 @@ class CRAM:
         self.giskard.set_json_goal('EndlessMode')
         self.giskard.plan_and_execute()
 
-    def place_carried_object(self):
-        pass
+    def place_carried_object(self, goal_point: PointStamped):
+        map_T_place_pose = PoseStamped()
+        map_T_place_pose.header.frame_id = self.map
+        map_T_place_pose.pose.orientation = Quaternion(*quaternion_from_matrix(np.array([[0, -1, 0, 0],
+                                                                                         [0, 0, -1, 0],
+                                                                                         [1, 0, 0, 0],
+                                                                                         [0, 0, 0, 1]])))
+        map_T_place_pose.pose.position = goal_point.point
+        self.giskard.set_cart_goal(goal_pose=map_T_place_pose,
+                                   tip_link=self.tip_link,
+                                   root_link=self.map)
+        self.giskard.allow_all_collisions()
+        self.giskard.plan_and_execute()
+        self.gripper.open()
+
+        tip_T_back = PoseStamped()
+        tip_T_back.header.frame_id = self.tip_link
+        tip_T_back.pose.position.z = - 0.2
+        tip_T_back.pose.orientation.w = 1
+        self.giskard.set_cart_goal(goal_pose=tip_T_back,
+                                   tip_link=self.tip_link,
+                                   root_link=self.map)
+        self.giskard.allow_all_collisions()
+        self.giskard.plan_and_execute()
+        
+        self.giskard.set_joint_goal(default_pose)
+        self.giskard.plan_and_execute()
 
     def end_logging(self):
         self.fancylogger.log_event("crampylog.csv", "experiment", "END")
@@ -360,9 +389,7 @@ class CRAM:
 
     def get_placing_point(self):
         return self.region_points[
-                self.rm.position_with_most_trues_final(self.rm.region_free)]
-
-
+            self.rm.position_with_most_trues_final(self.rm.region_free)]
 
 
 rospy.init_node('cram')
@@ -381,7 +408,7 @@ hsr_say(cram.talker_pub, "OK. I'll now grasp this object.")
 cram.grasp_object_from_table(uuid)
 cram.point_at_sofa()
 
-hsr_say(cram.talker_pub,"I'll now follow you")
+hsr_say(cram.talker_pub, "I'll now follow you")
 cram.fancylogger.log_event("crampylog.csv", "human_tracking", "START")
 cram.trigger_human_tracking()
 cram.carry_my_bs()
@@ -394,25 +421,19 @@ cram.fancylogger.log_event("crampylog.csv", "human_tracking", "END")
 
 # TODO Drive in front of shelf
 
-hsr_say(cram.talker_pub,"Let me take a look for some space, to put this.")
+hsr_say(cram.talker_pub, "Let me take a look for some space, to put this.")
 cram.check_shelf_regions()
 point = cram.get_placing_point()
 
 # TODO Place
-hsr_say(cram.talker_pub,"I'll now place the object.")
-
-
-
+hsr_say(cram.talker_pub, "I'll now place the object.")
 
 cram.fancylogger.log_event("crampylog.csv", "experiment", "END")
 
-
-
-
-#def euclidean_distance(point1, point2):
+# def euclidean_distance(point1, point2):
 #    return np.linalg.norm(np.array(point1) - np.array(point2))
 #
-#def main():
+# def main():
 #    rospy.init_node('tf_lookup_and_check_distance', anonymous=True)
 #
 #    # Parameters

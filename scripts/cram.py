@@ -303,11 +303,9 @@ class CRAM:
         self.giskard.update_parent_link_of_group(name=self.grasped_uuid,
                                                  parent_link=self.tip_link)
         # %% lift
-        gripper_goal = PoseStamped()
-        gripper_goal.header.frame_id = self.tip_link
-        gripper_goal.pose.position.x = 0.15
-        gripper_goal.pose.orientation.w = 1
-        self.giskard.set_cart_goal(gripper_goal, tip_link=self.tip_link, root_link=self.map)
+        map_T_gripper = tf.lookup_pose(self.map, self.tip_link)
+        map_T_gripper.pose.position.z += 0.15
+        self.giskard.set_cart_goal(map_T_gripper, tip_link=self.tip_link, root_link=self.map)
         self.giskard.plan_and_execute()
 
         self.giskard.set_joint_goal(carry_pose)
@@ -315,17 +313,17 @@ class CRAM:
 
         self.fancylogger.log_event("crampylog.csv", "grasp_object_from_table", "END")
 
-    def point_at_sofa(self, height: float = 0.75):
+    def point_at_sofa(self, torso_goal: bool, height: float = 0.75):
         cram.fancylogger.log_event("crampylog.csv", "move_head", "START")
         goal_point = PointStamped()
         goal_point.header.frame_id = self.map
         goal_point.point.x = 13.711359024047852
         goal_point.point.y = 4.189180374145508
         goal_point.point.z = height
-        self.point_at(goal_point)
+        self.point_at(goal_point, torso_goal)
         cram.fancylogger.log_event("crampylog.csv", "move_head", "END")
 
-    def point_at(self, goal_point: PointStamped):
+    def point_at(self, goal_point: PointStamped, torso_goal: bool):
         head = 'head_rgbd_sensor_link'
         pointing_axis = Vector3Stamped()
         pointing_axis.header.frame_id = head
@@ -334,14 +332,14 @@ class CRAM:
                                        tip_link=head,
                                        root_link=self.map,
                                        pointing_axis=pointing_axis)
-        self.giskard.set_joint_goal({'arm_lift_joint': 0.5})
+        if torso_goal:
+            self.giskard.set_joint_goal({'arm_lift_joint': 0.5})
         self.giskard.plan_and_execute()
 
     def carry_my_bs(self):
         self.giskard.set_json_goal('CarryMyBullshit',
                                    patrick_topic_name='robokudo/human_position')
         self.giskard.allow_all_collisions()
-        self.giskard.set_json_goal('EndlessMode')
         self.giskard.plan_and_execute(wait=False)
 
     def place_carried_object(self, goal_point: PointStamped):
@@ -451,13 +449,13 @@ cram.reset()
 cram.fancylogger.log_event("crampylog.csv", "experiment", "START")
 cram.detect_objects_on_table()
 
-cram.point_at_sofa()
+cram.point_at_sofa(True)
 hsr_say(cram.talker_pub, "If you want, point at one object, and i will carry it for you to a storage place.")
 uuid = cram.detect_human_pointing()
 
 hsr_say(cram.talker_pub, "OK. I'll now grasp this object.")
 cram.grasp_object_from_table(uuid)
-cram.point_at_sofa()
+cram.point_at_sofa(False)
 
 hsr_say(cram.talker_pub, "I'll now follow you")
 cram.fancylogger.log_event("crampylog.csv", "human_tracking", "START")

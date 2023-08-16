@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+import actionlib
+import rospy
 from geometry_msgs.msg import Point
 from visualization_msgs.msg import Marker
 
@@ -18,19 +20,19 @@ class RegionManager:
         region_std_place_y = 0.2
         region_std_place_z = 0.79
 
-        self.region_points[0].x = 8.18
+        self.region_points[0].x = 8.15
         self.region_points[0].y = region_std_place_y
         self.region_points[0].z = region_std_place_z
 
-        self.region_points[1].x = 8.00
+        self.region_points[1].x = 7.97
         self.region_points[1].y = region_std_place_y
         self.region_points[1].z = region_std_place_z
 
-        self.region_points[2].x = 7.82
+        self.region_points[2].x = 7.79
         self.region_points[2].y = region_std_place_y
         self.region_points[2].z = region_std_place_z
 
-        self.region_points[3].x = 7.64
+        self.region_points[3].x = 7.61
         self.region_points[3].y = region_std_place_y
         self.region_points[3].z = region_std_place_z
 

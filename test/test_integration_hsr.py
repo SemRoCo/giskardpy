@@ -86,8 +86,8 @@ class HSRTestWrapperMujoco(HSRTestWrapper):
         # self.l_gripper = rospy.ServiceProxy('l_gripper_simulator/set_joint_states', SetJointState)
         self.mujoco_reset = rospy.ServiceProxy('mujoco/reset', Trigger)
         self.odom_root = 'odom'
-        super().__init__(HSR_Mujoco) # for open loop control
-        # super().__init__(HSR_Mujoco_Closedloop)  # for closed loop control
+        # super().__init__(HSR_Mujoco) # for open loop control
+        super().__init__(HSR_Mujoco_Closedloop)  # for closed loop control
 
     def reset_base(self):
         p = PoseStamped()

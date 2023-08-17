@@ -837,7 +837,7 @@ class ClosedLoop(OpenLoop):
                                                              identifier.PublishDebugExpressions)))
         # planning_4.add_child(WiggleCancel('wiggle'))
         # planning_4.add_child(LoopDetector('loop detector'))
-        # planning_4.add_child(GoalReached('goal reached', real_time=True))
+        planning_4.add_child(GoalReached('goal reached', real_time=True))
         # planning_4.add_child(TimePlugin())
         if self.god_map.get_data(identifier.MaxTrajectoryLength_enabled):
             kwargs = self.god_map.get_data(identifier.MaxTrajectoryLength)

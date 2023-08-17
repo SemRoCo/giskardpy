@@ -2,35 +2,40 @@ import abc
 import datetime
 import os
 from abc import ABC
-from collections import OrderedDict, defaultdict
+from collections import defaultdict
 from copy import deepcopy
-from time import time
 from typing import List, Dict, Tuple, Type, Union, Optional, DefaultDict
-
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
 import giskardpy.casadi_wrapper as cas
 from giskardpy import identifier
-from giskardpy.configs.data_types import SupportedQPSolver
-from giskardpy.exceptions import OutOfJointLimitsException, \
-    HardConstraintsViolatedException, QPSolverException, InfeasibleException
-from giskardpy.goals.goal import WEIGHT_ABOVE_CA, WEIGHT_MAX
+from giskardpy.configs.qp_controller_config import SupportedQPSolver
+from giskardpy.exceptions import HardConstraintsViolatedException, QPSolverException, InfeasibleException, \
+    VelocityLimitUnreachableException
 from giskardpy.god_map import GodMap
+from giskardpy.god_map_user import GodMapWorshipper
 from giskardpy.model.world import WorldTree
-from giskardpy.my_types import derivative_joint_map, Derivatives
+from giskardpy.my_types import Derivatives
 from giskardpy.qp.constraint import InequalityConstraint, EqualityConstraint, DerivativeInequalityConstraint
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.next_command import NextCommands
+from giskardpy.qp.pos_in_vel_limits import b_profile
 from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.utils import logging
-from giskardpy.utils.utils import create_path, suppress_stdout, get_all_classes_in_package
+from giskardpy.utils.utils import create_path, get_all_classes_in_package
 from giskardpy.utils.decorators import memoize
+import giskardpy.utils.math as giskard_math
+
+# used for saving pandas in the same folder every time within a run
+date_str = datetime.datetime.now().strftime('%Yy-%mm-%dd--%Hh-%Mm-%Ss')
 
 
-def save_pandas(dfs, names, path):
-    folder_name = f'{path}/pandas_{datetime.datetime.now().strftime("%Yy-%mm-%dd--%Hh-%Mm-%Ss")}/'
+def save_pandas(dfs, names, path, time: float, folder_name: Optional[str] = None):
+    if folder_name is None:
+        folder_name = ''
+    folder_name = f'{path}/pandas/{folder_name}_{date_str}/{time}/'
     create_path(folder_name)
     for df, name in zip(dfs, names):
         csv_string = 'name\n'
@@ -173,27 +178,6 @@ class Weights(ProblemDataPart):
         x_offset = cas.solve_for(f, target_value)
         return (cas.abs(current_position + x_offset - limit) * a) ** exp, x_offset
 
-    def asdf(self, current_position: cas.Symbol,
-             lower_limit: float,
-             upper_limit: float,
-             target_weight: float = 100,
-             threshold: float = 0.1, exp: float = 2) \
-            -> Tuple[float, cas.Expression, float, cas.Expression]:
-        range_half = (upper_limit - lower_limit) / 2
-        center = (upper_limit + lower_limit) / 2
-        soft_lower_limit = center - range_half * (1 - threshold)
-        soft_upper_limit = center + range_half * (1 - threshold)
-
-        lower_weight_f = cas.abs(current_position - soft_lower_limit) ** exp
-        a = target_weight / lower_weight_f.compile().fast_call(np.array([lower_limit]))[0]
-        lower_weight_f *= -a
-
-        upper_weight_f = cas.abs(current_position - soft_upper_limit) ** exp
-        a = target_weight / upper_weight_f.compile().fast_call(np.array([upper_limit]))[0]
-        upper_weight_f *= a
-
-        return soft_lower_limit, lower_weight_f, soft_upper_limit, upper_weight_f
-
     @profile
     def construct_expression(self) -> Union[cas.Expression, Tuple[cas.Expression, cas.Expression]]:
         components = []
@@ -278,34 +262,52 @@ class FreeVariableBounds(ProblemDataPart):
                          max_derivative=max_derivative)
         self.evaluated = True
 
-    def velocity_limit(self, v: FreeVariable, t: int):
-        lower_limit = v.get_lower_limit(Derivatives.position, evaluated=True)
-        upper_limit = v.get_upper_limit(Derivatives.position, evaluated=True)
+    def velocity_limit(self, v: FreeVariable):
         current_position = v.get_symbol(Derivatives.position)
         lower_velocity_limit = v.get_lower_limit(Derivatives.velocity, evaluated=True)
         upper_velocity_limit = v.get_upper_limit(Derivatives.velocity, evaluated=True)
-        lb = cas.max(lower_limit - current_position - lower_velocity_limit * t * self.dt,
-                     lower_velocity_limit * self.dt) / self.dt
-        ub = cas.min(upper_limit - current_position - upper_velocity_limit * t * self.dt,
-                     upper_velocity_limit * self.dt) / self.dt
+        lower_acc_limit = v.get_lower_limit(Derivatives.acceleration, evaluated=True)
+        upper_acc_limit = v.get_upper_limit(Derivatives.acceleration, evaluated=True)
+        current_vel = v.get_symbol(Derivatives.velocity)
+        current_acc = v.get_symbol(Derivatives.acceleration)
 
-        if t == 0:
-            current_velocity = v.get_symbol(Derivatives.velocity)
-            lower_one_step_velocities = []
-            upper_one_step_velocities = []
-            for derivative in Derivatives.range(Derivatives.velocity, self.max_derivative):
-                step_size = self.dt ** (derivative - 1)
-                lower_one_step_velocities.append(v.get_lower_limit(derivative, evaluated=True) * step_size)
-                upper_one_step_velocities.append(v.get_upper_limit(derivative, evaluated=True) * step_size)
-            lower_one_step_vel = max(lower_one_step_velocities)
-            upper_one_step_vel = min(upper_one_step_velocities)
-            # lower_one_step_vel = cas.min(lower_one_step_vel, current_velocity - lower_one_step_vel)
-            # upper_one_step_vel = cas.max(upper_one_step_vel, - current_velocity + upper_one_step_vel)
-            lb = cas.limit(lb, lower_velocity_limit, upper_one_step_vel)
-            ub = cas.limit(ub, lower_one_step_vel, upper_velocity_limit)
-        else:
-            lb = cas.limit(lb, lower_velocity_limit, 0)
-            ub = cas.limit(ub, 0, upper_velocity_limit)
+        lower_jerk_limit = v.get_lower_limit(Derivatives.jerk, evaluated=True)
+        upper_jerk_limit = v.get_upper_limit(Derivatives.jerk, evaluated=True)
+
+        if not v.has_position_limits():
+            lb = cas.Expression([lower_velocity_limit] * self.prediction_horizon
+                                + [lower_acc_limit] * self.prediction_horizon
+                                + [lower_jerk_limit] * self.prediction_horizon)
+            ub = cas.Expression([upper_velocity_limit] * self.prediction_horizon
+                                + [upper_acc_limit] * self.prediction_horizon
+                                + [upper_jerk_limit] * self.prediction_horizon)
+            return lb, ub
+
+        lower_limit = v.get_lower_limit(Derivatives.position, evaluated=True)
+        upper_limit = v.get_upper_limit(Derivatives.position, evaluated=True)
+
+        try:
+            lb, ub = b_profile(current_pos=current_position,
+                               current_vel=current_vel,
+                               current_acc=current_acc,
+                               pos_limits=(lower_limit, upper_limit),
+                               vel_limits=(lower_velocity_limit, upper_velocity_limit),
+                               acc_limits=(lower_acc_limit, upper_acc_limit),
+                               jerk_limits=(lower_jerk_limit, upper_jerk_limit),
+                               dt=self.dt,
+                               ph=self.prediction_horizon)
+        except InfeasibleException as e:
+            max_reachable_vel = giskard_math.max_velocity_from_horizon_and_jerk(self.prediction_horizon,
+                                                                                upper_jerk_limit, self.dt)
+            if max_reachable_vel < upper_velocity_limit:
+                error_msg = f'Free variable "{v.name}" can\'t reach velocity limit of "{upper_velocity_limit}". ' \
+                            f'Maximum reachable with prediction horizon = "{self.prediction_horizon}", ' \
+                            f'jerk limit = "{upper_jerk_limit}" and dt = "{self.dt}" is "{max_reachable_vel}".'
+                logging.logerr(error_msg)
+                raise VelocityLimitUnreachableException(error_msg)
+            else:
+                raise
+
         return lb, ub
 
     @profile
@@ -313,24 +315,15 @@ class FreeVariableBounds(ProblemDataPart):
             -> Tuple[List[Dict[str, cas.symbol_expr_float]], List[Dict[str, cas.symbol_expr_float]]]:
         lb: DefaultDict[Derivatives, Dict[str, cas.symbol_expr_float]] = defaultdict(dict)
         ub: DefaultDict[Derivatives, Dict[str, cas.symbol_expr_float]] = defaultdict(dict)
-        for t in range(self.prediction_horizon):
-            for v in self.free_variables:
+        for v in self.free_variables:
+            lb_, ub_ = self.velocity_limit(v)
+            for t in range(self.prediction_horizon):
                 for derivative in Derivatives.range(Derivatives.velocity, min(v.order, self.max_derivative)):
                     if t >= self.prediction_horizon - (self.max_derivative - derivative):
                         continue
-                    # if t == self.prediction_horizon - 1 \
-                    #         and derivative < min(v.order, self.max_derivative) \
-                    #         and self.prediction_horizon > 2:  # and False:
-                    #     lb[derivative][f't{t:03}/{v.name}/{derivative}'] = 0
-                    #     ub[derivative][f't{t:03}/{v.name}/{derivative}'] = 0
-                    # else:
-                    if derivative == Derivatives.velocity and v.has_position_limits():
-                        lower_limit, upper_limit = self.velocity_limit(v, t)
-                    else:
-                        lower_limit = v.get_lower_limit(derivative, evaluated=self.evaluated)
-                        upper_limit = v.get_upper_limit(derivative, evaluated=self.evaluated)
-                    lb[derivative][f't{t:03}/{v.name}/{derivative}'] = lower_limit
-                    ub[derivative][f't{t:03}/{v.name}/{derivative}'] = upper_limit
+                    index = t + self.prediction_horizon * (derivative - 1)
+                    lb[derivative][f't{t:03}/{v.name}/{derivative}'] = lb_[index]
+                    ub[derivative][f't{t:03}/{v.name}/{derivative}'] = ub_[index]
         lb_params = []
         ub_params = []
         for derivative, name_to_bound_map in sorted(lb.items()):
@@ -953,7 +946,7 @@ def detect_solvers():
 detect_solvers()
 
 
-class QPProblemBuilder:
+class QPProblemBuilder(GodMapWorshipper):
     """
     Wraps around QP Solver. Builds the required matrices from constraints.
     """
@@ -1119,7 +1112,7 @@ class QPProblemBuilder:
         if num_debug_expressions > 0:
             logging.loginfo(f'  #debug expressions: {len(self.compiled_debug_expressions)}')
 
-    def save_all_pandas(self):
+    def save_all_pandas(self, folder_name: Optional[str] = None):
         if hasattr(self, 'p_xdot') and self.p_xdot is not None:
             save_pandas(
                 [self.p_weights, self.p_lb, self.p_ub,
@@ -1127,7 +1120,9 @@ class QPProblemBuilder:
                  self.p_A, self.p_lbA, self.p_ubA,
                  self.p_debug, self.p_xdot],
                 ['weights', 'lb', 'ub', 'E', 'bE', 'A', 'lbA', 'ubA', 'debug', 'xdot'],
-                self.god_map.get_data(identifier.tmp_folder))
+                self.god_map.get_data(identifier.tmp_folder),
+                self.god_map.get_data(identifier.time),
+                folder_name)
         else:
             save_pandas(
                 [self.p_weights, self.p_lb, self.p_ub,
@@ -1135,15 +1130,9 @@ class QPProblemBuilder:
                  self.p_A, self.p_lbA, self.p_ubA,
                  self.p_debug],
                 ['weights', 'lb', 'ub', 'E', 'bE', 'A', 'lbA', 'ubA', 'debug'],
-                self.god_map.get_data(identifier.tmp_folder))
-
-    @property
-    def god_map(self) -> GodMap:
-        return GodMap()
-
-    @property
-    def world(self) -> WorldTree:
-        return self.god_map.get_data(identifier.world)
+                self.god_map.get_data(identifier.tmp_folder),
+                self.god_map.get_data(identifier.time),
+                folder_name)
 
     def _print_pandas_array(self, array):
         import pandas as pd
@@ -1171,17 +1160,22 @@ class QPProblemBuilder:
         try:
             self.xdot_full = self.qp_solver.solve_and_retry(substitutions=substitutions)
             # self._create_debug_pandas(self.qp_solver)
-            return NextCommands(free_variables=self.free_variables, xdot=self.xdot_full, max_derivative=self.order,
-                                prediction_horizon=self.prediction_horizon)
+            return NextCommands(self.free_variables, self.xdot_full, self.order, self.prediction_horizon)
         except InfeasibleException as e_original:
             self.xdot_full = None
             self._create_debug_pandas(self.qp_solver)
+            self._has_nan()
             self._print_iis()
             if isinstance(e_original, HardConstraintsViolatedException):
                 raise
             self.xdot_full = None
             self._are_hard_limits_violated(str(e_original))
             raise
+
+    def _has_nan(self):
+        nan_entries = self.p_A.isnull().stack()
+        row_col_names = nan_entries[nan_entries].index.tolist()
+        pass
 
     def _are_hard_limits_violated(self, error_message):
         self._create_debug_pandas(self.qp_solver)

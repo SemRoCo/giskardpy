@@ -25,7 +25,10 @@ def ros(request):
     tf.init(60)
 
     def kill_ros():
-        GodMap().get_data(identifier.tree_manager).render()
+        try:
+            GodMap().get_data(identifier.tree_manager).render()
+        except KeyError as e:
+            logging.logerr(f'Failed to render behavior tree.')
         logging.loginfo('shutdown ros')
         rospy.signal_shutdown('die')
         try:

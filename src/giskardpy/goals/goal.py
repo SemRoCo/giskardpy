@@ -3,7 +3,12 @@ from __future__ import annotations
 import abc
 from abc import ABC
 from collections import OrderedDict
-from typing import Optional, Tuple, Dict, List, Union, Callable
+from typing import Optional, Tuple, Dict, List, Union, Callable, TYPE_CHECKING
+
+from giskardpy.god_map_user import GodMapWorshipper
+
+if TYPE_CHECKING:
+    from giskardpy.configs.behavior_tree_config import ControlModes
 
 import giskardpy.identifier as identifier
 import giskardpy.utils.tfwrapper as tf
@@ -24,17 +29,21 @@ WEIGHT_BELOW_CA = Constraint_msg.WEIGHT_BELOW_CA
 WEIGHT_MIN = Constraint_msg.WEIGHT_MIN
 
 
-class Goal(ABC):
+class Goal(GodMapWorshipper, ABC):
+    _sub_goals: List[Goal]
 
     @abc.abstractmethod
     def __init__(self):
         """
         This is where you specify goal parameters and save them as self attributes.
         """
-        self.god_map = GodMap()
-        self._test_mode = self.god_map.get_data(identifier.test_mode)
-        self._sub_goals: List[Goal] = []
-        self.world = self.god_map.get_data(identifier.world)  # type: WorldTree
+        self._sub_goals = []
+
+    def clean_up(self):
+        pass
+
+    def is_done(self):
+        return None
 
     @property
     def prediction_horizon(self) -> int:
@@ -63,10 +72,7 @@ class Goal(ABC):
         :param distance: distance threshold for the collision check. Only distances smaller than this value can be
                             detected.
         """
-        if self.world.link_order(link_a, link_b):
-            key = (link_a, link_b)
-        else:
-            key = (link_b, link_a)
+        key = link_a, link_b
         if self.world.are_linked(link_a, link_b):
             return
         try:
@@ -95,7 +101,10 @@ class Goal(ABC):
 
     def traj_time_in_seconds(self) -> w.Expression:
         t = self.god_map.to_expr(identifier.time)
-        return t * self.get_sampling_period_symbol()
+        if self.god_map.get_data(identifier.control_mode) == ControlModes.close_loop:
+            return t
+        else:
+            return t * self.get_sampling_period_symbol()
 
     def transform_msg(self, target_frame: my_string, msg: transformable_message, tf_timeout: float = 1) \
             -> transformable_message:
@@ -364,7 +373,7 @@ class Goal(ABC):
         if task_expression.shape != (1, 1):
             raise GiskardException(f'expression must have shape (1,1), has {task_expression.shape}')
         name = name if name else ''
-        name = str(self) + name
+        name = str(self) + "/" + name
         if name in self._inequality_constraints:
             raise KeyError(f'A constraint with name \'{name}\' already exists. '
                            f'You need to set a name, if you add multiple constraints.')
@@ -405,8 +414,8 @@ class Goal(ABC):
         if task_expression.shape != (1, 1):
             raise GiskardException(f'expression must have shape (1,1), has {task_expression.shape}')
         name = name if name else ''
-        name = str(self) + name
-        if name in self._inequality_constraints:
+        name = str(self) + '/' + name
+        if name in self._equality_constraints:
             raise KeyError(f'A constraint with name \'{name}\' already exists. '
                            f'You need to set a name, if you add multiple constraints.')
         lower_slack_limit = lower_slack_limit if lower_slack_limit is not None else -float('inf')
@@ -494,10 +503,10 @@ class Goal(ABC):
         self._debug_expressions[name] = expr
 
     def add_position_constraint(self,
-                                expr_current: Union[w.Symbol, float],
-                                expr_goal: Union[w.Symbol, float],
-                                reference_velocity: Union[w.Symbol, float],
-                                weight: Union[w.Symbol, float] = WEIGHT_BELOW_CA,
+                                expr_current: Union[w.symbol_expr, float],
+                                expr_goal: Union[w.symbol_expr_float, float],
+                                reference_velocity: Union[w.symbol_expr_float, float],
+                                weight: Union[w.symbol_expr_float, float] = WEIGHT_BELOW_CA,
                                 name: str = ''):
         """
         A wrapper around add_constraint. Will add a constraint that tries to move expr_current to expr_goal.

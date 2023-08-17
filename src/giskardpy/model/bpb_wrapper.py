@@ -1,54 +1,78 @@
+import os
+from typing import List, Tuple, Optional
+
 import betterpybullet as pb
+import numpy as np
+import trimesh
 
-from giskardpy.utils.utils import resolve_ros_iris, convert_to_decomposed_obj_and_save_in_tmp
+from giskardpy import identifier
+from giskardpy.god_map import GodMap
+from giskardpy.model.collision_world_syncer import Collision
+from giskardpy.model.links import Link, LinkGeometry, BoxGeometry, SphereGeometry, CylinderGeometry, MeshGeometry
+from giskardpy.my_types import my_string, PrefixName
+from giskardpy.utils import logging
+from giskardpy.utils.math import inverse_frame
+from giskardpy.utils.utils import resolve_ros_iris, to_tmp_path, write_to_tmp, suppress_stdout
 
+CollisionObject = pb.CollisionObject
 
-class MyCollisionObject(pb.CollisionObject):
-    def __init__(self, name, collision_id):
-        super().__init__()
-        self.name = name
-        self.collision_id = collision_id
-        self.identifier = f'{self.name}/{self.collision_id}'
-
-    def __repr__(self):
-        return str(self.identifier)
-
-    def __str__(self):
-        return str(self.identifier)
-
-    def __hash__(self):
-        return self.identifier.__hash__()
-
-    def __eq__(self, other):
-        return self.identifier.__eq__(other.__str__())
-
-    def __ne__(self, other):
-        return self.identifier.__ne__(other.__str__())
-
-    def __le__(self, other):
-        return self.identifier.__le__(other.__str__())
-
-    def __ge__(self, other):
-        return self.identifier.__ge__(other.__str__())
-
-    def __gt__(self, other):
-        return self.identifier.__gt__(other.__str__())
-
-    def __lt__(self, other):
-        return self.identifier.__lt__(other.__str__())
-
-    def __contains__(self, item):
-        return self.identifier.__contains__(item.__str__())
+if not hasattr(pb, '__version__') or pb.__version__ != '1.0.0':
+    raise ImportError('Betterpybullet is outdated.')
 
 
-def create_cube_shape(extents):
+class BPCollisionWrapper(Collision):
+    def __init__(self, pb_collision: pb.Collision):
+        self.pb_collision = pb_collision
+        self.link_a = self.pb_collision.obj_a.name
+        self.link_b = self.pb_collision.obj_b.name
+        self.original_link_a = self.link_a
+        self.original_link_b = self.link_b
+        self.is_external = None
+        self.new_a_P_pa = None
+        self.new_b_P_pb = None
+        self.new_b_V_n = None
+
+    @property
+    def map_P_pa(self):
+        return self.pb_collision.map_P_pa
+
+    @property
+    def map_P_pb(self):
+        return self.pb_collision.map_P_pb
+
+    @property
+    def map_V_n(self):
+        return self.pb_collision.world_V_n
+
+    @property
+    def a_P_pa(self):
+        return self.pb_collision.a_P_pa
+
+    @property
+    def b_P_pb(self):
+        return self.pb_collision.b_P_pb
+
+    @property
+    def contact_distance(self):
+        return self.pb_collision.contact_distance
+
+    @property
+    def link_b_hash(self):
+        return self.link_b.__hash__()
+
+
+def create_cube_shape(extents: Tuple[float, float, float]) -> pb.BoxShape:
     out = pb.BoxShape(pb.Vector3(*[extents[x] * 0.5 for x in range(3)])) if type(
         extents) is not pb.Vector3 else pb.BoxShape(extents)
     out.margin = 0.001
     return out
 
 
-def create_cylinder_shape(diameter, height):
+def to_giskard_collision(collision: pb.Collision):
+    return BPCollisionWrapper(collision)
+
+
+def create_cylinder_shape(diameter: float, height: float) -> pb.CylinderShape:
     # out = pb.CylinderShapeZ(pb.Vector3(0.5 * diameter, 0.5 * diameter, height * 0.5))
     # out.margin = 0.001
     # Weird thing: The default URDF loader in bullet instantiates convex meshes. Idk why.
@@ -57,13 +81,45 @@ def create_cylinder_shape(diameter, height):
                                   scale=[diameter, diameter, height])
 
 
-def create_sphere_shape(diameter):
+def create_sphere_shape(diameter: float) -> pb.SphereShape:
     out = pb.SphereShape(0.5 * diameter)
     out.margin = 0.001
     return out
 
 
-def create_compound_shape(shapes_poses=[]):
+def create_shape_from_geometry(geometry: LinkGeometry) -> pb.CollisionShape:
+    if isinstance(geometry, BoxGeometry):
+        shape = create_cube_shape((geometry.depth, geometry.width, geometry.height))
+    elif isinstance(geometry, SphereGeometry):
+        shape = create_sphere_shape(geometry.radius * 2)
+    elif isinstance(geometry, CylinderGeometry):
+        shape = create_cylinder_shape(geometry.radius * 2, geometry.height)
+    elif isinstance(geometry, MeshGeometry):
+        shape = load_convex_mesh_shape(geometry.file_name_absolute, scale=geometry.scale)
+        geometry.set_collision_file_name(shape.file_path)
+    else:
+        raise NotImplementedError()
+    return shape
+
+
+def create_shape_from_link(link: Link, collision_id: int = 0) -> pb.CollisionObject:
+    # if len(link.collisions) > 1:
+    shapes = []
+    map_T_o = None
+    for collision_id, geometry in enumerate(link.collisions):
+        if map_T_o is None:
+            shape = create_shape_from_geometry(geometry)
+        else:
+            shape = create_shape_from_geometry(geometry)
+        link_T_geometry = pb.Transform.from_np(geometry.link_T_geometry.evaluate())
+        shapes.append((link_T_geometry, shape))
+    shape = create_compound_shape(shapes_poses=shapes)
+    # else:
+    #     shape = create_shape_from_geometry(link.collisions[0])
+    return create_object(link.name, shape, pb.Transform.identity())
+
+
+def create_compound_shape(shapes_poses: List[Tuple[pb.Transform, pb.CollisionShape]] = None) -> pb.CompoundShape:
     out = pb.CompoundShape()
     for t, s in shapes_poses:
         out.add_child(t, s)
@@ -72,9 +128,7 @@ def create_compound_shape(shapes_poses=[]):
 
 # Technically the tracker is not required here,
 # since the loader keeps references to the loaded shapes.
-def load_convex_mesh_shape(pkg_filename: str, single_shape=False, scale=(1, 1, 1)):
-    if pkg_filename.startswith('file://'):
-        pkg_filename = pkg_filename.split('file://')[1]
+def load_convex_mesh_shape(pkg_filename: str, single_shape=False, scale=(1, 1, 1)) -> pb.ConvexShape:
     if not pkg_filename.endswith('.obj'):
         obj_pkg_filename = convert_to_decomposed_obj_and_save_in_tmp(pkg_filename)
     else:
@@ -84,8 +138,38 @@ def load_convex_mesh_shape(pkg_filename: str, single_shape=False, scale=(1, 1, 1
                                 scaling=pb.Vector3(scale[0], scale[1], scale[2]))
 
 
-def create_object(name, shape, transform=pb.Transform.identity(), collision_id=0):
-    out = MyCollisionObject(name, collision_id)
+def convert_to_decomposed_obj_and_save_in_tmp(file_name: str, log_path='/tmp/giskardpy/vhacd.log'):
+    first_group_name = list(GodMap().get_data(identifier.world).groups.keys())[0]
+    resolved_old_path = resolve_ros_iris(file_name)
+    short_file_name = file_name.split('/')[-1][:-3]
+    obj_file_name = f'{first_group_name}/{short_file_name}obj'
+    new_path_original = to_tmp_path(obj_file_name)
+    if not os.path.exists(new_path_original):
+        mesh = trimesh.load(resolved_old_path, force='mesh')
+        obj_str = trimesh.exchange.obj.export_obj(mesh)
+        write_to_tmp(obj_file_name, obj_str)
+        logging.loginfo(f'Converted {file_name} to obj and saved in {new_path_original}.')
+    new_path = new_path_original
+
+    new_path_decomposed = new_path_original.replace('.obj', '_decomposed.obj')
+    if not os.path.exists(new_path_decomposed):
+        mesh = trimesh.load(new_path_original, force='mesh')
+        if not trimesh.convex.is_convex(mesh):
+            logging.loginfo(f'{file_name} is not convex, applying vhacd.')
+            with suppress_stdout():
+                pb.vhacd(new_path_original, new_path_decomposed, log_path)
+            new_path = new_path_decomposed
+    else:
+        new_path = new_path_decomposed
+
+    return new_path
+
+
+def create_object(name: PrefixName, shape: pb.CollisionShape, transform: Optional[pb.Transform] = None) \
+        -> pb.CollisionObject:
+    if transform is None:
+        transform = pb.Transform.identity()
+    out = pb.CollisionObject(name)
     out.collision_shape = shape
     out.collision_flags = pb.CollisionObject.KinematicObject
     out.transform = transform

@@ -1,17 +1,21 @@
 <launch>
 
-  <node pkg="giskardpy" type="giskard.py" name="giskard" output="screen">
-    <param name="config" value="HSR_IAI"/>
-  </node>
+    <node pkg="giskardpy" type="iai_hsr.py" name="giskard" output="screen"/>
 
-  <node pkg="giskardpy" type="interactive_marker.py" name="giskard_interactive_marker" output="screen">
-    <rosparam param="enable_self_collision">False</rosparam>
-    <rosparam param="interactive_marker_chains">
-      - [odom, base_footprint]
-      - [odom, head_rgbd_sensor_link]
-      - [odom, hand_palm_link]
-    </rosparam>
-  </node>
+    <node pkg="giskardpy" type="joystick_e_stop.py" name="giskard_e_stop" output="screen">
+        <remap from="/joy" to="/hsrb/joy"/>
+        <rosparam param="button_ids">
+            [0, 1, 2, 3, 4, 5, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+        </rosparam>
+    </node>
+
+    <node pkg="giskardpy" type="interactive_marker.py" name="giskard_interactive_marker" output="screen">
+        <rosparam param="enable_self_collision">False</rosparam>
+        <rosparam param="interactive_marker_chains">
+          - [odom, base_footprint]
+          - [odom, head_rgbd_sensor_link]
+          - [odom, hand_palm_link]
+        </rosparam>
+    </node>
 
 </launch>
-

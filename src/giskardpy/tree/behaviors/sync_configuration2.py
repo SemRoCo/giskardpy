@@ -1,4 +1,3 @@
-from queue import Queue, Empty, LifoQueue
 from threading import Lock, Semaphore
 from typing import Optional
 

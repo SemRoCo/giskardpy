@@ -118,7 +118,7 @@ jobs:
         with:
           path: 'ros_ws/src/iai_robots'
           repository: code-iai/iai_robots
-          ref: noetic
+          ref: master
       - if: ${{ inputs.robot == 'pr2' }}
         name: Checkout iai_pr2
         uses: actions/checkout@v3

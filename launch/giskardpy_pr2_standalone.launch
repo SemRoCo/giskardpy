@@ -1,20 +1,20 @@
 <launch>
 
-  <include file="$(find pr2_description)/robots/upload_pr2.launch"/>
+    <include file="$(find pr2_description)/robots/upload_pr2.launch"/>
 
-  <node pkg="giskardpy" type="giskard.py" name="giskard" output="screen">
-    <param name="config" value="PR2_StandAlone"/>
-  </node>
+    <node pkg="giskardpy" type="pr2_standalone.py" name="giskard" output="screen"/>
 
-  <node pkg="giskardpy" type="interactive_marker.py" name="giskard_interactive_marker" output="screen">
-    <rosparam param="enable_self_collision">False</rosparam>
-    <rosparam param="interactive_marker_chains">
-      - [odom_combined, pr2/r_gripper_tool_frame]
-      - [odom_combined, pr2/l_gripper_tool_frame]
-      - [odom_combined, pr2/base_footprint]
-      - [odom_combined, pr2/high_def_frame]
-    </rosparam>
-  </node>
+    <node pkg="giskardpy" type="interactive_marker.py" name="giskard_interactive_marker" output="screen">
+        <rosparam param="enable_self_collision">False</rosparam>
+        <rosparam param="interactive_marker_chains">
+          - [odom_combined, pr2/r_gripper_tool_frame]
+          - [odom_combined, pr2/l_gripper_tool_frame]
+          - [odom_combined, pr2/base_footprint]
+          - [odom_combined, pr2/high_def_frame]
+        </rosparam>
+    </node>
+
+    <node name="rviz" pkg="rviz" type="rviz" args="-d $(find giskardpy)/launch/rviz_config/standalone.rviz" />
 
 </launch>
 

@@ -24,7 +24,7 @@ class PR2CasterConstraints(Goal):
 class Caster(Goal):
     def __init__(self, joint_name: str, velocity_limit: float = 1):
         super().__init__()
-        self.joint_name = self.world.get_joint_name(joint_name)
+        self.joint_name = self.world.search_for_joint_name(joint_name)
         self.velocity_limit = velocity_limit
 
     def make_constraints(self):

@@ -15,7 +15,7 @@ class FreeVariable:
                  name: PrefixName,
                  lower_limits: Dict[Derivatives, float],
                  upper_limits: Dict[Derivatives, float],
-                 quadratic_weights: Optional[Dict[Derivatives, float]] = None,
+                 quadratic_weights: Dict[Derivatives, float],
                  horizon_functions: Optional[Dict[Derivatives, float]] = None):
         self.god_map = GodMap()
         self._symbols = {}
@@ -27,14 +27,8 @@ class FreeVariable:
         self.default_upper_limits = upper_limits
         self.lower_limits = {}
         self.upper_limits = {}
-        if quadratic_weights is None:
-            self.quadratic_weights = {}
-            for i in range(self.god_map.get_data(identifier.max_derivative)):
-                derivative = Derivatives(i + 1)
-                quadratic_weight_symbol = self.god_map.to_symbol(identifier.joint_weights + [derivative, self.name])
-                self.quadratic_weights[derivative] = quadratic_weight_symbol
-        else:
-            self.quadratic_weights = quadratic_weights
+        self.quadratic_weights = quadratic_weights
+        assert len(self.quadratic_weights) == self.god_map.get_data(identifier.max_derivative)
         assert max(self._symbols.keys()) == len(self._symbols) - 1
 
         self.horizon_functions = defaultdict(lambda: 0.00001)
@@ -73,7 +67,7 @@ class FreeVariable:
         else:
             raise KeyError(f'Free variable {self} doesn\'t have lower limit for derivative of order {derivative}')
         if evaluated:
-            return self.god_map.evaluate_expr(expr)
+            return float(self.god_map.evaluate_expr(expr))
         return expr
 
     def set_lower_limit(self, derivative: Derivatives, limit: Union[w.Expression, float]):
@@ -96,6 +90,18 @@ class FreeVariable:
         if evaluated:
             return self.god_map.evaluate_expr(expr)
         return expr
+
+    def get_lower_limits(self, max_derivative: Derivatives) -> Dict[Derivatives, float]:
+        lower_limits = {}
+        for derivative in Derivatives.range(Derivatives.position, max_derivative):
+            lower_limits[derivative] = self.get_lower_limit(derivative, default=False, evaluated=True)
+        return lower_limits
+
+    def get_upper_limits(self, max_derivative: Derivatives) -> Dict[Derivatives, float]:
+        upper_limits = {}
+        for derivative in Derivatives.range(Derivatives.position, max_derivative):
+            upper_limits[derivative] = self.get_upper_limit(derivative, default=False, evaluated=True)
+        return upper_limits
 
     def has_position_limits(self) -> bool:
         try:

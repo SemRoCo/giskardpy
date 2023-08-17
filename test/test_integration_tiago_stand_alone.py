@@ -3,20 +3,18 @@ from typing import Optional
 
 import numpy as np
 import pytest
-import rospy
 from geometry_msgs.msg import PoseStamped, Quaternion, Point, PointStamped, Vector3Stamped, QuaternionStamped
-from std_srvs.srv import Trigger
 from tf.transformations import quaternion_about_axis, quaternion_from_matrix
 
 import giskardpy.utils.tfwrapper as tf
-from giskard_msgs.msg import MoveResult
-from giskardpy import identifier
-from giskardpy.configs.data_types import SupportedQPSolver
-from giskardpy.configs.tiago import TiagoMujoco, Tiago_Standalone
+from giskardpy.configs.behavior_tree_config import StandAloneBTConfig
+from giskardpy.configs.giskard import Giskard
+from giskardpy.configs.qp_controller_config import QPControllerConfig
+from giskardpy.configs.iai_robots.tiago import TiagoStandaloneInterface, TiagoCollisionAvoidanceConfig
+from giskardpy.configs.world_config import WorldWithDiffDriveRobot
 from giskardpy.goals.goal import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
-from giskardpy.model.joints import OneDofJoint
-from giskardpy.my_types import PrefixName, Derivatives
-from giskardpy.utils.utils import publish_pose, launch_launchfile
+from giskardpy.my_types import PrefixName
+from giskardpy.utils.utils import launch_launchfile
 from utils_for_tests import GiskardTestWrapper, RotationGoalChecker, TranslationGoalChecker
 
 
@@ -96,10 +94,14 @@ class TiagoTestWrapper(GiskardTestWrapper):
         'gripper_left_right_finger_joint': 0.001,
     }
 
-    def __init__(self, config=None):
-        if config is None:
-            config = Tiago_Standalone
-        super().__init__(config)
+    def __init__(self, giskard=None):
+        if giskard is None:
+            giskard = Giskard(world_config=WorldWithDiffDriveRobot(),
+                              collision_avoidance_config=TiagoCollisionAvoidanceConfig(),
+                              robot_interface_config=TiagoStandaloneInterface(),
+                              behavior_tree_config=StandAloneBTConfig(),
+                              qp_controller_config=QPControllerConfig())
+        super().__init__(giskard)
 
     def move_base(self, goal_pose: PoseStamped, check: bool = True):
         tip_link = PrefixName('base_footprint', self.robot_name)
@@ -478,18 +480,17 @@ class TestCollisionAvoidance:
         box_pose.pose.position.z = 0.07
         box_pose.pose.position.x = 0.1
         box_pose.pose.orientation.w = 1
-        # zero_pose.add_box('box',
-        #                   size=(0.05,0.05,0.05),
-        #                   pose=box_pose)
+        zero_pose.add_box('box',
+                          size=(0.05,0.05,0.05),
+                          pose=box_pose)
         box_pose = PoseStamped()
         box_pose.header.frame_id = 'arm_left_5_link'
         box_pose.pose.position.z = 0.07
         box_pose.pose.position.y = -0.1
         box_pose.pose.orientation.w = 1
-        # zero_pose.add_box('box2',
-        #                   size=(0.05,0.05,0.05),
-        #                   pose=box_pose)
-        # zero_pose.allow_self_collision()
+        zero_pose.add_box('box2',
+                          size=(0.05,0.05,0.05),
+                          pose=box_pose)
         zero_pose.plan_and_execute()
 
     def test_load_negative_scale(self, zero_pose: TiagoTestWrapper):
@@ -714,9 +715,10 @@ class TestJointGoals:
 
     def test_joint_goals_at_limits(self, zero_pose: TiagoTestWrapper):
         js1 = {
-            'head_1_joint': 5,
-            'head_2_joint': -5
+            'arm_right_5_joint': 3,
+            # 'arm_left_5_joint': -3
         }
+        # zero_pose.set_seed_configuration(start_state)
         zero_pose.set_joint_goal(js1, check=False, weight=WEIGHT_ABOVE_CA)
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
@@ -736,7 +738,7 @@ class TestJointGoals:
     def test_get_out_of_joint_soft_limits_passive(self, zero_pose: TiagoTestWrapper):
         js = {
             'arm_right_5_joint': 3,
-            'arm_left_5_joint': -3
+            # 'arm_left_5_joint': -3
         }
         zero_pose.set_json_goal('SetSeedConfiguration',
                                 seed_configuration=js)
@@ -746,56 +748,27 @@ class TestJointGoals:
     def test_get_out_of_joint_soft_limits_passive_with_velocity(self, zero_pose: TiagoTestWrapper):
         js = {
             'arm_right_5_joint': 3,
-            'arm_left_5_joint': -3
+            # 'arm_left_5_joint': -3
         }
         zero_pose.set_json_goal('SetSeedConfiguration',
                                 seed_configuration=js)
         zero_pose.world.state[PrefixName('arm_right_5_joint', 'tiago_dual')].velocity = 1
+        # zero_pose.world.state[PrefixName('arm_left_5_joint', 'tiago_dual')].velocity = -1
         zero_pose.plan_and_execute()
         zero_pose.are_joint_limits_violated()
 
     def test_try_to_stay_out_of_soft_limits(self, zero_pose: TiagoTestWrapper):
         js = {
-            'head_1_joint': 2,
-            'head_2_joint': -2
+            'arm_right_5_joint': 3,
+            # 'arm_left_5_joint': -3
         }
         zero_pose.set_json_goal('SetSeedConfiguration',
                                 seed_configuration=js)
-        zero_pose.set_joint_goal(js, weight=WEIGHT_BELOW_CA, check=False)
+        zero_pose.set_joint_goal(js, check=False)
+        zero_pose.world.state[PrefixName('arm_right_5_joint', 'tiago_dual')].velocity = 1
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
         zero_pose.are_joint_limits_violated()
-
-    def test_torso_goal(self, zero_pose: TiagoTestWrapper):
-        # js1 = {
-        #     'torso_lift_joint': 0.2,
-        # }
-        # js2 = {
-        #     'torso_lift_joint': 0.25,
-        #     'head_1_joint': 1
-        # }
-        # zero_pose.set_joint_goal(js1)
-        # # zero_pose.allow_all_collisions()
-        # zero_pose.plan_and_execute()
-        #
-        # zero_pose.set_joint_goal(js2)
-        # # zero_pose.allow_all_collisions()
-        # zero_pose.plan_and_execute()
-
-        # zero_pose.set_json_goal('SetSeedConfiguration',
-        #                         seed_configuration=js_start)
-        zero_pose.allow_self_collision()
-        js = deepcopy(zero_pose.default_pose)
-        # del js['head_1_joint']
-        # del js['head_2_joint']
-        zero_pose.set_joint_goal(js)
-        zero_pose.plan()
-        zero_pose.allow_self_collision()
-        js = deepcopy(zero_pose.default_pose)
-        del js['gripper_right_left_finger_joint']
-        # del js['gripper_right_right_finger_joint']
-        zero_pose.set_joint_goal(js)
-        zero_pose.plan()
 
     def test_get_out_of_joint_soft_limits2(self, zero_pose: TiagoTestWrapper):
         js = {

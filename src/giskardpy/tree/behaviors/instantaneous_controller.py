@@ -22,7 +22,7 @@ class ControllerPlugin(GiskardBehavior):
         substitutions = self.god_map.get_values(parameters)
 
         next_cmds = self.controller.get_cmd(substitutions)
-        self.get_god_map().set_data(identifier.qp_solver_solution, next_cmds)
+        self.god_map.set_data(identifier.qp_solver_solution, next_cmds)
 
         return Status.RUNNING
 

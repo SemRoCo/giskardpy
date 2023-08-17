@@ -2,7 +2,7 @@
 import numpy as np
 from qpsolvers import solve_qp
 
-from giskardpy.configs.data_types import SupportedQPSolver
+from giskardpy.configs.qp_controller_config import SupportedQPSolver
 from giskardpy.exceptions import QPSolverException, InfeasibleException, HardConstraintsViolatedException
 from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.utils import logging

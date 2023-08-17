@@ -6,7 +6,7 @@ import numpy as np
 import qpalm
 from scipy import sparse as sp
 
-from giskardpy.configs.data_types import SupportedQPSolver
+from giskardpy.configs.qp_controller_config import SupportedQPSolver
 from giskardpy.exceptions import QPSolverException, InfeasibleException, HardConstraintsViolatedException
 from giskardpy.qp.qp_solver import QPSolver
 
@@ -154,8 +154,8 @@ class QPSolverQPalm(QPSolver):
             A2 = np.vstack((A2, E))
         if len(A) > 0:
             A2 = np.vstack((A2, A))
-        lbA = np.concatenate((lb, lbA))
-        ubA = np.concatenate((ub, ubA))
+        lbA = np.concatenate((lb, bE, lbA))
+        ubA = np.concatenate((ub, bE, ubA))
         return self.solver_call(H, g, A2, lbA, ubA)
 
     @profile
@@ -230,6 +230,7 @@ class QPSolverQPalm(QPSolver):
         lb = self.lb_bE_lbA[:num_b]
         ub = self.ub_bE_ubA[:num_b]
         lb, ub = self.lb_ub_with_inf(lb, ub)
+        lb = -lb
         bE = self.lb_bE_lbA[num_b:num_b + num_bE]
         lbA = self.lb_bE_lbA[num_b + num_bE:]
         ubA = self.ub_bE_ubA[num_b + num_bE:]

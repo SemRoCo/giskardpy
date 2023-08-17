@@ -2,9 +2,9 @@ import numpy as np
 from clarabel import clarabel
 from scipy import sparse
 
-from giskardpy.configs.data_types import SupportedQPSolver
+from giskardpy.configs.qp_controller_config import SupportedQPSolver
 from giskardpy.qp.qp_solver import QPSolver
-from giskardpy.utils.utils import record_time
+from giskardpy.utils.decorators import record_time
 
 
 class QPSolverClarabel(QPSolver):

@@ -53,10 +53,27 @@ def urdf_joint_to_limits(urdf_joint: up.Joint) -> Tuple[derivative_map, derivati
         upper_limits[Derivatives.velocity] = urdf_joint.limit.velocity
     except AttributeError:
         pass
+    if urdf_joint.mimic is not None:
+        if urdf_joint.mimic.multiplier is not None:
+            multiplier = urdf_joint.mimic.multiplier
+        else:
+            multiplier = 1
+        if urdf_joint.mimic.offset is not None:
+            offset = urdf_joint.mimic.offset
+        else:
+            offset = 0
+        for d2 in Derivatives.range(Derivatives.position, Derivatives.velocity):
+            lower_limits[d2] -= offset
+            upper_limits[d2] -= offset
+            if multiplier < 0:
+                upper_limits[d2], lower_limits[d2] = lower_limits[d2], upper_limits[d2]
+            upper_limits[d2] /= multiplier
+            lower_limits[d2] /= multiplier
     return lower_limits, upper_limits
 
 
-def urdf_to_joint(urdf_joint: up.Joint, prefix: str) -> Union[FixedJoint, RevoluteJoint, PrismaticJoint]:
+def urdf_to_joint(urdf_joint: up.Joint, prefix: str) \
+        -> Union[FixedJoint, RevoluteJoint, PrismaticJoint]:
     joint_class = urdf_joint_to_class(urdf_joint)
     if urdf_joint.origin is not None:
         translation_offset = urdf_joint.origin.xyz
@@ -82,22 +99,10 @@ def urdf_to_joint(urdf_joint: up.Joint, prefix: str) -> Union[FixedJoint, Revolu
                            parent_link_name=parent_link_name,
                            child_link_name=child_link_name,
                            parent_T_child=parent_T_child)
-    lower_limits, upper_limits = urdf_joint_to_limits(urdf_joint)
-    for i in range(GodMap().unsafe_get_data(identifier.max_derivative)):
-        derivative = Derivatives(i + 1)  # to start with velocity and include max_derivative
-        limit_symbol = GodMap().to_symbol(identifier.joint_limits + [derivative, joint_name])
-        if derivative in lower_limits:
-            lower_limits[derivative] = w.max(-limit_symbol, lower_limits[derivative])
-        else:
-            lower_limits[derivative] = -limit_symbol
-        if derivative in upper_limits:
-            upper_limits[derivative] = w.min(limit_symbol, upper_limits[derivative])
-        else:
-            upper_limits[derivative] = limit_symbol
-
+    is_mimic = urdf_joint.mimic is not None
     multiplier = None
     offset = None
-    if urdf_joint.mimic is not None:
+    if is_mimic:
         if urdf_joint.mimic.multiplier is not None:
             multiplier = urdf_joint.mimic.multiplier
         else:
@@ -106,16 +111,22 @@ def urdf_to_joint(urdf_joint: up.Joint, prefix: str) -> Union[FixedJoint, Revolu
             offset = urdf_joint.mimic.offset
         else:
             offset = 0
-        upper_limits[Derivatives.position] -= offset
-        lower_limits[Derivatives.position] -= offset
-        if multiplier < 0:
-            upper_limits[Derivatives.position], \
-            lower_limits[Derivatives.position] = lower_limits[Derivatives.position], upper_limits[Derivatives.position]
-        upper_limits[Derivatives.position] /= multiplier
-        lower_limits[Derivatives.position] /= multiplier
+
         free_variable_name = PrefixName(urdf_joint.mimic.joint, prefix)
     else:
         free_variable_name = joint_name
+
+    lower_limits, upper_limits = urdf_joint_to_limits(urdf_joint)
+    # for derivative, limit in default_limits.items():
+    #     if derivative in lower_limits:
+    #         lower_limits[derivative] = w.max(-limit, lower_limits[derivative])
+    #     else:
+    #         lower_limits[derivative] = -limit
+    #     if derivative in upper_limits:
+    #         upper_limits[derivative] = w.min(limit, upper_limits[derivative])
+    #     else:
+    #         upper_limits[derivative] = limit
+
     return joint_class(name=joint_name,
                        free_variable_name=free_variable_name,
                        parent_link_name=parent_link_name,
@@ -160,14 +171,16 @@ class MovableJoint(Joint):
 
 class FixedJoint(Joint):
     def __init__(self, name: PrefixName, parent_link_name: PrefixName, child_link_name: PrefixName,
-                 parent_T_child: w.TransMatrix):
+                 parent_T_child: Optional[w.TransMatrix] = None):
         self.name = name
         self.parent_link_name = parent_link_name
         self.child_link_name = child_link_name
+        if parent_T_child is None:
+            parent_T_child = w.eye(4)
         self.parent_T_child = w.TransMatrix(parent_T_child)
 
 
-class TFJoint(Joint):
+class Joint6DOF(Joint):
     def __init__(self, name: PrefixName, parent_link_name: PrefixName, child_link_name: PrefixName):
         self.name = name
         self.parent_link_name = parent_link_name
@@ -242,7 +255,9 @@ class OneDofJoint(MovableJoint):
         return self.free_variable.get_symbol(derivative) * self.multiplier + self.offset
 
     def get_limit_expressions(self, order: Derivatives) -> Optional[Tuple[w.Expression, w.Expression]]:
-        return self.free_variable.get_lower_limit(order), self.free_variable.get_upper_limit(order)
+        lower_limit = self.free_variable.get_lower_limit(order) * self.multiplier + self.offset
+        upper_limit = self.free_variable.get_upper_limit(order) * self.multiplier + self.offset
+        return lower_limit, upper_limit
 
 
 class RevoluteJoint(OneDofJoint):
@@ -455,8 +470,8 @@ class DiffDrive(MovableJoint, VirtualFreeVariables):
                                                   lower_limits=translation_lower_limits,
                                                   upper_limits=self.translation_limits)
         self.yaw = self.world.add_free_variable(name=PrefixName('yaw', self.name),
-                                                    lower_limits=rotation_lower_limits,
-                                                    upper_limits=self.rotation_limits)
+                                                lower_limits=rotation_lower_limits,
+                                                upper_limits=self.rotation_limits)
         self.free_variables = [self.x_vel, self.yaw]
 
     def update_transform(self, new_parent_T_child: Pose):
@@ -629,6 +644,7 @@ class OmniDrivePR22(MovableJoint, VirtualFreeVariables):
         self.world.state[self.pitch.name].position = pitch
         self.world.state[self.yaw.name].position = yaw
 
+
 class PR2CasterJoint(MovableJoint):
     def __init__(self,
                  name: PrefixName,
@@ -658,8 +674,8 @@ class PR2CasterJoint(MovableJoint):
             yaw1_position = self.odom_joint.yaw1_vel.get_symbol(Derivatives.position)
             yaw2_position = self.odom_joint.yaw.get_symbol(Derivatives.position)
             yaw2_velocity = self.odom_joint.yaw.get_symbol(Derivatives.velocity)
-            x_vel = w.cos(yaw1_position-yaw2_position) * forward_velocity
-            y_vel = w.sin(yaw1_position-yaw2_position) * forward_velocity
+            x_vel = w.cos(yaw1_position - yaw2_position) * forward_velocity
+            y_vel = w.sin(yaw1_position - yaw2_position) * forward_velocity
             yaw_vel = yaw2_velocity
         # caster_link = self.world.joints[self.name].child_link_name
         parent_P_child = self.parent_T_child.to_position()

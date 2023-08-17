@@ -9,23 +9,28 @@ class TestMath(unittest.TestCase):
         limits = {
             Derivatives.velocity: 1,
             Derivatives.acceleration: np.inf,
+            Derivatives.jerk: 21.1
+        }
+        actual = giskard_math.mpc_velocity_integral(limits, 0.05, 9)
+        expected = giskard_math.mpc_velocity_integral3(limits, 0.05, 9)
+        self.assertAlmostEqual(actual, expected)
+
+    def test_velocity_integral_jerk2(self):
+        limits = {
+            Derivatives.velocity: 0.8,
+            Derivatives.acceleration: np.inf,
             Derivatives.jerk: 30
         }
         actual = giskard_math.mpc_velocity_integral(limits, 0.05, 9)
-        self.assertAlmostEqual(actual, 0.185)
+        expected = giskard_math.mpc_velocity_integral2(limits, 0.05, 9)
+        self.assertAlmostEqual(actual, expected)
 
-    def test_velocity_integral_acc(self):
+    def test_velocity_integral_jerk3(self):
         limits = {
-            Derivatives.velocity: 0.5,
-            Derivatives.acceleration: 1.5,
+            Derivatives.velocity: 0.8,
+            Derivatives.acceleration: np.inf,
+            Derivatives.jerk: 60
         }
         actual = giskard_math.mpc_velocity_integral(limits, 0.05, 9)
-        self.assertAlmostEqual(actual, 0.095)
-
-    def test_velocity_integral_acc2(self):
-        limits = {
-            Derivatives.velocity: 0.6,
-            Derivatives.acceleration: 1.5,
-        }
-        actual = giskard_math.mpc_velocity_integral(limits, 0.05, 9)
-        self.assertAlmostEqual(actual, 0.135)
+        expected = giskard_math.mpc_velocity_integral2(limits, 0.05, 9)
+        self.assertAlmostEqual(actual, expected)

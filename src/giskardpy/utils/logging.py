@@ -2,8 +2,6 @@ from inspect import currentframe, getframeinfo
 
 import rospy
 
-from giskardpy import identifier
-
 @profile
 def generate_debug_msg(msg):
     node_name = rospy.get_name()

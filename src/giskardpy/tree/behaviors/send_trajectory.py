@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Dict
 
 import control_msgs
 from rospy import ROSException
@@ -10,7 +10,7 @@ from giskardpy.exceptions import ExecutionException, FollowJointTrajectory_INVAL
     FollowJointTrajectory_PATH_TOLERANCE_VIOLATED, FollowJointTrajectory_GOAL_TOLERANCE_VIOLATED, \
     ExecutionTimeoutException, ExecutionSucceededPrematurely, ExecutionPreemptedException
 from giskardpy.model.joints import OneDofJoint, OmniDrive
-from giskardpy.my_types import PrefixName
+from giskardpy.my_types import PrefixName, Derivatives
 
 try:
     import pr2_controllers_msgs.msg
@@ -20,7 +20,8 @@ import py_trees
 import rospy
 import rostopic
 from actionlib_msgs.msg import GoalStatus
-from control_msgs.msg import FollowJointTrajectoryAction, FollowJointTrajectoryGoal, FollowJointTrajectoryResult
+from control_msgs.msg import FollowJointTrajectoryAction, FollowJointTrajectoryGoal, FollowJointTrajectoryResult, \
+    JointTolerance
 from py_trees_ros.actions import ActionClient
 
 import giskardpy.identifier as identifier
@@ -47,8 +48,10 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
     @record_time
     @profile
     def __init__(self, action_namespace: str, state_topic: str, group_name: str,
-                 goal_time_tolerance: float = 1, fill_velocity_values: bool = True):
+                 goal_time_tolerance: float = 1, fill_velocity_values: bool = True,
+                 path_tolerance: Dict[Derivatives, float] = None):
         self.group_name = group_name
+        self.delay = rospy.Duration(0)
         self.action_namespace = action_namespace
         GiskardBehavior.__init__(self, str(self))
         self.min_deadline: rospy.Time
@@ -56,6 +59,7 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
         self.controlled_joints: List[OneDofJoint] = []
         self.fill_velocity_values = fill_velocity_values
         self.goal_time_tolerance = rospy.Duration(goal_time_tolerance)
+        self.path_tolerance = path_tolerance
 
         loginfo(f'Waiting for action server \'{self.action_namespace}\' to appear.')
         action_msg_type = None
@@ -122,28 +126,36 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
         loginfo(f'Flagging the following joints as controlled: {controlled_joint_names}.')
         self.world.register_controlled_joints(controlled_joint_names)
 
-    def __str__(self):
-        return f'{super().__str__()} ({self.action_namespace})'
-
     @record_time
     @profile
     def initialise(self):
         super().initialise()
-        trajectory = self.get_god_map().get_data(identifier.trajectory)
+        self.delay = self.god_map.get_data(identifier.time_delay)
+        trajectory = self.god_map.get_data(identifier.trajectory)
         goal = FollowJointTrajectoryGoal()
-        sample_period = self.get_god_map().get_data(identifier.sample_period)
+        sample_period = self.god_map.get_data(identifier.sample_period)
         start_time = self.god_map.get_data(identifier.tracking_start_time)
         fill_velocity_values = self.god_map.get_data(identifier.fill_trajectory_velocity_values)
         if fill_velocity_values is None:
             fill_velocity_values = self.fill_velocity_values
         goal.trajectory = trajectory.to_msg(sample_period, start_time, self.controlled_joints,
                                             fill_velocity_values)
+
+        if self.path_tolerance is not None:
+            for i, joint_name in enumerate(goal.trajectory.joint_names):
+                jt = JointTolerance()
+                jt.name = joint_name
+                jt.position = self.path_tolerance[Derivatives.position]
+                jt.velocity = self.path_tolerance[Derivatives.velocity]
+                jt.acceleration = self.path_tolerance[Derivatives.acceleration]
+                goal.path_tolerance.append(jt)
+
         self.action_goal = goal
         deadline = self.action_goal.trajectory.header.stamp + \
                    self.action_goal.trajectory.points[-1].time_from_start + \
                    self.action_goal.goal_time_tolerance
-        self.min_deadline = deadline - self.goal_time_tolerance
-        self.max_deadline = deadline + self.goal_time_tolerance
+        self.min_deadline = deadline - self.goal_time_tolerance + self.delay
+        self.max_deadline = deadline + self.goal_time_tolerance + self.delay
         self.cancel_tries = 0
 
     @catch_and_raise_to_blackboard
@@ -243,4 +255,4 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
         self.sent_goal = False
 
     def __str__(self):
-        return f'{self.__class__.__name__}/{self.group_name}/{self.action_namespace}'
+        return f'{self.__class__.__name__}\n/{self.group_name}/{self.action_namespace}'

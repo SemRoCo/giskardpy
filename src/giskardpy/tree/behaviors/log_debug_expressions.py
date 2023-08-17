@@ -29,6 +29,8 @@ class LogDebugExpressionsPlugin(GiskardBehavior):
                 last_mjs = self.trajectory.get_exact(round((time-1)/self.sample_period))
             js = JointStates()
             for name, value in debug_data.items():
+                if len(value) > 1:
+                    continue
                 if last_mjs is not None:
                     velocity = value - last_mjs[name].position
                 else:

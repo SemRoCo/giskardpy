@@ -47,8 +47,6 @@ def memoize(function):
 
     @wraps(function)
     def wrapper(*args, **kwargs):
-        # key = cPickle.dumps((args, kwargs))
-        # key = pickle.dumps((args, sorted(kwargs.items()), -1))
         key = (args, frozenset(kwargs.items()))
         try:
             return memo[key]
@@ -60,8 +58,34 @@ def memoize(function):
     return wrapper
 
 
+def memoize_with_counter(reset_after: int):
+    def memoize(function):
+        memo = function.memo = {}
+        function.__counter = 0
+
+        @wraps(function)
+        def wrapper(*args, **kwargs):
+            key = (args, frozenset(kwargs.items()))
+            try:
+                hit = memo[key]
+                if function.__counter >= reset_after:
+                    raise KeyError
+                else:
+                    function.__counter += 1
+                    return hit
+            except KeyError:
+                function.__counter = 1
+                rv = function(*args, **kwargs)
+                memo[key] = rv
+                return rv
+
+        return wrapper
+
+    return memoize
+
+
 def record_time(function):
-    return function
+    # return function
     function_name = function.__name__
 
     @wraps(function)
@@ -88,15 +112,13 @@ def copy_memoize(function):
 
     @wraps(function)
     def wrapper(*args, **kwargs):
-        # key = cPickle.dumps((args, kwargs))
-        # key = pickle.dumps((args, sorted(kwargs.items()), -1))
         key = (args, frozenset(kwargs.items()))
         try:
             return deepcopy(memo[key])
         except KeyError:
             rv = function(*args, **kwargs)
             memo[key] = rv
-            return rv
+            return deepcopy(rv)
 
     return wrapper
 

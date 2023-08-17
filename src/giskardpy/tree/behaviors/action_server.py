@@ -76,7 +76,7 @@ class ActionServerBehavior(GiskardBehavior):
     as_handler: ActionServerHandler
 
     @record_time
-    def __init__(self, name, as_name, action_type=None):
+    def __init__(self, name: str, as_name: str, action_type=None):
         self.as_name = as_name
         self.action_type = action_type
         self.as_handler = Blackboard().get(self.as_name)
@@ -85,8 +85,5 @@ class ActionServerBehavior(GiskardBehavior):
             Blackboard().set(self.as_name, self.as_handler)
         super().__init__(name)
 
-    def get_as(self):
-        """
-        :rtype: ActionServerHandler
-        """
+    def get_as(self) -> ActionServerHandler:
         return self.as_handler

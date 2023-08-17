@@ -2,9 +2,7 @@
 
   <include file="$(find hsr_description)/launch/upload_hsrb.launch"/>
 
-  <node pkg="giskardpy" type="giskard.py" name="giskard" output="screen">
-    <param name="config" value="HSR_StandAlone"/>
-  </node>
+  <node pkg="giskardpy" type="hsr_standalone.py" name="giskard" output="screen"/>
 
   <node pkg="giskardpy" type="interactive_marker.py" name="giskard_interactive_marker" output="screen">
     <rosparam param="enable_self_collision">False</rosparam>
@@ -14,6 +12,8 @@
       - [odom, hsrb/hand_palm_link]
     </rosparam>
   </node>
+
+  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find giskardpy)/launch/rviz_config/standalone.rviz" />
 
 </launch>
 

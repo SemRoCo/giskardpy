@@ -315,9 +315,12 @@ class GraspBoxMalte(Goal):
         #                                              'orthoPointz'])
 
         # orient the line between the fingers parallel to the line of the smallest width
+        root_V_y = w.dot(root_T_hand, w.Vector3([0, 1, 0]))
+        root_V_z = w.Vector3([0, 0, 1])
+        hacked_error = root_V_z - root_V_y
         self.add_equality_constraint_vector(reference_velocities=[self.max_velocity * 3] * 3,
-                                            equality_bounds=lower_error[:3],
-                                            task_expression=root_V_tips[:3],
+                                            equality_bounds=hacked_error[:3],
+                                            task_expression=root_V_y[:3],
                                             weights=[weight_outside_cylinder, weight_outside_cylinder,
                                                      weight_outside_cylinder],
                                             names=['orient_x', 'orient_y', 'orient_z'])
@@ -355,8 +358,8 @@ class GraspBoxMalte(Goal):
                                             weights=[palm_contact_weight] * 3,
                                             names=['orthoAxisx2', 'orthoAxisy2', 'orthoAxisz2'])
         self.add_equality_constraint_vector(reference_velocities=[0.2, 0.2, 0.2],
-                                            equality_bounds=lower_error[:3],
-                                            task_expression=root_V_tips[:3],
+                                            equality_bounds=hacked_error[:3],
+                                            task_expression=root_V_y[:3],
                                             weights=[palm_contact_weight] * 3,
                                             names=['orient_x2', 'orient_y2', 'orient_z2'])
         # ---------------------Keep Hand open during Pahse 2------------------------------------------------------

@@ -35,7 +35,7 @@ class ControlLoop(AsyncBehavior, GodMapWorshipper):
 
         stoppers = success_is_running(Sequence)('stop conditions')
         stoppers.add_child(LoopDetector('loop detector'))
-        stoppers.add_child(LocalMinimum('local minimum'))
+        stoppers.add_child(LocalMinimum('local minimum', real_time=self.is_closed_loop))
         stoppers.add_child(MaxTrajectoryLength('traj length check',
                                                real_time=self.is_closed_loop))
         stoppers.add_child(GoalDone('goal done check'))

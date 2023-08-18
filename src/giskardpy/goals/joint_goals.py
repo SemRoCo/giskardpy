@@ -289,7 +289,7 @@ class JointPositionRevolute(Goal):
             self.add_equality_constraint(reference_velocity=max_velocity,
                                          equality_bound=error,
                                          weight=weight,
-                                         goal_reached_threshold=0.05,
+                                         goal_reached_threshold=0.005,
                                          task_expression=current_joint)
 
     def __str__(self):

@@ -2,6 +2,7 @@ import numpy as np
 from py_trees import Status
 
 import giskardpy.identifier as identifier
+from giskardpy.exceptions import LocalMinimumException
 from giskardpy.my_types import Derivatives
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
@@ -24,7 +25,6 @@ class LocalMinimum(GiskardBehavior):
 
     @profile
     def initialise(self):
-        self.above_threshold_time = 0
         self.thresholds = self.make_velocity_threshold()
         self.number_of_controlled_joints = len(self.thresholds)
         self.endless_mode = self.god_map.get_data(identifier.endless_mode)
@@ -35,17 +35,17 @@ class LocalMinimum(GiskardBehavior):
     def update(self):
         if self.endless_mode:
             return Status.SUCCESS
-        planning_time = self.god_map.get_data(identifier.time)
-        if planning_time - self.above_threshold_time >= self.window_size:
+        traj_time = self.traj_time_in_sec
+        if traj_time >= self.window_size:
             velocities = np.array(list(self.god_map.get_data(identifier.qp_solver_solution).xdot_velocity))
             below_threshold = np.all(np.abs(velocities) < self.thresholds)
             if below_threshold:
                 run_time = self.get_runtime()
                 logging.loginfo('Velocities went below threshold.')
                 logging.loginfo(f'Found goal trajectory with length '
-                                f'{planning_time * self.sample_period:.3f}s in {run_time:.3f}s')
-                raise
-        return Status.SUCCESS
+                                f'{traj_time:.3f}s in {run_time:.3f}s')
+                raise LocalMinimumException('asdf')
+        return Status.RUNNING
 
     def make_velocity_threshold(self, min_cut_off=0.01, max_cut_off=0.06):
         joint_convergence_threshold = self.joint_convergence_threshold

@@ -8,18 +8,18 @@ from giskardpy.tree.behaviors.goal_canceled import GoalCanceled
 from giskardpy.tree.behaviors.publish_feedback import PublishFeedback
 from giskardpy.tree.behaviors.set_move_result import SetMoveResult
 from giskardpy.tree.branches.clean_up_control_loop import CleanupControlLoop
-from giskardpy.tree.branches.control_loop import ControlLoopBranch
+from giskardpy.tree.branches.control_loop import ControlLoop
 from giskardpy.tree.decorators import success_is_failure
 
 
 class ProcessGoal(Selector, GodMapWorshipper):
-    control_loop_branch: ControlLoopBranch
+    control_loop_branch: ControlLoop
     cleanup_control_loop: CleanupControlLoop
 
     def __init__(self, name: str = 'process goal'):
         super().__init__(name)
         self.cleanup_control_loop = CleanupControlLoop()
-        self.control_loop_branch = success_is_failure(ControlLoopBranch)()
+        self.control_loop_branch = success_is_failure(ControlLoop)()
 
         self.add_child(GoalCanceled('goal canceled2', self.god_map.get_data(identifier.action_server_name)))
         self.add_child(success_is_failure(PublishFeedback)('publish feedback1', MoveFeedback.PLANNING))

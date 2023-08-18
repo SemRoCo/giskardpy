@@ -19,6 +19,7 @@ from giskardpy.tree.branches.prepare_control_loop import PrepareControlLoop
 from giskardpy.tree.branches.process_goal import ProcessGoal
 from giskardpy.tree.branches.wait_for_goal import WaitForGoal
 from giskardpy.tree.composites.async_composite import AsyncBehavior
+from giskardpy.tree.control_modes import ControlModes
 from giskardpy.tree.decorators import success_is_running, failure_is_success
 
 
@@ -28,7 +29,10 @@ class GiskardBT(BehaviourTree, GodMapWorshipper):
     process_goal: ProcessGoal
     post_processing: PostProcessing
 
-    def __init__(self):
+    def __init__(self, control_mode: ControlModes):
+        self.god_map.set_data(identifier.control_mode, control_mode)
+        # TODO reject invalid control mode
+        # raise KeyError(f'Robot interface mode \'{self._control_mode}\' is not supported.')
         root = Sequence('Giskard')
         self.wait_for_goal = WaitForGoal()
         self.prepare_control_loop = failure_is_success(PrepareControlLoop)()

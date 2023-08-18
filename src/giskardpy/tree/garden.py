@@ -79,7 +79,7 @@ from giskardpy.tree.behaviors.time_real import RosTime
 from giskardpy.tree.behaviors.visualization import VisualizationBehavior
 from giskardpy.tree.behaviors.world_updater import WorldUpdater
 from giskardpy.tree.branches.clean_up_control_loop import CleanupControlLoop
-from giskardpy.tree.branches.control_loop import ControlLoopBranch
+from giskardpy.tree.branches.control_loop import ControlLoop
 from giskardpy.tree.branches.giskard_bt import GiskardBT
 from giskardpy.tree.branches.post_processing import PostProcessing
 from giskardpy.tree.branches.prepare_control_loop import PrepareControlLoop
@@ -217,17 +217,14 @@ class TreeManager(ABC):
     tree: GiskardBT
 
     @profile
-    def __init__(self, tree=None):
+    def __init__(self, control_mode: ControlModes):
+        self.god_map.set_data(identifier.tree_manager, self)
         self.action_server_name = self.god_map.get_data(identifier.action_server_name)
 
-        if tree is None:
-            self.tree = GiskardBT()
-            self.setup()
-        else:
-            self.tree = tree
+        self.tree = GiskardBT(control_mode=control_mode)
         self.tree_nodes = {}
 
-        self.__init_map(self.tree.root, None, 0)
+        # self.__init_map(self.tree.root, None, 0)
 
     def live(self):
         sleeper = rospy.Rate(1 / self.tick_rate)
@@ -587,7 +584,7 @@ class StandAlone(TreeManager):
         planning_2.add_child(success_is_failure(PublishFeedback)('publish feedback1',
                                                                  MoveFeedback.PLANNING))
         # planning_2.add_child(success_is_failure(StartTimer)('start runtime timer'))
-        planning_2.add_child(success_is_failure(ControlLoopBranch)(self.closed_loop_control_name))
+        planning_2.add_child(success_is_failure(ControlLoop)(self.closed_loop_control_name))
         planning_2.add_child(CleanupControlLoop())
         return planning_2
 

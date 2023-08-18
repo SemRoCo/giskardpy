@@ -25,15 +25,7 @@ class BehaviorTreeConfig(ABC):
         return self.god_map.get_data(identifier.tree_manager)
 
     def _create_behavior_tree(self):
-        if self._control_mode == ControlModes.open_loop:
-            behavior_tree = OpenLoop()
-        elif self._control_mode == ControlModes.close_loop:
-            behavior_tree = ClosedLoop()
-        elif self._control_mode == ControlModes.standalone:
-            behavior_tree = StandAlone()
-        else:
-            raise KeyError(f'Robot interface mode \'{self._control_mode}\' is not supported.')
-        self.god_map.set_data(identifier.tree_manager, behavior_tree)
+        TreeManager(self._control_mode)
 
     def set_defaults(self):
         pass

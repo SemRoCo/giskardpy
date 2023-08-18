@@ -2,7 +2,7 @@ from py_trees import Status
 
 import giskardpy.identifier as identifier
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
-from giskardpy.utils.decorators import record_time
+from giskardpy.utils.decorators import record_time, catch_and_raise_to_blackboard
 
 
 class RealKinSimPlugin(GiskardBehavior):
@@ -10,9 +10,9 @@ class RealKinSimPlugin(GiskardBehavior):
 
     def initialise(self):
         self.last_time = None
-        self.god_map.set_data(identifier.dt, 0)
         self.start_time = self.god_map.get_data(identifier.tracking_start_time)
 
+    @catch_and_raise_to_blackboard
     @record_time
     @profile
     def update(self):
@@ -22,12 +22,7 @@ class RealKinSimPlugin(GiskardBehavior):
             return Status.RUNNING
         # if self.last_time is None:
         next_cmds = self.god_map.get_data(identifier.qp_solver_solution)
-        # joints = self.world.joints
-        # next_time = rospy.get_rostime()
         dt = next_time - self.last_time
-        # dt = 0.0125
-        # self.god_map.set_data(identifier.dt, 0.0125)
-        # print(f'dt: {dt}')
         self.world.update_state(next_cmds, dt)
         self.last_time = next_time
         # self.world.notify_state_change()

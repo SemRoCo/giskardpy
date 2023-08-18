@@ -36,6 +36,18 @@ class GodMapWorshipper:
         return self.god_map.get_data(identifier.control_mode)
 
     @property
+    def is_closed_loop(self):
+        return self.control_mode == self.control_mode.close_loop
+
+    @property
+    def is_standalone(self):
+        return self.control_mode == self.control_mode.standalone
+
+    @property
+    def is_open_loop(self):
+        return self.control_mode == self.control_mode.open_loop
+
+    @property
     def collision_checker_id(self) -> CollisionCheckerLib:
         return self.god_map.get_data(identifier.collision_checker)
 

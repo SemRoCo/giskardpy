@@ -20,4 +20,4 @@ class GoalDone(GiskardBehavior):
         if all_goals_succeeded:
             return Status.SUCCESS
         else:
-            return Status.RUNNING
+            return Status.SUCCESS

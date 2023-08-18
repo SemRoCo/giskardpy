@@ -58,7 +58,6 @@ class SyncConfiguration(GiskardBehavior):
             pass
 
         self.world.state.update(self.mjs)
-        self.world.notify_state_change()
         return Status.SUCCESS
 
     def __str__(self):

@@ -93,7 +93,7 @@ class SendCmdVel(GiskardBehavior, ABC):
         cmd = self.god_map.get_data(identifier.qp_solver_solution)
         twist = self.solver_cmd_to_twist(cmd)
         self.vel_pub.publish(twist)
-        return Status.RUNNING
+        return Status.SUCCESS
 
     def terminate(self, new_status):
         self.vel_pub.publish(Twist())

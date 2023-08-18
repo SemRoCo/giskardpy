@@ -27,15 +27,17 @@ class WaitForGoal(Sequence, GodMapWorshipper):
     synchronization: Synchronization
     publish_state: PublishState
     goal_received: GoalReceived
+    world_updater: WorldUpdater
 
     def __init__(self, name: str = 'wait for goal'):
         super().__init__(name)
-        self.synchronization = Synchronization()
+        self.world_updater = WorldUpdater('update world')
+        self.synchronization = Synchronization('sync 1')
         self.publish_state = PublishState()
         self.goal_received = GoalReceived('has goal?',
                                           self.god_map.get_data(identifier.action_server_name),
                                           MoveAction)
-
+        self.add_child(self.world_updater)
         self.add_child(self.synchronization)
         self.add_child(self.publish_state)
         self.add_child(self.goal_received)

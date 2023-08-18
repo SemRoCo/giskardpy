@@ -85,6 +85,7 @@ class Giskard(GodMapWorshipper):
         self._controlled_joints_sanity_check()
         self.world.notify_model_change()
         self.collision_scene.sync()
+        self.tree_manager.setup()
 
     def _controlled_joints_sanity_check(self):
         world = self.god_map.get_data(identifier.world)
@@ -93,9 +94,10 @@ class Giskard(GodMapWorshipper):
             raise GiskardException('No joints are flagged as controlled.')
         logging.loginfo(f'The following joints are non-fixed according to the urdf, '
                         f'but not flagged as controlled: {non_controlled_joints}.')
-        if not self.tree_manager.base_tracking_enabled() \
-                and not self.control_mode == ControlModes.standalone:
-            logging.loginfo('No cmd_vel topic has been registered.')
+        # FIXME
+        # if not self.tree_manager.base_tracking_enabled() \
+        #         and not self.control_mode == ControlModes.standalone:
+        #     logging.loginfo('No cmd_vel topic has been registered.')
 
     def add_goal_package_name(self, package_name: str):
         new_goals = get_all_classes_in_package(package_name, Goal)

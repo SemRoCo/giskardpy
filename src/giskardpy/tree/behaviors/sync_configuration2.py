@@ -24,11 +24,7 @@ class SyncConfiguration2(GiskardBehavior):
     @record_time
     @profile
     def __init__(self, group_name: str, joint_state_topic='joint_states'):
-        """
-        :type js_identifier: str
-        """
         super().__init__(str(self))
-        self.pub = rospy.Publisher('asdfasfd', JointState, queue_size=10)
         self.joint_state_topic = joint_state_topic
         if not self.joint_state_topic.startswith('/'):
             self.joint_state_topic = '/' + self.joint_state_topic
@@ -36,7 +32,6 @@ class SyncConfiguration2(GiskardBehavior):
         self.mjs: Optional[JointStates] = None
         self.group_name = group_name
         self.lock = Lock()
-        # self.lock = LifoQueue(maxsize=0)
 
     @record_time
     @profile

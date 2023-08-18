@@ -25,7 +25,7 @@ from giskardpy import identifier
 from giskardpy.configs.collision_avoidance_config import CollisionCheckerLib
 from giskardpy.exceptions import DuplicateNameException, BehaviorTreeException
 from giskardpy.god_map import GodMap
-from giskardpy.my_types import PrefixName
+from giskardpy.my_types import PrefixName, Derivatives
 from giskardpy.tree.behaviors.debug_marker_publisher import DebugMarkerPublisher
 from giskardpy.tree.behaviors.append_zero_velocity import SetZeroVelocity
 from giskardpy.tree.behaviors.cleanup import CleanUp, CleanUpPlanning, CleanUpBaseController
@@ -69,6 +69,7 @@ from giskardpy.tree.behaviors.set_cmd import SetCmd
 from giskardpy.tree.behaviors.set_move_result import SetMoveResult
 from giskardpy.tree.behaviors.set_tracking_start_time import SetTrackingStartTime
 from giskardpy.tree.behaviors.setup_base_traj_constraints import SetDriveGoals
+from giskardpy.tree.behaviors.sleep import Sleep
 from giskardpy.tree.behaviors.sync_configuration import SyncConfiguration
 from giskardpy.tree.behaviors.sync_configuration2 import SyncConfiguration2
 from giskardpy.tree.behaviors.sync_odometry import SyncOdometry, SyncOdometryNoLock
@@ -596,6 +597,10 @@ class StandAlone(TreeManager):
         plan_postprocessing.add_child(GoalCleanUp('clean up goals'))
         return plan_postprocessing
 
+    def add_sleeper(self, time: float):
+        sleep_node = success_is_running(Sleep)('sleeper', time)
+        self.insert_node_behind_node_of_type(self.closed_loop_control_name, ControllerPlugin, sleep_node)
+
     def add_visualization_marker_behavior(self,
                                           add_to_sync: Optional[bool] = None,
                                           add_to_planning: Optional[bool] = None,
@@ -631,7 +636,7 @@ class StandAlone(TreeManager):
         NotImplementedError(f'stand alone mode doesn\'t support {current_function_name}.')
 
     def add_follow_joint_traj_action_server(self, namespace: str, state_topic: str, group_name: str,
-                                            fill_velocity_values: bool):
+                                            fill_velocity_values: bool, path_tolerance: Dict[Derivatives, float] = None):
         # todo new abstract decorator that uses this as default implementation
         current_function_name = inspect.currentframe().f_code.co_name
         NotImplementedError(f'stand alone mode doesn\'t support {current_function_name}.')
@@ -710,9 +715,9 @@ class OpenLoop(StandAlone):
     control_mode = ControlModes.open_loop
 
     def add_follow_joint_traj_action_server(self, namespace: str, state_topic: str, group_name: str,
-                                            fill_velocity_values: bool):
+                                            fill_velocity_values: bool, path_tolerance: Dict[Derivatives, float] = None):
         behavior = SendFollowJointTrajectory(action_namespace=namespace, state_topic=state_topic, group_name=group_name,
-                                             fill_velocity_values=fill_velocity_values)
+                                             fill_velocity_values=fill_velocity_values, path_tolerance=path_tolerance)
         self.insert_node(behavior, self.move_robots_name)
 
     def add_base_traj_action_server(self, cmd_vel_topic: str, track_only_velocity: bool = False,

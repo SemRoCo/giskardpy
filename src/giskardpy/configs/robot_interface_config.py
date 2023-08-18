@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Optional, List
+from typing import Optional, List, Dict
 
 from giskardpy import identifier
 from giskardpy.tree.control_modes import ControlModes
 from giskardpy.exceptions import GiskardException
 from giskardpy.god_map import GodMap
 from giskardpy.model.world import WorldTree
-from giskardpy.my_types import my_string, PrefixName
+from giskardpy.my_types import my_string, PrefixName, Derivatives
 from giskardpy.tree.garden import TreeManager
 
 
@@ -72,7 +72,7 @@ class RobotInterfaceConfig(ABC):
             group_name = self.world.robot_name
         self.tree_manager.tree.wait_for_goal.synchronization.sync_joint_state_topic(group_name=group_name,
                                                                                     topic_name=topic_name)
-        self.tree_manager.tree.process_goal.control_loop_branch.synchronization.sync_joint_state_topic(
+        self.tree_manager.tree.process_goal.control_loop_branch.synchronization.sync_joint_state2_topic(
             group_name=group_name,
             topic_name=topic_name)
 
@@ -106,7 +106,8 @@ class RobotInterfaceConfig(ABC):
                                            namespace: str,
                                            state_topic: str,
                                            group_name: Optional[str] = None,
-                                           fill_velocity_values: bool = False):
+                                           fill_velocity_values: bool = False,
+                                           path_tolerance: Dict[Derivatives, float] = None):
         """
         Connect Giskard to a follow joint trajectory server. It will automatically figure out which joints are offered
         and can be controlled.
@@ -119,7 +120,8 @@ class RobotInterfaceConfig(ABC):
             group_name = self.world.robot_name
         self.tree_manager.add_follow_joint_traj_action_server(namespace=namespace, state_topic=state_topic,
                                                               group_name=group_name,
-                                                              fill_velocity_values=fill_velocity_values)
+                                                              fill_velocity_values=fill_velocity_values,
+                                                              path_tolerance=path_tolerance)
 
     def add_joint_velocity_controller(self, namespaces: List[str]):
         """

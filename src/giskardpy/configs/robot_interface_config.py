@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from typing import Optional, List
 
 from giskardpy import identifier
-from giskardpy.configs.behavior_tree_config import ControlModes
+from giskardpy.tree.control_modes import ControlModes
 from giskardpy.exceptions import GiskardException
 from giskardpy.god_map import GodMap
 from giskardpy.model.world import WorldTree

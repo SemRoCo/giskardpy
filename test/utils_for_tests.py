@@ -28,12 +28,8 @@ from giskard_msgs.msg import CollisionEntry, MoveResult, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse, DyeGroupResponse
 from giskardpy import identifier
 
-from giskardpy.configs.behavior_tree_config import BehaviorTreeConfig
-from giskardpy.configs.collision_avoidance_config import CollisionAvoidanceConfig
 from giskardpy.configs.giskard import Giskard
 from giskardpy.configs.qp_controller_config import QPControllerConfig, SupportedQPSolver
-from giskardpy.configs.robot_interface_config import RobotInterfaceConfig
-from giskardpy.configs.world_config import WorldConfig
 from giskardpy.data_types import KeyDefaultDict, JointStates
 from giskardpy.god_map_user import GodMapWorshipper
 from giskardpy.model.collision_world_syncer import Collisions, Collision

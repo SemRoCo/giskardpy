@@ -6,7 +6,7 @@ from giskardpy.my_types import Derivatives
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
-from giskardpy.utils.decorators import record_time
+from giskardpy.utils.decorators import record_time, catch_and_raise_to_blackboard
 
 
 # fast
@@ -29,11 +29,12 @@ class LocalMinimum(GiskardBehavior):
         self.number_of_controlled_joints = len(self.thresholds)
         self.endless_mode = self.god_map.get_data(identifier.endless_mode)
 
+    @catch_and_raise_to_blackboard
     @record_time
     @profile
     def update(self):
         if self.endless_mode:
-            return Status.RUNNING
+            return Status.SUCCESS
         planning_time = self.god_map.get_data(identifier.time)
         if planning_time - self.above_threshold_time >= self.window_size:
             velocities = np.array(list(self.god_map.get_data(identifier.qp_solver_solution).xdot_velocity))
@@ -43,8 +44,8 @@ class LocalMinimum(GiskardBehavior):
                 logging.loginfo('Velocities went below threshold.')
                 logging.loginfo(f'Found goal trajectory with length '
                                 f'{planning_time * self.sample_period:.3f}s in {run_time:.3f}s')
-                return Status.SUCCESS
-        return Status.RUNNING
+                raise
+        return Status.SUCCESS
 
     def make_velocity_threshold(self, min_cut_off=0.01, max_cut_off=0.06):
         joint_convergence_threshold = self.joint_convergence_threshold

@@ -1,4 +1,4 @@
-from typing import Optional
+from giskard_msgs.msg import MoveResult
 
 
 class DontPrintStackTrace:
@@ -6,163 +6,154 @@ class DontPrintStackTrace:
 
 
 class GiskardException(Exception):
-    pass
+    error_code: int = MoveResult.ERROR
+    error_message: str = ''
+
+    def __init__(self, error_message: str):
+        super().__init__(error_message)
+        self.error_message = error_message
+
+    def to_move_result(self) -> MoveResult:
+        move_result = MoveResult()
+        move_result.error_code = self.error_code
+        move_result.error_message = self.error_message
+        return move_result
 
 
 class SetupException(GiskardException):
     pass
 
 
-# solver exceptions-----------------------------------------------------------------------------------------------------
-# int64 QP_SOLVER_ERROR=5 # if no solver code fits
+# %% solver exceptions
 class QPSolverException(GiskardException):
-
-    def __init__(self, error_message: str, error_code: Optional[int] = None):
-        super().__init__(error_message)
-        self.error_code = error_code
+    error_code = MoveResult.QP_SOLVER_ERROR
 
 
 class InfeasibleException(QPSolverException):
-    pass
+    error_code = MoveResult.INFEASIBLE
 
 
 class VelocityLimitUnreachableException(QPSolverException):
-    pass
+    error_code = MoveResult.VELOCITYLIMITUNREACHABLE
 
 
 class OutOfJointLimitsException(InfeasibleException):
-    pass
+    error_code = MoveResult.OUT_OF_JOINT_LIMITS
 
 
 class HardConstraintsViolatedException(InfeasibleException):
-    pass
+    error_code = MoveResult.HARD_CONSTRAINTS_VIOLATED
 
 
 class EmptyProblemException(InfeasibleException, DontPrintStackTrace):
+    error_code = MoveResult.EMPTY_PROBLEM
+
+
+# %% world state exceptions
+class WorldException(GiskardException):
+    error_code = MoveResult.WORLD_ERROR
+
+
+class UnknownGroupException(WorldException, KeyError):
+    error_code = MoveResult.UNKNOWN_GROUP
+
+
+class UnknownLinkException(WorldException, KeyError):
     pass
 
 
-# world state exceptions------------------------------------------------------------------------------------------------
-# int64 WORLD_ERROR=7 # if no world error fits
-class PhysicsWorldException(GiskardException):
+class RobotExistsException(WorldException):
     pass
 
 
-# int64 UNKNOWN_OBJECT=6
-class UnknownGroupException(PhysicsWorldException, KeyError):
+class DuplicateNameException(WorldException):
     pass
 
 
-class UnknownLinkException(PhysicsWorldException, KeyError):
+class UnsupportedOptionException(WorldException):
     pass
 
 
-class RobotExistsException(PhysicsWorldException):
+class CorruptShapeException(WorldException):
     pass
 
 
-class DuplicateNameException(PhysicsWorldException):
-    pass
-
-
-class UnsupportedOptionException(PhysicsWorldException):
-    pass
-
-
-class CorruptShapeException(PhysicsWorldException):
-    pass
-
-
-# error during motion problem building phase----------------------------------------------------------------------------
-# int64 CONSTRAINT_ERROR # if no constraint code fits
+# %% error during motion problem building phase
 class ConstraintException(GiskardException):
-    pass
+    error_code = MoveResult.CONSTRAINT_ERROR
 
 
-# int64 UNKNOWN_CONSTRAINT
 class UnknownConstraintException(ConstraintException, KeyError):
-    pass
+    error_code = MoveResult.UNKNOWN_CONSTRAINT
 
 
-# int64 CONSTRAINT_INITIALIZATION_ERROR
 class ConstraintInitalizationException(ConstraintException):
-    pass
+    error_code = MoveResult.CONSTRAINT_INITIALIZATION_ERROR
 
 
-# int64 INVALID_GOAL
 class InvalidGoalException(ConstraintException):
-    pass
+    error_code = MoveResult.INVALID_GOAL
 
 
-# errors during planning------------------------------------------------------------------------------------------------
-# int64 PLANNING_ERROR=13 # if no planning code fits
+# %% errors during planning
 class PlanningException(GiskardException):
-    pass
+    error_code = MoveResult.CONTROL_ERROR
 
 
-# int64 SHAKING # Planning was stopped because the trajectory contains a shaky velocity profile. Detection parameters can be tuned in config file
 class ShakingException(PlanningException):
-    pass
+    error_code = MoveResult.SHAKING
 
 
-# int64 UNREACHABLE # if reachability check fails
-class UnreachableException(PlanningException):
-    pass
+class LocalMinimumException(PlanningException):
+    error_code = MoveResult.LOCAL_MINIMUM
 
 
 class SelfCollisionViolatedException(PlanningException):
-    pass
+    error_code = MoveResult.SELF_COLLISION_VIOLATED
 
 
 # errors during execution
-# int64 EXECUTION_ERROR # if no execution code fits
-# int64 PREEMPTED # goal got canceled via action server interface
 class ExecutionException(GiskardException):
-    pass
+    error_code = MoveResult.EXECUTION_ERROR
 
 
 class FollowJointTrajectory_INVALID_GOAL(ExecutionException):
-    pass
+    error_code = MoveResult.FollowJointTrajectory_INVALID_GOAL
 
 
 class FollowJointTrajectory_INVALID_JOINTS(ExecutionException):
-    pass
+    error_code = MoveResult.FollowJointTrajectory_INVALID_JOINTS
 
 
 class FollowJointTrajectory_OLD_HEADER_TIMESTAMP(ExecutionException):
-    pass
+    error_code = MoveResult.FollowJointTrajectory_OLD_HEADER_TIMESTAMP
 
 
 class FollowJointTrajectory_PATH_TOLERANCE_VIOLATED(ExecutionException):
-    pass
+    error_code = MoveResult.FollowJointTrajectory_PATH_TOLERANCE_VIOLATED
 
 
 class FollowJointTrajectory_GOAL_TOLERANCE_VIOLATED(ExecutionException):
-    pass
+    error_code = MoveResult.FollowJointTrajectory_GOAL_TOLERANCE_VIOLATED
 
 
 class PreemptedException(ExecutionException):
-    pass
+    error_code = MoveResult.PREEMPTED
 
 
 class ExecutionPreemptedException(ExecutionException):
-    pass
+    error_code = MoveResult.EXECUTION_PREEMPTED
 
 
 class ExecutionTimeoutException(ExecutionException):
-    pass
+    error_code = MoveResult.EXECUTION_TIMEOUT
 
 
 class ExecutionSucceededPrematurely(ExecutionException):
-    pass
+    error_code = MoveResult.EXECUTION_SUCCEEDED_PREMATURELY
 
 
-# ----------------------------------------------------------------------------------------------------------------------
+# %% behavior tree exceptions
 
 class BehaviorTreeException(GiskardException):
-    pass
-
-
-# ----------------------------------------------------------------------------------------------------------------------
-class ImplementationException(GiskardException):
-    pass
+    error_code = MoveResult.BEHAVIOR_TREE_ERROR

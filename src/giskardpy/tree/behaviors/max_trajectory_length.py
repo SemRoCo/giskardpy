@@ -21,7 +21,7 @@ class MaxTrajectoryLength(GiskardBehavior):
     @profile
     def update(self):
         if self.endless_mode:
-            return Status.RUNNING
+            return Status.SUCCESS
         t = self.god_map.get_data(identifier.time)
         length = self.god_map.get_data(identifier.max_trajectory_length)
         if not self.real_time:
@@ -33,4 +33,4 @@ class MaxTrajectoryLength(GiskardBehavior):
         if t > length:
             raise PlanningException(f'Aborted because trajectory is longer than {length}')
 
-        return Status.RUNNING
+        return Status.SUCCESS

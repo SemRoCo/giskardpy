@@ -41,9 +41,9 @@ class LoopDetector(GiskardBehavior):
             run_time = self.get_runtime()
             logging.loginfo('found goal trajectory with length {:.3f}s in {:.3f}s'.format(planning_time * sample_period,
                                                                                           run_time))
-            return Status.SUCCESS
+            return Status.FAILURE
         self.past_joint_states.add(rounded_js)
-        return Status.RUNNING
+        return Status.SUCCESS
 
     def round_js(self, js: JointStates) -> tuple:
         return tuple(round(state.position / self.velocity_limits[name], self.precision) for name, state in js.items())

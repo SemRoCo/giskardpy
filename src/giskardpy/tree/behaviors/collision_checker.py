@@ -65,4 +65,4 @@ class CollisionChecker(GiskardBehavior):
         collisions = self.collision_scene.check_collisions(self.collision_matrix, self.collision_list_size)
         self.are_self_collisions_violated(collisions)
         self.god_map.set_data(identifier.closest_point, collisions)
-        return Status.RUNNING
+        return Status.SUCCESS

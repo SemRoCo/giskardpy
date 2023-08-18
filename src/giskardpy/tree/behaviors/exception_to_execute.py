@@ -5,12 +5,10 @@ from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.decorators import record_time
 
 
-class ExceptionToExecute(GiskardBehavior):
+class ClearBlackboardException(GiskardBehavior):
     @record_time
     @profile
     def update(self):
         if self.get_blackboard_exception() is not None:
             self.clear_blackboard_exception()
-            self.god_map.set_data(identifier.execute, False)
-            return Status.SUCCESS
-        return Status.FAILURE
+        return Status.SUCCESS

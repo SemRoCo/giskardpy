@@ -20,7 +20,7 @@ from giskardpy import casadi_wrapper as w, identifier
 from giskardpy.casadi_wrapper import CompiledFunction
 from giskardpy.data_types import JointStates
 from giskardpy.exceptions import DuplicateNameException, UnknownGroupException, UnknownLinkException, \
-    PhysicsWorldException, GiskardException
+    WorldException, GiskardException
 from giskardpy.god_map import GodMap
 from giskardpy.god_map_user import GodMapWorshipper
 from giskardpy.model.joints import Joint, FixedJoint, PrismaticJoint, RevoluteJoint, OmniDrive, DiffDrive, \
@@ -188,7 +188,7 @@ class WorldTree(WorldTreeInterface, GodMapWorshipper):
     @property
     def root_link(self) -> Link:
         if self._root_link_name is None:
-            raise PhysicsWorldException('no root_link set')
+            raise WorldException('no root_link set')
         return self.links[self._root_link_name]
 
     @property
@@ -912,12 +912,12 @@ class WorldTree(WorldTreeInterface, GodMapWorshipper):
             if link.parent_joint_name is None:
                 orphans.append(link_name)
         if len(orphans) > 1:
-            raise PhysicsWorldException(f'Found multiple orphaned links: {orphans}.')
+            raise WorldException(f'Found multiple orphaned links: {orphans}.')
         self._root_link_name = orphans[0]
 
     def _raise_if_link_does_not_exist(self, link_name: my_string):
         if link_name not in self.links:
-            raise PhysicsWorldException(f'Link \'{link_name}\' does not exist.')
+            raise WorldException(f'Link \'{link_name}\' does not exist.')
 
     def _raise_if_link_exists(self, link_name: my_string):
         if link_name in self.links:
@@ -925,7 +925,7 @@ class WorldTree(WorldTreeInterface, GodMapWorshipper):
 
     def _raise_if_joint_does_not_exist(self, joint_name: my_string):
         if joint_name not in self.joints:
-            raise PhysicsWorldException(f'Joint \'{joint_name}\' does not exist.')
+            raise WorldException(f'Joint \'{joint_name}\' does not exist.')
 
     def _raise_if_joint_exists(self, joint_name: my_string):
         if joint_name in self.joints:

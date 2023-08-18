@@ -4,7 +4,8 @@ from typing import Optional
 from giskardpy import identifier
 from giskardpy.god_map import GodMap
 from giskardpy.tree.behaviors.tf_publisher import TfPublishingModes
-from giskardpy.tree.garden import OpenLoop, ClosedLoop, StandAlone, ControlModes, TreeManager
+from giskardpy.tree.garden import OpenLoop, ClosedLoop, StandAlone, TreeManager
+from giskardpy.tree.control_modes import ControlModes
 
 
 class BehaviorTreeConfig(ABC):
@@ -58,9 +59,11 @@ class BehaviorTreeConfig(ABC):
                                             available on the machine where Giskard is running.
                                       False: use meshes defined in urdf.
         """
-        self.tree_manager.add_visualization_marker_behavior(add_to_sync=add_to_sync, add_to_planning=add_to_planning,
-                                                            add_to_control_loop=add_to_control_loop,
-                                                            use_decomposed_meshes=use_decomposed_meshes)
+        if add_to_sync:
+            self.tree_manager.tree.wait_for_goal.publish_state.add_visualization_marker_behavior(use_decomposed_meshes)
+        if add_to_control_loop:
+            self.tree_manager.tree.process_goal.control_loop_branch.publish_state.add_visualization_marker_behavior(use_decomposed_meshes)
+        # FIXME add to planning
 
     def add_qp_data_publisher(self, publish_lb: bool = False, publish_ub: bool = False,
                               publish_lbA: bool = False, publish_ubA: bool = False,
@@ -110,7 +113,9 @@ class BehaviorTreeConfig(ABC):
         """
         Publishes tf for Giskard's internal state.
         """
-        self.tree_manager.add_tf_publisher(include_prefix=include_prefix, tf_topic=tf_topic, mode=mode)
+        self.tree_manager.tree.wait_for_goal.publish_state.add_tf_publisher(include_prefix=include_prefix,
+                                                                            tf_topic=tf_topic,
+                                                                            mode=mode)
 
 
 class StandAloneBTConfig(BehaviorTreeConfig):

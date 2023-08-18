@@ -146,5 +146,5 @@ class ClosedLoopBTConfig(BehaviorTreeConfig):
         super().__init__(ControlModes.close_loop)
 
     def setup(self):
-        self.add_visualization_marker_publisher(add_to_sync=True, add_to_planning=False, add_to_control_loop=False)
+        self.add_visualization_marker_publisher(add_to_sync=True, add_to_planning=False, add_to_control_loop=True)
         #self.add_qp_data_publisher(publish_xdot=True, publish_lb=True, publish_ub=True)

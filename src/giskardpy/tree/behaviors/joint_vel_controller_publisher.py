@@ -27,14 +27,6 @@ class JointVelController(GiskardBehavior):
             self.joint_names[i] = self.world.search_for_joint_name(self.joint_names[i])
         self.world.register_controlled_joints(self.joint_names)
 
-    @profile
-    def initialise(self):
-        def f(joint_symbol):
-            return self.god_map.expr_to_key[joint_symbol][-2]
-
-        self.symbol_to_joint_map = KeyDefaultDict(f)
-        super().initialise()
-
     @catch_and_raise_to_blackboard
     @record_time
     @profile
@@ -43,7 +35,7 @@ class JointVelController(GiskardBehavior):
         for i, joint_name in enumerate(self.joint_names):
             msg.data = self.world.state[joint_name].velocity
             self.publishers[i].publish(msg)
-        return Status.SUCCESS
+        return Status.RUNNING
 
     def terminate(self, new_status):
         super().terminate(new_status)

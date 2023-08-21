@@ -84,7 +84,8 @@ class CartesianOrientation(Goal):
                  reference_velocity: Optional[float] = None,
                  max_velocity: Optional[float] = None,
                  weight: float = WEIGHT_ABOVE_CA,
-                 root_link2: str = None):
+                 root_link2: str = None,
+                 name_extra: str = None):
         """
         See CartesianPose.
         """
@@ -111,6 +112,7 @@ class CartesianOrientation(Goal):
         self.reference_velocity = reference_velocity
         self.max_velocity = max_velocity
         self.weight = weight
+        self.name_extra = name_extra
         # if self.max_velocity is not None:
         #     self.add_constraints_of_goal(RotationVelocityLimit(root_link=root_link,
         #                                                        tip_link=tip_link,
@@ -131,15 +133,26 @@ class CartesianOrientation(Goal):
         else:
             c_R_r_eval = self.get_fk_evaluated(self.tip_link, self.root_link).to_rotation()
         # self.add_debug_expr('trans', w.norm(r_P_c))
-        self.add_rotation_goal_constraints(frame_R_current=r_R_c,
-                                           frame_R_goal=r_R_g,
-                                           current_R_frame_eval=c_R_r_eval,
-                                           reference_velocity=self.reference_velocity,
-                                           weight=self.weight)
+        if self.name_extra:
+            self.add_rotation_goal_constraints(frame_R_current=r_R_c,
+                                               frame_R_goal=r_R_g,
+                                               current_R_frame_eval=c_R_r_eval,
+                                               reference_velocity=self.reference_velocity,
+                                               weight=self.weight,
+                                               name=self.name_extra)
+        else:
+            self.add_rotation_goal_constraints(frame_R_current=r_R_c,
+                                               frame_R_goal=r_R_g,
+                                               current_R_frame_eval=c_R_r_eval,
+                                               reference_velocity=self.reference_velocity,
+                                               weight=self.weight)
 
     def __str__(self):
         s = super().__str__()
-        return f'{s}/{self.root_link}/{self.tip_link}'
+        if self.name_extra:
+            return f'{s}/{self.root_link}/{self.tip_link}/{self.name_extra}'
+        else:
+            return f'{s}/{self.root_link}/{self.tip_link}'
 
 
 class CartesianPositionStraight(Goal):
@@ -542,7 +555,7 @@ class TranslationVelocityLimit(Goal):
 
 class RotationVelocityLimit(Goal):
     def __init__(self, root_link: str, tip_link: str, root_group: Optional[str] = None, tip_group: Optional[str] = None,
-                 weight=WEIGHT_ABOVE_CA, max_velocity=0.5, hard=True):
+                 weight=WEIGHT_ABOVE_CA, max_velocity=0.5, hard=True, name_extra=None):
         """
         See CartesianVelocityLimit
         """
@@ -554,22 +567,25 @@ class RotationVelocityLimit(Goal):
 
         self.weight = weight
         self.max_velocity = max_velocity
+        self.name_extra = name_extra
 
     def make_constraints(self):
         r_R_c = self.get_fk(self.root_link, self.tip_link).to_rotation()
         if self.hard:
             self.add_rotational_velocity_limit(frame_R_current=r_R_c,
                                                max_velocity=self.max_velocity,
-                                               weight=self.weight)
+                                               weight=self.weight,
+                                               name=self.name_extra)
         else:
             self.add_rotational_velocity_limit(frame_R_current=r_R_c,
                                                max_velocity=self.max_velocity,
                                                weight=self.weight,
-                                               max_violation=0)
+                                               max_violation=0,
+                                               name=self.name_extra)
 
     def __str__(self):
         s = super().__str__()
-        return f'{s}/{self.root_link}/{self.tip_link}'
+        return f'{s}/{self.root_link}/{self.tip_link}/{self.name_extra}'
 
 
 class CartesianVelocityLimit(Goal):

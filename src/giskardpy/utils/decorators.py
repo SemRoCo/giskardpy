@@ -16,7 +16,7 @@ from contextlib import contextmanager
 from copy import deepcopy
 from functools import wraps
 from time import time
-from typing import Type, Optional, Dict
+from typing import Type, Optional, Dict, TypeVar, Callable
 
 import numpy as np
 import roslaunch
@@ -41,12 +41,17 @@ from giskardpy.utils import logging
 from giskardpy.utils.time_collector import TimeCollector
 from giskardpy.utils.utils import has_blackboard_exception, raise_to_blackboard
 
+from functools import wraps
+from typing import Any, TypeVar
 
-def memoize(function):
+T = TypeVar("T", bound=Callable)
+
+
+def memoize(function: T) -> T:
     memo = function.memo = {}
 
     @wraps(function)
-    def wrapper(*args, **kwargs):
+    def wrapper(*args: Any, **kwargs: Any) -> R:
         key = (args, frozenset(kwargs.items()))
         try:
             return memo[key]
@@ -55,11 +60,11 @@ def memoize(function):
             memo[key] = rv
             return rv
 
-    return wrapper
+    return wrapper  # type: ignore
 
 
 def memoize_with_counter(reset_after: int):
-    def memoize(function):
+    def memoize(function: T) -> T:
         memo = function.memo = {}
         function.__counter = 0
 
@@ -84,7 +89,7 @@ def memoize_with_counter(reset_after: int):
     return memoize
 
 
-def record_time(function):
+def record_time(function: T) -> T:
     # return function
     function_name = function.__name__
 
@@ -107,7 +112,7 @@ def clear_memo(f):
         f.memo.clear()
 
 
-def copy_memoize(function):
+def copy_memoize(function: T) -> T:
     memo = function.memo = {}
 
     @wraps(function)
@@ -123,7 +128,7 @@ def copy_memoize(function):
     return wrapper
 
 
-def catch_and_raise_to_blackboard(function):
+def catch_and_raise_to_blackboard(function: T) -> T:
     @wraps(function)
     def wrapper(*args, **kwargs):
         if has_blackboard_exception():

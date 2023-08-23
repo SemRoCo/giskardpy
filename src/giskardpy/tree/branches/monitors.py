@@ -15,7 +15,6 @@ from giskardpy.tree.behaviors.notify_state_change import NotifyStateChange
 from giskardpy.tree.behaviors.real_kinematic_sim import RealKinSimPlugin
 from giskardpy.tree.behaviors.time import TimePlugin
 from giskardpy.tree.behaviors.time_real import RosTime
-from giskardpy.tree.branches.monitors import Monitors
 from giskardpy.tree.branches.publish_state import PublishState
 from giskardpy.tree.branches.send_controls import SendControls
 from giskardpy.tree.branches.synchronization import Synchronization
@@ -24,35 +23,15 @@ from giskardpy.tree.control_modes import ControlModes
 from giskardpy.tree.decorators import success_is_running
 
 
-class ControlLoop(AsyncBehavior, GodMapWorshipper):
-    publish_state: PublishState
-    synchronization: Synchronization
-    send_controls: SendControls
-    monitors: Monitors
+@success_is_running
+class Monitors(Sequence, GodMapWorshipper):
 
-    def __init__(self, name: str = 'control_loop'):
+    def __init__(self, name: str = 'monitors'):
         super().__init__(name)
-        self.publish_state = success_is_running(PublishState)('publish state 2')
-        self.synchronization = success_is_running(Synchronization)()
-        self.monitors = Monitors()
+        self.add_child(LoopDetector('loop detector'))
+        self.add_child(LocalMinimum('local minimum', real_time=self.is_closed_loop))
+        self.add_child(MaxTrajectoryLength('traj length check', real_time=self.is_closed_loop))
+        self.add_child(GoalDone('goal done check'))
 
-        self.add_child(self.synchronization)
-
-        if self.god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none:
-            self.add_child(success_is_running(CollisionChecker)('collision checker'))
-
-        self.add_child(ControllerPlugin('controller'))
-
-        if self.is_closed_loop:
-            self.send_controls = success_is_running(SendControls)()
-
-            self.add_child(success_is_running(RosTime)())
-            self.add_child(success_is_running(RealKinSimPlugin)('kin sim'))
-            self.add_child(self.send_controls)
-        else:
-            self.add_child(success_is_running(TimePlugin)('increase time closed loop'))
-            self.add_child(success_is_running(KinSimPlugin)('kin sim'))
-            self.add_child(success_is_running(LogTrajPlugin)('log closed loop control'))
-
-        self.add_child(self.monitors)
-        self.add_child(self.publish_state)
+    def add_monitor(self):
+        pass

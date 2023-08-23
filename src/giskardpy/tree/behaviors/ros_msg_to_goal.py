@@ -46,6 +46,7 @@ class RosMsgToGoal(GiskardBehavior):
         loginfo('Parsing goal message.')
         move_cmd: MoveCmd = self.god_map.get_data(identifier.goal_msg).move_cmd
         self.god_map.set_data(identifier.goals, {})
+        self.god_map.set_data(identifier.goal_id, self.goal_id + 1)
         try:
             self.parse_constraints(move_cmd)
         except AttributeError:

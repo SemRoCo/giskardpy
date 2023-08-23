@@ -20,6 +20,13 @@ class GodMapWorshipper:
     god_map = GodMap()
 
     @property
+    def goal_id(self) -> int:
+        if self.god_map.has_data(identifier.goal_id):
+            return self.god_map.get_data(identifier.goal_id)
+        else:
+            return -1
+
+    @property
     def world(self) -> WorldTree:
         return self.god_map.get_data(identifier.world)
 

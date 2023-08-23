@@ -19,15 +19,18 @@ class LocalMinimum(GiskardBehavior):
         self.joint_convergence_threshold = joint_convergence_threshold
         self.window_size = window_size
         self.real_time = real_time
+        self.last_goal_id = -1
         self.sample_period = self.god_map.get_data(identifier.sample_period)
         if real_time:
             self.window_size *= self.sample_period
 
     @profile
     def initialise(self):
-        self.thresholds = self.make_velocity_threshold()
-        self.number_of_controlled_joints = len(self.thresholds)
-        self.endless_mode = self.god_map.get_data(identifier.endless_mode)
+        if self.goal_id > self.last_goal_id:
+            self.thresholds = self.make_velocity_threshold()
+            self.number_of_controlled_joints = len(self.thresholds)
+            self.endless_mode = self.god_map.get_data(identifier.endless_mode)
+            self.last_goal_id = self.goal_id
 
     @catch_and_raise_to_blackboard
     @record_time
@@ -45,7 +48,7 @@ class LocalMinimum(GiskardBehavior):
                 logging.loginfo(f'Found goal trajectory with length '
                                 f'{traj_time:.3f}s in {run_time:.3f}s')
                 raise LocalMinimumException('asdf')
-        return Status.RUNNING
+        return Status.SUCCESS
 
     def make_velocity_threshold(self, min_cut_off=0.01, max_cut_off=0.06):
         joint_convergence_threshold = self.joint_convergence_threshold

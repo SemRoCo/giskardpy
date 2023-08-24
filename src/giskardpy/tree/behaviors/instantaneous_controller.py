@@ -22,11 +22,10 @@ class ControllerPlugin(GiskardBehavior):
         parameters = self.controller.get_parameter_names()
         substitutions = self.god_map.get_values(parameters)
 
-        next_cmds, goal_reached_panda = self.controller.get_cmd(substitutions)
+        next_cmds = self.controller.get_cmd(substitutions)
         self.god_map.set_data(identifier.qp_solver_solution, next_cmds)
-        non_negative_entries = goal_reached_panda['data'] >= 0
-        if (goal_reached_panda.loc[non_negative_entries]['data'] == 0).any():
-            return Status.RUNNING
-        logging.loginfo('Goals satisfied.')
-        return Status.SUCCESS
+        # non_negative_entries = goal_reached_panda['data'] >= 0
+        # if (goal_reached_panda.loc[non_negative_entries]['data'] == 0).any():
+        #     return Status.RUNNING
+        return Status.RUNNING
 

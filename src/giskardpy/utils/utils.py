@@ -81,9 +81,9 @@ def get_all_classes_in_package(package_name: str, parent_class: Optional[Type] =
     for importer, modname, ispkg in pkgutil.iter_modules(package.__path__):
         try:
             module = __import__(f'{package.__name__}.{modname}', fromlist="dummy")
-        except:
+        except Exception as e:
             if not silent:
-                logging.loginfo(f'Failed to load {modname}')
+                logging.logwarn(f'Failed to load {modname}: {str(e)}')
             continue
         for name2, value2 in inspect.getmembers(module, inspect.isclass):
             if parent_class is None or issubclass(value2, parent_class) and package_name in str(value2):

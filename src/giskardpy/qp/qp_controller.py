@@ -1092,7 +1092,7 @@ class QPProblemBuilder(GodMapWorshipper):
         self.free_variable_bounds = FreeVariableBounds(**kwargs)
         self.equality_model = EqualityModel(**kwargs)
         self.equality_bounds = EqualityBounds(**kwargs)
-        self.goal_reached_checks = GoalReached(**kwargs)
+        # self.goal_reached_checks = GoalReached(**kwargs)
         self.inequality_model = InequalityModel(**kwargs)
         self.inequality_bounds = InequalityBounds(default_limits=default_limits, **kwargs)
 
@@ -1106,7 +1106,7 @@ class QPProblemBuilder(GodMapWorshipper):
         qp_solver = solver_class(weights=weights, g=g, lb=lb, ub=ub,
                                  E=E, E_slack=E_slack, bE=bE,
                                  A=A, A_slack=A_slack, lbA=lbA, ubA=ubA)
-        self.goal_reached_checks.compile(qp_solver.free_symbols)
+        # self.goal_reached_checks.compile(qp_solver.free_symbols)
         logging.loginfo('Done compiling controller:')
         logging.loginfo(f'  #free variables: {weights.shape[0]}')
         logging.loginfo(f'  #equality constraints: {bE.shape[0]}')
@@ -1170,15 +1170,14 @@ class QPProblemBuilder(GodMapWorshipper):
         return self.god_map.unsafe_get_data(identifier.time) * self.god_map.unsafe_get_data(identifier.sample_period)
 
     @profile
-    def get_cmd(self, substitutions: np.ndarray) -> Tuple[NextCommands, pd.DataFrame]:
+    def get_cmd(self, substitutions: np.ndarray) -> NextCommands:
         """
         Uses substitutions for each symbol to compute the next commands for each joint.
         """
         try:
             self.xdot_full = self.qp_solver.solve_and_retry(substitutions=substitutions)
-            # self._create_debug_pandas(self.qp_solver)
-            return NextCommands(self.free_variables, self.xdot_full, self.order, self.prediction_horizon), \
-                self.goal_reached_checks.to_panda(substitutions)
+            self._create_debug_pandas(self.qp_solver)
+            return NextCommands(self.free_variables, self.xdot_full, self.order, self.prediction_horizon)
         except InfeasibleException as e_original:
             self.xdot_full = None
             self._create_debug_pandas(self.qp_solver)

@@ -5,9 +5,10 @@ from typing import Dict, Optional, List
 from geometry_msgs.msg import PoseStamped
 
 from giskardpy import casadi_wrapper as w, identifier
+from giskardpy.goals.tasks.joint_tasks import JointPositionTask
 from giskardpy.tree.control_modes import ControlModes
 from giskardpy.exceptions import ConstraintException, ConstraintInitalizationException
-from giskardpy.goals.goal import Goal, WEIGHT_BELOW_CA, NonMotionGoal, WEIGHT_ABOVE_CA
+from giskardpy.goals.goal import Goal, WEIGHT_BELOW_CA, NonMotionGoal
 from giskardpy.model.joints import OmniDrive, DiffDrive, OmniDrivePR22
 from giskardpy.my_types import PrefixName
 from giskardpy.utils.math import axis_angle_from_quaternion
@@ -269,28 +270,25 @@ class JointPositionRevolute(Goal):
 
     @profile
     def make_constraints(self):
-        current_joint = self.get_joint_position_symbol(self.joint_name)
-
-        joint_goal = self.goal
-        weight = self.weight
-
-        max_velocity = w.min(self.max_velocity,
-                             self.world.get_joint_velocity_limits(self.joint_name)[1])
-
-        error = joint_goal - current_joint
-        if self.hard:
-            self.add_equality_constraint(reference_velocity=max_velocity,
-                                         equality_bound=error,
-                                         weight=weight,
-                                         task_expression=current_joint,
-                                         upper_slack_limit=0,
-                                         lower_slack_limit=0)
-        else:
-            self.add_equality_constraint(reference_velocity=max_velocity,
-                                         equality_bound=error,
-                                         weight=weight,
-                                         goal_reached_threshold=0.005,
-                                         task_expression=current_joint)
+        task = JointPositionTask(joint_current=self.get_joint_position_symbol(self.joint_name),
+                                 joint_goal=self.goal,
+                                 weight=self.weight,
+                                 velocity_limit=w.min(self.max_velocity,
+                                                      self.world.get_joint_velocity_limits(self.joint_name)[1]))
+        self.add_task(task)
+        # if self.hard:
+        #     self.add_equality_constraint(reference_velocity=max_velocity,
+        #                                  equality_bound=error,
+        #                                  weight=weight,
+        #                                  task_expression=current_joint,
+        #                                  upper_slack_limit=0,
+        #                                  lower_slack_limit=0)
+        # else:
+        #     self.add_equality_constraint(reference_velocity=max_velocity,
+        #                                  equality_bound=error,
+        #                                  weight=weight,
+        #                                  goal_reached_threshold=0.005,
+        #                                  task_expression=current_joint)
 
     def __str__(self):
         s = super().__str__()

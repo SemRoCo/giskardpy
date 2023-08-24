@@ -51,7 +51,7 @@ def memoize(function: T) -> T:
     memo = function.memo = {}
 
     @wraps(function)
-    def wrapper(*args: Any, **kwargs: Any) -> R:
+    def wrapper(*args: Any, **kwargs: Any) -> T:
         key = (args, frozenset(kwargs.items()))
         try:
             return memo[key]

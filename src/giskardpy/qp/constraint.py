@@ -72,12 +72,10 @@ class EqualityConstraint:
                  derivative_goal: cas.symbol_expr_float,
                  velocity_limit: cas.symbol_expr_float,
                  quadratic_weight: cas.symbol_expr_float, control_horizon: int,
-                 goal_reached_threshold: Optional[float] = None,
                  linear_weight: Optional[cas.symbol_expr_float] = None,
                  lower_slack_limit: Optional[cas.symbol_expr_float] = None,
                  upper_slack_limit: Optional[cas.symbol_expr_float] = None):
         self.name = name
-        self.goal_reached_threshold = goal_reached_threshold
         self.expression = expression
         self.quadratic_weight = quadratic_weight
         if control_horizon is None:
@@ -108,11 +106,6 @@ class EqualityConstraint:
     def normalized_weight(self):
         weight_normalized = self.quadratic_weight * (1 / self.velocity_limit) ** 2
         return weight_normalized * self.control_horizon
-
-    def goal_reached(self):
-        if self.goal_reached_threshold is None:
-            return -1
-        return cas.less_equal(cas.abs(self.bound), self.goal_reached_threshold)
 
     def capped_bound(self, dt: float):
         return cas.limit(self.bound,

@@ -699,16 +699,19 @@ class RotationMatrix(Symbol_):
     def to_axis_angle(self):
         return self.to_quaternion().to_axis_angle()
 
-    def to_angle(self, hint):
+    def to_angle(self, hint=None):
         """
         :param hint: A function whose sign of the result will be used to determine if angle should be positive or
                         negative
         :return:
         """
         axis, angle = self.to_axis_angle()
-        return normalize_angle(if_greater_zero(hint(axis),
-                                               if_result=angle,
-                                               else_result=-angle))
+        if hint is not None:
+            return normalize_angle(if_greater_zero(hint(axis),
+                                                   if_result=angle,
+                                                   else_result=-angle))
+        else:
+            return angle
 
     @classmethod
     def from_vectors(cls, x=None, y=None, z=None):
@@ -1945,6 +1948,11 @@ def angle_between_vector(v1, v2):
     v1 = v1[:3]
     v2 = v2[:3]
     return acos(dot(v1.T, v2) / (norm(v1) * norm(v2)))
+
+
+def rotational_error(r1, r2):
+    r_distance = r1.dot(r2.inverse())
+    return r_distance.to_angle()
 
 
 def velocity_limit_from_position_limit(acceleration_limit,

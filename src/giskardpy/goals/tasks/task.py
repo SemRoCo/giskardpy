@@ -280,3 +280,40 @@ class Task:
                                             names=[f'{name}/trans/x',
                                                    f'{name}/trans/y',
                                                    f'{name}/trans/z'])
+    
+    def add_rotation_goal_constraints(self,
+                                      frame_R_current: cas.RotationMatrix,
+                                      frame_R_goal: cas.RotationMatrix,
+                                      current_R_frame_eval: cas.RotationMatrix,
+                                      reference_velocity: Union[cas.Symbol, float],
+                                      weight: Union[cas.Symbol, float],
+                                      name: str = ''):
+        """
+        Adds constraints to move frame_R_current to frame_R_goal. Make sure that both are expressed relative to the same
+        frame.
+        :param frame_R_current: current rotation as rotation matrix
+        :param frame_R_goal: goal rotation as rotation matrix
+        :param current_R_frame_eval: an expression that computes the reverse of frame_R_current.
+                                        Use self.get_fk_evaluated for this.
+        :param reference_velocity: rad/s
+        :param weight:
+        :param name:
+        """
+        hack = cas.RotationMatrix.from_axis_angle(cas.Vector3((0, 0, 1)), 0.0001)
+        frame_R_current = frame_R_current.dot(hack)  # hack to avoid singularity
+        tip_Q_tipCurrent = current_R_frame_eval.dot(frame_R_current).to_quaternion()
+        tip_R_goal = current_R_frame_eval.dot(frame_R_goal)
+
+        tip_Q_goal = tip_R_goal.to_quaternion()
+
+        tip_Q_goal = cas.if_greater_zero(-tip_Q_goal[3], -tip_Q_goal, tip_Q_goal)  # flip to get shortest path
+
+        expr = tip_Q_tipCurrent
+        # w is not needed because its derivative is always 0 for identity quaternions
+        self.add_equality_constraint_vector(reference_velocities=[reference_velocity] * 3,
+                                            equality_bounds=tip_Q_goal[:3],
+                                            weights=[weight] * 3,
+                                            task_expression=expr[:3],
+                                            names=[f'{name}/rot/x',
+                                                   f'{name}/rot/y',
+                                                   f'{name}/rot/z'])

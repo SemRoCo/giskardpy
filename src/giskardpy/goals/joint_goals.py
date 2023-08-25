@@ -4,13 +4,14 @@ from typing import Dict, Optional, List
 
 from geometry_msgs.msg import PoseStamped
 
-from giskardpy import casadi_wrapper as w, identifier
+from giskardpy import casadi_wrapper as cas, identifier
 from giskardpy.goals.monitors.joint_monitors import PositionMonitor
+from giskardpy.goals.monitors.monitors import Monitor
 from giskardpy.goals.tasks.joint_tasks import JointPositionTask, PositionTask
 from giskardpy.tree.control_modes import ControlModes
 from giskardpy.exceptions import ConstraintException, ConstraintInitalizationException
 from giskardpy.goals.goal import Goal, NonMotionGoal
-from giskardpy.goals.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE
+from giskardpy.goals.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE, Task
 from giskardpy.model.joints import OmniDrive, DiffDrive, OmniDrivePR22, OneDofJoint
 from giskardpy.my_types import PrefixName, Derivatives
 from giskardpy.utils.math import axis_angle_from_quaternion
@@ -106,10 +107,10 @@ class JointPositionContinuous(Goal):
 
     def make_constraints(self):
         current_joint = self.get_joint_position_symbol(self.joint_name)
-        max_velocity = w.min(self.max_velocity,
-                             self.world.get_joint_velocity_limits(self.joint_name)[1])
+        max_velocity = cas.min(self.max_velocity,
+                               self.world.get_joint_velocity_limits(self.joint_name)[1])
 
-        error = w.shortest_angular_distance(current_joint, self.joint_goal)
+        error = cas.shortest_angular_distance(current_joint, self.joint_goal)
 
         if self.hard:
             self.add_equality_constraint(reference_velocity=max_velocity,
@@ -164,8 +165,8 @@ class JointPositionPrismatic(Goal):
 
         try:
             limit_expr = self.world.get_joint_velocity_limits(self.joint_name)[1]
-            max_velocity = w.min(self.max_velocity,
-                                 limit_expr)
+            max_velocity = cas.min(self.max_velocity,
+                                   limit_expr)
         except IndexError:
             max_velocity = self.max_velocity
 
@@ -218,8 +219,8 @@ class JointVelocityRevolute(Goal):
 
         try:
             limit_expr = self.world.get_joint_velocity_limits(self.joint_name)[1]
-            max_velocity = w.min(self.max_velocity,
-                                 limit_expr)
+            max_velocity = cas.min(self.max_velocity,
+                                   limit_expr)
         except IndexError:
             max_velocity = self.max_velocity
 
@@ -275,8 +276,8 @@ class JointPositionRevolute(Goal):
         task = JointPositionTask(joint_current=self.get_joint_position_symbol(self.joint_name),
                                  joint_goal=self.goal,
                                  weight=self.weight,
-                                 velocity_limit=w.min(self.max_velocity,
-                                                      self.world.get_joint_velocity_limits(self.joint_name)[1]))
+                                 velocity_limit=cas.min(self.max_velocity,
+                                                        self.world.get_joint_velocity_limits(self.joint_name)[1]))
         self.add_task(task)
         # if self.hard:
         #     self.add_equality_constraint(reference_velocity=max_velocity,
@@ -332,12 +333,12 @@ class ShakyJointPositionRevoluteOrPrismatic(Goal):
         time = self.god_map.to_symbol(identifier.time)
         time_in_secs = self.sample_period * time
 
-        max_velocity = w.min(self.max_velocity,
-                             self.world.get_joint_velocity_limits(self.joint_name)[1])
+        max_velocity = cas.min(self.max_velocity,
+                               self.world.get_joint_velocity_limits(self.joint_name)[1])
 
-        fun_params = frequency * 2.0 * w.pi * time_in_secs
-        err = (joint_goal - current_joint) + noise_amplitude * max_velocity * w.sin(fun_params)
-        capped_err = w.limit(err, -noise_amplitude * max_velocity, noise_amplitude * max_velocity)
+        fun_params = frequency * 2.0 * cas.pi * time_in_secs
+        err = (joint_goal - current_joint) + noise_amplitude * max_velocity * cas.sin(fun_params)
+        capped_err = cas.limit(err, -noise_amplitude * max_velocity, noise_amplitude * max_velocity)
 
         self.add_equality_constraint(equality_bound=capped_err,
                                      reference_velocity=max_velocity,
@@ -381,14 +382,14 @@ class ShakyJointPositionContinuous(Goal):
         time = self.god_map.to_symbol(identifier.time)
         time_in_secs = self.sample_period * time
 
-        max_velocity = w.min(self.max_velocity,
-                             self.world.get_joint_velocity_limits(self.joint_name)[1])
+        max_velocity = cas.min(self.max_velocity,
+                               self.world.get_joint_velocity_limits(self.joint_name)[1])
 
-        fun_params = frequency * 2.0 * w.pi * time_in_secs
-        err = w.shortest_angular_distance(current_joint, joint_goal) + noise_amplitude * max_velocity * w.sin(
+        fun_params = frequency * 2.0 * cas.pi * time_in_secs
+        err = cas.shortest_angular_distance(current_joint, joint_goal) + noise_amplitude * max_velocity * cas.sin(
             fun_params)
 
-        capped_err = w.limit(err, -noise_amplitude * max_velocity, noise_amplitude * max_velocity)
+        capped_err = cas.limit(err, -noise_amplitude * max_velocity, noise_amplitude * max_velocity)
 
         self.add_equality_constraint(equality_bound=capped_err,
                                      reference_velocity=max_velocity,
@@ -430,8 +431,8 @@ class AvoidSingleJointLimits(Goal):
         percentage = self.percentage / 100.
         lower_limit, upper_limit = self.world.get_joint_position_limits(self.joint_name)
         max_velocity = self.max_velocity
-        max_velocity = w.min(max_velocity,
-                             self.world.get_joint_velocity_limits(self.joint_name)[1])
+        max_velocity = cas.min(max_velocity,
+                               self.world.get_joint_velocity_limits(self.joint_name)[1])
 
         joint_range = upper_limit - lower_limit
         center = (upper_limit + lower_limit) / 2.
@@ -444,7 +445,7 @@ class AvoidSingleJointLimits(Goal):
         upper_err = upper_goal - joint_symbol
         lower_err = lower_goal - joint_symbol
 
-        error = w.max(w.abs(w.min(upper_err, 0)), w.abs(w.max(lower_err, 0)))
+        error = cas.max(cas.abs(cas.min(upper_err, 0)), cas.abs(cas.max(lower_err, 0)))
         weight = weight * (error / max_error)
 
         self.add_inequality_constraint(reference_velocity=max_velocity,
@@ -531,7 +532,8 @@ class JointPositionList(Goal):
             joint_name = self.world.search_for_joint_name(joint_name, group_name)
 
             ll_pos, ul_pos = self.world.compute_joint_limits(joint_name, Derivatives.position)
-            goal_position = min(ul_pos, max(ll_pos, goal_position))
+            if ll_pos is not None:
+                goal_position = min(ul_pos, max(ll_pos, goal_position))
 
             ll_vel, ul_vel = self.world.compute_joint_limits(joint_name, Derivatives.velocity)
             velocity_limit = min(ul_vel, max(ll_vel, max_velocity))
@@ -544,16 +546,29 @@ class JointPositionList(Goal):
             self.thresholds.append(self.threshold)
 
     def make_constraints(self):
-        monitor = PositionMonitor(current_positions=self.current_positions,
-                                  goal_positions=self.goal_positions,
-                                  thresholds=self.thresholds,
-                                  crucial=True)
-        task = PositionTask(names=self.names,
-                            current_positions=self.current_positions,
-                            goal_positions=self.goal_positions,
-                            velocity_limits=self.velocity_limits,
-                            weight=self.weight,
-                            to_end=monitor)
+        task = Task(name='joint goal')
+        comparison_list = []
+        for name, current, goal, threshold, velocity_limit in zip(self.names, self.current_positions,
+                                                                  self.goal_positions,
+                                                                  self.thresholds, self.velocity_limits):
+            if self.world.is_joint_continuous(name):
+                error = cas.shortest_angular_distance(current, goal)
+            else:
+                error = goal - current
+            comparison_list.append(cas.less(cas.abs(error), threshold))
+
+            task.add_equality_constraint(name=name,
+                                         reference_velocity=velocity_limit,
+                                         equality_bound=error,
+                                         weight=self.weight,
+                                         task_expression=current)
+
+        expression = cas.logic_all(cas.Expression(comparison_list))
+        monitor = Monitor(expression=expression,
+                          crucial=True)
+
+        task.to_end = monitor
+
         self.add_task(task)
 
     def __str__(self):

@@ -4,9 +4,10 @@ from py_trees import Status
 
 import giskardpy.identifier as identifier
 from giskardpy.data_types import JointStates
+from giskardpy.exceptions import ExecutionException
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
-from giskardpy.utils.decorators import record_time
+from giskardpy.utils.decorators import record_time, catch_and_raise_to_blackboard
 
 
 class LoopDetector(GiskardBehavior):
@@ -29,6 +30,7 @@ class LoopDetector(GiskardBehavior):
             if threshold < 0.001:
                 self.velocity_limits[name] = 0.001
 
+    @catch_and_raise_to_blackboard
     @record_time
     @profile
     def update(self):
@@ -39,11 +41,12 @@ class LoopDetector(GiskardBehavior):
             sample_period = self.god_map.get_data(identifier.sample_period)
             logging.loginfo('found loop, stopped planning.')
             run_time = self.get_runtime()
-            logging.loginfo('found goal trajectory with length {:.3f}s in {:.3f}s'.format(planning_time * sample_period,
-                                                                                          run_time))
-            return Status.FAILURE
+            msg = 'found goal trajectory with length {:.3f}s in {:.3f}s'.format(planning_time * sample_period,
+                                                                                run_time)
+            logging.loginfo(msg)
+            raise ExecutionException(msg)
         self.past_joint_states.add(rounded_js)
-        return Status.SUCCESS
+        return Status.RUNNING
 
     def round_js(self, js: JointStates) -> tuple:
         return tuple(round(state.position / self.velocity_limits[name], self.precision) for name, state in js.items())

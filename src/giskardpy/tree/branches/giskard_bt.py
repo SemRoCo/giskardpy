@@ -14,6 +14,7 @@ from giskardpy.tree.behaviors.loop_detector import LoopDetector
 from giskardpy.tree.behaviors.max_trajectory_length import MaxTrajectoryLength
 from giskardpy.tree.behaviors.send_result import SendResult
 from giskardpy.tree.behaviors.time import TimePlugin
+from giskardpy.tree.branches.clean_up_control_loop import CleanupControlLoop
 from giskardpy.tree.branches.post_processing import PostProcessing
 from giskardpy.tree.branches.prepare_control_loop import PrepareControlLoop
 from giskardpy.tree.branches.process_goal import ProcessGoal
@@ -28,6 +29,7 @@ class GiskardBT(BehaviourTree, GodMapWorshipper):
     prepare_control_loop: PrepareControlLoop
     process_goal: ProcessGoal
     post_processing: PostProcessing
+    cleanup_control_loop: CleanupControlLoop
 
     def __init__(self, control_mode: ControlModes):
         self.god_map.set_data(identifier.control_mode, control_mode)
@@ -38,10 +40,12 @@ class GiskardBT(BehaviourTree, GodMapWorshipper):
         self.prepare_control_loop = failure_is_success(PrepareControlLoop)()
         self.process_goal = failure_is_success(ProcessGoal)()
         self.post_processing = failure_is_success(PostProcessing)()
+        self.cleanup_control_loop = CleanupControlLoop()
 
         root.add_child(self.wait_for_goal)
         root.add_child(self.prepare_control_loop)
         root.add_child(self.process_goal)
+        root.add_child(self.cleanup_control_loop)
         root.add_child(self.post_processing)
         root.add_child(SendResult('send result',
                                   self.god_map.get_data(identifier.action_server_name),

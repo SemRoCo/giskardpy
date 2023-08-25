@@ -1,7 +1,7 @@
 from typing import Optional, List, Union, Dict
 import giskardpy.casadi_wrapper as cas
 from giskardpy.exceptions import GiskardException, ConstraintInitalizationException
-from giskardpy.goals.monitors.monitors import SwitchMonitor, MonitorInterface, AlwaysOne, AlwaysZero
+from giskardpy.goals.monitors.monitors import AlwaysOne, AlwaysZero, Monitor
 from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint
 
 
@@ -12,15 +12,15 @@ class Task:
     eq_constraints: Dict[str, EqualityConstraint]
     neq_constraints: Dict[str, InequalityConstraint]
     derivative_constraints: Dict[str, DerivativeInequalityConstraint]
-    to_start: SwitchMonitor
-    to_hold: MonitorInterface
-    to_end: SwitchMonitor
+    to_start: Monitor
+    to_hold: Monitor
+    to_end: Monitor
     name: Optional[str]
 
     def __init__(self, name: Optional[str],
-                 to_start: Optional[SwitchMonitor] = None,
-                 to_hold: Optional[MonitorInterface] = None,
-                 to_end: Optional[SwitchMonitor] = None):
+                 to_start: Optional[Monitor] = None,
+                 to_hold: Optional[Monitor] = None,
+                 to_end: Optional[Monitor] = None):
         if name is None:
             self.name = str(self.__class__.__name__)
         else:
@@ -29,15 +29,15 @@ class Task:
         self.neq_constraints = {}
         self.derivative_constraints = {}
         if to_start is None:
-            self.to_start = AlwaysOne()
+            self.to_start = AlwaysOne(crucial=False)
         else:
             self.to_start = to_start
         if to_hold is None:
-            self.to_hold = AlwaysOne()
+            self.to_hold = AlwaysOne(crucial=False)
         else:
             self.to_hold = to_hold
         if to_end is None:
-            self.to_end = AlwaysZero()
+            self.to_end = AlwaysZero(crucial=False)
         else:
             self.to_end = to_end
 
@@ -48,11 +48,11 @@ class Task:
         constraints = []
         for constraint in self.eq_constraints.values():
             if self.to_start is not None:
-                constraint.quadratic_weight *= self.to_start.get_weight_expression()
+                constraint.quadratic_weight *= self.to_start.get_state_expression()
             if self.to_hold is not None:
-                constraint.quadratic_weight *= self.to_hold.get_weight_expression()
+                constraint.quadratic_weight *= self.to_hold.get_state_expression()
             if self.to_end is not None:
-                constraint.quadratic_weight *= (1 - self.to_end.get_weight_expression())
+                constraint.quadratic_weight *= (1 - self.to_end.get_state_expression())
             constraints.append(constraint)
         return constraints
 

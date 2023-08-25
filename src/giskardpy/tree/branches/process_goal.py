@@ -14,15 +14,13 @@ from giskardpy.tree.decorators import success_is_failure
 
 class ProcessGoal(Selector, GodMapWorshipper):
     control_loop_branch: ControlLoop
-    cleanup_control_loop: CleanupControlLoop
 
     def __init__(self, name: str = 'process goal'):
         super().__init__(name)
-        self.cleanup_control_loop = CleanupControlLoop()
         self.control_loop_branch = success_is_failure(ControlLoop)()
 
         self.add_child(GoalCanceled('goal canceled2', self.god_map.get_data(identifier.action_server_name)))
         self.add_child(success_is_failure(PublishFeedback)('publish feedback1', MoveFeedback.PLANNING))
         # planning_2.add_child(success_is_failure(StartTimer)('start runtime timer'))
         self.add_child(self.control_loop_branch)
-        self.add_child(self.cleanup_control_loop)
+

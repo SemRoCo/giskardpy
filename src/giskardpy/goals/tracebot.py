@@ -8,6 +8,8 @@ from geometry_msgs.msg import Vector3Stamped, PointStamped
 import giskardpy.utils.tfwrapper as tf
 from giskardpy import casadi_wrapper as cas
 from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA
+from giskardpy.goals.monitors.joint_monitors import PositionMonitor
+from giskardpy.goals.tasks.joint_tasks import PositionTask
 
 
 class InsertCylinder(Goal):
@@ -55,9 +57,14 @@ class InsertCylinder(Goal):
 
         # straight line goal
         root_P_goal = root_P_hole + root_V_up * self.pre_grasp_height
+        top_reached_monitor = PositionMonitor(current_positions=[root_P_tip],
+                                              goal_positions=[root_P_goal],
+                                              thresholds=[0.01],
+                                              crucial=False)
         distance_to_line, root_P_on_line = cas.distance_point_to_line_segment(root_P_tip, root_P_hole, root_P_goal)
         distance_to_hole = cas.norm(root_P_hole - root_P_tip)
         weight_pregrasp = cas.if_less(distance_to_line, 0.01, 0, self.weight)
+        # pre_place_task = PositionTask(names=)
         self.add_point_goal_constraints(frame_P_current=root_P_tip,
                                         frame_P_goal=root_P_on_line,
                                         reference_velocity=0.1,
@@ -87,10 +94,9 @@ class InsertCylinder(Goal):
         self.add_debug_expr('root_P_hole', root_P_hole)
         self.add_debug_expr('weight_insert', weight_insert)
 
-        #tilt straight
+        # tilt straight
         weight_straight = cas.if_less(weight_tilt, 0.01, self.weight, 0)
         self.add_vector_goal_constraints(frame_V_current=root_V_cylinder_z,
                                          frame_V_goal=root_V_up,
                                          reference_velocity=0.1,
                                          weight=weight_straight)
-

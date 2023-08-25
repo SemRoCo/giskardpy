@@ -5,12 +5,13 @@ from typing import Dict, Optional, List
 from geometry_msgs.msg import PoseStamped
 
 from giskardpy import casadi_wrapper as w, identifier
-from giskardpy.goals.tasks.joint_tasks import JointPositionTask
+from giskardpy.goals.monitors.joint_monitors import PositionMonitor
+from giskardpy.goals.tasks.joint_tasks import JointPositionTask, PositionTask
 from giskardpy.tree.control_modes import ControlModes
 from giskardpy.exceptions import ConstraintException, ConstraintInitalizationException
 from giskardpy.goals.goal import Goal, WEIGHT_BELOW_CA, NonMotionGoal
-from giskardpy.model.joints import OmniDrive, DiffDrive, OmniDrivePR22
-from giskardpy.my_types import PrefixName
+from giskardpy.model.joints import OmniDrive, DiffDrive, OmniDrivePR22, OneDofJoint
+from giskardpy.my_types import PrefixName, Derivatives
 from giskardpy.utils.math import axis_angle_from_quaternion
 
 
@@ -501,8 +502,9 @@ class JointPositionList(Goal):
     def __init__(self,
                  goal_state: Dict[str, float],
                  group_name: Optional[str] = None,
-                 weight: Optional[float] = None,
-                 max_velocity: Optional[float] = None,
+                 weight: float = WEIGHT_BELOW_CA,
+                 max_velocity: float = 1,
+                 threshold: float = 0.005,
                  hard: bool = False):
         """
         Calls JointPosition for a list of joints.
@@ -513,26 +515,49 @@ class JointPositionList(Goal):
         :param hard: turns this into a hard constraint.
         """
         super().__init__()
+        self.current_positions = []
+        self.goal_positions = []
+        self.velocity_limits = []
+        self.thresholds = []
+        self.names = []
         self.joint_names = list(goal_state.keys())
+        self.max_velocity = max_velocity
+        self.weight = weight
+        self.threshold = threshold
         if len(goal_state) == 0:
             raise ConstraintInitalizationException(f'Can\'t initialize {self} with no joints.')
         for joint_name, goal_position in goal_state.items():
-            params = {'joint_name': joint_name,
-                      'group_name': group_name,
-                      'goal': goal_position}
-            if weight is not None:
-                params['weight'] = weight
-            if max_velocity is not None:
-                params['max_velocity'] = max_velocity
-            params['hard'] = hard
-            self.add_constraints_of_goal(JointPosition(**params))
+            joint_name = self.world.search_for_joint_name(joint_name, group_name)
+
+            ll_pos, ul_pos = self.world.compute_joint_limits(joint_name, Derivatives.position)
+            goal_position = min(ul_pos, max(ll_pos, goal_position))
+
+            ll_vel, ul_vel = self.world.compute_joint_limits(joint_name, Derivatives.velocity)
+            velocity_limit = min(ul_vel, max(ll_vel, max_velocity))
+
+            joint: OneDofJoint = self.world.joints[joint_name]
+            self.names.append(str(joint_name))
+            self.current_positions.append(joint.get_symbol(Derivatives.position))
+            self.goal_positions.append(goal_position)
+            self.velocity_limits.append(velocity_limit)
+            self.thresholds.append(self.threshold)
 
     def make_constraints(self):
-        pass
+        monitor = PositionMonitor(current_positions=self.current_positions,
+                                  goal_positions=self.goal_positions,
+                                  thresholds=self.thresholds,
+                                  crucial=True)
+        task = PositionTask(names=self.names,
+                            current_positions=self.current_positions,
+                            goal_positions=self.goal_positions,
+                            velocity_limits=self.velocity_limits,
+                            weight=self.weight,
+                            to_end=monitor)
+        self.add_task(task)
 
     def __str__(self):
         s = super().__str__()
-        return f'{s}/{self.joint_names}'
+        return f'{s}'
 
 
 class JointPosition(Goal):

@@ -3,6 +3,7 @@ from py_trees import Sequence
 from giskard_msgs.msg import MoveFeedback
 from giskardpy.god_map_user import GodMapWorshipper
 from giskardpy.tree.behaviors.cleanup import CleanUpPlanning
+from giskardpy.tree.behaviors.compile_monitors import CompileMonitors
 from giskardpy.tree.behaviors.init_qp_controller import InitQPController
 from giskardpy.tree.behaviors.new_trajectory import NewTrajectory
 from giskardpy.tree.behaviors.publish_feedback import PublishFeedback
@@ -20,4 +21,5 @@ class PrepareControlLoop(Sequence, GodMapWorshipper):
         self.add_child(NewTrajectory('NewTrajectory'))
         self.add_child(RosMsgToGoal('RosMsgToGoal'))
         self.add_child(InitQPController('InitQPController'))
+        self.add_child(CompileMonitors())
         self.add_child(SetTrackingStartTime('start tracking time'))

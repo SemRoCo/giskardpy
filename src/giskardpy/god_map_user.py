@@ -3,11 +3,13 @@ from __future__ import annotations
 from giskard_msgs.msg import MoveGoal
 from giskardpy import identifier
 from giskardpy.god_map import GodMap
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, List
 
 from giskardpy.utils.utils import int_to_bit_list
 
 if TYPE_CHECKING:
+    from giskardpy.goals.monitors.monitor_manager import MonitorManager
+    from giskardpy.goals.monitors.monitors import Monitor
     from giskardpy.configs.collision_avoidance_config import CollisionAvoidanceConfig
     from giskardpy.configs.world_config import WorldConfig
     from giskardpy.tree.control_modes import ControlModes
@@ -29,6 +31,14 @@ class GodMapWorshipper:
     @property
     def world(self) -> WorldTree:
         return self.god_map.get_data(identifier.world)
+
+    @property
+    def monitors(self) -> List[Monitor]:
+        return self.god_map.get_data(identifier.monitors, [])
+
+    @property
+    def monitor_manager(self) -> MonitorManager:
+        return self.god_map.get_data(identifier.monitor_manager, [])
 
     @property
     def tree_manager(self) -> TreeManager:

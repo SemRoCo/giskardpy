@@ -3,7 +3,7 @@ from py_trees import Status
 import giskardpy.identifier as identifier
 from giskardpy.exceptions import PlanningException
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
-from giskardpy.utils.decorators import record_time
+from giskardpy.utils.decorators import record_time, catch_and_raise_to_blackboard
 
 
 class MaxTrajectoryLength(GiskardBehavior):
@@ -17,11 +17,12 @@ class MaxTrajectoryLength(GiskardBehavior):
     def initialise(self):
         self.endless_mode = self.god_map.get_data(identifier.endless_mode)
 
+    @catch_and_raise_to_blackboard
     @record_time
     @profile
     def update(self):
         if self.endless_mode:
-            return Status.SUCCESS
+            return Status.RUNNING
         t = self.god_map.get_data(identifier.time)
         length = self.god_map.get_data(identifier.max_trajectory_length)
         if not self.real_time:
@@ -33,4 +34,4 @@ class MaxTrajectoryLength(GiskardBehavior):
         if t > length:
             raise PlanningException(f'Aborted because trajectory is longer than {length}')
 
-        return Status.SUCCESS
+        return Status.RUNNING

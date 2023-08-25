@@ -9,7 +9,8 @@ from giskardpy.goals.monitors.joint_monitors import PositionMonitor
 from giskardpy.goals.tasks.joint_tasks import JointPositionTask, PositionTask
 from giskardpy.tree.control_modes import ControlModes
 from giskardpy.exceptions import ConstraintException, ConstraintInitalizationException
-from giskardpy.goals.goal import Goal, WEIGHT_BELOW_CA, NonMotionGoal
+from giskardpy.goals.goal import Goal, NonMotionGoal
+from giskardpy.goals.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE
 from giskardpy.model.joints import OmniDrive, DiffDrive, OmniDrivePR22, OneDofJoint
 from giskardpy.my_types import PrefixName, Derivatives
 from giskardpy.utils.math import axis_angle_from_quaternion

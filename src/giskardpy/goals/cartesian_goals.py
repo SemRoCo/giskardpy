@@ -8,7 +8,8 @@ from geometry_msgs.msg import Vector3Stamped
 from tf.transformations import rotation_from_matrix
 
 from giskardpy import casadi_wrapper as w
-from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
+from giskardpy.goals.goal import Goal
+from giskardpy.goals.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE
 from giskardpy.model.joints import DiffDrive, OmniDrivePR22
 from giskardpy.my_types import Derivatives
 from giskardpy.utils import logging

@@ -3,7 +3,13 @@ import giskardpy.casadi_wrapper as cas
 from giskardpy.exceptions import GiskardException, ConstraintInitalizationException
 from giskardpy.goals.monitors.monitors import AlwaysOne, AlwaysZero, Monitor
 from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint
+from giskard_msgs.msg import Constraint as Constraint_msg
 
+WEIGHT_MAX = Constraint_msg.WEIGHT_MAX
+WEIGHT_ABOVE_CA = Constraint_msg.WEIGHT_ABOVE_CA
+WEIGHT_COLLISION_AVOIDANCE = Constraint_msg.WEIGHT_COLLISION_AVOIDANCE
+WEIGHT_BELOW_CA = Constraint_msg.WEIGHT_BELOW_CA
+WEIGHT_MIN = Constraint_msg.WEIGHT_MIN
 
 class Task:
     """
@@ -203,3 +209,74 @@ class Task:
                                          name=name_suffix,
                                          lower_slack_limit=lower_slack_limit,
                                          upper_slack_limit=upper_slack_limit)
+
+    def add_point_goal_constraints(self,
+                                   frame_P_current: cas.Point3,
+                                   frame_P_goal: cas.Point3,
+                                   reference_velocity: cas.symbol_expr_float,
+                                   weight: cas.symbol_expr_float,
+                                   name: str = ''):
+        """
+        Adds three constraints to move frame_P_current to frame_P_goal.
+        Make sure that both points are expressed relative to the same frame!
+        :param frame_P_current: a vector describing a 3D point
+        :param frame_P_goal: a vector describing a 3D point
+        :param reference_velocity: m/s
+        :param weight:
+        :param name:
+        """
+        frame_V_error = frame_P_goal - frame_P_current
+        self.add_equality_constraint_vector(reference_velocities=[reference_velocity] * 3,
+                                            equality_bounds=frame_V_error[:3],
+                                            weights=[weight] * 3,
+                                            task_expression=frame_P_current[:3],
+                                            names=[f'{name}/x',
+                                                   f'{name}/y',
+                                                   f'{name}/z'])
+
+    def add_position_constraint(self,
+                                expr_current: Union[cas.symbol_expr, float],
+                                expr_goal: Union[cas.symbol_expr_float, float],
+                                reference_velocity: Union[cas.symbol_expr_float, float],
+                                weight: Union[cas.symbol_expr_float, float] = WEIGHT_BELOW_CA,
+                                name: str = ''):
+        """
+        A wrapper around add_constraint. Will add a constraint that tries to move expr_current to expr_goal.
+        """
+        error = expr_goal - expr_current
+        self.add_equality_constraint(reference_velocity=reference_velocity,
+                                     equality_bound=error,
+                                     weight=weight,
+                                     task_expression=expr_current,
+                                     name=name)
+    
+    def add_vector_goal_constraints(self,
+                                    frame_V_current: cas.Vector3,
+                                    frame_V_goal: cas.Vector3,
+                                    reference_velocity: cas.symbol_expr_float,
+                                    weight: cas.symbol_expr_float = WEIGHT_BELOW_CA,
+                                    name: str = ''):
+        """
+        Adds constraints to align frame_V_current with frame_V_goal. Make sure that both vectors are expressed
+        relative to the same frame and are normalized to a length of 1.
+        :param frame_V_current: a vector describing a 3D vector
+        :param frame_V_goal: a vector describing a 3D vector
+        :param reference_velocity: rad/s
+        :param weight:
+        :param name:
+        """
+        angle = cas.save_acos(frame_V_current.dot(frame_V_goal))
+        # avoid singularity by staying away from pi
+        angle_limited = cas.min(cas.max(angle, -reference_velocity), reference_velocity)
+        angle_limited = cas.save_division(angle_limited, angle)
+        root_V_goal_normal_intermediate = cas.slerp(frame_V_current, frame_V_goal, angle_limited)
+
+        error = root_V_goal_normal_intermediate - frame_V_current
+
+        self.add_equality_constraint_vector(reference_velocities=[reference_velocity] * 3,
+                                            equality_bounds=error[:3],
+                                            weights=[weight] * 3,
+                                            task_expression=frame_V_current[:3],
+                                            names=[f'{name}/trans/x',
+                                                   f'{name}/trans/y',
+                                                   f'{name}/trans/z'])

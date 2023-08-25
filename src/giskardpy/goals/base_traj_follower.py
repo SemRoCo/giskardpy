@@ -13,7 +13,8 @@ from visualization_msgs.msg import MarkerArray, Marker
 
 from giskardpy import casadi_wrapper as w, identifier
 from giskardpy.exceptions import GiskardException, ConstraintInitalizationException
-from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE
+from giskardpy.goals.goal import Goal
+from giskardpy.goals.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE
 from giskardpy.model.joints import OmniDrive, OmniDrivePR22
 from giskardpy.my_types import my_string, Derivatives, PrefixName
 from giskardpy.utils import logging

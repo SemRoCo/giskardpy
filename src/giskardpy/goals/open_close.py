@@ -3,7 +3,8 @@ from __future__ import division
 from typing import Optional
 
 from giskardpy.goals.cartesian_goals import CartesianPose
-from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
+from giskardpy.goals.goal import Goal
+from giskardpy.goals.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE
 from giskardpy.goals.joint_goals import JointPosition
 
 

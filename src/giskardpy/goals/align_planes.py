@@ -4,7 +4,8 @@ from geometry_msgs.msg import Vector3Stamped
 
 import giskardpy.utils.tfwrapper as tf
 from giskardpy import casadi_wrapper as w
-from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA
+from giskardpy.goals.goal import Goal
+from giskardpy.goals.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE
 from giskardpy.utils.logging import logwarn
 
 

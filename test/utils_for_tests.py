@@ -31,11 +31,11 @@ from giskardpy import identifier
 from giskardpy.configs.giskard import Giskard
 from giskardpy.configs.qp_controller_config import QPControllerConfig, SupportedQPSolver
 from giskardpy.data_types import KeyDefaultDict, JointStates
+from giskardpy.goals.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
 from giskardpy.god_map_user import GodMapWorshipper
 from giskardpy.model.collision_world_syncer import Collisions, Collision
 from giskardpy.my_types import PrefixName, Derivatives
 from giskardpy.exceptions import UnknownGroupException
-from giskardpy.goals.goal import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
 from giskardpy.god_map import GodMap
 from giskardpy.model.joints import OneDofJoint, OmniDrive, DiffDrive
 from giskardpy.model.world import WorldTree

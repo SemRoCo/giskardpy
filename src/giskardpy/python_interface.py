@@ -18,7 +18,7 @@ from giskard_msgs.srv import RegisterGroupResponse
 from giskard_msgs.srv import UpdateWorld, UpdateWorldRequest, UpdateWorldResponse, GetGroupInfo, \
     GetGroupNames, RegisterGroup
 from giskardpy.exceptions import DuplicateNameException, UnknownGroupException
-from giskardpy.goals.goal import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
+from giskardpy.goals.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
 from giskardpy.model.utils import make_world_body_box
 from giskardpy.my_types import goal_parameter
 from giskardpy.utils.utils import position_dict_to_joint_states, convert_ros_message_to_dictionary, \

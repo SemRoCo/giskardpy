@@ -2,7 +2,8 @@ from typing import Dict, Optional
 
 import giskardpy.utils.tfwrapper as tf
 from giskardpy import casadi_wrapper as w, identifier
-from giskardpy.goals.goal import Goal, WEIGHT_COLLISION_AVOIDANCE, WEIGHT_ABOVE_CA
+from giskardpy.goals.goal import Goal
+from giskardpy.goals.tasks.task import WEIGHT_ABOVE_CA
 from giskardpy.my_types import my_string
 
 

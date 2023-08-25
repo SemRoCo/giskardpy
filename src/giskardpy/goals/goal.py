@@ -5,7 +5,7 @@ from abc import ABC
 from collections import OrderedDict
 from typing import Optional, Tuple, Dict, List, Union, Callable, TYPE_CHECKING
 
-from giskardpy.goals.tasks.task import Task
+from giskardpy.goals.tasks.task import Task, WEIGHT_BELOW_CA
 from giskardpy.god_map_user import GodMapWorshipper
 
 if TYPE_CHECKING:
@@ -13,18 +13,11 @@ if TYPE_CHECKING:
 
 import giskardpy.identifier as identifier
 import giskardpy.utils.tfwrapper as tf
-from giskard_msgs.msg import Constraint as Constraint_msg
 from giskardpy import casadi_wrapper as w
 from giskardpy.exceptions import ConstraintInitalizationException, UnknownGroupException
 from giskardpy.model.joints import OneDofJoint
 from giskardpy.my_types import my_string, transformable_message, PrefixName, Derivatives
 from giskardpy.qp.constraint import InequalityConstraint, EqualityConstraint, DerivativeInequalityConstraint
-
-WEIGHT_MAX = Constraint_msg.WEIGHT_MAX
-WEIGHT_ABOVE_CA = Constraint_msg.WEIGHT_ABOVE_CA
-WEIGHT_COLLISION_AVOIDANCE = Constraint_msg.WEIGHT_COLLISION_AVOIDANCE
-WEIGHT_BELOW_CA = Constraint_msg.WEIGHT_BELOW_CA
-WEIGHT_MIN = Constraint_msg.WEIGHT_MIN
 
 
 class Goal(GodMapWorshipper, ABC):
@@ -369,45 +362,7 @@ class Goal(GodMapWorshipper, ABC):
             expr = w.Expression(expr)
         self._debug_expressions[name] = expr
 
-    def add_position_constraint(self,
-                                expr_current: Union[w.symbol_expr, float],
-                                expr_goal: Union[w.symbol_expr_float, float],
-                                reference_velocity: Union[w.symbol_expr_float, float],
-                                weight: Union[w.symbol_expr_float, float] = WEIGHT_BELOW_CA,
-                                name: str = ''):
-        """
-        A wrapper around add_constraint. Will add a constraint that tries to move expr_current to expr_goal.
-        """
-        error = expr_goal - expr_current
-        self.add_equality_constraint(reference_velocity=reference_velocity,
-                                     equality_bound=error,
-                                     weight=weight,
-                                     task_expression=expr_current,
-                                     name=name)
 
-    def add_point_goal_constraints(self,
-                                   frame_P_current: w.Point3,
-                                   frame_P_goal: w.Point3,
-                                   reference_velocity: w.symbol_expr_float,
-                                   weight: w.symbol_expr_float,
-                                   name: str = ''):
-        """
-        Adds three constraints to move frame_P_current to frame_P_goal.
-        Make sure that both points are expressed relative to the same frame!
-        :param frame_P_current: a vector describing a 3D point
-        :param frame_P_goal: a vector describing a 3D point
-        :param reference_velocity: m/s
-        :param weight:
-        :param name:
-        """
-        frame_V_error = frame_P_goal - frame_P_current
-        self.add_equality_constraint_vector(reference_velocities=[reference_velocity] * 3,
-                                            equality_bounds=frame_V_error[:3],
-                                            weights=[weight] * 3,
-                                            task_expression=frame_P_current[:3],
-                                            names=[f'{name}/x',
-                                                   f'{name}/y',
-                                                   f'{name}/z'])
 
     def add_translational_velocity_limit(self,
                                          frame_P_current: w.Point3,
@@ -435,36 +390,6 @@ class Goal(GodMapWorshipper, ABC):
                                      velocity_limit=max_velocity,
                                      name_suffix=f'{name}/vel')
 
-    def add_vector_goal_constraints(self,
-                                    frame_V_current: w.Vector3,
-                                    frame_V_goal: w.Vector3,
-                                    reference_velocity: w.symbol_expr_float,
-                                    weight: w.symbol_expr_float = WEIGHT_BELOW_CA,
-                                    name: str = ''):
-        """
-        Adds constraints to align frame_V_current with frame_V_goal. Make sure that both vectors are expressed
-        relative to the same frame and are normalized to a length of 1.
-        :param frame_V_current: a vector describing a 3D vector
-        :param frame_V_goal: a vector describing a 3D vector
-        :param reference_velocity: rad/s
-        :param weight:
-        :param name:
-        """
-        angle = w.save_acos(frame_V_current.dot(frame_V_goal))
-        # avoid singularity by staying away from pi
-        angle_limited = w.min(w.max(angle, -reference_velocity), reference_velocity)
-        angle_limited = w.save_division(angle_limited, angle)
-        root_V_goal_normal_intermediate = w.slerp(frame_V_current, frame_V_goal, angle_limited)
-
-        error = root_V_goal_normal_intermediate - frame_V_current
-
-        self.add_equality_constraint_vector(reference_velocities=[reference_velocity] * 3,
-                                            equality_bounds=error[:3],
-                                            weights=[weight] * 3,
-                                            task_expression=frame_V_current[:3],
-                                            names=[f'{name}/trans/x',
-                                                   f'{name}/trans/y',
-                                                   f'{name}/trans/z'])
 
     def add_rotation_goal_constraints(self,
                                       frame_R_current: w.RotationMatrix,

@@ -674,6 +674,22 @@ class TestConstraints:
                                          root_link=zero_pose.default_root)
         zero_pose.plan_and_execute()
 
+    def test_RelativePositionSequence(self, zero_pose: PR2TestWrapper):
+        goal1 = PointStamped()
+        goal1.header.frame_id = 'base_footprint'
+        goal1.point.x = 1
+
+        goal2 = PointStamped()
+        goal2.header.frame_id = 'base_footprint'
+        goal2.point.y = 1
+        zero_pose.set_json_goal('RelativePositionSequence',
+                                goal1=goal1,
+                                goal2=goal2,
+                                root_link='map',
+                                tip_link='base_footprint')
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute()
+
     def test_CartesianPoseStraight2(self, better_pose: PR2TestWrapper):
         better_pose.close_l_gripper()
         goal_position = PoseStamped()

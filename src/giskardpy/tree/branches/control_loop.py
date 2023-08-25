@@ -38,11 +38,11 @@ class ControlLoop(AsyncBehavior, GodMapWorshipper):
         self.check_monitors = CheckMonitors()
 
         self.add_child(self.synchronization)
-        self.add_child(success_is_running(EvaluateMonitors)())
 
         if self.god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none:
             self.add_child(success_is_running(CollisionChecker)('collision checker'))
 
+        self.add_child(success_is_running(EvaluateMonitors)())
         self.add_child(ControllerPlugin('controller'))
 
         if self.is_closed_loop:

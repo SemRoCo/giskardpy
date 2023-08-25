@@ -26,22 +26,6 @@ class Monitor(GodMapWorshipper):
     def get_state_expression(self):
         return self.god_map.to_symbol(identifier.monitor_manager + ['state', self.id])
 
-    def _get_identifier(self):
-        try:
-            return identifier.monitors + [self.id]
-        except AttributeError as e:
-            raise AttributeError(
-                f'You have to ensure that str(self) is possible before calling parents __init__: {e}')
-
-    def get_parameter_as_symbolic_expression(self, name: str) -> Union[Union[cas.Symbol, float], cas.Expression]:
-        """
-        :param name: name of a class attribute, e.g. self.muh
-        :return: a symbol (or matrix of symbols) that refers to self.muh
-        """
-        if not hasattr(self, name):
-            raise AttributeError(f'{self.__class__.__name__} doesn\'t have attribute {name}')
-        return self.god_map.to_expr(self._get_identifier() + [name])
-
 
 class AlwaysOne(Monitor):
     def __init__(self, crucial: bool):

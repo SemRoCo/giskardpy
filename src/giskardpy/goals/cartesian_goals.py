@@ -638,3 +638,49 @@ class CartesianVelocityLimit(Goal):
     def __str__(self):
         s = super().__str__()
         return f'{s}/{self.root_link}/{self.tip_link}'
+
+
+class RelativePositionSequence(Goal):
+    def __init__(self,
+                 goal1: PointStamped,
+                 goal2: PointStamped,
+                 root_link: str,
+                 tip_link: str):
+        super().__init__()
+        self.root_link = self.world.search_for_link_name(root_link)
+        self.tip_link = self.world.search_for_link_name(tip_link)
+        self.goal1 = self.transform_msg(self.root_link, goal1)
+        self.goal2 = self.transform_msg(self.root_link, goal2)
+        self.max_velocity = 0.1
+        self.weight = WEIGHT_BELOW_CA
+
+    def make_constraints(self):
+        root_P_current = self.get_fk(self.root_link, self.tip_link).to_position()
+        root_P_goal1 = cas.Point3(self.goal1)
+        root_P_goal2 = cas.Point3(self.goal2)
+
+        error1 = cas.euclidean_distance(root_P_goal1, root_P_current)
+        error1_monitor = Monitor(expression=cas.less(cas.abs(error1), 0.01),
+                                 crucial=True,
+                                 stay_one=True)
+
+        error2 = cas.euclidean_distance(root_P_goal2, root_P_current)
+        error2_monitor = Monitor(expression=cas.less(cas.abs(error2), 0.01),
+                                 crucial=True,
+                                 stay_one=True)
+
+        step1 = Task(name='step1',
+                     to_end=error1_monitor)
+        step1.add_point_goal_constraints(root_P_current, root_P_goal1,
+                                         reference_velocity=self.max_velocity,
+                                         weight=self.weight)
+        self.add_task(step1)
+
+        step2 = Task(name='step2', to_start=error1_monitor, to_end=error2_monitor)
+        step2.add_point_goal_constraints(root_P_current, root_P_goal2,
+                                         reference_velocity=self.max_velocity,
+                                         weight=self.weight)
+        self.add_task(step2)
+
+    def __str__(self) -> str:
+        return super().__str__()

@@ -2127,3 +2127,11 @@ def vel_integral(vel_limit, jerk_limit, dt, ph):
     half1 = math.floor(ph / 2)
     x = f(0, 0, jerk_limit, half1, dt, ph)
     return x
+
+
+def substitute(expression, old_symbols, new_symbols):
+    sx = expression.s
+    old_symbols = Expression([_to_sx(s) for s in old_symbols]).s
+    new_symbols = Expression([_to_sx(s) for s in new_symbols]).s
+    sx = ca.substitute(sx, old_symbols, new_symbols)
+    return Expression(sx)

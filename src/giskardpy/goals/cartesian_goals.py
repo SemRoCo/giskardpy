@@ -649,25 +649,29 @@ class RelativePositionSequence(Goal):
         super().__init__()
         self.root_link = self.world.search_for_link_name(root_link)
         self.tip_link = self.world.search_for_link_name(tip_link)
-        self.goal1 = self.transform_msg(self.root_link, goal1)
-        self.goal2 = self.transform_msg(self.root_link, goal2)
+        self.root_P_goal1 = self.transform_msg(self.root_link, goal1)
+        self.tip_P_goal2 = self.transform_msg(self.tip_link, goal2)
         self.max_velocity = 0.1
         self.weight = WEIGHT_BELOW_CA
 
     def make_constraints(self):
         root_P_current = self.get_fk(self.root_link, self.tip_link).to_position()
-        root_P_goal1 = cas.Point3(self.goal1)
-        root_P_goal2 = cas.Point3(self.goal2)
+
+        root_P_goal1 = cas.Point3(self.root_P_goal1)
+        tip_P_goal2 = cas.Point3(self.tip_P_goal2)
+        root_P_goal2 = self.get_fk(self.root_link, self.tip_link).dot(tip_P_goal2)
 
         error1 = cas.euclidean_distance(root_P_goal1, root_P_current)
-        error1_monitor = Monitor(expression=cas.less(cas.abs(error1), 0.01),
-                                 crucial=True,
+        error1_monitor = Monitor(crucial=True,
                                  stay_one=True)
+        error1_monitor.set_expression(cas.less(cas.abs(error1), 0.01))
 
-        error2 = cas.euclidean_distance(root_P_goal2, root_P_current)
-        error2_monitor = Monitor(expression=cas.less(cas.abs(error2), 0.01),
-                                 crucial=True,
+        error2_monitor = Monitor(crucial=True,
                                  stay_one=True)
+        root_P_goal2_cached = error1_monitor.substitute_with_on_flip_symbols(root_P_goal2)
+
+        error2 = cas.euclidean_distance(root_P_goal2_cached, root_P_current)
+        error2_monitor.set_expression(cas.less(cas.abs(error2), 0.01))
 
         step1 = Task(name='step1',
                      to_end=error1_monitor)
@@ -677,7 +681,7 @@ class RelativePositionSequence(Goal):
         self.add_task(step1)
 
         step2 = Task(name='step2', to_start=error1_monitor, to_end=error2_monitor)
-        step2.add_point_goal_constraints(root_P_current, root_P_goal2,
+        step2.add_point_goal_constraints(root_P_current, root_P_goal2_cached,
                                          reference_velocity=self.max_velocity,
                                          weight=self.weight)
         self.add_task(step2)

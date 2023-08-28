@@ -34,18 +34,9 @@ class Task:
         self.eq_constraints = {}
         self.neq_constraints = {}
         self.derivative_constraints = {}
-        if to_start is None:
-            self.to_start = AlwaysOne(crucial=False)
-        else:
-            self.to_start = to_start
-        if to_hold is None:
-            self.to_hold = AlwaysOne(crucial=False)
-        else:
-            self.to_hold = to_hold
-        if to_end is None:
-            self.to_end = AlwaysZero(crucial=False)
-        else:
-            self.to_end = to_end
+        self.to_start = to_start
+        self.to_hold = to_hold
+        self.to_end = to_end
 
     def __str__(self):
         return self.name

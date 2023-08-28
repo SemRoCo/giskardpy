@@ -18,7 +18,7 @@ class MonitorManager(GodMapWorshipper):
             expressions.append(monitor.get_expression())
         expressions = cas.Expression(expressions)
         self.compiled_monitors = expressions.compile(expressions.free_symbols())
-        self.filter_mask = np.array([1 if x.stay_one else 0 for x in self.monitors], dtype=int)
+        self.filter_mask = np.array([x.stay_one for x in self.monitors], dtype=bool)
         self.state = np.zeros_like(self.filter_mask)
         self.switches_state = np.zeros_like(self.filter_mask)
         self.crucial_filter = [m.crucial for m in self.monitors]

@@ -468,14 +468,6 @@ def generate_pydot_graph(root, visibility_level):
 
     def add_edges(root, root_dot_name, visibility_level):
         if visibility_level < root.blackbox_level:
-            # if isinstance(root, AsyncBehavior) \
-            #         or (hasattr(root, 'original') and isinstance(root.original, AsyncBehavior)):
-            #     children = []
-            #     names2 = []
-            #     for name, child in root.get_children().items():
-            #         children.append(child)
-            #         names2.append(name)
-            # else:
             children = root.children
             names2 = [c.name for c in children]
             for name, c in zip(names2, children):
@@ -501,12 +493,16 @@ def generate_pydot_graph(root, visibility_level):
                         if function_name in time_dict:
                             times = time_dict[function_name]
                             average_time = np.average(times)
+                            std_time = np.std(times)
                             total_time = np.sum(times)
                             if total_time > 1:
                                 color = 'red'
                             proposed_dot_name += f'\n{function_name.ljust(function_name_padding, "-")}' \
-                                                 f'\n{"  avg".ljust(entry_name_padding)}{f"={average_time:.3}".ljust(number_padding)}' \
-                                                 f'\n{"  sum".ljust(entry_name_padding)}{f"={total_time:.3}".ljust(number_padding)}'
+                                                 f'\n{"  #calls".ljust(entry_name_padding)}{f"={len(times)}".ljust(number_padding)}' \
+                                                 f'\n{"  avg".ljust(entry_name_padding)}{f"={average_time:.7f}".ljust(number_padding)}' \
+                                                 f'\n{"  std".ljust(entry_name_padding)}{f"={std_time:.7f}".ljust(number_padding)}' \
+                                                 f'\n{"  max".ljust(entry_name_padding)}{f"={max(times):.7f}".ljust(number_padding)}' \
+                                                 f'\n{"  sum".ljust(entry_name_padding)}{f"={total_time:.7f}".ljust(number_padding)}'
                         else:
                             proposed_dot_name += f'\n{function_name.ljust(function_name_padding, "-")}'
 

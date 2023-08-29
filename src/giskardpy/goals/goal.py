@@ -5,6 +5,7 @@ from abc import ABC
 from collections import OrderedDict
 from typing import Optional, Tuple, Dict, List, Union, Callable, TYPE_CHECKING
 
+from giskardpy.goals.monitors.monitors import Monitor
 from giskardpy.goals.tasks.task import Task, WEIGHT_BELOW_CA
 from giskardpy.god_map_user import GodMapWorshipper
 
@@ -209,9 +210,9 @@ class Goal(GodMapWorshipper, ABC):
 
     @profile
     def get_constraints(self) -> Tuple[Dict[str, EqualityConstraint],
-                                       Dict[str, InequalityConstraint],
-                                       Dict[str, DerivativeInequalityConstraint],
-                                       Dict[str, Union[w.Symbol, float]]]:
+    Dict[str, InequalityConstraint],
+    Dict[str, DerivativeInequalityConstraint],
+    Dict[str, Union[w.Symbol, float]]]:
         self._equality_constraints = OrderedDict()
         self._inequality_constraints = OrderedDict()
         self._derivative_constraints = OrderedDict()
@@ -234,7 +235,7 @@ class Goal(GodMapWorshipper, ABC):
             self._derivative_constraints.update(_prepend_prefix(self.__class__.__name__, derivative_constraints))
             self._debug_expressions.update(_prepend_prefix(self.__class__.__name__, debug_expressions))
         return self._equality_constraints, self._inequality_constraints, self._derivative_constraints, \
-               self._debug_expressions
+            self._debug_expressions
 
     def add_constraints_of_goal(self, goal: Goal):
         self._sub_goals.append(goal)
@@ -346,9 +347,11 @@ class Goal(GodMapWorshipper, ABC):
                                                                             upper_slack_limit=upper_slack_limit,
                                                                             horizon_function=horizon_function)
 
-
     def add_task(self, task: Task):
         self.tasks.append(task)
+
+    def add_monitor(self, monitor: Monitor):
+        self.monitor_manager.add_monitor(monitor)
 
     def add_debug_expr(self, name: str, expr: w.all_expressions_float):
         """
@@ -361,8 +364,6 @@ class Goal(GodMapWorshipper, ABC):
         if not isinstance(expr, w.Symbol_):
             expr = w.Expression(expr)
         self._debug_expressions[name] = expr
-
-
 
     def add_translational_velocity_limit(self,
                                          frame_P_current: w.Point3,
@@ -389,9 +390,6 @@ class Goal(GodMapWorshipper, ABC):
                                      upper_slack_limit=max_violation,
                                      velocity_limit=max_velocity,
                                      name_suffix=f'{name}/vel')
-
-
-
 
     def add_rotational_velocity_limit(self,
                                       frame_R_current: w.RotationMatrix,

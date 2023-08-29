@@ -1,7 +1,10 @@
+from typing import List
+
 import numpy as np
 
 import giskardpy.casadi_wrapper as cas
 from giskardpy.casadi_wrapper import CompiledFunction
+from giskardpy.goals.monitors.monitors import Monitor
 from giskardpy.god_map_user import GodMapWorshipper
 
 
@@ -15,15 +18,16 @@ def custom_op_numpy(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     return np.logical_and(np.logical_not(a), np.logical_or(a, b))
 
 
-
-
-
 class MonitorManager(GodMapWorshipper):
     compiled_monitors: CompiledFunction
     state: np.ndarray
     switch_filter = np.ndarray
     switch_state = np.ndarray
     crucial_filter = np.ndarray
+    monitors: List[Monitor] = None
+
+    def __init__(self):
+        self.monitors = []
 
     def compile_monitors(self):
         expressions = []
@@ -36,6 +40,7 @@ class MonitorManager(GodMapWorshipper):
         self.switches_state = np.zeros_like(self.stay_one_filter)
         self.crucial_filter = [m.crucial for m in self.monitors]
 
+    @profile
     def update_state(self, new_state):  # Assuming new_state is a NumPy array with only 1 and 0
         new_state = new_state.astype(int)
         filtered_switches = self.switches_state[self.stay_one_filter]
@@ -46,14 +51,21 @@ class MonitorManager(GodMapWorshipper):
         self.switches_state[self.stay_one_filter] = filtered_switches | filtered_new_state
         self.state = self.switches_state | new_state
 
+    def add_monitor(self, monitor: Monitor):
+        self.monitors.append(monitor)
+        monitor.set_id(len(self.monitors) - 1)
+
+    @profile
     def trigger_monitor_flips(self, flips: np.ndarray):
         flipped_monitors = np.array(self.monitors)[self.stay_one_filter][flips]
         for m in flipped_monitors:
             m.update_substitution_values()
 
+    @profile
     def evaluate_monitors(self):
         args = self.god_map.get_values(self.compiled_monitors.str_params)
         self.update_state(self.compiled_monitors.fast_call(args))
 
+    @profile
     def crucial_monitors_satisfied(self):
         return np.all(self.state[self.crucial_filter])

@@ -4232,6 +4232,7 @@ class TestBenchmark:
 # kernprof -lv py.test -s test/test_integration_pr2.py
 # time: [1-9][1-9]*.[1-9]* s
 # import pytest
+# pytest.main(['-s', __file__ + '::TestConstraints::test_RelativePositionSequence'])
 # pytest.main(['-s', __file__ + '::TestJointGoals::test_joint_goal2'])
 # pytest.main(['-s', __file__ + '::TestConstraints::test_open_dishwasher_apartment'])
 # pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_bowl_and_cup'])

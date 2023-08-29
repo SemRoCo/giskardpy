@@ -654,6 +654,7 @@ class RelativePositionSequence(Goal):
         self.max_velocity = 0.1
         self.weight = WEIGHT_BELOW_CA
 
+    @profile
     def make_constraints(self):
         root_P_current = self.get_fk(self.root_link, self.tip_link).to_position()
 
@@ -664,10 +665,12 @@ class RelativePositionSequence(Goal):
         error1 = cas.euclidean_distance(root_P_goal1, root_P_current)
         error1_monitor = Monitor(crucial=True,
                                  stay_one=True)
+        self.add_monitor(error1_monitor)
         error1_monitor.set_expression(cas.less(cas.abs(error1), 0.01))
 
         error2_monitor = Monitor(crucial=True,
                                  stay_one=True)
+        self.add_monitor(error2_monitor)
         root_P_goal2_cached = error1_monitor.substitute_with_on_flip_symbols(root_P_goal2)
 
         error2 = cas.euclidean_distance(root_P_goal2_cached, root_P_current)

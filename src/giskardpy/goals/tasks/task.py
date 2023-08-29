@@ -1,7 +1,7 @@
 from typing import Optional, List, Union, Dict
 import giskardpy.casadi_wrapper as cas
 from giskardpy.exceptions import GiskardException, ConstraintInitalizationException
-from giskardpy.goals.monitors.monitors import AlwaysOne, AlwaysZero, Monitor
+from giskardpy.goals.monitors.monitors import Monitor
 from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint
 from giskard_msgs.msg import Constraint as Constraint_msg
 

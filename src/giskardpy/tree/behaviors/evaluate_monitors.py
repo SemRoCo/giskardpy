@@ -16,6 +16,7 @@ class EvaluateMonitors(GiskardBehavior):
         super().__init__(name)
 
     @catch_and_raise_to_blackboard
+    @record_time
     def update(self):
         self.monitor_manager.evaluate_monitors()
         return Status.SUCCESS

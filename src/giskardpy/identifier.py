@@ -9,8 +9,8 @@ fk_np = world + ['compute_fk_np']
 joint_states = world + ['state']
 controlled_joints = ['controlled_joints']
 goal_id = ['goal_id']
-monitors = ['monitors']
 monitor_manager = ['monitor_manager']
+monitors = monitor_manager + ['monitors']
 
 fill_trajectory_velocity_values = ['fill_trajectory_velocity_values']
 

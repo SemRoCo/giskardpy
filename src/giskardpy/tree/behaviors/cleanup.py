@@ -3,6 +3,7 @@ from py_trees import Status
 from visualization_msgs.msg import MarkerArray, Marker
 
 from giskardpy import identifier
+from giskardpy.goals.monitors.monitor_manager import MonitorManager
 from giskardpy.model.collision_world_syncer import Collisions
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.decorators import record_time
@@ -34,6 +35,7 @@ class CleanUp(GiskardBehavior):
         self.collision_scene.reset_cache()
         self.god_map.set_data(identifier.closest_point, Collisions(1))
         self.god_map.set_data(identifier.time, 1)
+        self.god_map.set_data(identifier.monitor_manager, MonitorManager())
 
         self.god_map.set_data(identifier.next_move_goal, None)
         if hasattr(self.get_blackboard(), 'runtime'):

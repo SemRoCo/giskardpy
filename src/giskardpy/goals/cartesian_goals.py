@@ -663,12 +663,14 @@ class RelativePositionSequence(Goal):
         root_P_goal2 = self.get_fk(self.root_link, self.tip_link).dot(tip_P_goal2)
 
         error1 = cas.euclidean_distance(root_P_goal1, root_P_current)
-        error1_monitor = Monitor(crucial=True,
+        error1_monitor = Monitor(name='p1',
+                                 crucial=True,
                                  stay_one=True)
         self.add_monitor(error1_monitor)
         error1_monitor.set_expression(cas.less(cas.abs(error1), 0.01))
 
-        error2_monitor = Monitor(crucial=True,
+        error2_monitor = Monitor(name='p2',
+                                 crucial=True,
                                  stay_one=True)
         self.add_monitor(error2_monitor)
         root_P_goal2_cached = error1_monitor.substitute_with_on_flip_symbols(root_P_goal2)

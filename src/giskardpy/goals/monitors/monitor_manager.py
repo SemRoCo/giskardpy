@@ -3,12 +3,13 @@ from typing import List
 import numpy as np
 
 import giskardpy.casadi_wrapper as cas
+from giskardpy import identifier
 from giskardpy.casadi_wrapper import CompiledFunction
 from giskardpy.goals.monitors.monitors import Monitor
 from giskardpy.god_map_user import GodMapWorshipper
 
 
-def custom_op_numpy(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+def flipped_to_one(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     """
     0, 0 -> 0
     0, 1 -> 1
@@ -45,11 +46,18 @@ class MonitorManager(GodMapWorshipper):
         new_state = new_state.astype(int)
         filtered_switches = self.switches_state[self.stay_one_filter]
         filtered_new_state = new_state[self.stay_one_filter]
-        new_flips = custom_op_numpy(filtered_switches, filtered_new_state)
+        new_flips = flipped_to_one(filtered_switches, filtered_new_state)
         if np.any(new_flips):
             self.trigger_monitor_flips(new_flips)
         self.switches_state[self.stay_one_filter] = filtered_switches | filtered_new_state
-        self.state = self.switches_state | new_state
+        next_state = self.switches_state | new_state
+        any_flips = np.logical_xor(self.state, next_state)
+        if np.any(any_flips):
+            for i, state in enumerate(any_flips):
+                if state:
+                    print(self.monitors[i].name)
+                    self.monitors[i].notify_flipped(self.trajectory_time_in_seconds)
+        self.state = next_state
 
     def add_monitor(self, monitor: Monitor):
         self.monitors.append(monitor)

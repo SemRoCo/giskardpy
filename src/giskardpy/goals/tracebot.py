@@ -62,12 +62,16 @@ class InsertCylinder(Goal):
         root_P_top = root_P_hole + root_V_up * self.pre_grasp_height
         distance_to_top = cas.euclidean_distance(root_P_tip, root_P_top)
         top_reached = cas.less(distance_to_top, 0.01)
-        top_reached_monitor = Monitor(expression=top_reached, crucial=False, stay_one=True)
+        top_reached_monitor = Monitor(name='top reached', crucial=False, stay_one=True)
+        self.add_monitor(top_reached_monitor)
+        top_reached_monitor.set_expression(top_reached)
 
         distance_to_line, root_P_on_line = cas.distance_point_to_line_segment(root_P_tip, root_P_hole, root_P_top)
         distance_to_hole = cas.norm(root_P_hole - root_P_tip)
         bottom_reached = cas.less(distance_to_hole, 0.01)
-        bottom_reached_monitor = Monitor(expression=bottom_reached, crucial=True)
+        bottom_reached_monitor = Monitor('bottom reached', crucial=True, stay_one=True)
+        bottom_reached_monitor.set_expression(bottom_reached)
+        self.add_monitor(bottom_reached_monitor)
 
         reach_top = Task(name='reach top', to_end=top_reached_monitor)
         reach_top.add_point_goal_constraints(frame_P_current=root_P_tip,
@@ -76,7 +80,7 @@ class InsertCylinder(Goal):
                                              weight=self.weight)
         self.add_task(reach_top)
 
-        go_to_line = Task(name='pre place', to_start=top_reached_monitor)
+        go_to_line = Task(name='straight line', to_start=top_reached_monitor)
         go_to_line.add_point_goal_constraints(frame_P_current=root_P_tip,
                                               frame_P_goal=root_P_on_line,
                                               reference_velocity=0.1,
@@ -89,7 +93,7 @@ class InsertCylinder(Goal):
 
         # tilted orientation goal
         angle = cas.angle_between_vector(root_V_cylinder_z, root_V_up)
-        tilt_task = Task(name='tilt', to_end=bottom_reached_monitor)
+        tilt_task = Task(name='tilted', to_end=bottom_reached_monitor)
         tilt_task.add_position_constraint(expr_current=angle,
                                           expr_goal=self.tilt,
                                           reference_velocity=0.1,
@@ -111,7 +115,9 @@ class InsertCylinder(Goal):
         #
         # # tilt straight
         tilt_error = cas.angle_between_vector(root_V_cylinder_z, root_V_up)
-        tilt_monitor = Monitor(expression=cas.less(tilt_error, 0.01), crucial=True)
+        tilt_monitor = Monitor(name='straight', crucial=True)
+        tilt_monitor.set_expression(cas.less(tilt_error, 0.01))
+        self.add_monitor(tilt_monitor)
 
         tilt_straight_task = Task(name='tilt straight', to_start=bottom_reached_monitor, to_end=tilt_monitor)
         tilt_straight_task.add_vector_goal_constraints(frame_V_current=root_V_cylinder_z,

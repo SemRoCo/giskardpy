@@ -77,6 +77,14 @@ class GodMapWorshipper:
         return self.god_map.get_data(identifier.collision_avoidance_config)
 
     @property
+    def trajectory_time_in_seconds(self):
+        time = self.god_map.get_data(identifier.time)
+        if self.is_closed_loop:
+            return time
+        return time * self.god_map.get_data(identifier.sample_period)
+
+
+    @property
     def goal_msg_type(self) -> int:
         return self.goal_msg.type
 

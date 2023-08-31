@@ -9,6 +9,7 @@ from giskardpy.goals.goal import Goal
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.decorators import record_time
 from giskardpy.utils.logging import logwarn
+from giskardpy.utils.utils import create_path
 
 
 class PlotGanttChart(GiskardBehavior):
@@ -17,7 +18,7 @@ class PlotGanttChart(GiskardBehavior):
     def __init__(self, name: str = 'plot gantt chart'):
         super().__init__(name)
 
-    def plot_gantt_chart(self, goals: Dict[str, Goal]):
+    def plot_gantt_chart(self, goals: Dict[str, Goal], file_name: str):
         tasks = []
         start_dates = []
         end_dates = []
@@ -49,11 +50,13 @@ class PlotGanttChart(GiskardBehavior):
         plt.xlabel('Time')
         plt.ylabel('Tasks')
         plt.tight_layout()
-        plt.savefig('text.png')
+        create_path(file_name)
+        plt.savefig(file_name)
 
     @record_time
     @profile
     def update(self):
         goals = self.god_map.get_data(identifier.goals)
-        self.plot_gantt_chart(goals)
+        file_name = self.god_map.get_data(identifier.tmp_folder) + f'/gantt_charts/goal_{self.goal_id}.png'
+        self.plot_gantt_chart(goals, file_name)
         return Status.SUCCESS

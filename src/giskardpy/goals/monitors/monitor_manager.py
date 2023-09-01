@@ -55,7 +55,6 @@ class MonitorManager(GodMapWorshipper):
         if np.any(any_flips):
             for i, state in enumerate(any_flips):
                 if state:
-                    print(self.monitors[i].name)
                     self.monitors[i].notify_flipped(self.trajectory_time_in_seconds)
         self.state = next_state
 

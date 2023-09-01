@@ -3,7 +3,8 @@ from typing import Dict, Optional
 import giskardpy.utils.tfwrapper as tf
 from giskardpy import casadi_wrapper as w, identifier
 from giskardpy.goals.goal import Goal
-from giskardpy.goals.tasks.task import WEIGHT_ABOVE_CA
+from giskardpy.goals.monitors.monitors import Monitor
+from giskardpy.goals.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE, Task
 from giskardpy.my_types import my_string
 
 
@@ -32,12 +33,6 @@ class ExternalCollisionAvoidance(Goal):
         self.control_horizon = self.prediction_horizon - (self.god_map.get_data(identifier.max_derivative) - 1)
         self.control_horizon = max(1, self.control_horizon)
 
-    # def get_contact_normal_on_b_in_root(self):
-    #     return self.god_map.list_to_vector3(identifier.closest_point + ['get_external_collisions',
-    #                                                                           (self.link_name,),
-    #                                                                           self.idx,
-    #                                                                           'root_V_n'])
-
     def map_V_n_symbol(self):
         return self.god_map.list_to_vector3(identifier.closest_point + ['get_external_collisions',
                                                                         (self.link_name,),
@@ -55,12 +50,6 @@ class ExternalCollisionAvoidance(Goal):
                                                                        (self.link_name,),
                                                                        self.idx,
                                                                        'new_map_P_pa'])
-
-    # def get_closest_point_on_b_in_root(self):
-    #     return self.god_map.list_to_point3(identifier.closest_point + ['get_external_collisions',
-    #                                                                          (self.link_name,),
-    #                                                                          self.idx,
-    #                                                                          'root_P_b'])
 
     def get_actual_distance(self):
         return self.god_map.to_symbol(identifier.closest_point + ['get_external_collisions',
@@ -123,23 +112,22 @@ class ExternalCollisionAvoidance(Goal):
                                    1e4,
                                    w.max(0, upper_slack))
 
-        weight = w.if_greater(actual_distance, 50, 0, WEIGHT_COLLISION_AVOIDANCE)
+        # weight = w.if_greater(actual_distance, 50, 0, WEIGHT_COLLISION_AVOIDANCE)
 
-        weight = w.save_division(weight,  # divide by number of active repeller per link
+        weight = w.save_division(WEIGHT_COLLISION_AVOIDANCE,  # divide by number of active repeller per link
                                  w.min(number_of_external_collisions, self.num_repeller))
-        # if self.link_name == 'base_footprint' and self.idx <= 1:
-        #     self.add_debug_expr('soft_threshold', soft_threshold)
-        #     self.add_debug_expr('weight', weight)
-        #     self.add_debug_expr('soft_threshold', soft_threshold)
-        #     self.add_debug_expr('dist', dist)
-        #     self.add_debug_expr('actual_distance', actual_distance)
-        self.add_inequality_constraint(reference_velocity=self.max_velocity,
+        distance_monitor = Monitor('distance', crucial=False)
+        distance_monitor.set_expression(w.less(actual_distance, 50))
+        self.add_monitor(distance_monitor)
+        task = Task('stay away', to_hold=distance_monitor)
+        task.add_inequality_constraint(reference_velocity=self.max_velocity,
                                        lower_error=lower_limit,
                                        upper_error=float('inf'),
                                        weight=weight,
                                        task_expression=dist,
                                        lower_slack_limit=-float('inf'),
                                        upper_slack_limit=upper_slack)
+        self.add_task(task)
 
     def __str__(self):
         s = super().__str__()
@@ -218,10 +206,6 @@ class SelfCollisionAvoidance(Goal):
 
         dist = pb_V_n.dot(pb_P_pa)
 
-        weight = w.if_greater(actual_distance, 50, 0, WEIGHT_COLLISION_AVOIDANCE)
-        weight = w.save_division(weight,  # divide by number of active repeller per link
-                                 w.min(number_of_self_collisions, self.num_repeller))
-
         qp_limits_for_lba = self.max_velocity * sample_period * self.control_horizon
 
         lower_limit = self.soft_threshold - actual_distance
@@ -243,13 +227,20 @@ class SelfCollisionAvoidance(Goal):
                                    1e4,
                                    w.max(0, upper_slack))
 
-        self.add_inequality_constraint(reference_velocity=self.max_velocity,
+        weight = w.save_division(WEIGHT_COLLISION_AVOIDANCE,  # divide by number of active repeller per link
+                                 w.min(number_of_self_collisions, self.num_repeller))
+        distance_monitor = Monitor('distance', crucial=False)
+        distance_monitor.set_expression(w.less(actual_distance, 50))
+        self.add_monitor(distance_monitor)
+        task = Task('stay away', to_hold=distance_monitor)
+        task.add_inequality_constraint(reference_velocity=self.max_velocity,
                                        lower_error=lower_limit,
                                        upper_error=float('inf'),
                                        weight=weight,
                                        task_expression=dist,
                                        lower_slack_limit=-float('inf'),
                                        upper_slack_limit=upper_slack)
+        self.add_task(task)
 
     def __str__(self):
         s = super().__str__()

@@ -69,12 +69,13 @@ class CartesianPosition(Goal):
         # self.add_debug_expr('trans', cas.norm(r_P_c))
 
         distance_to_goal = cas.euclidean_distance(r_P_g, r_P_c)
-        distance_to_goal_monitor = Monitor(expression=cas.less(distance_to_goal, self.threshold),
+        distance_to_goal_monitor = Monitor('distance',
                                            crucial=True,
                                            stay_one=True)
+        distance_to_goal_monitor.set_expression(cas.less(distance_to_goal, self.threshold))
+        self.add_monitor(distance_to_goal_monitor)
 
-        task = Task(name='position goal',
-                    to_end=distance_to_goal_monitor)
+        task = Task(name='position goal')
         task.add_point_goal_constraints(frame_P_goal=r_P_g,
                                         frame_P_current=r_P_c,
                                         reference_velocity=self.reference_velocity,
@@ -144,12 +145,13 @@ class CartesianOrientation(Goal):
             c_R_r_eval = self.get_fk_evaluated(self.tip_link, self.root_link).to_rotation()
 
         rotation_error = cas.rotational_error(r_R_c, r_R_g)
-        rotation_error_monitor = Monitor(expression=cas.less(cas.abs(rotation_error), 0.01),
+        rotation_error_monitor = Monitor('rotation error',
                                          crucial=True,
                                          stay_one=True)
+        rotation_error_monitor.set_expression(cas.less(cas.abs(rotation_error), 0.01))
+        self.add_monitor(rotation_error_monitor)
 
-        task = Task(name='rotation',
-                    to_end=rotation_error_monitor)
+        task = Task(name='rotation')
         task.add_rotation_goal_constraints(frame_R_current=r_R_c,
                                            frame_R_goal=r_R_g,
                                            current_R_frame_eval=c_R_r_eval,

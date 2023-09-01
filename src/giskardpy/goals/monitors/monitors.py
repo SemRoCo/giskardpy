@@ -11,7 +11,7 @@ class Monitor(GodMapWorshipper):
     state_flip_times: List[float]
     name: str
 
-    def __init__(self, name: str, crucial: bool, stay_one: bool = False):
+    def __init__(self, name: str, *, crucial: bool, stay_one: bool = False):
         self.id = -1
         self.name = name
         self.stay_one = stay_one

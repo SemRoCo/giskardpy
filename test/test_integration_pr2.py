@@ -3306,6 +3306,7 @@ class TestCollisionAvoidanceGoals:
                           size=(0.2, 0.04, 0.04),
                           parent_link=box_setup.r_tip,
                           pose=p)
+        box_setup.allow_self_collision()
         box_setup.plan_and_execute()
         box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.048)
         box_setup.check_cpi_geq([attached_link_name], 0.048)

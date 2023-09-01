@@ -53,6 +53,18 @@ class Task:
             constraints.append(constraint)
         return constraints
 
+    def get_neq_constraints(self):
+        constraints = []
+        for constraint in self.neq_constraints.values():
+            if self.to_start is not None:
+                constraint.quadratic_weight *= self.to_start.get_state_expression()
+            if self.to_hold is not None:
+                constraint.quadratic_weight *= self.to_hold.get_state_expression()
+            if self.to_end is not None:
+                constraint.quadratic_weight *= (1 - self.to_end.get_state_expression())
+            constraints.append(constraint)
+        return constraints
+
     def add_equality_constraint(self,
                                 reference_velocity: cas.symbol_expr_float,
                                 equality_bound: cas.symbol_expr_float,
@@ -78,10 +90,6 @@ class Task:
         if task_expression.shape != (1, 1):
             raise GiskardException(f'expression must have shape (1, 1), has {task_expression.shape}')
         name = name if name else f'{len(self.eq_constraints)}'
-        # name = str(self) + '/' + name
-        # if name in self.eq_constraints:
-        #     raise KeyError(f'A constraint with name \'{name}\' already exists. '
-        #                    f'You need to set a name, if you add multiple constraints.')
         lower_slack_limit = lower_slack_limit if lower_slack_limit is not None else -float('inf')
         upper_slack_limit = upper_slack_limit if upper_slack_limit is not None else float('inf')
         self.eq_constraints[name] = EqualityConstraint(name=name,
@@ -121,12 +129,12 @@ class Task:
             raise GiskardException(f'expression must have shape (1,1), has {task_expression.shape}')
         name = name if name else ''
         name = str(self) + "/" + name
-        if name in self._inequality_constraints:
+        if name in self.neq_constraints:
             raise KeyError(f'A constraint with name \'{name}\' already exists. '
                            f'You need to set a name, if you add multiple constraints.')
         lower_slack_limit = lower_slack_limit if lower_slack_limit is not None else -float('inf')
         upper_slack_limit = upper_slack_limit if upper_slack_limit is not None else float('inf')
-        self._inequality_constraints[name] = InequalityConstraint(name=name,
+        self.neq_constraints[name] = InequalityConstraint(name=name,
                                                                   expression=task_expression,
                                                                   lower_error=lower_error,
                                                                   upper_error=upper_error,

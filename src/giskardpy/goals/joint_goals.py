@@ -564,8 +564,9 @@ class JointPositionList(Goal):
                                          task_expression=current)
 
         expression = cas.logic_all(cas.Expression(comparison_list))
-        monitor = Monitor(expression=expression,
-                          crucial=True)
+        monitor = Monitor('position error', crucial=True)
+        monitor.set_expression(expression)
+        self.add_monitor(monitor)
 
         task.to_end = monitor
 

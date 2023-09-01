@@ -94,7 +94,7 @@ class Goal(GodMapWorshipper, ABC):
                 f'You have to ensure that str(self) is possible before calling parents __init__: {e}')
 
     def traj_time_in_seconds(self) -> w.Expression:
-        t = self.god_map.to_expr(identifier.time)
+        t = self.god_map.to_symbol(identifier.time)
         if self.god_map.get_data(identifier.control_mode) == ControlModes.close_loop:
             return t
         else:
@@ -223,6 +223,10 @@ class Goal(GodMapWorshipper, ABC):
                 name = f'{str(self)}/{task.name}/{constraint.name}'
                 constraint.name = name
                 self._equality_constraints[name] = constraint
+            for constraint in task.get_neq_constraints():
+                name = f'{str(self)}/{task.name}/{constraint.name}'
+                constraint.name = name
+                self._inequality_constraints[name] = constraint
             # self._equality_constraints.update(_prepend_prefix(self.__class__.__name__, equality_constraints))
 
         for sub_goal in self._sub_goals:

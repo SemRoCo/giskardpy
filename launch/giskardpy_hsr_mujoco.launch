@@ -1,0 +1,5 @@
+<launch>
+
+    <node pkg="giskardpy" type="hsr_mujoco.py" name="giskard" output="screen"/>
+
+</launch>

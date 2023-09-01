@@ -82,7 +82,7 @@ class KeepObjectAbovePlane(Goal):
         self.add_inequality_constraint_vector(reference_velocities=[self.max_velocity] * 3,
                                               lower_errors=root_P_plane_proj[:3] - root_P_object_proj[:3],
                                               upper_errors=root_V_height_axis[:3],
-                                              weights=[WEIGHT_ABOVE_CA] * 3,
+                                              weights=[WEIGHT_ABOVE_CA * self.weight / WEIGHT_BELOW_CA] * 3,
                                               # WEIGHT needs to be that high, to work for start positions  where the tip is below the plane
                                               task_expression=root_P_object_proj[:3],
                                               names=['abovex', 'abovey', 'abovez'])
@@ -132,6 +132,7 @@ class TiltObject(Goal):
                  weight: float = WEIGHT_BELOW_CA,
                  object_group: Optional[str] = None,
                  root_group: Optional[str] = None,
+                 name_extra=None
                  ):
         """
         Tilts the object link between lower and upper angles in degree around the
@@ -150,6 +151,7 @@ class TiltObject(Goal):
         self.rotation_velocity = rotation_velocity
         self.root_group = root_group
         self.object_group = object_group
+        self.name_extra = name_extra
 
     def make_constraints(self):
         def get_quaternion_from_rotation_around_axis(angle, axis, axis_frame):
@@ -172,14 +174,16 @@ class TiltObject(Goal):
                                                           goal_orientation=goal_orientation,
                                                           max_velocity=self.rotation_velocity,
                                                           reference_velocity=self.max_velocity,
-                                                          weight=self.weight))
+                                                          weight=self.weight,
+                                                          name_extra=self.name_extra))
         self.add_constraints_of_goal(RotationVelocityLimit(root_link=self.root,
                                                            root_group=self.root_group,
                                                            tip_link=self.tip,
                                                            tip_group=self.object_group,
                                                            max_velocity=self.rotation_velocity,
                                                            weight=self.weight,
-                                                           hard=True))
+                                                           hard=True,
+                                                           name_extra=self.name_extra))
         root_V_y = w.Vector3([0, 1, 0])
         root_T_tip = self.get_fk(self.root, self.world.search_for_link_name(self.tip, self.object_group))
         root_V_tip_y = root_T_tip.to_rotation()[:, 1]
@@ -188,7 +192,7 @@ class TiltObject(Goal):
 
     def __str__(self):
         s = super().__str__()
-        return f'{s}/{self.root}/{self.tip}'
+        return f'{s}/{self.root}/{self.tip}/{self.name_extra}'
 
 
 class KeepObjectUpright(Goal):

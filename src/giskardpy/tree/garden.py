@@ -84,6 +84,10 @@ from giskardpy.tree.composites.better_parallel import ParallelPolicy, Parallel
 from giskardpy.utils import logging
 from giskardpy.utils.utils import create_path
 from giskardpy.utils.utils import get_all_classes_in_package
+from giskardpy.tree.behaviors.sync_mujoco_sim_state import SyncMujocoSim
+from giskardpy.tree.behaviors.sync_ball_velocity import SyncBallVel
+# from giskardpy.tree.behaviors.sync_box_pose import SyncBoxPose
+from giskardpy.tree.behaviors.sync_pouring_actions import SyncPouringActions
 
 T = TypeVar('T', bound=Union[Type[GiskardBehavior], Type[Composite]])
 
@@ -953,6 +957,7 @@ class OpenLoop(StandAlone):
         #     sync.add_child(TFPublisher('publish tf', **self.god_map.get_data(identifier.TFPublisher)))
         sync.add_child(CollisionSceneUpdater('update collision scene'))
         sync.add_child(running_is_success(VisualizationBehavior)('visualize collision scene'))
+        # sync.add_child(SyncMujocoSim(name='update from mujoco sim', only_creation=True))
         return sync
 
     def grow_execution(self):
@@ -1054,6 +1059,7 @@ class ClosedLoop(OpenLoop):
 
     def grow_closed_loop_control(self):
         planning_4 = failure_is_success(AsyncBehavior)(self.closed_loop_control_name)
+        # planning_4.add_child(SyncMujocoSim('sync mujoco sim'))
         planning_4.add_child(success_is_running(SyncTfFrames)('sync tf frames close loop'))
         planning_4.add_child(success_is_running(NotifyStateChange)())
         if self.god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none:
@@ -1062,9 +1068,11 @@ class ClosedLoop(OpenLoop):
         planning_4.add_child(RosTime())
         planning_4.add_child(RealKinSimPlugin('kin sim'))
         # planning_4.add_child(LoopDetector('loop detector'))
-        planning_4.add_child(GoalReached('goal reached', real_time=True))
-        planning_4.add_child(MaxTrajectoryLength('traj length check', real_time=True))
-        planning_4.add_child(GoalDone('goal done check'))
+        # planning_4.add_child(GoalReached('goal reached', real_time=True))
+        # planning_4.add_child(MaxTrajectoryLength('traj length check', real_time=True))
+        # planning_4.add_child(GoalDone('goal done check'))
+        # planning_4.add_child(SyncBoxPose('sync box pose'))
+        planning_4.add_child(SyncPouringActions('syncPouring'))
         return planning_4
 
 # def sanity_check(god_map):

@@ -4,7 +4,7 @@ from typing import Optional
 
 import numpy as np
 import pytest
-from geometry_msgs.msg import PoseStamped, Point, Quaternion, PointStamped, Vector3Stamped
+from geometry_msgs.msg import PoseStamped, Point, Quaternion, PointStamped, Vector3Stamped, QuaternionStamped
 from numpy import pi
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
@@ -509,7 +509,6 @@ class TestAddObject:
         zero_pose.plan_and_execute()
 
 
-
 class TestPouring:
     def test_pouring(self, better_pose):
         # TODO: there seems to be a bug in the mujoco sync. it slows down start up and the base is not moved
@@ -538,7 +537,7 @@ class TestPouring:
         edgePose.header.frame_id = 'cup'
         edgePose.pose.position.x = 0
         edgePose.pose.position.y = 0.03
-        edgePose.pose.position.z = 0.045
+        edgePose.pose.position.z = 0.095
         edgePose.pose.orientation = Quaternion(*quaternion_from_matrix([[1, 0, 0, 0],
                                                                         [0, 1, 0, 0],
                                                                         [0, 0, 1, 0],
@@ -547,7 +546,7 @@ class TestPouring:
         zero_pose.add_box('container', (0.2, 0.2, 0.03), containerPose)
         # zero_pose.add_mesh('container', mesh='package://giskardpy/test/urdfs/meshes/bowl_21.obj',
         #                    pose=containerPose)
-        zero_pose.add_cylinder('cup', 0.10, 0.03, cupPose, parent_link=cupPose.header.frame_id)
+        zero_pose.add_cylinder('cup', 0.20, 0.03, cupPose, parent_link=cupPose.header.frame_id)
         zero_pose.add_box('edge', (0.02, 0.01, 0.01), edgePose, 'cup', 'cup')
 
         # held object
@@ -560,8 +559,8 @@ class TestPouring:
         # goal object and keep above parameter
         container_plane = PointStamped()
         container_plane.header.frame_id = 'container'  # 'sync_bowl1/sync_bowl1'
-        lower_distance = 0.19
-        upper_distance = 0.19
+        lower_distance = 0.1
+        upper_distance = 0.15
         plane_radius = 0.0
 
         # reference axis for keep upright
@@ -577,7 +576,7 @@ class TestPouring:
         rotation_axis = Vector3Stamped()
         rotation_axis.header.frame_id = 'edge'
         rotation_axis.vector.x = 1
-        tilt_angle = -1.5708
+        tilt_angle = -1.9
         tilt_velocity = 0.9
 
         # zero_pose.update_parent_link_of_group('sync_create_cup2223', 'hand_palm_link', 'hsrb4s')
@@ -595,36 +594,36 @@ class TestPouring:
                                 reference_link_axis=reference_axis,
                                 root_link='map')
         # align x planes of object and map
-        zero_pose.set_json_goal('KeepObjectUpright',
-                                object_link_axis=rotation_axis,
-                                reference_link_axis=reference_axis2,
-                                root_link='map')
+        # zero_pose.set_json_goal('KeepObjectUpright',
+        #                         object_link_axis=rotation_axis,
+        #                         reference_link_axis=reference_axis2,
+        #                         root_link='map')
 
         # zero_pose.set_avoid_joint_limits_goal(30)
         # zero_pose.add_cmd()
         zero_pose.plan_and_execute()
         # # Second phase TiltObject & KeepObjectAbovePlane
-        # zero_pose.set_json_goal('KeepObjectAbovePlane',
-        #                         object_link='sync_create_cup2223/sync_create_cup2223',
-        #                         plane_center_point=container_plane,
-        #                         lower_distance=lower_distance,
-        #                         upper_distance=upper_distance,
-        #                         plane_radius=plane_radius,
-        #                         root_link='map')
-        #
-        # zero_pose.set_json_goal('TiltObject',
-        #                         object_link='edge',
-        #                         reference_link='map',
-        #                         rotation_velocity=tilt_velocity,
-        #                         root_link='map',
-        #                         lower_angle=tilt_angle,
-        #                         rotation_axis=rotation_axis)
-        # # align x planes of object and map
-        # zero_pose.set_json_goal('KeepObjectUpright',
-        #                         object_link_axis=rotation_axis,
-        #                         reference_link_axis=reference_axis2,
-        #                         root_link='map')
-        #
+        zero_pose.set_json_goal('KeepObjectAbovePlane',
+                                object_link='cup',# 'sync_create_cup2223/sync_create_cup2223',
+                                plane_center_point=container_plane,
+                                lower_distance=lower_distance,
+                                upper_distance=upper_distance,
+                                plane_radius=plane_radius,
+                                root_link='map')
+
+        zero_pose.set_json_goal('TiltObject',
+                                object_link='edge',
+                                reference_link='map',
+                                rotation_velocity=tilt_velocity,
+                                root_link='map',
+                                lower_angle=tilt_angle,
+                                rotation_axis=rotation_axis)
+        # align x planes of object and map
+        zero_pose.set_json_goal('KeepObjectUpright',
+                                object_link_axis=rotation_axis,
+                                reference_link_axis=reference_axis2,
+                                root_link='map')
+        zero_pose.plan_and_execute()
         # zero_pose.add_cmd()
         #
         # # # Third phase KeepObjectUpright & KeepObjectAbovePlane
@@ -646,3 +645,87 @@ class TestPouring:
         #                         root_link='map')
         #
         # zero_pose.plan_and_execute()
+
+
+class TestActions:
+    def test_pouring_action(self, zero_pose: HSRTestWrapper):
+        # TODO: add move to constraints and make the others more stable
+        orientation = QuaternionStamped()
+        orientation.header.frame_id = 'map'
+        orientation.quaternion = Quaternion(*quaternion_from_matrix([[0, 0, 1, 0],
+                                                                     [0, -1, 0, 0],
+                                                                     [1, 0, 0, 0],
+                                                                     [0, 0, 0, 1]]))
+
+        down_orientation = QuaternionStamped()
+        down_orientation.header.frame_id = 'map'
+        down_orientation.quaternion = Quaternion(*quaternion_from_matrix([[0, 0, 1, 0],
+                                                                          [0, 1, 0, 0],
+                                                                          [-1, 0, 0, 0],
+                                                                          [0, 0, 0, 1]]))
+
+        container_plane = PointStamped()
+        container_plane.header.frame_id = 'map'
+        container_plane.point.x = 2
+        container_plane.point.z = 1
+
+        zero_pose.set_json_goal('PouringAction',
+                                tip_link='hand_palm_link',
+                                root_link='map',
+                                upright_orientation=orientation,
+                                down_orientation=down_orientation,
+                                container_plane=container_plane)
+        zero_pose.set_avoid_joint_limits_goal()
+        zero_pose.plan_and_execute()
+
+
+class TestGrasping:
+    def test_box_grasp(self, better_pose: HSRTestWrapper):
+        better_pose2 = {
+            'arm_flex_joint': -0.7,
+            'arm_lift_joint': 0.2,
+            'arm_roll_joint': 0.0,
+            'head_pan_joint': -0.1,
+            'head_tilt_joint': 0.1,
+            'wrist_flex_joint': -0.9,
+            'wrist_roll_joint': -0.4,
+        }
+
+        hand = Hand(hand_tool_frame='hsrb4s/hand_tool_frame',
+                    palm_link='hsrb4s/hand_palm_link',
+                    thumb=Finger(tip_tool_frame='hsrb4s/thumb_tool_frame',
+                                 collision_links=['hsrb4s/hand_l_distal_link',
+                                                  'hsrb4s/hand_l_proximal_link']),
+                    fingers=[Finger(tip_tool_frame='hsrb4s/finger_tool_frame',
+                                    collision_links=['hsrb4s/hand_l_distal_link',
+                                                     'hsrb4s/hand_l_proximal_link'])
+                             ],
+                    finger_js={'hand_motor_joint': 0.7},
+                    opening_width=0.06)
+
+        box_pose = PoseStamped()
+        box_pose.header.frame_id = 'map'
+        box_pose.pose.position.z = 0.3
+        box_pose.pose.position.x = 2
+        box_pose.pose.position.y = 0
+        box_pose.pose.orientation.w = 1
+        better_pose.add_box('box', (0.03, 0.2, 0.3), box_pose)
+
+        better_pose.set_json_goal('GraspBox',
+                                  hand=hand,
+                                  object_name='box',
+                                  root_link='map',
+                                  blocked_directions=[0, 0, 0, 0, 0, 0],
+                                  group='hsrb4s',
+                                  max_linear_velocity=0.2)
+
+        view = 'hsrb4s/head_center_camera_frame'
+        goal_point = PointStamped()
+        goal_point.point = box_pose.pose.position
+        pointingAxis = Vector3Stamped()
+        pointingAxis.header.frame_id = view
+        pointingAxis.vector.z = 1
+        better_pose.set_pointing_goal(goal_point, view, pointingAxis, 'map')
+
+        better_pose.allow_all_collisions()
+        better_pose.plan_and_execute()

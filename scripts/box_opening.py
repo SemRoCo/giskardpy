@@ -11,6 +11,7 @@ from urdf_parser_py import urdf
 import giskardpy.utils.tfwrapper as tf
 
 import rospy
+import rospkg
 
 from multiverse_msgs.msg import ObjectAttribute
 from multiverse_msgs.srv import Socket, SocketRequest, SocketResponse
@@ -44,7 +45,7 @@ def control_gripper(open: bool, left: bool = True, right: bool= True):
             gripper_client.wait_for_server()
         gripper_cmd_goal = GripperCommandGoal()
         gripper_cmd_goal.command.position = open * 0.4
-        gripper_cmd_goal.command.max_effort = 100.0
+        gripper_cmd_goal.command.max_effort = 500.0
 
         for gripper_client in gripper_left_clients:
             gripper_client.send_goal(gripper_cmd_goal)
@@ -54,7 +55,7 @@ def control_gripper(open: bool, left: bool = True, right: bool= True):
             gripper_client.wait_for_server()
         gripper_cmd_goal = GripperCommandGoal()
         gripper_cmd_goal.command.position = open * 0.4
-        gripper_cmd_goal.command.max_effort = 100.0
+        gripper_cmd_goal.command.max_effort = 500.0
 
         for gripper_client in gripper_right_clients:
             gripper_client.send_goal(gripper_cmd_goal)
@@ -70,7 +71,7 @@ class CRAM:
     camera_link = 'xtion_rgb_frame'
     base_footprint = 'base_footprint'
     torso_link = 'torso_lift_link'
-    better_pose = {
+    park_pose = {
         'arm_left_1_joint': - 1.0,
         'arm_left_2_joint': 0.0,
         'arm_left_3_joint': 1.5,
@@ -85,11 +86,7 @@ class CRAM:
         'arm_right_5_joint': - 1.5,
         'arm_right_6_joint': 0.5,
         'arm_right_7_joint': 0.0,
-        'torso_lift_joint': 0.7,
-        'gripper_right_left_finger_joint': 0.045,
-        'gripper_right_right_finger_joint': 0.045,
-        'gripper_left_left_finger_joint': 0.045,
-        'gripper_left_right_finger_joint': 0.045,
+        'torso_lift_joint': 0.7
     }
 
     def __init__(self):
@@ -102,7 +99,7 @@ class CRAM:
             object_attr.object_name = joint_name
             object_attr.attribute_names = ["joint_rvalue"]
             self._box_request.receive.append(object_attr)
-        self.load_env()
+        self.load_box()
         self.initial_pose()
 
     def open_grippers(self):
@@ -114,7 +111,7 @@ class CRAM:
     def close_left_gripper(self):
         control_gripper(False, left=True, right=False)
 
-    def close_gripper(self):
+    def close_grippers(self):
         control_gripper(False)
 
     def open_right_gripper(self):
@@ -123,8 +120,9 @@ class CRAM:
     def close_right_gripper(self):
         control_gripper(False, left=False, right=True)
 
-    def load_env(self):
-        path_to_urdf = '/media/giangnguyen/Storage/Multiverse/multiverse_ws/src/Multiverse-Objects/articulated_objects/box/urdf/box.urdf'
+    def load_box(self):
+        rospack = rospkg.RosPack()
+        path_to_urdf = rospack.get_path("articulated_objects") + '/box/urdf/box.urdf'
         robot: urdf.Robot = urdf.Robot.from_xml_file(file_path=path_to_urdf)
         urdf_str = robot.to_xml_string()
         if self.box_name not in self.giskard.get_group_names():
@@ -156,18 +154,17 @@ class CRAM:
                              parent_link='map')
 
     def initial_pose(self):
-
         cart_goal = PoseStamped()
         cart_goal.header.frame_id = "map"
         cart_goal.pose.position = Point(1.97, 2.5, 0)
         cart_goal.pose.orientation.w = 1
-        # self.giskard.set_cart_goal(g)
+        
         self.giskard.set_json_goal(constraint_type='DiffDriveBaseGoal',
                                    goal_pose=cart_goal, tip_link="base_footprint", root_link="map")
         self.giskard.allow_all_collisions()
         self.giskard.plan_and_execute()
 
-        self.giskard.set_joint_goal(goal_state=self.better_pose)
+        self.giskard.set_joint_goal(goal_state=self.park_pose)
         self.giskard.allow_all_collisions()
         self.giskard.plan_and_execute()
 
@@ -187,7 +184,6 @@ class CRAM:
         except rospy.ServiceException as error:
             print(f"Service call failed: {error}")
 
-
         self.giskard.set_json_goal('SetSeedConfiguration',
                               seed_configuration=joint_values,
                               group_name='box')
@@ -201,7 +197,7 @@ class CRAM:
         # pre grasp
         left_grasp_pose = PoseStamped()
         left_grasp_pose.header.frame_id = self.box_flap_side_2_link
-        left_grasp_pose.pose.position.x = 0.38
+        left_grasp_pose.pose.position.x = 0.40
         left_grasp_pose.pose.position.z = 0.05
         box_R_gripper = np.array([[-1, 0, 0, 0],
                                   [0, 0, -1, 0],
@@ -226,7 +222,7 @@ class CRAM:
                               tip_link=tip_link)
         self.giskard.allow_all_collisions()
         self.giskard.plan_and_execute()
-        rospy.sleep(15)
+        rospy.sleep(5)
         self.update_box_state()
 
         left_grasp_pose = PoseStamped()
@@ -276,8 +272,8 @@ class CRAM:
         # pre grasp
         left_grasp_pose = PoseStamped()
         left_grasp_pose.header.frame_id = self.box_flap_side_1_link
-        left_grasp_pose.pose.position.x = -0.4
-        left_grasp_pose.pose.position.z = 0.1
+        left_grasp_pose.pose.position.x = -0.40
+        left_grasp_pose.pose.position.z = 0.05
         box_R_gripper = np.array([[1, 0, 0, 0],
                                   [0, 0, -1, 0],
                                   [0, 1, 0, 0],
@@ -320,6 +316,7 @@ class CRAM:
                                    tip_link=tip_link)
         self.giskard.allow_all_collisions()
         self.giskard.plan_and_execute()
+
         rospy.sleep(5)
         self.update_box_state()
         left_grasp_pose = PoseStamped()
@@ -365,7 +362,7 @@ class CRAM:
         tip_link = self.right_tip_link
         pre_pose = PoseStamped()
         pre_pose.header.frame_id = self.milk_name
-        pre_pose.pose.position.y = 0.4
+        pre_pose.pose.position.y = 0.38
         pre_pose.pose.orientation = Quaternion(*quaternion_from_matrix(np.array([[0, 1, 0, 0],
                                                                                  [-1, 0, 0, 0],
                                                                                  [0, 0, 1, 0],
@@ -401,6 +398,15 @@ class CRAM:
                                    tip_link=self.milk_name)
         self.giskard.allow_all_collisions()
         self.giskard.plan_and_execute()
+
+        goal_state = {}
+        goal_state["arm_right_5_joint"] = -1.5
+        goal_state["arm_right_6_joint"] = 0.5
+        goal_state["arm_right_7_joint"] = 1.57
+        self.giskard.set_joint_goal(goal_state=goal_state)
+        self.giskard.allow_all_collisions()
+        self.giskard.plan_and_execute()
+
         self.initial_pose()
 
 

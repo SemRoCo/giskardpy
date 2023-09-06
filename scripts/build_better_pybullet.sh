@@ -22,7 +22,7 @@ if [ ! -d "pybind11" ]; then
 fi
 
 if [ ! -d "bullet3" ]; then
-    git clone https://github.com/SemRoCo/bullet3 --branch kineverse_new
+    git clone https://github.com/SemRoCo/bullet3
 
     cd bullet3
 

@@ -14,6 +14,7 @@ class Open(Goal):
                  tip_group: Optional[str] = None,
                  environment_group: Optional[str] = None,
                  goal_joint_state: Optional[float] = None,
+                 max_velocity: float = 100,
                  weight: float = WEIGHT_ABOVE_CA):
         """
         Open a container in an environment.
@@ -50,6 +51,7 @@ class Open(Goal):
         self.add_constraints_of_goal(JointPosition(joint_name=self.joint_name.short_name,
                                                    group_name=self.joint_group.name,
                                                    goal=goal_joint_state,
+                                                   max_velocity=max_velocity,
                                                    weight=WEIGHT_BELOW_CA))
 
     def make_constraints(self):

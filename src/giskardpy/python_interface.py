@@ -395,6 +395,7 @@ class GiskardWrapper:
                                 tip_group: Optional[str] = None,
                                 environment_group: Optional[str] = None,
                                 goal_joint_state: Optional[float] = None,
+                                max_velocity: float = 100,
                                 weight=WEIGHT_ABOVE_CA, ):
         """
         Open a container in an environment.
@@ -414,6 +415,7 @@ class GiskardWrapper:
                            tip_group=tip_group,
                            environment_group=environment_group,
                            goal_joint_state=goal_joint_state,
+                           max_velocity=max_velocity,
                            weight=weight)
 
     def set_close_container_goal(self,

@@ -5,7 +5,6 @@ from typing import Dict, Optional, List
 from geometry_msgs.msg import PoseStamped
 
 from giskardpy import casadi_wrapper as cas, identifier
-from giskardpy.goals.monitors.joint_monitors import PositionMonitor
 from giskardpy.goals.monitors.monitors import Monitor
 from giskardpy.goals.tasks.joint_tasks import JointPositionTask, PositionTask
 from giskardpy.tree.control_modes import ControlModes

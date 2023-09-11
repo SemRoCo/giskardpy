@@ -4,7 +4,7 @@ import giskardpy.casadi_wrapper as cas
 from giskardpy.goals.monitors.monitors import Monitor
 
 
-class PositionMonitor(Monitor):
+class JointGoalReached(Monitor):
     def __init__(self,
                  current_positions: List[cas.symbol_expr_float],
                  goal_positions: List[cas.symbol_expr_float],

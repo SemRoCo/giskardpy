@@ -1,15 +1,17 @@
 from typing import Optional, List, Union, Dict
+
+import giskard_msgs.msg
 import giskardpy.casadi_wrapper as cas
 from giskardpy.exceptions import GiskardException, ConstraintInitalizationException
 from giskardpy.goals.monitors.monitors import Monitor
 from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint
-from giskard_msgs.msg import Constraint as Constraint_msg
 
-WEIGHT_MAX = Constraint_msg.WEIGHT_MAX
-WEIGHT_ABOVE_CA = Constraint_msg.WEIGHT_ABOVE_CA
-WEIGHT_COLLISION_AVOIDANCE = Constraint_msg.WEIGHT_COLLISION_AVOIDANCE
-WEIGHT_BELOW_CA = Constraint_msg.WEIGHT_BELOW_CA
-WEIGHT_MIN = Constraint_msg.WEIGHT_MIN
+WEIGHT_MAX = giskard_msgs.msg.Weights.WEIGHT_MAX
+WEIGHT_ABOVE_CA = giskard_msgs.msg.Weights.WEIGHT_ABOVE_CA
+WEIGHT_COLLISION_AVOIDANCE = giskard_msgs.msg.Weights.WEIGHT_COLLISION_AVOIDANCE
+WEIGHT_BELOW_CA = giskard_msgs.msg.Weights.WEIGHT_BELOW_CA
+WEIGHT_MIN = giskard_msgs.msg.Weights.WEIGHT_MIN
+
 
 class Task:
     """
@@ -18,15 +20,12 @@ class Task:
     eq_constraints: Dict[str, EqualityConstraint]
     neq_constraints: Dict[str, InequalityConstraint]
     derivative_constraints: Dict[str, DerivativeInequalityConstraint]
-    to_start: Monitor
-    to_hold: Monitor
-    to_end: Monitor
+    to_start: List[Monitor]
+    to_hold: List[Monitor]
+    to_end: List[Monitor]
     name: Optional[str]
 
-    def __init__(self, name: Optional[str],
-                 to_start: Optional[Monitor] = None,
-                 to_hold: Optional[Monitor] = None,
-                 to_end: Optional[Monitor] = None):
+    def __init__(self, name: Optional[str]):
         if name is None:
             self.name = str(self.__class__.__name__)
         else:
@@ -34,34 +33,43 @@ class Task:
         self.eq_constraints = {}
         self.neq_constraints = {}
         self.derivative_constraints = {}
-        self.to_start = to_start
-        self.to_hold = to_hold
-        self.to_end = to_end
+        self.to_start = []
+        self.to_hold = []
+        self.to_end = []
 
     def __str__(self):
         return self.name
 
+    def add_to_start_monitor(self, monitor: Monitor):
+        self.to_start.append(monitor)
+
+    def add_to_hold_monitor(self, monitor: Monitor):
+        self.to_hold.append(monitor)
+
+    def add_to_end_monitor(self, monitor: Monitor):
+        self.to_end.append(monitor)
+
     def get_eq_constraints(self):
         constraints = []
         for constraint in self.eq_constraints.values():
-            if self.to_start is not None:
-                constraint.quadratic_weight *= self.to_start.get_state_expression()
-            if self.to_hold is not None:
-                constraint.quadratic_weight *= self.to_hold.get_state_expression()
-            if self.to_end is not None:
-                constraint.quadratic_weight *= (1 - self.to_end.get_state_expression())
+            for monitor in self.to_start:
+                constraint.quadratic_weight *= monitor.get_state_expression()
+            for monitor in self.to_hold:
+                constraint.quadratic_weight *= monitor.get_state_expression()
+            for monitor in self.to_end:
+                constraint.quadratic_weight *= (1 - monitor.get_state_expression())
             constraints.append(constraint)
         return constraints
 
     def get_neq_constraints(self):
         constraints = []
         for constraint in self.neq_constraints.values():
-            if self.to_start is not None:
-                constraint.quadratic_weight *= self.to_start.get_state_expression()
-            if self.to_hold is not None:
-                constraint.quadratic_weight *= self.to_hold.get_state_expression()
-            if self.to_end is not None:
-                constraint.quadratic_weight *= (1 - self.to_end.get_state_expression())
+            for monitor in self.to_start:
+                constraint.quadratic_weight *= monitor.get_state_expression()
+            for monitor in self.to_hold:
+                constraint.quadratic_weight *= monitor.get_state_expression()
+            for monitor in self.to_end:
+                constraint.quadratic_weight *= (1 - monitor.get_state_expression())
             constraints.append(constraint)
         return constraints
 
@@ -135,14 +143,14 @@ class Task:
         lower_slack_limit = lower_slack_limit if lower_slack_limit is not None else -float('inf')
         upper_slack_limit = upper_slack_limit if upper_slack_limit is not None else float('inf')
         self.neq_constraints[name] = InequalityConstraint(name=name,
-                                                                  expression=task_expression,
-                                                                  lower_error=lower_error,
-                                                                  upper_error=upper_error,
-                                                                  velocity_limit=reference_velocity,
-                                                                  quadratic_weight=weight,
-                                                                  lower_slack_limit=lower_slack_limit,
-                                                                  upper_slack_limit=upper_slack_limit,
-                                                                  control_horizon=control_horizon)
+                                                          expression=task_expression,
+                                                          lower_error=lower_error,
+                                                          upper_error=upper_error,
+                                                          velocity_limit=reference_velocity,
+                                                          quadratic_weight=weight,
+                                                          lower_slack_limit=lower_slack_limit,
+                                                          upper_slack_limit=upper_slack_limit,
+                                                          control_horizon=control_horizon)
 
     def add_inequality_constraint_vector(self,
                                          reference_velocities: Union[
@@ -248,7 +256,7 @@ class Task:
                                      weight=weight,
                                      task_expression=expr_current,
                                      name=name)
-    
+
     def add_vector_goal_constraints(self,
                                     frame_V_current: cas.Vector3,
                                     frame_V_goal: cas.Vector3,
@@ -279,7 +287,7 @@ class Task:
                                             names=[f'{name}/trans/x',
                                                    f'{name}/trans/y',
                                                    f'{name}/trans/z'])
-    
+
     def add_rotation_goal_constraints(self,
                                       frame_R_current: cas.RotationMatrix,
                                       frame_R_goal: cas.RotationMatrix,

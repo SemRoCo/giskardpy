@@ -176,7 +176,7 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
             return py_trees.Status.INVALID
         # pity there is no 'is_connected' api like there is for c++
         if not self.sent_goal:
-            self.action_client.send_goal(self.action_goal)
+            self.action_client._send_action_goal(self.action_goal)
             logging.loginfo('Sending trajectory to \'{}\'.'.format(self.action_namespace))
             self.sent_goal = True
             self.feedback_message = "sent goal to the action server"

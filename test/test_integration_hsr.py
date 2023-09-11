@@ -188,11 +188,11 @@ class TestJointGoals:
 
     def test_mimic_joints4(self, zero_pose: HSRTestWrapper):
         ll, ul = zero_pose.world.get_joint_velocity_limits('hsrb/arm_lift_joint')
-        assert ll == -0.2
-        assert ul == 0.2
+        assert ll == -0.15
+        assert ul == 0.15
         ll, ul = zero_pose.world.get_joint_velocity_limits('hsrb/torso_lift_joint')
-        assert ll == -0.1
-        assert ul == 0.1
+        assert ll == -0.075
+        assert ul == 0.075
         joint_goal = {'torso_lift_joint': 0.25}
         zero_pose.set_joint_goal(joint_goal, check=False)
         zero_pose.allow_all_collisions()

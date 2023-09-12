@@ -28,7 +28,7 @@ from giskardpy.model.utils import make_world_body_box, hacky_urdf_parser_fix
 from giskardpy.model.world import WorldTree
 from giskardpy.my_types import PrefixName
 from giskardpy.goals.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE
-from giskardpy.python_interface import GiskardWrapper
+from giskardpy.python_interface.python_interface import GiskardWrapper
 from giskardpy.utils.utils import launch_launchfile, suppress_stderr
 from giskardpy.utils.math import compare_points
 from utils_for_tests import compare_poses, publish_marker_vector, \
@@ -348,7 +348,7 @@ class TestJointGoals:
         }
         zero_pose.set_joint_goal(js)
         zero_pose.allow_all_collisions()
-        zero_pose.set_json_goal('EnableVelocityTrajectoryTracking', enabled=True)
+        # zero_pose.set_json_goal('EnableVelocityTrajectoryTracking', enabled=True)
         zero_pose.plan_and_execute()
 
     def test_gripper_goal(self, zero_pose: PR2TestWrapper):

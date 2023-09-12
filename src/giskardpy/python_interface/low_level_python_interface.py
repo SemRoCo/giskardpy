@@ -10,7 +10,8 @@ from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
 from visualization_msgs.msg import MarkerArray
 
-from giskard_msgs.msg import MoveAction, MoveGoal, WorldBody, CollisionEntry, MoveResult, MoveFeedback, MotionGoal
+from giskard_msgs.msg import MoveAction, MoveGoal, WorldBody, CollisionEntry, MoveResult, MoveFeedback, MotionGoal, \
+    Monitor
 import giskard_msgs.msg as giskard_msgs
 from giskard_msgs.srv import DyeGroupRequest, DyeGroup, GetGroupInfoRequest, DyeGroupResponse
 from giskard_msgs.srv import GetGroupNamesResponse, GetGroupInfoResponse, RegisterGroupRequest
@@ -18,15 +19,19 @@ from giskard_msgs.srv import RegisterGroupResponse
 from giskard_msgs.srv import UpdateWorld, UpdateWorldRequest, UpdateWorldResponse, GetGroupInfo, \
     GetGroupNames, RegisterGroup
 from giskardpy.exceptions import DuplicateNameException, UnknownGroupException
+from giskardpy.goals.monitors.joint_monitors import JointGoalReached
 from giskardpy.goals.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
 from giskardpy.model.utils import make_world_body_box
 from giskardpy.my_types import goal_parameter
 from giskardpy.utils.utils import position_dict_to_joint_states, convert_ros_message_to_dictionary, \
-    replace_prefix_name_with_str
+    replace_prefix_name_with_str, kwargs_to_json
 
 
 class LowLevelGiskardWrapper:
     last_feedback: MoveFeedback = None
+    _goals: List[MotionGoal]
+    _monitors: List[Monitor]
+    _collision_entries: List[CollisionEntry]
 
     def __init__(self, node_name: str = 'giskard'):
         giskard_topic = f'{node_name}/command'
@@ -50,8 +55,9 @@ class LowLevelGiskardWrapper:
         """
         Removes all move commands from the current goal, collision entries are left untouched.
         """
-        self.goals = []
-        self.monitors = []
+        self._goals = []
+        self._monitors = []
+        self._collision_entries = []
 
     def execute(self, wait: bool = True) -> MoveResult:
         """
@@ -86,8 +92,9 @@ class LowLevelGiskardWrapper:
 
     def _create_action_goal(self) -> MoveGoal:
         action_goal = MoveGoal()
-        action_goal.monitors = self.monitors
-        action_goal.goals = self.goals
+        action_goal.monitors = self._monitors
+        action_goal.goals = self._goals
+        action_goal.collisions = self._collision_entries
         self.clear_cmds()
         return action_goal
 
@@ -124,34 +131,36 @@ class LowLevelGiskardWrapper:
         :param kwargs: maps constraint parameter names to their values.
                         Values should be a float, str, dict or ros messages.
         """
-        constraint = MotionGoal()
-        constraint.name = goal_name
-        constraint.type = goal_type
-        constraint.to_start = to_start if to_start is not None else []
-        constraint.to_hold = to_hold if to_hold is not None else []
-        constraint.to_end = to_end if to_end is not None else []
-        for k, v in kwargs.copy().items():
-            if v is None:
-                del kwargs[k]
-            if isinstance(v, Message):
-                kwargs[k] = convert_ros_message_to_dictionary(v)
-        kwargs = replace_prefix_name_with_str(kwargs)
-        constraint.parameter_value_pair = json.dumps(kwargs)
-        self.goals.append(constraint)
-
-    def set_json_goal(self,
-                      constraint_type: str,
-                      **kwargs: goal_parameter):
-        self.add_motion_goal(goal_type=constraint_type, **kwargs)
+        motion_goal = MotionGoal()
+        motion_goal.name = goal_name
+        motion_goal.type = goal_type
+        motion_goal.to_start = to_start if to_start is not None else []
+        motion_goal.to_hold = to_hold if to_hold is not None else []
+        motion_goal.to_end = to_end if to_end is not None else []
+        motion_goal.parameter_value_pair = kwargs_to_json(kwargs)
+        self._goals.append(motion_goal)
 
     def add_monitor(self, monitor_type: str, monitor_name: str, **kwargs):
+        assert [x for x in self._monitors if x.name == monitor_name] == []
         monitor = giskard_msgs.Monitor()
         monitor.type = monitor_type
         monitor.name = monitor_name
-        monitor.parameter_value_pair = kwargs
+        monitor.parameter_value_pair = kwargs_to_json(kwargs)
+        self._monitors.append(monitor)
 
     def _feedback_cb(self, msg: MoveFeedback):
         self.last_feedback = msg
+
+    # %% predefined monitors
+    def add_joint_goal_monitor(self, name: str,
+                               goal_state: Dict[str, float],
+                               threshold: float,
+                               crucial: bool):
+        self.add_monitor(monitor_type=JointGoalReached.__name__,
+                         monitor_name=name,
+                         goal_state=goal_state,
+                         threshold=threshold,
+                         crucial=crucial)
 
     # %% predefined goals
     def set_cart_goal(self,
@@ -267,6 +276,10 @@ class LowLevelGiskardWrapper:
                            weight=weight,
                            **kwargs)
 
+    def set_seed_configuration(self, seed_configuration):
+        self.add_motion_goal(goal_type='SetSeedConfiguration',
+                             seed_configuration=seed_configuration)
+
     def set_straight_translation_goal(self,
                                       goal_pose: PoseStamped,
                                       tip_link: str,
@@ -338,13 +351,13 @@ class LowLevelGiskardWrapper:
         :param max_velocity: will be applied to all joints
         :param hard: turns this into a hard constraint.
         """
-        self.set_json_goal(constraint_type='JointPositionList',
-                           goal_state=goal_state,
-                           group_name=group_name,
-                           weight=weight,
-                           max_velocity=max_velocity,
-                           hard=hard,
-                           **kwargs)
+        self.add_motion_goal(goal_type='JointPositionList',
+                             goal_state=goal_state,
+                             group_name=group_name,
+                             weight=weight,
+                             max_velocity=max_velocity,
+                             hard=hard,
+                             **kwargs)
 
     def set_align_planes_goal(self,
                               goal_normal: Vector3Stamped,
@@ -570,7 +583,7 @@ class LowLevelGiskardWrapper:
         Adds collision entries to the current goal
         :param collisions: list of CollisionEntry
         """
-        self.move_cmd.collisions.extend(collisions)
+        self._collision_entries.extend(collisions)
 
     def allow_collision(self, group1: str = CollisionEntry.ALL, group2: str = CollisionEntry.ALL):
         """

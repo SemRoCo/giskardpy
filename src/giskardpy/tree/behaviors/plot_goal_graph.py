@@ -31,32 +31,22 @@ def generate_graph(tasks: List[Task], monitors: List[Monitor], output_file: str 
     for task in tasks:
         graph.add_node(pydot.Node(task.name, shape='box', color='black', fontcolor='black'))
 
-        if task.to_start is not None:
-            to_start = task.to_start.name
-        else:
-            to_start = None
-        if task.to_end is not None:
-            to_end = task.to_end.name
-        else:
-            to_end = None
-        if task.to_hold is not None:
-            to_hold = task.to_hold.name
-        else:
-            to_hold = None
-
-        if to_start:
-            graph.add_edge(pydot.Edge(to_start, task.name, color='green'))
-            to_end_only_monitors.discard(to_start)
-        else:
-            add_t0 = True
-            graph.add_edge(pydot.Edge('t_0', task.name, color='green'))
-
-        if to_end:
-            graph.add_edge(pydot.Edge(task.name, to_end, color='red'))
-
-        if to_hold:
+        for monitor in task.to_start:
+            to_start = monitor.name
+            if to_start:
+                graph.add_edge(pydot.Edge(to_start, task.name, color='green'))
+                to_end_only_monitors.discard(to_start)
+            else:
+                add_t0 = True
+                graph.add_edge(pydot.Edge('t_0', task.name, color='green'))
+        for monitor in task.to_hold:
+            to_hold = monitor.name
             graph.add_edge(pydot.Edge(to_hold, task.name, color='orange'))
             to_end_only_monitors.discard(to_hold)
+        for monitor in task.to_end:
+            to_end = monitor.name
+            graph.add_edge(pydot.Edge(task.name, to_end, color='red'))
+
 
     # Add "t_0" node with red border and black text if needed
     if add_t0:

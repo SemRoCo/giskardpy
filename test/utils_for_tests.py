@@ -39,7 +39,7 @@ from giskardpy.exceptions import UnknownGroupException
 from giskardpy.god_map import GodMap
 from giskardpy.model.joints import OneDofJoint, OmniDrive, DiffDrive
 from giskardpy.model.world import WorldTree
-from giskardpy.python_interface import GiskardWrapper
+from giskardpy.python_interface.python_interface import GiskardWrapper
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.qp_controller import available_solvers
 from giskardpy.tree.behaviors.plot_debug_expressions import PlotDebugExpressions
@@ -288,13 +288,9 @@ class GiskardTestWrapper(GiskardWrapper, GodMapWorshipper):
     def set_seed_odometry(self, base_pose, group_name: Optional[str] = None):
         if group_name is None:
             group_name = self.robot_name
-        self.set_json_goal('SetOdometry',
-                           group_name=group_name,
-                           base_pose=base_pose)
-
-    def set_seed_configuration(self, seed_configuration):
-        self.set_json_goal('SetSeedConfiguration',
-                           seed_configuration=seed_configuration)
+        self.add_motion_goal('SetOdometry',
+                             group_name=group_name,
+                             base_pose=base_pose)
 
     def set_localization(self, map_T_odom: PoseStamped):
         if self.set_localization_srv is not None:
@@ -748,16 +744,16 @@ class GiskardTestWrapper(GiskardWrapper, GodMapWorshipper):
         try:
             time_spend_giskarding = time()
             if stop_after is not None:
-                super().send_goal(goal_type, wait=False)
+                super()._send_action_goal(goal_type, wait=False)
                 rospy.sleep(stop_after)
                 self.interrupt()
                 rospy.sleep(1)
                 r = self.get_result(rospy.Duration(3))
             elif not wait:
-                super().send_goal(goal_type, wait=wait)
+                super()._send_action_goal(goal_type, wait=wait)
                 return
             else:
-                r = super().send_goal(goal_type, wait=wait)
+                r = super()._send_action_goal(goal_type, wait=wait)
             self.wait_heartbeats()
             diff = time() - time_spend_giskarding
             self.total_time_spend_giskarding += diff

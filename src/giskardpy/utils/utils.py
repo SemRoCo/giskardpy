@@ -443,3 +443,21 @@ def publish_pose(pose: PoseStamped):
 
 def int_to_bit_list(number: int) -> List[int]:
     return [2 ** i * int(bit) for i, bit in enumerate(reversed("{0:b}".format(number))) if int(bit) != 0]
+
+
+def json_to_kwargs(json_str: str) -> Dict[str, Any]:
+    parsed_json = json.loads(json_str)
+    for key, value in parsed_json.items():
+        if isinstance(value, dict) and 'message_type' in value:
+            parsed_json[key] = convert_dictionary_to_ros_message(value)
+    return parsed_json
+
+
+def kwargs_to_json(kwargs: Dict[str, Any]) -> str:
+    for k, v in kwargs.copy().items():
+        if v is None:
+            del kwargs[k]
+        if isinstance(v, Message):
+            kwargs[k] = convert_ros_message_to_dictionary(v)
+    kwargs = replace_prefix_name_with_str(kwargs)
+    return json.dumps(kwargs)

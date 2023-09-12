@@ -24,7 +24,7 @@ from giskardpy.exceptions import DuplicateNameException, UnknownGroupException, 
 from giskardpy.god_map import GodMap
 from giskardpy.god_map_user import GodMapWorshipper
 from giskardpy.model.joints import Joint, FixedJoint, PrismaticJoint, RevoluteJoint, OmniDrive, DiffDrive, \
-    urdf_to_joint, VirtualFreeVariables, MovableJoint, Joint6DOF
+    urdf_to_joint, VirtualFreeVariables, MovableJoint, Joint6DOF, OneDofJoint
 from giskardpy.model.links import Link, MeshGeometry
 from giskardpy.model.utils import hacky_urdf_parser_fix
 from giskardpy.my_types import PrefixName, Derivatives, derivative_joint_map, derivative_map
@@ -256,6 +256,17 @@ class WorldTree(WorldTreeInterface, GodMapWorshipper):
         Like get_joint_name, but returns the actual joint.
         """
         return self.joints[self.search_for_joint_name(joint_name, group_name)]
+
+    def get_one_dof_joint_symbol(self, joint_name: PrefixName, derivative: Derivatives) -> Union[w.Symbol, float]:
+        """
+        returns a symbol that refers to the given joint
+        """
+        if not self.world.has_joint(joint_name):
+            raise KeyError(f'World doesn\'t have joint named: {joint_name}.')
+        joint = self.world.joints[joint_name]
+        if isinstance(joint, OneDofJoint):
+            return joint.get_symbol(derivative)
+        raise TypeError(f'get_joint_position_symbol is only supported for OneDofJoint, not {type(joint)}')
 
     def get_link_name(self, link_name: str, group_name: Optional[str] = None) -> PrefixName:
         logging.logwarn(f'Deprecated warning: use \'search_for_link_name\' instead of \'get_link_name\'.')

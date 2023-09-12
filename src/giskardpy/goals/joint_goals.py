@@ -567,7 +567,7 @@ class JointPositionList(Goal):
         monitor.set_expression(expression)
         self.add_monitor(monitor)
 
-        task.to_end = monitor
+        task.add_to_end_monitor(monitor)
 
         self.add_task(task)
 

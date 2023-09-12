@@ -25,14 +25,14 @@ class PlotGanttChart(GiskardBehavior):
         for goal_name, goal in goals.items():
             for task in goal.tasks:
                 tasks.append(f'{goal_name} - {task.name}')
-                if task.to_start is None:
+                if not task.to_start:
                     start_dates.append(0)
                 else:
-                    start_dates.append(task.to_start.state_flip_times[0])
-                if task.to_end is None:
+                    start_dates.extend([x.state_flip_times[0] for x in task.to_start])
+                if not task.to_end:
                     end_dates.append(self.trajectory_time_in_seconds)
                 else:
-                    end_dates.append(task.to_end.state_flip_times[0])
+                    end_dates.extend([x.state_flip_times[0] for x in task.to_end])
 
         plt.figure(figsize=(10, 5))
 

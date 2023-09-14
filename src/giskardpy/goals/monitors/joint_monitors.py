@@ -15,7 +15,13 @@ class JointGoalReached(Monitor):
         for joint_name, goal in goal_state.items():
             joint_name = self.world.search_for_joint_name(joint_name)
             current = self.world.get_one_dof_joint_symbol(joint_name, Derivatives.position)
-            comparison_list.append(cas.less(cas.abs(goal - current), threshold))
+            if self.world.is_joint_continuous(joint_name):
+                error = cas.shortest_angular_distance(current, goal)
+            else:
+                error = goal - current
+            self.debug_expression_manager.add_debug_expression(str(joint_name), cas.min(cas.abs(error), 4*threshold))
+            comparison_list.append(cas.less(cas.abs(error), threshold))
+        self.debug_expression_manager.add_debug_expression('threshold', threshold)
         expression = cas.logic_all(cas.Expression(comparison_list))
         super().__init__(name, crucial=crucial)
         self.set_expression(expression)

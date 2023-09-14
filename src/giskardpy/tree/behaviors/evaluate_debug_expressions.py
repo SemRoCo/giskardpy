@@ -10,14 +10,9 @@ class EvaluateDebugExpressions(GiskardBehavior):
     controller: QPProblemBuilder = None
 
     @catch_and_raise_to_blackboard
-    @profile
-    def initialise(self):
-        self.controller = self.god_map.get_data(identifier.qp_controller)
-
-    @catch_and_raise_to_blackboard
     @record_time
     @profile
     def update(self):
-        self.controller.eval_debug_exprs()
+        self.debug_expression_manager.eval_debug_exprs()
         return Status.RUNNING
 

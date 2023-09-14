@@ -146,6 +146,10 @@ class Goal(GodMapWorshipper, ABC):
         result.child_frame = tip
         return result
 
+    def connect_to_end(self, monitor: Monitor):
+        for task in self.tasks:
+            task.add_to_end_monitor(monitor)
+
     def get_fk_evaluated(self, root: PrefixName, tip: PrefixName) -> w.TransMatrix:
         """
         Return the homogeneous transformation matrix root_T_tip. This Matrix refers to the evaluated current transform.
@@ -217,7 +221,7 @@ class Goal(GodMapWorshipper, ABC):
         self._inequality_constraints = OrderedDict()
         self._derivative_constraints = OrderedDict()
         self._debug_expressions = OrderedDict()
-        self.make_constraints()
+        # self.make_constraints()
         for task in self.tasks:
             for constraint in task.get_eq_constraints():
                 name = f'{str(self)}/{task.name}/{constraint.name}'

@@ -343,10 +343,14 @@ class TestJointGoals:
             'l_shoulder_lift_joint': 0.011627231224188975,
             'l_forearm_roll_joint': 312.67276414458695,
             'l_elbow_flex_joint': -2.0300928925694675,
-            'l_wrist_flex_joint': -0.10014623223021513,
+            'l_wrist_flex_joint': -0.1,
             'l_wrist_roll_joint': -6.062015047706399,
         }
-        zero_pose.set_joint_goal(js)
+        # zero_pose.set_joint_goal(js)
+        zero_pose.add_joint_goal_monitor('asdf', goal_state=js, threshold=0.005, crucial=True)
+        zero_pose.add_motion_goal(goal_type='JointPositionList',
+                                  goal_state=js,
+                                  to_end=['asdf'])
         zero_pose.allow_all_collisions()
         # zero_pose.set_json_goal('EnableVelocityTrajectoryTracking', enabled=True)
         zero_pose.plan_and_execute()

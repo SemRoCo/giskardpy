@@ -9,7 +9,7 @@ from giskardpy.utils.decorators import record_time
 
 class LogDebugExpressionsPlugin(GiskardBehavior):
     @profile
-    def __init__(self, name):
+    def __init__(self, name: str = 'log debug expr'):
         super().__init__(name)
         self.number_of_joints = len(self.world.controlled_joints)
         self.sample_period = self.god_map.get_data(identifier.sample_period)

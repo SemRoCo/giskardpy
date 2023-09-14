@@ -5,6 +5,7 @@ import numpy as np
 import giskardpy.casadi_wrapper as cas
 from giskardpy import identifier
 from giskardpy.casadi_wrapper import CompiledFunction
+from giskardpy.exceptions import GiskardException
 from giskardpy.goals.monitors.monitors import Monitor
 from giskardpy.god_map_user import GodMapWorshipper
 
@@ -40,6 +41,12 @@ class MonitorManager(GodMapWorshipper):
         self.state = np.zeros_like(self.stay_one_filter)
         self.switches_state = np.zeros_like(self.stay_one_filter)
         self.crucial_filter = [m.crucial for m in self.monitors]
+
+    def get_monitor(self, name: str) -> Monitor:
+        for monitor in self.monitors:
+            if monitor.name == name:
+                return monitor
+        raise KeyError(f'No monitor of name {name} found.')
 
     @profile
     def update_state(self, new_state):  # Assuming new_state is a NumPy array with only 1 and 0

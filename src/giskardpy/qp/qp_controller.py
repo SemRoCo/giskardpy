@@ -965,9 +965,6 @@ class QPProblemBuilder(GodMapWorshipper):
     """
     Wraps around QP Solver. Builds the required matrices from constraints.
     """
-    debug_expressions: Dict[str, cas.all_expressions]
-    compiled_debug_expressions: Dict[str, cas.CompiledFunction]
-    evaluated_debug_expressions: Dict[str, np.ndarray]
     inequality_constraints: List[InequalityConstraint]
     equality_constraints: List[EqualityConstraint]
     derivative_constraints: List[DerivativeInequalityConstraint]
@@ -987,7 +984,6 @@ class QPProblemBuilder(GodMapWorshipper):
                  equality_constraints: List[EqualityConstraint] = None,
                  inequality_constraints: List[InequalityConstraint] = None,
                  derivative_constraints: List[DerivativeInequalityConstraint] = None,
-                 debug_expressions: Dict[str, Union[cas.Symbol, float]] = None,
                  retries_with_relaxed_constraints: int = 0,
                  retry_added_slack: float = 100,
                  retry_weight_factor: float = 100):
@@ -995,13 +991,10 @@ class QPProblemBuilder(GodMapWorshipper):
         self.equality_constraints = []
         self.inequality_constraints = []
         self.derivative_constraints = []
-        self.debug_expressions = {}
         self.prediction_horizon = prediction_horizon
-        self.sample_period = sample_period
         self.retries_with_relaxed_constraints = retries_with_relaxed_constraints
         self.retry_added_slack = retry_added_slack
         self.retry_weight_factor = retry_weight_factor
-        self.evaluated_debug_expressions = {}
         self.xdot_full = None
         if free_variables is not None:
             self.add_free_variables(free_variables)
@@ -1011,8 +1004,6 @@ class QPProblemBuilder(GodMapWorshipper):
             self.add_equality_constraints(equality_constraints)
         if derivative_constraints is not None:
             self.add_derivative_constraints(derivative_constraints)
-        if debug_expressions is not None:
-            self.add_debug_expressions(debug_expressions)
 
         if solver_id is not None:
             self.qp_solver_class = available_solvers[solver_id]
@@ -1075,9 +1066,6 @@ class QPProblemBuilder(GodMapWorshipper):
                             f'to prediction horizon of {self.prediction_horizon}')
             constraint.control_horizon = self.prediction_horizon
 
-    def add_debug_expressions(self, debug_expressions: Dict[str, cas.Expression]):
-        self.debug_expressions.update(debug_expressions)
-
     @profile
     def compile(self, solver_class: Type[QPSolver], default_limits: bool = False) -> QPSolver:
         logging.loginfo('Creating controller')
@@ -1111,23 +1099,10 @@ class QPProblemBuilder(GodMapWorshipper):
         logging.loginfo(f'  #free variables: {weights.shape[0]}')
         logging.loginfo(f'  #equality constraints: {bE.shape[0]}')
         logging.loginfo(f'  #inequality constraints: {lbA.shape[0]}')
-        self._compile_debug_expressions()
         return qp_solver
 
     def get_parameter_names(self):
         return self.qp_solver.free_symbols_str
-
-    def _compile_debug_expressions(self):
-        self.compiled_debug_expressions = {}
-        free_symbols = set()
-        for name, expr in self.debug_expressions.items():
-            free_symbols.update(expr.free_symbols())
-        free_symbols = list(free_symbols)
-        for name, expr in self.debug_expressions.items():
-            self.compiled_debug_expressions[name] = expr.compile(free_symbols)
-        num_debug_expressions = len(self.compiled_debug_expressions)
-        if num_debug_expressions > 0:
-            logging.loginfo(f'  #debug expressions: {len(self.compiled_debug_expressions)}')
 
     def save_all_pandas(self, folder_name: Optional[str] = None):
         if hasattr(self, 'p_xdot') and self.p_xdot is not None:
@@ -1157,14 +1132,6 @@ class QPProblemBuilder(GodMapWorshipper):
             with pd.option_context('display.max_rows', None, 'display.max_columns', None):
                 print(array)
 
-    @profile
-    def eval_debug_exprs(self):
-        self.evaluated_debug_expressions = {}
-        for name, f in self.compiled_debug_expressions.items():
-            params = self.god_map.get_values(f.str_params)
-            self.evaluated_debug_expressions[name] = f.fast_call(params).copy()
-        return self.evaluated_debug_expressions
-
     @property
     def traj_time_in_sec(self):
         return self.god_map.unsafe_get_data(identifier.time) * self.god_map.unsafe_get_data(identifier.sample_period)
@@ -1176,7 +1143,7 @@ class QPProblemBuilder(GodMapWorshipper):
         """
         try:
             self.xdot_full = self.qp_solver.solve_and_retry(substitutions=substitutions)
-            self._create_debug_pandas(self.qp_solver)
+            # self._create_debug_pandas(self.qp_solver)
             return NextCommands(self.free_variables, self.xdot_full, self.order, self.prediction_horizon)
         except InfeasibleException as e_original:
             self.xdot_full = None
@@ -1268,17 +1235,6 @@ class QPProblemBuilder(GodMapWorshipper):
         num_neq_constr = len(self.inequality_constraints)
         num_eq_constr = len(self.equality_constraints)
         num_constr = num_vel_constr + num_neq_constr + num_eq_constr
-
-        p_debug = {}
-        for name, value in self.evaluated_debug_expressions.items():
-            if isinstance(value, np.ndarray):
-                if len(value.shape) == 2:
-                    p_debug[name] = value.reshape((value.shape[0] * value.shape[1]))
-                else:
-                    p_debug[name] = value
-            else:
-                p_debug[name] = np.array(value)
-        self.p_debug = pd.DataFrame.from_dict(p_debug, orient='index').sort_index()
 
         self.p_weights = pd.DataFrame(weights, self.free_variable_names, ['data'], dtype=float)
         self.p_g = pd.DataFrame(g, self.free_variable_names, ['data'], dtype=float)

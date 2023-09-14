@@ -20,16 +20,17 @@ from giskardpy.tree.branches.publish_state import PublishState
 from giskardpy.tree.branches.send_controls import SendControls
 from giskardpy.tree.branches.synchronization import Synchronization
 from giskardpy.tree.composites.async_composite import AsyncBehavior
+from giskardpy.tree.composites.running_selector import RunningSelector
 from giskardpy.tree.control_modes import ControlModes
 from giskardpy.tree.decorators import success_is_running
 
 
-class CheckMonitors(Selector, GodMapWorshipper):
+class CheckMonitors(RunningSelector, GodMapWorshipper):
 
     def __init__(self, name: str = 'check monitors'):
         super().__init__(name)
         self.add_child(CrucialMonitorsSatisfied())
-        self.add_child(LoopDetector('loop detector'))
+        # self.add_child(LoopDetector('loop detector'))
         self.add_child(LocalMinimum('local minimum', real_time=self.is_closed_loop))
         self.add_child(MaxTrajectoryLength('traj length check', real_time=self.is_closed_loop))
         # self.add_child(GoalDone('goal done check'))

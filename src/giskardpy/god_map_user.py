@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, List
 from giskardpy.utils.utils import int_to_bit_list
 
 if TYPE_CHECKING:
+    from giskardpy.debug_expression_manager import DebugExpressionManager
     from giskardpy.goals.monitors.monitor_manager import MonitorManager
     from giskardpy.goals.monitors.monitors import Monitor
     from giskardpy.configs.collision_avoidance_config import CollisionAvoidanceConfig
@@ -39,6 +40,10 @@ class GodMapWorshipper:
     @property
     def monitor_manager(self) -> MonitorManager:
         return self.god_map.get_data(identifier.monitor_manager, [])
+
+    @property
+    def debug_expression_manager(self) -> DebugExpressionManager:
+        return self.god_map.get_data(identifier.debug_expression_manager, [])
 
     @property
     def tree_manager(self) -> TreeManager:
@@ -81,12 +86,15 @@ class GodMapWorshipper:
         time = self.god_map.get_data(identifier.time)
         if self.is_closed_loop:
             return time
-        return time * self.god_map.get_data(identifier.sample_period)
-
+        return time * self.sample_period
 
     @property
     def goal_msg_type(self) -> int:
         return self.goal_msg.type
+
+    @property
+    def sample_period(self) -> float:
+        return self.god_map.get_data(identifier.sample_period)
 
     @property
     def goal_msg(self) -> MoveGoal:

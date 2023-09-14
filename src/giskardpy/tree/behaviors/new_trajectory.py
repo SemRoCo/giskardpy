@@ -16,8 +16,6 @@ class NewTrajectory(GiskardBehavior):
         trajectory = Trajectory()
         trajectory.set(0, current_js)
         self.god_map.set_data(identifier.trajectory, trajectory)
-        trajectory = Trajectory()
-        self.god_map.set_data(identifier.debug_trajectory, trajectory)
 
     def update(self):
         return Status.SUCCESS

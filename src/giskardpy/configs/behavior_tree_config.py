@@ -3,6 +3,7 @@ from typing import Optional
 
 from giskardpy import identifier
 from giskardpy.god_map import GodMap
+from giskardpy.tree.behaviors.compile_debug_expressions import CompileDebugExpressions
 from giskardpy.tree.behaviors.tf_publisher import TfPublishingModes
 from giskardpy.tree.garden import OpenLoop, ClosedLoop, StandAlone, TreeManager
 from giskardpy.tree.control_modes import ControlModes
@@ -69,6 +70,7 @@ class BehaviorTreeConfig(ABC):
         """
         QP data is streamed and can be visualized in e.g. plotjuggler. Useful for debugging.
         """
+        self.add_evaluate_debug_expressions()
         self.tree_manager.add_qp_data_publisher(publish_lb=publish_lb,
                                                 publish_ub=publish_ub,
                                                 publish_lbA=publish_lbA,
@@ -95,12 +97,14 @@ class BehaviorTreeConfig(ABC):
         """
         Plots debug expressions defined in goals.
         """
-        self.tree_manager.add_plot_debug_trajectory(normalize_position=normalize_position, wait=wait)
+        self.add_evaluate_debug_expressions()
+        self.tree_manager.tree.post_processing.add_plot_debug_trajectory(normalize_position=normalize_position, wait=wait)
 
     def add_debug_marker_publisher(self):
         """
         Publishes debug expressions defined in goals.
         """
+        self.add_evaluate_debug_expressions()
         self.tree_manager.add_debug_marker_publisher()
 
     def add_tf_publisher(self, include_prefix: bool = True, tf_topic: str = 'tf',
@@ -112,6 +116,10 @@ class BehaviorTreeConfig(ABC):
                                                                             tf_topic=tf_topic,
                                                                             mode=mode)
 
+    def add_evaluate_debug_expressions(self):
+        self.tree_manager.tree.prepare_control_loop.add_child(CompileDebugExpressions())
+        self.tree_manager.tree.process_goal.control_loop_branch.add_evaluate_debug_expressions()
+
 
 class StandAloneBTConfig(BehaviorTreeConfig):
     def __init__(self, planning_sleep: Optional[float] = None):
@@ -122,6 +130,7 @@ class StandAloneBTConfig(BehaviorTreeConfig):
         self.add_visualization_marker_publisher(add_to_sync=True, add_to_planning=False, add_to_control_loop=True)
         self.add_tf_publisher(include_prefix=True, mode=TfPublishingModes.all)
         self.add_trajectory_plotter()
+        self.add_debug_trajectory_plotter()
         # self.add_debug_marker_publisher()
         if self.planning_sleep is not None:
             self.add_sleeper(self.planning_sleep)

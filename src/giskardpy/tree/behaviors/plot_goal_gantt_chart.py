@@ -7,7 +7,7 @@ from py_trees import Status
 from giskardpy import identifier
 from giskardpy.goals.goal import Goal
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
-from giskardpy.utils.decorators import record_time
+from giskardpy.utils.decorators import record_time, catch_and_raise_to_blackboard
 from giskardpy.utils.logging import logwarn
 from giskardpy.utils.utils import create_path
 
@@ -53,6 +53,7 @@ class PlotGanttChart(GiskardBehavior):
         create_path(file_name)
         plt.savefig(file_name)
 
+    @catch_and_raise_to_blackboard
     @record_time
     @profile
     def update(self):

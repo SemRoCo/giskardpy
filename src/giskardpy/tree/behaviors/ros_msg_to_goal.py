@@ -32,6 +32,7 @@ class RosMsgToGoal(GiskardBehavior):
         self.allowed_monitor_types = {}
         for path in goal_package_paths:
             self.allowed_motion_goal_types.update(get_all_classes_in_package(path, Goal))
+        self.allowed_monitor_types.update(get_all_classes_in_package('giskardpy.goals.monitors', Monitor))
         self.robot_names = self.collision_scene.robot_names
 
     @record_time
@@ -75,6 +76,10 @@ class RosMsgToGoal(GiskardBehavior):
                 params = json_to_kwargs(motion_goal.parameter_value_pair)
                 c: Goal = C(**params)
                 c._save_self_on_god_map()
+                c.make_constraints()
+                for monitor_name in motion_goal.to_end:
+                    monitor = self.monitor_manager.get_monitor(monitor_name)
+                    c.connect_to_end(monitor)
             except Exception as e:
                 traceback.print_exc()
                 error_msg = f'Initialization of \'{C.__name__}\' constraint failed: \n {e} \n'
@@ -92,7 +97,7 @@ class RosMsgToGoal(GiskardBehavior):
                 raise UnknownConstraintException(f'unknown monitor type: \'{monitor_msg.type}\'.')
             try:
                 params = json_to_kwargs(monitor_msg.parameter_value_pair)
-                monitor: Monitor = C(**params)
+                monitor: Monitor = C(monitor_msg.name, **params)
                 self.monitor_manager.add_monitor(monitor)
             except Exception as e:
                 traceback.print_exc()

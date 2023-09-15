@@ -596,13 +596,13 @@ class WorldTree(WorldTreeInterface, GodMapWorshipper):
             pose_msg = Pose()
             position = pose.to_position().evaluate()
             orientation = pose.to_rotation().to_quaternion().evaluate()
-            pose_msg.position.x = position[0]
-            pose_msg.position.y = position[1]
-            pose_msg.position.z = position[2]
-            pose_msg.orientation.x = orientation[0]
-            pose_msg.orientation.y = orientation[1]
-            pose_msg.orientation.z = orientation[2]
-            pose_msg.orientation.w = orientation[3]
+            pose_msg.position.x = position[0][0]
+            pose_msg.position.y = position[1][0]
+            pose_msg.position.z = position[2][0]
+            pose_msg.orientation.x = orientation[0][0]
+            pose_msg.orientation.y = orientation[1][0]
+            pose_msg.orientation.z = orientation[2][0]
+            pose_msg.orientation.w = orientation[3][0]
             joint = Joint6DOF(name=PrefixName(group_name, self.connection_prefix),
                               parent_link_name=parent_link_name,
                               child_link_name=urdf_root_link.name)

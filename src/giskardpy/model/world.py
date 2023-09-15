@@ -588,15 +588,11 @@ class WorldTree(WorldTreeInterface, GodMapWorshipper):
         urdf_root_link_name_prefixed = PrefixName(urdf_root_link_name, group_name)
 
         if parent_link_name is not None:
-            # parent_link = self.links[parent_link_name]
             urdf_link = parsed_urdf.link_map[urdf_root_link_name]
             urdf_root_link = Link.from_urdf(urdf_link=urdf_link,
                                             prefix=group_name,
                                             color=self.default_link_color)
             self._add_link(urdf_root_link)
-            # self._add_fixed_joint(parent_link=parent_link,
-            #                       child_link=urdf_root_link,
-            #                       transform=pose)
             pose_msg = Pose()
             position = pose.to_position().evaluate()
             orientation = pose.to_rotation().to_quaternion().evaluate()

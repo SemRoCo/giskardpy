@@ -1064,6 +1064,7 @@ class GiskardTestWrapper(GiskardWrapper, GodMapWorshipper):
                                     js_topic=js_topic,
                                     set_js_topic=set_js_topic,
                                     timeout=timeout)
+        self.wait_heartbeats()
         self.check_add_object_result(response=response,
                                      name=name,
                                      size=None,

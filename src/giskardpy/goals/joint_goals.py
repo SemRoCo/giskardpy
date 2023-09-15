@@ -546,7 +546,6 @@ class JointPositionList(Goal):
 
     def make_constraints(self):
         task = Task(name='joint goal')
-        comparison_list = []
         for name, current, goal, threshold, velocity_limit in zip(self.names, self.current_positions,
                                                                   self.goal_positions,
                                                                   self.thresholds, self.velocity_limits):
@@ -554,20 +553,12 @@ class JointPositionList(Goal):
                 error = cas.shortest_angular_distance(current, goal)
             else:
                 error = goal - current
-            comparison_list.append(cas.less(cas.abs(error), threshold))
 
             task.add_equality_constraint(name=name,
                                          reference_velocity=velocity_limit,
                                          equality_bound=error,
                                          weight=self.weight,
                                          task_expression=current)
-
-        expression = cas.logic_all(cas.Expression(comparison_list))
-        # monitor = Monitor('position error', crucial=True)
-        # monitor.set_expression(expression)
-        # self.add_monitor(monitor)
-        #
-        # task.add_to_end_monitor(monitor)
 
         self.add_task(task)
 

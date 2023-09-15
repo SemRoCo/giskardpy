@@ -69,7 +69,7 @@ class CompiledFunction:
             except Exception:
                 self.compiled_f = ca.Function('f', parameters, ca.densify(expression.s))
             self.buf, self.f_eval = self.compiled_f.buffer()
-            if expression.shape[1] == 1:
+            if expression.shape[1] <= 1:
                 shape = expression.shape[0]
             else:
                 shape = expression.shape

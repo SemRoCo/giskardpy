@@ -47,7 +47,6 @@ from giskardpy.tree.behaviors.joint_group_vel_controller_publisher import JointG
 from giskardpy.tree.behaviors.joint_pos_controller_publisher import JointPosController
 from giskardpy.tree.behaviors.joint_vel_controller_publisher import JointVelController
 from giskardpy.tree.behaviors.kinematic_sim import KinSimPlugin
-from giskardpy.tree.behaviors.log_debug_expressions import LogDebugExpressionsPlugin
 from giskardpy.tree.behaviors.log_trajectory import LogTrajPlugin
 from giskardpy.tree.behaviors.loop_detector import LoopDetector
 from giskardpy.tree.behaviors.max_trajectory_length import MaxTrajectoryLength
@@ -664,19 +663,6 @@ class StandAlone(TreeManager):
         if len(self.get_nodes_of_type(PlotTrajectory)) > 0:
             raise BehaviorTreeException(f'add_plot_trajectory is not allowed to be called twice')
         behavior = PlotTrajectory('plot trajectory', wait=wait, normalize_position=normalize_position)
-        self.insert_node(behavior, self.plan_postprocessing_name)
-
-    def add_plot_debug_trajectory(self, normalize_position: bool = False, wait: bool = False):
-        if len(self.get_nodes_of_type(PlotDebugExpressions)) > 0:
-            raise BehaviorTreeException(f'add_plot_debug_trajectory is not allowed to be called twice')
-        self.add_evaluate_debug_expressions()
-        for node in self.get_nodes_of_type(EvaluateDebugExpressions):
-            manager_node = self.tree_nodes[node.name]
-            parent_node = self.tree_nodes[node.name].parent
-            if parent_node.node.name == self.closed_loop_control_name:
-                self.insert_node(LogDebugExpressionsPlugin('log lba'), self.closed_loop_control_name,
-                                 manager_node.position + 1)
-        behavior = PlotDebugExpressions('plot debug trajectory', wait=wait, normalize_position=normalize_position)
         self.insert_node(behavior, self.plan_postprocessing_name)
 
     def add_qp_data_publisher(self, publish_lb: bool = False, publish_ub: bool = False, publish_lbA: bool = False,

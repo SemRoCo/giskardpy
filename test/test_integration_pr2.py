@@ -347,10 +347,10 @@ class TestJointGoals:
             'l_wrist_roll_joint': -6.062015047706399,
         }
         # zero_pose.set_joint_goal(js)
-        zero_pose.add_joint_goal_monitor('asdf', goal_state=js, threshold=0.005, crucial=True)
+        # zero_pose.add_joint_goal_monitor('asdf', goal_state=js, threshold=0.005, crucial=False)
+        zero_pose.add_monitor(monitor_type='LocalMinimumReached', monitor_name='local min reached')
         zero_pose.add_motion_goal(goal_type='JointPositionList',
-                                  goal_state=js,
-                                  to_end=['asdf'])
+                                  goal_state=js)
         zero_pose.allow_all_collisions()
         # zero_pose.set_json_goal('EnableVelocityTrajectoryTracking', enabled=True)
         zero_pose.plan_and_execute()

@@ -19,9 +19,8 @@ class JointGoalReached(Monitor):
                 error = cas.shortest_angular_distance(current, goal)
             else:
                 error = goal - current
-            self.debug_expression_manager.add_debug_expression(str(joint_name), cas.min(cas.abs(error), 4*threshold))
             comparison_list.append(cas.less(cas.abs(error), threshold))
-        self.debug_expression_manager.add_debug_expression('threshold', threshold)
         expression = cas.logic_all(cas.Expression(comparison_list))
         super().__init__(name, crucial=crucial)
         self.set_expression(expression)
+

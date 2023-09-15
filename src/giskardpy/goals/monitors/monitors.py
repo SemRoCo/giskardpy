@@ -1,8 +1,12 @@
 from typing import Union, List
 
+import numpy as np
+
 import giskardpy.casadi_wrapper as cas
 from giskardpy import identifier
 from giskardpy.god_map_user import GodMapWorshipper
+from giskardpy.my_types import Derivatives
+from giskardpy.qp.free_variable import FreeVariable
 
 
 class Monitor(GodMapWorshipper):
@@ -59,3 +63,19 @@ class Monitor(GodMapWorshipper):
 
     def get_state_expression(self):
         return self.god_map.to_symbol(identifier.monitor_manager + ['state', self.id])
+
+
+class LocalMinimumReached(Monitor):
+    def __init__(self, name: str = 'local minimum reached', min_cut_off: float = 0.01, max_cut_off: float = 0.06,
+                 joint_convergence_threshold: float = 0.01):
+        super().__init__(name=name, crucial=True, stay_one=False)
+        condition_list = []
+        traj_length_in_sec = self.god_map.to_symbol(identifier.time) * self.sample_period
+        condition_list.append(cas.greater(traj_length_in_sec, 1))
+        for free_variable_name, free_variable in self.world.free_variables.items():
+            velocity_limit = self.god_map.evaluate_expr(free_variable.get_upper_limit(Derivatives.velocity))
+            joint_vel_symbol = free_variable.get_symbol(Derivatives.velocity)
+            velocity_limit *= joint_convergence_threshold
+            velocity_limit = min(max(min_cut_off, velocity_limit), max_cut_off)
+            condition_list.append(cas.less(cas.abs(joint_vel_symbol), velocity_limit))
+        self.expression = cas.logic_all(cas.Expression(condition_list))

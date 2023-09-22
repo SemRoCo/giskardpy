@@ -58,7 +58,10 @@ class RosMsgToGoal(GetGoal):
             # traceback.print_exc()
             return Status.SUCCESS
         if self.god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none:
-            self.parse_collision_entries(move_cmd.collisions)
+            try:
+                self.parse_collision_entries(move_cmd.collisions)
+            except ConstraintInitalizationException:
+                loginfo('Got ConstraintInitializationError')
         loginfo('Done parsing goal message.')
         return Status.SUCCESS
 
@@ -99,9 +102,20 @@ class RosMsgToGoal(GetGoal):
                 raise e
 
     def replace_jsons_with_ros_messages(self, d):
-        for key, value in d.items():
-            if isinstance(value, dict) and 'message_type' in value:
-                d[key] = convert_dictionary_to_ros_message(value)
+        if isinstance(d, list):
+            for i, element in enumerate(d):
+                d[i] = self.replace_jsons_with_ros_messages(element)
+
+        if isinstance(d, dict):
+
+            if 'message_type' in d:
+
+                d = convert_dictionary_to_ros_message(d)
+
+            else:
+                for key, value in d.copy().items():
+                    d[key] = self.replace_jsons_with_ros_messages(value)
+
         return d
 
     @profile

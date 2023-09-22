@@ -113,9 +113,6 @@ class HSRTestWrapperMujoco(HSRTestWrapper):
         p.pose.orientation.w = 1
         # self.move_base(p)
 
-    def teleport_base(self, goal_pose, group_name: Optional[str] = None):
-        self.move_base(goal_pose)
-
     def set_localization(self, map_T_odom: PoseStamped):
         pass
         # super(HSRTestWrapper, self).set_localization(map_T_odom)
@@ -519,7 +516,7 @@ class TestPouring:
         containerPose.header.frame_id = 'map'
         containerPose.pose.position.x = 2
         containerPose.pose.position.y = 0
-        containerPose.pose.position.z = 0.8
+        containerPose.pose.position.z = 0.6
         containerPose.pose.orientation = Quaternion(*quaternion_from_matrix([[1, 0, 0, 0],
                                                                              [0, 1, 0, 0],
                                                                              [0, 0, 1, 0],
@@ -528,7 +525,7 @@ class TestPouring:
         cupPose.header.frame_id = 'hand_palm_link'
         cupPose.pose.position.x = 0
         cupPose.pose.position.y = 0
-        cupPose.pose.position.z = 0.05
+        cupPose.pose.position.z = 0.1
         cupPose.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 0, 1, 0],
                                                                        [0, -1, 0, 0],
                                                                        [1, 0, 0, 0],
@@ -537,7 +534,7 @@ class TestPouring:
         edgePose.header.frame_id = 'cup'
         edgePose.pose.position.x = 0
         edgePose.pose.position.y = 0.03
-        edgePose.pose.position.z = 0.095
+        edgePose.pose.position.z = 0.07
         edgePose.pose.orientation = Quaternion(*quaternion_from_matrix([[1, 0, 0, 0],
                                                                         [0, 1, 0, 0],
                                                                         [0, 0, 1, 0],
@@ -546,7 +543,7 @@ class TestPouring:
         zero_pose.add_box('container', (0.2, 0.2, 0.03), containerPose)
         # zero_pose.add_mesh('container', mesh='package://giskardpy/test/urdfs/meshes/bowl_21.obj',
         #                    pose=containerPose)
-        zero_pose.add_cylinder('cup', 0.20, 0.03, cupPose, parent_link=cupPose.header.frame_id)
+        zero_pose.add_cylinder('cup', 0.15, 0.03, cupPose, parent_link=cupPose.header.frame_id)
         zero_pose.add_box('edge', (0.02, 0.01, 0.01), edgePose, 'cup', 'cup')
 
         # held object
@@ -594,17 +591,17 @@ class TestPouring:
                                 reference_link_axis=reference_axis,
                                 root_link='map')
         # align x planes of object and map
-        # zero_pose.set_json_goal('KeepObjectUpright',
-        #                         object_link_axis=rotation_axis,
-        #                         reference_link_axis=reference_axis2,
-        #                         root_link='map')
+        zero_pose.set_json_goal('KeepObjectUpright',
+                                object_link_axis=rotation_axis,
+                                reference_link_axis=reference_axis2,
+                                root_link='map')
 
         # zero_pose.set_avoid_joint_limits_goal(30)
         # zero_pose.add_cmd()
         zero_pose.plan_and_execute()
         # # Second phase TiltObject & KeepObjectAbovePlane
         zero_pose.set_json_goal('KeepObjectAbovePlane',
-                                object_link='cup',# 'sync_create_cup2223/sync_create_cup2223',
+                                object_link='edge',# 'sync_create_cup2223/sync_create_cup2223',
                                 plane_center_point=container_plane,
                                 lower_distance=lower_distance,
                                 upper_distance=upper_distance,
@@ -674,7 +671,8 @@ class TestActions:
                                 root_link='map',
                                 upright_orientation=orientation,
                                 down_orientation=down_orientation,
-                                container_plane=container_plane)
+                                container_plane=container_plane,
+                                tilt_joint='wrist_roll_joint')
         zero_pose.set_avoid_joint_limits_goal()
         zero_pose.plan_and_execute()
 

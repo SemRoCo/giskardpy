@@ -10,6 +10,7 @@ joint_states = world + ['state']
 controlled_joints = ['controlled_joints']
 goal_id = ['goal_id']
 monitor_manager = ['monitor_manager']
+motion_goal_manager = ['motion_goal_manager']
 debug_expression_manager = ['debug_expression_manager']
 monitors = monitor_manager + ['monitors']
 

@@ -3,18 +3,20 @@ from __future__ import annotations
 from giskard_msgs.msg import MoveGoal
 from giskardpy import identifier
 from giskardpy.god_map import GodMap
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING, List, Dict
 
 from giskardpy.utils.utils import int_to_bit_list
 
 if TYPE_CHECKING:
+    from giskardpy.goals.motion_goal_manager import MotionGoalManager
     from giskardpy.debug_expression_manager import DebugExpressionManager
     from giskardpy.goals.monitors.monitor_manager import MonitorManager
     from giskardpy.goals.monitors.monitors import Monitor
     from giskardpy.configs.collision_avoidance_config import CollisionAvoidanceConfig
     from giskardpy.configs.world_config import WorldConfig
     from giskardpy.tree.control_modes import ControlModes
-    from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer, CollisionCheckerLib
+    from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer, CollisionCheckerLib, \
+    CollisionAvoidanceGroupThresholds
     from giskardpy.tree.garden import TreeManager
     from giskardpy.model.world import WorldTree
 
@@ -39,7 +41,11 @@ class GodMapWorshipper:
 
     @property
     def monitor_manager(self) -> MonitorManager:
-        return self.god_map.get_data(identifier.monitor_manager, [])
+        return self.god_map.get_data(identifier.monitor_manager)
+
+    @property
+    def motion_goal_manager(self) -> MotionGoalManager:
+        return self.god_map.get_data(identifier.motion_goal_manager)
 
     @property
     def debug_expression_manager(self) -> DebugExpressionManager:
@@ -80,6 +86,10 @@ class GodMapWorshipper:
     @property
     def collision_avoidance_config(self) -> CollisionAvoidanceConfig:
         return self.god_map.get_data(identifier.collision_avoidance_config)
+
+    @property
+    def collision_avoidance_configs(self) -> Dict[str, CollisionAvoidanceGroupThresholds]:
+        return self.god_map.unsafe_get_data(identifier.collision_avoidance_configs)
 
     @property
     def trajectory_time_in_seconds(self):

@@ -315,7 +315,7 @@ class CollisionWorldSynchronizer(GodMapWorshipper):
     self_collision_matrix: Dict[Tuple[PrefixName, PrefixName], DisableCollisionReason]
     self_collision_matrix_paths: Dict[str, str]
     world: WorldTree
-    collision_avoidance_configs: Dict[str, CollisionAvoidanceGroupThresholds]
+    collision_avoidance_configs: Dict[str, CollisionAvoidanceGroupThresholds] = None
     disabled_links: Set[PrefixName]
     srdf_disable_all_collisions = 'disable_all_collisions'
     srdf_disable_self_collision = 'disable_self_collision'

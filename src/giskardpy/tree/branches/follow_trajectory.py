@@ -12,7 +12,7 @@ from giskardpy.tree.behaviors.init_qp_controller import InitQPController
 from giskardpy.tree.behaviors.log_trajectory import LogTrajPlugin
 from giskardpy.tree.behaviors.new_trajectory import NewTrajectory
 from giskardpy.tree.behaviors.publish_feedback import PublishFeedback
-from giskardpy.tree.behaviors.ros_msg_to_goal import RosMsgToGoal
+from giskardpy.tree.behaviors.ros_msg_to_goal import ParseActionGoal
 from giskardpy.tree.behaviors.set_move_result import SetMoveResult
 from giskardpy.tree.behaviors.set_tracking_start_time import SetTrackingStartTime
 from giskardpy.tree.behaviors.sync_configuration import SyncConfiguration

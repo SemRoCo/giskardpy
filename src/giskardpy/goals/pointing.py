@@ -50,7 +50,7 @@ class Pointing(Goal):
 
     def make_constraints(self):
         root_T_tip = self.get_fk(self.root, self.tip)
-        root_P_goal_point: w.Point3 = self.get_parameter_as_symbolic_expression('root_P_goal_point')
+        root_P_goal_point = w.Point3(self.root_P_goal_point)
         tip_V_pointing_axis = w.Vector3(self.tip_V_pointing_axis)
 
         root_V_goal_axis = root_P_goal_point - root_T_tip.to_position()

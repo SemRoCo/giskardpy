@@ -1,3 +1,4 @@
+import traceback
 from typing import List
 
 import numpy as np
@@ -5,9 +6,12 @@ import numpy as np
 import giskardpy.casadi_wrapper as cas
 from giskardpy import identifier
 from giskardpy.casadi_wrapper import CompiledFunction
-from giskardpy.exceptions import GiskardException
+from giskardpy.exceptions import GiskardException, UnknownConstraintException, ConstraintInitalizationException
 from giskardpy.goals.monitors.monitors import Monitor
 from giskardpy.god_map_user import GodMapWorshipper
+import giskard_msgs.msg as giskard_msgs
+from giskardpy.utils import logging
+from giskardpy.utils.utils import json_to_kwargs, get_all_classes_in_package
 
 
 def flipped_to_one(a: np.ndarray, b: np.ndarray) -> np.ndarray:
@@ -30,6 +34,9 @@ class MonitorManager(GodMapWorshipper):
 
     def __init__(self):
         self.monitors = []
+        self.allowed_monitor_types = {}
+        self.allowed_monitor_types.update(get_all_classes_in_package('giskardpy.goals.monitors', Monitor))
+        self.robot_names = self.collision_scene.robot_names
 
     def compile_monitors(self):
         expressions = []
@@ -83,3 +90,23 @@ class MonitorManager(GodMapWorshipper):
     @profile
     def crucial_monitors_satisfied(self):
         return np.all(self.state[self.crucial_filter])
+
+
+    @profile
+    def parse_monitors(self, monitor_msgs: List[giskard_msgs.Monitor]):
+        for monitor_msg in monitor_msgs:
+            try:
+                logging.loginfo(f'Adding monitor of type: \'{monitor_msg.type}\'')
+                C = self.allowed_monitor_types[monitor_msg.type]
+            except KeyError:
+                raise UnknownConstraintException(f'unknown monitor type: \'{monitor_msg.type}\'.')
+            try:
+                params = json_to_kwargs(monitor_msg.parameter_value_pair)
+                monitor: Monitor = C(monitor_msg.name, **params)
+                self.monitor_manager.add_monitor(monitor)
+            except Exception as e:
+                traceback.print_exc()
+                error_msg = f'Initialization of \'{C.__name__}\' constraint failed: \n {e} \n'
+                if not isinstance(e, GiskardException):
+                    raise ConstraintInitalizationException(error_msg)
+                raise e

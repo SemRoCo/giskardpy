@@ -543,24 +543,25 @@ class JointPositionList(Goal):
             self.goal_positions.append(goal_position)
             self.velocity_limits.append(velocity_limit)
             self.thresholds.append(self.threshold)
+            task = Task(name='joint goal')
+            for name, current, goal, threshold, velocity_limit in zip(self.names, self.current_positions,
+                                                                      self.goal_positions,
+                                                                      self.thresholds, self.velocity_limits):
+                if self.world.is_joint_continuous(name):
+                    error = cas.shortest_angular_distance(current, goal)
+                else:
+                    error = goal - current
+
+                task.add_equality_constraint(name=name,
+                                             reference_velocity=velocity_limit,
+                                             equality_bound=error,
+                                             weight=self.weight,
+                                             task_expression=current)
+
+            self.add_task(task)
 
     def make_constraints(self):
-        task = Task(name='joint goal')
-        for name, current, goal, threshold, velocity_limit in zip(self.names, self.current_positions,
-                                                                  self.goal_positions,
-                                                                  self.thresholds, self.velocity_limits):
-            if self.world.is_joint_continuous(name):
-                error = cas.shortest_angular_distance(current, goal)
-            else:
-                error = goal - current
-
-            task.add_equality_constraint(name=name,
-                                         reference_velocity=velocity_limit,
-                                         equality_bound=error,
-                                         weight=self.weight,
-                                         task_expression=current)
-
-        self.add_task(task)
+        pass
 
     def __str__(self):
         s = super().__str__()

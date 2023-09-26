@@ -59,7 +59,7 @@ from giskardpy.tree.behaviors.plugin_if import IF
 from giskardpy.tree.behaviors.publish_debug_expressions import PublishDebugExpressions
 from giskardpy.tree.behaviors.publish_feedback import PublishFeedback
 from giskardpy.tree.behaviors.real_kinematic_sim import RealKinSimPlugin
-from giskardpy.tree.behaviors.ros_msg_to_goal import RosMsgToGoal
+from giskardpy.tree.behaviors.ros_msg_to_goal import ParseActionGoal
 from giskardpy.tree.behaviors.send_result import SendResult
 from giskardpy.tree.behaviors.send_trajectory import SendFollowJointTrajectory
 from giskardpy.tree.behaviors.send_trajectory_omni_drive_realtime import SendTrajectoryToCmdVel
@@ -566,7 +566,7 @@ class StandAlone(TreeManager):
     def grow_planning(self):
         planning = success_is_failure(Sequence)('planning')
         # planning.add_child(IF('command set?', identifier.next_move_goal))
-        planning.add_child(RosMsgToGoal('RosMsgToGoal'))
+        planning.add_child(ParseActionGoal('RosMsgToGoal'))
         planning.add_child(InitQPController('InitQPController'))
         planning.add_child(self.grow_planning2())
         # planning.add_child(planning_1)

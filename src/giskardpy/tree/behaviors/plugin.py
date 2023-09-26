@@ -31,10 +31,6 @@ class GiskardBehavior(Behaviour, GodMapWorshipper):
             return self.god_map.unsafe_get_data(identifier.time)
         return self.god_map.unsafe_get_data(identifier.time) * self.god_map.unsafe_get_data(identifier.sample_period)
 
-    @property
-    def collision_avoidance_configs(self) -> Dict[str, CollisionAvoidanceGroupThresholds]:
-        return self.god_map.unsafe_get_data(identifier.collision_avoidance_configs)
-
     def get_runtime(self):
         return time() - self.get_blackboard().runtime
 

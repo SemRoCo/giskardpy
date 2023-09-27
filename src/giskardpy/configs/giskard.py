@@ -46,7 +46,7 @@ class Giskard:
                                               path in the list.
         """
         GodMap.god_map.set_data(identifier.giskard, self)
-        GodMap.world_config = world_config
+        self.world_config = world_config
         self.robot_interface_config = robot_interface_config
         if collision_avoidance_config is None:
             collision_avoidance_config = DisableCollisionAvoidanceConfig()

@@ -22,6 +22,7 @@ from giskardpy.configs.behavior_tree_config import StandAloneBTConfig
 from giskardpy.configs.giskard import Giskard
 from giskardpy.configs.iai_robots.pr2 import PR2CollisionAvoidance, PR2StandaloneInterface, WorldWithPR2Config
 from giskardpy.configs.qp_controller_config import QPControllerConfig, SupportedQPSolver
+from giskardpy.god_map_user import GodMap
 from giskardpy.model.better_pybullet_syncer import BetterPyBulletSyncer
 from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
 from giskardpy.model.utils import make_world_body_box, hacky_urdf_parser_fix
@@ -140,7 +141,7 @@ class PR2TestWrapper(GiskardTestWrapper):
                               collision_avoidance_config=PR2CollisionAvoidance(drive_joint_name=drive_joint_name),
                               behavior_tree_config=StandAloneBTConfig())
         super().__init__(giskard)
-        self.robot = self.world.groups[self.robot_name]
+        self.robot = GodMap.world.groups[self.robot_name]
 
     def teleport_base(self, goal_pose, group_name: Optional[str] = None):
         self.set_seed_odometry(base_pose=goal_pose, group_name=group_name)
@@ -153,10 +154,10 @@ class PR2TestWrapper(GiskardTestWrapper):
         self.plan_and_execute()
 
     def get_l_gripper_links(self):
-        return [str(x) for x in self.world.groups[self.l_gripper_group].link_names_with_collisions]
+        return [str(x) for x in GodMap.world.groups[self.l_gripper_group].link_names_with_collisions]
 
     def get_r_gripper_links(self):
-        return [str(x) for x in self.world.groups[self.r_gripper_group].link_names_with_collisions]
+        return [str(x) for x in GodMap.world.groups[self.r_gripper_group].link_names_with_collisions]
 
     def get_r_forearm_links(self):
         return ['r_wrist_flex_link', 'r_wrist_roll_link', 'r_forearm_roll_link', 'r_forearm_link',
@@ -178,7 +179,7 @@ class PR2TestWrapper(GiskardTestWrapper):
         p = PoseStamped()
         p.header.frame_id = 'map'
         p.pose.orientation.w = 1
-        if self.is_standalone():
+        if GodMap.is_standalone:
             self.teleport_base(p)
         else:
             self.move_base(p)
@@ -188,7 +189,7 @@ class PR2TestWrapper(GiskardTestWrapper):
         self.set_seed_odometry(map_T_odom)
         self.plan_and_execute()
         # self.wait_heartbeats(15)
-        # p2 = self.world.compute_fk_pose(self.world.root_link_name, self.odom_root)
+        # p2 = GodMap.world.compute_fk_pose(GodMap.world.root_link_name, self.odom_root)
         # compare_poses(p2.pose, map_T_odom.pose)
 
     def reset(self):
@@ -236,7 +237,7 @@ def giskard(request, ros):
 
 @pytest.fixture()
 def pocky_pose_setup(resetted_giskard: PR2TestWrapper) -> PR2TestWrapper:
-    if resetted_giskard.is_standalone():
+    if resetted_giskard.is_standalone:
         resetted_giskard.set_seed_configuration(pocky_pose)
         resetted_giskard.allow_all_collisions()
     else:
@@ -249,7 +250,7 @@ def pocky_pose_setup(resetted_giskard: PR2TestWrapper) -> PR2TestWrapper:
 @pytest.fixture()
 def world_setup(zero_pose: PR2TestWrapper) -> WorldTree:
     zero_pose.stop_ticking()
-    return zero_pose.world
+    return GodMap.world
 
 
 @pytest.fixture()
@@ -274,55 +275,6 @@ def fake_table_setup(pocky_pose_setup: PR2TestWrapper) -> PR2TestWrapper:
     p.pose.orientation.w = 1
     pocky_pose_setup.add_box(name='box', size=(1, 1, 1), pose=p)
     return pocky_pose_setup
-
-
-# class TestFk(object):
-#     def test_fk(self, zero_pose: PR2TestWrapper):
-#         for root, tip in itertools.product(zero_pose.robot().link_names, repeat=2):
-#             try:
-#                 fk1 = zero_pose.god_map.get_data(fk_pose + [(root, tip)])
-#             except Exception as e:
-#                 fk1 = zero_pose.god_map.get_data(fk_pose + [(root, tip)])
-#                 pass
-#             fk2 = tf.lookup_pose(str(root), str(tip))
-#             compare_poses(fk1.pose, fk2.pose)
-#
-#     def test_fk_attached(self, zero_pose: PR2TestWrapper):
-#         pocky = 'box'
-#         p = PoseStamped()
-#         p.header.frame_id = zero_pose.r_tip
-#         p.pose.position.x = 0.05
-#         p.pose.orientation.x = 1
-#         zero_pose.add_box(pocky, size=(0.1, 0.02, 0.02), parent_link=zero_pose.r_tip, pose=p)
-#         for root, tip in itertools.product(zero_pose.robot.link_names, [pocky]):
-#             fk1 = zero_pose.god_map.get_data(fk_pose + [(root, tip)])
-#             fk2 = tf.lookup_pose(str(root), str(tip))
-#             compare_poses(fk1.pose, fk2.pose)
-#
-#     def test_fk_world(self, kitchen_setup: PR2TestWrapper):
-#         kitchen: SubWorldTree = kitchen_setup.world.groups['kitchen']
-#         robot: SubWorldTree = kitchen_setup.robot
-#         kitchen_links = list(kitchen.link_names)
-#         robot_links = list(robot.link_names)
-#         for i in range(25):
-#             if i % 2 == 0:
-#                 root = kitchen_links[i]
-#                 tip = robot_links[i]
-#             else:
-#                 tip = kitchen_links[i]
-#                 root = robot_links[i]
-#             fk1 = kitchen_setup.god_map.get_data(fk_pose + [(root, tip)])
-#             if i % 2 == 0:
-#                 root = f'iai_kitchen/{root}'
-#             else:
-#                 tip = f'iai_kitchen/{tip}'
-#             fk2 = tf.lookup_pose(str(root), str(tip))
-#             print(f'{root} {tip}')
-#             try:
-#                 compare_poses(fk1.pose, fk2.pose)
-#             except Exception as e:
-#                 pass
-#                 raise
 
 
 class TestJointGoals:

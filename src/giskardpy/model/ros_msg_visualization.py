@@ -22,14 +22,11 @@ class ROSMsgVisualization:
         self.use_decomposed_meshes = use_decomposed_meshes
         self.publisher = rospy.Publisher('~visualization_marker_array', MarkerArray, queue_size=1)
         self.marker_ids = {}
-        GodMap.god_map = _GodMap()
-        GodMap.world = GodMap.god_map.get_data(identifier.world)
         if tf_frame is None:
             self.tf_root = str(GodMap.world.root_link_name)
         else:
             self.tf_root = tf_frame
         GodMap.god_map.set_data(identifier.ros_visualizer, self)
-        GodMap.collision_scene = GodMap.god_map.get_data(identifier.collision_scene)
 
     @profile
     def create_world_markers(self, name_space: str = 'planning_visualization') -> List[Marker]:

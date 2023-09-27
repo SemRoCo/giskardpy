@@ -500,7 +500,7 @@ class WorldTree(WorldTreeInterface):
             raise KeyError(f'World doesn\'t have link \'{root_link_name}\'')
         if name in self.groups:
             raise DuplicateNameException(f'Group with name {name} already exists')
-        new_group = WorldBranch(name, root_link_name, self, actuated=actuated)
+        new_group = WorldBranch(name, root_link_name, actuated=actuated)
         # if the group is a subtree of a subtree, register it for the subtree as well
         # for group in self.groups.values():
         #     if root_link_name in group.links:
@@ -1289,24 +1289,24 @@ class WorldTree(WorldTreeInterface):
             str_params: List[str]
 
             def __init__(self, world: WorldTree):
-                GodMap.world = world
-                GodMap.god_map = _GodMap()
-                self.fks = {GodMap.world.root_link_name: w.TransMatrix()}
+                self.world = world
+                self.god_map = _GodMap()
+                self.fks = {self.world.root_link_name: w.TransMatrix()}
 
             @profile
             def joint_call(self, joint_name: my_string) -> bool:
-                joint = GodMap.world.joints[joint_name]
+                joint = self.world.joints[joint_name]
                 map_T_parent = self.fks[joint.parent_link_name]
                 self.fks[joint.child_link_name] = map_T_parent.dot(joint.parent_T_child)
                 return False
 
             @profile
             def compile_fks(self):
-                all_fks = w.vstack([self.fks[link_name] for link_name in GodMap.world.link_names_as_set])
+                all_fks = w.vstack([self.fks[link_name] for link_name in self.world.link_names_as_set])
                 collision_fks = []
                 # collision_ids = []
-                for link_name in sorted(GodMap.world.link_names_with_collisions):
-                    if link_name == GodMap.world.root_link_name:
+                for link_name in sorted(self.world.link_names_with_collisions):
+                    if link_name == self.world.root_link_name:
                         continue
                     # link = GodMap.world.links[link_name]
                     # for collision_id, geometry in enumerate(link.collisions):
@@ -1573,10 +1573,9 @@ class WorldTree(WorldTreeInterface):
 
 
 class WorldBranch(WorldTreeInterface):
-    def __init__(self, name: str, root_link_name: PrefixName, world: WorldTree, actuated: bool = False):
+    def __init__(self, name: str, root_link_name: PrefixName, actuated: bool = False):
         self.name = name
         self.root_link_name = root_link_name
-        GodMap.world = world
         self.actuated = actuated
 
     def get_siblings_with_collisions(self, joint_name: PrefixName) -> List[PrefixName]:

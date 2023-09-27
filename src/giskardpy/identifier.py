@@ -88,6 +88,8 @@ pouring_move_to = pouring_actions + ['move_to']
 pouring_tilt = pouring_actions + ['tilt']
 pouring_tilt_back = pouring_actions + ['tilt_back']
 pouring_keep_upright = pouring_actions + ['keep_upright']
+pouring_rotate_left = pouring_actions + ['rotate_left']
+pouring_rotate_right = pouring_actions + ['rotate_right']
 
 box_x = ['box_x']
 box_y = ['box_y']

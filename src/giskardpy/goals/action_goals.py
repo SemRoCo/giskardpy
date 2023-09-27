@@ -17,6 +17,7 @@ from giskardpy import identifier
 from giskardpy.goals.cartesian_goals import CartesianOrientation
 from giskardpy.goals.pouring_goals import KeepObjectAbovePlane
 from giskardpy.goals.pouring_goals import TiltObject, KeepObjectUpright
+import math
 
 
 class PouringAction(Goal):
@@ -28,7 +29,7 @@ class PouringAction(Goal):
         self.root_link = self.world.search_for_link_name(root_link, root_group)
         self.tip_link2 = self.world.search_for_link_name('hand_camera_frame', tip_group)
         self.tip_link = self.world.search_for_link_name(tip_link, tip_group)
-        self.max_vel = max_velocity
+        self.max_vel = max_velocity/2
         self.weight = weight
         self.upright_orientation = upright_orientation
         self.down_orientation = down_orientation
@@ -76,12 +77,37 @@ class PouringAction(Goal):
                                          name='upright')
 
         is_tilt = self.god_map.to_expr(identifier.pouring_tilt)
-        #Todo: I might have to save a reference pose when the pouring starts to define rotation around that
+        # Todo: I might have to save a reference pose when the pouring starts to define rotation around that
         self.add_equality_constraint(reference_velocity=self.max_vel,
                                      equality_bound=self.max_vel,
                                      weight=self.weight * is_tilt,
                                      task_expression=self.get_joint_position_symbol(self.tilt_joint),
                                      name='tilt')
+
+        is_rotate_left = self.god_map.to_expr(identifier.pouring_rotate_left)
+        is_rotate_right = self.god_map.to_expr(identifier.pouring_rotate_right)
+        base_link = self.world.search_for_link_name('base_footprint')
+        root_R_base = self.get_fk(self.root_link, base_link).to_rotation()
+        base_R_base = w.RotationMatrix()
+        angle = 0.5 * is_rotate_left - 0.5 *is_rotate_right
+        base_R_base[0, 0] = w.cos(angle)
+        base_R_base[1, 0] = w.sin(angle)
+        base_R_base[0, 1] = -w.sin(angle)
+        base_R_base[1, 1] = w.cos(angle)
+        base_R_base[2, 2] = 1
+        root_R_base_desire = root_R_base.dot(base_R_base)
+        self.add_equality_constraint_vector(reference_velocities=[self.max_vel] * 4,
+                                            equality_bounds=[root_R_base_desire[0, 0] - root_R_base[0, 0],
+                                                             root_R_base_desire[1, 0] - root_R_base[1, 0],
+                                                             root_R_base_desire[0, 1] - root_R_base[0, 1],
+                                                             root_R_base_desire[1, 1] - root_R_base[1, 1]
+                                                             ],
+                                            weights=[self.weight * w.max(is_rotate_left, is_rotate_right)] * 4,
+                                            task_expression=[root_R_base[0, 0],
+                                                             root_R_base[1, 0],
+                                                             root_R_base[0, 1],
+                                                             root_R_base[1, 1]],
+                                            names=['r1', 'r2', 'r3', 'r4'])
         # v = Vector3Stamped()
         # v.header.frame_id = 'hand_palm_link'
         # v.vector.z = 1

@@ -33,7 +33,9 @@ class SyncPouringActions(GiskardBehavior):
                                 'y': 'move_to',
                                 'g': 'tilt',
                                 'h': 'tilt_back',
-                                'q': 'keep_upright'}
+                                'q': 'keep_upright',
+                                'z': 'rotate_left',
+                                'x': 'rotate_right'}
         self.all_commands = {'forward': 0,
                              'backward': 0,
                              'left': 0,
@@ -43,7 +45,9 @@ class SyncPouringActions(GiskardBehavior):
                              'move_to': 0,
                              'tilt': 0,
                              'tilt_back': 0,
-                             'keep_upright': 0}
+                             'keep_upright': 0,
+                             'rotate_left': 0,
+                             'rotate_right': 0}
         self.all_commands_empty = copy.deepcopy(self.all_commands)
         self.god_map.set_data(identifier.pouring_actions, self.all_commands)
         self.counter = 0

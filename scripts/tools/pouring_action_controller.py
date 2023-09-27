@@ -48,7 +48,9 @@ print({'w': 'forward',
        'y': 'move_to',
        'g': 'tilt',
        'h': 'tilt_back',
-       'q': 'keep_upright'})
+       'q': 'keep_upright',
+       'z': 'rotate_left',
+       'x': 'rotate_right'})
 
 
 # Function to publish the concatenated pressed keys

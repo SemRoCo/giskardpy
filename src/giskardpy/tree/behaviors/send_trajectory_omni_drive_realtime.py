@@ -51,7 +51,7 @@ class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
             rospy.sleep(1)
 
         if joint_name is None:
-            for joint in GodMap.world.joints.values():
+            for joint in GodMap.get_world().joints.values():
                 if isinstance(joint, (OmniDrive, DiffDrive, OmniDrivePR22)):
                     # FIXME can only handle one drive
                     # self.controlled_joints = [joint]
@@ -59,9 +59,9 @@ class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
             if not hasattr(self, 'joint'):
                 raise GiskardException('didnt find drive joint.')
         else:
-            joint_name = GodMap.world.search_for_joint_name(joint_name)
-            self.joint = GodMap.world.joints[joint_name]
-        GodMap.world.register_controlled_joints([self.joint.name])
+            joint_name = GodMap.get_world().search_for_joint_name(joint_name)
+            self.joint = GodMap.get_world().joints[joint_name]
+        GodMap.get_world().register_controlled_joints([self.joint.name])
         loginfo(f'Received controlled joints from \'{cmd_vel_topic}\'.')
 
     def __str__(self):
@@ -102,8 +102,8 @@ class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
         if isinstance(self.joint, OmniDrivePR22):
             try:
                 forward_velocity = cmd.free_variable_data[self.joint.forward_vel.name][0]
-                yaw1_position = GodMap.world.state[self.joint.yaw1_vel.name].position
-                yaw2_position = GodMap.world.state[self.joint.yaw.name].position
+                yaw1_position = GodMap.get_world().state[self.joint.yaw1_vel.name].position
+                yaw2_position = GodMap.get_world().state[self.joint.yaw.name].position
                 bf_yaw1 = yaw1_position - yaw2_position
                 twist.linear.x = np.cos(bf_yaw1) * forward_velocity
                 twist.linear.y = np.sin(bf_yaw1) * forward_velocity

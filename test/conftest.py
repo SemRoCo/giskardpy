@@ -112,8 +112,8 @@ def kitchen_setup(better_pose: GiskardTestWrapper) -> GiskardTestWrapper:
                              js_topic='/kitchen/joint_states',
                              set_js_topic='/kitchen/cram_joint_states')
     js = {}
-    for joint_name in GodMap.world.groups[better_pose.kitchen_name].movable_joint_names:
-        joint = GodMap.world.joints[joint_name]
+    for joint_name in GodMap.get_world().groups[better_pose.kitchen_name].movable_joint_names:
+        joint = GodMap.get_world().joints[joint_name]
         if isinstance(joint, OneDofJoint):
             if GodMap.is_standalone:
                 js[str(joint.free_variable.name)] = 0.0
@@ -140,8 +140,8 @@ def apartment_setup(better_pose: GiskardTestWrapper) -> GiskardTestWrapper:
                              js_topic='/apartment_joint_states',
                              set_js_topic='/iai_kitchen/cram_joint_states')
     js = {}
-    for joint_name in GodMap.world.groups[better_pose.environment_name].movable_joint_names:
-        joint = GodMap.world.joints[joint_name]
+    for joint_name in GodMap.get_world().groups[better_pose.environment_name].movable_joint_names:
+        joint = GodMap.get_world().joints[joint_name]
         if isinstance(joint, OneDofJoint):
             js[str(joint.free_variable.name)] = 0.0
     better_pose.set_apartment_js(js)
@@ -150,6 +150,6 @@ def apartment_setup(better_pose: GiskardTestWrapper) -> GiskardTestWrapper:
     base_pose.pose.position.x = 1.5
     base_pose.pose.position.y = 2.4
     base_pose.pose.orientation.w = 1
-    base_pose = better_pose.transform_msg(GodMap.world.root_link_name, base_pose)
+    base_pose = better_pose.transform_msg(GodMap.get_world().root_link_name, base_pose)
     better_pose.set_localization(base_pose)
     return better_pose

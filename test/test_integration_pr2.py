@@ -141,7 +141,7 @@ class PR2TestWrapper(GiskardTestWrapper):
                               collision_avoidance_config=PR2CollisionAvoidance(drive_joint_name=drive_joint_name),
                               behavior_tree_config=StandAloneBTConfig())
         super().__init__(giskard)
-        self.robot = GodMap.world.groups[self.robot_name]
+        self.robot = GodMap.get_world().groups[self.robot_name]
 
     def teleport_base(self, goal_pose, group_name: Optional[str] = None):
         self.set_seed_odometry(base_pose=goal_pose, group_name=group_name)
@@ -154,10 +154,10 @@ class PR2TestWrapper(GiskardTestWrapper):
         self.plan_and_execute()
 
     def get_l_gripper_links(self):
-        return [str(x) for x in GodMap.world.groups[self.l_gripper_group].link_names_with_collisions]
+        return [str(x) for x in GodMap.get_world().groups[self.l_gripper_group].link_names_with_collisions]
 
     def get_r_gripper_links(self):
-        return [str(x) for x in GodMap.world.groups[self.r_gripper_group].link_names_with_collisions]
+        return [str(x) for x in GodMap.get_world().groups[self.r_gripper_group].link_names_with_collisions]
 
     def get_r_forearm_links(self):
         return ['r_wrist_flex_link', 'r_wrist_roll_link', 'r_forearm_roll_link', 'r_forearm_link',
@@ -189,7 +189,7 @@ class PR2TestWrapper(GiskardTestWrapper):
         self.set_seed_odometry(map_T_odom)
         self.plan_and_execute()
         # self.wait_heartbeats(15)
-        # p2 = GodMap.world.compute_fk_pose(GodMap.world.root_link_name, self.odom_root)
+        # p2 = GodMap.get_world().compute_fk_pose(GodMap.get_world().root_link_name, self.odom_root)
         # compare_poses(p2.pose, map_T_odom.pose)
 
     def reset(self):
@@ -250,7 +250,7 @@ def pocky_pose_setup(resetted_giskard: PR2TestWrapper) -> PR2TestWrapper:
 @pytest.fixture()
 def world_setup(zero_pose: PR2TestWrapper) -> WorldTree:
     zero_pose.stop_ticking()
-    return GodMap.world
+    return GodMap.get_world()
 
 
 @pytest.fixture()

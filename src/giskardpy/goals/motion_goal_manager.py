@@ -23,7 +23,7 @@ class MotionGoalManager:
         self.allowed_motion_goal_types = {}
         for path in goal_package_paths:
             self.allowed_motion_goal_types.update(get_all_classes_in_package(path, Goal))
-        self.robot_names = GodMap.collision_scene.robot_names
+        self.robot_names = GodMap.get_collision_scene().robot_names
 
     @profile
     def parse_motion_goals(self, motion_goals: List[giskard_msgs.MotionGoal]):
@@ -39,7 +39,7 @@ class MotionGoalManager:
                 c.make_constraints()
                 self.motion_goals[str(c)] = c
                 for monitor_name in motion_goal.to_end:
-                    monitor = GodMap.monitor_manager.get_monitor(monitor_name)
+                    monitor = GodMap.get_monitor_manager().get_monitor(monitor_name)
                     c.connect_to_end(monitor)
             except Exception as e:
                 traceback.print_exc()
@@ -55,36 +55,36 @@ class MotionGoalManager:
         """
         collision_matrix = self.collision_entries_to_collision_matrix(collision_entries)
         GodMap.god_map.set_data(identifier.collision_matrix, collision_matrix)
-        if not collision_entries or not GodMap.collision_scene.is_allow_all_collision(collision_entries[-1]):
+        if not collision_entries or not GodMap.get_collision_scene().is_allow_all_collision(collision_entries[-1]):
             self.add_external_collision_avoidance_constraints(soft_threshold_override=collision_matrix)
-        if not collision_entries or (not GodMap.collision_scene.is_allow_all_collision(collision_entries[-1]) and
-                                     not GodMap.collision_scene.is_allow_all_self_collision(collision_entries[-1])):
+        if not collision_entries or (not GodMap.get_collision_scene().is_allow_all_collision(collision_entries[-1]) and
+                                     not GodMap.get_collision_scene().is_allow_all_self_collision(collision_entries[-1])):
             self.add_self_collision_avoidance_constraints()
 
     def collision_entries_to_collision_matrix(self, collision_entries: List[giskard_msgs.CollisionEntry]):
-        GodMap.collision_scene.sync()
+        GodMap.get_collision_scene().sync()
         collision_check_distances = self.create_collision_check_distances()
-        # ignored_collisions = GodMap.collision_scene.ignored_self_collion_pairs
-        collision_matrix = GodMap.collision_scene.collision_goals_to_collision_matrix(deepcopy(collision_entries),
+        # ignored_collisions = GodMap.get_collision_scene().ignored_self_collion_pairs
+        collision_matrix = GodMap.get_collision_scene().collision_goals_to_collision_matrix(deepcopy(collision_entries),
                                                                                     collision_check_distances)
         return collision_matrix
 
     def create_collision_check_distances(self) -> Dict[PrefixName, float]:
         for robot_name in self.robot_names:
-            collision_avoidance_config = GodMap.collision_avoidance_configs[robot_name]
+            collision_avoidance_config = GodMap.get_collision_avoidance_configs()[robot_name]
             external_distances = collision_avoidance_config.external_collision_avoidance
             self_distances = collision_avoidance_config.self_collision_avoidance
 
         max_distances = {}
         # override max distances based on external distances dict
-        for robot in GodMap.collision_scene.robots:
+        for robot in GodMap.get_collision_scene().robots:
             for link_name in robot.link_names_with_collisions:
                 try:
-                    controlled_parent_joint = GodMap.world.get_controlled_parent_joint_of_link(link_name)
+                    controlled_parent_joint = GodMap.get_world().get_controlled_parent_joint_of_link(link_name)
                 except KeyError as e:
                     continue  # this happens when the root link of a robot has a collision model
                 distance = external_distances[controlled_parent_joint].soft_threshold
-                for child_link_name in GodMap.world.get_directly_controlled_child_links_with_collisions(
+                for child_link_name in GodMap.get_world().get_directly_controlled_child_links_with_collisions(
                         controlled_parent_joint):
                     max_distances[child_link_name] = distance
 
@@ -99,21 +99,21 @@ class MotionGoalManager:
 
     @profile
     def add_external_collision_avoidance_constraints(self, soft_threshold_override=None):
-        configs = GodMap.collision_avoidance_configs
-        fixed_joints = GodMap.collision_scene.fixed_joints
-        joints = [j for j in GodMap.world.controlled_joints if j not in fixed_joints]
+        configs = GodMap.get_collision_avoidance_configs()
+        fixed_joints = GodMap.get_collision_scene().fixed_joints
+        joints = [j for j in GodMap.get_world().controlled_joints if j not in fixed_joints]
         num_constrains = 0
         for joint_name in joints:
             try:
-                robot_name = GodMap.world.get_group_of_joint(joint_name).name
+                robot_name = GodMap.get_world().get_group_of_joint(joint_name).name
             except KeyError:
-                child_link = GodMap.world.joints[joint_name].child_link_name
-                robot_name = GodMap.world._get_group_name_containing_link(child_link)
-            child_links = GodMap.world.get_directly_controlled_child_links_with_collisions(joint_name, fixed_joints)
+                child_link = GodMap.get_world().joints[joint_name].child_link_name
+                robot_name = GodMap.get_world()._get_group_name_containing_link(child_link)
+            child_links = GodMap.get_world().get_directly_controlled_child_links_with_collisions(joint_name, fixed_joints)
             if child_links:
                 number_of_repeller = configs[robot_name].external_collision_avoidance[joint_name].number_of_repeller
                 for i in range(number_of_repeller):
-                    child_link = GodMap.world.joints[joint_name].child_link_name
+                    child_link = GodMap.get_world().joints[joint_name].child_link_name
                     hard_threshold = configs[robot_name].external_collision_avoidance[joint_name].hard_threshold
                     if soft_threshold_override is not None:
                         soft_threshold = soft_threshold_override
@@ -132,26 +132,26 @@ class MotionGoalManager:
     @profile
     def add_self_collision_avoidance_constraints(self):
         counter = defaultdict(int)
-        fixed_joints = GodMap.collision_scene.fixed_joints
-        configs = GodMap.collision_avoidance_configs
+        fixed_joints = GodMap.get_collision_scene().fixed_joints
+        configs = GodMap.get_collision_avoidance_configs()
         num_constr = 0
         for robot_name in self.robot_names:
-            for link_a_o, link_b_o in GodMap.world.groups[robot_name].possible_collision_combinations():
-                link_a_o, link_b_o = GodMap.world.sort_links(link_a_o, link_b_o)
+            for link_a_o, link_b_o in GodMap.get_world().groups[robot_name].possible_collision_combinations():
+                link_a_o, link_b_o = GodMap.get_world().sort_links(link_a_o, link_b_o)
                 try:
-                    if (link_a_o, link_b_o) in GodMap.collision_scene.self_collision_matrix:
+                    if (link_a_o, link_b_o) in GodMap.get_collision_scene().self_collision_matrix:
                         continue
-                    link_a, link_b = GodMap.world.compute_chain_reduced_to_controlled_joints(link_a_o, link_b_o, fixed_joints)
-                    link_a, link_b = GodMap.world.sort_links(link_a, link_b)
+                    link_a, link_b = GodMap.get_world().compute_chain_reduced_to_controlled_joints(link_a_o, link_b_o, fixed_joints)
+                    link_a, link_b = GodMap.get_world().sort_links(link_a, link_b)
                     counter[link_a, link_b] += 1
                 except KeyError as e:
                     # no controlled joint between both links
                     pass
 
         for link_a, link_b in counter:
-            group_names = GodMap.world.get_group_names_containing_link(link_a)
+            group_names = GodMap.get_world().get_group_names_containing_link(link_a)
             if len(group_names) != 1:
-                group_name = GodMap.world.get_parent_group_name(group_names.pop())
+                group_name = GodMap.get_world().get_parent_group_name(group_names.pop())
             else:
                 group_name = group_names.pop()
             num_of_constraints = min(1, counter[link_a, link_b])
@@ -176,8 +176,8 @@ class MotionGoalManager:
                                          config[link_b].soft_threshold)
                     number_of_repeller = min(config[link_a].number_of_repeller,
                                              config[link_b].number_of_repeller)
-                groups_a = GodMap.world._get_group_name_containing_link(link_a)
-                groups_b = GodMap.world._get_group_name_containing_link(link_b)
+                groups_a = GodMap.get_world()._get_group_name_containing_link(link_a)
+                groups_b = GodMap.get_world()._get_group_name_containing_link(link_b)
                 if groups_b == groups_a:
                     robot_name = groups_a
                 else:

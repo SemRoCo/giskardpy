@@ -142,7 +142,7 @@ class Trajectory:
         cm_per_second = cm_to_inch(cm_per_second)
         height_per_derivative = cm_to_inch(height_per_derivative)
         hspace = cm_to_inch(hspace)
-        max_derivative = GodMap.max_derivative
+        max_derivative = GodMap.get_max_derivative()
         with plot_lock:
             def ceil(val, base=0.0, stride=1.0):
                 base = base % stride

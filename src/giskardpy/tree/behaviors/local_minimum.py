@@ -22,7 +22,7 @@ class LocalMinimum(GiskardBehavior):
         self.real_time = real_time
         self.last_goal_id = -1
         if real_time:
-            self.window_size *= GodMap.sample_period
+            self.window_size *= GodMap.get_sample_period()
 
     @profile
     def initialise(self):

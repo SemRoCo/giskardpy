@@ -31,9 +31,9 @@ class Synchronization(Sequence):
     def __init__(self, suffix: str = ''):
         super().__init__(f'synchronize{suffix}')
         self.sync_tf_frames = SyncTfFrames('sync tf frames1')
-        GodMap.collision_scene_updater = CollisionSceneUpdater('update collision scene')
+        self.collision_scene_updater = CollisionSceneUpdater('update collision scene')
         self.add_child(self.sync_tf_frames)
-        self.add_child(GodMap.collision_scene_updater)
+        self.add_child(self.collision_scene_updater)
         self.add_child(NotifyStateChange())
 
     def sync_6dof_joint_with_tf_frame(self, joint_name: PrefixName, tf_parent_frame: str, tf_child_frame: str):

@@ -25,4 +25,4 @@ class OverwriteWeights(Goal):
         super().__init__()
         # ints get parsed as strings, when they arrive here...
         updates = {int(k): v for k, v in updates.items()}
-        GodMap.world.overwrite_joint_weights(updates)
+        GodMap.get_world().overwrite_joint_weights(updates)

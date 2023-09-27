@@ -250,17 +250,17 @@ class GiskardTestWrapper(GiskardWrapper):
             logging.loginfo('Inside github workflow, turning off visualization')
             plugins_to_disable = [VisualizationBehavior, PlotTrajectory, PlotDebugExpressions]
             for behavior_type in plugins_to_disable:
-                for node in GodMap.tree_manager.get_nodes_of_type(behavior_type):
-                    GodMap.tree_manager.disable_node(node.name)
+                for node in GodMap.get_tree_manager().get_nodes_of_type(behavior_type):
+                    GodMap.get_tree_manager().disable_node(node.name)
         if 'QP_SOLVER' in os.environ:
             self.giskard.qp_controller_config.set_qp_solver(SupportedQPSolver[os.environ['QP_SOLVER']])
         # self.tree_manager = TreeManager.from_param_server(robot_names, namespaces)
-        self.heart = Timer(period=rospy.Duration(GodMap.tree_manager.tick_rate), callback=self.heart_beat)
+        self.heart = Timer(period=rospy.Duration(GodMap.get_tree_manager().tick_rate), callback=self.heart_beat)
         # self.namespaces = namespaces
-        self.robot_names = [list(GodMap.world.groups.keys())[0]]
+        self.robot_names = [list(GodMap.get_world().groups.keys())[0]]
         super().__init__(node_name='tests')
         self.results = Queue(100)
-        self.default_root = str(GodMap.world.root_link_name)
+        self.default_root = str(GodMap.get_world().root_link_name)
         self.goal_checks = []
 
         def create_publisher(topic):
@@ -270,15 +270,15 @@ class GiskardTestWrapper(GiskardWrapper):
 
         self.joint_state_publisher = KeyDefaultDict(create_publisher)
         # rospy.sleep(1)
-        self.original_number_of_links = len(GodMap.world.links)
+        self.original_number_of_links = len(GodMap.get_world().links)
 
     def has_odometry_joint(self, group_name: Optional[str] = None):
         if group_name is None:
             group_name = self.robot_name
-        parent_joint_name = GodMap.world.groups[group_name].root_link.parent_joint_name
+        parent_joint_name = GodMap.get_world().groups[group_name].root_link.parent_joint_name
         if parent_joint_name is None:
             return False
-        joint = GodMap.world.get_joint(parent_joint_name)
+        joint = GodMap.get_world().get_joint(parent_joint_name)
         return isinstance(joint, (OmniDrive, DiffDrive))
 
     def set_seed_odometry(self, base_pose, group_name: Optional[str] = None):
@@ -297,7 +297,7 @@ class GiskardTestWrapper(GiskardWrapper):
             req.transform.rotation = map_T_odom.pose.orientation
             assert self.set_localization_srv(req).success
             self.wait_heartbeats(15)
-            p2 = GodMap.world.compute_fk_pose(GodMap.world.root_link_name, self.odom_root)
+            p2 = GodMap.get_world().compute_fk_pose(GodMap.get_world().root_link_name, self.odom_root)
             compare_poses(p2.pose, map_T_odom.pose)
 
     def transform_msg(self, target_frame, msg, timeout=1):
@@ -308,15 +308,15 @@ class GiskardTestWrapper(GiskardWrapper):
             else:
                 raise LookupException('just to trigger except block')
         except (LookupException, ExtrapolationException) as e:
-            target_frame = GodMap.world.search_for_link_name(target_frame)
+            target_frame = GodMap.get_world().search_for_link_name(target_frame)
             try:
-                result_msg.header.frame_id = GodMap.world.search_for_link_name(result_msg.header.frame_id)
+                result_msg.header.frame_id = GodMap.get_world().search_for_link_name(result_msg.header.frame_id)
             except UnknownGroupException:
                 pass
-            return GodMap.world.transform_msg(target_frame, result_msg)
+            return GodMap.get_world().transform_msg(target_frame, result_msg)
 
     def wait_heartbeats(self, number=2):
-        behavior_tree = GodMap.tree_manager.tree
+        behavior_tree = GodMap.get_tree_manager().tree
         c = behavior_tree.count
         while behavior_tree.count < c + number:
             rospy.sleep(0.001)
@@ -325,7 +325,7 @@ class GiskardTestWrapper(GiskardWrapper):
         """
         :rtype: giskardpy.model.world.WorldBranch
         """
-        return GodMap.world.groups[group_name]
+        return GodMap.get_world().groups[group_name]
 
     def dye_group(self, group_name: str, rgba: Tuple[float, float, float, float],
                   expected_error_codes=(DyeGroupResponse.SUCCESS,)):
@@ -334,7 +334,7 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def heart_beat(self, timer_thing):
         if self._alive:
-            GodMap.tree_manager.tick()
+            GodMap.get_tree_manager().tick()
 
     def stop_ticking(self):
         self._alive = False
@@ -368,7 +368,7 @@ class GiskardTestWrapper(GiskardWrapper):
                                         str(num_eq_slack_variables),
                                         str(num_neq_slack_variables),
                                         str(num_slack_variables),
-                                        str(int(self.god_map.get_data(identifier.max_derivative))),
+                                        str(int(GodMap.get_max_derivative())),
                                         str(times)])
 
         logging.loginfo('saved benchmark file')
@@ -378,9 +378,9 @@ class GiskardTestWrapper(GiskardWrapper):
         rospy.sleep(1)
         self.heart.shutdown()
         # TODO it is strange that I need to kill the services... should be investigated. (:
-        GodMap.tree_manager.kill_all_services()
+        GodMap.get_tree_manager().kill_all_services()
         giskarding_time = self.total_time_spend_giskarding
-        if GodMap.god_map.get_data(identifier.control_mode) != ControlModes.standalone:
+        if not GodMap.is_standalone:
             giskarding_time -= self.total_time_spend_moving
         logging.loginfo(f'total time spend giskarding: {giskarding_time}')
         logging.loginfo(f'total time spend moving: {self.total_time_spend_moving}')
@@ -389,7 +389,7 @@ class GiskardTestWrapper(GiskardWrapper):
     def set_object_joint_state(self, object_name, joint_state):
         super().set_object_joint_state(object_name, joint_state)
         self.wait_heartbeats(3)
-        current_js = GodMap.world.groups[object_name].state
+        current_js = GodMap.get_world().groups[object_name].state
         joint_names_with_prefix = set(j.long_name for j in current_js)
         joint_state_names = list()
         for j_n in joint_state.keys():
@@ -422,8 +422,8 @@ class GiskardTestWrapper(GiskardWrapper):
         for joint_name in goal_js:
             goal = goal_js[joint_name]
             current = current_js[joint_name]
-            joint_name = GodMap.world.search_for_joint_name(joint_name)
-            if GodMap.world.is_joint_continuous(joint_name):
+            joint_name = GodMap.get_world().search_for_joint_name(joint_name)
+            if GodMap.get_world().is_joint_continuous(joint_name):
                 np.testing.assert_almost_equal(shortest_angular_distance(goal, current), 0, decimal=decimal,
                                                err_msg='{}: actual: {} desired: {}'.format(joint_name, current,
                                                                                            goal))
@@ -434,14 +434,14 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def get_robot_short_root_link_name(self, root_group: str = None):
         # If robots exist
-        if len(GodMap.world.robot_names) != 0:
+        if len(GodMap.get_world().robot_names) != 0:
             # If a group is given, just return the root_link_name of the SubTreeWorld
             if root_group is not None:
-                root_link = GodMap.world.groups[root_group].root_link_name
+                root_link = GodMap.get_world().groups[root_group].root_link_name
             else:
                 # If only one robot is imported
-                if len(GodMap.world.robot_names) == 1:
-                    root_link = GodMap.world.groups[GodMap.world.robot_names[0]].root_link_name
+                if len(GodMap.get_world().robot_names) == 1:
+                    root_link = GodMap.get_world().groups[GodMap.get_world().robot_names[0]].root_link_name
                 else:
                     raise Exception('Multiple Robots detected: root group is needed'
                                     ' to get the root link automatically.')
@@ -449,8 +449,8 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def get_root_and_tip_link(self, root_link: str, tip_link: str,
                               root_group: str = None, tip_group: str = None) -> Tuple[PrefixName, PrefixName]:
-        return GodMap.world.search_for_link_name(root_link, root_group), \
-            GodMap.world.search_for_link_name(tip_link, tip_group)
+        return GodMap.get_world().search_for_link_name(root_link, root_group), \
+            GodMap.get_world().search_for_link_name(tip_link, tip_group)
 
     #
     # GOAL STUFF #################################################################################################
@@ -489,7 +489,7 @@ class GiskardTestWrapper(GiskardWrapper):
                           check: bool = False,
                           **kwargs):
         if root_link is None:
-            root_link = GodMap.world.root_link_name
+            root_link = GodMap.get_world().root_link_name
             root_group = None
         super().set_rotation_goal(goal_orientation=goal_orientation,
                                   tip_link=tip_link,
@@ -507,7 +507,7 @@ class GiskardTestWrapper(GiskardWrapper):
                              weight=None, max_velocity=None, check=False,
                              **kwargs):
         if root_link is None:
-            root_link = GodMap.world.root_link_name
+            root_link = GodMap.get_world().root_link_name
             root_group = None
         super().set_translation_goal(goal_point=goal_point,
                                      tip_link=tip_link,
@@ -529,7 +529,7 @@ class GiskardTestWrapper(GiskardWrapper):
                                       weight=None, max_velocity=None,
                                       **kwargs):
         if root_link is None:
-            root_link = GodMap.world.root_link_name
+            root_link = GodMap.get_world().root_link_name
             root_group = None
         super().set_straight_translation_goal(goal_pose=goal_pose,
                                               tip_link=tip_link,
@@ -572,7 +572,7 @@ class GiskardTestWrapper(GiskardWrapper):
                            goal_pose=goal_pose)
         if check:
             full_root_link = self.default_root
-            full_tip_link = GodMap.world.get_link_name('base_footprint')
+            full_tip_link = GodMap.get_world().get_link_name('base_footprint')
             goal_point = PointStamped()
             goal_point.header = goal_pose.header
             goal_point.point = goal_pose.pose.position
@@ -631,7 +631,7 @@ class GiskardTestWrapper(GiskardWrapper):
                           weight: float = WEIGHT_BELOW_CA,
                           check=False):
         if root_link is None:
-            root_link = GodMap.world.root_link_name
+            root_link = GodMap.get_world().root_link_name
             root_group = None
         super().set_pointing_goal(goal_point=goal_point,
                                   tip_link=tip_link,
@@ -654,7 +654,7 @@ class GiskardTestWrapper(GiskardWrapper):
                               goal_normal=None, max_angular_velocity=None,
                               weight=None, check=False):
         if root_link is None:
-            root_link = GodMap.world.root_link_name
+            root_link = GodMap.get_world().root_link_name
             root_group = None
         super().set_align_planes_goal(tip_link=tip_link,
                                       tip_group=tip_group,
@@ -686,7 +686,7 @@ class GiskardTestWrapper(GiskardWrapper):
                                weight: Optional[float] = None,
                                check=False):
         if root_link is None:
-            root_link = GodMap.world.root_link_name
+            root_link = GodMap.get_world().root_link_name
             root_group = None
         super().set_straight_cart_goal(goal_pose=goal_pose,
                                        tip_link=tip_link,
@@ -746,8 +746,8 @@ class GiskardTestWrapper(GiskardWrapper):
             self.wait_heartbeats()
             diff = time() - time_spend_giskarding
             self.total_time_spend_giskarding += diff
-            self.total_time_spend_moving += len(GodMap.god_map.get_data(identifier.trajectory).keys()) * \
-                                            GodMap.god_map.get_data(identifier.sample_period)
+            self.total_time_spend_moving += (len(GodMap.god_map.get_data(identifier.trajectory).keys()) *
+                                             GodMap.get_sample_period())
             logging.logwarn(f'Goal processing took {diff}')
             error_code = r.error_code
             error_message = r.error_message
@@ -791,7 +791,7 @@ class GiskardTestWrapper(GiskardWrapper):
         return trajectory2
 
     def are_joint_limits_violated(self, eps=1e-6):
-        active_free_variables: List[FreeVariable] = GodMap.god_map.get_data(identifier.qp_controller).free_variables
+        active_free_variables: List[FreeVariable] = GodMap.get_qp_controller().free_variables
         for free_variable in active_free_variables:
             if free_variable.has_position_limits():
                 lower_limit = free_variable.get_lower_limit(Derivatives.position)
@@ -800,23 +800,23 @@ class GiskardTestWrapper(GiskardWrapper):
                     lower_limit = lower_limit.evaluate()
                 if not isinstance(upper_limit, float):
                     upper_limit = upper_limit.evaluate()
-                current_position = GodMap.world.state[free_variable.name].position
+                current_position = GodMap.get_world().state[free_variable.name].position
                 assert lower_limit - eps <= current_position <= upper_limit + eps, \
                     f'joint limit of {free_variable.name} is violated {lower_limit} <= {current_position} <= {upper_limit}'
 
     def are_joint_limits_in_traj_violated(self):
         trajectory_vel = self.get_result_trajectory_velocity()
         trajectory_pos = self.get_result_trajectory_position()
-        controlled_joints = GodMap.god_map.get_data(identifier.controlled_joints)
+        controlled_joints = GodMap.get_world().controlled_joints
         for joint_name in controlled_joints:
-            if isinstance(GodMap.world.joints[joint_name], OneDofJoint):
-                if not GodMap.world.is_joint_continuous(joint_name):
-                    joint_limits = GodMap.world.get_joint_position_limits(joint_name)
+            if isinstance(GodMap.get_world().joints[joint_name], OneDofJoint):
+                if not GodMap.get_world().is_joint_continuous(joint_name):
+                    joint_limits = GodMap.get_world().get_joint_position_limits(joint_name)
                     error_msg = f'{joint_name} has violated joint position limit'
                     eps = 0.0001
                     np.testing.assert_array_less(trajectory_pos[joint_name], joint_limits[1] + eps, error_msg)
                     np.testing.assert_array_less(-trajectory_pos[joint_name], -joint_limits[0] + eps, error_msg)
-                vel_limit = GodMap.world.get_joint_velocity_limits(joint_name)[1] * 1.001
+                vel_limit = GodMap.get_world().get_joint_velocity_limits(joint_name)[1] * 1.001
                 vel = trajectory_vel[joint_name]
                 error_msg = f'{joint_name} has violated joint velocity limit {vel} > {vel_limit}'
                 assert np.all(np.less_equal(vel, vel_limit)), error_msg
@@ -837,9 +837,9 @@ class GiskardTestWrapper(GiskardWrapper):
     def clear_world(self, timeout: float = TimeOut) -> UpdateWorldResponse:
         respone = super().clear_world(timeout=timeout)
         assert respone.error_codes == UpdateWorldResponse.SUCCESS
-        assert len(GodMap.world.groups) == 1
+        assert len(GodMap.get_world().groups) == 1
         assert len(self.get_group_names()) == 1
-        assert self.original_number_of_links == len(GodMap.world.links)
+        assert self.original_number_of_links == len(GodMap.get_world().links)
         return respone
 
     def remove_group(self,
@@ -849,19 +849,19 @@ class GiskardTestWrapper(GiskardWrapper):
         old_link_names = []
         old_joint_names = []
         if expected_response == UpdateWorldResponse.SUCCESS:
-            old_link_names = GodMap.world.groups[name].link_names_as_set
-            old_joint_names = GodMap.world.groups[name].joint_names
+            old_link_names = GodMap.get_world().groups[name].link_names_as_set
+            old_joint_names = GodMap.get_world().groups[name].joint_names
         r = super(GiskardTestWrapper, self).remove_group(name, timeout=timeout)
         assert r.error_codes == expected_response, \
             f'Got: \'{update_world_error_code(r.error_codes)}\', ' \
             f'expected: \'{update_world_error_code(expected_response)}.\''
-        assert name not in GodMap.world.groups
+        assert name not in GodMap.get_world().groups
         assert name not in self.get_group_names()
         if expected_response == UpdateWorldResponse.SUCCESS:
             for old_link_name in old_link_names:
-                assert old_link_name not in GodMap.world.link_names_as_set
+                assert old_link_name not in GodMap.get_world().link_names_as_set
             for old_joint_name in old_joint_names:
-                assert old_joint_name not in GodMap.world.joint_names
+                assert old_joint_name not in GodMap.get_world().joint_names
         return r
 
     def detach_group(self, name, timeout: float = TimeOut, expected_response=UpdateWorldResponse.SUCCESS):
@@ -871,7 +871,7 @@ class GiskardTestWrapper(GiskardWrapper):
                                          name=name,
                                          size=None,
                                          pose=None,
-                                         parent_link=GodMap.world.root_link_name,
+                                         parent_link=GodMap.get_world().root_link_name,
                                          parent_link_group='',
                                          expected_error_code=expected_response)
 
@@ -890,25 +890,25 @@ class GiskardTestWrapper(GiskardWrapper):
             assert name in self.get_group_names()
             response2 = self.get_group_info(name)
             if pose is not None:
-                p = self.transform_msg(GodMap.world.root_link_name, pose)
-                o_p = GodMap.world.groups[name].base_pose
+                p = self.transform_msg(GodMap.get_world().root_link_name, pose)
+                o_p = GodMap.get_world().groups[name].base_pose
                 compare_poses(p.pose, o_p)
                 compare_poses(o_p, response2.root_link_pose.pose)
             if parent_link_group != '':
                 robot = self.get_group_info(parent_link_group)
                 assert name in robot.child_groups
-                short_parent_link = GodMap.world.groups[parent_link_group].get_link_short_name_match(parent_link)
-                assert short_parent_link == GodMap.world.get_parent_link_of_link(
-                    GodMap.world.groups[name].root_link_name)
+                short_parent_link = GodMap.get_world().groups[parent_link_group].get_link_short_name_match(parent_link)
+                assert short_parent_link == GodMap.get_world().get_parent_link_of_link(
+                    GodMap.get_world().groups[name].root_link_name)
             else:
                 if parent_link == '':
-                    parent_link = GodMap.world.root_link_name
+                    parent_link = GodMap.get_world().root_link_name
                 else:
-                    parent_link = GodMap.world.search_for_link_name(parent_link)
-                assert parent_link == GodMap.world.get_parent_link_of_link(GodMap.world.groups[name].root_link_name)
+                    parent_link = GodMap.get_world().search_for_link_name(parent_link)
+                assert parent_link == GodMap.get_world().get_parent_link_of_link(GodMap.get_world().groups[name].root_link_name)
         else:
             if expected_error_code != UpdateWorldResponse.DUPLICATE_GROUP_ERROR:
-                assert name not in GodMap.world.groups
+                assert name not in GodMap.get_world().groups
                 assert name not in self.get_group_names()
 
     def add_box(self,
@@ -942,7 +942,7 @@ class GiskardTestWrapper(GiskardWrapper):
             assert expected_error_code == UpdateWorldResponse.UNKNOWN_GROUP_ERROR
         if expected_error_code == UpdateWorldResponse.SUCCESS:
             info = self.get_group_info(group_name)
-            map_T_group = tf.transform_pose(GodMap.world.root_link_name, new_pose)
+            map_T_group = tf.transform_pose(GodMap.get_world().root_link_name, new_pose)
             compare_poses(info.root_link_pose.pose, map_T_group.pose)
 
     def add_sphere(self,
@@ -1093,11 +1093,11 @@ class GiskardTestWrapper(GiskardWrapper):
         return self.compute_collisions(collision_entries)
 
     def compute_collisions(self, collision_entries: List[CollisionEntry]) -> Collisions:
-        GodMap.collision_scene.reset_cache()
-        collision_matrix = GodMap.collision_scene.collision_goals_to_collision_matrix(collision_entries,
+        GodMap.get_collision_scene().reset_cache()
+        collision_matrix = GodMap.get_collision_scene().collision_goals_to_collision_matrix(collision_entries,
                                                                                       defaultdict(lambda: 0.3))
 
-        return GodMap.collision_scene.check_collisions(collision_matrix, 15)
+        return GodMap.get_collision_scene().check_collisions(collision_matrix, 15)
 
     def compute_all_collisions(self) -> Collisions:
         collision_entries = [CollisionEntry(type=CollisionEntry.AVOID_COLLISION,
@@ -1106,7 +1106,7 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def check_cpi_geq(self, links, distance_threshold, check_external=True, check_self=True):
         collisions = self.compute_all_collisions()
-        links = [GodMap.world.search_for_link_name(link_name) for link_name in links]
+        links = [GodMap.get_world().search_for_link_name(link_name) for link_name in links]
         for collision in collisions.all_collisions:
             if not check_external and collision.is_external:
                 continue
@@ -1120,7 +1120,7 @@ class GiskardTestWrapper(GiskardWrapper):
     def check_cpi_leq(self, links, distance_threshold, check_external=True, check_self=True):
         collisions = self.compute_all_collisions()
         min_contact: Collision = None
-        links = [GodMap.world.search_for_link_name(link_name) for link_name in links]
+        links = [GodMap.get_world().search_for_link_name(link_name) for link_name in links]
         for collision in collisions.all_collisions:
             if not check_external and collision.is_external:
                 continue
@@ -1234,7 +1234,7 @@ class SuccessfulActionServer(object):
 class GoalChecker:
     def __init__(self, giskard: GiskardTestWrapper):
         self.giskard = giskard
-        self.world: WorldTree = GodMap.god_map.unsafe_get_data(identifier.world)
+        self.world: WorldTree = GodMap.get_world()
         # self.robot: SubWorldTree = self.world.groups[self.god_map.unsafe_get_data(identifier.robot_group_name)]
 
 

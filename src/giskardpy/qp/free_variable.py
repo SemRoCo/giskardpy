@@ -27,7 +27,7 @@ class FreeVariable:
         self.lower_limits = {}
         self.upper_limits = {}
         self.quadratic_weights = quadratic_weights
-        assert len(self.quadratic_weights) == GodMap.max_derivative
+        assert len(self.quadratic_weights) == GodMap.get_max_derivative()
         assert max(self._symbols.keys()) == len(self._symbols) - 1
 
         self.horizon_functions = defaultdict(lambda: 0.00001)

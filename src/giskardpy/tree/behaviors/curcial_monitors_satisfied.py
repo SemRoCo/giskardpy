@@ -14,6 +14,6 @@ class CrucialMonitorsSatisfied(GiskardBehavior):
     @record_time
     @profile
     def update(self):
-        if GodMap.monitor_manager.crucial_monitors_satisfied():
+        if GodMap.get_monitor_manager().crucial_monitors_satisfied():
             return Status.SUCCESS
         return Status.RUNNING

@@ -31,7 +31,7 @@ class InequalityConstraint:
         self.expression = expression
         self.quadratic_weight = quadratic_weight
         if control_horizon is None:
-            self.control_horizon = GodMap.prediction_horizon - (GodMap.max_derivative - 1)
+            self.control_horizon = GodMap.get_prediction_horizon() - (GodMap.get_max_derivative() - 1)
         else:
             self.control_horizon = control_horizon
         self.control_horizon = max(1, self.control_horizon)
@@ -72,7 +72,7 @@ class EqualityConstraint:
         self.expression = expression
         self.quadratic_weight = quadratic_weight
         if control_horizon is None:
-            self.control_horizon = GodMap.prediction_horizon - (GodMap.max_derivative - 1)
+            self.control_horizon = GodMap.get_prediction_horizon() - (GodMap.get_max_derivative() - 1)
         else:
             self.control_horizon = control_horizon
         self.control_horizon = max(1, self.control_horizon)
@@ -117,7 +117,7 @@ class DerivativeInequalityConstraint:
         self.derivative = derivative
         self.expression = expression
         self.quadratic_weight = quadratic_weight
-        self.control_horizon = control_horizon if control_horizon is not None else max(GodMap.prediction_horizon - 2, 1)
+        self.control_horizon = control_horizon if control_horizon is not None else max(GodMap.get_prediction_horizon() - 2, 1)
         self.normalization_factor = normalization_factor
         if self.is_iterable(lower_limit):
             self.lower_limit = lower_limit

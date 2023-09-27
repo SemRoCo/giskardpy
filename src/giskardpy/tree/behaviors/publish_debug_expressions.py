@@ -137,7 +137,7 @@ class PublishDebugExpressions(GiskardBehavior):
     @record_time
     @profile
     def update(self):
-        qp_controller: QPProblemBuilder = GodMap.qp_controller
+        qp_controller: QPProblemBuilder = GodMap.get_qp_controller()
         msg = self.create_msg(qp_controller)
         self.publisher.publish(msg)
         return Status.RUNNING

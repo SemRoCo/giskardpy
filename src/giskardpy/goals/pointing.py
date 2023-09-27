@@ -36,8 +36,8 @@ class Pointing(Goal):
         super().__init__()
         self.weight = weight
         self.max_velocity = max_velocity
-        self.root = GodMap.world.search_for_link_name(root_link, root_group)
-        self.tip = GodMap.world.search_for_link_name(tip_link, tip_group)
+        self.root = GodMap.get_world().search_for_link_name(root_link, root_group)
+        self.tip = GodMap.get_world().search_for_link_name(tip_link, tip_group)
         self.root_P_goal_point = self.transform_msg(self.root, goal_point)
 
         if pointing_axis is not None:
@@ -50,7 +50,7 @@ class Pointing(Goal):
             self.tip_V_pointing_axis.vector.z = 1
 
     def make_constraints(self):
-        root_T_tip = GodMap.world.compose_fk_expression(self.root, self.tip)
+        root_T_tip = GodMap.get_world().compose_fk_expression(self.root, self.tip)
         root_P_goal_point = w.Point3(self.root_P_goal_point)
         tip_V_pointing_axis = w.Vector3(self.tip_V_pointing_axis)
 

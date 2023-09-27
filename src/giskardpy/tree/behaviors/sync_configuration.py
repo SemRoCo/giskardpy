@@ -58,7 +58,7 @@ class SyncConfiguration(GiskardBehavior):
         except Empty:
             pass
 
-        GodMap.world.state.update(self.mjs)
+        GodMap.get_world().state.update(self.mjs)
         return Status.SUCCESS
 
     def __str__(self):

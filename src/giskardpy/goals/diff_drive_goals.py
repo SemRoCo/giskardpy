@@ -19,9 +19,9 @@ class DiffDriveTangentialToPoint(Goal):
                  group_name: Optional[str] = None,
                  reference_velocity: float = 0.5, weight: bool = WEIGHT_ABOVE_CA, drive: bool = False):
         super().__init__()
-        self.tip = GodMap.world.search_for_link_name('base_footprint', group_name)
-        self.root = GodMap.world.root_link_name
-        self.goal_point = self.transform_msg(GodMap.world.root_link_name, goal_point)
+        self.tip = GodMap.get_world().search_for_link_name('base_footprint', group_name)
+        self.root = GodMap.get_world().root_link_name
+        self.goal_point = self.transform_msg(GodMap.get_world().root_link_name, goal_point)
         self.goal_point.point.z = 0
         self.weight = weight
         self.drive = drive
@@ -35,7 +35,7 @@ class DiffDriveTangentialToPoint(Goal):
 
     def make_constraints(self):
         map_P_center = w.Point3(self.goal_point)
-        map_T_base = GodMap.world.compose_fk_expression(self.root, self.tip)
+        map_T_base = GodMap.get_world().compose_fk_expression(self.root, self.tip)
         map_P_base = map_T_base.to_position()
         map_V_base_to_center = map_P_center - map_P_base
         map_V_base_to_center = w.scale(map_V_base_to_center, 1)
@@ -92,11 +92,11 @@ class PointingDiffDriveEEF(Goal):
         fk_vel = self.get_fk_velocity(self.eef_root, self.eef_tip)
         eef_root_V_eef_tip = w.Vector3((fk_vel[0], fk_vel[1], 0))
         eef_root_V_eef_tip_normed = w.scale(eef_root_V_eef_tip, 1)
-        base_root_T_eef_root = GodMap.world.compose_fk_expression(self.base_root, self.eef_root)
+        base_root_T_eef_root = GodMap.get_world().compose_fk_expression(self.base_root, self.eef_root)
         base_root_V_eef_tip = w.dot(base_root_T_eef_root, eef_root_V_eef_tip_normed)
 
         tip_V_pointing_axis = w.Vector3(self.tip_V_pointing_axis)
-        base_root_T_base_tip = GodMap.world.compose_fk_expression(self.base_root, self.base_tip)
+        base_root_T_base_tip = GodMap.get_world().compose_fk_expression(self.base_root, self.base_tip)
         base_root_V_pointing_axis = w.dot(base_root_T_base_tip, tip_V_pointing_axis)
 
         # weight = w.if_less_eq(distance, 0.05, WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA)
@@ -124,13 +124,13 @@ class KeepHandInWorkspace(Goal):
         super().__init__()
         if base_footprint is None:
             base_footprint = 'base_footprint'
-        base_footprint = GodMap.world.search_for_link_name(base_footprint, group_name)
+        base_footprint = GodMap.get_world().search_for_link_name(base_footprint, group_name)
         if map_frame is None:
-            map_frame = GodMap.world.root_link_name
+            map_frame = GodMap.get_world().root_link_name
         self.weight = weight
         self.max_velocity = max_velocity
         self.map_frame = map_frame
-        self.tip_link = GodMap.world.search_for_link_name(tip_link, group_name)
+        self.tip_link = GodMap.get_world().search_for_link_name(tip_link, group_name)
         self.base_footprint = base_footprint
 
         if pointing_axis is not None:
@@ -144,9 +144,9 @@ class KeepHandInWorkspace(Goal):
     def make_constraints(self):
         weight = WEIGHT_ABOVE_CA
         base_footprint_V_pointing_axis = w.Vector3(self.map_V_pointing_axis)
-        map_T_base_footprint = GodMap.world.compose_fk_expression(self.map_frame, self.base_footprint)
+        map_T_base_footprint = GodMap.get_world().compose_fk_expression(self.map_frame, self.base_footprint)
         map_V_pointing_axis = w.dot(map_T_base_footprint, base_footprint_V_pointing_axis)
-        map_T_tip = GodMap.world.compose_fk_expression(self.map_frame, self.tip_link)
+        map_T_tip = GodMap.get_world().compose_fk_expression(self.map_frame, self.tip_link)
         map_V_tip = w.Vector3(map_T_tip.to_position())
         map_V_tip.y = 0
         map_V_tip.z = 0
@@ -181,10 +181,10 @@ class KeepHandInWorkspace(Goal):
         # fk_vel = self.get_fk_velocity(self.base_footprint, self.tip_link)
         # eef_root_V_eef_tip = w.vector3(fk_vel[0], fk_vel[1], 0)
         # eef_root_V_eef_tip_normed = w.scale(eef_root_V_eef_tip, 1)
-        # base_root_T_eef_root = GodMap.world.compose_fk_expression(self.map_frame, self.base_footprint)
+        # base_root_T_eef_root = GodMap.get_world().compose_fk_expression(self.map_frame, self.base_footprint)
         # base_root_V_eef_tip = w.dot(base_root_T_eef_root, eef_root_V_eef_tip_normed)
         #
-        # base_root_T_base_tip = GodMap.world.compose_fk_expression(self.map_frame, self.base_tip)
+        # base_root_T_base_tip = GodMap.get_world().compose_fk_expression(self.map_frame, self.base_tip)
         # base_root_V_pointing_axis = w.dot(base_root_T_base_tip, tip_V_pointing_axis)
         #
         # weight = WEIGHT_ABOVE_CA * w.norm(eef_root_V_eef_tip_normed)
@@ -207,19 +207,19 @@ class PR2DiffDriveOrient(Goal):
         super().__init__()
         self.max_angular_velocity = max_angular_velocity
         self.max_linear_velocity = max_linear_velocity
-        diff_drive_joints = [v for k, v in GodMap.world.joints.items() if isinstance(v, OmniDrivePR22)]
+        diff_drive_joints = [v for k, v in GodMap.get_world().joints.items() if isinstance(v, OmniDrivePR22)]
         assert len(diff_drive_joints) == 1
         self.joint: OmniDrivePR22 = diff_drive_joints[0]
         self.weight = weight
         self.base_root_link = self.joint.parent_link_name
         self.base_tip_link = self.joint.child_link_name
-        self.eef_tip_link = GodMap.world.get_link_name(eef_link)
+        self.eef_tip_link = GodMap.get_world().get_link_name(eef_link)
         # self.root_T_goal = self.transform_msg(self.root_link, goal_pose)
 
     def make_constraints(self):
-        base_root_T_base_tip = GodMap.world.compose_fk_expression(self.base_root_link, self.base_tip_link)
+        base_root_T_base_tip = GodMap.get_world().compose_fk_expression(self.base_root_link, self.base_tip_link)
 
-        base_tip_T_eef_tip = GodMap.world.compose_fk_expression(self.base_tip_link, self.eef_tip_link)
+        base_tip_T_eef_tip = GodMap.get_world().compose_fk_expression(self.base_tip_link, self.eef_tip_link)
         base_tip_P_eef_tip = base_tip_T_eef_tip.to_position()
         base_tip_V_eef_vel = w.Vector3(self.get_expr_velocity(base_tip_P_eef_tip))
         base_root_V_eef_vel = base_root_T_base_tip.dot(base_tip_V_eef_vel)

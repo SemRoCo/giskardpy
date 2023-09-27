@@ -19,7 +19,7 @@ class JointStatePublisher(CommandPublisher):
 
     def publish_joint_state(self, time):
         msg = JointState()
-        js = deepcopy(GodMap.world.state)
+        js = deepcopy(GodMap.get_world().state)
         try:
             qp_data = GodMap.god_map.get_data(identifier.qp_solver_solution)
         except Exception:

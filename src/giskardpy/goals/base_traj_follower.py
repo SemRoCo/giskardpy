@@ -29,7 +29,7 @@ class BaseTrajFollower(Goal):
         super().__init__()
         self.weight = weight
         self.joint_name = joint_name
-        self.joint: OmniDrive = GodMap.world.joints[joint_name]
+        self.joint: OmniDrive = GodMap.get_world().joints[joint_name]
         self.odom_link = self.joint.parent_link_name
         self.base_footprint_link = self.joint.child_link_name
         self.track_only_velocity = track_only_velocity
@@ -46,7 +46,7 @@ class BaseTrajFollower(Goal):
         time = GodMap.god_map.to_expr(identifier.time)
         b_result_cases = []
         for t in range(self.trajectory_length):
-            b = t * GodMap.sample_period
+            b = t * GodMap.get_sample_period()
             eq_result = self.x_symbol(t, free_variable_name, derivative)
             b_result_cases.append((b, eq_result))
             # FIXME if less eq cases behavior changed
@@ -68,30 +68,30 @@ class BaseTrajFollower(Goal):
     @profile
     def make_map_T_base_footprint_goal(self, t_in_s: float, derivative: Derivatives = Derivatives.position):
         odom_T_base_footprint_goal = self.make_odom_T_base_footprint_goal(t_in_s, derivative)
-        map_T_odom = GodMap.world.compose_fk_evaluated_expression(GodMap.world.root_link_name, self.odom_link)
+        map_T_odom = GodMap.get_world().compose_fk_evaluated_expression(GodMap.get_world().root_link_name, self.odom_link)
         return w.dot(map_T_odom, odom_T_base_footprint_goal)
 
     @profile
     def trans_error_at(self, t_in_s: float):
         odom_T_base_footprint_goal = self.make_odom_T_base_footprint_goal(t_in_s)
-        map_T_odom = GodMap.world.compose_fk_evaluated_expression(GodMap.world.root_link_name, self.odom_link)
+        map_T_odom = GodMap.get_world().compose_fk_evaluated_expression(GodMap.get_world().root_link_name, self.odom_link)
         map_T_base_footprint_goal = w.dot(map_T_odom, odom_T_base_footprint_goal)
-        map_T_base_footprint_current = GodMap.world.compose_fk_expression(GodMap.world.root_link_name, self.base_footprint_link)
+        map_T_base_footprint_current = GodMap.get_world().compose_fk_expression(GodMap.get_world().root_link_name, self.base_footprint_link)
 
         frame_P_goal = map_T_base_footprint_goal.to_position()
         frame_P_current = map_T_base_footprint_current.to_position()
-        error = (frame_P_goal - frame_P_current) / GodMap.sample_period
+        error = (frame_P_goal - frame_P_current) / GodMap.get_sample_period()
         return error[0], error[1]
 
     @profile
     def add_trans_constraints(self):
         errors_x = []
         errors_y = []
-        map_T_base_footprint = GodMap.world.compose_fk_expression(GodMap.world.root_link_name, self.base_footprint_link)
-        for t in range(GodMap.prediction_horizon):
-            x = self.current_traj_point(self.joint.x_vel.name, t * GodMap.sample_period, Derivatives.velocity)
+        map_T_base_footprint = GodMap.get_world().compose_fk_expression(GodMap.get_world().root_link_name, self.base_footprint_link)
+        for t in range(GodMap.get_prediction_horizon()):
+            x = self.current_traj_point(self.joint.x_vel.name, t * GodMap.get_sample_period(), Derivatives.velocity)
             if isinstance(self.joint, OmniDrive):
-                y = self.current_traj_point(self.joint.y_vel.name, t * GodMap.sample_period, Derivatives.velocity)
+                y = self.current_traj_point(self.joint.y_vel.name, t * GodMap.get_sample_period(), Derivatives.velocity)
             else:
                 y = 0
             base_footprint_P_vel = w.Vector3((x, y, 0))
@@ -127,14 +127,14 @@ class BaseTrajFollower(Goal):
     def rot_error_at(self, t_in_s: int):
         rotation_goal = self.current_traj_point(self.joint.yaw.name, t_in_s)
         rotation_current = self.joint.yaw.get_symbol(Derivatives.position)
-        error = w.shortest_angular_distance(rotation_current, rotation_goal) / GodMap.sample_period
+        error = w.shortest_angular_distance(rotation_current, rotation_goal) / GodMap.get_sample_period()
         return error
 
     @profile
     def add_rot_constraints(self):
         errors = []
-        for t in range(GodMap.prediction_horizon):
-            errors.append(self.current_traj_point(self.joint.yaw.name, t * GodMap.sample_period, Derivatives.velocity))
+        for t in range(GodMap.get_prediction_horizon()):
+            errors.append(self.current_traj_point(self.joint.yaw.name, t * GodMap.get_sample_period(), Derivatives.velocity))
             if t == 0 and not self.track_only_velocity:
                 errors[-1] += self.rot_error_at(t)
         self.add_velocity_constraint(lower_velocity_limit=errors,
@@ -225,15 +225,15 @@ class CarryMyBullshit(Goal):
         self.laser_avoidance_angle_cutout = laser_avoidance_angle_cutout
         self.laser_avoidance_sideways_buffer = laser_avoidance_sideways_buffer
         self.base_orientation_threshold = base_orientation_threshold
-        self.odom_joint_name = GodMap.world.search_for_joint_name(odom_joint_name)
-        self.odom_joint: OmniDrive = GodMap.world.get_joint(self.odom_joint_name)
+        self.odom_joint_name = GodMap.get_world().search_for_joint_name(odom_joint_name)
+        self.odom_joint: OmniDrive = GodMap.get_world().get_joint(self.odom_joint_name)
         self.target_age_threshold = target_age_threshold
         self.target_age_exception_threshold = target_age_exception_threshold
         if root_link is None:
-            self.root = GodMap.world.root_link_name
+            self.root = GodMap.get_world().root_link_name
         else:
-            self.root = GodMap.world.search_for_link_name(root_link)
-        self.camera_link = GodMap.world.search_for_link_name(camera_link)
+            self.root = GodMap.get_world().search_for_link_name(root_link)
+        self.camera_link = GodMap.get_world().search_for_link_name(camera_link)
         self.tip_V_camera_axis = Vector3()
         self.tip_V_camera_axis.z = 1
         self.tip = self.odom_joint.child_link_name
@@ -383,7 +383,7 @@ class CarryMyBullshit(Goal):
             scan, self.thresholds_pc)
 
     def get_current_point(self) -> np.ndarray:
-        root_T_tip = GodMap.world.compute_fk_np(self.root, self.tip)
+        root_T_tip = GodMap.get_world().compute_fk_np(self.root, self.tip)
         x = root_T_tip[0, 3]
         y = root_T_tip[1, 3]
         return np.array([x, y])
@@ -445,7 +445,7 @@ class CarryMyBullshit(Goal):
         m_line.ns = 'traj'
         m_line.id = 1
         m_line.type = m_line.LINE_STRIP
-        m_line.header.frame_id = str(GodMap.world.root_link_name)
+        m_line.header.frame_id = str(GodMap.get_world().root_link_name)
         m_line.scale.x = 0.05
         m_line.color.a = 1
         m_line.color.r = 1
@@ -573,9 +573,9 @@ class CarryMyBullshit(Goal):
         self.publish_trajectory()
 
     def make_constraints(self):
-        root_T_bf = GodMap.world.compose_fk_expression(self.root, self.tip)
-        root_T_odom = GodMap.world.compose_fk_expression(self.root, self.odom)
-        root_T_camera = GodMap.world.compose_fk_expression(self.root, self.camera_link)
+        root_T_bf = GodMap.get_world().compose_fk_expression(self.root, self.tip)
+        root_T_odom = GodMap.get_world().compose_fk_expression(self.root, self.odom)
+        root_T_camera = GodMap.get_world().compose_fk_expression(self.root, self.camera_link)
         root_P_tip = root_T_bf.to_position()
         min_left_violation1 = self.get_parameter_as_symbolic_expression('closest_laser_left')
         min_right_violation1 = self.get_parameter_as_symbolic_expression('closest_laser_right')
@@ -729,18 +729,18 @@ class CarryMyBullshit(Goal):
             # min_left_violation = w.min(self.laser_distance_threshold_width, closest_laser_left)
             # min_right_violation = w.min(self.laser_distance_threshold_width, closest_laser_right)
             # left = w.Point3([0, min_left_violation, 0])
-            # left.reference_frame = GodMap.world.search_for_link_name(self.laser_frame)
+            # left.reference_frame = GodMap.get_world().search_for_link_name(self.laser_frame)
             # right = w.Point3([0, min_right_violation, 0])
-            # right.reference_frame = GodMap.world.search_for_link_name(self.laser_frame)
+            # right.reference_frame = GodMap.get_world().search_for_link_name(self.laser_frame)
             # self.add_debug_expr('left', left)
             # self.add_debug_expr('right', right)
             sideways_vel = (closest_laser_left + closest_laser_right)
             # bf_P_laser_avoidance = w.Point3([self.laser_distance_threshold + closest_laser_reading, 0, 0])
-            # bf_P_laser_avoidance.reference_frame = GodMap.world.search_for_link_name(self.laser_frame)
+            # bf_P_laser_avoidance.reference_frame = GodMap.get_world().search_for_link_name(self.laser_frame)
             # self.add_debug_expr('center', bf_P_laser_avoidance)
             bf_V_laser_avoidance_direction = w.Vector3([0, sideways_vel, 0])
             map_V_laser_avoidance_direction = root_T_bf.dot(bf_V_laser_avoidance_direction)
-            map_V_laser_avoidance_direction.vis_frame = GodMap.world.search_for_link_name(self.laser_frame)
+            map_V_laser_avoidance_direction.vis_frame = GodMap.get_world().search_for_link_name(self.laser_frame)
             self.add_debug_expr('base_V_laser_avoidance_direction', map_V_laser_avoidance_direction)
             odom_y_vel = self.odom_joint.y_vel.get_symbol(Derivatives.position)
 
@@ -770,13 +770,13 @@ class BaseTrajFollowerPR2(BaseTrajFollower):
     def add_trans_constraints(self):
         lb_yaw1 = []
         lb_forward = []
-        GodMap.world.state[self.joint.yaw1_vel.name].position = 0
-        map_T_current = GodMap.world.compose_fk_expression(GodMap.world.root_link_name, self.base_footprint_link)
+        GodMap.get_world().state[self.joint.yaw1_vel.name].position = 0
+        map_T_current = GodMap.get_world().compose_fk_expression(GodMap.get_world().root_link_name, self.base_footprint_link)
         map_P_current = map_T_current.to_position()
         self.add_debug_expr(f'map_P_current.x', map_P_current.x)
         self.add_debug_expr('time', GodMap.god_map.to_expr(identifier.time))
-        for t in range(GodMap.prediction_horizon - 2):
-            trajectory_time_in_s = t * GodMap.sample_period
+        for t in range(GodMap.get_prediction_horizon() - 2):
+            trajectory_time_in_s = t * GodMap.get_sample_period()
             map_P_goal = self.make_map_T_base_footprint_goal(trajectory_time_in_s).to_position()
             map_V_error = (map_P_goal - map_P_current)
             self.add_debug_expr(f'map_P_goal.x/{t}', map_P_goal.x)
@@ -804,7 +804,7 @@ class BaseTrajFollowerPR2(BaseTrajFollower):
             #     lb_yaw1[-1] += self.rot_error_at(t)
             #     yaw1_goal_position = self.current_traj_point(self.joint.yaw1_vel.name, trajectory_time_in_s,
             #                                                  Derivatives.position)
-            forward = self.current_traj_point(self.joint.forward_vel.name, t * GodMap.sample_period,
+            forward = self.current_traj_point(self.joint.forward_vel.name, t * GodMap.get_sample_period(),
                                               Derivatives.velocity) * 1.1
             lb_forward.append(forward)
         weight_vel = WEIGHT_ABOVE_CA

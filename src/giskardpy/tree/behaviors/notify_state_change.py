@@ -10,6 +10,6 @@ class NotifyStateChange(GiskardBehavior):
     @record_time
     @profile
     def update(self):
-        GodMap.world.notify_state_change()
+        GodMap.get_world().notify_state_change()
 
         return Status.SUCCESS

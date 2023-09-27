@@ -24,7 +24,7 @@ class RealKinSimPlugin(GiskardBehavior):
         # if self.last_time is None:
         next_cmds = GodMap.god_map.get_data(identifier.qp_solver_solution)
         dt = next_time - self.last_time
-        GodMap.world.update_state(next_cmds, dt)
+        GodMap.get_world().update_state(next_cmds, dt)
         self.last_time = next_time
-        # GodMap.world.notify_state_change()
+        # GodMap.get_world().notify_state_change()
         return Status.RUNNING

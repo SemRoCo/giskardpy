@@ -107,7 +107,7 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
         if len(controlled_joint_names) == 0:
             raise ValueError(f'\'{state_topic}\' has no joints')
 
-        for joint in GodMap.world.joints.values():
+        for joint in GodMap.get_world().joints.values():
             if isinstance(joint, OneDofJoint):
                 if joint.free_variable.name in controlled_joint_names:
                     self.controlled_joints.append(joint)
@@ -121,11 +121,11 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
         if len(controlled_joint_names) > 0:
             raise ValueError(f'{state_topic} provides the following joints '
                              f'that are not known to giskard: {controlled_joint_names}')
-        GodMap.world.register_controlled_joints(controlled_joint_names)
+        GodMap.get_world().register_controlled_joints(controlled_joint_names)
         controlled_joint_names = [j.name for j in self.controlled_joints]
         loginfo(f'Successfully connected to \'{state_topic}\'.')
         loginfo(f'Flagging the following joints as controlled: {controlled_joint_names}.')
-        GodMap.world.register_controlled_joints(controlled_joint_names)
+        GodMap.get_world().register_controlled_joints(controlled_joint_names)
 
     @record_time
     @profile
@@ -138,7 +138,7 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
         fill_velocity_values = GodMap.god_map.get_data(identifier.fill_trajectory_velocity_values)
         if fill_velocity_values is None:
             fill_velocity_values = self.fill_velocity_values
-        goal.trajectory = trajectory.to_msg(GodMap.sample_period, start_time, self.controlled_joints,
+        goal.trajectory = trajectory.to_msg(GodMap.get_sample_period(), start_time, self.controlled_joints,
                                             fill_velocity_values)
 
         if self.path_tolerance is not None:

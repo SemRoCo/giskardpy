@@ -41,8 +41,8 @@ class GraspBar(Goal):
         :param weight: 
         """
         super().__init__()
-        self.root = GodMap.world.search_for_link_name(root_link, root_group)
-        self.tip = GodMap.world.search_for_link_name(tip_link, tip_group)
+        self.root = GodMap.get_world().search_for_link_name(root_link, root_group)
+        self.tip = GodMap.get_world().search_for_link_name(tip_link, tip_group)
 
         bar_center = self.transform_msg(self.root, bar_center)
 
@@ -69,7 +69,7 @@ class GraspBar(Goal):
         tip_V_tip_grasp_axis = w.Vector3(self.tip_grasp_axis)
         root_P_bar_center = w.Point3(self.bar_center)
 
-        root_T_tip = GodMap.world.compose_fk_expression(self.root, self.tip)
+        root_T_tip = GodMap.get_world().compose_fk_expression(self.root, self.tip)
         root_V_tip_normal = w.dot(root_T_tip, tip_V_tip_grasp_axis)
 
         self.add_vector_goal_constraints(frame_V_current=root_V_tip_normal,
@@ -77,7 +77,7 @@ class GraspBar(Goal):
                                          reference_velocity=self.reference_angular_velocity,
                                          weight=self.weight)
 
-        root_P_tip = GodMap.world.compose_fk_expression(self.root, self.tip).to_position()
+        root_P_tip = GodMap.get_world().compose_fk_expression(self.root, self.tip).to_position()
 
         root_P_line_start = root_P_bar_center + root_V_bar_axis * self.bar_length / 2
         root_P_line_end = root_P_bar_center - root_V_bar_axis * self.bar_length / 2

@@ -80,10 +80,10 @@ class Goal(ABC):
         """
         try:
             try:
-                msg.header.frame_id = GodMap.world.search_for_link_name(msg.header.frame_id)
+                msg.header.frame_id = GodMap.get_world().search_for_link_name(msg.header.frame_id)
             except UnknownGroupException:
                 pass
-            return GodMap.world.transform_msg(target_frame, msg)
+            return GodMap.get_world().transform_msg(target_frame, msg)
         except KeyError:
             return tf.transform_msg(target_frame, msg, timeout=tf_timeout)
 
@@ -91,9 +91,9 @@ class Goal(ABC):
         """
         returns a symbol that refers to the given joint
         """
-        if not GodMap.world.has_joint(joint_name):
+        if not GodMap.get_world().has_joint(joint_name):
             raise KeyError(f'World doesn\'t have joint named: {joint_name}.')
-        joint = GodMap.world.joints[joint_name]
+        joint = GodMap.get_world().joints[joint_name]
         if isinstance(joint, OneDofJoint):
             return joint.get_symbol(Derivatives.position)
         raise TypeError(f'get_joint_position_symbol is only supported for OneDofJoint, not {type(joint)}')
@@ -125,22 +125,22 @@ class Goal(ABC):
     @property
     def joint_position_symbols(self) -> List[Union[w.Symbol, float]]:
         position_symbols = []
-        for joint in GodMap.world.controlled_joints:
-            position_symbols.extend(GodMap.world.joints[joint].free_variables)
+        for joint in GodMap.get_world().controlled_joints:
+            position_symbols.extend(GodMap.get_world().joints[joint].free_variables)
         return [x.get_symbol(Derivatives.position) for x in position_symbols]
 
     @property
     def joint_velocity_symbols(self) -> List[Union[w.Symbol, float]]:
         velocity_symbols = []
-        for joint in GodMap.world.controlled_joints:
-            velocity_symbols.extend(GodMap.world.joints[joint].free_variable_list)
+        for joint in GodMap.get_world().controlled_joints:
+            velocity_symbols.extend(GodMap.get_world().joints[joint].free_variable_list)
         return [x.get_symbol(Derivatives.velocity) for x in velocity_symbols]
 
     @property
     def joint_acceleration_symbols(self) -> List[Union[w.Symbol, float]]:
         acceleration_symbols = []
-        for joint in GodMap.world.controlled_joints:
-            acceleration_symbols.extend(GodMap.world.joints[joint].free_variables)
+        for joint in GodMap.get_world().controlled_joints:
+            acceleration_symbols.extend(GodMap.get_world().joints[joint].free_variables)
         return [x.get_symbol(Derivatives.acceleration) for x in acceleration_symbols]
 
     @profile
@@ -182,7 +182,7 @@ class Goal(ABC):
         self.tasks.append(task)
 
     def add_monitor(self, monitor: Monitor):
-        GodMap.monitor_manager.add_monitor(monitor)
+        GodMap.get_monitor_manager().add_monitor(monitor)
 
     # def add_debug_expr(self, name: str, expr: w.all_expressions_float):
     #     """

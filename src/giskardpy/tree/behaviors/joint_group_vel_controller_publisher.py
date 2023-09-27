@@ -24,8 +24,8 @@ class JointGroupVelController(GiskardBehavior):
         self.cmd_pub = rospy.Publisher(self.cmd_topic, Float64MultiArray, queue_size=10)
         self.joint_names = rospy.get_param(f'{self.namespace}/joints')
         for i in range(len(self.joint_names)):
-            self.joint_names[i] = GodMap.world.search_for_joint_name(self.joint_names[i])
-        GodMap.world.register_controlled_joints(self.joint_names)
+            self.joint_names[i] = GodMap.get_world().search_for_joint_name(self.joint_names[i])
+        GodMap.get_world().register_controlled_joints(self.joint_names)
         self.msg = None
 
     @profile
@@ -42,7 +42,7 @@ class JointGroupVelController(GiskardBehavior):
     def update(self):
         msg = Float64MultiArray()
         for i, joint_name in enumerate(self.joint_names):
-            msg.data.append(GodMap.world.state[joint_name].velocity)
+            msg.data.append(GodMap.get_world().state[joint_name].velocity)
         self.cmd_pub.publish(msg)
         return Status.SUCCESS
 

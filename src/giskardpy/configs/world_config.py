@@ -41,7 +41,7 @@ class WorldConfig(ABC):
 
     @property
     def robot_group_name(self) -> str:
-        return GodMap.world.robot_name
+        return GodMap.get_world().robot_name
 
     def set_default_weights(self,
                             velocity_weight: float = 0.01,
@@ -51,7 +51,7 @@ class WorldConfig(ABC):
         The default values are set automatically, even if this function is not called.
         A typical goal has a weight of 1, so the values in here should be sufficiently below that.
         """
-        GodMap.world.update_default_weights({Derivatives.velocity: velocity_weight,
+        GodMap.get_world().update_default_weights({Derivatives.velocity: velocity_weight,
                                            Derivatives.acceleration: acceleration_weight,
                                            Derivatives.jerk: jerk_weight})
 
@@ -59,16 +59,16 @@ class WorldConfig(ABC):
         """
         Set weights for joints that are used by the qp controller. Don't change this unless you know what you are doing.
         """
-        joint_name = GodMap.world.search_for_joint_name(joint_name, group_name)
-        joint = GodMap.world.joints[joint_name]
+        joint_name = GodMap.get_world().search_for_joint_name(joint_name, group_name)
+        joint = GodMap.get_world().joints[joint_name]
         if not isinstance(joint, OneDofJoint):
             raise ValueError(f'Can\'t change weight because {joint_name} is not of type {str(OneDofJoint)}.')
-        free_variable = GodMap.world.free_variables[joint.free_variable.name]
+        free_variable = GodMap.get_world().free_variables[joint.free_variable.name]
         for derivative, weight in weight_map.items():
             free_variable.quadratic_weights[derivative] = weight
 
     def get_root_link_of_group(self, group_name: str) -> PrefixName:
-        return GodMap.world.groups[group_name].root_link_name
+        return GodMap.get_world().groups[group_name].root_link_name
 
     def set_joint_limits(self, limit_map: derivative_map, joint_name: my_string, group_name: Optional[str] = None):
         """
@@ -77,11 +77,11 @@ class WorldConfig(ABC):
                                                             Derivatives.acceleration: np.inf,
                                                             Derivatives.jerk: 30}
         """
-        joint_name = GodMap.world.search_for_joint_name(joint_name, group_name)
-        joint = GodMap.world.joints[joint_name]
+        joint_name = GodMap.get_world().search_for_joint_name(joint_name, group_name)
+        joint = GodMap.get_world().joints[joint_name]
         if not isinstance(joint, OneDofJoint):
             raise ValueError(f'Can\'t change limits because {joint_name} is not of type {str(OneDofJoint)}.')
-        free_variable = GodMap.world.free_variables[joint.free_variable.name]
+        free_variable = GodMap.get_world().free_variables[joint.free_variable.name]
         for derivative, limit in limit_map.items():
             free_variable.set_lower_limit(derivative, -limit)
             free_variable.set_upper_limit(derivative, limit)
@@ -93,7 +93,7 @@ class WorldConfig(ABC):
         :param b: 0-1
         :param a: 0-1
         """
-        GodMap.world.default_link_color = ColorRGBA(r, g, b, a)
+        GodMap.get_world().default_link_color = ColorRGBA(r, g, b, a)
 
     def set_default_limits(self, new_limits: derivative_map):
         """
@@ -102,7 +102,7 @@ class WorldConfig(ABC):
                                  Derivatives.acceleration: np.inf,
                                  Derivatives.jerk: 30}
         """
-        GodMap.world.update_default_limits(new_limits)
+        GodMap.get_world().update_default_limits(new_limits)
 
     def add_robot_urdf(self,
                        urdf: str,
@@ -114,7 +114,7 @@ class WorldConfig(ABC):
         """
         if group_name is None:
             group_name = robot_name_from_urdf_string(urdf)
-        GodMap.world.add_urdf(urdf=urdf, group_name=group_name, actuated=True)
+        GodMap.get_world().add_urdf(urdf=urdf, group_name=group_name, actuated=True)
         return group_name
 
     def add_robot_from_parameter_server(self,
@@ -138,13 +138,13 @@ class WorldConfig(ABC):
         """
         if homogenous_transform is None:
             homogenous_transform = np.eye(4)
-        parent_link = GodMap.world.search_for_link_name(parent_link)
+        parent_link = GodMap.get_world().search_for_link_name(parent_link)
 
         child_link = PrefixName.from_string(child_link, set_none_if_no_slash=True)
         joint_name = PrefixName(f'{parent_link}_{child_link}_fixed_joint', None)
         joint = FixedJoint(name=joint_name, parent_link_name=parent_link, child_link_name=child_link,
                            parent_T_child=homogenous_transform)
-        GodMap.world._add_joint(joint)
+        GodMap.get_world()._add_joint(joint)
 
     def add_diff_drive_joint(self,
                              name: str,
@@ -164,9 +164,9 @@ class WorldConfig(ABC):
                                    name=joint_name,
                                    translation_limits=translation_limits,
                                    rotation_limits=rotation_limits)
-        GodMap.world._add_joint(brumbrum_joint)
-        GodMap.world.deregister_group(robot_group_name)
-        GodMap.world.register_group(robot_group_name, root_link_name=parent_link_name, actuated=True)
+        GodMap.get_world()._add_joint(brumbrum_joint)
+        GodMap.get_world().deregister_group(robot_group_name)
+        GodMap.get_world().register_group(robot_group_name, root_link_name=parent_link_name, actuated=True)
 
     def add_6dof_joint(self, parent_link: my_string, child_link: my_string, joint_name: my_string):
         """
@@ -175,18 +175,18 @@ class WorldConfig(ABC):
         :param parent_link:
         :param child_link:
         """
-        parent_link = GodMap.world.search_for_link_name(parent_link)
+        parent_link = GodMap.get_world().search_for_link_name(parent_link)
         child_link = PrefixName.from_string(child_link, set_none_if_no_slash=True)
         joint_name = PrefixName.from_string(joint_name, set_none_if_no_slash=True)
         joint = Joint6DOF(name=joint_name, parent_link_name=parent_link, child_link_name=child_link)
-        GodMap.world._add_joint(joint)
+        GodMap.get_world()._add_joint(joint)
 
     def add_empty_link(self, link_name: my_string):
         """
         If you need a virtual link during your world building.
         """
         link = Link(link_name)
-        GodMap.world._add_link(link)
+        GodMap.get_world()._add_link(link)
 
     def add_omni_drive_joint(self,
                              name: str,
@@ -218,9 +218,9 @@ class WorldConfig(ABC):
                                    x_name=x_name,
                                    y_name=y_name,
                                    yaw_name=yaw_vel_name)
-        GodMap.world._add_joint(brumbrum_joint)
-        GodMap.world.deregister_group(robot_group_name)
-        GodMap.world.register_group(robot_group_name, root_link_name=parent_link_name, actuated=True)
+        GodMap.get_world()._add_joint(brumbrum_joint)
+        GodMap.get_world().deregister_group(robot_group_name)
+        GodMap.get_world().register_group(robot_group_name, root_link_name=parent_link_name, actuated=True)
 
 
 class WorldWithFixedRobot(WorldConfig):

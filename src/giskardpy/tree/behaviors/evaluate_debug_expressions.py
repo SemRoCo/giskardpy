@@ -14,6 +14,6 @@ class EvaluateDebugExpressions(GiskardBehavior):
     @record_time
     @profile
     def update(self):
-        GodMap.debug_expression_manager.eval_debug_exprs()
+        GodMap.get_debug_expression_manager().eval_debug_exprs()
         return Status.RUNNING
 

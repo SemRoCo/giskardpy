@@ -26,7 +26,7 @@ class LoopDetector(GiskardBehavior):
         super().initialise()
         self.past_joint_states = set()
         self.velocity_limits = defaultdict(lambda: 1.)
-        self.velocity_limits.update(GodMap.world.get_all_free_variable_velocity_limits())
+        self.velocity_limits.update(GodMap.get_world().get_all_free_variable_velocity_limits())
         for name, threshold in self.velocity_limits.items():
             if threshold < 0.001:
                 self.velocity_limits[name] = 0.001
@@ -35,13 +35,13 @@ class LoopDetector(GiskardBehavior):
     @record_time
     @profile
     def update(self):
-        current_js = GodMap.world.state
+        current_js = GodMap.get_world().state
         planning_time = GodMap.god_map.get_data(identifier.time)
         rounded_js = self.round_js(current_js)
         if planning_time >= self.window_size and rounded_js in self.past_joint_states:
             logging.loginfo('found loop, stopped planning.')
             run_time = self.get_runtime()
-            msg = f'found goal trajectory with length {planning_time * GodMap.sample_period:.3}s in {run_time:.3}s'
+            msg = f'found goal trajectory with length {planning_time * GodMap.get_sample_period():.3}s in {run_time:.3}s'
             logging.loginfo(msg)
             raise ExecutionException(msg)
         self.past_joint_states.add(rounded_js)

@@ -16,10 +16,10 @@ class SetZeroVelocity(GiskardBehavior):
     @record_time
     @profile
     def update(self):
-        for free_variable, state in GodMap.world.state.items():
+        for free_variable, state in GodMap.get_world().state.items():
             for derivative in Derivatives:
                 if derivative == Derivatives.position:
                     continue
-                GodMap.world.state[free_variable][derivative] = 0
-        GodMap.world.notify_state_change()
+                GodMap.get_world().state[free_variable][derivative] = 0
+        GodMap.get_world().notify_state_change()
         return Status.SUCCESS

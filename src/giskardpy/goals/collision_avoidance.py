@@ -29,9 +29,9 @@ class ExternalCollisionAvoidance(Goal):
         self.link_name = link_name
         self.idx = idx
         super().__init__()
-        self.root = GodMap.world.root_link_name
+        self.root = GodMap.get_world().root_link_name
         self.robot_name = robot_name
-        self.control_horizon = GodMap.prediction_horizon - (GodMap.god_map.get_data(identifier.max_derivative) - 1)
+        self.control_horizon = GodMap.get_prediction_horizon() - (GodMap.god_map.get_data(identifier.max_derivative) - 1)
         self.control_horizon = max(1, self.control_horizon)
 
     def map_V_n_symbol(self):
@@ -73,10 +73,10 @@ class ExternalCollisionAvoidance(Goal):
         a_P_pa = self.get_closest_point_on_a_in_a()
         map_V_n = self.map_V_n_symbol()
         actual_distance = self.get_actual_distance()
-        sample_period = GodMap.sample_period
+        sample_period = GodMap.get_sample_period()
         number_of_external_collisions = self.get_number_of_external_collisions()
 
-        map_T_a = GodMap.world.compose_fk_expression(self.root, self.link_name)
+        map_T_a = GodMap.get_world().compose_fk_expression(self.root, self.link_name)
 
         map_P_pa = map_T_a.dot(a_P_pa)
 
@@ -87,8 +87,8 @@ class ExternalCollisionAvoidance(Goal):
 
         soft_threshold = 0
         actual_link_b_hash = self.get_link_b_hash()
-        parent_joint = GodMap.world.links[self.link_name].parent_joint_name
-        direct_children = set(GodMap.world.get_directly_controlled_child_links_with_collisions(parent_joint))
+        parent_joint = GodMap.get_world().links[self.link_name].parent_joint_name
+        direct_children = set(GodMap.get_world().get_directly_controlled_child_links_with_collisions(parent_joint))
         b_result_cases = [(k[1].__hash__(), v) for k, v in self.soft_thresholds.items() if k[0] in direct_children]
         soft_threshold = w.if_eq_cases(a=actual_link_b_hash,
                                        b_result_cases=b_result_cases,
@@ -156,9 +156,9 @@ class SelfCollisionAvoidance(Goal):
         if self.link_a.prefix != self.link_b.prefix:
             raise Exception(f'Links {self.link_a} and {self.link_b} have different prefix.')
         super().__init__()
-        self.root = GodMap.world.root_link_name
+        self.root = GodMap.get_world().root_link_name
         self.robot_name = robot_name
-        self.control_horizon = GodMap.prediction_horizon - (GodMap.god_map.get_data(identifier.max_derivative) - 1)
+        self.control_horizon = GodMap.get_prediction_horizon() - (GodMap.god_map.get_data(identifier.max_derivative) - 1)
         self.control_horizon = max(1, self.control_horizon)
 
     def get_contact_normal_in_b(self):
@@ -194,10 +194,10 @@ class SelfCollisionAvoidance(Goal):
         hard_threshold = w.min(self.hard_threshold, self.soft_threshold / 2)
         actual_distance = self.get_actual_distance()
         number_of_self_collisions = self.get_number_of_self_collisions()
-        sample_period = GodMap.sample_period
+        sample_period = GodMap.get_sample_period()
 
-        # b_T_a2 = GodMap.world.compose_fk_evaluated_expression(self.link_b, self.link_a)
-        b_T_a = GodMap.world.compose_fk_expression(self.link_b, self.link_a)
+        # b_T_a2 = GodMap.get_world().compose_fk_evaluated_expression(self.link_b, self.link_a)
+        b_T_a = GodMap.get_world().compose_fk_expression(self.link_b, self.link_a)
         pb_T_b = self.get_b_T_pb().inverse()
         a_P_pa = self.get_position_on_a_in_a()
 
@@ -265,26 +265,26 @@ class CollisionAvoidanceHint(Goal):
         :param weight: float, default WEIGHT_ABOVE_CA
         """
         super().__init__()
-        self.link_name = GodMap.world.search_for_link_name(tip_link)
-        self.link_b = GodMap.world.search_for_link_name(object_link_name)
+        self.link_name = GodMap.get_world().search_for_link_name(tip_link)
+        self.link_b = GodMap.get_world().search_for_link_name(object_link_name)
         self.key = (self.link_name, self.link_b)
         self.object_group = object_group
         self.link_b_hash = self.link_b.__hash__()
         if root_link is None:
-            self.root_link = GodMap.world.root_link_name
+            self.root_link = GodMap.get_world().root_link_name
         else:
-            self.root_link = GodMap.world.search_for_link_name(root_link)
+            self.root_link = GodMap.get_world().search_for_link_name(root_link)
 
         if spring_threshold is None:
             spring_threshold = max_threshold
         else:
             spring_threshold = max(spring_threshold, max_threshold)
 
-        self.add_collision_check(GodMap.world.links[self.link_name].name,
-                                 GodMap.world.links[self.link_b].name,
+        self.add_collision_check(GodMap.get_world().links[self.link_name].name,
+                                 GodMap.get_world().links[self.link_b].name,
                                  spring_threshold)
 
-        self.avoidance_hint = GodMap.world.transform_msg(self.root_link, avoidance_hint)
+        self.avoidance_hint = GodMap.get_world().transform_msg(self.root_link, avoidance_hint)
         self.avoidance_hint.vector = tf.normalize(self.avoidance_hint.vector)
 
         self.max_velocity = max_linear_velocity
@@ -311,7 +311,7 @@ class CollisionAvoidanceHint(Goal):
         link_b_hash = self.get_link_b()
         actual_distance_capped = w.max(actual_distance, 0)
 
-        root_T_a = GodMap.world.compose_fk_expression(self.root_link, self.link_name)
+        root_T_a = GodMap.get_world().compose_fk_expression(self.root_link, self.link_name)
 
         spring_error = spring_threshold - actual_distance_capped
         spring_error = w.max(spring_error, 0)

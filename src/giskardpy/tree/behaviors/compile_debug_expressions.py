@@ -15,5 +15,5 @@ class CompileDebugExpressions(GiskardBehavior):
     @catch_and_raise_to_blackboard
     @record_time
     def update(self):
-        GodMap.debug_expression_manager.compile_debug_expressions()
+        GodMap.get_debug_expression_manager().compile_debug_expressions()
         return Status.SUCCESS

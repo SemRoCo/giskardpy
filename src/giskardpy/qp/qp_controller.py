@@ -1026,7 +1026,7 @@ class QPProblemBuilder:
         self.free_variables.extend(list(sorted(free_variables, key=lambda x: x.position_name)))
         l = [x.position_name for x in free_variables]
         duplicates = set([x for x in l if l.count(x) > 1])
-        self.order = Derivatives(min(self.prediction_horizon, GodMap.max_derivative))
+        self.order = Derivatives(min(self.prediction_horizon, GodMap.get_max_derivative()))
         assert duplicates == set(), f'there are free variables with the same name: {duplicates}'
 
     def add_inequality_constraints(self, constraints: List[InequalityConstraint]):
@@ -1074,7 +1074,7 @@ class QPProblemBuilder:
                   'equality_constraints': self.equality_constraints,
                   'inequality_constraints': self.inequality_constraints,
                   'derivative_constraints': self.derivative_constraints,
-                  'sample_period': GodMap.sample_period,
+                  'sample_period': GodMap.get_sample_period(),
                   'prediction_horizon': self.prediction_horizon,
                   'max_derivative': self.order}
         self.weights = Weights(**kwargs)
@@ -1182,7 +1182,7 @@ class QPProblemBuilder:
             tmp[:len(a)] = a
             return tmp
 
-        sample_period = self.state[str(GodMap.sample_period)]
+        sample_period = self.state[str(GodMap.get_sample_period())]
         try:
             start_pos = self.state[joint_name]
         except KeyError:
@@ -1224,7 +1224,7 @@ class QPProblemBuilder:
     @profile
     def _create_debug_pandas(self, qp_solver: QPSolver):
         weights, g, lb, ub, E, bE, A, lbA, ubA, weight_filter, bE_filter, bA_filter = qp_solver.get_problem_data()
-        sample_period = GodMap.sample_period
+        sample_period = GodMap.get_sample_period()
         self.free_variable_names = self.free_variable_bounds.names[weight_filter]
         self.equality_constr_names = self.equality_bounds.names[bE_filter]
         self.inequality_constr_names = self.inequality_bounds.names[bA_filter]

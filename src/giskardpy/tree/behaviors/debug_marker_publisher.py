@@ -32,7 +32,7 @@ class DebugMarkerPublisher(GiskardBehavior):
     def __init__(self, name, tf_topic='/tf', map_frame: Optional[str] = None):
         super().__init__(name)
         if map_frame is None:
-            self.map_frame = str(GodMap.world.root_link_name)
+            self.map_frame = str(GodMap.get_world().root_link_name)
         else:
             self.map_frame = map_frame
         self.tf_pub = rospy.Publisher(tf_topic, TFMessage, queue_size=10)
@@ -55,7 +55,7 @@ class DebugMarkerPublisher(GiskardBehavior):
             if not hasattr(expr, 'reference_frame'):
                 continue
             if expr.reference_frame is not None:
-                map_T_ref = GodMap.world.compute_fk_np(GodMap.world.root_link_name, expr.reference_frame)
+                map_T_ref = GodMap.get_world().compute_fk_np(GodMap.get_world().root_link_name, expr.reference_frame)
             else:
                 map_T_ref = np.eye(4)
             if isinstance(expr, w.TransMatrix):
@@ -130,7 +130,7 @@ class DebugMarkerPublisher(GiskardBehavior):
                 if isinstance(expr, w.Vector3):
                     ref_V_d = value
                     if expr.vis_frame is not None:
-                        map_T_vis = GodMap.world.compute_fk_np(GodMap.world.root_link_name, expr.vis_frame)
+                        map_T_vis = GodMap.get_world().compute_fk_np(GodMap.get_world().root_link_name, expr.vis_frame)
                     else:
                         map_T_vis = np.eye(4)
                     map_V_d = np.dot(map_T_ref, ref_V_d)

@@ -46,7 +46,7 @@ class SyncOdometry(GiskardBehavior):
                 self.lock.put(msg)
             except ROSException as e:
                 logging.logwarn(f'Waiting for topic \'{self.odometry_topic}\' to appear.')
-        self.joint: OmniDrive = GodMap.world.joints[self.joint_name]
+        self.joint: OmniDrive = GodMap.get_world().joints[self.joint_name]
         if odom:
             self.odometry_sub = rospy.Subscriber(self.odometry_topic, Odometry, self.cb, queue_size=1)
         else:
@@ -102,7 +102,7 @@ class SyncOdometryNoLock(GiskardBehavior):
                 # self.lock.put(msg)
             except ROSException as e:
                 logging.logwarn(f'Waiting for topic \'{self.odometry_topic}\' to appear.')
-        self.joint: OmniDrive = GodMap.world.joints[self.joint_name]
+        self.joint: OmniDrive = GodMap.get_world().joints[self.joint_name]
         if odom:
             self.odometry_sub = rospy.Subscriber(self.odometry_topic, Odometry, self.cb, queue_size=1)
         else:

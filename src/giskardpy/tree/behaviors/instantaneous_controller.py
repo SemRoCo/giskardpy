@@ -14,7 +14,7 @@ class ControllerPlugin(GiskardBehavior):
     @catch_and_raise_to_blackboard
     @profile
     def initialise(self):
-        self.controller = GodMap.qp_controller
+        self.controller = GodMap.get_qp_controller()
 
     @catch_and_raise_to_blackboard
     @record_time

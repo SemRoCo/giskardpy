@@ -19,7 +19,7 @@ class InitQPController(GiskardBehavior):
     @record_time
     @profile
     def update(self):
-        eq_constraints, neq_constraints, derivative_constraints = GodMap.motion_goal_manager.get_constraints_from_goals()
+        eq_constraints, neq_constraints, derivative_constraints = GodMap.get_motion_goal_manager().get_constraints_from_goals()
         free_variables = self.get_active_free_symbols(eq_constraints, neq_constraints, derivative_constraints)
 
         qp_controller = QPProblemBuilder(
@@ -27,8 +27,8 @@ class InitQPController(GiskardBehavior):
             equality_constraints=list(eq_constraints.values()),
             inequality_constraints=list(neq_constraints.values()),
             derivative_constraints=list(derivative_constraints.values()),
-            sample_period=GodMap.sample_period,
-            prediction_horizon=GodMap.prediction_horizon,
+            sample_period=GodMap.get_sample_period(),
+            prediction_horizon=GodMap.get_prediction_horizon(),
             solver_id=GodMap.god_map.unsafe_get_data(identifier.qp_solver_name),
             retries_with_relaxed_constraints=GodMap.god_map.unsafe_get_data(
                 identifier.retries_with_relaxed_constraints),
@@ -46,7 +46,7 @@ class InitQPController(GiskardBehavior):
         symbols = set()
         for c in chain(eq_constraints.values(), neq_constraints.values(), derivative_constraints.values()):
             symbols.update(str(s) for s in w.free_symbols(c.expression))
-        free_variables = list(sorted([v for v in GodMap.world.free_variables.values() if v.position_name in symbols],
+        free_variables = list(sorted([v for v in GodMap.get_world().free_variables.values() if v.position_name in symbols],
                                      key=lambda x: x.position_name))
         if len(free_variables) == 0:
             raise EmptyProblemException('Goal parsing resulted in no free variables.')

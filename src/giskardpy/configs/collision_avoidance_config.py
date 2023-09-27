@@ -44,7 +44,7 @@ class CollisionAvoidanceConfig(abc.ABC):
         """
 
     def _sanity_check(self):
-        if GodMap.collision_checker_id != CollisionCheckerLib.none \
+        if GodMap.get_collision_checker_id() != CollisionCheckerLib.none \
                 and not self.collision_scene.has_self_collision_matrix():
             raise SetupException('You have to load a collision matrix, use: \n'
                                  'roslaunch giskardpy collision_matrix_tool.launch')
@@ -82,7 +82,7 @@ class CollisionAvoidanceConfig(abc.ABC):
         :param group_name: name of the group this default will be applied to
         """
         if group_name is None:
-            group_name = GodMap.world.robot_name
+            group_name = GodMap.get_world().robot_name
         new_default = CollisionAvoidanceThresholds(
             number_of_repeller=number_of_repeller,
             soft_threshold=soft_threshold,
@@ -129,7 +129,7 @@ class CollisionAvoidanceConfig(abc.ABC):
         :param max_velocity: how fast it will move away from collisions
         """
         if group_name is None:
-            group_name = GodMap.world.robot_name
+            group_name = GodMap.get_world().robot_name
         config = self.collision_scene.collision_avoidance_configs[group_name]
         joint_name = PrefixName(joint_name, group_name)
         if number_of_repeller is not None:
@@ -157,7 +157,7 @@ class CollisionAvoidanceConfig(abc.ABC):
         :param max_velocity: how fast it will move away from collisions
         """
         if group_name is None:
-            group_name = GodMap.world.robot_name
+            group_name = GodMap.get_world().robot_name
         config = self.collision_scene.collision_avoidance_configs[group_name]
         link_name = PrefixName(link_name, group_name)
         if number_of_repeller is not None:
@@ -176,7 +176,7 @@ class CollisionAvoidanceConfig(abc.ABC):
         :param group_name: name of the robot for which it will be applied, only needs to be set if there are multiple robots.
         """
         if group_name is None:
-            group_name = GodMap.world.robot_name
+            group_name = GodMap.get_world().robot_name
         if group_name not in self.collision_scene.self_collision_matrix_paths:
             self.collision_scene.load_self_collision_matrix_from_srdf(path_to_srdf, group_name)
         else:
@@ -189,9 +189,9 @@ class CollisionAvoidanceConfig(abc.ABC):
         collisions.
         """
         if group_name is None:
-            group_name = GodMap.world.robot_name
+            group_name = GodMap.get_world().robot_name
         for joint_name in joint_names:
-            world_joint_name = GodMap.world.search_for_joint_name(joint_name, group_name)
+            world_joint_name = GodMap.get_world().search_for_joint_name(joint_name, group_name)
             self.collision_scene.add_fixed_joint(world_joint_name)
 
 

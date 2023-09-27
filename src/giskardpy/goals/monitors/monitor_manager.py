@@ -36,7 +36,7 @@ class MonitorManager:
         self.monitors = []
         self.allowed_monitor_types = {}
         self.allowed_monitor_types.update(get_all_classes_in_package('giskardpy.goals.monitors', Monitor))
-        self.robot_names = GodMap.collision_scene.robot_names
+        self.robot_names = GodMap.get_collision_scene().robot_names
 
     def compile_monitors(self):
         expressions = []
@@ -69,7 +69,7 @@ class MonitorManager:
         if np.any(any_flips):
             for i, state in enumerate(any_flips):
                 if state:
-                    self.monitors[i].notify_flipped(GodMap.trajectory_time_in_seconds)
+                    self.monitors[i].notify_flipped(GodMap.get_trajectory_time_in_seconds())
         self.state = next_state
 
     def add_monitor(self, monitor: Monitor):

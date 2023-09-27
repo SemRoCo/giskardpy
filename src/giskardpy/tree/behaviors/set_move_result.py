@@ -29,11 +29,11 @@ class SetMoveResult(GiskardBehavior):
         else:
             move_result = GiskardException(str(e)).to_move_result()
 
-        if isinstance(e, EmptyProblemException) and GodMap.control_mode == ControlModes.standalone:
+        if isinstance(e, EmptyProblemException) and GodMap.get_control_mode() == ControlModes.standalone:
             move_result = MoveResult()
 
         trajectory = GodMap.god_map.get_data(identifier.trajectory)
-        joints = [GodMap.world.joints[joint_name] for joint_name in GodMap.world.movable_joint_names]
+        joints = [GodMap.get_world().joints[joint_name] for joint_name in GodMap.get_world().movable_joint_names]
         sample_period = GodMap.god_map.get_data(identifier.sample_period)
         move_result.trajectory = trajectory.to_msg(sample_period=sample_period, start_time=0, joints=joints)
         if move_result.error_code == MoveResult.PREEMPTED:

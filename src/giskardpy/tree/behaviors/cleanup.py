@@ -32,10 +32,9 @@ class CleanUp(GiskardBehavior):
         if self.clear_markers_:
             self.clear_markers()
         GodMap.god_map.clear_cache()
-        giskard = GodMap.god_map.get_data(identifier.giskard)
-        giskard.set_defaults()
-        GodMap.world.fast_all_fks = None
-        GodMap.collision_scene.reset_cache()
+        GodMap.get_giskard().set_defaults()
+        GodMap.get_world().fast_all_fks = None
+        GodMap.get_collision_scene().reset_cache()
         GodMap.god_map.set_data(identifier.closest_point, Collisions(1))
         GodMap.god_map.set_data(identifier.time, 1)
         GodMap.god_map.set_data(identifier.monitor_manager, MonitorManager())

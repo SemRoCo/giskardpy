@@ -21,8 +21,6 @@ class CommandPublisher(GiskardBehavior):
 
     @profile
     def initialise(self):
-        GodMap.sample_period = GodMap.god_map.get_data(identifier.sample_period)
-        # self.stamp = rospy.get_rostime()
         self.timer = rospy.Timer(period=rospy.Duration(1/self.hz), callback=self.publish_joint_state)
         super().initialise()
 

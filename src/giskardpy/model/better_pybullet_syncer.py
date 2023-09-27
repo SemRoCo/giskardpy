@@ -123,13 +123,13 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
             self.object_name_to_id = {}
             self.objects_in_order = []
 
-            for link_name in sorted(GodMap.world.link_names_with_collisions):
-                link = GodMap.world.links[link_name]
+            for link_name in sorted(GodMap.get_world().link_names_with_collisions):
+                link = GodMap.get_world().links[link_name]
                 self.add_object(link)
                 self.objects_in_order.append(self.object_name_to_id[link_name])
-            bpb.batch_set_transforms(self.objects_in_order, GodMap.world.compute_all_collision_fks())
+            bpb.batch_set_transforms(self.objects_in_order, GodMap.get_world().compute_all_collision_fks())
         else:
-            bpb.batch_set_transforms(self.objects_in_order, GodMap.world.compute_all_collision_fks())
+            bpb.batch_set_transforms(self.objects_in_order, GodMap.get_world().compute_all_collision_fks())
 
     @profile
     def get_map_T_geometry(self, link_name: PrefixName, collision_id: int = 0) -> Pose:

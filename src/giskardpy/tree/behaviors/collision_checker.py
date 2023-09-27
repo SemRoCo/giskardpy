@@ -38,8 +38,8 @@ class CollisionChecker(GiskardBehavior):
             self.collision_matrix = GodMap.god_map.get_data(identifier.collision_matrix)
             self.collision_matrix = self.add_added_checks(self.collision_matrix)
             self.collision_list_size = sum([config.max_num_of_repeller()
-                                            for config in GodMap.collision_avoidance_configs.values()])
-            GodMap.collision_scene.sync()
+                                            for config in GodMap.get_collision_avoidance_configs().values()])
+            GodMap.get_collision_scene().sync()
             super().initialise()
         except Exception as e:
             raise_to_blackboard(e)
@@ -62,8 +62,8 @@ class CollisionChecker(GiskardBehavior):
         """
         Computes closest point info for all robot links and safes it to the god map.
         """
-        GodMap.collision_scene.sync()
-        collisions = GodMap.collision_scene.check_collisions(self.collision_matrix, self.collision_list_size)
+        GodMap.get_collision_scene().sync()
+        collisions = GodMap.get_collision_scene().check_collisions(self.collision_matrix, self.collision_list_size)
         self.are_self_collisions_violated(collisions)
         GodMap.god_map.set_data(identifier.closest_point, collisions)
         return Status.RUNNING

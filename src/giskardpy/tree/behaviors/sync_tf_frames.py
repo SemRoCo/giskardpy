@@ -26,7 +26,7 @@ class SyncTfFrames(GiskardBehavior):
         if joint_name in self.joint_map:
             raise AttributeError(f'Joint \'{joint_name}\' is already being tracking with a tf frame: '
                                  f'\'{self.joint_map[joint_name][0]}\'<-\'{self.joint_map[joint_name][1]}\'')
-        joint = GodMap.world.joints[joint_name]
+        joint = GodMap.get_world().joints[joint_name]
         if not isinstance(joint, Joint6DOF):
             raise AttributeError(f'Can only sync Joint6DOF with tf but \'{joint_name}\' is of type \'{type(joint)}\'.')
         self.joint_map[joint_name] = (tf_parent_frame, tf_child_frame)
@@ -37,7 +37,7 @@ class SyncTfFrames(GiskardBehavior):
     def update(self):
         with GodMap.god_map:
             for joint_name, (tf_parent_frame, tf_child_frame) in self.joint_map.items():
-                joint: Joint6DOF = GodMap.world.joints[joint_name]
+                joint: Joint6DOF = GodMap.get_world().joints[joint_name]
                 parent_T_child = lookup_pose(tf_parent_frame, tf_child_frame)
                 joint.update_transform(parent_T_child.pose)
 

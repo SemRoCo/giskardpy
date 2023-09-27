@@ -22,17 +22,17 @@ class ParseActionGoal(GiskardBehavior):
     @profile
     def update(self):
         loginfo('Parsing goal message.')
-        move_goal = GodMap.goal_msg
-        GodMap.god_map.set_data(identifier.goal_id, GodMap.goal_id + 1)
+        move_goal = GodMap.get_goal_msg()
+        GodMap.god_map.set_data(identifier.goal_id, GodMap.get_goal_id() + 1)
         try:
-            GodMap.monitor_manager.parse_monitors(move_goal.monitors)
-            GodMap.motion_goal_manager.parse_motion_goals(move_goal.goals)
+            GodMap.get_monitor_manager().parse_monitors(move_goal.monitors)
+            GodMap.get_motion_goal_manager().parse_motion_goals(move_goal.goals)
         except AttributeError:
             traceback.print_exc()
             raise InvalidGoalException('Couldn\'t transform goal')
         except Exception as e:
             raise e
         if GodMap.god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none:
-            GodMap.motion_goal_manager.parse_collision_entries(move_goal.collisions)
+            GodMap.get_motion_goal_manager().parse_collision_entries(move_goal.collisions)
         loginfo('Done parsing goal message.')
         return Status.SUCCESS

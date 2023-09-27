@@ -34,11 +34,11 @@ class SetSeedConfiguration(NonMotionGoal):
         if GodMap.is_goal_msg_type_execute() and not GodMap.is_standalone:
             raise ConstraintInitalizationException(f'It is not allowed to combine {str(self)} with plan and execute.')
         for joint_name, initial_joint_value in seed_configuration.items():
-            joint_name = GodMap.world.search_for_joint_name(joint_name, group_name)
-            if joint_name not in GodMap.world.state:
+            joint_name = GodMap.get_world().search_for_joint_name(joint_name, group_name)
+            if joint_name not in GodMap.get_world().state:
                 raise KeyError(f'World has no joint \'{joint_name}\'.')
-            GodMap.world.state[joint_name].position = initial_joint_value
-        GodMap.world.notify_state_change()
+            GodMap.get_world().state[joint_name].position = initial_joint_value
+        GodMap.get_world().notify_state_change()
 
     def __str__(self) -> str:
         return f'{str(self.__class__.__name__)}/{list(self.seed_configuration.keys())}'
@@ -50,13 +50,13 @@ class SetOdometry(NonMotionGoal):
         self.group_name = group_name
         if GodMap.is_goal_msg_type_execute() and not GodMap.is_standalone:
             raise ConstraintInitalizationException(f'It is not allowed to combine {str(self)} with plan and execute.')
-        brumbrum_joint_name = GodMap.world.groups[group_name].root_link.child_joint_names[0]
-        brumbrum_joint = GodMap.world.joints[brumbrum_joint_name]
+        brumbrum_joint_name = GodMap.get_world().groups[group_name].root_link.child_joint_names[0]
+        brumbrum_joint = GodMap.get_world().joints[brumbrum_joint_name]
         if not isinstance(brumbrum_joint, (OmniDrive, DiffDrive, OmniDrivePR22)):
             raise ConstraintInitalizationException(f'Group {group_name} has no odometry joint.')
         base_pose = self.transform_msg(brumbrum_joint.parent_link_name, base_pose).pose
-        GodMap.world.state[brumbrum_joint.x.name].position = base_pose.position.x
-        GodMap.world.state[brumbrum_joint.y.name].position = base_pose.position.y
+        GodMap.get_world().state[brumbrum_joint.x.name].position = base_pose.position.x
+        GodMap.get_world().state[brumbrum_joint.y.name].position = base_pose.position.y
         axis, angle = axis_angle_from_quaternion(base_pose.orientation.x,
                                                  base_pose.orientation.y,
                                                  base_pose.orientation.z,
@@ -64,12 +64,12 @@ class SetOdometry(NonMotionGoal):
         if axis[-1] < 0:
             angle = -angle
         if isinstance(brumbrum_joint, OmniDrivePR22):
-            GodMap.world.state[brumbrum_joint.yaw1_vel.name].position = 0
-            # GodMap.world.state[brumbrum_joint.yaw2_name].position = angle
-            GodMap.world.state[brumbrum_joint.yaw.name].position = angle
+            GodMap.get_world().state[brumbrum_joint.yaw1_vel.name].position = 0
+            # GodMap.get_world().state[brumbrum_joint.yaw2_name].position = angle
+            GodMap.get_world().state[brumbrum_joint.yaw.name].position = angle
         else:
-            GodMap.world.state[brumbrum_joint.yaw.name].position = angle
-        GodMap.world.notify_state_change()
+            GodMap.get_world().state[brumbrum_joint.yaw.name].position = angle
+        GodMap.get_world().notify_state_change()
 
     def __str__(self) -> str:
         return f'{str(self.__class__.__name__)}/{self.group_name}'
@@ -99,14 +99,14 @@ class JointPositionContinuous(Goal):
         self.max_velocity = max_velocity
         self.hard = hard
         super().__init__()
-        self.joint_name = GodMap.world.search_for_joint_name(joint_name, group_name)
-        if not GodMap.world.is_joint_continuous(self.joint_name):
+        self.joint_name = GodMap.get_world().search_for_joint_name(joint_name, group_name)
+        if not GodMap.get_world().is_joint_continuous(self.joint_name):
             raise ConstraintException(f'{self.__class__.__name__} called with non continuous joint {joint_name}')
 
     def make_constraints(self):
         current_joint = self.get_joint_position_symbol(self.joint_name)
         max_velocity = cas.min(self.max_velocity,
-                               GodMap.world.get_joint_velocity_limits(self.joint_name)[1])
+                               GodMap.get_world().get_joint_velocity_limits(self.joint_name)[1])
 
         error = cas.shortest_angular_distance(current_joint, self.joint_goal)
 
@@ -152,17 +152,17 @@ class JointPositionPrismatic(Goal):
         self.max_velocity = max_velocity
         self.hard = hard
         super().__init__()
-        self.joint_name = GodMap.world.search_for_joint_name(joint_name, group_name)
-        ll, ul = GodMap.world.get_joint_position_limits(self.joint_name)
+        self.joint_name = GodMap.get_world().search_for_joint_name(joint_name, group_name)
+        ll, ul = GodMap.get_world().get_joint_position_limits(self.joint_name)
         self.goal = min(ul, max(ll, self.goal))
-        if not GodMap.world.is_joint_prismatic(self.joint_name):
+        if not GodMap.get_world().is_joint_prismatic(self.joint_name):
             raise ConstraintException(f'{self.__class__.__name__} called with non prismatic joint {joint_name}')
 
     def make_constraints(self):
         current_joint = self.get_joint_position_symbol(self.joint_name)
 
         try:
-            limit_expr = GodMap.world.get_joint_velocity_limits(self.joint_name)[1]
+            limit_expr = GodMap.get_world().get_joint_velocity_limits(self.joint_name)[1]
             max_velocity = cas.min(self.max_velocity,
                                    limit_expr)
         except IndexError:
@@ -208,15 +208,15 @@ class JointVelocityRevolute(Goal):
         self.max_velocity = max_velocity
         self.hard = hard
         super().__init__()
-        self.joint_name = GodMap.world.search_for_joint_name(joint_name, group_name)
-        if not GodMap.world.is_joint_revolute(self.joint_name):
+        self.joint_name = GodMap.get_world().search_for_joint_name(joint_name, group_name)
+        if not GodMap.get_world().is_joint_revolute(self.joint_name):
             raise ConstraintException(f'{self.__class__.__name__} called with non revolute joint {joint_name}')
 
     def make_constraints(self):
         current_joint = self.get_joint_position_symbol(self.joint_name)
 
         try:
-            limit_expr = GodMap.world.get_joint_velocity_limits(self.joint_name)[1]
+            limit_expr = GodMap.get_world().get_joint_velocity_limits(self.joint_name)[1]
             max_velocity = cas.min(self.max_velocity,
                                    limit_expr)
         except IndexError:
@@ -265,8 +265,8 @@ class JointPositionRevolute(Goal):
         self.max_velocity = max_velocity
         self.hard = hard
         super().__init__()
-        self.joint_name = GodMap.world.search_for_joint_name(joint_name, group_name)
-        if not GodMap.world.is_joint_revolute(self.joint_name):
+        self.joint_name = GodMap.get_world().search_for_joint_name(joint_name, group_name)
+        if not GodMap.get_world().is_joint_revolute(self.joint_name):
             raise ConstraintException(f'{self.__class__.__name__} called with non revolute joint {joint_name}')
 
     @profile
@@ -275,7 +275,7 @@ class JointPositionRevolute(Goal):
                                  joint_goal=self.goal,
                                  weight=self.weight,
                                  velocity_limit=cas.min(self.max_velocity,
-                                                        GodMap.world.get_joint_velocity_limits(self.joint_name)[1]))
+                                                        GodMap.get_world().get_joint_velocity_limits(self.joint_name)[1]))
         self.add_task(task)
         # if self.hard:
         #     self.add_equality_constraint(reference_velocity=max_velocity,
@@ -310,8 +310,8 @@ class ShakyJointPositionRevoluteOrPrismatic(Goal):
         :param max_velocity: float, rad/s, default 3451, meaning the urdf/config limits are active
         """
         super().__init__()
-        self.joint_name = GodMap.world.search_for_joint_name(joint_name, group_name)
-        if not GodMap.world.is_joint_revolute(self.joint_name) and not GodMap.world.is_joint_prismatic(joint_name):
+        self.joint_name = GodMap.get_world().search_for_joint_name(joint_name, group_name)
+        if not GodMap.get_world().is_joint_revolute(self.joint_name) and not GodMap.get_world().is_joint_prismatic(joint_name):
             raise ConstraintException(
                 f'{self.__class__.__name__} called with non revolute/prismatic joint {joint_name}')
 
@@ -329,10 +329,10 @@ class ShakyJointPositionRevoluteOrPrismatic(Goal):
         weight = self.weight
 
         time = GodMap.god_map.to_symbol(identifier.time)
-        time_in_secs = GodMap.sample_period * time
+        time_in_secs = GodMap.get_sample_period() * time
 
         max_velocity = cas.min(self.max_velocity,
-                               GodMap.world.get_joint_velocity_limits(self.joint_name)[1])
+                               GodMap.get_world().get_joint_velocity_limits(self.joint_name)[1])
 
         fun_params = frequency * 2.0 * cas.pi * time_in_secs
         err = (joint_goal - current_joint) + noise_amplitude * max_velocity * cas.sin(fun_params)
@@ -366,8 +366,8 @@ class ShakyJointPositionContinuous(Goal):
         self.weight = weight
         self.max_velocity = max_velocity
         super().__init__()
-        self.joint_name = GodMap.world.search_for_joint_name(joint_name, group_name)
-        if not GodMap.world.is_joint_continuous(self.joint_name):
+        self.joint_name = GodMap.get_world().search_for_joint_name(joint_name, group_name)
+        if not GodMap.get_world().is_joint_continuous(self.joint_name):
             raise ConstraintException(f'{self.__class__.__name__} called with non continuous joint {joint_name}')
 
     def make_constraints(self):
@@ -378,10 +378,10 @@ class ShakyJointPositionContinuous(Goal):
         weight = self.weight
 
         time = GodMap.god_map.to_symbol(identifier.time)
-        time_in_secs = GodMap.sample_period * time
+        time_in_secs = GodMap.get_sample_period() * time
 
         max_velocity = cas.min(self.max_velocity,
-                               GodMap.world.get_joint_velocity_limits(self.joint_name)[1])
+                               GodMap.get_world().get_joint_velocity_limits(self.joint_name)[1])
 
         fun_params = frequency * 2.0 * cas.pi * time_in_secs
         err = cas.shortest_angular_distance(current_joint, joint_goal) + noise_amplitude * max_velocity * cas.sin(
@@ -418,8 +418,8 @@ class AvoidSingleJointLimits(Goal):
         self.max_velocity = max_linear_velocity
         self.percentage = percentage
         super().__init__()
-        self.joint_name = GodMap.world.search_for_joint_name(joint_name, group_name)
-        if not GodMap.world.is_joint_revolute(self.joint_name) and not GodMap.world.is_joint_prismatic(self.joint_name):
+        self.joint_name = GodMap.get_world().search_for_joint_name(joint_name, group_name)
+        if not GodMap.get_world().is_joint_revolute(self.joint_name) and not GodMap.get_world().is_joint_prismatic(self.joint_name):
             raise ConstraintException(
                 f'{self.__class__.__name__} called with non prismatic or revolute joint {joint_name}')
 
@@ -427,10 +427,10 @@ class AvoidSingleJointLimits(Goal):
         weight = self.weight
         joint_symbol = self.get_joint_position_symbol(self.joint_name)
         percentage = self.percentage / 100.
-        lower_limit, upper_limit = GodMap.world.get_joint_position_limits(self.joint_name)
+        lower_limit, upper_limit = GodMap.get_world().get_joint_position_limits(self.joint_name)
         max_velocity = self.max_velocity
         max_velocity = cas.min(max_velocity,
-                               GodMap.world.get_joint_velocity_limits(self.joint_name)[1])
+                               GodMap.get_world().get_joint_velocity_limits(self.joint_name)[1])
 
         joint_range = upper_limit - lower_limit
         center = (upper_limit + lower_limit) / 2.
@@ -473,19 +473,19 @@ class AvoidJointLimits(Goal):
         super().__init__()
         if joint_list is not None:
             for joint_name in joint_list:
-                joint_name = GodMap.world.search_for_joint_name(joint_name, group_name)
-                if GodMap.world.is_joint_prismatic(joint_name) or GodMap.world.is_joint_revolute(joint_name):
+                joint_name = GodMap.get_world().search_for_joint_name(joint_name, group_name)
+                if GodMap.get_world().is_joint_prismatic(joint_name) or GodMap.get_world().is_joint_revolute(joint_name):
                     self.add_constraints_of_goal(AvoidSingleJointLimits(joint_name=joint_name.short_name,
                                                                         group_name=None,
                                                                         percentage=percentage,
                                                                         weight=weight))
         else:
             if group_name is None:
-                joint_list = GodMap.world.controlled_joints
+                joint_list = GodMap.get_world().controlled_joints
             else:
-                joint_list = GodMap.world.groups[group_name].controlled_joints
+                joint_list = GodMap.get_world().groups[group_name].controlled_joints
             for joint_name in joint_list:
-                if GodMap.world.is_joint_prismatic(joint_name) or GodMap.world.is_joint_revolute(joint_name):
+                if GodMap.get_world().is_joint_prismatic(joint_name) or GodMap.get_world().is_joint_revolute(joint_name):
                     self.add_constraints_of_goal(AvoidSingleJointLimits(joint_name=joint_name.short_name,
                                                                         group_name=None,
                                                                         percentage=percentage,
@@ -527,16 +527,16 @@ class JointPositionList(Goal):
         if len(goal_state) == 0:
             raise ConstraintInitalizationException(f'Can\'t initialize {self} with no joints.')
         for joint_name, goal_position in goal_state.items():
-            joint_name = GodMap.world.search_for_joint_name(joint_name, group_name)
+            joint_name = GodMap.get_world().search_for_joint_name(joint_name, group_name)
 
-            ll_pos, ul_pos = GodMap.world.compute_joint_limits(joint_name, Derivatives.position)
+            ll_pos, ul_pos = GodMap.get_world().compute_joint_limits(joint_name, Derivatives.position)
             if ll_pos is not None:
                 goal_position = min(ul_pos, max(ll_pos, goal_position))
 
-            ll_vel, ul_vel = GodMap.world.compute_joint_limits(joint_name, Derivatives.velocity)
+            ll_vel, ul_vel = GodMap.get_world().compute_joint_limits(joint_name, Derivatives.velocity)
             velocity_limit = min(ul_vel, max(ll_vel, max_velocity))
 
-            joint: OneDofJoint = GodMap.world.joints[joint_name]
+            joint: OneDofJoint = GodMap.get_world().joints[joint_name]
             self.names.append(str(joint_name))
             self.current_positions.append(joint.get_symbol(Derivatives.position))
             self.goal_positions.append(goal_position)
@@ -546,7 +546,7 @@ class JointPositionList(Goal):
             for name, current, goal, threshold, velocity_limit in zip(self.names, self.current_positions,
                                                                       self.goal_positions,
                                                                       self.thresholds, self.velocity_limits):
-                if GodMap.world.is_joint_continuous(name):
+                if GodMap.get_world().is_joint_continuous(name):
                     error = cas.shortest_angular_distance(current, goal)
                 else:
                     error = goal - current
@@ -584,12 +584,12 @@ class JointPosition(Goal):
         :param max_velocity: m/s for prismatic joints, rad/s for revolute or continuous joints, limited by urdf
         """
         super().__init__()
-        self.joint_name = GodMap.world.search_for_joint_name(joint_name, group_name)
-        if GodMap.world.is_joint_continuous(self.joint_name):
+        self.joint_name = GodMap.get_world().search_for_joint_name(joint_name, group_name)
+        if GodMap.get_world().is_joint_continuous(self.joint_name):
             C = JointPositionContinuous
-        elif GodMap.world.is_joint_revolute(self.joint_name):
+        elif GodMap.get_world().is_joint_revolute(self.joint_name):
             C = JointPositionRevolute
-        elif GodMap.world.is_joint_prismatic(self.joint_name):
+        elif GodMap.get_world().is_joint_prismatic(self.joint_name):
             C = JointPositionPrismatic
         else:
             raise ConstraintInitalizationException(f'\'{joint_name}\' has to be continuous, revolute or prismatic')

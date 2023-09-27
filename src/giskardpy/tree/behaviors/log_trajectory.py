@@ -12,7 +12,7 @@ class LogTrajPlugin(GiskardBehavior):
     @record_time
     @profile
     def update(self):
-        current_js = deepcopy(GodMap.world.state)
+        current_js = deepcopy(GodMap.get_world().state)
         time = GodMap.god_map.get_data(identifier.time)
         trajectory = GodMap.god_map.get_data(identifier.trajectory)
         trajectory.set(time, current_js)

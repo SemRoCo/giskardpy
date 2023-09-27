@@ -26,7 +26,7 @@ class WiggleCancel(GiskardBehavior):
 
     def make_velocity_threshold(self, min_cut_off=0.01, max_cut_off=0.06):
         joint_convergence_threshold = GodMap.god_map.get_data(identifier.joint_convergence_threshold)
-        free_variables = GodMap.world.free_variables
+        free_variables = GodMap.get_world().free_variables
         thresholds = []
         for free_variable in free_variables:
             velocity_limit = GodMap.god_map.evaluate_expr(free_variable.get_upper_limit(1))
@@ -40,17 +40,17 @@ class WiggleCancel(GiskardBehavior):
     def initialise(self):
         super().initialise()
         self.js_samples = []
-        GodMap.sample_period = GodMap.sample_period
-        self.max_detectable_freq = 1 / (2 * GodMap.sample_period)
+        GodMap.get_sample_period() = GodMap.get_sample_period()
+        self.max_detectable_freq = 1 / (2 * GodMap.get_sample_period())
         self.min_wiggle_frequency = self.frequency_range * self.max_detectable_freq
         self.keys = []
         self.thresholds = []
         self.velocity_limits = []
         # FIXME check for free variables and not joints
-        for joint_name, threshold in zip(GodMap.world.controlled_joints,
+        for joint_name, threshold in zip(GodMap.get_world().controlled_joints,
                                          self.make_velocity_threshold()):
-            _, velocity_limit = GodMap.world.get_joint_velocity_limits(joint_name)
-            if GodMap.world.is_joint_prismatic(joint_name):
+            _, velocity_limit = GodMap.get_world().get_joint_velocity_limits(joint_name)
+            if GodMap.get_world().is_joint_prismatic(joint_name):
                 velocity_limit = min(self.max_linear_velocity, velocity_limit)
             else:
                 velocity_limit = min(self.max_angular_velocity, velocity_limit)
@@ -66,7 +66,7 @@ class WiggleCancel(GiskardBehavior):
     @record_time
     @profile
     def update(self):
-        prediction_horizon = GodMap.prediction_horizon
+        prediction_horizon = GodMap.get_prediction_horizon()
         if prediction_horizon > 1:
             return Status.RUNNING
         latest_points = GodMap.god_map.get_data(identifier.joint_states)
@@ -84,7 +84,7 @@ class WiggleCancel(GiskardBehavior):
         js_samples_array = np.array(self.js_samples)
         plot = False
         try:
-            self.detect_shaking(js_samples_array, GodMap.sample_period, self.min_wiggle_frequency,
+            self.detect_shaking(js_samples_array, GodMap.get_sample_period(), self.min_wiggle_frequency,
                                 self.amplitude_threshold, self.thresholds, self.velocity_limits, plot)
         except ShakingException as e:
             if GodMap.god_map.get_data(identifier.cut_off_shaking):

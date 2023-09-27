@@ -28,7 +28,7 @@ class PlotTrajectory(GiskardBehavior):
     def plot(self):
         trajectory = GodMap.god_map.get_data(identifier.trajectory)
         if trajectory:
-            sample_period = GodMap.sample_period
+            sample_period = GodMap.get_sample_period()
             try:
                 trajectory.plot_trajectory(path_to_data_folder=self.path_to_data_folder,
                                            sample_period=sample_period,

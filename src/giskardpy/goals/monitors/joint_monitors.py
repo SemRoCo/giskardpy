@@ -14,9 +14,9 @@ class JointGoalReached(Monitor):
                  crucial: bool):
         comparison_list = []
         for joint_name, goal in goal_state.items():
-            joint_name = GodMap.world.search_for_joint_name(joint_name)
-            current = GodMap.world.get_one_dof_joint_symbol(joint_name, Derivatives.position)
-            if GodMap.world.is_joint_continuous(joint_name):
+            joint_name = GodMap.get_world().search_for_joint_name(joint_name)
+            current = GodMap.get_world().get_one_dof_joint_symbol(joint_name, Derivatives.position)
+            if GodMap.get_world().is_joint_continuous(joint_name):
                 error = cas.shortest_angular_distance(current, goal)
             else:
                 error = goal - current

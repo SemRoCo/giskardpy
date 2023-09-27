@@ -36,8 +36,8 @@ class AlignPlanes(Goal):
         if 'root_normal' in kwargs:
             logwarn('Deprecated warning: use goal_normal instead of root_normal')
             goal_normal = kwargs['root_normal']
-        self.root = GodMap.world.search_for_link_name(root_link, root_group)
-        self.tip = GodMap.world.search_for_link_name(tip_link, tip_group)
+        self.root = GodMap.get_world().search_for_link_name(root_link, root_group)
+        self.tip = GodMap.get_world().search_for_link_name(tip_link, tip_group)
         self.max_velocity = max_angular_velocity
         self.weight = weight
 
@@ -56,7 +56,7 @@ class AlignPlanes(Goal):
 
     def make_constraints(self):
         tip_V_tip_normal = w.Vector3(self.tip_V_tip_normal)
-        root_R_tip = GodMap.world.compose_fk_expression(self.root, self.tip).to_rotation()
+        root_R_tip = GodMap.get_world().compose_fk_expression(self.root, self.tip).to_rotation()
         root_V_tip_normal = root_R_tip.dot(tip_V_tip_normal)
         root_V_root_normal = w.Vector3(self.root_V_root_normal)
         self.add_vector_goal_constraints(frame_V_current=root_V_tip_normal,

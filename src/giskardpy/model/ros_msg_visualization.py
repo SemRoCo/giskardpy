@@ -23,7 +23,7 @@ class ROSMsgVisualization:
         self.publisher = rospy.Publisher('~visualization_marker_array', MarkerArray, queue_size=1)
         self.marker_ids = {}
         if tf_frame is None:
-            self.tf_root = str(GodMap.world.root_link_name)
+            self.tf_root = str(GodMap.get_world().root_link_name)
         else:
             self.tf_root = tf_frame
         GodMap.god_map.set_data(identifier.ros_visualizer, self)
@@ -32,9 +32,9 @@ class ROSMsgVisualization:
     def create_world_markers(self, name_space: str = 'planning_visualization') -> List[Marker]:
         markers = []
         time_stamp = rospy.Time()
-        links = GodMap.world.link_names_with_collisions
+        links = GodMap.get_world().link_names_with_collisions
         for i, link_name in enumerate(links):
-            for j, marker in enumerate(GodMap.world.links[link_name].collision_visualization_markers(use_decomposed_meshes=self.use_decomposed_meshes).markers):
+            for j, marker in enumerate(GodMap.get_world().links[link_name].collision_visualization_markers(use_decomposed_meshes=self.use_decomposed_meshes).markers):
                 marker.header.frame_id = self.tf_root
                 marker.action = Marker.ADD
                 link_id_key = f'{link_name}_{j}'
@@ -43,7 +43,7 @@ class ROSMsgVisualization:
                 marker.id = self.marker_ids[link_id_key]
                 marker.ns = name_space
                 marker.header.stamp = time_stamp
-                marker.pose = GodMap.collision_scene.get_map_T_geometry(link_name, j)
+                marker.pose = GodMap.get_collision_scene().get_map_T_geometry(link_name, j)
                 markers.append(marker)
         return markers
 
@@ -75,13 +75,13 @@ class ROSMsgVisualization:
                 yellow_threshold = thresholds.soft_threshold
                 contact_distance = collision.contact_distance
                 if collision.map_P_pa is None:
-                    map_T_a = GodMap.world.compute_fk_np(GodMap.world.root_link_name, collision.original_link_a)
+                    map_T_a = GodMap.get_world().compute_fk_np(GodMap.get_world().root_link_name, collision.original_link_a)
                     map_P_pa = np.dot(map_T_a, collision.a_P_pa)
                 else:
                     map_P_pa = collision.map_P_pa
 
                 if collision.map_P_pb is None:
-                    map_T_b = GodMap.world.compute_fk_np(GodMap.world.root_link_name, collision.original_link_b)
+                    map_T_b = GodMap.get_world().compute_fk_np(GodMap.get_world().root_link_name, collision.original_link_b)
                     map_P_pb = np.dot(map_T_b, collision.b_P_pb)
                 else:
                     map_P_pb = collision.map_P_pb

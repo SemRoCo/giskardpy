@@ -40,10 +40,10 @@ class CartesianPosition(Goal):
             p.header = goal_point.header
             p.point = goal_point.pose.position
             goal_point = p
-        self.root_link = GodMap.world.search_for_link_name(root_link, root_group)
-        self.tip_link = GodMap.world.search_for_link_name(tip_link, tip_group)
+        self.root_link = GodMap.get_world().search_for_link_name(root_link, root_group)
+        self.tip_link = GodMap.get_world().search_for_link_name(tip_link, tip_group)
         if root_link2 is not None:
-            self.root_link2 = GodMap.world.search_for_link_name(root_link2, root_group)
+            self.root_link2 = GodMap.get_world().search_for_link_name(root_link2, root_group)
             self.goal_point = self.transform_msg(self.root_link2, goal_point)
         else:
             self.root_link2 = None
@@ -63,9 +63,9 @@ class CartesianPosition(Goal):
     @profile
     def make_constraints(self):
         r_P_g = cas.Point3(self.goal_point)
-        r_P_c = GodMap.world.compose_fk_expression(self.root_link, self.tip_link).to_position()
+        r_P_c = GodMap.get_world().compose_fk_expression(self.root_link, self.tip_link).to_position()
         if self.root_link2 is not None:
-            root_link2_T_root_link = GodMap.world.compose_fk_evaluated_expression(self.root_link2, self.root_link)
+            root_link2_T_root_link = GodMap.get_world().compose_fk_evaluated_expression(self.root_link2, self.root_link)
             r_P_c = root_link2_T_root_link.dot(r_P_c)
         # self.add_debug_expr('trans', cas.norm(r_P_c))
 
@@ -114,10 +114,10 @@ class CartesianOrientation(Goal):
             q.header = goal_orientation.header
             q.quaternion = goal_orientation.pose.orientation
             goal_orientation = q
-        self.root_link = GodMap.world.search_for_link_name(root_link, root_group)
-        self.tip_link = GodMap.world.search_for_link_name(tip_link, tip_group)
+        self.root_link = GodMap.get_world().search_for_link_name(root_link, root_group)
+        self.tip_link = GodMap.get_world().search_for_link_name(tip_link, tip_group)
         if root_link2 is not None:
-            self.root_link2 = GodMap.world.search_for_link_name(root_link2, root_group)
+            self.root_link2 = GodMap.get_world().search_for_link_name(root_link2, root_group)
             self.goal_orientation = self.transform_msg(self.root_link2, goal_orientation)
         else:
             self.root_link2 = None
@@ -136,14 +136,14 @@ class CartesianOrientation(Goal):
 
     def make_constraints(self):
         r_R_g = cas.RotationMatrix(self.goal_orientation)
-        r_R_c = GodMap.world.compose_fk_expression(self.root_link, self.tip_link).to_rotation()
+        r_R_c = GodMap.get_world().compose_fk_expression(self.root_link, self.tip_link).to_rotation()
         if self.root_link2 is not None:
-            c_R_r_eval = GodMap.world.compose_fk_evaluated_expression(self.tip_link, self.root_link2).to_rotation()
-            root_link2_T_root_link = GodMap.world.compose_fk_evaluated_expression(self.root_link2, self.root_link)
+            c_R_r_eval = GodMap.get_world().compose_fk_evaluated_expression(self.tip_link, self.root_link2).to_rotation()
+            root_link2_T_root_link = GodMap.get_world().compose_fk_evaluated_expression(self.root_link2, self.root_link)
             # self.add_debug_matrix('root_link2_T_root_link', root_link2_T_root_link)
             r_R_c = root_link2_T_root_link.dot(r_R_c)
         else:
-            c_R_r_eval = GodMap.world.compose_fk_evaluated_expression(self.tip_link, self.root_link).to_rotation()
+            c_R_r_eval = GodMap.get_world().compose_fk_evaluated_expression(self.tip_link, self.root_link).to_rotation()
 
         rotation_error = cas.rotational_error(r_R_c, r_R_g)
         rotation_error_monitor = Monitor('rotation error',
@@ -186,14 +186,14 @@ class CartesianPositionStraight(Goal):
         self.reference_velocity = reference_velocity
         self.max_velocity = max_velocity
         self.weight = weight
-        self.root_link = GodMap.world.search_for_link_name(root_link, root_group)
-        self.tip_link = GodMap.world.search_for_link_name(tip_link, tip_group)
+        self.root_link = GodMap.get_world().search_for_link_name(root_link, root_group)
+        self.tip_link = GodMap.get_world().search_for_link_name(tip_link, tip_group)
         self.goal_point = self.transform_msg(self.root_link, goal_point)
 
     def make_constraints(self):
         root_P_goal = cas.Point3(self.goal_point)
-        root_P_tip = GodMap.world.compose_fk_expression(self.root_link, self.tip_link).to_position()
-        t_T_r = GodMap.world.compose_fk_expression(self.tip_link, self.root_link)
+        root_P_tip = GodMap.get_world().compose_fk_expression(self.root_link, self.tip_link).to_position()
+        t_T_r = GodMap.get_world().compose_fk_expression(self.tip_link, self.root_link)
         tip_P_goal = t_T_r.dot(root_P_goal)
 
         # Create rotation matrix, which rotates the tip link frame
@@ -213,8 +213,8 @@ class CartesianPositionStraight(Goal):
 
         # Apply rotation matrix on the fk of the tip link
         a_T_t = t_R_a.inverse().dot(
-            GodMap.world.compose_fk_evaluated_expression(self.tip_link, self.root_link)).dot(
-            GodMap.world.compose_fk_expression(self.root_link, self.tip_link))
+            GodMap.get_world().compose_fk_evaluated_expression(self.tip_link, self.root_link)).dot(
+            GodMap.get_world().compose_fk_expression(self.root_link, self.tip_link))
         expr_p = a_T_t.to_position()
         dist = cas.norm(root_P_goal - root_P_tip)
 
@@ -332,11 +332,11 @@ class DiffDriveBaseGoal(Goal):
             pointing_axis.header.frame_id = tip_link
             pointing_axis.vector.x = 1
         self.weight = weight
-        self.map = GodMap.world.search_for_link_name(root_link, root_group)
-        self.base_footprint = GodMap.world.search_for_link_name(tip_link, tip_group)
+        self.map = GodMap.get_world().search_for_link_name(root_link, root_group)
+        self.base_footprint = GodMap.get_world().search_for_link_name(tip_link, tip_group)
         self.goal_pose = self.transform_msg(self.map, goal_pose)
         self.goal_pose.pose.position.z = 0
-        diff_drive_joints = [v for k, v in GodMap.world.joints.items() if isinstance(v, DiffDrive)]
+        diff_drive_joints = [v for k, v in GodMap.get_world().joints.items() if isinstance(v, DiffDrive)]
         assert len(diff_drive_joints) == 1
         self.joint: DiffDrive = diff_drive_joints[0]
         self.odom = self.joint.parent_link_name
@@ -350,14 +350,14 @@ class DiffDriveBaseGoal(Goal):
             self.base_footprint_V_pointing_axis.vector.z = 1
 
     def make_constraints(self):
-        map_T_base_current = cas.TransMatrix(GodMap.world.compute_fk_np(self.map, self.base_footprint))
-        map_T_odom_current = GodMap.world.compute_fk_np(self.map, self.odom)
+        map_T_base_current = cas.TransMatrix(GodMap.get_world().compute_fk_np(self.map, self.base_footprint))
+        map_T_odom_current = GodMap.get_world().compute_fk_np(self.map, self.odom)
         map_odom_angle, _, _ = rotation_from_matrix(map_T_odom_current)
         map_R_base_current = map_T_base_current.to_rotation()
         axis_start, angle_start = map_R_base_current.to_axis_angle()
         angle_start = cas.if_greater_zero(axis_start[2], angle_start, -angle_start)
 
-        map_T_base_footprint = GodMap.world.compose_fk_expression(self.map, self.base_footprint)
+        map_T_base_footprint = GodMap.get_world().compose_fk_expression(self.map, self.base_footprint)
         map_P_base_footprint = map_T_base_footprint.to_position()
         # map_R_base_footprint = map_T_base_footprint.to_rotation()
         map_T_base_footprint_goal = cas.TransMatrix(self.goal_pose)
@@ -441,7 +441,7 @@ class PR2DiffDriveBaseGoal(Goal):
         super().__init__()
         self.max_angular_velocity = max_angular_velocity
         self.max_linear_velocity = max_linear_velocity
-        diff_drive_joints = [v for k, v in GodMap.world.joints.items() if isinstance(v, OmniDrivePR22)]
+        diff_drive_joints = [v for k, v in GodMap.get_world().joints.items() if isinstance(v, OmniDrivePR22)]
         assert len(diff_drive_joints) == 1
         self.joint: OmniDrivePR22 = diff_drive_joints[0]
         self.weight = weight
@@ -456,7 +456,7 @@ class PR2DiffDriveBaseGoal(Goal):
                                                    weight=WEIGHT_BELOW_CA))
 
     def make_constraints(self):
-        root_T_tip = GodMap.world.compose_fk_expression(self.root_link, self.tip_link)
+        root_T_tip = GodMap.get_world().compose_fk_expression(self.root_link, self.tip_link)
         root_P_tip = root_T_tip.to_position()
 
         root_T_goal = cas.TransMatrix(self.root_T_goal)
@@ -539,14 +539,14 @@ class TranslationVelocityLimit(Goal):
         See CartesianVelocityLimit
         """
         super().__init__()
-        self.root_link = GodMap.world.search_for_link_name(root_link, root_group)
-        self.tip_link = GodMap.world.search_for_link_name(tip_link, tip_group)
+        self.root_link = GodMap.get_world().search_for_link_name(root_link, root_group)
+        self.tip_link = GodMap.get_world().search_for_link_name(tip_link, tip_group)
         self.hard = hard
         self.weight = weight
         self.max_velocity = max_velocity
 
     def make_constraints(self):
-        r_P_c = GodMap.world.compose_fk_expression(self.root_link, self.tip_link).to_position()
+        r_P_c = GodMap.get_world().compose_fk_expression(self.root_link, self.tip_link).to_position()
         # self.add_debug_expr('limit', -self.max_velocity)
         if not self.hard:
             self.add_translational_velocity_limit(frame_P_current=r_P_c,
@@ -571,15 +571,15 @@ class RotationVelocityLimit(Goal):
         """
 
         super().__init__()
-        self.root_link = GodMap.world.search_for_link_name(root_link, root_group)
-        self.tip_link = GodMap.world.search_for_link_name(tip_link, tip_group)
+        self.root_link = GodMap.get_world().search_for_link_name(root_link, root_group)
+        self.tip_link = GodMap.get_world().search_for_link_name(tip_link, tip_group)
         self.hard = hard
 
         self.weight = weight
         self.max_velocity = max_velocity
 
     def make_constraints(self):
-        r_R_c = GodMap.world.compose_fk_expression(self.root_link, self.tip_link).to_rotation()
+        r_R_c = GodMap.get_world().compose_fk_expression(self.root_link, self.tip_link).to_rotation()
         if self.hard:
             self.add_rotational_velocity_limit(frame_R_current=r_R_c,
                                                max_velocity=self.max_velocity,
@@ -650,8 +650,8 @@ class RelativePositionSequence(Goal):
                  root_link: str,
                  tip_link: str):
         super().__init__()
-        self.root_link = GodMap.world.search_for_link_name(root_link)
-        self.tip_link = GodMap.world.search_for_link_name(tip_link)
+        self.root_link = GodMap.get_world().search_for_link_name(root_link)
+        self.tip_link = GodMap.get_world().search_for_link_name(tip_link)
         self.root_P_goal1 = self.transform_msg(self.root_link, goal1)
         self.tip_P_goal2 = self.transform_msg(self.tip_link, goal2)
         self.max_velocity = 0.1
@@ -659,11 +659,11 @@ class RelativePositionSequence(Goal):
 
     @profile
     def make_constraints(self):
-        root_P_current = GodMap.world.compose_fk_expression(self.root_link, self.tip_link).to_position()
+        root_P_current = GodMap.get_world().compose_fk_expression(self.root_link, self.tip_link).to_position()
 
         root_P_goal1 = cas.Point3(self.root_P_goal1)
         tip_P_goal2 = cas.Point3(self.tip_P_goal2)
-        root_P_goal2 = GodMap.world.compose_fk_expression(self.root_link, self.tip_link).dot(tip_P_goal2)
+        root_P_goal2 = GodMap.get_world().compose_fk_expression(self.root_link, self.tip_link).dot(tip_P_goal2)
 
         error1 = cas.euclidean_distance(root_P_goal1, root_P_current)
         error1_monitor = Monitor(name='p1',

@@ -247,7 +247,7 @@ class TreeManager(ABC):
         self.tree.blackboard_exchange.get_blackboard_variables_srv.shutdown()
         self.tree.blackboard_exchange.open_blackboard_watcher_srv.shutdown()
         self.tree.blackboard_exchange.close_blackboard_watcher_srv.shutdown()
-        for value in GodMap.tree_manager.tree_nodes.values():
+        for value in GodMap.get_tree_manager().tree_nodes.values():
             node = value.node
             for attribute_name, attribute in vars(node).items():
                 if isinstance(attribute, rospy.Service):

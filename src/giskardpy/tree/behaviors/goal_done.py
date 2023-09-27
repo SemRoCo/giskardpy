@@ -11,7 +11,7 @@ class GoalDone(GiskardBehavior):
     # @catch_and_raise_to_blackboard
     def update(self):
         all_goals_succeeded = None
-        for goal in GodMap.motion_goals.values():
+        for goal in GodMap.get_motion_goals().values():
             is_done = goal.is_done()
             if is_done is not None:
                 if all_goals_succeeded is None:

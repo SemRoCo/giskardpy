@@ -13,7 +13,7 @@ class NewTrajectory(GiskardBehavior):
     @record_time
     @profile
     def initialise(self):
-        current_js = deepcopy(GodMap.world.state)
+        current_js = deepcopy(GodMap.get_world().state)
         trajectory = Trajectory()
         trajectory.set(0, current_js)
         GodMap.god_map.set_data(identifier.trajectory, trajectory)

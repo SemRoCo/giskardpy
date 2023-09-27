@@ -6,6 +6,7 @@ import giskardpy.utils.tfwrapper as tf
 from giskardpy import casadi_wrapper as w
 from giskardpy.goals.goal import Goal
 from giskardpy.goals.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE
+from giskardpy.god_map_user import GodMap
 from giskardpy.utils.logging import logwarn
 
 

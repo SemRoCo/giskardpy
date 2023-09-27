@@ -4,6 +4,7 @@ from typing import List, Union, Optional, Callable
 import giskardpy.casadi_wrapper as cas
 from giskardpy import identifier
 from giskardpy.god_map import _GodMap
+from giskardpy.god_map_user import GodMap
 from giskardpy.my_types import Derivatives
 
 DebugConstraint = namedtuple('debug', ['expr'])

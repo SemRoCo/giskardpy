@@ -5,6 +5,7 @@ import numpy as np
 
 from giskardpy import identifier
 from giskardpy.god_map import _GodMap
+from giskardpy.god_map_user import GodMap
 
 
 class TimeCollector:

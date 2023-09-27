@@ -1,6 +1,7 @@
 from py_trees import Status
 
 import giskardpy.identifier as identifier
+from giskardpy.god_map_user import GodMap
 from giskardpy.qp.qp_controller import QPProblemBuilder
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.decorators import catch_and_raise_to_blackboard, record_time

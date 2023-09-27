@@ -6,6 +6,7 @@ from py_trees import Status
 
 from giskardpy import identifier
 from giskardpy.goals.goal import Goal
+from giskardpy.god_map_user import GodMap
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.decorators import record_time, catch_and_raise_to_blackboard
 from giskardpy.utils.logging import logwarn

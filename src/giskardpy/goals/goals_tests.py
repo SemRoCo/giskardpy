@@ -2,6 +2,7 @@ import numpy as np
 from geometry_msgs.msg import QuaternionStamped, PointStamped, PoseStamped, Vector3Stamped
 import giskardpy.casadi_wrapper as w
 from giskardpy.goals.goal import Goal
+from giskardpy.god_map_user import GodMap
 
 
 class DebugGoal(Goal):

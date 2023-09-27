@@ -30,10 +30,10 @@ class RobotInterfaceConfig(ABC):
 
     @property
     def robot_group_name(self) -> str:
-        return GodMap.world.robot_name
+        return self.world.robot_name
 
     def get_root_link_of_group(self, group_name: str) -> PrefixName:
-        return GodMap.world.groups[group_name].root_link_name
+        return self.world.groups[group_name].root_link_name
 
     @property
     def tree_manager(self) -> TreeManager:
@@ -55,7 +55,7 @@ class RobotInterfaceConfig(ABC):
         """
         Tell Giskard to sync a 6dof joint with a tf frame.
         """
-        joint_name = GodMap.world.search_for_joint_name(joint_name)
+        joint_name = self.world.search_for_joint_name(joint_name)
         self.tree_manager.tree.wait_for_goal.synchronization.sync_6dof_joint_with_tf_frame(joint_name,
                                                                                            tf_parent_frame,
                                                                                            tf_child_frame)
@@ -69,7 +69,7 @@ class RobotInterfaceConfig(ABC):
         Tell Giskard to sync the world state with a joint state topic
         """
         if group_name is None:
-            group_name = GodMap.world.robot_name
+            group_name = self.world.robot_name
         self.tree_manager.tree.wait_for_goal.synchronization.sync_joint_state_topic(group_name=group_name,
                                                                                     topic_name=topic_name)
         self.tree_manager.tree.process_goal.control_loop_branch.synchronization.sync_joint_state2_topic(
@@ -87,7 +87,7 @@ class RobotInterfaceConfig(ABC):
                                     the tracking smoother but less accurate.
         :param joint_name: name of the omni or diff drive joint. Doesn't need to be specified if there is only one.
         """
-        joint_name = GodMap.world.search_for_joint_name(joint_name)
+        joint_name = self.world.search_for_joint_name(joint_name)
         self.tree_manager.tree.process_goal.control_loop_branch.send_controls.add_base_traj_action_server(cmd_vel_topic,
                                                                                                           joint_name)
 
@@ -117,7 +117,7 @@ class RobotInterfaceConfig(ABC):
         :param fill_velocity_values: whether to fill the velocity entries in the message send to the robot
         """
         if group_name is None:
-            group_name = GodMap.world.robot_name
+            group_name = self.world.robot_name
         self.tree_manager.add_follow_joint_traj_action_server(namespace=namespace, state_topic=state_topic,
                                                               group_name=group_name,
                                                               fill_velocity_values=fill_velocity_values,

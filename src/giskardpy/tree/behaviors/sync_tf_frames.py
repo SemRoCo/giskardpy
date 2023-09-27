@@ -2,6 +2,7 @@ from typing import List, Tuple, Dict, Optional
 import giskardpy.casadi_wrapper as w
 from py_trees import Status
 
+from giskardpy.god_map_user import GodMap
 from giskardpy.model.joints import Joint6DOF
 from giskardpy.my_types import PrefixName
 from giskardpy.tree.behaviors.plugin import GiskardBehavior

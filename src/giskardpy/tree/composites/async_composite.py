@@ -6,6 +6,7 @@ import rospy
 from py_trees import Status, Composite
 
 from giskardpy import identifier
+from giskardpy.god_map_user import GodMap
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.utils import raise_to_blackboard
 

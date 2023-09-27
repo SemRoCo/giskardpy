@@ -3,6 +3,7 @@ from py_trees import Status
 from sensor_msgs.msg import JointState
 
 import giskardpy.identifier as identifier
+from giskardpy.god_map_user import GodMap
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.tree.behaviors.sync_configuration import SyncConfiguration
 from giskardpy.utils import logging

@@ -13,6 +13,7 @@ import giskardpy.identifier as identifier
 from giskardpy.goals.base_traj_follower import BaseTrajFollower
 from giskardpy.goals.goal import Goal
 from giskardpy.goals.set_prediction_horizon import SetPredictionHorizon
+from giskardpy.god_map_user import GodMap
 from giskardpy.model.joints import OmniDrive, DiffDrive
 from giskardpy.my_types import Derivatives
 from giskardpy.tree.behaviors.plugin import GiskardBehavior

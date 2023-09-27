@@ -8,6 +8,7 @@ from py_trees import Status
 from rospy import ROSException
 
 from giskardpy.data_types import JointStates
+from giskardpy.god_map_user import GodMap
 from giskardpy.model.joints import OmniDrive
 from giskardpy.my_types import PrefixName
 from giskardpy.tree.behaviors.plugin import GiskardBehavior

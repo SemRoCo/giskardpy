@@ -11,6 +11,7 @@ import giskardpy.casadi_wrapper as w
 from giskardpy import identifier
 from giskardpy.data_types import JointStates
 from giskardpy.god_map import _GodMap
+from giskardpy.god_map_user import GodMap
 from giskardpy.my_types import PrefixName, Derivatives
 from giskardpy.my_types import my_string, derivative_joint_map, derivative_map
 from giskardpy.qp.free_variable import FreeVariable

@@ -3,6 +3,7 @@ from py_trees_ros.trees import BehaviourTree
 
 from giskard_msgs.msg import MoveAction
 from giskardpy import identifier
+from giskardpy.god_map_user import GodMap
 from giskardpy.model.collision_world_syncer import CollisionCheckerLib
 from giskardpy.tree.behaviors.collision_checker import CollisionChecker
 from giskardpy.tree.behaviors.instantaneous_controller import ControllerPlugin

@@ -11,6 +11,7 @@ from std_msgs.msg import ColorRGBA
 
 from giskardpy import identifier
 from giskardpy.god_map import _GodMap
+from giskardpy.god_map_user import GodMap
 from giskardpy.model.joints import FixedJoint, OmniDrive, DiffDrive, Joint6DOF, OneDofJoint
 from giskardpy.model.links import Link
 from giskardpy.model.utils import robot_name_from_urdf_string

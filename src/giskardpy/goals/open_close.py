@@ -6,6 +6,7 @@ from giskardpy.goals.cartesian_goals import CartesianPose
 from giskardpy.goals.goal import Goal
 from giskardpy.goals.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE
 from giskardpy.goals.joint_goals import JointPosition
+from giskardpy.god_map_user import GodMap
 
 
 class Open(Goal):

@@ -7,6 +7,7 @@ from sensor_msgs.msg import JointState
 
 from giskardpy import identifier
 from giskardpy.data_types import JointStates
+from giskardpy.god_map_user import GodMap
 from giskardpy.model.trajectory import Trajectory
 from giskardpy.qp.qp_controller import QPProblemBuilder
 from giskardpy.tree.behaviors.plugin import GiskardBehavior

@@ -12,6 +12,7 @@ from giskardpy.goals.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_
 from giskardpy.goals.monitors.monitors import Monitor
 from giskardpy.goals.tasks.joint_tasks import PositionTask
 from giskardpy.goals.tasks.task import Task
+from giskardpy.god_map_user import GodMap
 
 
 class InsertCylinder(Goal):

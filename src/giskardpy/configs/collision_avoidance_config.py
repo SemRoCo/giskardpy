@@ -8,6 +8,7 @@ from typing import Dict, Optional, List, Union, DefaultDict, Tuple
 from giskardpy import identifier
 from giskardpy.exceptions import SetupException
 from giskardpy.god_map import _GodMap
+from giskardpy.god_map_user import GodMap
 from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer, CollisionAvoidanceGroupThresholds, \
     CollisionCheckerLib, CollisionAvoidanceThresholds
 from giskardpy.model.world import WorldTree

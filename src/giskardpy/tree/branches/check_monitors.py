@@ -1,6 +1,7 @@
 from py_trees import Sequence, Selector
 
 from giskardpy import identifier
+from giskardpy.god_map_user import GodMap
 from giskardpy.model.collision_world_syncer import CollisionCheckerLib
 from giskardpy.tree.behaviors.collision_checker import CollisionChecker
 from giskardpy.tree.behaviors.curcial_monitors_satisfied import CrucialMonitorsSatisfied

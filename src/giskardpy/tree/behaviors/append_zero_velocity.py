@@ -1,5 +1,6 @@
 from py_trees import Status
 
+from giskardpy.god_map_user import GodMap
 from giskardpy.my_types import Derivatives
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.decorators import record_time

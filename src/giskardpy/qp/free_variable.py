@@ -3,7 +3,6 @@ from typing import Dict, Optional, List, Union
 import numpy as np
 import giskardpy.casadi_wrapper as w
 from giskardpy import identifier
-from giskardpy.god_map import _GodMap
 from giskardpy.god_map_user import GodMap
 from giskardpy.my_types import Derivatives, PrefixName
 from giskardpy.utils.decorators import memoize

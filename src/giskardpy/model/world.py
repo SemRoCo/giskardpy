@@ -22,6 +22,7 @@ from giskardpy.data_types import JointStates
 from giskardpy.exceptions import DuplicateNameException, UnknownGroupException, UnknownLinkException, \
     WorldException, GiskardException
 from giskardpy.god_map import _GodMap
+from giskardpy.god_map_user import GodMap
 from giskardpy.model.joints import Joint, FixedJoint, PrismaticJoint, RevoluteJoint, OmniDrive, DiffDrive, \
     urdf_to_joint, VirtualFreeVariables, MovableJoint, Joint6DOF, OneDofJoint
 from giskardpy.model.links import Link, MeshGeometry
@@ -118,31 +119,31 @@ class WorldModelUpdateContextManager:
     first: bool = True
 
     def __init__(self, world: WorldTree):
-        GodMap.world = world
+        self.world = world
 
     def __enter__(self):
-        if GodMap.world.context_manager_active:
+        if self.world.context_manager_active:
             self.first = False
-        GodMap.world.context_manager_active = True
-        return GodMap.world
+        self.world.context_manager_active = True
+        return self.world
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_type is None and self.first:
-            GodMap.world.context_manager_active = False
-            GodMap.world.notify_model_change()
+            self.world.context_manager_active = False
+            self.world.notify_model_change()
 
 
 class ResetJointStateContextManager:
     def __init__(self, world: WorldTree):
-        GodMap.world = world
+        self.world = world
 
     def __enter__(self):
-        self.joint_state_tmp = deepcopy(GodMap.world.state)
+        self.joint_state_tmp = deepcopy(self.world.state)
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_type is None:
-            GodMap.world.state = self.joint_state_tmp
-            GodMap.world.notify_state_change()
+            self.world.state = self.joint_state_tmp
+            self.world.notify_state_change()
 
 
 class WorldTree(WorldTreeInterface):

@@ -7,6 +7,7 @@ from rospy import ROSException
 from sensor_msgs.msg import JointState
 
 from giskardpy.data_types import JointStates
+from giskardpy.god_map_user import GodMap
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
 from giskardpy.utils.decorators import record_time

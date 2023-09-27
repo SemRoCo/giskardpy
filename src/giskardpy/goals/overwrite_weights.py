@@ -1,6 +1,7 @@
 from __future__ import division
 
 from giskardpy.goals.goal import Goal
+from giskardpy.god_map_user import GodMap
 
 
 class OverwriteWeights(Goal):

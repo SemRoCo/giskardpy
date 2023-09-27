@@ -3,6 +3,7 @@ from py_trees import Status
 from std_msgs.msg import Float64
 
 from giskardpy.data_types import KeyDefaultDict
+from giskardpy.god_map_user import GodMap
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.decorators import catch_and_raise_to_blackboard, record_time
 

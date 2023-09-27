@@ -122,7 +122,7 @@ class GodMap:
     @classmethod
     def get_trajectory_time_in_seconds(cls):
         time = god_map.get_data(identifier.time)
-        if cls.is_closed_loop:
+        if cls.is_closed_loop():
             return time
         return time * cls.get_sample_period()
 

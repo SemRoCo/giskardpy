@@ -59,7 +59,7 @@ def ros(request):
 def resetted_giskard(giskard: GiskardTestWrapper) -> GiskardTestWrapper:
     logging.loginfo('resetting giskard')
     giskard.restart_ticking()
-    if GodMap.is_standalone and giskard.has_odometry_joint():
+    if GodMap.is_standalone() and giskard.has_odometry_joint():
         zero = PoseStamped()
         zero.header.frame_id = 'map'
         zero.pose.orientation.w = 1
@@ -70,7 +70,7 @@ def resetted_giskard(giskard: GiskardTestWrapper) -> GiskardTestWrapper:
 
 @pytest.fixture()
 def zero_pose(resetted_giskard: GiskardTestWrapper) -> GiskardTestWrapper:
-    if GodMap.is_standalone:
+    if GodMap.is_standalone():
         resetted_giskard.set_seed_configuration(resetted_giskard.default_pose)
         resetted_giskard.allow_all_collisions()
         resetted_giskard.projection()
@@ -83,7 +83,7 @@ def zero_pose(resetted_giskard: GiskardTestWrapper) -> GiskardTestWrapper:
 
 @pytest.fixture()
 def better_pose(resetted_giskard: GiskardTestWrapper) -> GiskardTestWrapper:
-    if GodMap.is_standalone:
+    if GodMap.is_standalone():
         resetted_giskard.set_seed_configuration(resetted_giskard.better_pose)
         resetted_giskard.allow_all_collisions()
         resetted_giskard.plan_and_execute()
@@ -97,7 +97,7 @@ def better_pose(resetted_giskard: GiskardTestWrapper) -> GiskardTestWrapper:
 @pytest.fixture()
 def kitchen_setup(better_pose: GiskardTestWrapper) -> GiskardTestWrapper:
     better_pose.kitchen_name = 'iai_kitchen'
-    if GodMap.is_standalone:
+    if GodMap.is_standalone():
         kitchen_pose = PoseStamped()
         kitchen_pose.header.frame_id = str(better_pose.default_root)
         kitchen_pose.pose.orientation.w = 1
@@ -115,7 +115,7 @@ def kitchen_setup(better_pose: GiskardTestWrapper) -> GiskardTestWrapper:
     for joint_name in GodMap.get_world().groups[better_pose.kitchen_name].movable_joint_names:
         joint = GodMap.get_world().joints[joint_name]
         if isinstance(joint, OneDofJoint):
-            if GodMap.is_standalone:
+            if GodMap.is_standalone():
                 js[str(joint.free_variable.name)] = 0.0
             else:
                 js[str(joint.free_variable.name.short_name)] = 0.0
@@ -126,7 +126,7 @@ def kitchen_setup(better_pose: GiskardTestWrapper) -> GiskardTestWrapper:
 @pytest.fixture()
 def apartment_setup(better_pose: GiskardTestWrapper) -> GiskardTestWrapper:
     better_pose.environment_name = 'iai_apartment'
-    if GodMap.is_standalone:
+    if GodMap.is_standalone():
         kitchen_pose = PoseStamped()
         kitchen_pose.header.frame_id = str(better_pose.default_root)
         kitchen_pose.pose.orientation.w = 1

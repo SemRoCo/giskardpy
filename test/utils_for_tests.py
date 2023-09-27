@@ -380,7 +380,7 @@ class GiskardTestWrapper(GiskardWrapper):
         # TODO it is strange that I need to kill the services... should be investigated. (:
         GodMap.get_tree_manager().kill_all_services()
         giskarding_time = self.total_time_spend_giskarding
-        if not GodMap.is_standalone:
+        if not GodMap.is_standalone():
             giskarding_time -= self.total_time_spend_moving
         logging.loginfo(f'total time spend giskarding: {giskarding_time}')
         logging.loginfo(f'total time spend moving: {self.total_time_spend_moving}')

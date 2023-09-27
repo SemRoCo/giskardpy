@@ -179,7 +179,7 @@ class PR2TestWrapper(GiskardTestWrapper):
         p = PoseStamped()
         p.header.frame_id = 'map'
         p.pose.orientation.w = 1
-        if GodMap.is_standalone:
+        if GodMap.is_standalone():
             self.teleport_base(p)
         else:
             self.move_base(p)
@@ -237,7 +237,7 @@ def giskard(request, ros):
 
 @pytest.fixture()
 def pocky_pose_setup(resetted_giskard: PR2TestWrapper) -> PR2TestWrapper:
-    if resetted_giskard.is_standalone:
+    if resetted_giskard.is_standalone():
         resetted_giskard.set_seed_configuration(pocky_pose)
         resetted_giskard.allow_all_collisions()
     else:

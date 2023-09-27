@@ -47,7 +47,7 @@ class ControlLoop(AsyncBehavior):
         self.add_child(success_is_running(EvaluateMonitors)())
         self.add_child(ControllerPlugin('controller'))
 
-        if GodMap.is_closed_loop:
+        if GodMap.is_closed_loop():
             self.send_controls = success_is_running(SendControls)()
 
             self.add_child(success_is_running(RosTime)())

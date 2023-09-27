@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, List, Dict
 from giskardpy.utils.utils import int_to_bit_list
 
 if TYPE_CHECKING:
+    from giskardpy.qp.qp_controller import QPProblemBuilder
     from giskardpy.configs.qp_controller_config import QPControllerConfig
     from giskardpy.my_types import Derivatives
     from giskardpy.goals.goal import Goal
@@ -79,7 +80,7 @@ class GodMap:
         return god_map.get_data(identifier.max_derivative)
 
     @classmethod
-    def get_qp_controller(cls) -> Derivatives:
+    def get_qp_controller(cls) -> QPProblemBuilder:
         return god_map.get_data(identifier.qp_controller)
 
     @classmethod

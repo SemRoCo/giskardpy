@@ -23,12 +23,6 @@ class GiskardBehavior(Behaviour):
     def __copy__(self):
         return type(self)(self.name)
 
-    @property
-    def traj_time_in_sec(self):
-        if GodMap.is_closed_loop:
-            return GodMap.god_map.unsafe_get_data(identifier.time)
-        return GodMap.god_map.unsafe_get_data(identifier.time) * GodMap.god_map.unsafe_get_data(identifier.sample_period)
-
     def get_runtime(self):
         return time() - self.get_blackboard().runtime
 

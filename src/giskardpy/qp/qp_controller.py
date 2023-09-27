@@ -196,7 +196,7 @@ class Weights(ProblemDataPart):
         weights = defaultdict(dict)  # maps order to joints
         for t in range(self.prediction_horizon):
             for v in self.free_variables:
-                for derivative in Derivatives.range(Derivatives.velocity, min(v.order, self.max_derivative)):
+                for derivative in Derivatives.range(Derivatives.velocity, self.max_derivative):
                     if t >= self.prediction_horizon - (self.max_derivative - derivative):
                         continue
                     normalized_weight = v.normalized_weight(t, derivative, self.prediction_horizon,
@@ -318,7 +318,7 @@ class FreeVariableBounds(ProblemDataPart):
         for v in self.free_variables:
             lb_, ub_ = self.velocity_limit(v)
             for t in range(self.prediction_horizon):
-                for derivative in Derivatives.range(Derivatives.velocity, min(v.order, self.max_derivative)):
+                for derivative in Derivatives.range(Derivatives.velocity, self.max_derivative):
                     if t >= self.prediction_horizon - (self.max_derivative - derivative):
                         continue
                     index = t + self.prediction_horizon * (derivative - 1)
@@ -1026,7 +1026,7 @@ class QPProblemBuilder:
         self.free_variables.extend(list(sorted(free_variables, key=lambda x: x.position_name)))
         l = [x.position_name for x in free_variables]
         duplicates = set([x for x in l if l.count(x) > 1])
-        self.order = Derivatives(min(self.prediction_horizon, max(v.order for v in self.free_variables)))
+        self.order = Derivatives(min(self.prediction_horizon, GodMap.max_derivative))
         assert duplicates == set(), f'there are free variables with the same name: {duplicates}'
 
     def add_inequality_constraints(self, constraints: List[InequalityConstraint]):
@@ -1132,10 +1132,6 @@ class QPProblemBuilder:
         if len(array) > 0:
             with pd.option_context('display.max_rows', None, 'display.max_columns', None):
                 print(array)
-
-    @property
-    def traj_time_in_sec(self):
-        return GodMap.god_map.unsafe_get_data(identifier.time) * GodMap.god_map.unsafe_get_data(identifier.sample_period)
 
     @profile
     def get_cmd(self, substitutions: np.ndarray) -> NextCommands:

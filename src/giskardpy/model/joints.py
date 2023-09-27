@@ -145,17 +145,12 @@ class Joint(ABC):
     parent_link_name: PrefixName
     child_link_name: PrefixName
     parent_T_child: w.TransMatrix
-    god_map = _GodMap()
 
     def __str__(self):
         return f'{self.name}: {self.parent_link_name}<-{self.child_link_name}'
 
     def __repr__(self):
         return str(self)
-
-    @property
-    def world(self):
-        return _GodMap().get_data(identifier.world)
 
 
 class VirtualFreeVariables(ABC):

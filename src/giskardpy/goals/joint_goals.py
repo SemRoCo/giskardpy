@@ -31,8 +31,7 @@ class SetSeedConfiguration(NonMotionGoal):
         super().__init__()
         if group_name is not None:
             seed_configuration = {PrefixName(joint_name, group_name): v for joint_name, v in seed_configuration.items()}
-        if GodMap.is_goal_msg_type_execute() \
-                and GodMap.god_map.get_data(identifier.control_mode) != ControlModes.standalone:
+        if GodMap.is_goal_msg_type_execute() and not GodMap.is_standalone:
             raise ConstraintInitalizationException(f'It is not allowed to combine {str(self)} with plan and execute.')
         for joint_name, initial_joint_value in seed_configuration.items():
             joint_name = GodMap.world.search_for_joint_name(joint_name, group_name)
@@ -49,8 +48,7 @@ class SetOdometry(NonMotionGoal):
     def __init__(self, group_name: str, base_pose: PoseStamped):
         super().__init__()
         self.group_name = group_name
-        if GodMap.is_goal_msg_type_execute() \
-                and GodMap.god_map.get_data(identifier.control_mode) != ControlModes.standalone:
+        if GodMap.is_goal_msg_type_execute() and not GodMap.is_standalone:
             raise ConstraintInitalizationException(f'It is not allowed to combine {str(self)} with plan and execute.')
         brumbrum_joint_name = GodMap.world.groups[group_name].root_link.child_joint_names[0]
         brumbrum_joint = GodMap.world.joints[brumbrum_joint_name]

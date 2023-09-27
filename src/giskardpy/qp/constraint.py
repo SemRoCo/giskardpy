@@ -31,7 +31,7 @@ class InequalityConstraint:
         self.expression = expression
         self.quadratic_weight = quadratic_weight
         if control_horizon is None:
-            self.control_horizon = self.prediction_horizon - (GodMap.god_map.get_data(identifier.max_derivative) - 1)
+            self.control_horizon = GodMap.prediction_horizon - (GodMap.max_derivative - 1)
         else:
             self.control_horizon = control_horizon
         self.control_horizon = max(1, self.control_horizon)
@@ -44,14 +44,6 @@ class InequalityConstraint:
             self.upper_slack_limit = upper_slack_limit
         if linear_weight is not None:
             self.linear_weight = linear_weight
-
-    @property
-    def god_map(self) -> _GodMap:
-        return _GodMap()
-
-    @property
-    def prediction_horizon(self) -> int:
-        return GodMap.god_map.get_data(identifier.prediction_horizon)
 
     def __str__(self):
         return self.name
@@ -80,7 +72,7 @@ class EqualityConstraint:
         self.expression = expression
         self.quadratic_weight = quadratic_weight
         if control_horizon is None:
-            self.control_horizon = self.prediction_horizon - (GodMap.god_map.get_data(identifier.max_derivative) - 1)
+            self.control_horizon = GodMap.prediction_horizon - (GodMap.max_derivative - 1)
         else:
             self.control_horizon = control_horizon
         self.control_horizon = max(1, self.control_horizon)
@@ -92,14 +84,6 @@ class EqualityConstraint:
             self.upper_slack_limit = upper_slack_limit
         if linear_weight is not None:
             self.linear_weight = linear_weight
-
-    @property
-    def god_map(self) -> _GodMap:
-        return _GodMap()
-
-    @property
-    def prediction_horizon(self) -> int:
-        return GodMap.god_map.get_data(identifier.prediction_horizon)
 
     def __str__(self):
         return self.name
@@ -133,7 +117,7 @@ class DerivativeInequalityConstraint:
         self.derivative = derivative
         self.expression = expression
         self.quadratic_weight = quadratic_weight
-        self.control_horizon = control_horizon if control_horizon is not None else max(self.prediction_horizon - 2, 1)
+        self.control_horizon = control_horizon if control_horizon is not None else max(GodMap.prediction_horizon - 2, 1)
         self.normalization_factor = normalization_factor
         if self.is_iterable(lower_limit):
             self.lower_limit = lower_limit
@@ -164,10 +148,6 @@ class DerivativeInequalityConstraint:
         self.horizon_function = default_horizon_function
         if horizon_function is not None:
             self.horizon_function = horizon_function
-
-    @property
-    def prediction_horizon(self) -> int:
-        return GodMap.god_map.get_data(identifier.prediction_horizon)
 
     def is_iterable(self, thing):
         if isinstance(thing, cas.ca.SX) and sum(thing.shape) == 2:

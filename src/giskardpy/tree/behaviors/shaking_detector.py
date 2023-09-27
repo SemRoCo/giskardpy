@@ -26,9 +26,9 @@ class WiggleCancel(GiskardBehavior):
 
     def make_velocity_threshold(self, min_cut_off=0.01, max_cut_off=0.06):
         joint_convergence_threshold = GodMap.god_map.get_data(identifier.joint_convergence_threshold)
-        free_variables = GodMap.god_map.get_data(identifier.free_variables)
+        free_variables = GodMap.world.free_variables
         thresholds = []
-        for free_variable in free_variables:  # type: FreeVariable
+        for free_variable in free_variables:
             velocity_limit = GodMap.god_map.evaluate_expr(free_variable.get_upper_limit(1))
             velocity_limit *= joint_convergence_threshold
             velocity_limit = min(max(min_cut_off, velocity_limit), max_cut_off)
@@ -40,7 +40,7 @@ class WiggleCancel(GiskardBehavior):
     def initialise(self):
         super().initialise()
         self.js_samples = []
-        GodMap.sample_period = GodMap.god_map.get_data(identifier.sample_period)
+        GodMap.sample_period = GodMap.sample_period
         self.max_detectable_freq = 1 / (2 * GodMap.sample_period)
         self.min_wiggle_frequency = self.frequency_range * self.max_detectable_freq
         self.keys = []
@@ -66,7 +66,7 @@ class WiggleCancel(GiskardBehavior):
     @record_time
     @profile
     def update(self):
-        prediction_horizon = GodMap.god_map.get_data(identifier.prediction_horizon)
+        prediction_horizon = GodMap.prediction_horizon
         if prediction_horizon > 1:
             return Status.RUNNING
         latest_points = GodMap.god_map.get_data(identifier.joint_states)

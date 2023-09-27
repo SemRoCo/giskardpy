@@ -35,15 +35,13 @@ class LoopDetector(GiskardBehavior):
     @record_time
     @profile
     def update(self):
-        current_js = GodMap.god_map.get_data(identifier.joint_states)
+        current_js = GodMap.world.state
         planning_time = GodMap.god_map.get_data(identifier.time)
         rounded_js = self.round_js(current_js)
         if planning_time >= self.window_size and rounded_js in self.past_joint_states:
-            sample_period = GodMap.god_map.get_data(identifier.sample_period)
             logging.loginfo('found loop, stopped planning.')
             run_time = self.get_runtime()
-            msg = 'found goal trajectory with length {:.3f}s in {:.3f}s'.format(planning_time * sample_period,
-                                                                                run_time)
+            msg = f'found goal trajectory with length {planning_time * GodMap.sample_period:.3}s in {run_time:.3}s'
             logging.loginfo(msg)
             raise ExecutionException(msg)
         self.past_joint_states.add(rounded_js)

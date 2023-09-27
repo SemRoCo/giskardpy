@@ -22,7 +22,7 @@ class ParseActionGoal(GiskardBehavior):
     @profile
     def update(self):
         loginfo('Parsing goal message.')
-        move_goal: giskard_msgs.MoveGoal = GodMap.god_map.get_data(identifier.goal_msg)
+        move_goal = GodMap.goal_msg
         GodMap.god_map.set_data(identifier.goal_id, GodMap.goal_id + 1)
         try:
             GodMap.monitor_manager.parse_monitors(move_goal.monitors)

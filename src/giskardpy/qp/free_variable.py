@@ -27,7 +27,7 @@ class FreeVariable:
         self.lower_limits = {}
         self.upper_limits = {}
         self.quadratic_weights = quadratic_weights
-        assert len(self.quadratic_weights) == GodMap.god_map.get_data(identifier.max_derivative)
+        assert len(self.quadratic_weights) == GodMap.max_derivative
         assert max(self._symbols.keys()) == len(self._symbols) - 1
 
         self.horizon_functions = defaultdict(lambda: 0.00001)
@@ -36,10 +36,6 @@ class FreeVariable:
                                  Derivatives.acceleration: 0.1,
                                  Derivatives.jerk: 0.1}
         self.horizon_functions.update(horizon_functions)
-
-    @property
-    def order(self) -> Derivatives:
-        return GodMap.god_map.get_data(identifier.max_derivative)
 
     def get_symbol(self, derivative: Derivatives) -> Union[w.Symbol, float]:
         try:

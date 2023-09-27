@@ -15,6 +15,7 @@ from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from giskardpy import identifier
 from giskardpy.data_types import JointStates
 from giskardpy.god_map import _GodMap
+from giskardpy.god_map_user import GodMap
 from giskardpy.model.joints import Joint, OmniDrive, MovableJoint
 from giskardpy.my_types import PrefixName, Derivatives
 from giskardpy.utils import logging
@@ -141,7 +142,7 @@ class Trajectory:
         cm_per_second = cm_to_inch(cm_per_second)
         height_per_derivative = cm_to_inch(height_per_derivative)
         hspace = cm_to_inch(hspace)
-        max_derivative = _GodMap().get_data(identifier.max_derivative)
+        max_derivative = GodMap.max_derivative
         with plot_lock:
             def ceil(val, base=0.0, stride=1.0):
                 base = base % stride

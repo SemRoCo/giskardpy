@@ -134,12 +134,11 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
         self.delay = GodMap.god_map.get_data(identifier.time_delay)
         trajectory = GodMap.god_map.get_data(identifier.trajectory)
         goal = FollowJointTrajectoryGoal()
-        sample_period = GodMap.god_map.get_data(identifier.sample_period)
         start_time = GodMap.god_map.get_data(identifier.tracking_start_time)
         fill_velocity_values = GodMap.god_map.get_data(identifier.fill_trajectory_velocity_values)
         if fill_velocity_values is None:
             fill_velocity_values = self.fill_velocity_values
-        goal.trajectory = trajectory.to_msg(sample_period, start_time, self.controlled_joints,
+        goal.trajectory = trajectory.to_msg(GodMap.sample_period, start_time, self.controlled_joints,
                                             fill_velocity_values)
 
         if self.path_tolerance is not None:

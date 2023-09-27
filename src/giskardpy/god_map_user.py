@@ -5,6 +5,7 @@ from giskardpy import identifier
 from giskardpy.god_map import _GodMap
 from typing import TYPE_CHECKING, List, Dict
 
+from giskardpy.my_types import Derivatives
 from giskardpy.utils.utils import int_to_bit_list
 
 if TYPE_CHECKING:
@@ -63,6 +64,14 @@ class GodMapTheologianMeta(type):
     @property
     def prediction_horizon(self) -> int:
         return self.god_map.get_data(identifier.prediction_horizon)
+
+    @property
+    def max_derivative(self) -> Derivatives:
+        return self.god_map.get_data(identifier.max_derivative)
+
+    @property
+    def qp_controller(self) -> Derivatives:
+        return self.god_map.get_data(identifier.qp_controller)
 
     @property
     def control_mode(self) -> ControlModes:

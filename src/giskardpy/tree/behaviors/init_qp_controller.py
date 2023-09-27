@@ -27,8 +27,8 @@ class InitQPController(GiskardBehavior):
             equality_constraints=list(eq_constraints.values()),
             inequality_constraints=list(neq_constraints.values()),
             derivative_constraints=list(derivative_constraints.values()),
-            sample_period=GodMap.god_map.unsafe_get_data(identifier.sample_period),
-            prediction_horizon=GodMap.god_map.unsafe_get_data(identifier.prediction_horizon),
+            sample_period=GodMap.sample_period,
+            prediction_horizon=GodMap.prediction_horizon,
             solver_id=GodMap.god_map.unsafe_get_data(identifier.qp_solver_name),
             retries_with_relaxed_constraints=GodMap.god_map.unsafe_get_data(
                 identifier.retries_with_relaxed_constraints),

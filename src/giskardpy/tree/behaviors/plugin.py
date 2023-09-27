@@ -25,7 +25,7 @@ class GiskardBehavior(Behaviour):
 
     @property
     def traj_time_in_sec(self):
-        if self.is_closed_loop:
+        if GodMap.is_closed_loop:
             return GodMap.god_map.unsafe_get_data(identifier.time)
         return GodMap.god_map.unsafe_get_data(identifier.time) * GodMap.god_map.unsafe_get_data(identifier.sample_period)
 

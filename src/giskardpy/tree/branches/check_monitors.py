@@ -30,6 +30,6 @@ class CheckMonitors(RunningSelector):
         super().__init__(name)
         self.add_child(CrucialMonitorsSatisfied())
         # self.add_child(LoopDetector('loop detector'))
-        # self.add_child(LocalMinimum('local minimum', real_time=self.is_closed_loop))
-        self.add_child(MaxTrajectoryLength('traj length check', real_time=self.is_closed_loop))
+        # self.add_child(LocalMinimum('local minimum', real_time=GodMap.is_closed_loop))
+        self.add_child(MaxTrajectoryLength('traj length check', real_time=GodMap.is_closed_loop))
         # self.add_child(GoalDone('goal done check'))

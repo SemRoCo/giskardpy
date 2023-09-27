@@ -1055,7 +1055,7 @@ class WorldTree(WorldTreeInterface):
     @property
     def controlled_joints(self) -> List[PrefixName]:
         try:
-            return self.god_map.unsafe_get_data(identifier.controlled_joints)
+            return GodMap.god_map.unsafe_get_data(identifier.controlled_joints)
         except KeyError:
             return []
 
@@ -1072,7 +1072,7 @@ class WorldTree(WorldTreeInterface):
         if unknown_joints:
             raise UnknownGroupException(f'Trying to register unknown joints: \'{unknown_joints}\'')
         old_controlled_joints.update(new_controlled_joints)
-        self.god_map.set_data(identifier.controlled_joints, list(sorted(old_controlled_joints)))
+        GodMap.god_map.set_data(identifier.controlled_joints, list(sorted(old_controlled_joints)))
 
     @memoize
     def get_controlled_parent_joint_of_link(self, link_name: PrefixName) -> PrefixName:
@@ -1276,7 +1276,7 @@ class WorldTree(WorldTreeInterface):
 
     @profile
     def compute_all_collision_fks(self):
-        params = self.god_map.unsafe_get_values(self._fk_computer.fast_collision_fks.str_params)
+        params = GodMap.god_map.unsafe_get_values(self._fk_computer.fast_collision_fks.str_params)
         return self._fk_computer.fast_collision_fks.fast_call(params)
 
     @profile
@@ -1289,7 +1289,7 @@ class WorldTree(WorldTreeInterface):
 
             def __init__(self, world: WorldTree):
                 GodMap.world = world
-                self.god_map = _GodMap()
+                GodMap.god_map = _GodMap()
                 self.fks = {GodMap.world.root_link_name: w.TransMatrix()}
 
             @profile
@@ -1326,7 +1326,7 @@ class WorldTree(WorldTreeInterface):
             @profile
             def recompute(self):
                 self.compute_fk_np.memo.clear()
-                self.fks = self.fast_all_fks.fast_call(self.god_map.unsafe_get_values(self.fast_all_fks.str_params))
+                self.fks = self.fast_all_fks.fast_call(GodMap.god_map.unsafe_get_values(self.fast_all_fks.str_params))
 
             @memoize
             @profile
@@ -1357,7 +1357,7 @@ class WorldTree(WorldTreeInterface):
 
     @profile
     def compose_fk_evaluated_expression(self, root: PrefixName, tip: PrefixName) -> w.TransMatrix:
-        result: w.TransMatrix = self.god_map.list_to_frame(identifier.fk_np + [(root, tip)])
+        result: w.TransMatrix = GodMap.god_map.list_to_frame(identifier.fk_np + [(root, tip)])
         result.reference_frame = root
         result.child_frame = tip
         return result
@@ -1449,9 +1449,9 @@ class WorldTree(WorldTreeInterface):
             # joint has no limits for this derivative
             return None, None
         if not isinstance(lower_limit, (int, float)) and lower_limit is not None:
-            lower_limit = self.god_map.evaluate_expr(lower_limit)
+            lower_limit = GodMap.god_map.evaluate_expr(lower_limit)
         if not isinstance(upper_limit, (int, float)) and upper_limit is not None:
-            upper_limit = self.god_map.evaluate_expr(upper_limit)
+            upper_limit = GodMap.god_map.evaluate_expr(upper_limit)
         return lower_limit, upper_limit
 
     def get_joint_position_limits(self, joint_name: my_string) -> Tuple[Optional[float], Optional[float]]:
@@ -1567,7 +1567,7 @@ class WorldTree(WorldTreeInterface):
             world_graph.add_edge(child_edge)
             parent_edge = pydot.Edge(str(joint.parent_link_name), str(joint_name))
             world_graph.add_edge(parent_edge)
-        file_name = f'{self.god_map.get_data(identifier.tmp_folder)}/world_tree.pdf'
+        file_name = f'{GodMap.god_map.get_data(identifier.tmp_folder)}/world_tree.pdf'
         world_graph.write_pdf(file_name)
 
 
@@ -1612,7 +1612,7 @@ class WorldBranch(WorldTreeInterface):
 
     @cached_property
     def controlled_joints(self) -> List[PrefixName]:
-        return [j for j in self.god_map.unsafe_get_data(identifier.controlled_joints) if j in self.joint_names_as_set]
+        return [j for j in GodMap.god_map.unsafe_get_data(identifier.controlled_joints) if j in self.joint_names_as_set]
 
     @property
     def parent_link_of_root(self) -> PrefixName:

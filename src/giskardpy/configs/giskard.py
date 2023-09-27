@@ -95,7 +95,7 @@ class Giskard:
                         f'but not flagged as controlled: {non_controlled_joints}.')
         # FIXME
         # if not GodMap.tree_manager.base_tracking_enabled() \
-        #         and not self.control_mode == ControlModes.standalone:
+        #         and not GodMap.control_mode == ControlModes.standalone:
         #     logging.loginfo('No cmd_vel topic has been registered.')
 
     def add_goal_package_name(self, package_name: str):

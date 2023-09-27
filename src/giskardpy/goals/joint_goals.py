@@ -31,7 +31,7 @@ class SetSeedConfiguration(NonMotionGoal):
         super().__init__()
         if group_name is not None:
             seed_configuration = {PrefixName(joint_name, group_name): v for joint_name, v in seed_configuration.items()}
-        if self.is_goal_msg_type_execute() \
+        if GodMap.is_goal_msg_type_execute() \
                 and GodMap.god_map.get_data(identifier.control_mode) != ControlModes.standalone:
             raise ConstraintInitalizationException(f'It is not allowed to combine {str(self)} with plan and execute.')
         for joint_name, initial_joint_value in seed_configuration.items():
@@ -49,7 +49,7 @@ class SetOdometry(NonMotionGoal):
     def __init__(self, group_name: str, base_pose: PoseStamped):
         super().__init__()
         self.group_name = group_name
-        if self.is_goal_msg_type_execute() \
+        if GodMap.is_goal_msg_type_execute() \
                 and GodMap.god_map.get_data(identifier.control_mode) != ControlModes.standalone:
             raise ConstraintInitalizationException(f'It is not allowed to combine {str(self)} with plan and execute.')
         brumbrum_joint_name = GodMap.world.groups[group_name].root_link.child_joint_names[0]
@@ -331,7 +331,7 @@ class ShakyJointPositionRevoluteOrPrismatic(Goal):
         weight = self.weight
 
         time = GodMap.god_map.to_symbol(identifier.time)
-        time_in_secs = self.sample_period * time
+        time_in_secs = GodMap.sample_period * time
 
         max_velocity = cas.min(self.max_velocity,
                                GodMap.world.get_joint_velocity_limits(self.joint_name)[1])
@@ -380,7 +380,7 @@ class ShakyJointPositionContinuous(Goal):
         weight = self.weight
 
         time = GodMap.god_map.to_symbol(identifier.time)
-        time_in_secs = self.sample_period * time
+        time_in_secs = GodMap.sample_period * time
 
         max_velocity = cas.min(self.max_velocity,
                                GodMap.world.get_joint_velocity_limits(self.joint_name)[1])

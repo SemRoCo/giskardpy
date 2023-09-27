@@ -31,7 +31,7 @@ class GiskardBT(BehaviourTree):
     cleanup_control_loop: CleanupControlLoop
 
     def __init__(self, control_mode: ControlModes):
-        self.god_map.set_data(identifier.control_mode, control_mode)
+        GodMap.god_map.set_data(identifier.control_mode, control_mode)
         # TODO reject invalid control mode
         # raise KeyError(f'Robot interface mode \'{self._control_mode}\' is not supported.')
         root = Sequence('Giskard')
@@ -47,6 +47,6 @@ class GiskardBT(BehaviourTree):
         root.add_child(self.cleanup_control_loop)
         root.add_child(self.post_processing)
         root.add_child(SendResult('send result',
-                                  self.god_map.get_data(identifier.action_server_name),
+                                  GodMap.god_map.get_data(identifier.action_server_name),
                                   MoveAction))
         super().__init__(root)

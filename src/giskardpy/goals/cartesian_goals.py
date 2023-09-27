@@ -11,6 +11,7 @@ from giskardpy import casadi_wrapper as cas
 from giskardpy.goals.goal import Goal
 from giskardpy.goals.monitors.monitors import Monitor
 from giskardpy.goals.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE, Task
+from giskardpy.god_map_user import GodMap
 from giskardpy.model.joints import DiffDrive, OmniDrivePR22
 from giskardpy.my_types import Derivatives
 from giskardpy.utils import logging
@@ -387,8 +388,8 @@ class DiffDriveBaseGoal(Goal):
             map_goal_angle2 + cas.shortest_angular_distance(map_goal_angle2, angle_start) / 2)
 
         middle_angle = GodMap.god_map.evaluate_expr(middle_angle)
-        a = self.god_map.evaluate_expr(cas.shortest_angular_distance(map_goal_angle_direction_f, middle_angle))
-        b = self.god_map.evaluate_expr(cas.shortest_angular_distance(map_goal_angle_direction_b, middle_angle))
+        a = GodMap.god_map.evaluate_expr(cas.shortest_angular_distance(map_goal_angle_direction_f, middle_angle))
+        b = GodMap.god_map.evaluate_expr(cas.shortest_angular_distance(map_goal_angle_direction_b, middle_angle))
         eps = 0.01
         if self.always_forward:
             map_goal_angle1 = map_goal_angle_direction_f

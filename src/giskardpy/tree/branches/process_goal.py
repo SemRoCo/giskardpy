@@ -18,7 +18,7 @@ class ProcessGoal(Selector):
         super().__init__(name)
         self.control_loop_branch = success_is_failure(ControlLoop)()
 
-        self.add_child(GoalCanceled('goal canceled2', self.god_map.get_data(identifier.action_server_name)))
+        self.add_child(GoalCanceled('goal canceled2', GodMap.god_map.get_data(identifier.action_server_name)))
         self.add_child(success_is_failure(PublishFeedback)('publish feedback1', MoveFeedback.PLANNING))
         # planning_2.add_child(success_is_failure(StartTimer)('start runtime timer'))
         self.add_child(self.control_loop_branch)

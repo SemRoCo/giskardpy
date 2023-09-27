@@ -38,7 +38,7 @@ class CollisionChecker(GiskardBehavior):
             self.collision_matrix = GodMap.god_map.get_data(identifier.collision_matrix)
             self.collision_matrix = self.add_added_checks(self.collision_matrix)
             self.collision_list_size = sum([config.max_num_of_repeller()
-                                            for config in self.collision_avoidance_configs.values()])
+                                            for config in GodMap.collision_avoidance_configs.values()])
             GodMap.collision_scene.sync()
             super().initialise()
         except Exception as e:

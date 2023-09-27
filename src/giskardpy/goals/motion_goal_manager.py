@@ -71,7 +71,7 @@ class MotionGoalManager:
 
     def create_collision_check_distances(self) -> Dict[PrefixName, float]:
         for robot_name in self.robot_names:
-            collision_avoidance_config = self.collision_avoidance_configs[robot_name]
+            collision_avoidance_config = GodMap.collision_avoidance_configs[robot_name]
             external_distances = collision_avoidance_config.external_collision_avoidance
             self_distances = collision_avoidance_config.self_collision_avoidance
 
@@ -99,7 +99,7 @@ class MotionGoalManager:
 
     @profile
     def add_external_collision_avoidance_constraints(self, soft_threshold_override=None):
-        configs = self.collision_avoidance_configs
+        configs = GodMap.collision_avoidance_configs
         fixed_joints = GodMap.collision_scene.fixed_joints
         joints = [j for j in GodMap.world.controlled_joints if j not in fixed_joints]
         num_constrains = 0
@@ -133,7 +133,7 @@ class MotionGoalManager:
     def add_self_collision_avoidance_constraints(self):
         counter = defaultdict(int)
         fixed_joints = GodMap.collision_scene.fixed_joints
-        configs = self.collision_avoidance_configs
+        configs = GodMap.collision_avoidance_configs
         num_constr = 0
         for robot_name in self.robot_names:
             for link_a_o, link_b_o in GodMap.world.groups[robot_name].possible_collision_combinations():
@@ -198,7 +198,7 @@ class MotionGoalManager:
         eq_constraints = {}
         neq_constraints = {}
         derivative_constraints = {}
-        goals: Dict[str, Goal] = self.god_map.get_data(identifier.motion_goals)
+        goals: Dict[str, Goal] = GodMap.god_map.get_data(identifier.motion_goals)
         for goal_name, goal in list(goals.items()):
             try:
                 new_eq_constraints, new_neq_constraints, new_derivative_constraints, _debug_expressions = goal.get_constraints()
@@ -208,7 +208,7 @@ class MotionGoalManager:
             neq_constraints.update(new_neq_constraints)
             derivative_constraints.update(new_derivative_constraints)
             # logging.loginfo(f'{goal_name} added {len(_constraints)+len(_vel_constraints)} constraints.')
-        self.god_map.set_data(identifier.eq_constraints, eq_constraints)
-        self.god_map.set_data(identifier.neq_constraints, neq_constraints)
-        self.god_map.set_data(identifier.derivative_constraints, derivative_constraints)
+        GodMap.god_map.set_data(identifier.eq_constraints, eq_constraints)
+        GodMap.god_map.set_data(identifier.neq_constraints, neq_constraints)
+        GodMap.god_map.set_data(identifier.derivative_constraints, derivative_constraints)
         return eq_constraints, neq_constraints, derivative_constraints

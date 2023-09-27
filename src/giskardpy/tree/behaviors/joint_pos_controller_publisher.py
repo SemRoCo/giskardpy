@@ -58,7 +58,7 @@ class JointPosController(GiskardBehavior):
         # GodMap.world.notify_state_change()
 
         # next_cmds = GodMap.god_map.get_data(identifier.qp_solver_solution)
-        # GodMap.world.update_state(next_cmds, self.sample_period)
+        # GodMap.world.update_state(next_cmds, GodMap.sample_period)
         msg = Float64()
         js = deepcopy(GodMap.world.state)
         # try:

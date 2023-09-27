@@ -3,6 +3,7 @@ from py_trees import Status
 import giskardpy.identifier as identifier
 from giskard_msgs.msg import MoveResult
 from giskardpy.exceptions import *
+from giskardpy.god_map_user import GodMap
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.tree.control_modes import ControlModes
 from giskardpy.utils import logging
@@ -28,12 +29,12 @@ class SetMoveResult(GiskardBehavior):
         else:
             move_result = GiskardException(str(e)).to_move_result()
 
-        if isinstance(e, EmptyProblemException) and self.control_mode == ControlModes.standalone:
+        if isinstance(e, EmptyProblemException) and GodMap.control_mode == ControlModes.standalone:
             move_result = MoveResult()
 
-        trajectory = self.god_map.get_data(identifier.trajectory)
+        trajectory = GodMap.god_map.get_data(identifier.trajectory)
         joints = [GodMap.world.joints[joint_name] for joint_name in GodMap.world.movable_joint_names]
-        sample_period = self.god_map.get_data(identifier.sample_period)
+        sample_period = GodMap.god_map.get_data(identifier.sample_period)
         move_result.trajectory = trajectory.to_msg(sample_period=sample_period, start_time=0, joints=joints)
         if move_result.error_code == MoveResult.PREEMPTED:
             logging.logwarn(f'Goal preempted: \'{move_result.error_message}\'.')
@@ -43,5 +44,5 @@ class SetMoveResult(GiskardBehavior):
                     logging.loginfo(f'{self.context} succeeded.')
                 else:
                     logging.logwarn(f'{self.context} failed: {move_result.error_message}.')
-        self.god_map.set_data(identifier.result_message, move_result)
+        GodMap.god_map.set_data(identifier.result_message, move_result)
         return Status.SUCCESS

@@ -40,13 +40,13 @@ class ControlLoop(AsyncBehavior):
 
         self.add_child(self.synchronization)
 
-        if self.god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none:
+        if GodMap.god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none:
             self.add_child(CollisionChecker('collision checker'))
 
         self.add_child(success_is_running(EvaluateMonitors)())
         self.add_child(ControllerPlugin('controller'))
 
-        if self.is_closed_loop:
+        if GodMap.is_closed_loop:
             self.send_controls = success_is_running(SendControls)()
 
             self.add_child(success_is_running(RosTime)())

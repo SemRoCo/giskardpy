@@ -22,7 +22,7 @@ class LocalMinimum(GiskardBehavior):
         self.real_time = real_time
         self.last_goal_id = -1
         if real_time:
-            self.window_size *= self.sample_period
+            self.window_size *= GodMap.sample_period
 
     @profile
     def initialise(self):
@@ -40,7 +40,7 @@ class LocalMinimum(GiskardBehavior):
             return Status.RUNNING
         traj_time = self.traj_time_in_sec
         if traj_time >= self.window_size:
-            velocities = np.array(list(self.god_map.get_data(identifier.qp_solver_solution).xdot_velocity))
+            velocities = np.array(list(GodMap.god_map.get_data(identifier.qp_solver_solution).xdot_velocity))
             below_threshold = np.all(np.abs(velocities) < self.thresholds)
             if below_threshold:
                 run_time = self.get_runtime()
@@ -52,10 +52,10 @@ class LocalMinimum(GiskardBehavior):
 
     def make_velocity_threshold(self, min_cut_off=0.01, max_cut_off=0.06):
         joint_convergence_threshold = self.joint_convergence_threshold
-        free_variables = self.god_map.get_data(identifier.free_variables)
+        free_variables = GodMap.god_map.get_data(identifier.free_variables)
         thresholds = []
         for free_variable in free_variables:  # type: FreeVariable
-            velocity_limit = self.god_map.evaluate_expr(free_variable.get_upper_limit(Derivatives.velocity))
+            velocity_limit = GodMap.god_map.evaluate_expr(free_variable.get_upper_limit(Derivatives.velocity))
             velocity_limit *= joint_convergence_threshold
             velocity_limit = min(max(min_cut_off, velocity_limit), max_cut_off)
             thresholds.append(velocity_limit)

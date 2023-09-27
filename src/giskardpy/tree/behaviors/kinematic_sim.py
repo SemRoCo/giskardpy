@@ -19,6 +19,6 @@ class KinSimPlugin(GiskardBehavior):
     @profile
     def update(self):
         next_cmds = GodMap.god_map.get_data(identifier.qp_solver_solution)
-        GodMap.world.update_state(next_cmds, self.sample_period)
+        GodMap.world.update_state(next_cmds, GodMap.sample_period)
         GodMap.world.notify_state_change()
         return Status.SUCCESS

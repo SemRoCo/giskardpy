@@ -40,8 +40,8 @@ class WiggleCancel(GiskardBehavior):
     def initialise(self):
         super().initialise()
         self.js_samples = []
-        self.sample_period = GodMap.god_map.get_data(identifier.sample_period)
-        self.max_detectable_freq = 1 / (2 * self.sample_period)
+        GodMap.sample_period = GodMap.god_map.get_data(identifier.sample_period)
+        self.max_detectable_freq = 1 / (2 * GodMap.sample_period)
         self.min_wiggle_frequency = self.frequency_range * self.max_detectable_freq
         self.keys = []
         self.thresholds = []
@@ -84,7 +84,7 @@ class WiggleCancel(GiskardBehavior):
         js_samples_array = np.array(self.js_samples)
         plot = False
         try:
-            self.detect_shaking(js_samples_array, self.sample_period, self.min_wiggle_frequency,
+            self.detect_shaking(js_samples_array, GodMap.sample_period, self.min_wiggle_frequency,
                                 self.amplitude_threshold, self.thresholds, self.velocity_limits, plot)
         except ShakingException as e:
             if GodMap.god_map.get_data(identifier.cut_off_shaking):

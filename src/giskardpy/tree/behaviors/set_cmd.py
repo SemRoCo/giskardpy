@@ -14,7 +14,7 @@ class SetCmd(GetGoal):
     @profile
     def __init__(self, name, as_name):
         GetGoal.__init__(self, name, as_name)
-        self.sample_period_backup = None
+        GodMap.sample_period_backup = None
 
     @property
     def goal(self):
@@ -44,16 +44,16 @@ class SetCmd(GetGoal):
                 raise_to_blackboard(InvalidGoalException('goal empty'))
             GodMap.god_map.set_data(identifier.result_message, empty_result)
             if self.is_plan(self.goal.type):
-                if self.sample_period_backup is not None:
-                    GodMap.god_map.set_data(identifier.sample_period, self.sample_period_backup)
-                    self.sample_period_backup = None
+                if GodMap.sample_period_backup is not None:
+                    GodMap.god_map.set_data(identifier.sample_period, GodMap.sample_period_backup)
+                    GodMap.sample_period_backup = None
             else:
                 error_message = 'Invalid move action goal type: {}'.format(self.goal.type)
                 logging.logwarn(error_message)
                 logging.logwarn('Goal rejected.')
                 raise_to_blackboard(InvalidGoalException(error_message))
             if self.is_check_reachability(self.goal.type):
-                self.sample_period_backup = GodMap.god_map.get_data(identifier.sample_period)
+                GodMap.sample_period_backup = GodMap.god_map.get_data(identifier.sample_period)
                 GodMap.god_map.set_data(identifier.sample_period, self.rc_sample_period)
                 collision_entry = CollisionEntry()
                 collision_entry.type = CollisionEntry.ALLOW_COLLISION
@@ -63,7 +63,7 @@ class SetCmd(GetGoal):
             else:
                 GodMap.god_map.set_data(identifier.check_reachability, False)
 
-            GodMap.god_map.set_data(identifier.execute, self.is_goal_msg_type_execute(self.goal.type))
+            GodMap.god_map.set_data(identifier.execute, GodMap.is_goal_msg_type_execute(self.goal.type))
             GodMap.god_map.set_data(identifier.skip_failures, self.is_skip_failures(self.goal.type))
             GodMap.god_map.set_data(identifier.cut_off_shaking, self.is_cut_off_shaking(self.goal.type))
 

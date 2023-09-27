@@ -73,7 +73,7 @@ class ExternalCollisionAvoidance(Goal):
         a_P_pa = self.get_closest_point_on_a_in_a()
         map_V_n = self.map_V_n_symbol()
         actual_distance = self.get_actual_distance()
-        sample_period = self.sample_period
+        sample_period = GodMap.sample_period
         number_of_external_collisions = self.get_number_of_external_collisions()
 
         map_T_a = GodMap.world.compose_fk_expression(self.root, self.link_name)
@@ -194,7 +194,7 @@ class SelfCollisionAvoidance(Goal):
         hard_threshold = w.min(self.hard_threshold, self.soft_threshold / 2)
         actual_distance = self.get_actual_distance()
         number_of_self_collisions = self.get_number_of_self_collisions()
-        sample_period = self.sample_period
+        sample_period = GodMap.sample_period
 
         # b_T_a2 = GodMap.world.compose_fk_evaluated_expression(self.link_b, self.link_a)
         b_T_a = GodMap.world.compose_fk_expression(self.link_b, self.link_a)

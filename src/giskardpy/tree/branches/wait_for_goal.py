@@ -35,7 +35,7 @@ class WaitForGoal(Sequence):
         self.synchronization = Synchronization('sync 1')
         self.publish_state = PublishState()
         self.goal_received = GoalReceived('has goal?',
-                                          self.god_map.get_data(identifier.action_server_name),
+                                          GodMap.god_map.get_data(identifier.action_server_name),
                                           MoveAction)
         self.add_child(GodMap.world_updater)
         self.add_child(self.synchronization)

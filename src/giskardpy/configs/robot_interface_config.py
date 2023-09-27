@@ -99,8 +99,8 @@ class RobotInterfaceConfig(ABC):
         """
         if self.control_mode != ControlModes.standalone:
             raise GiskardException(f'Joints only need to be registered in {ControlModes.standalone.name} mode.')
-        joint_names = [GodMap.world.search_for_joint_name(j, group_name) for j in joint_names]
-        GodMap.world.register_controlled_joints(joint_names)
+        joint_names = [self.world.search_for_joint_name(j, group_name) for j in joint_names]
+        self.world.register_controlled_joints(joint_names)
 
     def add_follow_joint_trajectory_server(self,
                                            namespace: str,

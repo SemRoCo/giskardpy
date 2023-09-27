@@ -30,7 +30,7 @@ class PlotGanttChart(GiskardBehavior):
                 else:
                     start_dates.extend([x.state_flip_times[0] for x in task.to_start])
                 if not task.to_end:
-                    end_dates.append(self.trajectory_time_in_seconds)
+                    end_dates.append(GodMap.trajectory_time_in_seconds)
                 else:
                     end_dates.extend([x.state_flip_times[0] for x in task.to_end])
 
@@ -57,7 +57,7 @@ class PlotGanttChart(GiskardBehavior):
     @record_time
     @profile
     def update(self):
-        goals = self.god_map.get_data(identifier.motion_goals)
-        file_name = self.god_map.get_data(identifier.tmp_folder) + f'/gantt_charts/goal_{GodMap.goal_id}.png'
+        goals = GodMap.god_map.get_data(identifier.motion_goals)
+        file_name = GodMap.god_map.get_data(identifier.tmp_folder) + f'/gantt_charts/goal_{GodMap.goal_id}.png'
         self.plot_gantt_chart(goals, file_name)
         return Status.SUCCESS

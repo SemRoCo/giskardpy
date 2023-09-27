@@ -29,7 +29,7 @@ class PouringAction(Goal):
         self.root_link = self.world.search_for_link_name(root_link, root_group)
         self.tip_link2 = self.world.search_for_link_name('hand_camera_frame', tip_group)
         self.tip_link = self.world.search_for_link_name(tip_link, tip_group)
-        self.max_vel = max_velocity/2
+        self.max_vel = max_velocity / 2
         self.weight = weight
         self.upright_orientation = upright_orientation
         self.down_orientation = down_orientation
@@ -76,20 +76,49 @@ class PouringAction(Goal):
                                          weight=self.weight * is_uprigth,
                                          name='upright')
 
-        is_tilt = self.god_map.to_expr(identifier.pouring_tilt)
+        is_tilt_left = self.god_map.to_expr(identifier.pouring_tilt_left)
+        is_tilt_right = self.god_map.to_expr(identifier.pouring_tilt_right)
         # Todo: I might have to save a reference pose when the pouring starts to define rotation around that
+        root_R_tip = self.get_fk(self.root_link, self.tip_link).to_rotation()
+        tip_R_tip = w.RotationMatrix()
+        angle = -0.5 * is_tilt_left + 0.5 * is_tilt_right
+        tip_R_tip[0, 0] = w.cos(angle)
+        tip_R_tip[1, 0] = w.sin(angle)
+        tip_R_tip[0, 1] = -w.sin(angle)
+        tip_R_tip[1, 1] = w.cos(angle)
+        tip_R_tip[2, 2] = 1
+        root_R_tip_desire = root_R_tip.dot(tip_R_tip)
+        self.add_equality_constraint_vector(reference_velocities=[self.max_vel] * 4,
+                                            equality_bounds=[root_R_tip_desire[0, 0] - root_R_tip[0, 0],
+                                                             root_R_tip_desire[1, 0] - root_R_tip[1, 0],
+                                                             root_R_tip_desire[0, 1] - root_R_tip[0, 1],
+                                                             root_R_tip_desire[1, 1] - root_R_tip[1, 1]
+                                                             ],
+                                            weights=[self.weight * w.max(is_tilt_left, is_tilt_right)] * 4,
+                                            task_expression=[root_R_tip[0, 0],
+                                                             root_R_tip[1, 0],
+                                                             root_R_tip[0, 1],
+                                                             root_R_tip[1, 1]],
+                                            names=['tipr1', 'tipr2', 'tipr3', 'tipr4'])
+        self.add_equality_constraint_vector(reference_velocities=[self.max_vel] * 3,
+                                            equality_bounds=[0] * 3,
+                                            weights=[self.weight * w.max(is_tilt_left, is_tilt_right)]*3,
+                                            task_expression=root_P_tip[:3],
+                                            names=['tipp1', 'tipp2', 'tipp3'])
+        root_V_tip_z = root_R_tip[:3, 2]
+        root_V_z = w.Vector3([0, 0, 1])
+        exp = root_V_tip_z.dot(root_V_z[:3])
         self.add_equality_constraint(reference_velocity=self.max_vel,
-                                     equality_bound=self.max_vel,
-                                     weight=self.weight * is_tilt,
-                                     task_expression=self.get_joint_position_symbol(self.tilt_joint),
-                                     name='tilt')
+                                     equality_bound=0 - exp,
+                                     weight=self.weight * w.max(is_tilt_left, is_tilt_right),
+                                     task_expression=exp)
 
         is_rotate_left = self.god_map.to_expr(identifier.pouring_rotate_left)
         is_rotate_right = self.god_map.to_expr(identifier.pouring_rotate_right)
         base_link = self.world.search_for_link_name('base_footprint')
         root_R_base = self.get_fk(self.root_link, base_link).to_rotation()
         base_R_base = w.RotationMatrix()
-        angle = 0.5 * is_rotate_left - 0.5 *is_rotate_right
+        angle = 0.5 * is_rotate_left - 0.5 * is_rotate_right
         base_R_base[0, 0] = w.cos(angle)
         base_R_base[1, 0] = w.sin(angle)
         base_R_base[0, 1] = -w.sin(angle)
@@ -107,7 +136,7 @@ class PouringAction(Goal):
                                                              root_R_base[1, 0],
                                                              root_R_base[0, 1],
                                                              root_R_base[1, 1]],
-                                            names=['r1', 'r2', 'r3', 'r4'])
+                                            names=['baser1', 'baser2', 'baser3', 'baser4'])
         # v = Vector3Stamped()
         # v.header.frame_id = 'hand_palm_link'
         # v.vector.z = 1

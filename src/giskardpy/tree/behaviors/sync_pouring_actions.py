@@ -31,8 +31,8 @@ class SyncPouringActions(GiskardBehavior):
                                 'u': 'up',
                                 'j': 'down',
                                 'y': 'move_to',
-                                'g': 'tilt',
-                                'h': 'tilt_back',
+                                'g': 'tilt_left',
+                                'h': 'tilt_right',
                                 'q': 'keep_upright',
                                 'z': 'rotate_left',
                                 'x': 'rotate_right'}
@@ -43,8 +43,8 @@ class SyncPouringActions(GiskardBehavior):
                              'up': 0,
                              'down': 0,
                              'move_to': 0,
-                             'tilt': 0,
-                             'tilt_back': 0,
+                             'tilt_left': 0,
+                             'tilt_right': 0,
                              'keep_upright': 0,
                              'rotate_left': 0,
                              'rotate_right': 0}

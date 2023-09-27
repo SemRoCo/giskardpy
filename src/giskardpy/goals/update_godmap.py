@@ -4,6 +4,7 @@ import numbers
 
 from giskardpy.exceptions import GiskardException
 from giskardpy.goals.goal import Goal
+from giskardpy.god_map_user import GodMap
 
 
 class UpdateGodMap(Goal):
@@ -21,7 +22,7 @@ class UpdateGodMap(Goal):
         for member, value in updates.items():
             next_identifier = identifier + [member]
             if isinstance(value, numbers.Number) and \
-                    isinstance(self.god_map.get_data(next_identifier), numbers.Number):
-                self.god_map.set_data(next_identifier, value)
+                    isinstance(GodMap.god_map.get_data(next_identifier), numbers.Number):
+                GodMap.god_map.set_data(next_identifier, value)
             else:
                 self.update_god_map(next_identifier, value)

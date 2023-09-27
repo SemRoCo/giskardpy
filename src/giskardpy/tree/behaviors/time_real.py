@@ -8,10 +8,10 @@ from giskardpy.tree.behaviors.plugin import GiskardBehavior
 class RosTime(GiskardBehavior):
     @property
     def start_time(self):
-        return self.god_map.get_data(identifier.tracking_start_time)
+        return GodMap.god_map.get_data(identifier.tracking_start_time)
 
     @profile
     def update(self):
-        with self.god_map:
-            self.god_map.unsafe_set_data(identifier.time, (rospy.get_rostime() - self.start_time).to_sec())
+        with GodMap.god_map:
+            GodMap.god_map.unsafe_set_data(identifier.time, (rospy.get_rostime() - self.start_time).to_sec())
         return Status.SUCCESS

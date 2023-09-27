@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from giskard_msgs.msg import MoveGoal
 from giskardpy import identifier
-from giskardpy.god_map import GodMap
+from giskardpy.god_map import _GodMap
 from typing import TYPE_CHECKING, List, Dict
 
 from giskardpy.utils.utils import int_to_bit_list
@@ -22,8 +22,8 @@ if TYPE_CHECKING:
     from giskardpy.model.world import WorldTree
 
 
-class GodMapWorshipper:
-    god_map = GodMap()
+class GodMapTheologianMeta(type):
+    god_map = _GodMap()
 
     @property
     def goal_id(self) -> int:
@@ -119,14 +119,20 @@ class GodMapWorshipper:
     def motion_goals(self) -> Dict[str, Goal]:
         return self.god_map.get_data(identifier.motion_goals)
 
-    def is_goal_msg_type_execute(self):
-        return MoveGoal.EXECUTE in int_to_bit_list(self.goal_msg_type)
 
-    def is_goal_msg_type_projection(self):
-        return MoveGoal.PROJECTION in int_to_bit_list(self.goal_msg_type)
+class GodMap(metaclass=GodMapTheologianMeta):
+    @classmethod
+    def is_goal_msg_type_execute(cls):
+        return MoveGoal.EXECUTE in int_to_bit_list(cls.goal_msg_type)
 
-    def is_goal_msg_local_minimum_is_success(self):
-        return self.goal_msg.local_minimum_is_success
+    @classmethod
+    def is_goal_msg_type_projection(cls):
+        return MoveGoal.PROJECTION in int_to_bit_list(cls.goal_msg_type)
 
-    def is_goal_msg_type_undefined(self):
-        return MoveGoal.UNDEFINED in int_to_bit_list(self.goal_msg_type)
+    @classmethod
+    def is_goal_msg_local_minimum_is_success(cls):
+        return cls.goal_msg.local_minimum_is_success
+
+    @classmethod
+    def is_goal_msg_type_undefined(cls):
+        return MoveGoal.UNDEFINED in int_to_bit_list(cls.goal_msg_type)

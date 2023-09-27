@@ -14,8 +14,8 @@ from giskardpy import identifier
 from giskardpy.configs.qp_controller_config import SupportedQPSolver
 from giskardpy.exceptions import HardConstraintsViolatedException, QPSolverException, InfeasibleException, \
     VelocityLimitUnreachableException
-from giskardpy.god_map import GodMap
-from giskardpy.god_map_user import GodMapWorshipper
+from giskardpy.god_map import _GodMap
+from giskardpy.god_map_user import GodMap
 from giskardpy.model.world import WorldTree
 from giskardpy.my_types import Derivatives
 from giskardpy.qp.constraint import InequalityConstraint, EqualityConstraint, DerivativeInequalityConstraint
@@ -89,7 +89,7 @@ class ProblemDataPart(ABC):
     def replace_hack(self, expression: Union[float, cas.Expression], new_value):
         if not isinstance(expression, cas.Expression):
             return expression
-        hack = GodMap().to_symbol(identifier.hack)
+        hack = _GodMap().to_symbol(identifier.hack)
         expression.s = cas.ca.substitute(expression.s, hack.s, new_value)
         return expression
 
@@ -961,7 +961,7 @@ def detect_solvers():
 detect_solvers()
 
 
-class QPProblemBuilder(GodMapWorshipper):
+class QPProblemBuilder:
     """
     Wraps around QP Solver. Builds the required matrices from constraints.
     """
@@ -1113,8 +1113,8 @@ class QPProblemBuilder(GodMapWorshipper):
                  self.p_A, self.p_lbA, self.p_ubA,
                  self.p_debug, self.p_xdot],
                 ['weights', 'lb', 'ub', 'E', 'bE', 'A', 'lbA', 'ubA', 'debug', 'xdot'],
-                self.god_map.get_data(identifier.tmp_folder),
-                self.god_map.get_data(identifier.time),
+                GodMap.god_map.get_data(identifier.tmp_folder),
+                GodMap.god_map.get_data(identifier.time),
                 folder_name)
         else:
             save_pandas(
@@ -1123,8 +1123,8 @@ class QPProblemBuilder(GodMapWorshipper):
                  self.p_A, self.p_lbA, self.p_ubA,
                  self.p_debug],
                 ['weights', 'lb', 'ub', 'E', 'bE', 'A', 'lbA', 'ubA', 'debug'],
-                self.god_map.get_data(identifier.tmp_folder),
-                self.god_map.get_data(identifier.time),
+                GodMap.god_map.get_data(identifier.tmp_folder),
+                GodMap.god_map.get_data(identifier.time),
                 folder_name)
 
     def _print_pandas_array(self, array):
@@ -1135,7 +1135,7 @@ class QPProblemBuilder(GodMapWorshipper):
 
     @property
     def traj_time_in_sec(self):
-        return self.god_map.unsafe_get_data(identifier.time) * self.god_map.unsafe_get_data(identifier.sample_period)
+        return GodMap.god_map.unsafe_get_data(identifier.time) * GodMap.god_map.unsafe_get_data(identifier.sample_period)
 
     @profile
     def get_cmd(self, substitutions: np.ndarray) -> NextCommands:

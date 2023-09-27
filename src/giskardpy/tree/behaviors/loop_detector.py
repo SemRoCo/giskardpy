@@ -5,6 +5,7 @@ from py_trees import Status
 import giskardpy.identifier as identifier
 from giskardpy.data_types import JointStates
 from giskardpy.exceptions import ExecutionException
+from giskardpy.god_map_user import GodMap
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
 from giskardpy.utils.decorators import record_time, catch_and_raise_to_blackboard
@@ -25,7 +26,7 @@ class LoopDetector(GiskardBehavior):
         super().initialise()
         self.past_joint_states = set()
         self.velocity_limits = defaultdict(lambda: 1.)
-        self.velocity_limits.update(self.world.get_all_free_variable_velocity_limits())
+        self.velocity_limits.update(GodMap.world.get_all_free_variable_velocity_limits())
         for name, threshold in self.velocity_limits.items():
             if threshold < 0.001:
                 self.velocity_limits[name] = 0.001
@@ -34,11 +35,11 @@ class LoopDetector(GiskardBehavior):
     @record_time
     @profile
     def update(self):
-        current_js = self.god_map.get_data(identifier.joint_states)
-        planning_time = self.god_map.get_data(identifier.time)
+        current_js = GodMap.god_map.get_data(identifier.joint_states)
+        planning_time = GodMap.god_map.get_data(identifier.time)
         rounded_js = self.round_js(current_js)
         if planning_time >= self.window_size and rounded_js in self.past_joint_states:
-            sample_period = self.god_map.get_data(identifier.sample_period)
+            sample_period = GodMap.god_map.get_data(identifier.sample_period)
             logging.loginfo('found loop, stopped planning.')
             run_time = self.get_runtime()
             msg = 'found goal trajectory with length {:.3f}s in {:.3f}s'.format(planning_time * sample_period,

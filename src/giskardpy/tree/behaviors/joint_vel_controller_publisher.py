@@ -24,8 +24,8 @@ class JointVelController(GiskardBehavior):
             self.publishers.append(rospy.Publisher(cmd_topic, Float64, queue_size=10))
             self.joint_names.append(rospy.get_param(f'{namespace}/joint'))
         for i in range(len(self.joint_names)):
-            self.joint_names[i] = self.world.search_for_joint_name(self.joint_names[i])
-        self.world.register_controlled_joints(self.joint_names)
+            self.joint_names[i] = GodMap.world.search_for_joint_name(self.joint_names[i])
+        GodMap.world.register_controlled_joints(self.joint_names)
 
     @catch_and_raise_to_blackboard
     @record_time
@@ -33,7 +33,7 @@ class JointVelController(GiskardBehavior):
     def update(self):
         msg = Float64()
         for i, joint_name in enumerate(self.joint_names):
-            msg.data = self.world.state[joint_name].velocity
+            msg.data = GodMap.world.state[joint_name].velocity
             self.publishers[i].publish(msg)
         return Status.RUNNING
 

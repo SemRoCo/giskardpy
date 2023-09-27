@@ -5,6 +5,7 @@ from giskardpy import casadi_wrapper as w, identifier
 from giskardpy.goals.goal import Goal
 from giskardpy.goals.monitors.monitors import Monitor
 from giskardpy.goals.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE, Task
+from giskardpy.god_map_user import GodMap
 from giskardpy.my_types import my_string
 
 
@@ -28,43 +29,43 @@ class ExternalCollisionAvoidance(Goal):
         self.link_name = link_name
         self.idx = idx
         super().__init__()
-        self.root = self.world.root_link_name
+        self.root = GodMap.world.root_link_name
         self.robot_name = robot_name
-        self.control_horizon = self.prediction_horizon - (self.god_map.get_data(identifier.max_derivative) - 1)
+        self.control_horizon = GodMap.prediction_horizon - (GodMap.god_map.get_data(identifier.max_derivative) - 1)
         self.control_horizon = max(1, self.control_horizon)
 
     def map_V_n_symbol(self):
-        return self.god_map.list_to_vector3(identifier.closest_point + ['get_external_collisions',
+        return GodMap.god_map.list_to_vector3(identifier.closest_point + ['get_external_collisions',
                                                                         (self.link_name,),
                                                                         self.idx,
                                                                         'map_V_n'])
 
     def get_closest_point_on_a_in_a(self):
-        return self.god_map.list_to_point3(identifier.closest_point + ['get_external_collisions',
+        return GodMap.god_map.list_to_point3(identifier.closest_point + ['get_external_collisions',
                                                                        (self.link_name,),
                                                                        self.idx,
                                                                        'new_a_P_pa'])
 
     def map_P_a_symbol(self):
-        return self.god_map.list_to_point3(identifier.closest_point + ['get_external_collisions',
+        return GodMap.god_map.list_to_point3(identifier.closest_point + ['get_external_collisions',
                                                                        (self.link_name,),
                                                                        self.idx,
                                                                        'new_map_P_pa'])
 
     def get_actual_distance(self):
-        return self.god_map.to_symbol(identifier.closest_point + ['get_external_collisions',
+        return GodMap.god_map.to_symbol(identifier.closest_point + ['get_external_collisions',
                                                                   (self.link_name,),
                                                                   self.idx,
                                                                   'contact_distance'])
 
     def get_link_b_hash(self):
-        return self.god_map.to_symbol(identifier.closest_point + ['get_external_collisions',
+        return GodMap.god_map.to_symbol(identifier.closest_point + ['get_external_collisions',
                                                                   (self.link_name,),
                                                                   self.idx,
                                                                   'link_b_hash'])
 
     def get_number_of_external_collisions(self):
-        return self.god_map.to_symbol(identifier.closest_point + ['get_number_of_external_collisions',
+        return GodMap.god_map.to_symbol(identifier.closest_point + ['get_number_of_external_collisions',
                                                                   (self.link_name,)])
 
     @profile
@@ -75,7 +76,7 @@ class ExternalCollisionAvoidance(Goal):
         sample_period = self.sample_period
         number_of_external_collisions = self.get_number_of_external_collisions()
 
-        map_T_a = self.world.compose_fk_expression(self.root, self.link_name)
+        map_T_a = GodMap.world.compose_fk_expression(self.root, self.link_name)
 
         map_P_pa = map_T_a.dot(a_P_pa)
 
@@ -86,8 +87,8 @@ class ExternalCollisionAvoidance(Goal):
 
         soft_threshold = 0
         actual_link_b_hash = self.get_link_b_hash()
-        parent_joint = self.world.links[self.link_name].parent_joint_name
-        direct_children = set(self.world.get_directly_controlled_child_links_with_collisions(parent_joint))
+        parent_joint = GodMap.world.links[self.link_name].parent_joint_name
+        direct_children = set(GodMap.world.get_directly_controlled_child_links_with_collisions(parent_joint))
         b_result_cases = [(k[1].__hash__(), v) for k, v in self.soft_thresholds.items() if k[0] in direct_children]
         soft_threshold = w.if_eq_cases(a=actual_link_b_hash,
                                        b_result_cases=b_result_cases,
@@ -155,37 +156,37 @@ class SelfCollisionAvoidance(Goal):
         if self.link_a.prefix != self.link_b.prefix:
             raise Exception(f'Links {self.link_a} and {self.link_b} have different prefix.')
         super().__init__()
-        self.root = self.world.root_link_name
+        self.root = GodMap.world.root_link_name
         self.robot_name = robot_name
-        self.control_horizon = self.prediction_horizon - (self.god_map.get_data(identifier.max_derivative) - 1)
+        self.control_horizon = GodMap.prediction_horizon - (GodMap.god_map.get_data(identifier.max_derivative) - 1)
         self.control_horizon = max(1, self.control_horizon)
 
     def get_contact_normal_in_b(self):
-        return self.god_map.list_to_vector3(identifier.closest_point + ['get_self_collisions',
+        return GodMap.god_map.list_to_vector3(identifier.closest_point + ['get_self_collisions',
                                                                         (self.link_a, self.link_b),
                                                                         self.idx,
                                                                         'new_b_V_n'])
 
     def get_position_on_a_in_a(self):
-        return self.god_map.list_to_point3(identifier.closest_point + ['get_self_collisions',
+        return GodMap.god_map.list_to_point3(identifier.closest_point + ['get_self_collisions',
                                                                        (self.link_a, self.link_b),
                                                                        self.idx,
                                                                        'new_a_P_pa'])
 
     def get_b_T_pb(self) -> w.TransMatrix:
-        return self.god_map.list_to_translation3(identifier.closest_point + ['get_self_collisions',
+        return GodMap.god_map.list_to_translation3(identifier.closest_point + ['get_self_collisions',
                                                                              (self.link_a, self.link_b),
                                                                              self.idx,
                                                                              'new_b_P_pb'])
 
     def get_actual_distance(self):
-        return self.god_map.to_symbol(identifier.closest_point + ['get_self_collisions',
+        return GodMap.god_map.to_symbol(identifier.closest_point + ['get_self_collisions',
                                                                   (self.link_a, self.link_b),
                                                                   self.idx,
                                                                   'contact_distance'])
 
     def get_number_of_self_collisions(self):
-        return self.god_map.to_symbol(identifier.closest_point + ['get_number_of_self_collisions',
+        return GodMap.god_map.to_symbol(identifier.closest_point + ['get_number_of_self_collisions',
                                                                   (self.link_a, self.link_b)])
 
     @profile
@@ -195,8 +196,8 @@ class SelfCollisionAvoidance(Goal):
         number_of_self_collisions = self.get_number_of_self_collisions()
         sample_period = self.sample_period
 
-        # b_T_a2 = self.world.compose_fk_evaluated_expression(self.link_b, self.link_a)
-        b_T_a = self.world.compose_fk_expression(self.link_b, self.link_a)
+        # b_T_a2 = GodMap.world.compose_fk_evaluated_expression(self.link_b, self.link_a)
+        b_T_a = GodMap.world.compose_fk_expression(self.link_b, self.link_a)
         pb_T_b = self.get_b_T_pb().inverse()
         a_P_pa = self.get_position_on_a_in_a()
 
@@ -264,26 +265,26 @@ class CollisionAvoidanceHint(Goal):
         :param weight: float, default WEIGHT_ABOVE_CA
         """
         super().__init__()
-        self.link_name = self.world.search_for_link_name(tip_link)
-        self.link_b = self.world.search_for_link_name(object_link_name)
+        self.link_name = GodMap.world.search_for_link_name(tip_link)
+        self.link_b = GodMap.world.search_for_link_name(object_link_name)
         self.key = (self.link_name, self.link_b)
         self.object_group = object_group
         self.link_b_hash = self.link_b.__hash__()
         if root_link is None:
-            self.root_link = self.world.root_link_name
+            self.root_link = GodMap.world.root_link_name
         else:
-            self.root_link = self.world.search_for_link_name(root_link)
+            self.root_link = GodMap.world.search_for_link_name(root_link)
 
         if spring_threshold is None:
             spring_threshold = max_threshold
         else:
             spring_threshold = max(spring_threshold, max_threshold)
 
-        self.add_collision_check(self.world.links[self.link_name].name,
-                                 self.world.links[self.link_b].name,
+        self.add_collision_check(GodMap.world.links[self.link_name].name,
+                                 GodMap.world.links[self.link_b].name,
                                  spring_threshold)
 
-        self.avoidance_hint = self.world.transform_msg(self.root_link, avoidance_hint)
+        self.avoidance_hint = GodMap.world.transform_msg(self.root_link, avoidance_hint)
         self.avoidance_hint.vector = tf.normalize(self.avoidance_hint.vector)
 
         self.max_velocity = max_linear_velocity
@@ -292,12 +293,12 @@ class CollisionAvoidanceHint(Goal):
         self.weight = weight
 
     def get_actual_distance(self):
-        return self.god_map.to_symbol(identifier.closest_point + ['get_external_collisions_long_key',
+        return GodMap.god_map.to_symbol(identifier.closest_point + ['get_external_collisions_long_key',
                                                                   self.key,
                                                                   'contact_distance'])
 
     def get_link_b(self):
-        return self.god_map.to_symbol(identifier.closest_point + ['get_external_collisions_long_key',
+        return GodMap.god_map.to_symbol(identifier.closest_point + ['get_external_collisions_long_key',
                                                                   self.key,
                                                                   'link_b_hash'])
 
@@ -310,7 +311,7 @@ class CollisionAvoidanceHint(Goal):
         link_b_hash = self.get_link_b()
         actual_distance_capped = w.max(actual_distance, 0)
 
-        root_T_a = self.world.compose_fk_expression(self.root_link, self.link_name)
+        root_T_a = GodMap.world.compose_fk_expression(self.root_link, self.link_name)
 
         spring_error = spring_threshold - actual_distance_capped
         spring_error = w.max(spring_error, 0)

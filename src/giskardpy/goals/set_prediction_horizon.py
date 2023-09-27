@@ -3,6 +3,7 @@ from typing import Union
 from giskardpy import identifier
 from giskardpy.configs.qp_controller_config import SupportedQPSolver
 from giskardpy.goals.goal import Goal, NonMotionGoal
+from giskardpy.god_map_user import GodMap
 from giskardpy.tree.behaviors.max_trajectory_length import MaxTrajectoryLength
 from giskardpy.utils import logging
 
@@ -21,7 +22,7 @@ class SetPredictionHorizon(Goal):
         pass
         if self.new_prediction_horizon < 7:
             logging.logwarn('Prediction horizon must be >= 7.')
-        self.god_map.set_data(identifier.prediction_horizon, self.new_prediction_horizon)
+        GodMap.god_map.set_data(identifier.prediction_horizon, self.new_prediction_horizon)
 
     def __str__(self) -> str:
         return str(self.__class__.__name__)
@@ -32,7 +33,7 @@ class SetQPSolver(NonMotionGoal):
     def __init__(self, qp_solver_id: Union[SupportedQPSolver, int]):
         super().__init__()
         qp_solver_id = SupportedQPSolver(qp_solver_id)
-        self.god_map.set_data(identifier.qp_solver_name, qp_solver_id)
+        GodMap.god_map.set_data(identifier.qp_solver_name, qp_solver_id)
 
     def __str__(self) -> str:
         return str(self.__class__.__name__)
@@ -48,7 +49,7 @@ class SetMaxTrajLength(NonMotionGoal):
         """
         super().__init__()
         assert new_length > 0
-        self.god_map.set_data(identifier.max_trajectory_length, new_length)
+        GodMap.god_map.set_data(identifier.max_trajectory_length, new_length)
 
     def __str__(self) -> str:
         return super().__str__()
@@ -57,7 +58,7 @@ class SetMaxTrajLength(NonMotionGoal):
 class EndlessMode(NonMotionGoal):
     def __init__(self):
         super().__init__()
-        self.god_map.set_data(identifier.endless_mode, True)
+        GodMap.god_map.set_data(identifier.endless_mode, True)
 
     def __str__(self) -> str:
         return super().__str__()
@@ -71,7 +72,7 @@ class EnableVelocityTrajectoryTracking(NonMotionGoal):
         :param enabled: If True, will the velocity part of the message.
         """
         super().__init__()
-        self.god_map.set_data(identifier.fill_trajectory_velocity_values, enabled)
+        GodMap.god_map.set_data(identifier.fill_trajectory_velocity_values, enabled)
 
     def __str__(self) -> str:
         return super().__str__()

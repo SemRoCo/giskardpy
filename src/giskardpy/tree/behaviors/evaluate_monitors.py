@@ -10,7 +10,6 @@ from giskardpy.utils.decorators import record_time, catch_and_raise_to_blackboar
 
 
 class EvaluateMonitors(GiskardBehavior):
-    monitor_manager: MonitorManager
 
     def __init__(self, name: str = 'evaluate monitors'):
         super().__init__(name)
@@ -18,5 +17,5 @@ class EvaluateMonitors(GiskardBehavior):
     @catch_and_raise_to_blackboard
     @record_time
     def update(self):
-        self.monitor_manager.evaluate_monitors()
+        GodMap.monitor_manager.evaluate_monitors()
         return Status.SUCCESS

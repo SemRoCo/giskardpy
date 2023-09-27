@@ -10,6 +10,6 @@ class GoalReceived(ActionServerBehavior):
     def update(self):
         if self.get_as().has_goal():
             logging.loginfo('Received new goal.')
-            self.god_map.set_data(identifier.goal_msg, self.pop_goal())
+            GodMap.god_map.set_data(identifier.goal_msg, self.pop_goal())
             return Status.SUCCESS
         return Status.FAILURE

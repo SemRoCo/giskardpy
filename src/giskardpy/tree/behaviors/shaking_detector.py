@@ -4,6 +4,7 @@ from py_trees import Status
 
 import giskardpy.identifier as identifier
 from giskardpy.exceptions import ShakingException
+from giskardpy.god_map_user import GodMap
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
 from giskardpy.utils.decorators import record_time
@@ -17,18 +18,18 @@ class WiggleCancel(GiskardBehavior):
     @profile
     def __init__(self, name):
         super().__init__(name)
-        self.amplitude_threshold = self.god_map.get_data(identifier.amplitude_threshold)
-        self.num_samples_in_fft = self.god_map.get_data(identifier.num_samples_in_fft)
-        self.frequency_range = self.god_map.get_data(identifier.frequency_range)
+        self.amplitude_threshold = GodMap.god_map.get_data(identifier.amplitude_threshold)
+        self.num_samples_in_fft = GodMap.god_map.get_data(identifier.num_samples_in_fft)
+        self.frequency_range = GodMap.god_map.get_data(identifier.frequency_range)
         self.max_angular_velocity = 10.5
         self.max_linear_velocity = 10.5
 
     def make_velocity_threshold(self, min_cut_off=0.01, max_cut_off=0.06):
-        joint_convergence_threshold = self.god_map.get_data(identifier.joint_convergence_threshold)
-        free_variables = self.god_map.get_data(identifier.free_variables)
+        joint_convergence_threshold = GodMap.god_map.get_data(identifier.joint_convergence_threshold)
+        free_variables = GodMap.god_map.get_data(identifier.free_variables)
         thresholds = []
         for free_variable in free_variables:  # type: FreeVariable
-            velocity_limit = self.god_map.evaluate_expr(free_variable.get_upper_limit(1))
+            velocity_limit = GodMap.god_map.evaluate_expr(free_variable.get_upper_limit(1))
             velocity_limit *= joint_convergence_threshold
             velocity_limit = min(max(min_cut_off, velocity_limit), max_cut_off)
             thresholds.append(velocity_limit)
@@ -39,17 +40,17 @@ class WiggleCancel(GiskardBehavior):
     def initialise(self):
         super().initialise()
         self.js_samples = []
-        self.sample_period = self.god_map.get_data(identifier.sample_period)
+        self.sample_period = GodMap.god_map.get_data(identifier.sample_period)
         self.max_detectable_freq = 1 / (2 * self.sample_period)
         self.min_wiggle_frequency = self.frequency_range * self.max_detectable_freq
         self.keys = []
         self.thresholds = []
         self.velocity_limits = []
         # FIXME check for free variables and not joints
-        for joint_name, threshold in zip(self.world.controlled_joints,
+        for joint_name, threshold in zip(GodMap.world.controlled_joints,
                                          self.make_velocity_threshold()):
-            _, velocity_limit = self.world.get_joint_velocity_limits(joint_name)
-            if self.world.is_joint_prismatic(joint_name):
+            _, velocity_limit = GodMap.world.get_joint_velocity_limits(joint_name)
+            if GodMap.world.is_joint_prismatic(joint_name):
                 velocity_limit = min(self.max_linear_velocity, velocity_limit)
             else:
                 velocity_limit = min(self.max_angular_velocity, velocity_limit)
@@ -65,10 +66,10 @@ class WiggleCancel(GiskardBehavior):
     @record_time
     @profile
     def update(self):
-        prediction_horizon = self.god_map.get_data(identifier.prediction_horizon)
+        prediction_horizon = GodMap.god_map.get_data(identifier.prediction_horizon)
         if prediction_horizon > 1:
             return Status.RUNNING
-        latest_points = self.god_map.get_data(identifier.joint_states)
+        latest_points = GodMap.god_map.get_data(identifier.joint_states)
 
         for i, key in enumerate(self.keys):
             self.js_samples[i].append(latest_points[key].velocity)
@@ -86,12 +87,12 @@ class WiggleCancel(GiskardBehavior):
             self.detect_shaking(js_samples_array, self.sample_period, self.min_wiggle_frequency,
                                 self.amplitude_threshold, self.thresholds, self.velocity_limits, plot)
         except ShakingException as e:
-            if self.god_map.get_data(identifier.cut_off_shaking):
-                trajectory = self.god_map.get_data(identifier.trajectory)
+            if GodMap.god_map.get_data(identifier.cut_off_shaking):
+                trajectory = GodMap.god_map.get_data(identifier.trajectory)
                 for i in range(self.num_samples_in_fft):
                     trajectory.delete_last()
-                # time = self.god_map.get_data(identifier.time)
-                # self.god_map.set_data(identifier.time, len(trajectory.keys()))
+                # time = GodMap.god_map.get_data(identifier.time)
+                # GodMap.god_map.set_data(identifier.time, len(trajectory.keys()))
                 if len(trajectory.keys()) >= self.num_samples_in_fft:
                     logging.loginfo(str(e))
                     logging.loginfo('cutting off last second')

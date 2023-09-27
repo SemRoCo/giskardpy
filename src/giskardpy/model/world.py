@@ -21,8 +21,7 @@ from giskardpy.casadi_wrapper import CompiledFunction
 from giskardpy.data_types import JointStates
 from giskardpy.exceptions import DuplicateNameException, UnknownGroupException, UnknownLinkException, \
     WorldException, GiskardException
-from giskardpy.god_map import GodMap
-from giskardpy.god_map_user import GodMapWorshipper
+from giskardpy.god_map import _GodMap
 from giskardpy.model.joints import Joint, FixedJoint, PrismaticJoint, RevoluteJoint, OmniDrive, DiffDrive, \
     urdf_to_joint, VirtualFreeVariables, MovableJoint, Joint6DOF, OneDofJoint
 from giskardpy.model.links import Link, MeshGeometry
@@ -119,34 +118,34 @@ class WorldModelUpdateContextManager:
     first: bool = True
 
     def __init__(self, world: WorldTree):
-        self.world = world
+        GodMap.world = world
 
     def __enter__(self):
-        if self.world.context_manager_active:
+        if GodMap.world.context_manager_active:
             self.first = False
-        self.world.context_manager_active = True
-        return self.world
+        GodMap.world.context_manager_active = True
+        return GodMap.world
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_type is None and self.first:
-            self.world.context_manager_active = False
-            self.world.notify_model_change()
+            GodMap.world.context_manager_active = False
+            GodMap.world.notify_model_change()
 
 
 class ResetJointStateContextManager:
     def __init__(self, world: WorldTree):
-        self.world = world
+        GodMap.world = world
 
     def __enter__(self):
-        self.joint_state_tmp = deepcopy(self.world.state)
+        self.joint_state_tmp = deepcopy(GodMap.world.state)
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_type is None:
-            self.world.state = self.joint_state_tmp
-            self.world.notify_state_change()
+            GodMap.world.state = self.joint_state_tmp
+            GodMap.world.notify_state_change()
 
 
-class WorldTree(WorldTreeInterface, GodMapWorshipper):
+class WorldTree(WorldTreeInterface):
     joints: Dict[PrefixName, Union[Joint, OmniDrive]]
     links: Dict[PrefixName, Link]
     state: JointStates
@@ -159,7 +158,7 @@ class WorldTree(WorldTreeInterface, GodMapWorshipper):
 
     def __init__(self):
         self.default_link_color = ColorRGBA(1, 1, 1, 0.75)
-        self.god_map.set_data(identifier.world, self)
+        GodMap.god_map.set_data(identifier.world, self)
         self.connection_prefix = 'connection'
         self.fast_all_fks = None
         self._state_version = 0
@@ -178,7 +177,7 @@ class WorldTree(WorldTreeInterface, GodMapWorshipper):
             Derivatives.velocity: 1,
         }
         identifier.max_derivative = ['max_derivative']
-        self.god_map.set_data(identifier.max_derivative, Derivatives.jerk)
+        GodMap.god_map.set_data(identifier.max_derivative, Derivatives.jerk)
         return self
 
     @property
@@ -261,9 +260,9 @@ class WorldTree(WorldTreeInterface, GodMapWorshipper):
         """
         returns a symbol that refers to the given joint
         """
-        if not self.world.has_joint(joint_name):
+        if not GodMap.world.has_joint(joint_name):
             raise KeyError(f'World doesn\'t have joint named: {joint_name}.')
-        joint = self.world.joints[joint_name]
+        joint = GodMap.world.joints[joint_name]
         if isinstance(joint, OneDofJoint):
             return joint.get_symbol(derivative)
         raise TypeError(f'get_joint_position_symbol is only supported for OneDofJoint, not {type(joint)}')
@@ -361,7 +360,7 @@ class WorldTree(WorldTreeInterface, GodMapWorshipper):
         the model version number.
         """
         if not self.context_manager_active:
-            with self.god_map:
+            with GodMap.god_map:
                 self.fix_tree_structure()
                 self.reset_cache()
                 self.init_all_fks()
@@ -568,7 +567,7 @@ class WorldTree(WorldTreeInterface, GodMapWorshipper):
         return free_variable
 
     def update_state(self, next_commands: NextCommands, dt: float):
-        max_derivative = self.god_map.get_data(identifier.max_derivative)
+        max_derivative = GodMap.god_map.get_data(identifier.max_derivative)
         for free_variable_name, command in next_commands.free_variable_data.items():
             self.state[free_variable_name][:max_derivative] += command * dt
             self.state[free_variable_name][max_derivative] = command[-1]
@@ -878,7 +877,7 @@ class WorldTree(WorldTreeInterface, GodMapWorshipper):
         """
         self._clear()
         with self.modify_world():
-            self.god_map.get_data(identifier.giskard).world_config.setup()
+            GodMap.god_map.get_data(identifier.giskard).world_config.setup()
 
     def _add_joint_and_create_child(self, joint: Joint):
         self._raise_if_joint_exists(joint.name)
@@ -1211,7 +1210,7 @@ class WorldTree(WorldTreeInterface, GodMapWorshipper):
 
     def get_fk_velocity(self, root: PrefixName, tip: PrefixName) -> w.Expression:
         # FIXME, only use symbols of fk expr?
-        r_T_t = self.world.compose_fk_expression(root, tip)
+        r_T_t = GodMap.world.compose_fk_expression(root, tip)
         r_R_t = r_T_t.to_rotation()
         axis, angle = r_R_t.to_axis_angle()
         r_R_t_axis_angle = axis * angle
@@ -1289,26 +1288,26 @@ class WorldTree(WorldTreeInterface, GodMapWorshipper):
             str_params: List[str]
 
             def __init__(self, world: WorldTree):
-                self.world = world
-                self.god_map = GodMap()
-                self.fks = {self.world.root_link_name: w.TransMatrix()}
+                GodMap.world = world
+                self.god_map = _GodMap()
+                self.fks = {GodMap.world.root_link_name: w.TransMatrix()}
 
             @profile
             def joint_call(self, joint_name: my_string) -> bool:
-                joint = self.world.joints[joint_name]
+                joint = GodMap.world.joints[joint_name]
                 map_T_parent = self.fks[joint.parent_link_name]
                 self.fks[joint.child_link_name] = map_T_parent.dot(joint.parent_T_child)
                 return False
 
             @profile
             def compile_fks(self):
-                all_fks = w.vstack([self.fks[link_name] for link_name in self.world.link_names_as_set])
+                all_fks = w.vstack([self.fks[link_name] for link_name in GodMap.world.link_names_as_set])
                 collision_fks = []
                 # collision_ids = []
-                for link_name in sorted(self.world.link_names_with_collisions):
-                    if link_name == self.world.root_link_name:
+                for link_name in sorted(GodMap.world.link_names_with_collisions):
+                    if link_name == GodMap.world.root_link_name:
                         continue
-                    # link = self.world.links[link_name]
+                    # link = GodMap.world.links[link_name]
                     # for collision_id, geometry in enumerate(link.collisions):
                     #     link_name_with_id = link.name_with_collision_id(collision_id)
                     collision_fks.append(self.fks[link_name])
@@ -1322,7 +1321,7 @@ class WorldTree(WorldTreeInterface, GodMapWorshipper):
                 self.str_params = [str(v) for v in params]
                 self.fast_all_fks = all_fks.compile(parameters=params)
                 self.fast_collision_fks = collision_fks.compile(parameters=params)
-                self.idx_start = {link_name: i * 4 for i, link_name in enumerate(self.world.link_names_as_set)}
+                self.idx_start = {link_name: i * 4 for i, link_name in enumerate(GodMap.world.link_names_as_set)}
 
             @profile
             def recompute(self):
@@ -1332,11 +1331,11 @@ class WorldTree(WorldTreeInterface, GodMapWorshipper):
             @memoize
             @profile
             def compute_fk_np(self, root, tip):
-                if root == self.world.root_link_name:
+                if root == GodMap.world.root_link_name:
                     map_T_root = np.eye(4)
                 else:
                     map_T_root = self.fks[self.idx_start[root]:self.idx_start[root] + 4]
-                if tip == self.world.root_link_name:
+                if tip == GodMap.world.root_link_name:
                     map_T_tip = np.eye(4)
                 else:
                     map_T_tip = self.fks[self.idx_start[tip]:self.idx_start[tip] + 4]
@@ -1576,18 +1575,18 @@ class WorldBranch(WorldTreeInterface):
     def __init__(self, name: str, root_link_name: PrefixName, world: WorldTree, actuated: bool = False):
         self.name = name
         self.root_link_name = root_link_name
-        self.world = world
+        GodMap.world = world
         self.actuated = actuated
 
     def get_siblings_with_collisions(self, joint_name: PrefixName) -> List[PrefixName]:
-        siblings = self.world.get_siblings_with_collisions(joint_name)
+        siblings = GodMap.world.get_siblings_with_collisions(joint_name)
         return [x for x in siblings if x in self.link_names_as_set]
 
     def get_link(self, link_name: str) -> Link:
-        return self.world.get_link(link_name, self.name)
+        return GodMap.world.get_link(link_name, self.name)
 
     def get_joint(self, joint_name: str) -> Joint:
-        return self.world.get_joint(joint_name, self.name)
+        return GodMap.world.get_joint(joint_name, self.name)
 
     def search_for_link_name(self, link_name: str) -> PrefixName:
         matches = []
@@ -1617,44 +1616,44 @@ class WorldBranch(WorldTreeInterface):
 
     @property
     def parent_link_of_root(self) -> PrefixName:
-        return self.world.get_parent_link_of_link(self.world.groups[self.name].root_link_name)
+        return GodMap.world.get_parent_link_of_link(GodMap.world.groups[self.name].root_link_name)
 
     @profile
     def possible_collision_combinations(self) -> Set[Tuple[PrefixName, PrefixName]]:
         links = self.link_names_with_collisions
-        link_combinations = {self.world.sort_links(link_a, link_b) for link_a, link_b in combinations(links, 2)}
+        link_combinations = {GodMap.world.sort_links(link_a, link_b) for link_a, link_b in combinations(links, 2)}
         for link_name in links:
             direct_children = set()
             for child_joint_name in self.links[link_name].child_joint_names:
-                if self.world.is_joint_controlled(child_joint_name):
+                if GodMap.world.is_joint_controlled(child_joint_name):
                     continue
                 child_link_name = self.joints[child_joint_name].child_link_name
-                links, joints = self.world.search_branch(link_name=child_link_name,
-                                                         stop_at_joint_when=self.world.is_joint_controlled,
+                links, joints = GodMap.world.search_branch(link_name=child_link_name,
+                                                         stop_at_joint_when=GodMap.world.is_joint_controlled,
                                                          stop_at_link_when=None,
                                                          collect_joint_when=None,
-                                                         collect_link_when=self.world.has_link_collisions)
+                                                         collect_link_when=GodMap.world.has_link_collisions)
 
                 direct_children.update(links)
             direct_children.add(link_name)
             link_combinations.difference_update(
-                self.world.sort_links(link_a, link_b) for link_a, link_b in combinations(direct_children, 2))
+                GodMap.world.sort_links(link_a, link_b) for link_a, link_b in combinations(direct_children, 2))
         return link_combinations
 
     def get_unmovable_links(self) -> List[PrefixName]:
-        unmovable_links, _ = self.world.search_branch(link_name=self.root_link_name,
+        unmovable_links, _ = GodMap.world.search_branch(link_name=self.root_link_name,
                                                       stop_at_joint_when=lambda
                                                           joint_name: joint_name in self.controlled_joints,
-                                                      collect_link_when=self.world.has_link_collisions)
+                                                      collect_link_when=GodMap.world.has_link_collisions)
         return unmovable_links
 
     @property
     def base_pose(self) -> Pose:
-        return self.world.compute_fk_pose(self.world.root_link_name, self.root_link_name).pose
+        return GodMap.world.compute_fk_pose(GodMap.world.root_link_name, self.root_link_name).pose
 
     @property
     def state(self) -> JointStates:
-        return JointStates({j: self.world.state[j] for j in self.joints if j in self.world.state})
+        return JointStates({j: GodMap.world.state[j] for j in self.joints if j in GodMap.world.state})
 
     def get_link_short_name_match(self, link_name: my_string) -> PrefixName:
         matches = []
@@ -1687,20 +1686,20 @@ class WorldBranch(WorldTreeInterface):
             pass
 
     @property
-    def god_map(self) -> GodMap:
-        return self.world.god_map
+    def god_map(self) -> _GodMap:
+        return GodMap.world.god_map
 
     @property
     def root_link(self) -> Link:
-        return self.world.links[self.root_link_name]
+        return GodMap.world.links[self.root_link_name]
 
     @cached_property
     def joints(self) -> Dict[PrefixName, Joint]:
         def helper(root_link: Link) -> Dict[PrefixName, Joint]:
-            joints = {j: self.world.joints[j] for j in root_link.child_joint_names}
+            joints = {j: GodMap.world.joints[j] for j in root_link.child_joint_names}
             for joint_name in root_link.child_joint_names:
-                joint = self.world.joints[joint_name]
-                child_link = self.world.links[joint.child_link_name]
+                joint = GodMap.world.joints[joint_name]
+                child_link = GodMap.world.links[joint.child_link_name]
                 joints.update(helper(child_link))
             return joints
 
@@ -1708,7 +1707,7 @@ class WorldBranch(WorldTreeInterface):
 
     @cached_property
     def groups(self) -> Dict[str, WorldBranch]:
-        return {group_name: group for group_name, group in self.world.groups.items() if
+        return {group_name: group for group_name, group in GodMap.world.groups.items() if
                 group.root_link_name in self.links and group.name != self.name}
 
     @cached_property
@@ -1716,19 +1715,19 @@ class WorldBranch(WorldTreeInterface):
         def helper(root_link: Link) -> Dict[my_string, Link]:
             links = {root_link.name: root_link}
             for j in root_link.child_joint_names:
-                j = self.world.joints[j]
-                child_link = self.world.links[j.child_link_name]
+                j = GodMap.world.joints[j]
+                child_link = GodMap.world.links[j.child_link_name]
                 links.update(helper(child_link))
             return links
 
         return helper(self.root_link)
 
     def compute_fk_pose(self, root: PrefixName, tip: PrefixName) -> PoseStamped:
-        return self.world.compute_fk_pose(root, tip)
+        return GodMap.world.compute_fk_pose(root, tip)
 
     def compute_fk_pose_with_collision_offset(self, root: PrefixName, tip: PrefixName, collision_id: int) \
             -> PoseStamped:
-        return self.world.compute_fk_pose_with_collision_offset(root, tip, collision_id)
+        return GodMap.world.compute_fk_pose_with_collision_offset(root, tip, collision_id)
 
     def is_link_controlled(self, link_name: PrefixName) -> bool:
-        return self.world.is_link_controlled(link_name)
+        return GodMap.world.is_link_controlled(link_name)

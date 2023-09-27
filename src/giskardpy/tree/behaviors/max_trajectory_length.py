@@ -2,6 +2,7 @@ from py_trees import Status
 
 import giskardpy.identifier as identifier
 from giskardpy.exceptions import PlanningException
+from giskardpy.god_map_user import GodMap
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.decorators import record_time, catch_and_raise_to_blackboard
 
@@ -15,7 +16,7 @@ class MaxTrajectoryLength(GiskardBehavior):
 
     @profile
     def initialise(self):
-        self.endless_mode = self.god_map.get_data(identifier.endless_mode)
+        self.endless_mode = GodMap.god_map.get_data(identifier.endless_mode)
 
     @catch_and_raise_to_blackboard
     @record_time
@@ -23,11 +24,11 @@ class MaxTrajectoryLength(GiskardBehavior):
     def update(self):
         if self.endless_mode:
             return Status.RUNNING
-        t = self.god_map.get_data(identifier.time)
-        length = self.god_map.get_data(identifier.max_trajectory_length)
+        t = GodMap.god_map.get_data(identifier.time)
+        length = GodMap.god_map.get_data(identifier.max_trajectory_length)
         if not self.real_time:
-            sample_period = self.god_map.get_data(identifier.sample_period)
-            length = self.god_map.get_data(identifier.max_trajectory_length)
+            sample_period = GodMap.god_map.get_data(identifier.sample_period)
+            length = GodMap.god_map.get_data(identifier.max_trajectory_length)
         else:
             sample_period = 1
         t = t * sample_period

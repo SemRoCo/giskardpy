@@ -3,7 +3,7 @@ from typing import List, Union, Optional, Callable
 
 import giskardpy.casadi_wrapper as cas
 from giskardpy import identifier
-from giskardpy.god_map import GodMap
+from giskardpy.god_map import _GodMap
 from giskardpy.my_types import Derivatives
 
 DebugConstraint = namedtuple('debug', ['expr'])
@@ -30,7 +30,7 @@ class InequalityConstraint:
         self.expression = expression
         self.quadratic_weight = quadratic_weight
         if control_horizon is None:
-            self.control_horizon = self.prediction_horizon - (self.god_map.get_data(identifier.max_derivative) - 1)
+            self.control_horizon = self.prediction_horizon - (GodMap.god_map.get_data(identifier.max_derivative) - 1)
         else:
             self.control_horizon = control_horizon
         self.control_horizon = max(1, self.control_horizon)
@@ -45,12 +45,12 @@ class InequalityConstraint:
             self.linear_weight = linear_weight
 
     @property
-    def god_map(self) -> GodMap:
-        return GodMap()
+    def god_map(self) -> _GodMap:
+        return _GodMap()
 
     @property
     def prediction_horizon(self) -> int:
-        return self.god_map.get_data(identifier.prediction_horizon)
+        return GodMap.god_map.get_data(identifier.prediction_horizon)
 
     def __str__(self):
         return self.name
@@ -79,7 +79,7 @@ class EqualityConstraint:
         self.expression = expression
         self.quadratic_weight = quadratic_weight
         if control_horizon is None:
-            self.control_horizon = self.prediction_horizon - (self.god_map.get_data(identifier.max_derivative) - 1)
+            self.control_horizon = self.prediction_horizon - (GodMap.god_map.get_data(identifier.max_derivative) - 1)
         else:
             self.control_horizon = control_horizon
         self.control_horizon = max(1, self.control_horizon)
@@ -93,12 +93,12 @@ class EqualityConstraint:
             self.linear_weight = linear_weight
 
     @property
-    def god_map(self) -> GodMap:
-        return GodMap()
+    def god_map(self) -> _GodMap:
+        return _GodMap()
 
     @property
     def prediction_horizon(self) -> int:
-        return self.god_map.get_data(identifier.prediction_horizon)
+        return GodMap.god_map.get_data(identifier.prediction_horizon)
 
     def __str__(self):
         return self.name
@@ -165,12 +165,8 @@ class DerivativeInequalityConstraint:
             self.horizon_function = horizon_function
 
     @property
-    def god_map(self) -> GodMap:
-        return GodMap()
-
-    @property
     def prediction_horizon(self) -> int:
-        return self.god_map.get_data(identifier.prediction_horizon)
+        return GodMap.god_map.get_data(identifier.prediction_horizon)
 
     def is_iterable(self, thing):
         if isinstance(thing, cas.ca.SX) and sum(thing.shape) == 2:

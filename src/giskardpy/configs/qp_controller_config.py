@@ -67,7 +67,7 @@ class QPControllerConfig:
 
     def set_defaults(self):
         self.qp_solver = self.__qp_solver
-        self.prediction_horizon = self.__prediction_horizon
+        GodMap.prediction_horizon = self.__prediction_horizon
         self.sample_period = self.__sample_period
         self.retries_with_relaxed_constraints = self.__retries_with_relaxed_constraints
         self.added_slack = self.__added_slack

@@ -6,13 +6,11 @@ from py_trees import Behaviour, Blackboard
 import giskardpy.utils.tfwrapper as tf
 from giskardpy import identifier
 from giskardpy.configs.collision_avoidance_config import CollisionAvoidanceGroupThresholds
-from giskardpy.god_map import GodMap
-from giskardpy.god_map_user import GodMapWorshipper
-from giskardpy.model.world import WorldTree
+from giskardpy.god_map_user import GodMap
 from giskardpy.utils.utils import has_blackboard_exception, get_blackboard_exception, clear_blackboard_exception
 
 
-class GiskardBehavior(Behaviour, GodMapWorshipper):
+class GiskardBehavior(Behaviour):
 
     def __init__(self, name: Optional[str] = None):
         if name is None:
@@ -28,8 +26,8 @@ class GiskardBehavior(Behaviour, GodMapWorshipper):
     @property
     def traj_time_in_sec(self):
         if self.is_closed_loop:
-            return self.god_map.unsafe_get_data(identifier.time)
-        return self.god_map.unsafe_get_data(identifier.time) * self.god_map.unsafe_get_data(identifier.sample_period)
+            return GodMap.god_map.unsafe_get_data(identifier.time)
+        return GodMap.god_map.unsafe_get_data(identifier.time) * GodMap.god_map.unsafe_get_data(identifier.sample_period)
 
     def get_runtime(self):
         return time() - self.get_blackboard().runtime
@@ -56,6 +54,6 @@ class GiskardBehavior(Behaviour, GodMapWorshipper):
 
     def transform_msg(self, target_frame, msg, timeout=1):
         try:
-            return self.world.transform_msg(target_frame, msg)
+            return GodMap.world.transform_msg(target_frame, msg)
         except KeyError as e:
             return tf.transform_msg(target_frame, msg, timeout=timeout)

@@ -6,12 +6,11 @@ import pandas as pd
 import giskardpy.casadi_wrapper as cas
 from giskardpy import identifier
 from giskardpy.data_types import JointStates
-from giskardpy.god_map_user import GodMapWorshipper
 from giskardpy.model.trajectory import Trajectory
 from giskardpy.utils import logging
 
 
-class DebugExpressionManager(GodMapWorshipper):
+class DebugExpressionManager:
     debug_expressions: Dict[str, cas.Expression]
     compiled_debug_expressions: Dict[str, cas.CompiledFunction]
     evaluated_debug_expressions: Dict[str, np.ndarray]

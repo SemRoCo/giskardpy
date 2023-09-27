@@ -32,7 +32,7 @@ class SetMoveResult(GiskardBehavior):
             move_result = MoveResult()
 
         trajectory = self.god_map.get_data(identifier.trajectory)
-        joints = [self.world.joints[joint_name] for joint_name in self.world.movable_joint_names]
+        joints = [GodMap.world.joints[joint_name] for joint_name in GodMap.world.movable_joint_names]
         sample_period = self.god_map.get_data(identifier.sample_period)
         move_result.trajectory = trajectory.to_msg(sample_period=sample_period, start_time=0, joints=joints)
         if move_result.error_code == MoveResult.PREEMPTED:

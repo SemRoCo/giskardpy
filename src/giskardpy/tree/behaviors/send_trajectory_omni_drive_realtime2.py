@@ -48,7 +48,7 @@ class SendCmdVel(GiskardBehavior, ABC):
             rospy.sleep(1)
 
         if joint_name is None:
-            for joint in self.world.joints.values():
+            for joint in GodMap.world.joints.values():
                 if isinstance(joint, (OmniDrive, DiffDrive)):
                     # FIXME can only handle one drive
                     # self.controlled_joints = [joint]
@@ -57,9 +57,9 @@ class SendCmdVel(GiskardBehavior, ABC):
                 #TODO
                 pass
         else:
-            joint_name = self.world.search_for_joint_name(joint_name)
-            self.joint = self.world.joints[joint_name]
-        self.world.register_controlled_joints([self.joint.name])
+            joint_name = GodMap.world.search_for_joint_name(joint_name)
+            self.joint = GodMap.world.joints[joint_name]
+        GodMap.world.register_controlled_joints([self.joint.name])
         loginfo(f'Received controlled joints from \'{cmd_vel_topic}\'.')
 
     def __str__(self):
@@ -90,7 +90,7 @@ class SendCmdVel(GiskardBehavior, ABC):
     @catch_and_raise_to_blackboard
     @profile
     def update(self):
-        cmd = self.god_map.get_data(identifier.qp_solver_solution)
+        cmd = GodMap.god_map.get_data(identifier.qp_solver_solution)
         twist = self.solver_cmd_to_twist(cmd)
         self.vel_pub.publish(twist)
         return Status.SUCCESS

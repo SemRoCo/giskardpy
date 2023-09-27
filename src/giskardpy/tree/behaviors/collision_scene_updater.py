@@ -8,5 +8,5 @@ class CollisionSceneUpdater(GiskardBehavior):
     @record_time
     @profile
     def update(self):
-        self.collision_scene.sync()
+        GodMap.collision_scene.sync()
         return Status.SUCCESS

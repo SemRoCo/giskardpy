@@ -36,7 +36,7 @@ from giskardpy.god_map_user import GodMapWorshipper
 from giskardpy.model.collision_world_syncer import Collisions, Collision
 from giskardpy.my_types import PrefixName, Derivatives
 from giskardpy.exceptions import UnknownGroupException
-from giskardpy.god_map import GodMap
+from giskardpy.god_map import _GodMap
 from giskardpy.model.joints import OneDofJoint, OmniDrive, DiffDrive
 from giskardpy.model.world import WorldTree
 from giskardpy.python_interface.python_interface import GiskardWrapper
@@ -226,7 +226,7 @@ def pykdl_frame_to_numpy(pykdl_frame):
 
 
 class GiskardTestWrapper(GiskardWrapper, GodMapWorshipper):
-    god_map: GodMap
+    god_map: _GodMap
     default_pose = {}
     better_pose = {}
     odom_root = 'odom'

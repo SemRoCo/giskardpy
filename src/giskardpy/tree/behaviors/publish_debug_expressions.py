@@ -110,7 +110,7 @@ class PublishDebugExpressions(GiskardBehavior):
             msg.position.extend(qp_controller.xdot_full.tolist())
 
         if self.publish_Ax or self.publish_Ex:
-            sample_period = self.god_map.get_data(identifier.sample_period)
+            sample_period = GodMap.god_map.get_data(identifier.sample_period)
             num_vel_constr = len(qp_controller.derivative_constraints) * (qp_controller.prediction_horizon - 2)
             num_neq_constr = len(qp_controller.inequality_constraints)
             num_eq_constr = len(qp_controller.equality_constraints)
@@ -137,7 +137,7 @@ class PublishDebugExpressions(GiskardBehavior):
     @record_time
     @profile
     def update(self):
-        qp_controller: QPProblemBuilder = self.god_map.get_data(identifier.qp_controller)
+        qp_controller: QPProblemBuilder = GodMap.god_map.get_data(identifier.qp_controller)
         msg = self.create_msg(qp_controller)
         self.publisher.publish(msg)
         return Status.RUNNING

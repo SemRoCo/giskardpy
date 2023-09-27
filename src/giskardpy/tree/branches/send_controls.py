@@ -2,14 +2,13 @@ from typing import List
 
 from py_trees import Sequence
 
-from giskardpy.god_map_user import GodMapWorshipper
 from giskardpy.my_types import PrefixName
 from giskardpy.tree.behaviors.joint_group_vel_controller_publisher import JointGroupVelController
 from giskardpy.tree.behaviors.joint_vel_controller_publisher import JointVelController
 from giskardpy.tree.behaviors.send_trajectory_omni_drive_realtime2 import SendCmdVel
 
 
-class SendControls(Sequence, GodMapWorshipper):
+class SendControls(Sequence):
     def __init__(self, name: str = 'send controls'):
         super().__init__(name)
 

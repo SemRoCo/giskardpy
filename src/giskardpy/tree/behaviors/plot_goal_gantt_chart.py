@@ -39,7 +39,7 @@ class PlotGanttChart(GiskardBehavior):
         for i, (task, start_date, end_date) in enumerate(zip(tasks, start_dates, end_dates)):
             plt.barh(task, end_date - start_date, height=0.8, left=start_date, color=(133/255, 232/255, 133/255))
 
-        for monitor in self.monitors:
+        for monitor in GodMap.monitors:
             state = False
             for flip_event in monitor.state_flip_times:
                 text = f'{monitor.name} {state} -> {not state}'
@@ -58,6 +58,6 @@ class PlotGanttChart(GiskardBehavior):
     @profile
     def update(self):
         goals = self.god_map.get_data(identifier.motion_goals)
-        file_name = self.god_map.get_data(identifier.tmp_folder) + f'/gantt_charts/goal_{self.goal_id}.png'
+        file_name = self.god_map.get_data(identifier.tmp_folder) + f'/gantt_charts/goal_{GodMap.goal_id}.png'
         self.plot_gantt_chart(goals, file_name)
         return Status.SUCCESS

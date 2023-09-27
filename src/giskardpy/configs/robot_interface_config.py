@@ -6,14 +6,14 @@ from typing import Optional, List, Dict
 from giskardpy import identifier
 from giskardpy.tree.control_modes import ControlModes
 from giskardpy.exceptions import GiskardException
-from giskardpy.god_map import GodMap
+from giskardpy.god_map import _GodMap
 from giskardpy.model.world import WorldTree
 from giskardpy.my_types import my_string, PrefixName, Derivatives
 from giskardpy.tree.garden import TreeManager
 
 
 class RobotInterfaceConfig(ABC):
-    god_map = GodMap()
+    god_map = _GodMap()
 
     def set_defaults(self):
         pass
@@ -30,10 +30,10 @@ class RobotInterfaceConfig(ABC):
 
     @property
     def robot_group_name(self) -> str:
-        return self.world.robot_name
+        return GodMap.world.robot_name
 
     def get_root_link_of_group(self, group_name: str) -> PrefixName:
-        return self.world.groups[group_name].root_link_name
+        return GodMap.world.groups[group_name].root_link_name
 
     @property
     def tree_manager(self) -> TreeManager:
@@ -55,7 +55,7 @@ class RobotInterfaceConfig(ABC):
         """
         Tell Giskard to sync a 6dof joint with a tf frame.
         """
-        joint_name = self.world.search_for_joint_name(joint_name)
+        joint_name = GodMap.world.search_for_joint_name(joint_name)
         self.tree_manager.tree.wait_for_goal.synchronization.sync_6dof_joint_with_tf_frame(joint_name,
                                                                                            tf_parent_frame,
                                                                                            tf_child_frame)
@@ -69,7 +69,7 @@ class RobotInterfaceConfig(ABC):
         Tell Giskard to sync the world state with a joint state topic
         """
         if group_name is None:
-            group_name = self.world.robot_name
+            group_name = GodMap.world.robot_name
         self.tree_manager.tree.wait_for_goal.synchronization.sync_joint_state_topic(group_name=group_name,
                                                                                     topic_name=topic_name)
         self.tree_manager.tree.process_goal.control_loop_branch.synchronization.sync_joint_state2_topic(
@@ -87,7 +87,7 @@ class RobotInterfaceConfig(ABC):
                                     the tracking smoother but less accurate.
         :param joint_name: name of the omni or diff drive joint. Doesn't need to be specified if there is only one.
         """
-        joint_name = self.world.search_for_joint_name(joint_name)
+        joint_name = GodMap.world.search_for_joint_name(joint_name)
         self.tree_manager.tree.process_goal.control_loop_branch.send_controls.add_base_traj_action_server(cmd_vel_topic,
                                                                                                           joint_name)
 
@@ -99,8 +99,8 @@ class RobotInterfaceConfig(ABC):
         """
         if self.control_mode != ControlModes.standalone:
             raise GiskardException(f'Joints only need to be registered in {ControlModes.standalone.name} mode.')
-        joint_names = [self.world.search_for_joint_name(j, group_name) for j in joint_names]
-        self.world.register_controlled_joints(joint_names)
+        joint_names = [GodMap.world.search_for_joint_name(j, group_name) for j in joint_names]
+        GodMap.world.register_controlled_joints(joint_names)
 
     def add_follow_joint_trajectory_server(self,
                                            namespace: str,
@@ -117,7 +117,7 @@ class RobotInterfaceConfig(ABC):
         :param fill_velocity_values: whether to fill the velocity entries in the message send to the robot
         """
         if group_name is None:
-            group_name = self.world.robot_name
+            group_name = GodMap.world.robot_name
         self.tree_manager.add_follow_joint_traj_action_server(namespace=namespace, state_topic=state_topic,
                                                               group_name=group_name,
                                                               fill_velocity_values=fill_velocity_values,

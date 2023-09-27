@@ -7,8 +7,7 @@ from typing import Dict, Optional, List, Union, DefaultDict, Tuple
 
 from giskardpy import identifier
 from giskardpy.exceptions import SetupException
-from giskardpy.god_map import GodMap
-from giskardpy.god_map_user import GodMapWorshipper
+from giskardpy.god_map import _GodMap
 from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer, CollisionAvoidanceGroupThresholds, \
     CollisionCheckerLib, CollisionAvoidanceThresholds
 from giskardpy.model.world import WorldTree
@@ -17,7 +16,7 @@ from giskardpy.utils import logging
 
 
 class CollisionAvoidanceConfig(abc.ABC):
-    god_map = GodMap()
+    god_map = _GodMap()
 
     def __init__(self, collision_checker: CollisionCheckerLib = CollisionCheckerLib.bpb):
         self._create_collision_checker(collision_checker)
@@ -82,7 +81,7 @@ class CollisionAvoidanceConfig(abc.ABC):
         :param group_name: name of the group this default will be applied to
         """
         if group_name is None:
-            group_name = self.world.robot_name
+            group_name = GodMap.world.robot_name
         new_default = CollisionAvoidanceThresholds(
             number_of_repeller=number_of_repeller,
             soft_threshold=soft_threshold,
@@ -129,7 +128,7 @@ class CollisionAvoidanceConfig(abc.ABC):
         :param max_velocity: how fast it will move away from collisions
         """
         if group_name is None:
-            group_name = self.world.robot_name
+            group_name = GodMap.world.robot_name
         config = self.collision_scene.collision_avoidance_configs[group_name]
         joint_name = PrefixName(joint_name, group_name)
         if number_of_repeller is not None:
@@ -157,7 +156,7 @@ class CollisionAvoidanceConfig(abc.ABC):
         :param max_velocity: how fast it will move away from collisions
         """
         if group_name is None:
-            group_name = self.world.robot_name
+            group_name = GodMap.world.robot_name
         config = self.collision_scene.collision_avoidance_configs[group_name]
         link_name = PrefixName(link_name, group_name)
         if number_of_repeller is not None:
@@ -176,7 +175,7 @@ class CollisionAvoidanceConfig(abc.ABC):
         :param group_name: name of the robot for which it will be applied, only needs to be set if there are multiple robots.
         """
         if group_name is None:
-            group_name = self.world.robot_name
+            group_name = GodMap.world.robot_name
         if group_name not in self.collision_scene.self_collision_matrix_paths:
             self.collision_scene.load_self_collision_matrix_from_srdf(path_to_srdf, group_name)
         else:
@@ -189,9 +188,9 @@ class CollisionAvoidanceConfig(abc.ABC):
         collisions.
         """
         if group_name is None:
-            group_name = self.world.robot_name
+            group_name = GodMap.world.robot_name
         for joint_name in joint_names:
-            world_joint_name = self.world.search_for_joint_name(joint_name, group_name)
+            world_joint_name = GodMap.world.search_for_joint_name(joint_name, group_name)
             self.collision_scene.add_fixed_joint(world_joint_name)
 
 

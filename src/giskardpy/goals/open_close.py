@@ -30,13 +30,13 @@ class Open(Goal):
         """
         super().__init__()
         self.weight = weight
-        self.tip_link = self.world.search_for_link_name(tip_link, tip_group)
-        self.handle_link = self.world.search_for_link_name(environment_link, environment_group)
-        self.joint_name = self.world.get_movable_parent_joint(self.handle_link)
-        self.joint_group = self.world.get_group_of_joint(self.joint_name)
-        self.handle_T_tip = self.world.compute_fk_pose(self.handle_link, self.tip_link)
+        self.tip_link = GodMap.world.search_for_link_name(tip_link, tip_group)
+        self.handle_link = GodMap.world.search_for_link_name(environment_link, environment_group)
+        self.joint_name = GodMap.world.get_movable_parent_joint(self.handle_link)
+        self.joint_group = GodMap.world.get_group_of_joint(self.joint_name)
+        self.handle_T_tip = GodMap.world.compute_fk_pose(self.handle_link, self.tip_link)
 
-        _, max_position = self.world.get_joint_position_limits(self.joint_name)
+        _, max_position = GodMap.world.get_joint_position_limits(self.joint_name)
         if goal_joint_state is None:
             goal_joint_state = max_position
         else:
@@ -74,9 +74,9 @@ class Close(Goal):
         super().__init__()
         self.tip_link = tip_link
         self.environment_link = environment_link
-        handle_link = self.world.search_for_link_name(environment_link, environment_group)
-        joint_name = self.world.get_movable_parent_joint(handle_link)
-        min_position, _ = self.world.get_joint_position_limits(joint_name)
+        handle_link = GodMap.world.search_for_link_name(environment_link, environment_group)
+        joint_name = GodMap.world.get_movable_parent_joint(handle_link)
+        min_position, _ = GodMap.world.get_joint_position_limits(joint_name)
         if goal_joint_state is None:
             goal_joint_state = min_position
         else:

@@ -30,7 +30,7 @@ from sensor_msgs.msg import JointState
 from visualization_msgs.msg import Marker, MarkerArray
 
 from giskardpy import identifier
-from giskardpy.god_map import GodMap
+from giskardpy.god_map import _GodMap
 from giskardpy.my_types import PrefixName
 from giskardpy.utils import logging
 
@@ -298,7 +298,7 @@ def write_to_tmp(file_name: str, file_str: str) -> str:
 
 
 def to_tmp_path(file_name: str) -> str:
-    path = GodMap().get_data(identifier.tmp_folder)
+    path = _GodMap().get_data(identifier.tmp_folder)
     return resolve_ros_iris(f'{path}{file_name}')
 
 

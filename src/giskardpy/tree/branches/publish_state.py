@@ -1,11 +1,10 @@
 from py_trees import Sequence
 
-from giskardpy.god_map_user import GodMapWorshipper
 from giskardpy.tree.behaviors.tf_publisher import TfPublishingModes, TFPublisher
 from giskardpy.tree.behaviors.visualization import VisualizationBehavior
 
 
-class PublishState(Sequence, GodMapWorshipper):
+class PublishState(Sequence):
     def __init__(self, name: str = 'publish state'):
         super().__init__(name)
 

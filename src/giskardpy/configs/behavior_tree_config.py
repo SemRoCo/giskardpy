@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Optional
 
 from giskardpy import identifier
-from giskardpy.god_map import GodMap
+from giskardpy.god_map import _GodMap
 from giskardpy.tree.behaviors.compile_debug_expressions import CompileDebugExpressions
 from giskardpy.tree.behaviors.tf_publisher import TfPublishingModes
 from giskardpy.tree.garden import OpenLoop, ClosedLoop, StandAlone, TreeManager
@@ -10,7 +10,7 @@ from giskardpy.tree.control_modes import ControlModes
 
 
 class BehaviorTreeConfig(ABC):
-    god_map = GodMap()
+    god_map = _GodMap()
 
     def __init__(self, mode: ControlModes):
         self._control_mode = mode

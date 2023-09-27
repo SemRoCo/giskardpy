@@ -3,6 +3,7 @@ from py_trees import Status
 
 import giskardpy.identifier as identifier
 from giskardpy.exceptions import LocalMinimumException
+from giskardpy.god_map_user import GodMap
 from giskardpy.my_types import Derivatives
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
@@ -25,11 +26,11 @@ class LocalMinimum(GiskardBehavior):
 
     @profile
     def initialise(self):
-        if self.goal_id > self.last_goal_id:
+        if GodMap.goal_id > self.last_goal_id:
             self.thresholds = self.make_velocity_threshold()
             self.number_of_controlled_joints = len(self.thresholds)
-            self.endless_mode = self.god_map.get_data(identifier.endless_mode)
-            self.last_goal_id = self.goal_id
+            self.endless_mode = GodMap.god_map.get_data(identifier.endless_mode)
+            self.last_goal_id = GodMap.goal_id
 
     @catch_and_raise_to_blackboard
     @record_time

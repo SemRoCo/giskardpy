@@ -4,7 +4,7 @@ from typing import Dict, Tuple, List
 import numpy as np
 
 from giskardpy import identifier
-from giskardpy.god_map import GodMap
+from giskardpy.god_map import _GodMap
 
 
 class TimeCollector:
@@ -12,7 +12,7 @@ class TimeCollector:
     separator = ';'
 
     def __init__(self):
-        self.god_map = GodMap()
+        GodMap.god_map = _GodMap()
 
     def add_qp_solve_time(self, class_name, number_variables, number_constraints, time):
         self.qp_solver_times[class_name, number_variables, number_constraints].append(time)

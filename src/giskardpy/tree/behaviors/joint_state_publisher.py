@@ -4,6 +4,7 @@ import rospy
 from sensor_msgs.msg import JointState
 
 import giskardpy.identifier as identifier
+from giskardpy.god_map_user import GodMap
 from giskardpy.tree.behaviors.cmd_publisher import CommandPublisher
 
 
@@ -18,15 +19,15 @@ class JointStatePublisher(CommandPublisher):
 
     def publish_joint_state(self, time):
         msg = JointState()
-        js = deepcopy(self.world.state)
+        js = deepcopy(GodMap.world.state)
         try:
-            qp_data = self.god_map.get_data(identifier.qp_solver_solution)
+            qp_data = GodMap.god_map.get_data(identifier.qp_solver_solution)
         except Exception:
             return
         for joint_name in self.joint_names:
             msg.name.append(joint_name)
             try:
-                key = str(self.god_map.key_to_expr[tuple(identifier.joint_states + [joint_name, 'position'])])
+                key = str(GodMap.god_map.key_to_expr[tuple(identifier.joint_states + [joint_name, 'position'])])
                 dt = ((time.current_real - self.stamp).to_sec())# - 1/self.hz)
                 # if joint_name == 'neck_shoulder_pan_joint':
                 #     print(dt)

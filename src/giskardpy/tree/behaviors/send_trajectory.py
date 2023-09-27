@@ -9,6 +9,7 @@ from giskardpy.exceptions import ExecutionException, FollowJointTrajectory_INVAL
     FollowJointTrajectory_INVALID_GOAL, FollowJointTrajectory_OLD_HEADER_TIMESTAMP, \
     FollowJointTrajectory_PATH_TOLERANCE_VIOLATED, FollowJointTrajectory_GOAL_TOLERANCE_VIOLATED, \
     ExecutionTimeoutException, ExecutionSucceededPrematurely, ExecutionPreemptedException
+from giskardpy.god_map_user import GodMap
 from giskardpy.model.joints import OneDofJoint, OmniDrive
 from giskardpy.my_types import PrefixName, Derivatives
 
@@ -106,7 +107,7 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
         if len(controlled_joint_names) == 0:
             raise ValueError(f'\'{state_topic}\' has no joints')
 
-        for joint in self.world.joints.values():
+        for joint in GodMap.world.joints.values():
             if isinstance(joint, OneDofJoint):
                 if joint.free_variable.name in controlled_joint_names:
                     self.controlled_joints.append(joint)
@@ -120,22 +121,22 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
         if len(controlled_joint_names) > 0:
             raise ValueError(f'{state_topic} provides the following joints '
                              f'that are not known to giskard: {controlled_joint_names}')
-        self.world.register_controlled_joints(controlled_joint_names)
+        GodMap.world.register_controlled_joints(controlled_joint_names)
         controlled_joint_names = [j.name for j in self.controlled_joints]
         loginfo(f'Successfully connected to \'{state_topic}\'.')
         loginfo(f'Flagging the following joints as controlled: {controlled_joint_names}.')
-        self.world.register_controlled_joints(controlled_joint_names)
+        GodMap.world.register_controlled_joints(controlled_joint_names)
 
     @record_time
     @profile
     def initialise(self):
         super().initialise()
-        self.delay = self.god_map.get_data(identifier.time_delay)
-        trajectory = self.god_map.get_data(identifier.trajectory)
+        self.delay = GodMap.god_map.get_data(identifier.time_delay)
+        trajectory = GodMap.god_map.get_data(identifier.trajectory)
         goal = FollowJointTrajectoryGoal()
-        sample_period = self.god_map.get_data(identifier.sample_period)
-        start_time = self.god_map.get_data(identifier.tracking_start_time)
-        fill_velocity_values = self.god_map.get_data(identifier.fill_trajectory_velocity_values)
+        sample_period = GodMap.god_map.get_data(identifier.sample_period)
+        start_time = GodMap.god_map.get_data(identifier.tracking_start_time)
+        fill_velocity_values = GodMap.god_map.get_data(identifier.fill_trajectory_velocity_values)
         if fill_velocity_values is None:
             fill_velocity_values = self.fill_velocity_values
         goal.trajectory = trajectory.to_msg(sample_period, start_time, self.controlled_joints,

@@ -5,7 +5,7 @@ from tf.transformations import quaternion_about_axis
 
 import giskardpy.utils.tfwrapper as tf
 from giskardpy import identifier
-from giskardpy.god_map import GodMap
+from giskardpy.god_map import _GodMap
 from giskardpy.model.joints import OneDofJoint
 from giskardpy.utils import logging
 from giskardpy.utils.utils import launch_launchfile
@@ -26,7 +26,7 @@ def ros(request):
 
     def kill_ros():
         try:
-            GodMap().get_data(identifier.tree_manager).render()
+            _GodMap().get_data(identifier.tree_manager).render()
         except KeyError as e:
             logging.logerr(f'Failed to render behavior tree.')
         logging.loginfo('shutdown ros')

@@ -1,7 +1,6 @@
 from py_trees import Sequence
 
 from giskardpy import identifier
-from giskardpy.god_map_user import GodMapWorshipper
 from giskardpy.model.collision_world_syncer import CollisionCheckerLib
 from giskardpy.tree.behaviors.collision_checker import CollisionChecker
 from giskardpy.tree.behaviors.evaluate_debug_expressions import EvaluateDebugExpressions
@@ -26,7 +25,7 @@ from giskardpy.tree.control_modes import ControlModes
 from giskardpy.tree.decorators import success_is_running
 
 
-class ControlLoop(AsyncBehavior, GodMapWorshipper):
+class ControlLoop(AsyncBehavior):
     publish_state: PublishState
     synchronization: Synchronization
     send_controls: SendControls

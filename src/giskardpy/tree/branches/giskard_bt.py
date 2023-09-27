@@ -3,7 +3,6 @@ from py_trees_ros.trees import BehaviourTree
 
 from giskard_msgs.msg import MoveAction
 from giskardpy import identifier
-from giskardpy.god_map_user import GodMapWorshipper
 from giskardpy.model.collision_world_syncer import CollisionCheckerLib
 from giskardpy.tree.behaviors.collision_checker import CollisionChecker
 from giskardpy.tree.behaviors.instantaneous_controller import ControllerPlugin
@@ -24,7 +23,7 @@ from giskardpy.tree.control_modes import ControlModes
 from giskardpy.tree.decorators import success_is_running, failure_is_success
 
 
-class GiskardBT(BehaviourTree, GodMapWorshipper):
+class GiskardBT(BehaviourTree):
     wait_for_goal: WaitForGoal
     prepare_control_loop: PrepareControlLoop
     process_goal: ProcessGoal

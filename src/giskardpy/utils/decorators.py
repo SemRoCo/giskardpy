@@ -35,7 +35,7 @@ from visualization_msgs.msg import Marker, MarkerArray
 
 from giskardpy import identifier
 from giskardpy.exceptions import DontPrintStackTrace
-from giskardpy.god_map import GodMap
+from giskardpy.god_map import _GodMap
 from giskardpy.my_types import PrefixName
 from giskardpy.utils import logging
 from giskardpy.utils.time_collector import TimeCollector

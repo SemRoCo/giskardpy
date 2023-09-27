@@ -1,7 +1,6 @@
 from py_trees import Sequence, Selector
 
 from giskardpy import identifier
-from giskardpy.god_map_user import GodMapWorshipper
 from giskardpy.model.collision_world_syncer import CollisionCheckerLib
 from giskardpy.tree.behaviors.collision_checker import CollisionChecker
 from giskardpy.tree.behaviors.curcial_monitors_satisfied import CrucialMonitorsSatisfied
@@ -25,7 +24,7 @@ from giskardpy.tree.control_modes import ControlModes
 from giskardpy.tree.decorators import success_is_running
 
 
-class CheckMonitors(RunningSelector, GodMapWorshipper):
+class CheckMonitors(RunningSelector):
 
     def __init__(self, name: str = 'check monitors'):
         super().__init__(name)

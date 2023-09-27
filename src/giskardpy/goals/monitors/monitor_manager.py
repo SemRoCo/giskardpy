@@ -8,8 +8,8 @@ from giskardpy import identifier
 from giskardpy.casadi_wrapper import CompiledFunction
 from giskardpy.exceptions import GiskardException, UnknownConstraintException, ConstraintInitalizationException
 from giskardpy.goals.monitors.monitors import Monitor
-from giskardpy.god_map_user import GodMapWorshipper
 import giskard_msgs.msg as giskard_msgs
+from giskardpy.god_map_user import GodMap
 from giskardpy.utils import logging
 from giskardpy.utils.utils import json_to_kwargs, get_all_classes_in_package
 
@@ -24,7 +24,7 @@ def flipped_to_one(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     return np.logical_and(np.logical_not(a), np.logical_or(a, b))
 
 
-class MonitorManager(GodMapWorshipper):
+class MonitorManager:
     compiled_monitors: CompiledFunction
     state: np.ndarray
     switch_filter = np.ndarray
@@ -36,7 +36,7 @@ class MonitorManager(GodMapWorshipper):
         self.monitors = []
         self.allowed_monitor_types = {}
         self.allowed_monitor_types.update(get_all_classes_in_package('giskardpy.goals.monitors', Monitor))
-        self.robot_names = self.collision_scene.robot_names
+        self.robot_names = GodMap.collision_scene.robot_names
 
     def compile_monitors(self):
         expressions = []
@@ -84,7 +84,7 @@ class MonitorManager(GodMapWorshipper):
 
     @profile
     def evaluate_monitors(self):
-        args = self.god_map.get_values(self.compiled_monitors.str_params)
+        args = GodMap.god_map.get_values(self.compiled_monitors.str_params)
         self.update_state(self.compiled_monitors.fast_call(args))
 
     @profile
@@ -103,7 +103,7 @@ class MonitorManager(GodMapWorshipper):
             try:
                 params = json_to_kwargs(monitor_msg.parameter_value_pair)
                 monitor: Monitor = C(monitor_msg.name, **params)
-                self.monitor_manager.add_monitor(monitor)
+                self.add_monitor(monitor)
             except Exception as e:
                 traceback.print_exc()
                 error_msg = f'Initialization of \'{C.__name__}\' constraint failed: \n {e} \n'

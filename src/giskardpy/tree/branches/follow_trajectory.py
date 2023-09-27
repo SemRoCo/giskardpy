@@ -1,7 +1,6 @@
 from py_trees import Sequence
 
 from giskard_msgs.msg import MoveFeedback
-from giskardpy.god_map_user import GodMapWorshipper
 from giskardpy.my_types import PrefixName
 from giskardpy.tree.behaviors.append_zero_velocity import SetZeroVelocity
 from giskardpy.tree.behaviors.cleanup import CleanUpPlanning
@@ -23,7 +22,7 @@ from giskardpy.tree.behaviors.world_updater import WorldUpdater
 from giskardpy.tree.decorators import success_is_failure, running_is_success
 
 
-class FollowTrajectory(Sequence, GodMapWorshipper):
+class FollowTrajectory(Sequence):
     world_updater: WorldUpdater
     sync_tf_frames: SyncTfFrames
     collision_scene_updater: CollisionSceneUpdater

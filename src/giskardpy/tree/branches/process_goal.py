@@ -2,7 +2,6 @@ from py_trees import Sequence, Selector
 
 from giskard_msgs.msg import MoveFeedback
 from giskardpy import identifier
-from giskardpy.god_map_user import GodMapWorshipper
 from giskardpy.tree.behaviors.exception_to_execute import ClearBlackboardException
 from giskardpy.tree.behaviors.goal_canceled import GoalCanceled
 from giskardpy.tree.behaviors.publish_feedback import PublishFeedback
@@ -12,7 +11,7 @@ from giskardpy.tree.branches.control_loop import ControlLoop
 from giskardpy.tree.decorators import success_is_failure
 
 
-class ProcessGoal(Selector, GodMapWorshipper):
+class ProcessGoal(Selector):
     control_loop_branch: ControlLoop
 
     def __init__(self, name: str = 'process goal'):

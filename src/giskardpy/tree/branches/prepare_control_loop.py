@@ -1,7 +1,6 @@
 from py_trees import Sequence
 
 from giskard_msgs.msg import MoveFeedback
-from giskardpy.god_map_user import GodMapWorshipper
 from giskardpy.tree.behaviors.cleanup import CleanUpPlanning
 from giskardpy.tree.behaviors.compile_monitors import CompileMonitors
 from giskardpy.tree.behaviors.init_qp_controller import InitQPController
@@ -13,7 +12,7 @@ from giskardpy.tree.behaviors.set_tracking_start_time import SetTrackingStartTim
 from giskardpy.tree.decorators import success_is_failure
 
 
-class PrepareControlLoop(Sequence, GodMapWorshipper):
+class PrepareControlLoop(Sequence):
     def __init__(self, name: str = 'prepare control loop'):
         super().__init__(name)
         self.add_child(PublishFeedback('publish feedback2',

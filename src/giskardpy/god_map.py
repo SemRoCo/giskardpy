@@ -16,7 +16,7 @@ from giskardpy.utils.singleton import SingletonMeta
 
 
 def set_default_in_override_block(block_identifier):
-    god_map = GodMap()
+    god_map = _GodMap()
     default_value = god_map.get_data(block_identifier[:-1] + ['default'])
     override = god_map.get_data(block_identifier)
     d = defaultdict(lambda: default_value)
@@ -183,7 +183,7 @@ def get_data(identifier: Sequence[Union[str, int, Sequence[Union[str, int]]]], d
     return result, shortcut
 
 
-class GodMap(metaclass=SingletonMeta):
+class _GodMap(metaclass=SingletonMeta):
     """
     Data structure used by tree to exchange information.
     """
@@ -422,7 +422,6 @@ class GodMap(metaclass=SingletonMeta):
                     logging.logerr(f'{key} has wrong dimensions: {value}')
                     raise e
             raise e
-
 
     def evaluate_expr(self, expr: w.Expression):
         if isinstance(expr, (int, float)):

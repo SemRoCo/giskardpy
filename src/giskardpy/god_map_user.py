@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, List, Dict
 from giskardpy.utils.utils import int_to_bit_list
 
 if TYPE_CHECKING:
+    from giskardpy.goals.goal import Goal
     from giskardpy.goals.motion_goal_manager import MotionGoalManager
     from giskardpy.debug_expression_manager import DebugExpressionManager
     from giskardpy.goals.monitors.monitor_manager import MonitorManager
@@ -49,7 +50,7 @@ class GodMapWorshipper:
 
     @property
     def debug_expression_manager(self) -> DebugExpressionManager:
-        return self.god_map.get_data(identifier.debug_expression_manager, [])
+        return self.god_map.get_data(identifier.debug_expression_manager)
 
     @property
     def tree_manager(self) -> TreeManager:
@@ -58,6 +59,10 @@ class GodMapWorshipper:
     @property
     def collision_scene(self) -> CollisionWorldSynchronizer:
         return self.god_map.get_data(identifier.collision_scene)
+
+    @property
+    def prediction_horizon(self) -> int:
+        return self.god_map.get_data(identifier.prediction_horizon)
 
     @property
     def control_mode(self) -> ControlModes:
@@ -109,6 +114,10 @@ class GodMapWorshipper:
     @property
     def goal_msg(self) -> MoveGoal:
         return self.god_map.get_data(identifier.goal_msg)
+
+    @property
+    def motion_goals(self) -> Dict[str, Goal]:
+        return self.god_map.get_data(identifier.motion_goals)
 
     def is_goal_msg_type_execute(self):
         return MoveGoal.EXECUTE in int_to_bit_list(self.goal_msg_type)

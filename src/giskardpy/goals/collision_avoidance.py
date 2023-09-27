@@ -75,7 +75,7 @@ class ExternalCollisionAvoidance(Goal):
         sample_period = self.sample_period
         number_of_external_collisions = self.get_number_of_external_collisions()
 
-        map_T_a = self.get_fk(self.root, self.link_name)
+        map_T_a = self.world.compose_fk_expression(self.root, self.link_name)
 
         map_P_pa = map_T_a.dot(a_P_pa)
 
@@ -195,8 +195,8 @@ class SelfCollisionAvoidance(Goal):
         number_of_self_collisions = self.get_number_of_self_collisions()
         sample_period = self.sample_period
 
-        # b_T_a2 = self.get_fk_evaluated(self.link_b, self.link_a)
-        b_T_a = self.get_fk(self.link_b, self.link_a)
+        # b_T_a2 = self.world.compose_fk_evaluated_expression(self.link_b, self.link_a)
+        b_T_a = self.world.compose_fk_expression(self.link_b, self.link_a)
         pb_T_b = self.get_b_T_pb().inverse()
         a_P_pa = self.get_position_on_a_in_a()
 
@@ -310,7 +310,7 @@ class CollisionAvoidanceHint(Goal):
         link_b_hash = self.get_link_b()
         actual_distance_capped = w.max(actual_distance, 0)
 
-        root_T_a = self.get_fk(self.root_link, self.link_name)
+        root_T_a = self.world.compose_fk_expression(self.root_link, self.link_name)
 
         spring_error = spring_threshold - actual_distance_capped
         spring_error = w.max(spring_error, 0)

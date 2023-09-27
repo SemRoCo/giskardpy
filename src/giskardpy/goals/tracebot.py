@@ -50,7 +50,7 @@ class InsertCylinder(Goal):
     def make_constraints(self):
         root_P_hole = cas.Point3(self.root_P_hole)
         root_V_up = cas.Vector3(self.root_V_up)
-        root_T_tip = self.get_fk(self.root, self.tip)
+        root_T_tip = self.world.compose_fk_expression(self.root, self.tip)
         root_P_tip = root_T_tip.to_position()
         tip_P_cylinder_bottom = cas.Vector3([0, 0, self.cylinder_height / 2])
         root_P_cylinder_bottom = root_T_tip.dot(tip_P_cylinder_bottom)

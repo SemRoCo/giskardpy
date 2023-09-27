@@ -75,7 +75,7 @@ class PlotGoalGraph(GiskardBehavior):
     @profile
     def update(self):
         tasks = []
-        for goal in self.god_map.get_data(identifier.goals).values():
+        for goal in self.god_map.get_data(identifier.motion_goals).values():
             tasks.extend(goal.tasks)
         file_name = self.god_map.get_data(identifier.tmp_folder) + f'/task_graphs/goal_{self.goal_id}.png'
         generate_graph(tasks, self.monitors, file_name)

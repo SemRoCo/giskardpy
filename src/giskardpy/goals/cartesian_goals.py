@@ -62,9 +62,9 @@ class CartesianPosition(Goal):
     @profile
     def make_constraints(self):
         r_P_g = cas.Point3(self.goal_point)
-        r_P_c = self.get_fk(self.root_link, self.tip_link).to_position()
+        r_P_c = self.world.compose_fk_expression(self.root_link, self.tip_link).to_position()
         if self.root_link2 is not None:
-            root_link2_T_root_link = self.get_fk_evaluated(self.root_link2, self.root_link)
+            root_link2_T_root_link = self.world.compose_fk_evaluated_expression(self.root_link2, self.root_link)
             r_P_c = root_link2_T_root_link.dot(r_P_c)
         # self.add_debug_expr('trans', cas.norm(r_P_c))
 
@@ -135,14 +135,14 @@ class CartesianOrientation(Goal):
 
     def make_constraints(self):
         r_R_g = cas.RotationMatrix(self.goal_orientation)
-        r_R_c = self.get_fk(self.root_link, self.tip_link).to_rotation()
+        r_R_c = self.world.compose_fk_expression(self.root_link, self.tip_link).to_rotation()
         if self.root_link2 is not None:
-            c_R_r_eval = self.get_fk_evaluated(self.tip_link, self.root_link2).to_rotation()
-            root_link2_T_root_link = self.get_fk_evaluated(self.root_link2, self.root_link)
+            c_R_r_eval = self.world.compose_fk_evaluated_expression(self.tip_link, self.root_link2).to_rotation()
+            root_link2_T_root_link = self.world.compose_fk_evaluated_expression(self.root_link2, self.root_link)
             # self.add_debug_matrix('root_link2_T_root_link', root_link2_T_root_link)
             r_R_c = root_link2_T_root_link.dot(r_R_c)
         else:
-            c_R_r_eval = self.get_fk_evaluated(self.tip_link, self.root_link).to_rotation()
+            c_R_r_eval = self.world.compose_fk_evaluated_expression(self.tip_link, self.root_link).to_rotation()
 
         rotation_error = cas.rotational_error(r_R_c, r_R_g)
         rotation_error_monitor = Monitor('rotation error',
@@ -191,8 +191,8 @@ class CartesianPositionStraight(Goal):
 
     def make_constraints(self):
         root_P_goal = cas.Point3(self.goal_point)
-        root_P_tip = self.get_fk(self.root_link, self.tip_link).to_position()
-        t_T_r = self.get_fk(self.tip_link, self.root_link)
+        root_P_tip = self.world.compose_fk_expression(self.root_link, self.tip_link).to_position()
+        t_T_r = self.world.compose_fk_expression(self.tip_link, self.root_link)
         tip_P_goal = t_T_r.dot(root_P_goal)
 
         # Create rotation matrix, which rotates the tip link frame
@@ -212,8 +212,8 @@ class CartesianPositionStraight(Goal):
 
         # Apply rotation matrix on the fk of the tip link
         a_T_t = t_R_a.inverse().dot(
-            self.get_fk_evaluated(self.tip_link, self.root_link)).dot(
-            self.get_fk(self.root_link, self.tip_link))
+            self.world.compose_fk_evaluated_expression(self.tip_link, self.root_link)).dot(
+            self.world.compose_fk_expression(self.root_link, self.tip_link))
         expr_p = a_T_t.to_position()
         dist = cas.norm(root_P_goal - root_P_tip)
 
@@ -356,7 +356,7 @@ class DiffDriveBaseGoal(Goal):
         axis_start, angle_start = map_R_base_current.to_axis_angle()
         angle_start = cas.if_greater_zero(axis_start[2], angle_start, -angle_start)
 
-        map_T_base_footprint = self.get_fk(self.map, self.base_footprint)
+        map_T_base_footprint = self.world.compose_fk_expression(self.map, self.base_footprint)
         map_P_base_footprint = map_T_base_footprint.to_position()
         # map_R_base_footprint = map_T_base_footprint.to_rotation()
         map_T_base_footprint_goal = cas.TransMatrix(self.goal_pose)
@@ -455,7 +455,7 @@ class PR2DiffDriveBaseGoal(Goal):
                                                    weight=WEIGHT_BELOW_CA))
 
     def make_constraints(self):
-        root_T_tip = self.get_fk(self.root_link, self.tip_link)
+        root_T_tip = self.world.compose_fk_expression(self.root_link, self.tip_link)
         root_P_tip = root_T_tip.to_position()
 
         root_T_goal = cas.TransMatrix(self.root_T_goal)
@@ -545,7 +545,7 @@ class TranslationVelocityLimit(Goal):
         self.max_velocity = max_velocity
 
     def make_constraints(self):
-        r_P_c = self.get_fk(self.root_link, self.tip_link).to_position()
+        r_P_c = self.world.compose_fk_expression(self.root_link, self.tip_link).to_position()
         # self.add_debug_expr('limit', -self.max_velocity)
         if not self.hard:
             self.add_translational_velocity_limit(frame_P_current=r_P_c,
@@ -578,7 +578,7 @@ class RotationVelocityLimit(Goal):
         self.max_velocity = max_velocity
 
     def make_constraints(self):
-        r_R_c = self.get_fk(self.root_link, self.tip_link).to_rotation()
+        r_R_c = self.world.compose_fk_expression(self.root_link, self.tip_link).to_rotation()
         if self.hard:
             self.add_rotational_velocity_limit(frame_R_current=r_R_c,
                                                max_velocity=self.max_velocity,
@@ -658,11 +658,11 @@ class RelativePositionSequence(Goal):
 
     @profile
     def make_constraints(self):
-        root_P_current = self.get_fk(self.root_link, self.tip_link).to_position()
+        root_P_current = self.world.compose_fk_expression(self.root_link, self.tip_link).to_position()
 
         root_P_goal1 = cas.Point3(self.root_P_goal1)
         tip_P_goal2 = cas.Point3(self.tip_P_goal2)
-        root_P_goal2 = self.get_fk(self.root_link, self.tip_link).dot(tip_P_goal2)
+        root_P_goal2 = self.world.compose_fk_expression(self.root_link, self.tip_link).dot(tip_P_goal2)
 
         error1 = cas.euclidean_distance(root_P_goal1, root_P_current)
         error1_monitor = Monitor(name='p1',

@@ -15,14 +15,15 @@ from giskardpy.utils.utils import get_all_classes_in_package, json_to_kwargs
 
 
 class MotionGoalManager(GodMapWorshipper):
+    motion_goals: Dict[str, Goal] = None
+
     def __init__(self):
-        self.god_map.set_data(identifier.goals, {})
+        self.motion_goals = {}
         goal_package_paths = self.god_map.get_data(identifier.goal_package_paths)
         self.allowed_motion_goal_types = {}
         for path in goal_package_paths:
             self.allowed_motion_goal_types.update(get_all_classes_in_package(path, Goal))
         self.robot_names = self.collision_scene.robot_names
-
 
     @profile
     def parse_motion_goals(self, motion_goals: List[giskard_msgs.MotionGoal]):
@@ -35,8 +36,8 @@ class MotionGoalManager(GodMapWorshipper):
             try:
                 params = json_to_kwargs(motion_goal.parameter_value_pair)
                 c: Goal = C(**params)
-                c._save_self_on_god_map()
                 c.make_constraints()
+                self.motion_goals[str(c)] = c
                 for monitor_name in motion_goal.to_end:
                     monitor = self.monitor_manager.get_monitor(monitor_name)
                     c.connect_to_end(monitor)
@@ -191,3 +192,23 @@ class MotionGoalManager(GodMapWorshipper):
                 constraint._save_self_on_god_map()
                 num_constr += 1
         logging.loginfo(f'Adding {num_constr} self collision avoidance constraints.')
+
+    @profile
+    def get_constraints_from_goals(self):
+        eq_constraints = {}
+        neq_constraints = {}
+        derivative_constraints = {}
+        goals: Dict[str, Goal] = self.god_map.get_data(identifier.motion_goals)
+        for goal_name, goal in list(goals.items()):
+            try:
+                new_eq_constraints, new_neq_constraints, new_derivative_constraints, _debug_expressions = goal.get_constraints()
+            except Exception as e:
+                raise ConstraintInitalizationException(str(e))
+            eq_constraints.update(new_eq_constraints)
+            neq_constraints.update(new_neq_constraints)
+            derivative_constraints.update(new_derivative_constraints)
+            # logging.loginfo(f'{goal_name} added {len(_constraints)+len(_vel_constraints)} constraints.')
+        self.god_map.set_data(identifier.eq_constraints, eq_constraints)
+        self.god_map.set_data(identifier.neq_constraints, neq_constraints)
+        self.god_map.set_data(identifier.derivative_constraints, derivative_constraints)
+        return eq_constraints, neq_constraints, derivative_constraints

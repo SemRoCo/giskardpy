@@ -18,7 +18,7 @@ class InitQPController(GiskardBehavior):
     @record_time
     @profile
     def update(self):
-        eq_constraints, neq_constraints, derivative_constraints = self.get_constraints_from_goals()
+        eq_constraints, neq_constraints, derivative_constraints = self.motion_goal_manager.get_constraints_from_goals()
         free_variables = self.get_active_free_symbols(eq_constraints, neq_constraints, derivative_constraints)
 
         qp_controller = QPProblemBuilder(
@@ -37,26 +37,6 @@ class InitQPController(GiskardBehavior):
         self.god_map.set_data(identifier.qp_controller, qp_controller)
 
         return Status.SUCCESS
-
-    @profile
-    def get_constraints_from_goals(self):
-        eq_constraints = {}
-        neq_constraints = {}
-        derivative_constraints = {}
-        goals: Dict[str, Goal] = self.god_map.get_data(identifier.goals)
-        for goal_name, goal in list(goals.items()):
-            try:
-                new_eq_constraints, new_neq_constraints, new_derivative_constraints, _debug_expressions = goal.get_constraints()
-            except Exception as e:
-                raise ConstraintInitalizationException(str(e))
-            eq_constraints.update(new_eq_constraints)
-            neq_constraints.update(new_neq_constraints)
-            derivative_constraints.update(new_derivative_constraints)
-            # logging.loginfo(f'{goal_name} added {len(_constraints)+len(_vel_constraints)} constraints.')
-        self.god_map.set_data(identifier.eq_constraints, eq_constraints)
-        self.god_map.set_data(identifier.neq_constraints, neq_constraints)
-        self.god_map.set_data(identifier.derivative_constraints, derivative_constraints)
-        return eq_constraints, neq_constraints, derivative_constraints
 
     def get_active_free_symbols(self,
                                 eq_constraints: Dict[str, EqualityConstraint],

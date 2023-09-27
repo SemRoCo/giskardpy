@@ -1205,7 +1205,26 @@ class WorldTree(WorldTreeInterface, GodMapWorshipper):
         for joint_name in tip_chain:
             a = self.joints[joint_name].parent_T_child
             fk = fk.dot(a)
+        fk.reference_frame = root_link
+        fk.child_frame = tip_link
         return fk
+
+    def get_fk_velocity(self, root: PrefixName, tip: PrefixName) -> w.Expression:
+        # FIXME, only use symbols of fk expr?
+        r_T_t = self.world.compose_fk_expression(root, tip)
+        r_R_t = r_T_t.to_rotation()
+        axis, angle = r_R_t.to_axis_angle()
+        r_R_t_axis_angle = axis * angle
+        r_P_t = r_T_t.to_position()
+        fk = w.Expression([r_P_t[0],
+                           r_P_t[1],
+                           r_P_t[2],
+                           r_R_t_axis_angle[0],
+                           r_R_t_axis_angle[1],
+                           r_R_t_axis_angle[2]])
+        return w.total_derivative(fk,
+                                  self.joint_position_symbols,
+                                  self.joint_velocity_symbols)
 
     @memoize
     def compute_fk_pose(self, root: my_string, tip: my_string) -> PoseStamped:
@@ -1293,7 +1312,7 @@ class WorldTree(WorldTreeInterface, GodMapWorshipper):
                     # for collision_id, geometry in enumerate(link.collisions):
                     #     link_name_with_id = link.name_with_collision_id(collision_id)
                     collision_fks.append(self.fks[link_name])
-                        # collision_ids.append(link_name_with_id)
+                    # collision_ids.append(link_name_with_id)
                 collision_fks = w.vstack(collision_fks)
                 # self.collision_link_order = list(collision_ids)
                 params = set()
@@ -1336,6 +1355,13 @@ class WorldTree(WorldTreeInterface, GodMapWorshipper):
     @profile
     def compute_fk_np(self, root: PrefixName, tip: PrefixName) -> np.ndarray:
         return self._fk_computer.compute_fk_np(root, tip)
+
+    @profile
+    def compose_fk_evaluated_expression(self, root: PrefixName, tip: PrefixName) -> w.TransMatrix:
+        result: w.TransMatrix = self.god_map.list_to_frame(identifier.fk_np + [(root, tip)])
+        result.reference_frame = root
+        result.child_frame = tip
+        return result
 
     @memoize
     @profile
@@ -1617,9 +1643,9 @@ class WorldBranch(WorldTreeInterface):
 
     def get_unmovable_links(self) -> List[PrefixName]:
         unmovable_links, _ = self.world.search_branch(link_name=self.root_link_name,
-                                                   stop_at_joint_when=lambda
-                                                       joint_name: joint_name in self.controlled_joints,
-                                                   collect_link_when=self.world.has_link_collisions)
+                                                      stop_at_joint_when=lambda
+                                                          joint_name: joint_name in self.controlled_joints,
+                                                      collect_link_when=self.world.has_link_collisions)
         return unmovable_links
 
     @property

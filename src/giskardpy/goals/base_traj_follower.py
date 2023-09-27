@@ -67,15 +67,15 @@ class BaseTrajFollower(Goal):
     @profile
     def make_map_T_base_footprint_goal(self, t_in_s: float, derivative: Derivatives = Derivatives.position):
         odom_T_base_footprint_goal = self.make_odom_T_base_footprint_goal(t_in_s, derivative)
-        map_T_odom = self.get_fk_evaluated(self.world.root_link_name, self.odom_link)
+        map_T_odom = self.world.compose_fk_evaluated_expression(self.world.root_link_name, self.odom_link)
         return w.dot(map_T_odom, odom_T_base_footprint_goal)
 
     @profile
     def trans_error_at(self, t_in_s: float):
         odom_T_base_footprint_goal = self.make_odom_T_base_footprint_goal(t_in_s)
-        map_T_odom = self.get_fk_evaluated(self.world.root_link_name, self.odom_link)
+        map_T_odom = self.world.compose_fk_evaluated_expression(self.world.root_link_name, self.odom_link)
         map_T_base_footprint_goal = w.dot(map_T_odom, odom_T_base_footprint_goal)
-        map_T_base_footprint_current = self.get_fk(self.world.root_link_name, self.base_footprint_link)
+        map_T_base_footprint_current = self.world.compose_fk_expression(self.world.root_link_name, self.base_footprint_link)
 
         frame_P_goal = map_T_base_footprint_goal.to_position()
         frame_P_current = map_T_base_footprint_current.to_position()
@@ -86,7 +86,7 @@ class BaseTrajFollower(Goal):
     def add_trans_constraints(self):
         errors_x = []
         errors_y = []
-        map_T_base_footprint = self.get_fk(self.world.root_link_name, self.base_footprint_link)
+        map_T_base_footprint = self.world.compose_fk_expression(self.world.root_link_name, self.base_footprint_link)
         for t in range(self.prediction_horizon):
             x = self.current_traj_point(self.joint.x_vel.name, t * self.sample_period, Derivatives.velocity)
             if isinstance(self.joint, OmniDrive):
@@ -572,9 +572,9 @@ class CarryMyBullshit(Goal):
         self.publish_trajectory()
 
     def make_constraints(self):
-        root_T_bf = self.get_fk(self.root, self.tip)
-        root_T_odom = self.get_fk(self.root, self.odom)
-        root_T_camera = self.get_fk(self.root, self.camera_link)
+        root_T_bf = self.world.compose_fk_expression(self.root, self.tip)
+        root_T_odom = self.world.compose_fk_expression(self.root, self.odom)
+        root_T_camera = self.world.compose_fk_expression(self.root, self.camera_link)
         root_P_tip = root_T_bf.to_position()
         min_left_violation1 = self.get_parameter_as_symbolic_expression('closest_laser_left')
         min_right_violation1 = self.get_parameter_as_symbolic_expression('closest_laser_right')
@@ -770,7 +770,7 @@ class BaseTrajFollowerPR2(BaseTrajFollower):
         lb_yaw1 = []
         lb_forward = []
         self.world.state[self.joint.yaw1_vel.name].position = 0
-        map_T_current = self.get_fk(self.world.root_link_name, self.base_footprint_link)
+        map_T_current = self.world.compose_fk_expression(self.world.root_link_name, self.base_footprint_link)
         map_P_current = map_T_current.to_position()
         self.add_debug_expr(f'map_P_current.x', map_P_current.x)
         self.add_debug_expr('time', self.god_map.to_expr(identifier.time))

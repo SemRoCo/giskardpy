@@ -34,7 +34,7 @@ class DiffDriveTangentialToPoint(Goal):
 
     def make_constraints(self):
         map_P_center = w.Point3(self.goal_point)
-        map_T_base = self.get_fk(self.root, self.tip)
+        map_T_base = self.world.compose_fk_expression(self.root, self.tip)
         map_P_base = map_T_base.to_position()
         map_V_base_to_center = map_P_center - map_P_base
         map_V_base_to_center = w.scale(map_V_base_to_center, 1)
@@ -91,11 +91,11 @@ class PointingDiffDriveEEF(Goal):
         fk_vel = self.get_fk_velocity(self.eef_root, self.eef_tip)
         eef_root_V_eef_tip = w.Vector3((fk_vel[0], fk_vel[1], 0))
         eef_root_V_eef_tip_normed = w.scale(eef_root_V_eef_tip, 1)
-        base_root_T_eef_root = self.get_fk(self.base_root, self.eef_root)
+        base_root_T_eef_root = self.world.compose_fk_expression(self.base_root, self.eef_root)
         base_root_V_eef_tip = w.dot(base_root_T_eef_root, eef_root_V_eef_tip_normed)
 
         tip_V_pointing_axis = w.Vector3(self.tip_V_pointing_axis)
-        base_root_T_base_tip = self.get_fk(self.base_root, self.base_tip)
+        base_root_T_base_tip = self.world.compose_fk_expression(self.base_root, self.base_tip)
         base_root_V_pointing_axis = w.dot(base_root_T_base_tip, tip_V_pointing_axis)
 
         # weight = w.if_less_eq(distance, 0.05, WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA)
@@ -143,9 +143,9 @@ class KeepHandInWorkspace(Goal):
     def make_constraints(self):
         weight = WEIGHT_ABOVE_CA
         base_footprint_V_pointing_axis = w.Vector3(self.map_V_pointing_axis)
-        map_T_base_footprint = self.get_fk(self.map_frame, self.base_footprint)
+        map_T_base_footprint = self.world.compose_fk_expression(self.map_frame, self.base_footprint)
         map_V_pointing_axis = w.dot(map_T_base_footprint, base_footprint_V_pointing_axis)
-        map_T_tip = self.get_fk(self.map_frame, self.tip_link)
+        map_T_tip = self.world.compose_fk_expression(self.map_frame, self.tip_link)
         map_V_tip = w.Vector3(map_T_tip.to_position())
         map_V_tip.y = 0
         map_V_tip.z = 0
@@ -180,10 +180,10 @@ class KeepHandInWorkspace(Goal):
         # fk_vel = self.get_fk_velocity(self.base_footprint, self.tip_link)
         # eef_root_V_eef_tip = w.vector3(fk_vel[0], fk_vel[1], 0)
         # eef_root_V_eef_tip_normed = w.scale(eef_root_V_eef_tip, 1)
-        # base_root_T_eef_root = self.get_fk(self.map_frame, self.base_footprint)
+        # base_root_T_eef_root = self.world.compose_fk_expression(self.map_frame, self.base_footprint)
         # base_root_V_eef_tip = w.dot(base_root_T_eef_root, eef_root_V_eef_tip_normed)
         #
-        # base_root_T_base_tip = self.get_fk(self.map_frame, self.base_tip)
+        # base_root_T_base_tip = self.world.compose_fk_expression(self.map_frame, self.base_tip)
         # base_root_V_pointing_axis = w.dot(base_root_T_base_tip, tip_V_pointing_axis)
         #
         # weight = WEIGHT_ABOVE_CA * w.norm(eef_root_V_eef_tip_normed)
@@ -216,9 +216,9 @@ class PR2DiffDriveOrient(Goal):
         # self.root_T_goal = self.transform_msg(self.root_link, goal_pose)
 
     def make_constraints(self):
-        base_root_T_base_tip = self.get_fk(self.base_root_link, self.base_tip_link)
+        base_root_T_base_tip = self.world.compose_fk_expression(self.base_root_link, self.base_tip_link)
 
-        base_tip_T_eef_tip = self.get_fk(self.base_tip_link, self.eef_tip_link)
+        base_tip_T_eef_tip = self.world.compose_fk_expression(self.base_tip_link, self.eef_tip_link)
         base_tip_P_eef_tip = base_tip_T_eef_tip.to_position()
         base_tip_V_eef_vel = w.Vector3(self.get_expr_velocity(base_tip_P_eef_tip))
         base_root_V_eef_vel = base_root_T_base_tip.dot(base_tip_V_eef_vel)

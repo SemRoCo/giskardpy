@@ -975,6 +975,7 @@ class QPProblemBuilder(GodMapWorshipper):
     inequality_model: InequalityModel
     inequality_bounds: InequalityBounds
     qp_solver: QPSolver
+    prediction_horizon: int = None
 
     def __init__(self,
                  sample_period: float,

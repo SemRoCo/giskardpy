@@ -13,7 +13,7 @@ class SetDriveGoals(GiskardBehavior):
     @record_time
     @profile
     def update(self):
-        self.god_map.set_data(identifier.goals, {})
+        self.god_map.set_data(identifier.motion_goals, {})
         drive_goals: List[Goal] = self.god_map.get_data(identifier.drive_goals)
         for drive_goal in drive_goals:
             drive_goal._save_self_on_god_map()

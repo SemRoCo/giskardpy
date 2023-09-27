@@ -340,6 +340,27 @@ class CollisionWorldSynchronizer(GodMapWorshipper):
         fixed_joint_list.append(joint_name)
         self._fixed_joints = tuple(fixed_joint_list)
 
+    def add_collision_check(self, link_a: PrefixName, link_b: PrefixName, distance: float):
+        """
+        Tell Giskard to check this collision, even if it got disabled through other means such as allow_all_collisions.
+        :param link_a:
+        :param link_b:
+        :param distance: distance threshold for the collision check. Only distances smaller than this value can be
+                            detected.
+        """
+        key = link_a, link_b
+        if self.world.are_linked(link_a, link_b):
+            return
+        try:
+            added_checks = self.god_map.get_data(identifier.added_collision_checks)
+        except KeyError:
+            added_checks = {}
+            self.god_map.set_data(identifier.added_collision_checks, added_checks)
+        if key in added_checks:
+            added_checks[key] = max(added_checks[key], distance)
+        else:
+            added_checks[key] = distance
+
     @classmethod
     def empty(cls):
         self = cls()

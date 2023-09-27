@@ -31,6 +31,7 @@ giskard.set_json_goal('PouringAction',
                       root_link='map',
                       upright_orientation=orientation,
                       down_orientation=down_orientation,
-                      container_plane=container_plane)
+                      container_plane=container_plane,
+                      tilt_joint='wrist_roll_joint')
 giskard.set_avoid_joint_limits_goal()
 giskard.plan_and_execute()

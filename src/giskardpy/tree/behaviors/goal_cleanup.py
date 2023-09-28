@@ -10,6 +10,6 @@ from giskardpy.utils.decorators import record_time, catch_and_raise_to_blackboar
 class GoalCleanUp(GiskardBehavior):
     # @catch_and_raise_to_blackboard
     def update(self):
-        for goal in god_map.motion_goals.values():
+        for goal in god_map.motion_goal_manager.motion_goals.values():
             goal.clean_up()
         return Status.SUCCESS

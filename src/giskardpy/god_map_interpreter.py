@@ -47,10 +47,6 @@ class GodMap(_GodMap):
         return self.get_data(identifier.world)
 
     @property
-    def monitors(self) -> List[Monitor]:
-        return self.get_data(identifier.monitors, [])
-
-    @property
     def monitor_manager(self) -> MonitorManager:
         return self.get_data(identifier.monitor_manager)
 
@@ -91,10 +87,6 @@ class GodMap(_GodMap):
         return self.get_data(identifier.qp_controller_config)
 
     @property
-    def control_mode(self) -> ControlModes:
-        return self.get_data(identifier.control_mode)
-
-    @property
     def collision_checker_id(self) -> CollisionCheckerLib:
         return self.get_data(identifier.collision_checker)
 
@@ -124,10 +116,6 @@ class GodMap(_GodMap):
     @property
     def goal_msg(self) -> MoveGoal:
         return self.get_data(identifier.goal_msg)
-
-    @property
-    def motion_goals(self) -> Dict[str, Goal]:
-        return self.get_data(identifier.motion_goals)
 
     @property
     def trajectory(self) -> Trajectory:
@@ -182,13 +170,13 @@ class GodMap(_GodMap):
         return MoveGoal.UNDEFINED == self.goal_msg.type
 
     def is_closed_loop(self):
-        return self.control_mode == self.control_mode.close_loop
+        return self.tree_manager.control_mode == self.tree_manager.control_mode.close_loop
 
     def is_standalone(self):
-        return self.control_mode == self.control_mode.standalone
+        return self.tree_manager.control_mode == self.tree_manager.control_mode.standalone
 
     def is_open_loop(self):
-        return self.control_mode == self.control_mode.open_loop
+        return self.tree_manager.control_mode == self.tree_manager.control_mode.open_loop
 
     def is_collision_checking_enabled(self):
         return self.collision_checker_id != self.collision_checker_id.none

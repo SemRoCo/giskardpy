@@ -12,7 +12,6 @@ goal_id = ['goal_id']
 monitor_manager = ['monitor_manager']
 motion_goal_manager = ['motion_goal_manager']
 debug_expression_manager = ['debug_expression_manager']
-monitors = monitor_manager + ['monitors']
 
 fill_trajectory_velocity_values = ['fill_trajectory_velocity_values']
 
@@ -29,7 +28,6 @@ eq_constraints = ['eq_constraints']
 neq_constraints = ['neq_constraints']
 derivative_constraints = ['derivative_constraints']
 free_variables = ['free_variables']
-debug_expressions = debug_expression_manager + ['debug_expressions']
 
 execute = ['execute']
 

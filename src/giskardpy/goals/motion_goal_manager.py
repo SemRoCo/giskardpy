@@ -199,7 +199,7 @@ class MotionGoalManager:
         eq_constraints = {}
         neq_constraints = {}
         derivative_constraints = {}
-        goals: Dict[str, Goal] = god_map.motion_goals
+        goals: Dict[str, Goal] = god_map.motion_goal_manager.motion_goals
         for goal_name, goal in list(goals.items()):
             try:
                 new_eq_constraints, new_neq_constraints, new_derivative_constraints, _debug_expressions = goal.get_constraints()

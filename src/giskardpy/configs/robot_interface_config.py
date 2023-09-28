@@ -40,7 +40,7 @@ class RobotInterfaceConfig(ABC):
 
     @property
     def control_mode(self) -> ControlModes:
-        return god_map.control_mode
+        return god_map.tree_manager.control_mode
 
     def sync_odometry_topic(self, odometry_topic: str, joint_name: str):
         """

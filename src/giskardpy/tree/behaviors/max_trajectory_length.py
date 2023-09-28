@@ -18,9 +18,9 @@ class MaxTrajectoryLength(GiskardBehavior):
     @profile
     def update(self):
         t = god_map.time
-        length = god_map.get_data(identifier.max_trajectory_length)
+        length = god_map.qp_controller_config.max_trajectory_length
         if not self.real_time:
-            length = god_map.get_data(identifier.max_trajectory_length)
+            length = god_map.qp_controller_config.max_trajectory_length
         else:
             sample_period = 1
         t = t * god_map.sample_period

@@ -27,7 +27,7 @@ def ros(request):
 
     def kill_ros():
         try:
-            god_map.get_data(identifier.tree_manager).render()
+            god_map.tree_manager.render()
         except KeyError as e:
             logging.logerr(f'Failed to render behavior tree.')
         logging.loginfo('shutdown ros')

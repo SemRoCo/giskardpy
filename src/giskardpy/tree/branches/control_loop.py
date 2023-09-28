@@ -40,7 +40,7 @@ class ControlLoop(AsyncBehavior):
 
         self.add_child(self.synchronization)
 
-        if god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none:
+        if god_map.is_collision_checking_enabled():
             self.add_child(CollisionChecker('collision checker'))
 
         self.add_child(success_is_running(EvaluateMonitors)())

@@ -3788,7 +3788,7 @@ class TestWorld:
         reference_collision_scene = BetterPyBulletSyncer()
         reference_reasons, reference_disabled_links = reference_collision_scene.load_self_collision_matrix_from_srdf(
             'package://giskardpy/test/data/pr2_test.srdf', 'pr2')
-        collision_scene: CollisionWorldSynchronizer = world_setup.god_map.get_data(identifier.collision_scene)
+        collision_scene: CollisionWorldSynchronizer = god_map.collision_scene
         actual_reasons = collision_scene.compute_self_collision_matrix('pr2',
                                                                        number_of_tries_never=500)
         assert actual_reasons == reference_reasons

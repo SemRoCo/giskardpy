@@ -298,7 +298,7 @@ def write_to_tmp(file_name: str, file_str: str) -> str:
 
 
 def to_tmp_path(file_name: str) -> str:
-    path = god_map.get_data(identifier.tmp_folder)
+    path = god_map.tmp_folder
     return resolve_ros_iris(f'{path}{file_name}')
 
 

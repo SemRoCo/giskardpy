@@ -131,10 +131,10 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
     @profile
     def initialise(self):
         super().initialise()
-        self.delay = god_map.get_data(identifier.time_delay)
+        self.delay = god_map.time_delay
         trajectory = god_map.trajectory
         goal = FollowJointTrajectoryGoal()
-        start_time = god_map.get_data(identifier.tracking_start_time)
+        start_time = god_map.tracking_start_time
         fill_velocity_values = god_map.get_data(identifier.fill_trajectory_velocity_values)
         if fill_velocity_values is None:
             fill_velocity_values = self.fill_velocity_values

@@ -25,7 +25,7 @@ class RobotInterfaceConfig(ABC):
 
     @property
     def world(self) -> WorldTree:
-        return god_map.get_data(identifier.world)
+        return god_map.world
 
     @property
     def robot_group_name(self) -> str:
@@ -36,11 +36,11 @@ class RobotInterfaceConfig(ABC):
 
     @property
     def tree_manager(self) -> TreeManager:
-        return god_map.get_data(identifier.tree_manager)
+        return god_map.tree_manager
 
     @property
     def control_mode(self) -> ControlModes:
-        return god_map.get_data(identifier.control_mode)
+        return god_map.control_mode
 
     def sync_odometry_topic(self, odometry_topic: str, joint_name: str):
         """

@@ -74,7 +74,7 @@ class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
         super().initialise()
         self.trajectory = god_map.trajectory
         sample_period = god_map.unsafe_get_data(identifier.sample_period)
-        self.start_time = god_map.unsafe_get_data(identifier.tracking_start_time)
+        self.start_time = god_map.tracking_start_time
         self.trajectory = self.trajectory.to_msg(sample_period, self.start_time, [self.joint], True)
         self.end_time = self.start_time + self.trajectory.points[-1].time_from_start + self.goal_time_tolerance
 

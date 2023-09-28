@@ -11,7 +11,7 @@ class RealKinSimPlugin(GiskardBehavior):
 
     def initialise(self):
         self.last_time = None
-        self.start_time = god_map.get_data(identifier.tracking_start_time)
+        self.start_time = god_map.tracking_start_time
 
     @catch_and_raise_to_blackboard
     @record_time

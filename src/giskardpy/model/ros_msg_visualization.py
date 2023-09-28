@@ -50,7 +50,7 @@ class ROSMsgVisualization:
     @profile
     def create_collision_markers(self, name_space: str = 'collisions') -> List[Marker]:
         try:
-            collisions: Collisions = god_map.get_data(identifier.closest_point)
+            collisions: Collisions = god_map.closest_point
         except KeyError as e:
             # no collisions
             return []

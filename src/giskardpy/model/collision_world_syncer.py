@@ -347,7 +347,7 @@ class CollisionWorldSynchronizer:
         if god_map.world.are_linked(link_a, link_b):
             return
         try:
-            added_checks = god_map.get_data(identifier.added_collision_checks)
+            added_checks = god_map.added_collision_checks
         except KeyError:
             added_checks = {}
             god_map.set_data(identifier.added_collision_checks, added_checks)
@@ -703,7 +703,7 @@ class CollisionWorldSynchronizer:
         self.self_collision_matrix_paths[group.name] = file_name
 
     def get_path_to_self_collision_matrix(self, group_name: str) -> str:
-        path_to_tmp = god_map.get_data(identifier.tmp_folder)
+        path_to_tmp = god_map.tmp_folder
         return f'{path_to_tmp}{group_name}/{group_name}.srdf'
 
     @profile

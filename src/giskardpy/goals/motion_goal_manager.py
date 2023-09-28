@@ -1,7 +1,7 @@
 import traceback
 from collections import defaultdict
 from copy import deepcopy
-from typing import List, Dict
+from typing import List, Dict, Tuple
 
 from giskardpy import identifier
 from giskardpy.exceptions import UnknownConstraintException, GiskardException, ConstraintInitalizationException
@@ -19,7 +19,7 @@ class MotionGoalManager:
 
     def __init__(self):
         self.motion_goals = {}
-        goal_package_paths = god_map.get_data(identifier.goal_package_paths)
+        goal_package_paths = god_map.goal_package_paths
         self.allowed_motion_goal_types = {}
         for path in goal_package_paths:
             self.allowed_motion_goal_types.update(get_all_classes_in_package(path, Goal))
@@ -61,7 +61,8 @@ class MotionGoalManager:
                                      not god_map.collision_scene.is_allow_all_self_collision(collision_entries[-1])):
             self.add_self_collision_avoidance_constraints()
 
-    def collision_entries_to_collision_matrix(self, collision_entries: List[giskard_msgs.CollisionEntry]):
+    def collision_entries_to_collision_matrix(self, collision_entries: List[giskard_msgs.CollisionEntry]) \
+            -> Dict[Tuple[PrefixName, PrefixName], float]:
         god_map.collision_scene.sync()
         collision_check_distances = self.create_collision_check_distances()
         # ignored_collisions = god_map.get_collision_scene().ignored_self_collion_pairs
@@ -198,7 +199,7 @@ class MotionGoalManager:
         eq_constraints = {}
         neq_constraints = {}
         derivative_constraints = {}
-        goals: Dict[str, Goal] = god_map.get_data(identifier.motion_goals)
+        goals: Dict[str, Goal] = god_map.motion_goals
         for goal_name, goal in list(goals.items()):
             try:
                 new_eq_constraints, new_neq_constraints, new_derivative_constraints, _debug_expressions = goal.get_constraints()

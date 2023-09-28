@@ -27,7 +27,7 @@ class WorldConfig(ABC):
 
     @property
     def world(self) -> WorldTree:
-        return god_map.get_data(identifier.world)
+        return god_map.world
 
     def set_defaults(self):
         pass

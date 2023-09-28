@@ -58,7 +58,7 @@ class PlotGanttChart(GiskardBehavior):
     @record_time
     @profile
     def update(self):
-        goals = god_map.get_data(identifier.motion_goals)
-        file_name = god_map.get_data(identifier.tmp_folder) + f'/gantt_charts/goal_{god_map.goal_id}.png'
+        goals = god_map.motion_goals
+        file_name = god_map.tmp_folder + f'/gantt_charts/goal_{god_map.goal_id}.png'
         self.plot_gantt_chart(goals, file_name)
         return Status.SUCCESS

@@ -19,7 +19,7 @@ class CollisionChecker(GiskardBehavior):
 
     def add_added_checks(self, collision_matrix):
         try:
-            added_checks = god_map.get_data(identifier.added_collision_checks)
+            added_checks = god_map.added_collision_checks
             god_map.set_data(identifier.added_collision_checks, {})
         except KeyError:
             # no collision checks added
@@ -35,7 +35,7 @@ class CollisionChecker(GiskardBehavior):
     @profile
     def initialise(self):
         try:
-            self.collision_matrix = god_map.get_data(identifier.collision_matrix)
+            self.collision_matrix = god_map.collision_matrix
             self.collision_matrix = self.add_added_checks(self.collision_matrix)
             self.collision_list_size = sum([config.max_num_of_repeller()
                                             for config in god_map.collision_avoidance_configs.values()])

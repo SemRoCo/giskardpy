@@ -1113,7 +1113,7 @@ class QPProblemBuilder:
                  self.p_A, self.p_lbA, self.p_ubA,
                  self.p_debug, self.p_xdot],
                 ['weights', 'lb', 'ub', 'E', 'bE', 'A', 'lbA', 'ubA', 'debug', 'xdot'],
-                god_map.get_data(identifier.tmp_folder),
+                god_map.tmp_folder,
                 god_map.time,
                 folder_name)
         else:
@@ -1123,7 +1123,7 @@ class QPProblemBuilder:
                  self.p_A, self.p_lbA, self.p_ubA,
                  self.p_debug],
                 ['weights', 'lb', 'ub', 'E', 'bE', 'A', 'lbA', 'ubA', 'debug'],
-                god_map.get_data(identifier.tmp_folder),
+                god_map.tmp_folder,
                 god_map.time,
                 folder_name)
 

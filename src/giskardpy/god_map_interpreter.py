@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from giskard_msgs.msg import MoveGoal
+import rospy
+
+from giskard_msgs.msg import MoveGoal, MoveResult
 from giskardpy import identifier
-from typing import TYPE_CHECKING, List, Dict
+from typing import TYPE_CHECKING, List, Dict, Set, Tuple
 
 from giskardpy.god_map import _GodMap
 
@@ -11,7 +13,7 @@ if TYPE_CHECKING:
     from giskardpy.model.trajectory import Trajectory
     from giskardpy.qp.qp_controller import QPProblemBuilder
     from giskardpy.configs.qp_controller_config import QPControllerConfig
-    from giskardpy.my_types import Derivatives
+    from giskardpy.my_types import Derivatives, PrefixName
     from giskardpy.goals.goal import Goal
     from giskardpy.configs.giskard import Giskard
     from giskardpy.goals.motion_goal_manager import MotionGoalManager
@@ -22,7 +24,7 @@ if TYPE_CHECKING:
     from giskardpy.configs.world_config import WorldConfig
     from giskardpy.tree.control_modes import ControlModes
     from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer, CollisionCheckerLib, \
-        CollisionAvoidanceGroupThresholds
+    CollisionAvoidanceGroupThresholds, Collisions
     from giskardpy.tree.garden import TreeManager
     from giskardpy.model.world import WorldTree
 
@@ -134,6 +136,38 @@ class GodMap(_GodMap):
     @property
     def qp_solver_solution(self) -> NextCommands:
         return self.get_data(identifier.qp_solver_solution)
+
+    @property
+    def tmp_folder(self) -> str:
+        return self.get_data(identifier.tmp_folder)
+
+    @property
+    def goal_package_paths(self) -> Set[str]:
+        return self.get_data(identifier.goal_package_paths)
+
+    @property
+    def added_collision_checks(self) -> Dict[Tuple[PrefixName, PrefixName], float]:
+        return self.get_data(identifier.added_collision_checks)
+
+    @property
+    def closest_point(self) -> Collisions:
+        return self.get_data(identifier.closest_point)
+
+    @property
+    def collision_matrix(self) -> Dict[Tuple[PrefixName, PrefixName], float]:
+        return self.get_data(identifier.collision_matrix)
+
+    @property
+    def time_delay(self) -> rospy.Duration:
+        return self.get_data(identifier.time_delay)
+
+    @property
+    def tracking_start_time(self) -> rospy.Time:
+        return self.get_data(identifier.tracking_start_time)
+
+    @property
+    def result_message(self) -> MoveResult:
+        return self.get_data(identifier.result_message)
 
     def is_goal_msg_type_execute(self):
         return MoveGoal.EXECUTE == self.goal_msg.type

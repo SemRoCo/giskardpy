@@ -32,7 +32,6 @@ from giskardpy.tree.behaviors.append_zero_velocity import SetZeroVelocity
 from giskardpy.tree.behaviors.cleanup import CleanUp, CleanUpPlanning, CleanUpBaseController
 from giskardpy.tree.behaviors.collision_checker import CollisionChecker
 from giskardpy.tree.behaviors.collision_scene_updater import CollisionSceneUpdater
-from giskardpy.tree.behaviors.commands_remaining import CommandsRemaining
 from giskardpy.tree.behaviors.evaluate_debug_expressions import EvaluateDebugExpressions
 from giskardpy.tree.behaviors.exception_to_execute import ClearBlackboardException
 from giskardpy.tree.behaviors.goal_canceled import GoalCanceled
@@ -217,7 +216,7 @@ class TreeManager(ABC):
     @profile
     def __init__(self, control_mode: ControlModes):
         god_map.set_data(identifier.tree_manager, self)
-        self.action_server_name = god_map.get_data(identifier.action_server_name)
+        self.action_server_name = god_map.giskard.action_server_name
 
         self.tree = GiskardBT(control_mode=control_mode)
         self.tree_nodes = {}
@@ -364,7 +363,7 @@ class TreeManager(ABC):
                 break
 
     def render(self):
-        path = god_map.get_data(identifier.tmp_folder) + 'tree'
+        path = god_map.tmp_folder + 'tree'
         create_path(path)
         render_dot_tree(self.tree.root, name=path)
 

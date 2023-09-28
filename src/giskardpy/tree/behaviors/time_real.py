@@ -9,7 +9,7 @@ from giskardpy.tree.behaviors.plugin import GiskardBehavior
 class RosTime(GiskardBehavior):
     @property
     def start_time(self):
-        return god_map.get_data(identifier.tracking_start_time)
+        return god_map.tracking_start_time
 
     @profile
     def update(self):

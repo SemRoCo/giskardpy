@@ -41,7 +41,6 @@ class CleanUp(GiskardBehavior):
         god_map.set_data(identifier.motion_goal_manager, MotionGoalManager())
         god_map.set_data(identifier.debug_expression_manager, DebugExpressionManager())
 
-        god_map.set_data(identifier.next_move_goal, None)
         if hasattr(self.get_blackboard(), 'runtime'):
             del self.get_blackboard().runtime
 

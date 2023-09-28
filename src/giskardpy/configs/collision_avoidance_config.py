@@ -25,7 +25,7 @@ class CollisionAvoidanceConfig(abc.ABC):
 
     @property
     def collision_scene(self) -> CollisionWorldSynchronizer:
-        return god_map.get_data(identifier.collision_scene)
+        return god_map.collision_scene
 
     @property
     def collision_checker_id(self) -> CollisionCheckerLib:
@@ -33,7 +33,7 @@ class CollisionAvoidanceConfig(abc.ABC):
 
     @property
     def world(self) -> WorldTree:
-        return god_map.get_data(identifier.world)
+        return god_map.world
 
     @abc.abstractmethod
     def setup(self):

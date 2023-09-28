@@ -13,7 +13,7 @@ class SendResult(ActionServerBehavior):
     @profile
     def update(self):
         Blackboard().set('exception', None)  # FIXME move this to reset?
-        result: MoveResult = god_map.get_data(identifier.result_message)
+        result: MoveResult = god_map.result_message
 
         if result.error_code == MoveResult.PREEMPTED:
             logging.logerr('Goal preempted')

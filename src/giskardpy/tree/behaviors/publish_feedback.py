@@ -10,7 +10,7 @@ from giskardpy.utils.decorators import record_time
 class PublishFeedback(ActionServerBehavior):
     @profile
     def __init__(self, name, feedback):
-        super().__init__(name, god_map.get_data(identifier.action_server_name))
+        super().__init__(name, god_map.giskard.action_server_name)
         self.feedback = feedback
 
     @record_time

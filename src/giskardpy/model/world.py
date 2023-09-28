@@ -1567,7 +1567,7 @@ class WorldTree(WorldTreeInterface):
             world_graph.add_edge(child_edge)
             parent_edge = pydot.Edge(str(joint.parent_link_name), str(joint_name))
             world_graph.add_edge(parent_edge)
-        file_name = f'{god_map.get_data(identifier.tmp_folder)}/world_tree.pdf'
+        file_name = f'{god_map.tmp_folder}/world_tree.pdf'
         world_graph.write_pdf(file_name)
 
 

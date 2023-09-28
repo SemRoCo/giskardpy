@@ -23,7 +23,7 @@ class BehaviorTreeConfig(ABC):
 
     @property
     def tree_manager(self) -> TreeManager:
-        return god_map.get_data(identifier.tree_manager)
+        return god_map.tree_manager
 
     def _create_behavior_tree(self):
         TreeManager(self._control_mode)

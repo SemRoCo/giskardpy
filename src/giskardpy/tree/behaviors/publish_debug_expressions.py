@@ -7,7 +7,7 @@ from sensor_msgs.msg import JointState
 
 from giskardpy import identifier
 from giskardpy.data_types import JointStates
-from giskardpy.god_map_user import GodMap
+from giskardpy.god_map_interpreter import god_map
 from giskardpy.model.trajectory import Trajectory
 from giskardpy.qp.qp_controller import QPProblemBuilder
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
@@ -137,7 +137,7 @@ class PublishDebugExpressions(GiskardBehavior):
     @record_time
     @profile
     def update(self):
-        qp_controller: QPProblemBuilder = GodMap.get_qp_controller()
+        qp_controller: QPProblemBuilder = god_map.qp_controller
         msg = self.create_msg(qp_controller)
         self.publisher.publish(msg)
         return Status.RUNNING

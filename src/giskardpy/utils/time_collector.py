@@ -5,15 +5,12 @@ import numpy as np
 
 from giskardpy import identifier
 from giskardpy.god_map import _GodMap
-from giskardpy.god_map_user import GodMap
+from giskardpy.god_map_interpreter import god_map
 
 
 class TimeCollector:
     qp_solver_times: Dict[Tuple[str, int, int], List[float]] = defaultdict(list)
     separator = ';'
-
-    def __init__(self):
-        GodMap.god_map = _GodMap()
 
     def add_qp_solve_time(self, class_name, number_variables, number_constraints, time):
         self.qp_solver_times[class_name, number_variables, number_constraints].append(time)

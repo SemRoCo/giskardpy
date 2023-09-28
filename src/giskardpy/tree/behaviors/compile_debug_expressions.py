@@ -3,7 +3,7 @@ from py_trees import Status
 
 import giskardpy.identifier as identifier
 from giskardpy.goals.monitors.monitor_manager import MonitorManager
-from giskardpy.god_map_user import GodMap
+from giskardpy.god_map_interpreter import god_map
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.decorators import record_time, catch_and_raise_to_blackboard
 
@@ -15,5 +15,5 @@ class CompileDebugExpressions(GiskardBehavior):
     @catch_and_raise_to_blackboard
     @record_time
     def update(self):
-        GodMap.get_debug_expression_manager().compile_debug_expressions()
+        god_map.debug_expression_manager.compile_debug_expressions()
         return Status.SUCCESS

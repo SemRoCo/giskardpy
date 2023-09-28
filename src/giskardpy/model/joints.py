@@ -11,7 +11,7 @@ import giskardpy.casadi_wrapper as w
 from giskardpy import identifier
 from giskardpy.data_types import JointStates
 from giskardpy.god_map import _GodMap
-from giskardpy.god_map_user import GodMap
+from giskardpy.god_map_interpreter import god_map
 from giskardpy.my_types import PrefixName, Derivatives
 from giskardpy.my_types import my_string, derivative_joint_map, derivative_map
 from giskardpy.qp.free_variable import FreeVariable
@@ -181,14 +181,14 @@ class Joint6DOF(Joint):
         self.name = name
         self.parent_link_name = parent_link_name
         self.child_link_name = child_link_name
-        self.x = GodMap.get_world().add_virtual_free_variable(name=PrefixName('x', self.name))
-        self.y = GodMap.get_world().add_virtual_free_variable(name=PrefixName('y', self.name))
-        self.z = GodMap.get_world().add_virtual_free_variable(name=PrefixName('z', self.name))
-        self.qx = GodMap.get_world().add_virtual_free_variable(name=PrefixName('qx', self.name))
-        self.qy = GodMap.get_world().add_virtual_free_variable(name=PrefixName('qy', self.name))
-        self.qz = GodMap.get_world().add_virtual_free_variable(name=PrefixName('qz', self.name))
-        self.qw = GodMap.get_world().add_virtual_free_variable(name=PrefixName('qw', self.name))
-        GodMap.get_world().state[self.qw.name].position = 1
+        self.x = god_map.world.add_virtual_free_variable(name=PrefixName('x', self.name))
+        self.y = god_map.world.add_virtual_free_variable(name=PrefixName('y', self.name))
+        self.z = god_map.world.add_virtual_free_variable(name=PrefixName('z', self.name))
+        self.qx = god_map.world.add_virtual_free_variable(name=PrefixName('qx', self.name))
+        self.qy = god_map.world.add_virtual_free_variable(name=PrefixName('qy', self.name))
+        self.qz = god_map.world.add_virtual_free_variable(name=PrefixName('qz', self.name))
+        self.qw = god_map.world.add_virtual_free_variable(name=PrefixName('qw', self.name))
+        god_map.world.state[self.qw.name].position = 1
         parent_P_child = w.Point3((self.x.get_symbol(Derivatives.position),
                                    self.y.get_symbol(Derivatives.position),
                                    self.z.get_symbol(Derivatives.position)))
@@ -199,13 +199,13 @@ class Joint6DOF(Joint):
         self.parent_T_child = w.TransMatrix.from_point_rotation_matrix(parent_P_child, parent_R_child)
 
     def update_transform(self, new_child_T_parent: Pose):
-        GodMap.get_world().state[self.x.name].position = new_child_T_parent.position.x
-        GodMap.get_world().state[self.y.name].position = new_child_T_parent.position.y
-        GodMap.get_world().state[self.z.name].position = new_child_T_parent.position.z
-        GodMap.get_world().state[self.qx.name].position = new_child_T_parent.orientation.x
-        GodMap.get_world().state[self.qy.name].position = new_child_T_parent.orientation.y
-        GodMap.get_world().state[self.qz.name].position = new_child_T_parent.orientation.z
-        GodMap.get_world().state[self.qw.name].position = new_child_T_parent.orientation.w
+        god_map.world.state[self.x.name].position = new_child_T_parent.position.x
+        god_map.world.state[self.y.name].position = new_child_T_parent.position.y
+        god_map.world.state[self.z.name].position = new_child_T_parent.position.z
+        god_map.world.state[self.qx.name].position = new_child_T_parent.orientation.x
+        god_map.world.state[self.qy.name].position = new_child_T_parent.orientation.y
+        god_map.world.state[self.qz.name].position = new_child_T_parent.orientation.z
+        god_map.world.state[self.qw.name].position = new_child_T_parent.orientation.w
 
 
 class OneDofJoint(MovableJoint):
@@ -238,10 +238,10 @@ class OneDofJoint(MovableJoint):
         else:
             self.offset = offset
         self.axis = axis
-        if free_variable_name in GodMap.get_world().free_variables:
-            self.free_variable = GodMap.get_world().free_variables[free_variable_name]
+        if free_variable_name in god_map.world.free_variables:
+            self.free_variable = god_map.world.free_variables[free_variable_name]
         else:
-            self.free_variable = GodMap.get_world().add_free_variable(free_variable_name, lower_limits, upper_limits)
+            self.free_variable = god_map.world.add_free_variable(free_variable_name, lower_limits, upper_limits)
         self.free_variables = [self.free_variable]
 
     def get_free_variable_names(self):
@@ -357,22 +357,22 @@ class OmniDrive(MovableJoint, VirtualFreeVariables):
         translation_lower_limits = {derivative: -limit for derivative, limit in self.translation_limits.items()}
         rotation_lower_limits = {derivative: -limit for derivative, limit in self.rotation_limits.items()}
 
-        self.x = GodMap.get_world().add_virtual_free_variable(name=self.x_name)
-        self.y = GodMap.get_world().add_virtual_free_variable(name=self.y_name)
-        self.z = GodMap.get_world().add_virtual_free_variable(name=PrefixName('z', self.name))
+        self.x = god_map.world.add_virtual_free_variable(name=self.x_name)
+        self.y = god_map.world.add_virtual_free_variable(name=self.y_name)
+        self.z = god_map.world.add_virtual_free_variable(name=PrefixName('z', self.name))
 
-        self.roll = GodMap.get_world().add_virtual_free_variable(name=PrefixName('roll', self.name))
-        self.pitch = GodMap.get_world().add_virtual_free_variable(name=PrefixName('pitch', self.name))
-        self.yaw = GodMap.get_world().add_free_variable(name=self.yaw_vel_name,
-                                                lower_limits=rotation_lower_limits,
-                                                upper_limits=self.rotation_limits)
+        self.roll = god_map.world.add_virtual_free_variable(name=PrefixName('roll', self.name))
+        self.pitch = god_map.world.add_virtual_free_variable(name=PrefixName('pitch', self.name))
+        self.yaw = god_map.world.add_free_variable(name=self.yaw_vel_name,
+                                                    lower_limits=rotation_lower_limits,
+                                                    upper_limits=self.rotation_limits)
 
-        self.x_vel = GodMap.get_world().add_free_variable(name=PrefixName('x_vel', self.name),
-                                                  lower_limits=translation_lower_limits,
-                                                  upper_limits=self.translation_limits)
-        self.y_vel = GodMap.get_world().add_free_variable(name=PrefixName('y_vel', self.name),
-                                                  lower_limits=translation_lower_limits,
-                                                  upper_limits=self.translation_limits)
+        self.x_vel = god_map.world.add_free_variable(name=PrefixName('x_vel', self.name),
+                                                      lower_limits=translation_lower_limits,
+                                                      upper_limits=self.translation_limits)
+        self.y_vel = god_map.world.add_free_variable(name=PrefixName('y_vel', self.name),
+                                                      lower_limits=translation_lower_limits,
+                                                      upper_limits=self.translation_limits)
         self.free_variables = [self.x_vel, self.y_vel, self.yaw]
 
     def update_transform(self, new_parent_T_child: Pose):
@@ -381,15 +381,15 @@ class OmniDrive(MovableJoint, VirtualFreeVariables):
                                                new_parent_T_child.orientation.z,
                                                new_parent_T_child.orientation.w)
         self.last_msg = JointStates()
-        GodMap.get_world().state[self.x.name].position = new_parent_T_child.position.x
-        GodMap.get_world().state[self.y.name].position = new_parent_T_child.position.y
-        GodMap.get_world().state[self.z.name].position = new_parent_T_child.position.z
-        GodMap.get_world().state[self.roll.name].position = roll
-        GodMap.get_world().state[self.pitch.name].position = pitch
-        GodMap.get_world().state[self.yaw.name].position = yaw
+        god_map.world.state[self.x.name].position = new_parent_T_child.position.x
+        god_map.world.state[self.y.name].position = new_parent_T_child.position.y
+        god_map.world.state[self.z.name].position = new_parent_T_child.position.z
+        god_map.world.state[self.roll.name].position = roll
+        god_map.world.state[self.pitch.name].position = pitch
+        god_map.world.state[self.yaw.name].position = yaw
 
     def update_state(self, dt: float):
-        state = GodMap.get_world().state
+        state = god_map.world.state
         state[self.x_vel.name].position = 0
         state[self.y_vel.name].position = 0
 
@@ -455,19 +455,19 @@ class DiffDrive(MovableJoint, VirtualFreeVariables):
         translation_lower_limits = {derivative: -limit for derivative, limit in self.translation_limits.items()}
         rotation_lower_limits = {derivative: -limit for derivative, limit in self.rotation_limits.items()}
 
-        self.x = GodMap.get_world().add_virtual_free_variable(name=PrefixName('x', self.name))
-        self.y = GodMap.get_world().add_virtual_free_variable(name=PrefixName('y', self.name))
-        self.z = GodMap.get_world().add_virtual_free_variable(name=PrefixName('z', self.name))
+        self.x = god_map.world.add_virtual_free_variable(name=PrefixName('x', self.name))
+        self.y = god_map.world.add_virtual_free_variable(name=PrefixName('y', self.name))
+        self.z = god_map.world.add_virtual_free_variable(name=PrefixName('z', self.name))
 
-        self.roll = GodMap.get_world().add_virtual_free_variable(name=PrefixName('roll', self.name))
-        self.pitch = GodMap.get_world().add_virtual_free_variable(name=PrefixName('pitch', self.name))
+        self.roll = god_map.world.add_virtual_free_variable(name=PrefixName('roll', self.name))
+        self.pitch = god_map.world.add_virtual_free_variable(name=PrefixName('pitch', self.name))
 
-        self.x_vel = GodMap.get_world().add_free_variable(name=PrefixName('x_vel', self.name),
-                                                  lower_limits=translation_lower_limits,
-                                                  upper_limits=self.translation_limits)
-        self.yaw = GodMap.get_world().add_free_variable(name=PrefixName('yaw', self.name),
-                                                lower_limits=rotation_lower_limits,
-                                                upper_limits=self.rotation_limits)
+        self.x_vel = god_map.world.add_free_variable(name=PrefixName('x_vel', self.name),
+                                                      lower_limits=translation_lower_limits,
+                                                      upper_limits=self.translation_limits)
+        self.yaw = god_map.world.add_free_variable(name=PrefixName('yaw', self.name),
+                                                    lower_limits=rotation_lower_limits,
+                                                    upper_limits=self.rotation_limits)
         self.free_variables = [self.x_vel, self.yaw]
 
     def update_transform(self, new_parent_T_child: Pose):
@@ -476,15 +476,15 @@ class DiffDrive(MovableJoint, VirtualFreeVariables):
                                                new_parent_T_child.orientation.z,
                                                new_parent_T_child.orientation.w)
         self.last_msg = JointStates()
-        GodMap.get_world().state[self.x.name].position = new_parent_T_child.position.x
-        GodMap.get_world().state[self.y.name].position = new_parent_T_child.position.y
-        GodMap.get_world().state[self.z.name].position = new_parent_T_child.position.z
-        GodMap.get_world().state[self.roll.name].position = roll
-        GodMap.get_world().state[self.pitch.name].position = pitch
-        GodMap.get_world().state[self.yaw.name].position = yaw
+        god_map.world.state[self.x.name].position = new_parent_T_child.position.x
+        god_map.world.state[self.y.name].position = new_parent_T_child.position.y
+        god_map.world.state[self.z.name].position = new_parent_T_child.position.z
+        god_map.world.state[self.roll.name].position = roll
+        god_map.world.state[self.pitch.name].position = pitch
+        god_map.world.state[self.yaw.name].position = yaw
 
     def update_state(self, dt: float):
-        state = GodMap.get_world().state
+        state = god_map.world.state
         state[self.x_vel.name].position = 0
 
         x_vel = state[self.x_vel.name].velocity
@@ -539,7 +539,7 @@ class OmniDrivePR22(MovableJoint, VirtualFreeVariables):
         self.create_parent_T_child()
 
     # def set_initial_state(self):
-    # GodMap.get_world().state[self.caster_yaw1_name].position = 1
+    # god_map.get_world().state[self.caster_yaw1_name].position = 1
 
     def create_free_variables(self):
         translation_lower_limits = {derivative: -limit for derivative, limit in self.translation_limits.items()}
@@ -555,25 +555,25 @@ class OmniDrivePR22(MovableJoint, VirtualFreeVariables):
             Derivatives.jerk: -100,
         }
 
-        self.x = GodMap.get_world().add_virtual_free_variable(name=PrefixName('x', self.name))
-        self.y = GodMap.get_world().add_virtual_free_variable(name=PrefixName('y', self.name))
-        self.z = GodMap.get_world().add_virtual_free_variable(name=PrefixName('z', self.name))
+        self.x = god_map.world.add_virtual_free_variable(name=PrefixName('x', self.name))
+        self.y = god_map.world.add_virtual_free_variable(name=PrefixName('y', self.name))
+        self.z = god_map.world.add_virtual_free_variable(name=PrefixName('z', self.name))
 
-        self.roll = GodMap.get_world().add_virtual_free_variable(name=PrefixName('roll', self.name))
-        self.pitch = GodMap.get_world().add_virtual_free_variable(name=PrefixName('pitch', self.name))
-        self.yaw = GodMap.get_world().add_virtual_free_variable(name=PrefixName('yaw', self.name))
+        self.roll = god_map.world.add_virtual_free_variable(name=PrefixName('roll', self.name))
+        self.pitch = god_map.world.add_virtual_free_variable(name=PrefixName('pitch', self.name))
+        self.yaw = god_map.world.add_virtual_free_variable(name=PrefixName('yaw', self.name))
 
-        self.forward_vel = GodMap.get_world().add_free_variable(name=PrefixName('forward_vel', self.name),
-                                                        lower_limits=translation_lower_limits,
-                                                        upper_limits=self.translation_limits)
-        self.yaw1_vel = GodMap.get_world().add_free_variable(name=PrefixName('yaw1_vel', self.name),
-                                                     lower_limits=caster_lower_limits,
-                                                     upper_limits=caster_upper_limits)
-        self.yaw = GodMap.get_world().add_free_variable(name=PrefixName('yaw2_vel', self.name),
-                                                lower_limits=rotation_lower_limits,
-                                                upper_limits=self.rotation_limits)
+        self.forward_vel = god_map.world.add_free_variable(name=PrefixName('forward_vel', self.name),
+                                                            lower_limits=translation_lower_limits,
+                                                            upper_limits=self.translation_limits)
+        self.yaw1_vel = god_map.world.add_free_variable(name=PrefixName('yaw1_vel', self.name),
+                                                         lower_limits=caster_lower_limits,
+                                                         upper_limits=caster_upper_limits)
+        self.yaw = god_map.world.add_free_variable(name=PrefixName('yaw2_vel', self.name),
+                                                    lower_limits=rotation_lower_limits,
+                                                    upper_limits=self.rotation_limits)
         self.free_variables = [self.forward_vel, self.yaw1_vel, self.yaw]
-        GodMap.get_world().state[self.forward_vel.name].position = 0.25
+        god_map.world.state[self.forward_vel.name].position = 0.25
 
         self.yaw1_vel.quadratic_weights[Derivatives.velocity] = 0.0001
         self.yaw1_vel.quadratic_weights[Derivatives.acceleration] = 0
@@ -584,7 +584,7 @@ class OmniDrivePR22(MovableJoint, VirtualFreeVariables):
 
     @profile
     def create_parent_T_child(self):
-        hack = GodMap.god_map.to_symbol(identifier.hack)
+        hack = god_map.to_symbol(identifier.hack)
         odom_T_bf = w.TransMatrix.from_xyz_rpy(x=self.x.get_symbol(Derivatives.position),
                                                y=self.y.get_symbol(Derivatives.position),
                                                # yaw=self.yaw.get_symbol(Derivatives.position)
@@ -605,10 +605,10 @@ class OmniDrivePR22(MovableJoint, VirtualFreeVariables):
         self.parent_T_child = odom_T_bf.dot(a).dot(b).dot(d).dot(z)
 
     def update_state(self, dt: float):
-        state = GodMap.get_world().state
-        GodMap.get_world().state[self.forward_vel.name].position = 0.25
-        # GodMap.get_world().state[self.yaw1_vel.name].position = 0
-        # GodMap.get_world().state[self.yaw2_vel.name].position = 0
+        state = god_map.world.state
+        god_map.world.state[self.forward_vel.name].position = 0.25
+        # god_map.get_world().state[self.yaw1_vel.name].position = 0
+        # god_map.get_world().state[self.yaw2_vel.name].position = 0
 
         # state[self.x_vel_name].position = 0
         # vel = state[self.x_vel_name].velocity
@@ -633,12 +633,12 @@ class OmniDrivePR22(MovableJoint, VirtualFreeVariables):
                                                new_parent_T_child.orientation.z,
                                                new_parent_T_child.orientation.w)
         self.last_msg = JointStates()
-        GodMap.get_world().state[self.x.name].position = new_parent_T_child.position.x
-        GodMap.get_world().state[self.y.name].position = new_parent_T_child.position.y
-        GodMap.get_world().state[self.z.name].position = new_parent_T_child.position.z
-        GodMap.get_world().state[self.roll.name].position = roll
-        GodMap.get_world().state[self.pitch.name].position = pitch
-        GodMap.get_world().state[self.yaw.name].position = yaw
+        god_map.world.state[self.x.name].position = new_parent_T_child.position.x
+        god_map.world.state[self.y.name].position = new_parent_T_child.position.y
+        god_map.world.state[self.z.name].position = new_parent_T_child.position.z
+        god_map.world.state[self.roll.name].position = roll
+        god_map.world.state[self.pitch.name].position = pitch
+        god_map.world.state[self.yaw.name].position = yaw
 
 
 class PR2CasterJoint(MovableJoint):
@@ -660,7 +660,7 @@ class PR2CasterJoint(MovableJoint):
         self.child_link_name = child_link_name
         self.axis = axis
         self.parent_T_child = parent_T_child
-        self.odom_joint = GodMap.get_world().joints[self.mimiced_joint_name]
+        self.odom_joint = god_map.world.joints[self.mimiced_joint_name]
         if isinstance(self.odom_joint, OmniDrive):
             x_vel = self.odom_joint.x_vel.get_symbol(Derivatives.velocity)
             y_vel = self.odom_joint.y_vel.get_symbol(Derivatives.velocity)
@@ -673,7 +673,7 @@ class PR2CasterJoint(MovableJoint):
             x_vel = w.cos(yaw1_position - yaw2_position) * forward_velocity
             y_vel = w.sin(yaw1_position - yaw2_position) * forward_velocity
             yaw_vel = yaw2_velocity
-        # caster_link = GodMap.get_world().joints[self.name].child_link_name
+        # caster_link = god_map.get_world().joints[self.name].child_link_name
         parent_P_child = self.parent_T_child.to_position()
         new_vel_x, new_vel_y = self.pointVel2D(parent_P_child[0],
                                                parent_P_child[1],
@@ -701,7 +701,7 @@ class PR2CasterJoint(MovableJoint):
         return []
 
     # def connect_to_existing_free_variables(self):
-    #     self.brumbrum = GodMap.get_world().joints[self.mimiced_joint_name]
+    #     self.brumbrum = god_map.get_world().joints[self.mimiced_joint_name]
     #     if isinstance(self.brumbrum, OmniDrive):
     #         self.x_vel = self.brumbrum.x_vel.get_symbol(Derivatives.velocity)
     #         self.y_vel = self.brumbrum.y_vel.get_symbol(Derivatives.velocity)

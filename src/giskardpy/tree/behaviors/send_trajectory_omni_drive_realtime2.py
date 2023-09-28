@@ -13,7 +13,7 @@ import giskardpy.identifier as identifier
 from giskardpy.goals.base_traj_follower import BaseTrajFollower
 from giskardpy.goals.goal import Goal
 from giskardpy.goals.set_prediction_horizon import SetPredictionHorizon
-from giskardpy.god_map_user import GodMap
+from giskardpy.god_map_interpreter import god_map
 from giskardpy.model.joints import OmniDrive, DiffDrive
 from giskardpy.my_types import Derivatives
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
@@ -49,7 +49,7 @@ class SendCmdVel(GiskardBehavior, ABC):
             rospy.sleep(1)
 
         if joint_name is None:
-            for joint in GodMap.get_world().joints.values():
+            for joint in god_map.world.joints.values():
                 if isinstance(joint, (OmniDrive, DiffDrive)):
                     # FIXME can only handle one drive
                     # self.controlled_joints = [joint]
@@ -58,9 +58,9 @@ class SendCmdVel(GiskardBehavior, ABC):
                 #TODO
                 pass
         else:
-            joint_name = GodMap.get_world().search_for_joint_name(joint_name)
-            self.joint = GodMap.get_world().joints[joint_name]
-        GodMap.get_world().register_controlled_joints([self.joint.name])
+            joint_name = god_map.world.search_for_joint_name(joint_name)
+            self.joint = god_map.world.joints[joint_name]
+        god_map.world.register_controlled_joints([self.joint.name])
         loginfo(f'Received controlled joints from \'{cmd_vel_topic}\'.')
 
     def __str__(self):
@@ -91,7 +91,7 @@ class SendCmdVel(GiskardBehavior, ABC):
     @catch_and_raise_to_blackboard
     @profile
     def update(self):
-        cmd = GodMap.god_map.get_data(identifier.qp_solver_solution)
+        cmd = god_map.get_data(identifier.qp_solver_solution)
         twist = self.solver_cmd_to_twist(cmd)
         self.vel_pub.publish(twist)
         return Status.SUCCESS

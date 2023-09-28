@@ -3,7 +3,7 @@ from py_trees_ros.trees import BehaviourTree
 
 from giskard_msgs.msg import MoveAction
 from giskardpy import identifier
-from giskardpy.god_map_user import GodMap
+from giskardpy.god_map_interpreter import god_map
 from giskardpy.model.collision_world_syncer import CollisionCheckerLib
 from giskardpy.tree.behaviors.collision_checker import CollisionChecker
 from giskardpy.tree.behaviors.instantaneous_controller import ControllerPlugin
@@ -32,7 +32,7 @@ class GiskardBT(BehaviourTree):
     cleanup_control_loop: CleanupControlLoop
 
     def __init__(self, control_mode: ControlModes):
-        GodMap.god_map.set_data(identifier.control_mode, control_mode)
+        god_map.set_data(identifier.control_mode, control_mode)
         # TODO reject invalid control mode
         # raise KeyError(f'Robot interface mode \'{self._control_mode}\' is not supported.')
         root = Sequence('Giskard')
@@ -48,6 +48,6 @@ class GiskardBT(BehaviourTree):
         root.add_child(self.cleanup_control_loop)
         root.add_child(self.post_processing)
         root.add_child(SendResult('send result',
-                                  GodMap.god_map.get_data(identifier.action_server_name),
+                                  god_map.get_data(identifier.action_server_name),
                                   MoveAction))
         super().__init__(root)

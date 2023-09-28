@@ -6,7 +6,7 @@ import pandas as pd
 import giskardpy.casadi_wrapper as cas
 from giskardpy import identifier
 from giskardpy.data_types import JointStates
-from giskardpy.god_map_user import GodMap
+from giskardpy.god_map_interpreter import god_map
 from giskardpy.model.trajectory import Trajectory
 from giskardpy.utils import logging
 
@@ -43,14 +43,14 @@ class DebugExpressionManager:
     def eval_debug_exprs(self):
         self.evaluated_debug_expressions = {}
         for name, f in self.compiled_debug_expressions.items():
-            params = GodMap.god_map.get_values(f.str_params)
+            params = god_map.get_values(f.str_params)
             self.evaluated_debug_expressions[name] = f.fast_call(params).copy()
         self.log_debug_expressions()
         return self.evaluated_debug_expressions
 
     def log_debug_expressions(self):
         if len(self.evaluated_debug_expressions) > 0:
-            time = GodMap.god_map.get_data(identifier.time) - 1
+            time = god_map.get_data(identifier.time) - 1
             last_mjs = None
             if time >= 1:
                 last_mjs = self.debug_trajectory.get_exact(time-1)
@@ -66,7 +66,7 @@ class DebugExpressionManager:
                     else:
                         velocity = 0
                 js[name].position = value
-                js[name].velocity = velocity/GodMap.get_sample_period()
+                js[name].velocity = velocity/god_map.sample_period
             self.debug_trajectory.set(time, js)
 
     def to_pandas(self):

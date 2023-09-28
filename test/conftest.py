@@ -6,7 +6,7 @@ from tf.transformations import quaternion_about_axis
 import giskardpy.utils.tfwrapper as tf
 from giskardpy import identifier
 from giskardpy.god_map import _GodMap
-from giskardpy.god_map_user import GodMap
+from giskardpy.god_map_interpreter import god_map
 from giskardpy.model.joints import OneDofJoint
 from giskardpy.utils import logging
 from giskardpy.utils.utils import launch_launchfile
@@ -27,7 +27,7 @@ def ros(request):
 
     def kill_ros():
         try:
-            _GodMap().get_data(identifier.tree_manager).render()
+            god_map.get_data(identifier.tree_manager).render()
         except KeyError as e:
             logging.logerr(f'Failed to render behavior tree.')
         logging.loginfo('shutdown ros')
@@ -59,7 +59,7 @@ def ros(request):
 def resetted_giskard(giskard: GiskardTestWrapper) -> GiskardTestWrapper:
     logging.loginfo('resetting giskard')
     giskard.restart_ticking()
-    if GodMap.is_standalone() and giskard.has_odometry_joint():
+    if god_map.is_standalone() and giskard.has_odometry_joint():
         zero = PoseStamped()
         zero.header.frame_id = 'map'
         zero.pose.orientation.w = 1
@@ -70,7 +70,7 @@ def resetted_giskard(giskard: GiskardTestWrapper) -> GiskardTestWrapper:
 
 @pytest.fixture()
 def zero_pose(resetted_giskard: GiskardTestWrapper) -> GiskardTestWrapper:
-    if GodMap.is_standalone():
+    if god_map.is_standalone():
         resetted_giskard.set_seed_configuration(resetted_giskard.default_pose)
         resetted_giskard.allow_all_collisions()
         resetted_giskard.projection()
@@ -83,7 +83,7 @@ def zero_pose(resetted_giskard: GiskardTestWrapper) -> GiskardTestWrapper:
 
 @pytest.fixture()
 def better_pose(resetted_giskard: GiskardTestWrapper) -> GiskardTestWrapper:
-    if GodMap.is_standalone():
+    if god_map.is_standalone():
         resetted_giskard.set_seed_configuration(resetted_giskard.better_pose)
         resetted_giskard.allow_all_collisions()
         resetted_giskard.plan_and_execute()
@@ -97,7 +97,7 @@ def better_pose(resetted_giskard: GiskardTestWrapper) -> GiskardTestWrapper:
 @pytest.fixture()
 def kitchen_setup(better_pose: GiskardTestWrapper) -> GiskardTestWrapper:
     better_pose.kitchen_name = 'iai_kitchen'
-    if GodMap.is_standalone():
+    if god_map.is_standalone():
         kitchen_pose = PoseStamped()
         kitchen_pose.header.frame_id = str(better_pose.default_root)
         kitchen_pose.pose.orientation.w = 1
@@ -112,10 +112,10 @@ def kitchen_setup(better_pose: GiskardTestWrapper) -> GiskardTestWrapper:
                              js_topic='/kitchen/joint_states',
                              set_js_topic='/kitchen/cram_joint_states')
     js = {}
-    for joint_name in GodMap.get_world().groups[better_pose.kitchen_name].movable_joint_names:
-        joint = GodMap.get_world().joints[joint_name]
+    for joint_name in god_map.world.groups[better_pose.kitchen_name].movable_joint_names:
+        joint = god_map.world.joints[joint_name]
         if isinstance(joint, OneDofJoint):
-            if GodMap.is_standalone():
+            if god_map.is_standalone():
                 js[str(joint.free_variable.name)] = 0.0
             else:
                 js[str(joint.free_variable.name.short_name)] = 0.0
@@ -126,7 +126,7 @@ def kitchen_setup(better_pose: GiskardTestWrapper) -> GiskardTestWrapper:
 @pytest.fixture()
 def apartment_setup(better_pose: GiskardTestWrapper) -> GiskardTestWrapper:
     better_pose.environment_name = 'iai_apartment'
-    if GodMap.is_standalone():
+    if god_map.is_standalone():
         kitchen_pose = PoseStamped()
         kitchen_pose.header.frame_id = str(better_pose.default_root)
         kitchen_pose.pose.orientation.w = 1
@@ -140,8 +140,8 @@ def apartment_setup(better_pose: GiskardTestWrapper) -> GiskardTestWrapper:
                              js_topic='/apartment_joint_states',
                              set_js_topic='/iai_kitchen/cram_joint_states')
     js = {}
-    for joint_name in GodMap.get_world().groups[better_pose.environment_name].movable_joint_names:
-        joint = GodMap.get_world().joints[joint_name]
+    for joint_name in god_map.world.groups[better_pose.environment_name].movable_joint_names:
+        joint = god_map.world.joints[joint_name]
         if isinstance(joint, OneDofJoint):
             js[str(joint.free_variable.name)] = 0.0
     better_pose.set_apartment_js(js)
@@ -150,6 +150,6 @@ def apartment_setup(better_pose: GiskardTestWrapper) -> GiskardTestWrapper:
     base_pose.pose.position.x = 1.5
     base_pose.pose.position.y = 2.4
     base_pose.pose.orientation.w = 1
-    base_pose = better_pose.transform_msg(GodMap.get_world().root_link_name, base_pose)
+    base_pose = better_pose.transform_msg(god_map.world.root_link_name, base_pose)
     better_pose.set_localization(base_pose)
     return better_pose

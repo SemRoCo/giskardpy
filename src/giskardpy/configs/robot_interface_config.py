@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from typing import Optional, List, Dict
 
 from giskardpy import identifier
+from giskardpy.god_map_interpreter import god_map
 from giskardpy.tree.control_modes import ControlModes
 from giskardpy.exceptions import GiskardException
 from giskardpy.god_map import _GodMap
@@ -13,8 +14,6 @@ from giskardpy.tree.garden import TreeManager
 
 
 class RobotInterfaceConfig(ABC):
-    god_map = _GodMap()
-
     def set_defaults(self):
         pass
 
@@ -26,7 +25,7 @@ class RobotInterfaceConfig(ABC):
 
     @property
     def world(self) -> WorldTree:
-        return self.god_map.get_data(identifier.world)
+        return god_map.get_data(identifier.world)
 
     @property
     def robot_group_name(self) -> str:
@@ -37,11 +36,11 @@ class RobotInterfaceConfig(ABC):
 
     @property
     def tree_manager(self) -> TreeManager:
-        return self.god_map.get_data(identifier.tree_manager)
+        return god_map.get_data(identifier.tree_manager)
 
     @property
     def control_mode(self) -> ControlModes:
-        return self.god_map.get_data(identifier.control_mode)
+        return god_map.get_data(identifier.control_mode)
 
     def sync_odometry_topic(self, odometry_topic: str, joint_name: str):
         """

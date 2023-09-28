@@ -4,10 +4,10 @@ import numbers
 
 from giskardpy.exceptions import GiskardException
 from giskardpy.goals.goal import Goal
-from giskardpy.god_map_user import GodMap
+from giskardpy.god_map_interpreter import god_map
 
 
-class UpdateGodMap(Goal):
+class Updategod_map.Goal):
 
     def __init__(self, updates):
         """
@@ -22,7 +22,7 @@ class UpdateGodMap(Goal):
         for member, value in updates.items():
             next_identifier = identifier + [member]
             if isinstance(value, numbers.Number) and \
-                    isinstance(GodMap.god_map.get_data(next_identifier), numbers.Number):
-                GodMap.god_map.set_data(next_identifier, value)
+                    isinstance(god_map.get_data(next_identifier), numbers.Number):
+                god_map.set_data(next_identifier, value)
             else:
                 self.update_god_map(next_identifier, value)

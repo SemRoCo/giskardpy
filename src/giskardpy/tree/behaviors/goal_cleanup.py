@@ -2,7 +2,7 @@ import rospy
 from py_trees import Status
 
 import giskardpy.identifier as identifier
-from giskardpy.god_map_user import GodMap
+from giskardpy.god_map_interpreter import god_map
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.decorators import record_time, catch_and_raise_to_blackboard
 
@@ -10,6 +10,6 @@ from giskardpy.utils.decorators import record_time, catch_and_raise_to_blackboar
 class GoalCleanUp(GiskardBehavior):
     # @catch_and_raise_to_blackboard
     def update(self):
-        for goal in GodMap.get_motion_goals().values():
+        for goal in god_map.motion_goals.values():
             goal.clean_up()
         return Status.SUCCESS

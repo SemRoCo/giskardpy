@@ -4,7 +4,7 @@ import numpy as np
 
 import giskardpy.casadi_wrapper as cas
 from giskardpy import identifier
-from giskardpy.god_map_user import GodMap
+from giskardpy.god_map_interpreter import god_map
 from giskardpy.my_types import Derivatives
 from giskardpy.qp.free_variable import FreeVariable
 
@@ -42,7 +42,7 @@ class Monitor:
         for i, symbol in enumerate(expression.free_symbols()):
             substitution_key = str(symbol)
             self.substitution_keys.append(substitution_key)
-            identifier_ = GodMap.god_map.expr_to_key[substitution_key]
+            identifier_ = god_map.expr_to_key[substitution_key]
             symbol_paths.append(identifier_)
             old_symbols.append(symbol)
             new_symbols.append(self.get_substitution_key(i))
@@ -55,14 +55,14 @@ class Monitor:
 
     @profile
     def update_substitution_values(self):
-        self.substitution_values = GodMap.god_map.get_values(self.substitution_keys)
+        self.substitution_values = god_map.get_values(self.substitution_keys)
 
     @profile
     def get_substitution_key(self, substitution_id: int) -> cas.Symbol:
-        return GodMap.god_map.to_symbol(identifier.monitors + [self.id, 'substitution_values', substitution_id])
+        return god_map.to_symbol(identifier.monitors + [self.id, 'substitution_values', substitution_id])
 
     def get_state_expression(self):
-        return GodMap.god_map.to_symbol(identifier.monitor_manager + ['state', self.id])
+        return god_map.to_symbol(identifier.monitor_manager + ['state', self.id])
 
 
 class LocalMinimumReached(Monitor):
@@ -70,10 +70,10 @@ class LocalMinimumReached(Monitor):
                  joint_convergence_threshold: float = 0.01):
         super().__init__(name=name, crucial=True, stay_one=False)
         condition_list = []
-        traj_length_in_sec = GodMap.god_map.to_symbol(identifier.time) * GodMap.get_sample_period()
+        traj_length_in_sec = god_map.to_symbol(identifier.time) * god_map.sample_period
         condition_list.append(cas.greater(traj_length_in_sec, 1))
-        for free_variable_name, free_variable in GodMap.get_world().free_variables.items():
-            velocity_limit = GodMap.god_map.evaluate_expr(free_variable.get_upper_limit(Derivatives.velocity))
+        for free_variable_name, free_variable in god_map.world.free_variables.items():
+            velocity_limit = god_map.evaluate_expr(free_variable.get_upper_limit(Derivatives.velocity))
             joint_vel_symbol = free_variable.get_symbol(Derivatives.velocity)
             velocity_limit *= joint_convergence_threshold
             velocity_limit = min(max(min_cut_off, velocity_limit), max_cut_off)

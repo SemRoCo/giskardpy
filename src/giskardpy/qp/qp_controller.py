@@ -15,7 +15,7 @@ from giskardpy.configs.qp_controller_config import SupportedQPSolver
 from giskardpy.exceptions import HardConstraintsViolatedException, QPSolverException, InfeasibleException, \
     VelocityLimitUnreachableException
 from giskardpy.god_map import _GodMap
-from giskardpy.god_map_user import GodMap
+from giskardpy.god_map_interpreter import god_map
 from giskardpy.model.world import WorldTree
 from giskardpy.my_types import Derivatives
 from giskardpy.qp.constraint import InequalityConstraint, EqualityConstraint, DerivativeInequalityConstraint
@@ -89,7 +89,7 @@ class ProblemDataPart(ABC):
     def replace_hack(self, expression: Union[float, cas.Expression], new_value):
         if not isinstance(expression, cas.Expression):
             return expression
-        hack = _GodMap().to_symbol(identifier.hack)
+        hack = god_map.to_symbol(identifier.hack)
         expression.s = cas.ca.substitute(expression.s, hack.s, new_value)
         return expression
 
@@ -1026,7 +1026,7 @@ class QPProblemBuilder:
         self.free_variables.extend(list(sorted(free_variables, key=lambda x: x.position_name)))
         l = [x.position_name for x in free_variables]
         duplicates = set([x for x in l if l.count(x) > 1])
-        self.order = Derivatives(min(self.prediction_horizon, GodMap.get_max_derivative()))
+        self.order = Derivatives(min(self.prediction_horizon, god_map.max_derivative))
         assert duplicates == set(), f'there are free variables with the same name: {duplicates}'
 
     def add_inequality_constraints(self, constraints: List[InequalityConstraint]):
@@ -1074,7 +1074,7 @@ class QPProblemBuilder:
                   'equality_constraints': self.equality_constraints,
                   'inequality_constraints': self.inequality_constraints,
                   'derivative_constraints': self.derivative_constraints,
-                  'sample_period': GodMap.get_sample_period(),
+                  'sample_period': god_map.sample_period,
                   'prediction_horizon': self.prediction_horizon,
                   'max_derivative': self.order}
         self.weights = Weights(**kwargs)
@@ -1113,8 +1113,8 @@ class QPProblemBuilder:
                  self.p_A, self.p_lbA, self.p_ubA,
                  self.p_debug, self.p_xdot],
                 ['weights', 'lb', 'ub', 'E', 'bE', 'A', 'lbA', 'ubA', 'debug', 'xdot'],
-                GodMap.god_map.get_data(identifier.tmp_folder),
-                GodMap.god_map.get_data(identifier.time),
+                god_map.get_data(identifier.tmp_folder),
+                god_map.get_data(identifier.time),
                 folder_name)
         else:
             save_pandas(
@@ -1123,8 +1123,8 @@ class QPProblemBuilder:
                  self.p_A, self.p_lbA, self.p_ubA,
                  self.p_debug],
                 ['weights', 'lb', 'ub', 'E', 'bE', 'A', 'lbA', 'ubA', 'debug'],
-                GodMap.god_map.get_data(identifier.tmp_folder),
-                GodMap.god_map.get_data(identifier.time),
+                god_map.get_data(identifier.tmp_folder),
+                god_map.get_data(identifier.time),
                 folder_name)
 
     def _print_pandas_array(self, array):
@@ -1182,7 +1182,7 @@ class QPProblemBuilder:
             tmp[:len(a)] = a
             return tmp
 
-        sample_period = self.state[str(GodMap.get_sample_period())]
+        sample_period = self.state[str(god_map.sample_period)]
         try:
             start_pos = self.state[joint_name]
         except KeyError:
@@ -1224,7 +1224,7 @@ class QPProblemBuilder:
     @profile
     def _create_debug_pandas(self, qp_solver: QPSolver):
         weights, g, lb, ub, E, bE, A, lbA, ubA, weight_filter, bE_filter, bA_filter = qp_solver.get_problem_data()
-        sample_period = GodMap.get_sample_period()
+        sample_period = god_map.sample_period
         self.free_variable_names = self.free_variable_bounds.names[weight_filter]
         self.equality_constr_names = self.equality_bounds.names[bE_filter]
         self.inequality_constr_names = self.inequality_bounds.names[bA_filter]

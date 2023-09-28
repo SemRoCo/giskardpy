@@ -7,7 +7,7 @@ import numpy as np
 
 from giskardpy import identifier
 from giskardpy.data_types import JointStates
-from giskardpy.god_map_user import GodMap
+from giskardpy.god_map_interpreter import god_map
 from giskardpy.model.trajectory import Trajectory
 from giskardpy.tree.behaviors.plot_trajectory import PlotTrajectory
 from giskardpy.utils.logging import logwarn
@@ -50,9 +50,9 @@ class PlotDebugExpressions(PlotTrajectory):
         return new_traj
 
     def plot(self):
-        trajectory = GodMap.get_debug_expression_manager().debug_trajectory
+        trajectory = god_map.debug_expression_manager.debug_trajectory
         if trajectory and len(trajectory.items()) > 0:
-            sample_period = GodMap.get_sample_period()
+            sample_period = god_map.sample_period
             traj = self.split_traj(trajectory)
             try:
                 traj.plot_trajectory(path_to_data_folder=self.path_to_data_folder,

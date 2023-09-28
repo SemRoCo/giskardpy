@@ -1,7 +1,7 @@
 from __future__ import division
 
 from giskardpy.goals.goal import Goal
-from giskardpy.god_map_user import GodMap
+from giskardpy.god_map_interpreter import god_map
 
 
 class OverwriteWeights(Goal):
@@ -25,4 +25,4 @@ class OverwriteWeights(Goal):
         super().__init__()
         # ints get parsed as strings, when they arrive here...
         updates = {int(k): v for k, v in updates.items()}
-        GodMap.get_world().overwrite_joint_weights(updates)
+        god_map.world.overwrite_joint_weights(updates)

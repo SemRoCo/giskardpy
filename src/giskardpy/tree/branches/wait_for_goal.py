@@ -2,7 +2,7 @@ from py_trees import Sequence
 
 from giskard_msgs.msg import MoveFeedback, MoveAction
 from giskardpy import identifier
-from giskardpy.god_map_user import GodMap
+from giskardpy.god_map_interpreter import god_map
 from giskardpy.tree.behaviors.append_zero_velocity import SetZeroVelocity
 from giskardpy.tree.behaviors.cleanup import CleanUpPlanning
 from giskardpy.tree.behaviors.collision_scene_updater import CollisionSceneUpdater
@@ -35,7 +35,7 @@ class WaitForGoal(Sequence):
         self.synchronization = Synchronization('sync 1')
         self.publish_state = PublishState()
         self.goal_received = GoalReceived('has goal?',
-                                          GodMap.god_map.get_data(identifier.action_server_name),
+                                          god_map.get_data(identifier.action_server_name),
                                           MoveAction)
         self.add_child(self.world_updater)
         self.add_child(self.synchronization)

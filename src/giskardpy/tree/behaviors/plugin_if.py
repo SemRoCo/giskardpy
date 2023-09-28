@@ -1,6 +1,6 @@
 from py_trees import Status
 
-from giskardpy.god_map_user import GodMap
+from giskardpy.god_map_interpreter import god_map
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.decorators import record_time
 
@@ -13,7 +13,7 @@ class IF(GiskardBehavior):
 
     @profile
     def update(self):
-        if GodMap.god_map.get_data(self.identifier):
+        if god_map.get_data(self.identifier):
             return Status.SUCCESS
         return Status.FAILURE
 

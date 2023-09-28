@@ -7,7 +7,7 @@ from std_msgs.msg import Float64MultiArray, Float64
 
 import giskardpy.identifier as identifier
 from giskardpy.data_types import KeyDefaultDict
-from giskardpy.god_map_user import GodMap
+from giskardpy.god_map_interpreter import god_map
 from giskardpy.my_types import Derivatives
 from giskardpy.tree.behaviors.cmd_publisher import CommandPublisher
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
@@ -30,39 +30,39 @@ class JointPosController(GiskardBehavior):
             self.publishers.append(rospy.Publisher(cmd_topic, Float64, queue_size=10))
             self.joint_names.append(rospy.get_param(f'{namespace}/joint'))
         for i in range(len(self.joint_names)):
-            self.joint_names[i] = GodMap.get_world().search_for_joint_name(self.joint_names[i])
-        GodMap.get_world().register_controlled_joints(self.joint_names)
+            self.joint_names[i] = god_map.world.search_for_joint_name(self.joint_names[i])
+        god_map.world.register_controlled_joints(self.joint_names)
 
     @profile
     def initialise(self):
         def f(joint_symbol):
-            return GodMap.god_map.expr_to_key[joint_symbol][-2]
+            return god_map.expr_to_key[joint_symbol][-2]
 
         self.symbol_to_joint_map = KeyDefaultDict(f)
         super().initialise()
 
     @catch_and_raise_to_blackboard
     def update(self):
-        # next_time = GodMap.god_map.get_data(identifier.time)
+        # next_time = god_map.get_data(identifier.time)
         # if next_time <= 0.0 or not hasattr(self, 'last_time'):
         #     self.last_time = next_time
         #     return Status.RUNNING
         # # if self.last_time is None:
-        # next_cmds = GodMap.god_map.get_data(identifier.qp_solver_solution)
-        # # joints = GodMap.get_world().joints
+        # next_cmds = god_map.get_data(identifier.qp_solver_solution)
+        # # joints = god_map.get_world().joints
         # # next_time = rospy.get_rostime()
         # dt = next_time - self.last_time
         # print(f'dt: {dt}')
-        # GodMap.get_world().update_state(next_cmds, dt)
+        # god_map.get_world().update_state(next_cmds, dt)
         # self.last_time = next_time
-        # GodMap.get_world().notify_state_change()
+        # god_map.get_world().notify_state_change()
 
-        # next_cmds = GodMap.god_map.get_data(identifier.qp_solver_solution)
-        # GodMap.get_world().update_state(next_cmds, GodMap.sample_period)
+        # next_cmds = god_map.get_data(identifier.qp_solver_solution)
+        # god_map.get_world().update_state(next_cmds, god_map.sample_period)
         msg = Float64()
-        js = deepcopy(GodMap.get_world().state)
+        js = deepcopy(god_map.world.state)
         # try:
-        #     qp_data = GodMap.god_map.get_data(identifier.qp_solver_solution)
+        #     qp_data = god_map.get_data(identifier.qp_solver_solution)
         #     if qp_data is None:
         #         return
         # except Exception:
@@ -73,8 +73,8 @@ class JointPosController(GiskardBehavior):
         #     dt = 0
         for i, joint_name in enumerate(self.joint_names):
             try:
-                # key = GodMap.get_world().joints[joint_name].free_variables[0].position_name
-                # velocity = GodMap.get_world().st
+                # key = god_map.get_world().joints[joint_name].free_variables[0].position_name
+                # velocity = god_map.get_world().st
                 # dt = (time.current_real - self.stamp).to_sec()
                 # dt -= 1/self.hz
                 position = js[joint_name].position #+ velocity * dt

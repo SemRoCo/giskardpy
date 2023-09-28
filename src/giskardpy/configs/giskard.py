@@ -6,7 +6,7 @@ from py_trees import Blackboard
 
 from giskardpy import identifier
 from giskardpy.configs.behavior_tree_config import BehaviorTreeConfig, OpenLoopBTConfig
-from giskardpy.god_map_user import GodMap
+from giskardpy.god_map_interpreter import god_map
 from giskardpy.tree.control_modes import ControlModes
 from giskardpy.configs.collision_avoidance_config import CollisionAvoidanceConfig, DisableCollisionAvoidanceConfig
 from giskardpy.configs.qp_controller_config import QPControllerConfig
@@ -45,7 +45,7 @@ class Giskard:
                                               Giskard will run 'from <additional path> import *' for each additional
                                               path in the list.
         """
-        GodMap.god_map.set_data(identifier.giskard, self)
+        god_map.set_data(identifier.giskard, self)
         self.world_config = world_config
         self.robot_interface_config = robot_interface_config
         if collision_avoidance_config is None:
@@ -61,10 +61,10 @@ class Giskard:
             additional_goal_package_paths = set()
         for additional_path in additional_goal_package_paths:
             self.add_goal_package_name(additional_path)
-        GodMap.god_map.set_data(identifier.hack, 0)
+        god_map.set_data(identifier.hack, 0)
 
     def set_defaults(self):
-        GodMap.get_world_config().set_defaults()
+        god_map.world_config.set_defaults()
         self.robot_interface_config.set_defaults()
         self.qp_controller_config.set_defaults()
         self.collision_avoidance_config.set_defaults()
@@ -74,28 +74,28 @@ class Giskard:
         """
         Initialize the behavior tree and world. You usually don't need to call this.
         """
-        with GodMap.get_world().modify_world():
-            GodMap.get_world_config().setup()
+        with god_map.world.modify_world():
+            god_map.world_config.setup()
         self.collision_avoidance_config.setup()
         self.collision_avoidance_config._sanity_check()
         self.behavior_tree_config._create_behavior_tree()
         self.behavior_tree_config.setup()
         self.robot_interface_config.setup()
         self._controlled_joints_sanity_check()
-        GodMap.get_world().notify_model_change()
-        GodMap.get_collision_scene().sync()
-        GodMap.get_tree_manager().setup()
+        god_map.world.notify_model_change()
+        god_map.collision_scene.sync()
+        god_map.tree_manager.setup()
 
     def _controlled_joints_sanity_check(self):
-        world = GodMap.god_map.get_data(identifier.world)
+        world = god_map.get_data(identifier.world)
         non_controlled_joints = set(world.movable_joint_names).difference(set(world.controlled_joints))
         if len(world.controlled_joints) == 0:
             raise GiskardException('No joints are flagged as controlled.')
         logging.loginfo(f'The following joints are non-fixed according to the urdf, '
                         f'but not flagged as controlled: {non_controlled_joints}.')
         # FIXME
-        # if not GodMap.get_tree_manager().base_tracking_enabled() \
-        #         and not GodMap.control_mode == ControlModes.standalone:
+        # if not god_map.get_tree_manager().base_tracking_enabled() \
+        #         and not god_map.control_mode == ControlModes.standalone:
         #     logging.loginfo('No cmd_vel topic has been registered.')
 
     def add_goal_package_name(self, package_name: str):
@@ -110,4 +110,4 @@ class Giskard:
         Start Giskard.
         """
         self.grow()
-        GodMap.god_map.get_data(identifier.tree_manager).live()
+        god_map.get_data(identifier.tree_manager).live()

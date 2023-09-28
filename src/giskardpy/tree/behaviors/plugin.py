@@ -6,7 +6,7 @@ from py_trees import Behaviour, Blackboard
 import giskardpy.utils.tfwrapper as tf
 from giskardpy import identifier
 from giskardpy.configs.collision_avoidance_config import CollisionAvoidanceGroupThresholds
-from giskardpy.god_map_user import GodMap
+from giskardpy.god_map_interpreter import god_map
 from giskardpy.utils.utils import has_blackboard_exception, get_blackboard_exception, clear_blackboard_exception
 
 
@@ -48,6 +48,6 @@ class GiskardBehavior(Behaviour):
 
     def transform_msg(self, target_frame, msg, timeout=1):
         try:
-            return GodMap.get_world().transform_msg(target_frame, msg)
+            return god_map.world.transform_msg(target_frame, msg)
         except KeyError as e:
             return tf.transform_msg(target_frame, msg, timeout=timeout)

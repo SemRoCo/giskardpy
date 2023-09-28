@@ -7,7 +7,7 @@ import giskardpy.casadi_wrapper as w
 import giskardpy.identifier as identifier
 from giskardpy.exceptions import EmptyProblemException, ConstraintInitalizationException
 from giskardpy.goals.goal import Goal
-from giskardpy.god_map_user import GodMap
+from giskardpy.god_map_interpreter import god_map
 from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint
 from giskardpy.qp.qp_controller import QPProblemBuilder
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
@@ -19,7 +19,7 @@ class InitQPController(GiskardBehavior):
     @record_time
     @profile
     def update(self):
-        eq_constraints, neq_constraints, derivative_constraints = GodMap.get_motion_goal_manager().get_constraints_from_goals()
+        eq_constraints, neq_constraints, derivative_constraints = god_map.motion_goal_manager.get_constraints_from_goals()
         free_variables = self.get_active_free_symbols(eq_constraints, neq_constraints, derivative_constraints)
 
         qp_controller = QPProblemBuilder(
@@ -27,15 +27,15 @@ class InitQPController(GiskardBehavior):
             equality_constraints=list(eq_constraints.values()),
             inequality_constraints=list(neq_constraints.values()),
             derivative_constraints=list(derivative_constraints.values()),
-            sample_period=GodMap.get_sample_period(),
-            prediction_horizon=GodMap.get_prediction_horizon(),
-            solver_id=GodMap.god_map.unsafe_get_data(identifier.qp_solver_name),
-            retries_with_relaxed_constraints=GodMap.god_map.unsafe_get_data(
+            sample_period=god_map.sample_period,
+            prediction_horizon=god_map.prediction_horizon,
+            solver_id=god_map.unsafe_get_data(identifier.qp_solver_name),
+            retries_with_relaxed_constraints=god_map.unsafe_get_data(
                 identifier.retries_with_relaxed_constraints),
-            retry_added_slack=GodMap.god_map.unsafe_get_data(identifier.retry_added_slack),
-            retry_weight_factor=GodMap.god_map.unsafe_get_data(identifier.retry_weight_factor),
+            retry_added_slack=god_map.unsafe_get_data(identifier.retry_added_slack),
+            retry_weight_factor=god_map.unsafe_get_data(identifier.retry_weight_factor),
         )
-        GodMap.god_map.set_data(identifier.qp_controller, qp_controller)
+        god_map.set_data(identifier.qp_controller, qp_controller)
 
         return Status.SUCCESS
 
@@ -46,9 +46,9 @@ class InitQPController(GiskardBehavior):
         symbols = set()
         for c in chain(eq_constraints.values(), neq_constraints.values(), derivative_constraints.values()):
             symbols.update(str(s) for s in w.free_symbols(c.expression))
-        free_variables = list(sorted([v for v in GodMap.get_world().free_variables.values() if v.position_name in symbols],
+        free_variables = list(sorted([v for v in god_map.world.free_variables.values() if v.position_name in symbols],
                                      key=lambda x: x.position_name))
         if len(free_variables) == 0:
             raise EmptyProblemException('Goal parsing resulted in no free variables.')
-        GodMap.god_map.set_data(identifier.free_variables, free_variables)
+        god_map.set_data(identifier.free_variables, free_variables)
         return free_variables

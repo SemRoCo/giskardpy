@@ -3,7 +3,7 @@ from threading import Thread
 from py_trees import Status
 
 from giskardpy import identifier
-from giskardpy.god_map_user import GodMap
+from giskardpy.god_map_interpreter import god_map
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.decorators import record_time
 from giskardpy.utils.logging import logwarn
@@ -18,7 +18,7 @@ class PlotTrajectory(GiskardBehavior):
         self.wait = wait
         self.normalize_position = normalize_position
         self.kwargs = kwargs
-        self.path_to_data_folder = GodMap.god_map.get_data(identifier.tmp_folder)
+        self.path_to_data_folder = god_map.get_data(identifier.tmp_folder)
 
     @profile
     def initialise(self):
@@ -26,9 +26,9 @@ class PlotTrajectory(GiskardBehavior):
         self.plot_thread.start()
 
     def plot(self):
-        trajectory = GodMap.god_map.get_data(identifier.trajectory)
+        trajectory = god_map.get_data(identifier.trajectory)
         if trajectory:
-            sample_period = GodMap.get_sample_period()
+            sample_period = god_map.sample_period
             try:
                 trajectory.plot_trajectory(path_to_data_folder=self.path_to_data_folder,
                                            sample_period=sample_period,

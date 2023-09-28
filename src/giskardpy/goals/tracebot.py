@@ -12,7 +12,7 @@ from giskardpy.goals.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_
 from giskardpy.goals.monitors.monitors import Monitor
 from giskardpy.goals.tasks.joint_tasks import PositionTask
 from giskardpy.goals.tasks.task import Task
-from giskardpy.god_map_user import GodMap
+from giskardpy.god_map_interpreter import god_map
 
 
 class InsertCylinder(Goal):
@@ -27,10 +27,10 @@ class InsertCylinder(Goal):
         super().__init__()
         self.cylinder_name = cylinder_name
         self.get_straight_after = get_straight_after
-        self.root = GodMap.get_world().root_link_name
-        self.tip = GodMap.get_world().search_for_link_name(self.cylinder_name)
+        self.root = god_map.world.root_link_name
+        self.tip = god_map.world.search_for_link_name(self.cylinder_name)
         if cylinder_height is None:
-            self.cylinder_height = GodMap.get_world().links[self.tip].collisions[0].height
+            self.cylinder_height = god_map.world.links[self.tip].collisions[0].height
         else:
             self.cylinder_height = cylinder_height
         self.tilt = tilt
@@ -51,7 +51,7 @@ class InsertCylinder(Goal):
     def make_constraints(self):
         root_P_hole = cas.Point3(self.root_P_hole)
         root_V_up = cas.Vector3(self.root_V_up)
-        root_T_tip = GodMap.get_world().compose_fk_expression(self.root, self.tip)
+        root_T_tip = god_map.world.compose_fk_expression(self.root, self.tip)
         root_P_tip = root_T_tip.to_position()
         tip_P_cylinder_bottom = cas.Vector3([0, 0, self.cylinder_height / 2])
         root_P_cylinder_bottom = root_T_tip.dot(tip_P_cylinder_bottom)

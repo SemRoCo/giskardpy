@@ -7,7 +7,7 @@ from rospy import ROSException
 from sensor_msgs.msg import JointState
 
 from giskardpy.data_types import JointStates
-from giskardpy.god_map_user import GodMap
+from giskardpy.god_map_interpreter import god_map
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
 from giskardpy.utils.decorators import record_time
@@ -58,7 +58,7 @@ class SyncConfiguration(GiskardBehavior):
         except Empty:
             pass
 
-        GodMap.get_world().state.update(self.mjs)
+        god_map.world.state.update(self.mjs)
         return Status.SUCCESS
 
     def __str__(self):

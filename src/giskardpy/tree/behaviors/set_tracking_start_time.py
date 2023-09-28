@@ -3,7 +3,7 @@ from py_trees import Status
 from sensor_msgs.msg import JointState
 
 import giskardpy.identifier as identifier
-from giskardpy.god_map_user import GodMap
+from giskardpy.god_map_interpreter import god_map
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.tree.behaviors.sync_configuration import SyncConfiguration
 from giskardpy.utils import logging
@@ -15,7 +15,7 @@ class SetTrackingStartTime(GiskardBehavior):
         self.offset = rospy.Duration(offset)
 
     def compute_time_offset(self) -> rospy.Duration:
-        sync_node = GodMap.get_tree_manager().get_nodes_of_type(SyncConfiguration)
+        sync_node = god_map.tree_manager.get_nodes_of_type(SyncConfiguration)
         topic_name = sync_node[0].joint_state_topic
         msg = rospy.wait_for_message(topic_name, JointState, rospy.Duration(5))
         current_time = rospy.get_rostime()
@@ -26,10 +26,10 @@ class SetTrackingStartTime(GiskardBehavior):
         super().initialise()
         delay = rospy.Duration(0)
         # delay = self.compute_time_offset()
-        GodMap.god_map.set_data(identifier.time_delay, delay)
+        god_map.set_data(identifier.time_delay, delay)
         if abs(delay.to_sec()) > 0.5:
             logging.logwarn(f'delay between joint states and current time is {delay.to_sec()}, compensating the offset.')
-        GodMap.god_map.set_data(identifier.tracking_start_time,
+        god_map.set_data(identifier.tracking_start_time,
                               rospy.get_rostime() + self.offset - delay)
 
     @profile

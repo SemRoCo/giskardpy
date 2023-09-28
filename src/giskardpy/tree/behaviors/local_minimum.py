@@ -3,7 +3,7 @@ from py_trees import Status
 
 import giskardpy.identifier as identifier
 from giskardpy.exceptions import LocalMinimumException
-from giskardpy.god_map_user import GodMap
+from giskardpy.god_map_interpreter import god_map
 from giskardpy.my_types import Derivatives
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
@@ -22,15 +22,15 @@ class LocalMinimum(GiskardBehavior):
         self.real_time = real_time
         self.last_goal_id = -1
         if real_time:
-            self.window_size *= GodMap.get_sample_period()
+            self.window_size *= god_map.sample_period
 
     @profile
     def initialise(self):
-        if GodMap.goal_id > self.last_goal_id:
+        if god_map.goal_id > self.last_goal_id:
             self.thresholds = self.make_velocity_threshold()
             self.number_of_controlled_joints = len(self.thresholds)
-            self.endless_mode = GodMap.god_map.get_data(identifier.endless_mode)
-            self.last_goal_id = GodMap.goal_id
+            self.endless_mode = god_map.get_data(identifier.endless_mode)
+            self.last_goal_id = god_map.goal_id
 
     @catch_and_raise_to_blackboard
     @record_time
@@ -40,7 +40,7 @@ class LocalMinimum(GiskardBehavior):
             return Status.RUNNING
         traj_time = self.traj_time_in_sec
         if traj_time >= self.window_size:
-            velocities = np.array(list(GodMap.god_map.get_data(identifier.qp_solver_solution).xdot_velocity))
+            velocities = np.array(list(god_map.get_data(identifier.qp_solver_solution).xdot_velocity))
             below_threshold = np.all(np.abs(velocities) < self.thresholds)
             if below_threshold:
                 run_time = self.get_runtime()
@@ -52,10 +52,10 @@ class LocalMinimum(GiskardBehavior):
 
     def make_velocity_threshold(self, min_cut_off=0.01, max_cut_off=0.06):
         joint_convergence_threshold = self.joint_convergence_threshold
-        free_variables = GodMap.god_map.get_data(identifier.free_variables)
+        free_variables = god_map.get_data(identifier.free_variables)
         thresholds = []
         for free_variable in free_variables:  # type: FreeVariable
-            velocity_limit = GodMap.god_map.evaluate_expr(free_variable.get_upper_limit(Derivatives.velocity))
+            velocity_limit = god_map.evaluate_expr(free_variable.get_upper_limit(Derivatives.velocity))
             velocity_limit *= joint_convergence_threshold
             velocity_limit = min(max(min_cut_off, velocity_limit), max_cut_off)
             thresholds.append(velocity_limit)

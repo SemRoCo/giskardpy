@@ -9,7 +9,7 @@ from giskardpy.data_types import JointStates
 from giskardpy.exceptions import ExecutionException
 from giskardpy.goals.monitors.monitors import Monitor
 from giskardpy.goals.tasks.task import Task
-from giskardpy.god_map_user import GodMap
+from giskardpy.god_map_interpreter import god_map
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
 from giskardpy.utils.decorators import record_time, catch_and_raise_to_blackboard
@@ -76,8 +76,8 @@ class PlotGoalGraph(GiskardBehavior):
     @profile
     def update(self):
         tasks = []
-        for goal in GodMap.god_map.get_data(identifier.motion_goals).values():
+        for goal in god_map.get_data(identifier.motion_goals).values():
             tasks.extend(goal.tasks)
-        file_name = GodMap.god_map.get_data(identifier.tmp_folder) + f'/task_graphs/goal_{GodMap.get_goal_id()}.png'
-        generate_graph(tasks, GodMap.get_monitors(), file_name)
+        file_name = god_map.get_data(identifier.tmp_folder) + f'/task_graphs/goal_{god_map.goal_id}.png'
+        generate_graph(tasks, god_map.monitors, file_name)
         return Status.SUCCESS

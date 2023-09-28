@@ -8,7 +8,7 @@ from sensor_msgs.msg import JointState
 
 import giskardpy.identifier as identifier
 from giskardpy.data_types import KeyDefaultDict, JointStates
-from giskardpy.god_map_user import GodMap
+from giskardpy.god_map_interpreter import god_map
 from giskardpy.my_types import Derivatives
 from giskardpy.tree.behaviors.cmd_publisher import CommandPublisher
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
@@ -24,14 +24,14 @@ class JointGroupVelController(GiskardBehavior):
         self.cmd_pub = rospy.Publisher(self.cmd_topic, Float64MultiArray, queue_size=10)
         self.joint_names = rospy.get_param(f'{self.namespace}/joints')
         for i in range(len(self.joint_names)):
-            self.joint_names[i] = GodMap.get_world().search_for_joint_name(self.joint_names[i])
-        GodMap.get_world().register_controlled_joints(self.joint_names)
+            self.joint_names[i] = god_map.world.search_for_joint_name(self.joint_names[i])
+        god_map.world.register_controlled_joints(self.joint_names)
         self.msg = None
 
     @profile
     def initialise(self):
         def f(joint_symbol):
-            return GodMap.god_map.expr_to_key[joint_symbol][-2]
+            return god_map.expr_to_key[joint_symbol][-2]
 
         self.symbol_to_joint_map = KeyDefaultDict(f)
         super().initialise()
@@ -42,7 +42,7 @@ class JointGroupVelController(GiskardBehavior):
     def update(self):
         msg = Float64MultiArray()
         for i, joint_name in enumerate(self.joint_names):
-            msg.data.append(GodMap.get_world().state[joint_name].velocity)
+            msg.data.append(god_map.world.state[joint_name].velocity)
         self.cmd_pub.publish(msg)
         return Status.SUCCESS
 

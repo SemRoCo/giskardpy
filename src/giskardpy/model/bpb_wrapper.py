@@ -7,6 +7,7 @@ import trimesh
 
 from giskardpy import identifier
 from giskardpy.god_map import _GodMap
+from giskardpy.god_map_interpreter import god_map
 from giskardpy.model.collision_world_syncer import Collision
 from giskardpy.model.links import Link, LinkGeometry, BoxGeometry, SphereGeometry, CylinderGeometry, MeshGeometry
 from giskardpy.my_types import my_string, PrefixName
@@ -139,7 +140,7 @@ def load_convex_mesh_shape(pkg_filename: str, single_shape=False, scale=(1, 1, 1
 
 
 def convert_to_decomposed_obj_and_save_in_tmp(file_name: str, log_path='/tmp/giskardpy/vhacd.log'):
-    first_group_name = list(_GodMap().get_data(identifier.world).groups.keys())[0]
+    first_group_name = list(god_map.get_data(identifier.world).groups.keys())[0]
     resolved_old_path = resolve_ros_iris(file_name)
     short_file_name = file_name.split('/')[-1][:-3]
     obj_file_name = f'{first_group_name}/{short_file_name}obj'

@@ -1,7 +1,7 @@
 from py_trees import Sequence
 
 from giskardpy import identifier
-from giskardpy.god_map_user import GodMap
+from giskardpy.god_map_interpreter import god_map
 from giskardpy.model.collision_world_syncer import CollisionCheckerLib
 from giskardpy.tree.behaviors.collision_checker import CollisionChecker
 from giskardpy.tree.behaviors.evaluate_debug_expressions import EvaluateDebugExpressions
@@ -41,13 +41,13 @@ class ControlLoop(AsyncBehavior):
 
         self.add_child(self.synchronization)
 
-        if GodMap.god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none:
+        if god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none:
             self.add_child(CollisionChecker('collision checker'))
 
         self.add_child(success_is_running(EvaluateMonitors)())
         self.add_child(ControllerPlugin('controller'))
 
-        if GodMap.is_closed_loop():
+        if god_map.is_closed_loop():
             self.send_controls = success_is_running(SendControls)()
 
             self.add_child(success_is_running(RosTime)())

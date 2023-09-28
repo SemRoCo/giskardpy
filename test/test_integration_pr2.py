@@ -22,7 +22,7 @@ from giskardpy.configs.behavior_tree_config import StandAloneBTConfig
 from giskardpy.configs.giskard import Giskard
 from giskardpy.configs.iai_robots.pr2 import PR2CollisionAvoidance, PR2StandaloneInterface, WorldWithPR2Config
 from giskardpy.configs.qp_controller_config import QPControllerConfig, SupportedQPSolver
-from giskardpy.god_map_user import GodMap
+from giskardpy.god_map_interpreter import god_map
 from giskardpy.model.better_pybullet_syncer import BetterPyBulletSyncer
 from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
 from giskardpy.model.utils import make_world_body_box, hacky_urdf_parser_fix
@@ -141,7 +141,7 @@ class PR2TestWrapper(GiskardTestWrapper):
                               collision_avoidance_config=PR2CollisionAvoidance(drive_joint_name=drive_joint_name),
                               behavior_tree_config=StandAloneBTConfig())
         super().__init__(giskard)
-        self.robot = GodMap.get_world().groups[self.robot_name]
+        self.robot = god_map.world.groups[self.robot_name]
 
     def teleport_base(self, goal_pose, group_name: Optional[str] = None):
         self.set_seed_odometry(base_pose=goal_pose, group_name=group_name)
@@ -154,10 +154,10 @@ class PR2TestWrapper(GiskardTestWrapper):
         self.plan_and_execute()
 
     def get_l_gripper_links(self):
-        return [str(x) for x in GodMap.get_world().groups[self.l_gripper_group].link_names_with_collisions]
+        return [str(x) for x in god_map.world.groups[self.l_gripper_group].link_names_with_collisions]
 
     def get_r_gripper_links(self):
-        return [str(x) for x in GodMap.get_world().groups[self.r_gripper_group].link_names_with_collisions]
+        return [str(x) for x in god_map.world.groups[self.r_gripper_group].link_names_with_collisions]
 
     def get_r_forearm_links(self):
         return ['r_wrist_flex_link', 'r_wrist_roll_link', 'r_forearm_roll_link', 'r_forearm_link',
@@ -179,7 +179,7 @@ class PR2TestWrapper(GiskardTestWrapper):
         p = PoseStamped()
         p.header.frame_id = 'map'
         p.pose.orientation.w = 1
-        if GodMap.is_standalone():
+        if god_map.is_standalone():
             self.teleport_base(p)
         else:
             self.move_base(p)
@@ -189,7 +189,7 @@ class PR2TestWrapper(GiskardTestWrapper):
         self.set_seed_odometry(map_T_odom)
         self.plan_and_execute()
         # self.wait_heartbeats(15)
-        # p2 = GodMap.get_world().compute_fk_pose(GodMap.get_world().root_link_name, self.odom_root)
+        # p2 = god_map.get_world().compute_fk_pose(god_map.get_world().root_link_name, self.odom_root)
         # compare_poses(p2.pose, map_T_odom.pose)
 
     def reset(self):
@@ -250,7 +250,7 @@ def pocky_pose_setup(resetted_giskard: PR2TestWrapper) -> PR2TestWrapper:
 @pytest.fixture()
 def world_setup(zero_pose: PR2TestWrapper) -> WorldTree:
     zero_pose.stop_ticking()
-    return GodMap.get_world()
+    return god_map.world
 
 
 @pytest.fixture()

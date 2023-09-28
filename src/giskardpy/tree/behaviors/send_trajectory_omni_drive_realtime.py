@@ -14,7 +14,7 @@ from giskardpy.exceptions import GiskardException
 from giskardpy.goals.base_traj_follower import BaseTrajFollower, BaseTrajFollowerPR2
 from giskardpy.goals.goal import Goal
 from giskardpy.goals.set_prediction_horizon import SetPredictionHorizon
-from giskardpy.god_map_user import GodMap
+from giskardpy.god_map_interpreter import god_map
 from giskardpy.model.joints import OmniDrive, DiffDrive, OmniDrivePR22
 from giskardpy.my_types import Derivatives
 from giskardpy.qp.next_command import NextCommands
@@ -51,7 +51,7 @@ class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
             rospy.sleep(1)
 
         if joint_name is None:
-            for joint in GodMap.get_world().joints.values():
+            for joint in god_map.world.joints.values():
                 if isinstance(joint, (OmniDrive, DiffDrive, OmniDrivePR22)):
                     # FIXME can only handle one drive
                     # self.controlled_joints = [joint]
@@ -59,9 +59,9 @@ class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
             if not hasattr(self, 'joint'):
                 raise GiskardException('didnt find drive joint.')
         else:
-            joint_name = GodMap.get_world().search_for_joint_name(joint_name)
-            self.joint = GodMap.get_world().joints[joint_name]
-        GodMap.get_world().register_controlled_joints([self.joint.name])
+            joint_name = god_map.world.search_for_joint_name(joint_name)
+            self.joint = god_map.world.joints[joint_name]
+        god_map.world.register_controlled_joints([self.joint.name])
         loginfo(f'Received controlled joints from \'{cmd_vel_topic}\'.')
 
     def __str__(self):
@@ -72,9 +72,9 @@ class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
     @profile
     def initialise(self):
         super().initialise()
-        self.trajectory = GodMap.god_map.get_data(identifier.trajectory)
-        sample_period = GodMap.god_map.unsafe_get_data(identifier.sample_period)
-        self.start_time = GodMap.god_map.unsafe_get_data(identifier.tracking_start_time)
+        self.trajectory = god_map.get_data(identifier.trajectory)
+        sample_period = god_map.unsafe_get_data(identifier.sample_period)
+        self.start_time = god_map.unsafe_get_data(identifier.tracking_start_time)
         self.trajectory = self.trajectory.to_msg(sample_period, self.start_time, [self.joint], True)
         self.end_time = self.start_time + self.trajectory.points[-1].time_from_start + self.goal_time_tolerance
 
@@ -82,19 +82,19 @@ class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
     @profile
     def setup(self, timeout):
         super().setup(timeout)
-        self.put_drive_goals_on_godmap()
+        self.put_drive_goals_on_god_map()
         return True
 
-    def put_drive_goals_on_godmap(self):
+    def put_drive_goals_on_god_map(self):
         try:
-            drive_goals = GodMap.god_map.get_data(identifier.drive_goals)
+            drive_goals = god_map.get_data(identifier.drive_goals)
         except KeyError:
             drive_goals = []
         drive_goals.extend(self.get_drive_goals())
-        GodMap.god_map.set_data(identifier.drive_goals, drive_goals)
+        god_map.set_data(identifier.drive_goals, drive_goals)
 
     def get_drive_goals(self) -> List[Goal]:
-        return [SetPredictionHorizon(prediction_horizon=GodMap.god_map.get_data(identifier.prediction_horizon) + 4),
+        return [SetPredictionHorizon(prediction_horizon=god_map.get_data(identifier.prediction_horizon) + 4),
                 BaseTrajFollower(joint_name=self.joint.name, track_only_velocity=self.track_only_velocity)]
 
     def solver_cmd_to_twist(self, cmd: NextCommands) -> Twist:
@@ -102,8 +102,8 @@ class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
         if isinstance(self.joint, OmniDrivePR22):
             try:
                 forward_velocity = cmd.free_variable_data[self.joint.forward_vel.name][0]
-                yaw1_position = GodMap.get_world().state[self.joint.yaw1_vel.name].position
-                yaw2_position = GodMap.get_world().state[self.joint.yaw.name].position
+                yaw1_position = god_map.world.state[self.joint.yaw1_vel.name].position
+                yaw2_position = god_map.world.state[self.joint.yaw.name].position
                 bf_yaw1 = yaw1_position - yaw2_position
                 twist.linear.x = np.cos(bf_yaw1) * forward_velocity
                 twist.linear.y = np.sin(bf_yaw1) * forward_velocity
@@ -144,7 +144,7 @@ class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
             self.vel_pub.publish(Twist())
             return Status.RUNNING
         if t <= self.end_time:
-            cmd = GodMap.god_map.get_data(identifier.qp_solver_solution)
+            cmd = god_map.get_data(identifier.qp_solver_solution)
             twist = self.solver_cmd_to_twist(cmd)
             self.vel_pub.publish(twist)
             return Status.SUCCESS

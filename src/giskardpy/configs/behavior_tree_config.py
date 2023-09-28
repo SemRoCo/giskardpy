@@ -3,6 +3,7 @@ from typing import Optional
 
 from giskardpy import identifier
 from giskardpy.god_map import _GodMap
+from giskardpy.god_map_interpreter import god_map
 from giskardpy.tree.behaviors.compile_debug_expressions import CompileDebugExpressions
 from giskardpy.tree.behaviors.tf_publisher import TfPublishingModes
 from giskardpy.tree.garden import OpenLoop, ClosedLoop, StandAlone, TreeManager
@@ -10,7 +11,6 @@ from giskardpy.tree.control_modes import ControlModes
 
 
 class BehaviorTreeConfig(ABC):
-    god_map = _GodMap()
 
     def __init__(self, mode: ControlModes):
         self._control_mode = mode
@@ -23,7 +23,7 @@ class BehaviorTreeConfig(ABC):
 
     @property
     def tree_manager(self) -> TreeManager:
-        return self.god_map.get_data(identifier.tree_manager)
+        return god_map.get_data(identifier.tree_manager)
 
     def _create_behavior_tree(self):
         TreeManager(self._control_mode)

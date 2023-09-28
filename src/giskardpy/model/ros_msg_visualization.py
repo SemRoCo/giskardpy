@@ -8,7 +8,7 @@ from visualization_msgs.msg import MarkerArray, Marker
 
 from giskardpy import identifier
 from giskardpy.god_map import _GodMap
-from giskardpy.god_map_user import GodMap
+from giskardpy.god_map_interpreter import god_map
 from giskardpy.model.collision_world_syncer import Collisions, Collision
 
 
@@ -23,18 +23,18 @@ class ROSMsgVisualization:
         self.publisher = rospy.Publisher('~visualization_marker_array', MarkerArray, queue_size=1)
         self.marker_ids = {}
         if tf_frame is None:
-            self.tf_root = str(GodMap.get_world().root_link_name)
+            self.tf_root = str(god_map.world.root_link_name)
         else:
             self.tf_root = tf_frame
-        GodMap.god_map.set_data(identifier.ros_visualizer, self)
+        god_map.set_data(identifier.ros_visualizer, self)
 
     @profile
     def create_world_markers(self, name_space: str = 'planning_visualization') -> List[Marker]:
         markers = []
         time_stamp = rospy.Time()
-        links = GodMap.get_world().link_names_with_collisions
+        links = god_map.world.link_names_with_collisions
         for i, link_name in enumerate(links):
-            for j, marker in enumerate(GodMap.get_world().links[link_name].collision_visualization_markers(use_decomposed_meshes=self.use_decomposed_meshes).markers):
+            for j, marker in enumerate(god_map.world.links[link_name].collision_visualization_markers(use_decomposed_meshes=self.use_decomposed_meshes).markers):
                 marker.header.frame_id = self.tf_root
                 marker.action = Marker.ADD
                 link_id_key = f'{link_name}_{j}'
@@ -43,18 +43,18 @@ class ROSMsgVisualization:
                 marker.id = self.marker_ids[link_id_key]
                 marker.ns = name_space
                 marker.header.stamp = time_stamp
-                marker.pose = GodMap.get_collision_scene().get_map_T_geometry(link_name, j)
+                marker.pose = god_map.collision_scene.get_map_T_geometry(link_name, j)
                 markers.append(marker)
         return markers
 
     @profile
     def create_collision_markers(self, name_space: str = 'collisions') -> List[Marker]:
         try:
-            collisions: Collisions = GodMap.god_map.get_data(identifier.closest_point)
+            collisions: Collisions = god_map.get_data(identifier.closest_point)
         except KeyError as e:
             # no collisions
             return []
-        collision_avoidance_configs = GodMap.god_map.unsafe_get_data(identifier.collision_avoidance_configs)
+        collision_avoidance_configs = god_map.unsafe_get_data(identifier.collision_avoidance_configs)
         m = Marker()
         m.header.frame_id = self.tf_root
         m.action = Marker.ADD
@@ -75,13 +75,13 @@ class ROSMsgVisualization:
                 yellow_threshold = thresholds.soft_threshold
                 contact_distance = collision.contact_distance
                 if collision.map_P_pa is None:
-                    map_T_a = GodMap.get_world().compute_fk_np(GodMap.get_world().root_link_name, collision.original_link_a)
+                    map_T_a = god_map.world.compute_fk_np(god_map.world.root_link_name, collision.original_link_a)
                     map_P_pa = np.dot(map_T_a, collision.a_P_pa)
                 else:
                     map_P_pa = collision.map_P_pa
 
                 if collision.map_P_pb is None:
-                    map_T_b = GodMap.get_world().compute_fk_np(GodMap.get_world().root_link_name, collision.original_link_b)
+                    map_T_b = god_map.world.compute_fk_np(god_map.world.root_link_name, collision.original_link_b)
                     map_P_pb = np.dot(map_T_b, collision.b_P_pb)
                 else:
                     map_P_pb = collision.map_P_pb

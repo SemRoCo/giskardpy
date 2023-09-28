@@ -6,7 +6,7 @@ from py_trees import Status
 
 from giskardpy import identifier
 from giskardpy.goals.goal import Goal
-from giskardpy.god_map_user import GodMap
+from giskardpy.god_map_interpreter import god_map
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.decorators import record_time, catch_and_raise_to_blackboard
 from giskardpy.utils.logging import logwarn
@@ -31,7 +31,7 @@ class PlotGanttChart(GiskardBehavior):
                 else:
                     start_dates.extend([x.state_flip_times[0] for x in task.to_start])
                 if not task.to_end:
-                    end_dates.append(GodMap.get_trajectory_time_in_seconds())
+                    end_dates.append(god_map.trajectory_time_in_seconds)
                 else:
                     end_dates.extend([x.state_flip_times[0] for x in task.to_end])
 
@@ -40,7 +40,7 @@ class PlotGanttChart(GiskardBehavior):
         for i, (task, start_date, end_date) in enumerate(zip(tasks, start_dates, end_dates)):
             plt.barh(task, end_date - start_date, height=0.8, left=start_date, color=(133/255, 232/255, 133/255))
 
-        for monitor in GodMap.get_monitors():
+        for monitor in god_map.monitors:
             state = False
             for flip_event in monitor.state_flip_times:
                 text = f'{monitor.name} {state} -> {not state}'
@@ -58,7 +58,7 @@ class PlotGanttChart(GiskardBehavior):
     @record_time
     @profile
     def update(self):
-        goals = GodMap.god_map.get_data(identifier.motion_goals)
-        file_name = GodMap.god_map.get_data(identifier.tmp_folder) + f'/gantt_charts/goal_{GodMap.get_goal_id()}.png'
+        goals = god_map.get_data(identifier.motion_goals)
+        file_name = god_map.get_data(identifier.tmp_folder) + f'/gantt_charts/goal_{god_map.goal_id}.png'
         self.plot_gantt_chart(goals, file_name)
         return Status.SUCCESS

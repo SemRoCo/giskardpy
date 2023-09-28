@@ -1,7 +1,7 @@
 from py_trees import Sequence, Selector
 
 from giskardpy import identifier
-from giskardpy.god_map_user import GodMap
+from giskardpy.god_map_interpreter import god_map
 from giskardpy.model.collision_world_syncer import CollisionCheckerLib
 from giskardpy.tree.behaviors.collision_checker import CollisionChecker
 from giskardpy.tree.behaviors.curcial_monitors_satisfied import CrucialMonitorsSatisfied
@@ -31,6 +31,6 @@ class CheckMonitors(RunningSelector):
         super().__init__(name)
         self.add_child(CrucialMonitorsSatisfied())
         # self.add_child(LoopDetector('loop detector'))
-        # self.add_child(LocalMinimum('local minimum', real_time=GodMap.is_closed_loop))
-        self.add_child(MaxTrajectoryLength('traj length check', real_time=GodMap.is_closed_loop()))
+        # self.add_child(LocalMinimum('local minimum', real_time=god_map.is_closed_loop))
+        self.add_child(MaxTrajectoryLength('traj length check', real_time=god_map.is_closed_loop()))
         # self.add_child(GoalDone('goal done check'))

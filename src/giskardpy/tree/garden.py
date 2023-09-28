@@ -25,7 +25,7 @@ from giskardpy import identifier
 from giskardpy.configs.collision_avoidance_config import CollisionCheckerLib
 from giskardpy.exceptions import DuplicateNameException, BehaviorTreeException
 from giskardpy.god_map import _GodMap
-from giskardpy.god_map_user import GodMap
+from giskardpy.god_map_interpreter import god_map
 from giskardpy.my_types import PrefixName, Derivatives
 from giskardpy.tree.behaviors.debug_marker_publisher import DebugMarkerPublisher
 from giskardpy.tree.behaviors.append_zero_velocity import SetZeroVelocity
@@ -210,7 +210,6 @@ def search_for(lines, function_name):
 
 
 class TreeManager(ABC):
-    god_map = _GodMap()
     tree_nodes: Dict[str, ManagerNode]
     tick_rate: float = 0.05
     control_mode = ControlModes.none
@@ -218,8 +217,8 @@ class TreeManager(ABC):
 
     @profile
     def __init__(self, control_mode: ControlModes):
-        GodMap.god_map.set_data(identifier.tree_manager, self)
-        self.action_server_name = GodMap.god_map.get_data(identifier.action_server_name)
+        god_map.set_data(identifier.tree_manager, self)
+        self.action_server_name = god_map.get_data(identifier.action_server_name)
 
         self.tree = GiskardBT(control_mode=control_mode)
         self.tree_nodes = {}
@@ -247,7 +246,7 @@ class TreeManager(ABC):
         self.tree.blackboard_exchange.get_blackboard_variables_srv.shutdown()
         self.tree.blackboard_exchange.open_blackboard_watcher_srv.shutdown()
         self.tree.blackboard_exchange.close_blackboard_watcher_srv.shutdown()
-        for value in GodMap.get_tree_manager().tree_nodes.values():
+        for value in god_map.tree_manager.tree_nodes.values():
             node = value.node
             for attribute_name, attribute in vars(node).items():
                 if isinstance(attribute, rospy.Service):
@@ -366,7 +365,7 @@ class TreeManager(ABC):
                 break
 
     def render(self):
-        path = GodMap.god_map.get_data(identifier.tmp_folder) + 'tree'
+        path = god_map.get_data(identifier.tmp_folder) + 'tree'
         create_path(path)
         render_dot_tree(self.tree.root, name=path)
 
@@ -728,15 +727,15 @@ class OpenLoop(StandAlone):
         self.insert_node(ControllerPlugin('base controller'), self.base_closed_loop_control_name)
         self.insert_node(RealKinSimPlugin('base kin sim'), self.base_closed_loop_control_name)
         # todo debugging
-        # if GodMap.god_map.get_data(identifier.PlotDebugTF_enabled):
+        # if god_map.get_data(identifier.PlotDebugTF_enabled):
         #     real_time_tracking.add_child(DebugMarkerPublisher('debug marker publisher'))
-        # if GodMap.god_map.unsafe_get_data(identifier.PublishDebugExpressions)['enabled_base']:
+        # if god_map.unsafe_get_data(identifier.PublishDebugExpressions)['enabled_base']:
         #     real_time_tracking.add_child(PublishDebugExpressions('PublishDebugExpressions',
-        #                                                          **GodMap.god_map.unsafe_get_data(
+        #                                                          **god_map.unsafe_get_data(
         #                                                              identifier.PublishDebugExpressions)))
-        # if GodMap.god_map.unsafe_get_data(identifier.PlotDebugTF)['enabled_base']:
+        # if god_map.unsafe_get_data(identifier.PlotDebugTF)['enabled_base']:
         #     real_time_tracking.add_child(DebugMarkerPublisher('debug marker publisher',
-        #                                                       **GodMap.god_map.unsafe_get_data(
+        #                                                       **god_map.unsafe_get_data(
         #                                                           identifier.PlotDebugTF)))
 
         self.insert_node(SendTrajectoryToCmdVel(cmd_vel_topic=cmd_vel_topic,
@@ -760,13 +759,13 @@ class OpenLoop(StandAlone):
         sync = Sequence('Synchronize')
         sync.add_child(WorldUpdater('update world'))
         sync.add_child(SyncTfFrames('sync tf frames3'))
-        # hardware_config: HardwareConfig = GodMap.god_map.get_data(identifier.hardware_config)
+        # hardware_config: HardwareConfig = god_map.get_data(identifier.hardware_config)
         # for kwargs in hardware_config.joint_state_topics_kwargs:
         #     sync.add_child(running_is_success(SyncConfiguration)(**kwargs))
         # for odometry_kwargs in hardware_config.odometry_node_kwargs:
         #     sync.add_child(running_is_success(SyncOdometry)(**odometry_kwargs))
-        # if GodMap.god_map.get_data(identifier.TFPublisher_enabled):
-        #     sync.add_child(TFPublisher('publish tf', **GodMap.god_map.get_data(identifier.TFPublisher)))
+        # if god_map.get_data(identifier.TFPublisher_enabled):
+        #     sync.add_child(TFPublisher('publish tf', **god_map.get_data(identifier.TFPublisher)))
         sync.add_child(CollisionSceneUpdater('update collision scene'))
         sync.add_child(running_is_success(VisualizationBehavior)('visualize collision scene'))
         return sync
@@ -782,7 +781,7 @@ class OpenLoop(StandAlone):
     def grow_monitor_execution(self):
         monitor_execution = failure_is_success(Selector)('monitor execution')
         monitor_execution.add_child(success_is_failure(PublishFeedback)('publish feedback',
-                                                                        GodMap.god_map.get_data(
+                                                                        god_map.get_data(
                                                                             identifier.action_server_name),
                                                                         MoveFeedback.EXECUTION))
         monitor_execution.add_child(self.grow_execution_cancelled())
@@ -872,7 +871,7 @@ class ClosedLoop(OpenLoop):
         planning_4 = failure_is_success(AsyncBehavior)(self.closed_loop_control_name)
         planning_4.add_child(success_is_running(SyncTfFrames)('sync tf frames close loop'))
         planning_4.add_child(success_is_running(NotifyStateChange)())
-        if GodMap.god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none:
+        if god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none:
             planning_4.add_child(CollisionChecker('collision checker'))
         planning_4.add_child(ControllerPlugin('controller'))
         planning_4.add_child(RosTime())

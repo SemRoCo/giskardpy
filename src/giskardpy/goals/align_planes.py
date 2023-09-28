@@ -6,7 +6,7 @@ import giskardpy.utils.tfwrapper as tf
 from giskardpy import casadi_wrapper as w
 from giskardpy.goals.goal import Goal
 from giskardpy.goals.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE
-from giskardpy.god_map_user import GodMap
+from giskardpy.god_map_interpreter import god_map
 from giskardpy.utils.logging import logwarn
 
 
@@ -36,8 +36,8 @@ class AlignPlanes(Goal):
         if 'root_normal' in kwargs:
             logwarn('Deprecated warning: use goal_normal instead of root_normal')
             goal_normal = kwargs['root_normal']
-        self.root = GodMap.get_world().search_for_link_name(root_link, root_group)
-        self.tip = GodMap.get_world().search_for_link_name(tip_link, tip_group)
+        self.root = god_map.world.search_for_link_name(root_link, root_group)
+        self.tip = god_map.world.search_for_link_name(tip_link, tip_group)
         self.max_velocity = max_angular_velocity
         self.weight = weight
 
@@ -56,7 +56,7 @@ class AlignPlanes(Goal):
 
     def make_constraints(self):
         tip_V_tip_normal = w.Vector3(self.tip_V_tip_normal)
-        root_R_tip = GodMap.get_world().compose_fk_expression(self.root, self.tip).to_rotation()
+        root_R_tip = god_map.world.compose_fk_expression(self.root, self.tip).to_rotation()
         root_V_tip_normal = root_R_tip.dot(tip_V_tip_normal)
         root_V_root_normal = w.Vector3(self.root_V_root_normal)
         self.add_vector_goal_constraints(frame_V_current=root_V_tip_normal,

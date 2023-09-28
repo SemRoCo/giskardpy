@@ -10,7 +10,7 @@ from sortedcontainers import SortedDict
 
 from giskardpy import identifier
 from giskardpy.configs.collision_avoidance_config import CollisionCheckerLib
-from giskardpy.god_map_user import GodMap
+from giskardpy.god_map_interpreter import god_map
 from giskardpy.model.bpb_wrapper import create_cube_shape, create_object, create_sphere_shape, create_cylinder_shape, \
     load_convex_mesh_shape, create_shape_from_link, to_giskard_collision
 from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer, Collision, Collisions
@@ -32,7 +32,7 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
     @classmethod
     def empty(cls):
         self = super().empty()
-        GodMap.god_map.set_data(identifier.collision_checker, CollisionCheckerLib.bpb)
+        god_map.set_data(identifier.collision_checker, CollisionCheckerLib.bpb)
         return self
 
     @profile
@@ -123,13 +123,13 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
             self.object_name_to_id = {}
             self.objects_in_order = []
 
-            for link_name in sorted(GodMap.get_world().link_names_with_collisions):
-                link = GodMap.get_world().links[link_name]
+            for link_name in sorted(god_map.world.link_names_with_collisions):
+                link = god_map.world.links[link_name]
                 self.add_object(link)
                 self.objects_in_order.append(self.object_name_to_id[link_name])
-            bpb.batch_set_transforms(self.objects_in_order, GodMap.get_world().compute_all_collision_fks())
+            bpb.batch_set_transforms(self.objects_in_order, god_map.world.compute_all_collision_fks())
         else:
-            bpb.batch_set_transforms(self.objects_in_order, GodMap.get_world().compute_all_collision_fks())
+            bpb.batch_set_transforms(self.objects_in_order, god_map.world.compute_all_collision_fks())
 
     @profile
     def get_map_T_geometry(self, link_name: PrefixName, collision_id: int = 0) -> Pose:

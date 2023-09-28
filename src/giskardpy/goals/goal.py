@@ -7,7 +7,7 @@ from typing import Optional, Tuple, Dict, List, Union, Callable, TYPE_CHECKING
 
 from giskardpy.goals.monitors.monitors import Monitor
 from giskardpy.goals.tasks.task import Task, WEIGHT_BELOW_CA
-from giskardpy.god_map_user import GodMap
+from giskardpy.god_map_interpreter import god_map
 
 if TYPE_CHECKING:
     from giskardpy.tree.control_modes import ControlModes
@@ -62,8 +62,8 @@ class Goal(ABC):
                 f'You have to ensure that str(self) is possible before calling parents __init__: {e}')
 
     def traj_time_in_seconds(self) -> w.Expression:
-        t = GodMap.god_map.to_symbol(identifier.time)
-        if GodMap.god_map.get_data(identifier.control_mode) == ControlModes.close_loop:
+        t = god_map.to_symbol(identifier.time)
+        if god_map.get_data(identifier.control_mode) == ControlModes.close_loop:
             return t
         else:
             return t * self.get_sampling_period_symbol()
@@ -80,10 +80,10 @@ class Goal(ABC):
         """
         try:
             try:
-                msg.header.frame_id = GodMap.get_world().search_for_link_name(msg.header.frame_id)
+                msg.header.frame_id = god_map.world.search_for_link_name(msg.header.frame_id)
             except UnknownGroupException:
                 pass
-            return GodMap.get_world().transform_msg(target_frame, msg)
+            return god_map.world.transform_msg(target_frame, msg)
         except KeyError:
             return tf.transform_msg(target_frame, msg, timeout=tf_timeout)
 
@@ -91,15 +91,15 @@ class Goal(ABC):
         """
         returns a symbol that refers to the given joint
         """
-        if not GodMap.get_world().has_joint(joint_name):
+        if not god_map.world.has_joint(joint_name):
             raise KeyError(f'World doesn\'t have joint named: {joint_name}.')
-        joint = GodMap.get_world().joints[joint_name]
+        joint = god_map.world.joints[joint_name]
         if isinstance(joint, OneDofJoint):
             return joint.get_symbol(Derivatives.position)
         raise TypeError(f'get_joint_position_symbol is only supported for OneDofJoint, not {type(joint)}')
 
     def get_sampling_period_symbol(self) -> Union[w.Symbol, float]:
-        return GodMap.god_map.to_symbol(identifier.sample_period)
+        return god_map.to_symbol(identifier.sample_period)
 
     def connect_to_end(self, monitor: Monitor):
         for task in self.tasks:
@@ -112,7 +112,7 @@ class Goal(ABC):
         """
         if not hasattr(self, name):
             raise AttributeError(f'{self.__class__.__name__} doesn\'t have attribute {name}')
-        return GodMap.god_map.to_expr(self._get_identifier() + [name])
+        return god_map.to_expr(self._get_identifier() + [name])
 
     def get_expr_velocity(self, expr: w.Expression) -> w.Expression:
         """
@@ -125,22 +125,22 @@ class Goal(ABC):
     @property
     def joint_position_symbols(self) -> List[Union[w.Symbol, float]]:
         position_symbols = []
-        for joint in GodMap.get_world().controlled_joints:
-            position_symbols.extend(GodMap.get_world().joints[joint].free_variables)
+        for joint in god_map.world.controlled_joints:
+            position_symbols.extend(god_map.world.joints[joint].free_variables)
         return [x.get_symbol(Derivatives.position) for x in position_symbols]
 
     @property
     def joint_velocity_symbols(self) -> List[Union[w.Symbol, float]]:
         velocity_symbols = []
-        for joint in GodMap.get_world().controlled_joints:
-            velocity_symbols.extend(GodMap.get_world().joints[joint].free_variable_list)
+        for joint in god_map.world.controlled_joints:
+            velocity_symbols.extend(god_map.world.joints[joint].free_variable_list)
         return [x.get_symbol(Derivatives.velocity) for x in velocity_symbols]
 
     @property
     def joint_acceleration_symbols(self) -> List[Union[w.Symbol, float]]:
         acceleration_symbols = []
-        for joint in GodMap.get_world().controlled_joints:
-            acceleration_symbols.extend(GodMap.get_world().joints[joint].free_variables)
+        for joint in god_map.world.controlled_joints:
+            acceleration_symbols.extend(god_map.world.joints[joint].free_variables)
         return [x.get_symbol(Derivatives.acceleration) for x in acceleration_symbols]
 
     @profile
@@ -182,7 +182,7 @@ class Goal(ABC):
         self.tasks.append(task)
 
     def add_monitor(self, monitor: Monitor):
-        GodMap.get_monitor_manager().add_monitor(monitor)
+        god_map.monitor_manager.add_monitor(monitor)
 
     # def add_debug_expr(self, name: str, expr: w.all_expressions_float):
     #     """

@@ -20,7 +20,7 @@ from giskardpy import identifier
 from giskardpy.data_types import JointStates
 from giskardpy.exceptions import CorruptShapeException, UnknownGroupException, \
     UnsupportedOptionException, DuplicateNameException, UnknownLinkException
-from giskardpy.god_map_user import GodMap
+from giskardpy.god_map_interpreter import god_map
 from giskardpy.model.world import WorldBranch
 from giskardpy.my_types import PrefixName
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
@@ -75,7 +75,7 @@ class WorldUpdater(GiskardBehavior):
     def __init__(self, name: str):
         self.added_plugin_names = defaultdict(list)
         super().__init__(name)
-        self.original_link_names = GodMap.get_world().link_names_as_set
+        self.original_link_names = god_map.world.link_names_as_set
         self.service_in_use = Queue(maxsize=1)
         self.work_permit = Queue(maxsize=1)
         self.update_ticked = Queue(maxsize=1)
@@ -96,10 +96,10 @@ class WorldUpdater(GiskardBehavior):
     def dye_group(self, req: DyeGroupRequest):
         res = DyeGroupResponse()
         try:
-            GodMap.get_world().dye_group(req.group_name, req.color)
+            god_map.world.dye_group(req.group_name, req.color)
             res.error_codes = DyeGroupResponse.SUCCESS
-            for link_name in GodMap.get_world().groups[req.group_name].links:
-                GodMap.get_world().links[link_name].reset_cache()
+            for link_name in god_map.world.groups[req.group_name].links:
+                god_map.world.links[link_name].reset_cache()
             logging.loginfo(f'dyed group \'{req.group_name}\' to r:{req.color.r} g:{req.color.g} b:{req.color.b} a:{req.color.a}')
         except UnknownGroupException:
             res.error_codes = DyeGroupResponse.GROUP_NOT_FOUND_ERROR
@@ -107,15 +107,15 @@ class WorldUpdater(GiskardBehavior):
 
     @profile
     def register_groups_cb(self, req: RegisterGroupRequest) -> RegisterGroupResponse:
-        link_name = GodMap.get_world().search_for_link_name(req.root_link_name, req.parent_group_name)
-        GodMap.get_world().register_group(req.group_name, link_name)
+        link_name = god_map.world.search_for_link_name(req.root_link_name, req.parent_group_name)
+        god_map.world.register_group(req.group_name, link_name)
         res = RegisterGroupResponse()
         res.error_codes = res.SUCCESS
         return res
 
     @profile
     def get_group_names_cb(self, req: GetGroupNamesRequest) -> GetGroupNamesResponse:
-        group_names = GodMap.get_world().group_names
+        group_names = god_map.world.group_names
         res = GetGroupNamesResponse()
         res.group_names = list(group_names)
         return res
@@ -125,16 +125,16 @@ class WorldUpdater(GiskardBehavior):
         res = GetGroupInfoResponse()
         res.error_codes = GetGroupInfoResponse.SUCCESS
         try:
-            group = GodMap.get_world().groups[req.group_name]  # type: WorldBranch
+            group = god_map.world.groups[req.group_name]  # type: WorldBranch
             res.controlled_joints = [str(j.short_name) for j in group.controlled_joints]
             res.links = list(sorted(str(x.short_name) for x in group.link_names_as_set))
             res.child_groups = list(sorted(str(x) for x in group.groups.keys()))
-            # tree = GodMap.god_map.unsafe_get_data(identifier.tree_manager)  # type: TreeManager
+            # tree = god_map.unsafe_get_data(identifier.tree_manager)  # type: TreeManager
             # node_name = str(PrefixName(req.group_name, 'js'))
             # if node_name in tree.tree_nodes:
             #     res.joint_state_topic = tree.tree_nodes[node_name].node.joint_state_topic
             res.root_link_pose.pose = group.base_pose
-            res.root_link_pose.header.frame_id = str(GodMap.get_world().root_link_name)
+            res.root_link_pose.header.frame_id = str(god_map.world.root_link_name)
             for key, value in group.state.items():
                 res.joint_state.name.append(str(key))
                 res.joint_state.position.append(value.position)
@@ -177,7 +177,7 @@ class WorldUpdater(GiskardBehavior):
             # calling this twice, because it may still have a tick from the prev update call
             self.update_ticked.get()
             self.work_permit.get(timeout=req.timeout)
-            with GodMap.god_map:
+            with god_map:
                 try:
                     if req.operation == UpdateWorldRequest.ADD:
                         self.add_object(req)
@@ -208,21 +208,21 @@ class WorldUpdater(GiskardBehavior):
     @profile
     def add_object(self, req: UpdateWorldRequest):
         # assumes that parent has god map lock
-        req.parent_link = GodMap.get_world().search_for_link_name(req.parent_link, req.parent_link_group)
+        req.parent_link = god_map.world.search_for_link_name(req.parent_link, req.parent_link_group)
         world_body = req.body
         if req.pose.header.frame_id == '':
             raise TransformException('Frame_id in pose is not set.')
         try:
-            global_pose = transform_pose(target_frame=GodMap.get_world().root_link_name, pose=req.pose, timeout=0.5)
+            global_pose = transform_pose(target_frame=god_map.world.root_link_name, pose=req.pose, timeout=0.5)
         except:
-            req.pose.header.frame_id = GodMap.get_world().search_for_link_name(req.pose.header.frame_id)
-            global_pose = GodMap.get_world().transform_msg(GodMap.get_world().root_link_name, req.pose)
+            req.pose.header.frame_id = god_map.world.search_for_link_name(req.pose.header.frame_id)
+            global_pose = god_map.world.transform_msg(god_map.world.root_link_name, req.pose)
 
-        global_pose = GodMap.get_world().transform_pose(req.parent_link, global_pose).pose
-        GodMap.get_world().add_world_body(group_name=req.group_name,
-                                  msg=world_body,
-                                  pose=global_pose,
-                                  parent_link_name=req.parent_link)
+        global_pose = god_map.world.transform_pose(req.parent_link, global_pose).pose
+        god_map.world.add_world_body(group_name=req.group_name,
+                                      msg=world_body,
+                                      pose=global_pose,
+                                      parent_link_name=req.parent_link)
         # SUB-CASE: If it is an articulated object, open up a joint state subscriber
         # FIXME also keep track of base pose
         logging.loginfo(f'Attached object \'{req.group_name}\' at \'{req.parent_link}\'.')
@@ -230,7 +230,7 @@ class WorldUpdater(GiskardBehavior):
             # plugin_name = str(PrefixName(req.group_name, 'js'))
             plugin = running_is_success(SyncConfiguration)(group_name=req.group_name,
                                                            joint_state_topic=world_body.joint_state_topic)
-            GodMap.get_tree_manager().insert_node(plugin, 'Synchronize', 1)
+            god_map.tree_manager.insert_node(plugin, 'Synchronize', 1)
             self.added_plugin_names[req.group_name].append(plugin.name)
             logging.loginfo(f'Added configuration plugin for \'{req.group_name}\' to tree.')
         if world_body.tf_root_link_name:
@@ -238,77 +238,77 @@ class WorldUpdater(GiskardBehavior):
             plugin_name = str(PrefixName(world_body.name, 'localization'))
             plugin = SyncTfFrames(plugin_name,
                                   frames=world_body.tf_root_link_name)
-            GodMap.get_tree_manager().insert_node(plugin, 'Synchronize', 1)
+            god_map.tree_manager.insert_node(plugin, 'Synchronize', 1)
             self.added_plugin_names[req.group_name].append(plugin.name)
             logging.loginfo(f'Added localization plugin for \'{req.group_name}\' to tree.')
-        parent_group = GodMap.get_world().get_parent_group_name(req.group_name)
-        new_links = GodMap.get_world().groups[req.group_name].link_names_with_collisions
-        GodMap.get_collision_scene().update_self_collision_matrix(parent_group, new_links)
-        GodMap.get_collision_scene().blacklist_inter_group_collisions()
+        parent_group = god_map.world.get_parent_group_name(req.group_name)
+        new_links = god_map.world.groups[req.group_name].link_names_with_collisions
+        god_map.collision_scene.update_self_collision_matrix(parent_group, new_links)
+        god_map.collision_scene.blacklist_inter_group_collisions()
         # logging.logwarn(f'adding took {time() - t:03}')
 
     @profile
     def update_group_pose(self, req: UpdateWorldRequest):
-        if req.group_name not in GodMap.get_world().groups:
+        if req.group_name not in god_map.world.groups:
             raise UnknownGroupException(f'Can\'t update pose of unknown group: \'{req.group_name}\'')
-        group = GodMap.get_world().groups[req.group_name]
+        group = god_map.world.groups[req.group_name]
         joint_name = group.root_link.parent_joint_name
-        pose = GodMap.get_world().transform_pose(GodMap.get_world().joints[joint_name].parent_link_name, req.pose).pose
-        GodMap.get_world().joints[joint_name].update_transform(pose)
-        GodMap.get_world().notify_state_change()
-        GodMap.get_collision_scene().remove_links_from_self_collision_matrix(set(group.link_names_with_collisions))
-        GodMap.get_collision_scene().update_collision_blacklist(
+        pose = god_map.world.transform_pose(god_map.world.joints[joint_name].parent_link_name, req.pose).pose
+        god_map.world.joints[joint_name].update_transform(pose)
+        god_map.world.notify_state_change()
+        god_map.collision_scene.remove_links_from_self_collision_matrix(set(group.link_names_with_collisions))
+        god_map.collision_scene.update_collision_blacklist(
             link_combinations=set(product(group.link_names_with_collisions,
-                                          GodMap.get_world().link_names_with_collisions)))
+                                          god_map.world.link_names_with_collisions)))
 
     @profile
     def update_parent_link(self, req: UpdateWorldRequest):
         # assumes that parent has god map lock
-        req.parent_link = GodMap.get_world().search_for_link_name(link_name=req.parent_link, group_name=req.parent_link_group)
-        if req.group_name not in GodMap.get_world().groups:
+        req.parent_link = god_map.world.search_for_link_name(link_name=req.parent_link, group_name=req.parent_link_group)
+        if req.group_name not in god_map.world.groups:
             raise UnknownGroupException(f'Can\'t attach to unknown group: \'{req.group_name}\'')
-        group = GodMap.get_world().groups[req.group_name]
+        group = god_map.world.groups[req.group_name]
         if group.root_link_name != req.parent_link:
             old_parent_link = group.parent_link_of_root
-            GodMap.get_world().move_group(req.group_name, req.parent_link)
+            god_map.world.move_group(req.group_name, req.parent_link)
             logging.loginfo(f'Reattached \'{req.group_name}\' from \'{old_parent_link}\' to \'{req.parent_link}\'.')
-            parent_group = GodMap.get_world().get_parent_group_name(req.group_name)
-            new_links = GodMap.get_world().groups[req.group_name].link_names_with_collisions
-            GodMap.get_collision_scene().remove_links_from_self_collision_matrix(new_links)
-            GodMap.get_collision_scene().update_self_collision_matrix(parent_group, new_links)
-            GodMap.get_collision_scene().blacklist_inter_group_collisions()
+            parent_group = god_map.world.get_parent_group_name(req.group_name)
+            new_links = god_map.world.groups[req.group_name].link_names_with_collisions
+            god_map.collision_scene.remove_links_from_self_collision_matrix(new_links)
+            god_map.collision_scene.update_self_collision_matrix(parent_group, new_links)
+            god_map.collision_scene.blacklist_inter_group_collisions()
         else:
             logging.logwarn(f'Didn\'t update world. \'{req.group_name}\' is already attached to \'{req.parent_link}\'.')
 
     @profile
     def remove_object(self, name):
         # assumes that parent has god map lock
-        if name not in GodMap.get_world().groups:
+        if name not in god_map.world.groups:
             raise UnknownGroupException(f'Can not remove unknown group: {name}.')
-        GodMap.get_world().delete_group(name)
-        GodMap.get_world().cleanup_unused_free_variable()
+        god_map.world.delete_group(name)
+        god_map.world.cleanup_unused_free_variable()
         self._remove_plugins_of_group(name)
         logging.loginfo(f'Deleted \'{name}\'.')
 
     def _remove_plugins_of_group(self, group_name):
         for plugin_name in self.added_plugin_names[group_name]:
-            GodMap.get_tree_manager().remove_node(plugin_name)
+            god_map.tree_manager.remove_node(plugin_name)
         del self.added_plugin_names[group_name]
 
     @profile
     def clear_world(self):
         # assumes that parent has god map lock
-        tmp_state = deepcopy(GodMap.get_world().state)
-        GodMap.get_world().delete_all_but_robots()
+        tmp_state = deepcopy(god_map.world.state)
+        god_map.world.delete_all_but_robots()
         for group_name in list(self.added_plugin_names.keys()):
             self._remove_plugins_of_group(group_name)
         self.added_plugin_names = defaultdict(list)
         # copy only state of joints that didn't get deleted
-        remaining_free_variables = list(GodMap.get_world().free_variables.keys())+list(GodMap.get_world().virtual_free_variables.keys())
-        GodMap.get_world().state = JointStates({k: v for k, v in tmp_state.items() if k in remaining_free_variables})
-        GodMap.get_world().notify_state_change()
-        GodMap.get_collision_scene().sync()
-        GodMap.get_collision_avoidance_config().setup()
+        remaining_free_variables = list(god_map.world.free_variables.keys()) + list(god_map.world.virtual_free_variables.keys())
+        god_map.world.state = JointStates({k: v for k, v in tmp_state.items() if k in remaining_free_variables})
+        god_map.world.notify_state_change()
+        god_map.collision_scene.sync()
+        god_map.collision_avoidance_config.setup()
         self.clear_markers()
         logging.loginfo('Cleared world.')
 

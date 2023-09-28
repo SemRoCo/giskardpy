@@ -58,10 +58,7 @@ class RosMsgToGoal(GetGoal):
             # traceback.print_exc()
             return Status.SUCCESS
         if self.god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none:
-            try:
-                self.parse_collision_entries(move_cmd.collisions)
-            except ConstraintInitalizationException:
-                loginfo('Got ConstraintInitializationError')
+            self.parse_collision_entries(move_cmd.collisions)
         loginfo('Done parsing goal message.')
         return Status.SUCCESS
 
@@ -211,7 +208,8 @@ class RosMsgToGoal(GetGoal):
                 try:
                     if (link_a_o, link_b_o) in self.collision_scene.self_collision_matrix:
                         continue
-                    link_a, link_b = self.world.compute_chain_reduced_to_controlled_joints(link_a_o, link_b_o, fixed_joints)
+                    link_a, link_b = self.world.compute_chain_reduced_to_controlled_joints(link_a_o, link_b_o,
+                                                                                           fixed_joints)
                     link_a, link_b = self.world.sort_links(link_a, link_b)
                     counter[link_a, link_b] += 1
                 except KeyError as e:

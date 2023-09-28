@@ -361,12 +361,11 @@ class WorldTree(WorldTreeInterface):
         the model version number.
         """
         if not self.context_manager_active:
-            with god_map:
-                self.fix_tree_structure()
-                self.reset_cache()
-                self.init_all_fks()
-                self.notify_state_change()
-                self._model_version += 1
+            self.fix_tree_structure()
+            self.reset_cache()
+            self.init_all_fks()
+            self.notify_state_change()
+            self._model_version += 1
 
     def travel_branch(self, link_name: PrefixName, companion: TravelCompanion):
         """

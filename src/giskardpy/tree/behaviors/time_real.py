@@ -13,6 +13,5 @@ class RosTime(GiskardBehavior):
 
     @profile
     def update(self):
-        with god_map:
-            god_map.unsafe_set_data(identifier.time, (rospy.get_rostime() - self.start_time).to_sec())
+        god_map.unsafe_set_data(identifier.time, (rospy.get_rostime() - self.start_time).to_sec())
         return Status.SUCCESS

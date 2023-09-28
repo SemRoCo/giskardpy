@@ -195,16 +195,14 @@ class _GodMap(metaclass=SingletonMeta):
     shortcuts: dict
 
     def __init__(self):
-        self.clear()
-        self.expr_separator = '_'
-        self.lock = RLock()
-
-    def clear(self):
         self._data = {}
         self.key_to_expr = {}
         self.expr_to_key = {}
         self.last_expr_values = {}
         self.shortcuts = {}
+        self.expr_separator = '_'
+        self.lock = RLock()
+
 
     def __enter__(self):
         self.lock.acquire()

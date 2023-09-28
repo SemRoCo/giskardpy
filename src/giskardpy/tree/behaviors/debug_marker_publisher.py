@@ -171,9 +171,8 @@ class DebugMarkerPublisher(GiskardBehavior):
     @record_time
     @profile
     def update(self):
-        with god_map:
-            self.debugs = god_map.unsafe_get_data(identifier.debug_expressions)
-            if len(self.debugs) > 0:
-                self.debugs_evaluated = god_map.unsafe_get_data(identifier.debug_expressions_evaluated)
-                self.publish_debug_markers()
+        self.debugs = god_map.debug_expression_manager.debug_expressions
+        if len(self.debugs) > 0:
+            self.debugs_evaluated = god_map.unsafe_get_data(identifier.debug_expressions_evaluated)
+            self.publish_debug_markers()
         return Status.RUNNING

@@ -177,24 +177,23 @@ class WorldUpdater(GiskardBehavior):
             # calling this twice, because it may still have a tick from the prev update call
             self.update_ticked.get()
             self.work_permit.get(timeout=req.timeout)
-            with god_map:
-                try:
-                    if req.operation == UpdateWorldRequest.ADD:
-                        self.add_object(req)
-                    elif req.operation == UpdateWorldRequest.UPDATE_PARENT_LINK:
-                        self.update_parent_link(req)
-                    elif req.operation == UpdateWorldRequest.UPDATE_POSE:
-                        self.update_group_pose(req)
-                    elif req.operation == UpdateWorldRequest.REMOVE:
-                        self.remove_object(req.group_name)
-                    elif req.operation == UpdateWorldRequest.REMOVE_ALL:
-                        self.clear_world()
-                    else:
-                        return UpdateWorldResponse(UpdateWorldResponse.INVALID_OPERATION,
-                                                   f'Received invalid operation code: {req.operation}')
-                    return UpdateWorldResponse()
-                except Exception as e:
-                    return exception_to_response(e, req)
+            try:
+                if req.operation == UpdateWorldRequest.ADD:
+                    self.add_object(req)
+                elif req.operation == UpdateWorldRequest.UPDATE_PARENT_LINK:
+                    self.update_parent_link(req)
+                elif req.operation == UpdateWorldRequest.UPDATE_POSE:
+                    self.update_group_pose(req)
+                elif req.operation == UpdateWorldRequest.REMOVE:
+                    self.remove_object(req.group_name)
+                elif req.operation == UpdateWorldRequest.REMOVE_ALL:
+                    self.clear_world()
+                else:
+                    return UpdateWorldResponse(UpdateWorldResponse.INVALID_OPERATION,
+                                               f'Received invalid operation code: {req.operation}')
+                return UpdateWorldResponse()
+            except Exception as e:
+                return exception_to_response(e, req)
         except Exception as e:
             response = UpdateWorldResponse()
             response.error_codes = UpdateWorldResponse.BUSY

@@ -15,6 +15,5 @@ class TimePlugin(GiskardBehavior):
 
     @profile
     def update(self):
-        with god_map:
-            god_map.unsafe_set_data(identifier.time, god_map.unsafe_get_data(identifier.time) + 1)
+        god_map.unsafe_set_data(identifier.time, god_map.unsafe_get_data(identifier.time) + 1)
         return Status.SUCCESS

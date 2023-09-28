@@ -481,26 +481,10 @@ class GiskardWrapper:
             if v is None:
                 del kwargs[k]
             else:
-                kwargs[k] = self.parse_messages(v)
+                kwargs[k] = convert_ros_message_to_dictionary(v)
         kwargs = replace_prefix_name_with_str(kwargs)
         constraint.parameter_value_pair = json.dumps(kwargs)
         self.cmd_seq[-1].constraints.append(constraint)
-
-    def parse_messages(self,
-                       val):
-
-        if isinstance(val, List):
-            for i, element in enumerate(val):
-                val[i] = self.parse_messages(element)
-
-        elif isinstance(val, Dict):
-            for k, v in val.copy().items():
-                val[k] = self.parse_messages(v)
-
-        elif isinstance(val, Message):
-            return convert_ros_message_to_dictionary(val)
-
-        return val
 
     def _set_collision_entries(self, collisions: List[CollisionEntry]):
         """

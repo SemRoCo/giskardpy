@@ -368,15 +368,32 @@ def make_pose_from_parts(pose, frame_id, position, orientation):
         pose.pose.orientation = Quaternion(*(orientation if orientation is not None else [0, 0, 0, 1]))
     return pose
 
+def convert_ros_message_to_dictionary(message) -> dict:
 
-def convert_ros_message_to_dictionary(message: Message) -> dict:
-    type_str_parts = str(type(message)).split('.')
-    part1 = type_str_parts[0].split('\'')[1]
-    part2 = type_str_parts[-1].split('\'')[0]
-    message_type = f'{part1}/{part2}'
-    d = {'message_type': message_type,
-         'message': original_convert_ros_message_to_dictionary(message)}
-    return d
+    if isinstance(message, list):
+        for i, element in enumerate(message):
+            message[i] = convert_ros_message_to_dictionary(element)
+    elif isinstance(message, dict):
+        for k, v in message.copy().items():
+            message[k] = convert_ros_message_to_dictionary(v)
+
+    elif isinstance(message, tuple):
+        list_values = list(message)
+        for i, element in enumerate(list_values):
+            list_values[i] = convert_ros_message_to_dictionary(element)
+        message = tuple(list_values)
+
+    elif isinstance(message, Message):
+
+        type_str_parts = str(type(message)).split('.')
+        part1 = type_str_parts[0].split('\'')[1]
+        part2 = type_str_parts[-1].split('\'')[0]
+        message_type = f'{part1}/{part2}'
+        d = {'message_type': message_type,
+             'message': original_convert_ros_message_to_dictionary(message)}
+        return d
+
+    return message
 
 
 def replace_prefix_name_with_str(d: dict) -> dict:

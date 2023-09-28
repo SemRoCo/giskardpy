@@ -38,7 +38,6 @@ from giskardpy.tree.behaviors.exception_to_execute import ClearBlackboardExcepti
 from giskardpy.tree.behaviors.goal_canceled import GoalCanceled
 from giskardpy.tree.behaviors.goal_cleanup import GoalCleanUp
 from giskardpy.tree.behaviors.goal_done import GoalDone
-from giskardpy.tree.behaviors.local_minimum import LocalMinimum
 from giskardpy.tree.behaviors.goal_received import GoalReceived
 from giskardpy.tree.behaviors.init_qp_controller import InitQPController
 from giskardpy.tree.behaviors.instantaneous_controller import ControllerPlugin
@@ -871,7 +870,7 @@ class ClosedLoop(OpenLoop):
         planning_4 = failure_is_success(AsyncBehavior)(self.closed_loop_control_name)
         planning_4.add_child(success_is_running(SyncTfFrames)('sync tf frames close loop'))
         planning_4.add_child(success_is_running(NotifyStateChange)())
-        if god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none:
+        if god_map.collision_checker != CollisionCheckerLib.none:
             planning_4.add_child(CollisionChecker('collision checker'))
         planning_4.add_child(ControllerPlugin('controller'))
         planning_4.add_child(RosTime())

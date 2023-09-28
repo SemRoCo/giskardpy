@@ -63,7 +63,7 @@ class Goal(ABC):
 
     def traj_time_in_seconds(self) -> w.Expression:
         t = god_map.to_symbol(identifier.time)
-        if god_map.get_data(identifier.control_mode) == ControlModes.close_loop:
+        if god_map.is_closed_loop():
             return t
         else:
             return t * self.get_sampling_period_symbol()

@@ -7,6 +7,8 @@ from typing import TYPE_CHECKING, List, Dict
 from giskardpy.god_map import _GodMap
 
 if TYPE_CHECKING:
+    from giskardpy.qp.next_command import NextCommands
+    from giskardpy.model.trajectory import Trajectory
     from giskardpy.qp.qp_controller import QPProblemBuilder
     from giskardpy.configs.qp_controller_config import QPControllerConfig
     from giskardpy.my_types import Derivatives
@@ -33,6 +35,10 @@ class GodMap(_GodMap):
             return self.get_data(identifier.goal_id)
         else:
             return -1
+
+    @property
+    def time(self) -> float:
+        return god_map.get_data(identifier.time)
 
     @property
     def world(self) -> WorldTree:
@@ -121,6 +127,14 @@ class GodMap(_GodMap):
     def motion_goals(self) -> Dict[str, Goal]:
         return self.get_data(identifier.motion_goals)
 
+    @property
+    def trajectory(self) -> Trajectory:
+        return self.get_data(identifier.trajectory)
+
+    @property
+    def qp_solver_solution(self) -> NextCommands:
+        return self.get_data(identifier.qp_solver_solution)
+
     def is_goal_msg_type_execute(self):
         return MoveGoal.EXECUTE == self.goal_msg.type
 
@@ -141,6 +155,9 @@ class GodMap(_GodMap):
 
     def is_open_loop(self):
         return self.control_mode == self.control_mode.open_loop
+
+    def is_collision_checking_enabled(self):
+        return self.collision_checker_id != self.collision_checker_id.none
 
 
 god_map = GodMap()

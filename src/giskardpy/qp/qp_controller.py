@@ -1114,7 +1114,7 @@ class QPProblemBuilder:
                  self.p_debug, self.p_xdot],
                 ['weights', 'lb', 'ub', 'E', 'bE', 'A', 'lbA', 'ubA', 'debug', 'xdot'],
                 god_map.get_data(identifier.tmp_folder),
-                god_map.get_data(identifier.time),
+                god_map.time,
                 folder_name)
         else:
             save_pandas(
@@ -1124,7 +1124,7 @@ class QPProblemBuilder:
                  self.p_debug],
                 ['weights', 'lb', 'ub', 'E', 'bE', 'A', 'lbA', 'ubA', 'debug'],
                 god_map.get_data(identifier.tmp_folder),
-                god_map.get_data(identifier.time),
+                god_map.time,
                 folder_name)
 
     def _print_pandas_array(self, array):

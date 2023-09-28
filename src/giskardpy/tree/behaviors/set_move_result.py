@@ -32,9 +32,9 @@ class SetMoveResult(GiskardBehavior):
         if isinstance(e, EmptyProblemException) and god_map.is_standalone():
             move_result = MoveResult()
 
-        trajectory = god_map.get_data(identifier.trajectory)
+        trajectory = god_map.trajectory
         joints = [god_map.world.joints[joint_name] for joint_name in god_map.world.movable_joint_names]
-        sample_period = god_map.get_data(identifier.sample_period)
+        sample_period = god_map.sample_period
         move_result.trajectory = trajectory.to_msg(sample_period=sample_period, start_time=0, joints=joints)
         if move_result.error_code == MoveResult.PREEMPTED:
             logging.logwarn(f'Goal preempted: \'{move_result.error_message}\'.')

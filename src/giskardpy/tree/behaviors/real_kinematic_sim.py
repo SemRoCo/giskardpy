@@ -17,12 +17,12 @@ class RealKinSimPlugin(GiskardBehavior):
     @record_time
     @profile
     def update(self):
-        next_time = god_map.get_data(identifier.time)
+        next_time = god_map.time
         if next_time <= 0.0 or self.last_time is None:
             self.last_time = next_time
             return Status.RUNNING
         # if self.last_time is None:
-        next_cmds = god_map.get_data(identifier.qp_solver_solution)
+        next_cmds = god_map.qp_solver_solution
         dt = next_time - self.last_time
         god_map.world.update_state(next_cmds, dt)
         self.last_time = next_time

@@ -43,12 +43,12 @@ class JointPosController(GiskardBehavior):
 
     @catch_and_raise_to_blackboard
     def update(self):
-        # next_time = god_map.get_data(identifier.time)
+        # next_time = god_map.time
         # if next_time <= 0.0 or not hasattr(self, 'last_time'):
         #     self.last_time = next_time
         #     return Status.RUNNING
         # # if self.last_time is None:
-        # next_cmds = god_map.get_data(identifier.qp_solver_solution)
+        # next_cmds = god_map.qp_solver_solution
         # # joints = god_map.get_world().joints
         # # next_time = rospy.get_rostime()
         # dt = next_time - self.last_time
@@ -57,12 +57,12 @@ class JointPosController(GiskardBehavior):
         # self.last_time = next_time
         # god_map.get_world().notify_state_change()
 
-        # next_cmds = god_map.get_data(identifier.qp_solver_solution)
+        # next_cmds = god_map.qp_solver_solution
         # god_map.get_world().update_state(next_cmds, god_map.sample_period)
         msg = Float64()
         js = deepcopy(god_map.world.state)
         # try:
-        #     qp_data = god_map.get_data(identifier.qp_solver_solution)
+        #     qp_data = god_map.qp_solver_solution
         #     if qp_data is None:
         #         return
         # except Exception:

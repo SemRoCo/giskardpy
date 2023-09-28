@@ -403,14 +403,14 @@ class TestConstraints:
         zero_pose.plan_and_execute(expected_error_codes=[MoveResult.QP_SOLVER_ERROR])
 
     def test_SetPredictionHorizon11(self, zero_pose: PR2TestWrapper):
-        default_prediction_horizon = zero_pose.god_map.get_data(identifier.prediction_horizon)
+        default_prediction_horizon = god_map.prediction_horizon
         zero_pose.set_prediction_horizon(prediction_horizon=11)
         zero_pose.set_joint_goal(zero_pose.better_pose)
         zero_pose.plan_and_execute()
-        assert zero_pose.god_map.get_data(identifier.prediction_horizon) == 11
+        assert god_map.prediction_horizon == 11
         zero_pose.set_joint_goal(zero_pose.default_pose)
         zero_pose.plan_and_execute()
-        assert zero_pose.god_map.get_data(identifier.prediction_horizon) == default_prediction_horizon
+        assert god_map.prediction_horizon == default_prediction_horizon
 
     def test_SetMaxTrajLength(self, zero_pose: PR2TestWrapper):
         new_length = 4
@@ -421,12 +421,12 @@ class TestConstraints:
         zero_pose.set_max_traj_length(new_length)
         zero_pose.set_cart_goal(base_goal, tip_link='base_footprint', root_link='map')
         result = zero_pose.plan_and_execute(expected_error_codes=[MoveResult.PLANNING_ERROR])
-        dt = zero_pose.god_map.get_data(identifier.sample_period)
+        dt = god_map.sample_period
         np.testing.assert_almost_equal(len(result.trajectory.points) * dt, new_length + dt * 2)
 
         zero_pose.set_cart_goal(base_goal, tip_link='base_footprint', root_link='map')
         result = zero_pose.plan_and_execute(expected_error_codes=[MoveResult.PLANNING_ERROR])
-        dt = zero_pose.god_map.get_data(identifier.sample_period)
+        dt = god_map.sample_period
         assert len(result.trajectory.points) * dt > new_length + 1
 
     def test_CollisionAvoidanceHint(self, kitchen_setup: PR2TestWrapper):
@@ -574,11 +574,11 @@ class TestConstraints:
                                     max_velocity=1)
         kitchen_setup.plan_and_execute()
         np.testing.assert_almost_equal(
-            kitchen_setup.god_map.get_data(identifier.trajectory).get_last()[
+            god_map.trajectory.get_last()[
                 PrefixName(joint_name1, group_name)].position,
             joint_goal, decimal=2)
         np.testing.assert_almost_equal(
-            kitchen_setup.god_map.get_data(identifier.trajectory).get_last()[
+            god_map.trajectory.get_last()[
                 PrefixName(joint_name2, group_name)].position,
             joint_goal, decimal=2)
 
@@ -721,7 +721,7 @@ class TestConstraints:
                                 weight=WEIGHT_BELOW_CA)
         zero_pose.plan_and_execute()
 
-        for time, state in zero_pose.god_map.get_data(identifier.debug_trajectory).items():
+        for time, state in god_map.debug_expression_manager.debug_trajectory.items():
             key = '{}/{}/{}/{}/trans_error'.format('CartesianVelocityLimit',
                                                    'TranslationVelocityLimit',
                                                    zero_pose.default_root,

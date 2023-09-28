@@ -7,7 +7,7 @@ from giskardpy.goals.goal import Goal
 from giskardpy.god_map_interpreter import god_map
 
 
-class Updategod_map.Goal):
+class UpdateGodMap(Goal):
 
     def __init__(self, updates):
         """

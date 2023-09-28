@@ -50,7 +50,7 @@ class DebugExpressionManager:
 
     def log_debug_expressions(self):
         if len(self.evaluated_debug_expressions) > 0:
-            time = god_map.get_data(identifier.time) - 1
+            time = god_map.time - 1
             last_mjs = None
             if time >= 1:
                 last_mjs = self.debug_trajectory.get_exact(time-1)

@@ -32,7 +32,7 @@ class ParseActionGoal(GiskardBehavior):
             raise InvalidGoalException('Couldn\'t transform goal')
         except Exception as e:
             raise e
-        if god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none:
+        if god_map.is_collision_checking_enabled():
             god_map.motion_goal_manager.parse_collision_entries(move_goal.collisions)
         loginfo('Done parsing goal message.')
         return Status.SUCCESS

@@ -53,7 +53,6 @@ world_config = giskard + ['world_config']
 max_derivative = qp_controller_config + ['max_derivative']
 goal_package_paths = giskard + ['goal_package_paths']
 max_trajectory_length = qp_controller_config + ['max_trajectory_length']
-endless_mode = qp_controller_config + ['endless_mode']
 action_server_name = giskard + ['action_server_name']
 
 sample_period = qp_controller_config + ['sample_period']

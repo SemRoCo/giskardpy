@@ -146,7 +146,7 @@ class BaseTrajFollower(Goal):
 
     @profile
     def make_constraints(self):
-        trajectory = god_map.get_data(identifier.trajectory)
+        trajectory = god_map.trajectory
         self.trajectory_length = len(trajectory.items())
         self.add_trans_constraints()
         self.add_rot_constraints()

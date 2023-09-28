@@ -746,7 +746,7 @@ class GiskardTestWrapper(GiskardWrapper):
             self.wait_heartbeats()
             diff = time() - time_spend_giskarding
             self.total_time_spend_giskarding += diff
-            self.total_time_spend_moving += (len(god_map.get_data(identifier.trajectory).keys()) *
+            self.total_time_spend_moving += (len(god_map.trajectory.keys()) *
                                              god_map.sample_period)
             logging.logwarn(f'Goal processing took {diff}')
             error_code = r.error_code
@@ -769,7 +769,7 @@ class GiskardTestWrapper(GiskardWrapper):
         return r
 
     def sync_world_with_trajectory(self):
-        t = god_map.get_data(identifier.trajectory)
+        t = god_map.trajectory
         whole_last_joint_state = t.get_last().to_position_dict()
         for group_name in self._object_js_topics:
             group_joints = self.get_group_info(group_name).joint_state.name
@@ -784,7 +784,7 @@ class GiskardTestWrapper(GiskardWrapper):
         return trajectory2
 
     def get_result_trajectory_velocity(self):
-        trajectory = god_map.get_data(identifier.trajectory)
+        trajectory = god_map.trajectory
         trajectory2 = {}
         for joint_name in trajectory.get_exact(0).keys():
             trajectory2[joint_name] = np.array([p[joint_name].velocity for t, p in trajectory.items()])

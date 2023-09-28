@@ -31,7 +31,7 @@ class ExternalCollisionAvoidance(Goal):
         super().__init__()
         self.root = god_map.world.root_link_name
         self.robot_name = robot_name
-        self.control_horizon = god_map.prediction_horizon - (god_map.get_data(identifier.max_derivative) - 1)
+        self.control_horizon = god_map.prediction_horizon - (god_map.max_derivative - 1)
         self.control_horizon = max(1, self.control_horizon)
 
     def map_V_n_symbol(self):
@@ -158,7 +158,7 @@ class SelfCollisionAvoidance(Goal):
         super().__init__()
         self.root = god_map.world.root_link_name
         self.robot_name = robot_name
-        self.control_horizon = god_map.prediction_horizon - (god_map.get_data(identifier.max_derivative) - 1)
+        self.control_horizon = god_map.prediction_horizon - (god_map.max_derivative - 1)
         self.control_horizon = max(1, self.control_horizon)
 
     def get_contact_normal_in_b(self):

@@ -91,7 +91,7 @@ class SendCmdVel(GiskardBehavior, ABC):
     @catch_and_raise_to_blackboard
     @profile
     def update(self):
-        cmd = god_map.get_data(identifier.qp_solver_solution)
+        cmd = god_map.qp_solver_solution
         twist = self.solver_cmd_to_twist(cmd)
         self.vel_pub.publish(twist)
         return Status.SUCCESS

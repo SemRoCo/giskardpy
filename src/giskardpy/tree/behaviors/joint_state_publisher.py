@@ -21,7 +21,7 @@ class JointStatePublisher(CommandPublisher):
         msg = JointState()
         js = deepcopy(god_map.world.state)
         try:
-            qp_data = god_map.get_data(identifier.qp_solver_solution)
+            qp_data = god_map.qp_solver_solution
         except Exception:
             return
         for joint_name in self.joint_names:

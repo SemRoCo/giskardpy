@@ -12,19 +12,12 @@ class MaxTrajectoryLength(GiskardBehavior):
     def __init__(self, name, real_time=False):
         super().__init__(name)
         self.real_time = real_time
-        self.endless_mode = False
-
-    @profile
-    def initialise(self):
-        self.endless_mode = god_map.get_data(identifier.endless_mode)
 
     @catch_and_raise_to_blackboard
     @record_time
     @profile
     def update(self):
-        if self.endless_mode:
-            return Status.RUNNING
-        t = god_map.get_data(identifier.time)
+        t = god_map.time
         length = god_map.get_data(identifier.max_trajectory_length)
         if not self.real_time:
             length = god_map.get_data(identifier.max_trajectory_length)

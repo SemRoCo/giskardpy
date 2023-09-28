@@ -69,7 +69,7 @@ class WiggleCancel(GiskardBehavior):
         prediction_horizon = god_map.prediction_horizon
         if prediction_horizon > 1:
             return Status.RUNNING
-        latest_points = god_map.get_data(identifier.joint_states)
+        latest_points = god_map.world.state
 
         for i, key in enumerate(self.keys):
             self.js_samples[i].append(latest_points[key].velocity)
@@ -88,10 +88,10 @@ class WiggleCancel(GiskardBehavior):
                                 self.amplitude_threshold, self.thresholds, self.velocity_limits, plot)
         except ShakingException as e:
             if god_map.get_data(identifier.cut_off_shaking):
-                trajectory = god_map.get_data(identifier.trajectory)
+                trajectory = god_map.trajectory
                 for i in range(self.num_samples_in_fft):
                     trajectory.delete_last()
-                # time = god_map.get_data(identifier.time)
+                # time = god_map.time
                 # god_map.set_data(identifier.time, len(trajectory.keys()))
                 if len(trajectory.keys()) >= self.num_samples_in_fft:
                     logging.loginfo(str(e))

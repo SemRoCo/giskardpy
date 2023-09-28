@@ -87,7 +87,7 @@ class Giskard:
         god_map.tree_manager.setup()
 
     def _controlled_joints_sanity_check(self):
-        world = god_map.get_data(identifier.world)
+        world = god_map.world
         non_controlled_joints = set(world.movable_joint_names).difference(set(world.controlled_joints))
         if len(world.controlled_joints) == 0:
             raise GiskardException('No joints are flagged as controlled.')
@@ -110,4 +110,4 @@ class Giskard:
         Start Giskard.
         """
         self.grow()
-        god_map.get_data(identifier.tree_manager).live()
+        god_map.tree_manager.live()

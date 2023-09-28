@@ -568,7 +568,7 @@ class WorldTree(WorldTreeInterface):
         return free_variable
 
     def update_state(self, next_commands: NextCommands, dt: float):
-        max_derivative = god_map.get_data(identifier.max_derivative)
+        max_derivative = god_map.max_derivative
         for free_variable_name, command in next_commands.free_variable_data.items():
             self.state[free_variable_name][:max_derivative] += command * dt
             self.state[free_variable_name][max_derivative] = command[-1]

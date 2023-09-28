@@ -9,7 +9,6 @@ from giskardpy.tree.behaviors.evaluate_monitors import EvaluateMonitors
 from giskardpy.tree.behaviors.goal_done import GoalDone
 from giskardpy.tree.behaviors.instantaneous_controller import ControllerPlugin
 from giskardpy.tree.behaviors.kinematic_sim import KinSimPlugin
-from giskardpy.tree.behaviors.local_minimum import LocalMinimum
 from giskardpy.tree.behaviors.log_trajectory import LogTrajPlugin
 from giskardpy.tree.behaviors.loop_detector import LoopDetector
 from giskardpy.tree.behaviors.max_trajectory_length import MaxTrajectoryLength

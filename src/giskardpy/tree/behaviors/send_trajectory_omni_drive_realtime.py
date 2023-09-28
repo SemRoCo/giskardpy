@@ -72,7 +72,7 @@ class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
     @profile
     def initialise(self):
         super().initialise()
-        self.trajectory = god_map.get_data(identifier.trajectory)
+        self.trajectory = god_map.trajectory
         sample_period = god_map.unsafe_get_data(identifier.sample_period)
         self.start_time = god_map.unsafe_get_data(identifier.tracking_start_time)
         self.trajectory = self.trajectory.to_msg(sample_period, self.start_time, [self.joint], True)
@@ -94,7 +94,7 @@ class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
         god_map.set_data(identifier.drive_goals, drive_goals)
 
     def get_drive_goals(self) -> List[Goal]:
-        return [SetPredictionHorizon(prediction_horizon=god_map.get_data(identifier.prediction_horizon) + 4),
+        return [SetPredictionHorizon(prediction_horizon=god_map.prediction_horizon + 4),
                 BaseTrajFollower(joint_name=self.joint.name, track_only_velocity=self.track_only_velocity)]
 
     def solver_cmd_to_twist(self, cmd: NextCommands) -> Twist:
@@ -144,7 +144,7 @@ class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
             self.vel_pub.publish(Twist())
             return Status.RUNNING
         if t <= self.end_time:
-            cmd = god_map.get_data(identifier.qp_solver_solution)
+            cmd = god_map.qp_solver_solution
             twist = self.solver_cmd_to_twist(cmd)
             self.vel_pub.publish(twist)
             return Status.SUCCESS

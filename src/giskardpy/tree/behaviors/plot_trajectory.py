@@ -26,7 +26,7 @@ class PlotTrajectory(GiskardBehavior):
         self.plot_thread.start()
 
     def plot(self):
-        trajectory = god_map.get_data(identifier.trajectory)
+        trajectory = god_map.trajectory
         if trajectory:
             sample_period = god_map.sample_period
             try:

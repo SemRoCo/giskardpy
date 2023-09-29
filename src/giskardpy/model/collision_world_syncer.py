@@ -348,9 +348,9 @@ class CollisionWorldSynchronizer:
             return
         try:
             added_checks = god_map.added_collision_checks
-        except KeyError:
+        except AttributeError:
             added_checks = {}
-            god_map.set_data(identifier.added_collision_checks, added_checks)
+            god_map.added_collision_checks = added_checks
         if key in added_checks:
             added_checks[key] = max(added_checks[key], distance)
         else:
@@ -358,15 +358,8 @@ class CollisionWorldSynchronizer:
 
     @classmethod
     def empty(cls):
+        #fixme
         self = cls()
-        giskard = {
-            'collision_avoidance': {
-                'collision_checker_id': CollisionCheckerLib.none
-            },
-        }
-        god_map.set_data(identifier.giskard, giskard)
-        god_map.set_data(identifier.tmp_folder, resolve_ros_iris('package://giskardpy/tmp/'))
-        god_map.set_data(identifier.collision_scene, self)
         return self
 
     def has_world_changed(self):
@@ -703,7 +696,7 @@ class CollisionWorldSynchronizer:
         self.self_collision_matrix_paths[group.name] = file_name
 
     def get_path_to_self_collision_matrix(self, group_name: str) -> str:
-        path_to_tmp = god_map.tmp_folder
+        path_to_tmp = god_map.giskard.tmp_folder
         return f'{path_to_tmp}{group_name}/{group_name}.srdf'
 
     @profile

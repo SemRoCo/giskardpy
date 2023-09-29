@@ -403,14 +403,14 @@ class TestConstraints:
         zero_pose.plan_and_execute(expected_error_codes=[MoveResult.QP_SOLVER_ERROR])
 
     def test_SetPredictionHorizon11(self, zero_pose: PR2TestWrapper):
-        default_prediction_horizon = god_map.prediction_horizon
+        default_prediction_horizon = god_map.qp_controller_config.prediction_horizon
         zero_pose.set_prediction_horizon(prediction_horizon=11)
         zero_pose.set_joint_goal(zero_pose.better_pose)
         zero_pose.plan_and_execute()
-        assert god_map.prediction_horizon == 11
+        assert god_map.qp_controller_config.prediction_horizon == 11
         zero_pose.set_joint_goal(zero_pose.default_pose)
         zero_pose.plan_and_execute()
-        assert god_map.prediction_horizon == default_prediction_horizon
+        assert god_map.qp_controller_config.prediction_horizon == default_prediction_horizon
 
     def test_SetMaxTrajLength(self, zero_pose: PR2TestWrapper):
         new_length = 4
@@ -421,12 +421,12 @@ class TestConstraints:
         zero_pose.set_max_traj_length(new_length)
         zero_pose.set_cart_goal(base_goal, tip_link='base_footprint', root_link='map')
         result = zero_pose.plan_and_execute(expected_error_codes=[MoveResult.PLANNING_ERROR])
-        dt = god_map.sample_period
+        dt = god_map.qp_controller_config.sample_period
         np.testing.assert_almost_equal(len(result.trajectory.points) * dt, new_length + dt * 2)
 
         zero_pose.set_cart_goal(base_goal, tip_link='base_footprint', root_link='map')
         result = zero_pose.plan_and_execute(expected_error_codes=[MoveResult.PLANNING_ERROR])
-        dt = god_map.sample_period
+        dt = god_map.qp_controller_config.sample_period
         assert len(result.trajectory.points) * dt > new_length + 1
 
     def test_CollisionAvoidanceHint(self, kitchen_setup: PR2TestWrapper):

@@ -26,7 +26,7 @@ class ROSMsgVisualization:
             self.tf_root = str(god_map.world.root_link_name)
         else:
             self.tf_root = tf_frame
-        god_map.set_data(identifier.ros_visualizer, self)
+        god_map.ros_visualizer = self
 
     @profile
     def create_world_markers(self, name_space: str = 'planning_visualization') -> List[Marker]:
@@ -51,10 +51,10 @@ class ROSMsgVisualization:
     def create_collision_markers(self, name_space: str = 'collisions') -> List[Marker]:
         try:
             collisions: Collisions = god_map.closest_point
-        except KeyError as e:
+        except AttributeError as e:
             # no collisions
             return []
-        collision_avoidance_configs = god_map.unsafe_get_data(identifier.collision_avoidance_configs)
+        collision_avoidance_configs = god_map.collision_scene.collision_avoidance_configs
         m = Marker()
         m.header.frame_id = self.tf_root
         m.action = Marker.ADD

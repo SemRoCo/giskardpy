@@ -225,11 +225,11 @@ class _GodMap(metaclass=SingletonMeta):
         identifier = tuple(identifier)
         try:
             if identifier not in self.shortcuts:
-                result, shortcut = get_data(identifier, self._data)
+                result, shortcut = get_data(identifier, self)
                 if shortcut:
                     self.shortcuts[identifier] = shortcut
                 return result
-            return self.shortcuts[identifier].c(self._data)
+            return self.shortcuts[identifier].c(self)
         except Exception as e:
             e2 = type(e)(f'{e}; path: {identifier}')
             raise e2

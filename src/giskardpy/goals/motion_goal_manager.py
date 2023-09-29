@@ -19,7 +19,7 @@ class MotionGoalManager:
 
     def __init__(self):
         self.motion_goals = {}
-        goal_package_paths = god_map.goal_package_paths
+        goal_package_paths = god_map.giskard.goal_package_paths
         self.allowed_motion_goal_types = {}
         for path in goal_package_paths:
             self.allowed_motion_goal_types.update(get_all_classes_in_package(path, Goal))
@@ -54,7 +54,7 @@ class MotionGoalManager:
         Adds a constraint for each link that pushed it away from its closest point.
         """
         collision_matrix = self.collision_entries_to_collision_matrix(collision_entries)
-        god_map.set_data(identifier.collision_matrix, collision_matrix)
+        god_map.collision_matrix = collision_matrix
         if not collision_entries or not god_map.collision_scene.is_allow_all_collision(collision_entries[-1]):
             self.add_external_collision_avoidance_constraints(soft_threshold_override=collision_matrix)
         if not collision_entries or (not god_map.collision_scene.is_allow_all_collision(collision_entries[-1]) and
@@ -72,7 +72,7 @@ class MotionGoalManager:
 
     def create_collision_check_distances(self) -> Dict[PrefixName, float]:
         for robot_name in self.robot_names:
-            collision_avoidance_config = god_map.collision_avoidance_configs[robot_name]
+            collision_avoidance_config = god_map.collision_scene.collision_avoidance_configs[robot_name]
             external_distances = collision_avoidance_config.external_collision_avoidance
             self_distances = collision_avoidance_config.self_collision_avoidance
 
@@ -100,7 +100,7 @@ class MotionGoalManager:
 
     @profile
     def add_external_collision_avoidance_constraints(self, soft_threshold_override=None):
-        configs = god_map.collision_avoidance_configs
+        configs = god_map.collision_scene.collision_avoidance_configs
         fixed_joints = god_map.collision_scene.fixed_joints
         joints = [j for j in god_map.world.controlled_joints if j not in fixed_joints]
         num_constrains = 0
@@ -134,7 +134,7 @@ class MotionGoalManager:
     def add_self_collision_avoidance_constraints(self):
         counter = defaultdict(int)
         fixed_joints = god_map.collision_scene.fixed_joints
-        configs = god_map.collision_avoidance_configs
+        configs = god_map.collision_scene.collision_avoidance_configs
         num_constr = 0
         for robot_name in self.robot_names:
             for link_a_o, link_b_o in god_map.world.groups[robot_name].possible_collision_combinations():
@@ -209,7 +209,7 @@ class MotionGoalManager:
             neq_constraints.update(new_neq_constraints)
             derivative_constraints.update(new_derivative_constraints)
             # logging.loginfo(f'{goal_name} added {len(_constraints)+len(_vel_constraints)} constraints.')
-        god_map.set_data(identifier.eq_constraints, eq_constraints)
-        god_map.set_data(identifier.neq_constraints, neq_constraints)
-        god_map.set_data(identifier.derivative_constraints, derivative_constraints)
+        god_map.eq_constraints = eq_constraints
+        god_map.neq_constraints = neq_constraints
+        god_map.derivative_constraints = derivative_constraints
         return eq_constraints, neq_constraints, derivative_constraints

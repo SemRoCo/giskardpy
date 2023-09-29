@@ -138,7 +138,7 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
         fill_velocity_values = god_map.get_data(identifier.fill_trajectory_velocity_values)
         if fill_velocity_values is None:
             fill_velocity_values = self.fill_velocity_values
-        goal.trajectory = trajectory.to_msg(god_map.sample_period, start_time, self.controlled_joints,
+        goal.trajectory = trajectory.to_msg(god_map.qp_controller_config.sample_period, start_time, self.controlled_joints,
                                             fill_velocity_values)
 
         if self.path_tolerance is not None:

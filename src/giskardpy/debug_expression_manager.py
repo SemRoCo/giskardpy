@@ -66,7 +66,7 @@ class DebugExpressionManager:
                     else:
                         velocity = 0
                 js[name].position = value
-                js[name].velocity = velocity/god_map.sample_period
+                js[name].velocity = velocity/god_map.qp_controller_config.sample_period
             self.debug_trajectory.set(time, js)
 
     def to_pandas(self):

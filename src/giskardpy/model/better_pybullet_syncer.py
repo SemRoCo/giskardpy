@@ -32,7 +32,7 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
     @classmethod
     def empty(cls):
         self = super().empty()
-        god_map.set_data(identifier.collision_checker, CollisionCheckerLib.bpb)
+        god_map.collision_scene.collision_checker_id = CollisionCheckerLib.bpb
         return self
 
     @profile

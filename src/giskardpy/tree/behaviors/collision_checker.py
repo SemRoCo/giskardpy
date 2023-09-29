@@ -20,8 +20,8 @@ class CollisionChecker(GiskardBehavior):
     def add_added_checks(self, collision_matrix):
         try:
             added_checks = god_map.added_collision_checks
-            god_map.set_data(identifier.added_collision_checks, {})
-        except KeyError:
+            god_map.added_collision_checks = {}
+        except AttributeError:
             # no collision checks added
             added_checks = {}
         for key, distance in added_checks.items():
@@ -38,7 +38,7 @@ class CollisionChecker(GiskardBehavior):
             self.collision_matrix = god_map.collision_matrix
             self.collision_matrix = self.add_added_checks(self.collision_matrix)
             self.collision_list_size = sum([config.max_num_of_repeller()
-                                            for config in god_map.collision_avoidance_configs.values()])
+                                            for config in god_map.collision_scene.collision_avoidance_configs.values()])
             god_map.collision_scene.sync()
             super().initialise()
         except Exception as e:
@@ -65,5 +65,5 @@ class CollisionChecker(GiskardBehavior):
         god_map.collision_scene.sync()
         collisions = god_map.collision_scene.check_collisions(self.collision_matrix, self.collision_list_size)
         self.are_self_collisions_violated(collisions)
-        god_map.set_data(identifier.closest_point, collisions)
+        god_map.closest_point = collisions
         return Status.RUNNING

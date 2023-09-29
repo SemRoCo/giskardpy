@@ -70,7 +70,7 @@ class LocalMinimumReached(Monitor):
                  joint_convergence_threshold: float = 0.01):
         super().__init__(name=name, crucial=True, stay_one=False)
         condition_list = []
-        traj_length_in_sec = god_map.to_symbol(identifier.time) * god_map.sample_period
+        traj_length_in_sec = god_map.to_symbol(identifier.time) * god_map.qp_controller_config.sample_period
         condition_list.append(cas.greater(traj_length_in_sec, 1))
         for free_variable_name, free_variable in god_map.world.free_variables.items():
             velocity_limit = god_map.evaluate_expr(free_variable.get_upper_limit(Derivatives.velocity))

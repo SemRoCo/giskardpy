@@ -23,7 +23,7 @@ class ParseActionGoal(GiskardBehavior):
     def update(self):
         loginfo('Parsing goal message.')
         move_goal = god_map.goal_msg
-        god_map.set_data(identifier.goal_id, god_map.goal_id + 1)
+        god_map.goal_id += 1
         try:
             god_map.monitor_manager.parse_monitors(move_goal.monitors)
             god_map.motion_goal_manager.parse_motion_goals(move_goal.goals)

@@ -23,7 +23,7 @@ class MaxTrajectoryLength(GiskardBehavior):
             length = god_map.qp_controller_config.max_trajectory_length
         else:
             sample_period = 1
-        t = t * god_map.sample_period
+        t = t * god_map.qp_controller_config.sample_period
         if t > length:
             raise PlanningException(f'Aborted because trajectory is longer than {length}')
 

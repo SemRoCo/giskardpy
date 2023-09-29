@@ -9,6 +9,10 @@ from typing import TYPE_CHECKING, List, Dict, Set, Tuple
 from giskardpy.god_map import _GodMap
 
 if TYPE_CHECKING:
+    from giskardpy.model.joints import Joint
+    from giskardpy.model.ros_msg_visualization import ROSMsgVisualization
+    from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint
+    from giskardpy.qp.free_variable import FreeVariable
     from giskardpy.qp.next_command import NextCommands
     from giskardpy.model.trajectory import Trajectory
     from giskardpy.qp.qp_controller import QPProblemBuilder
@@ -30,141 +34,54 @@ if TYPE_CHECKING:
 
 
 class GodMap(_GodMap):
+    goal_id: int = -1
+    monitor_manager: MonitorManager
+    giskard: Giskard
+    time: float
+    world: WorldTree
+    motion_goal_manager: MotionGoalManager
+    debug_expression_manager: DebugExpressionManager
+    tree_manager: TreeManager
+    collision_scene: CollisionWorldSynchronizer
+    prediction_horizon: int
+    max_derivative: Derivatives
+    qp_controller: QPProblemBuilder
+    qp_controller_config: QPControllerConfig
+    collision_checker_id: CollisionCheckerLib
+    world_config: WorldConfig
+    collision_avoidance_config: CollisionAvoidanceConfig
+    collision_avoidance_configs: Dict[str, CollisionAvoidanceGroupThresholds]
+    goal_msg: MoveGoal
+    trajectory: Trajectory
+    qp_solver_solution: NextCommands
+    added_collision_checks: Dict[Tuple[PrefixName, PrefixName], float]
+    closest_point: Collisions
+    collision_matrix: Dict[Tuple[PrefixName, PrefixName], float]
+    time_delay: rospy.Duration
+    tracking_start_time: rospy.Time
+    result_message: MoveResult
+    eq_constraints: Dict[str, EqualityConstraint]
+    neq_constraints: Dict[str, InequalityConstraint]
+    derivative_constraints: Dict[str, DerivativeInequalityConstraint]
+    hack: float
+    fill_trajectory_velocity_values: bool
+    ros_visualizer: ROSMsgVisualization
+    free_variables: List[FreeVariable]
+    controlled_joints: List[Joint]
 
-    @property
-    def goal_id(self) -> int:
-        if self.has_data(identifier.goal_id):
-            return self.get_data(identifier.goal_id)
-        else:
-            return -1
-
-    @property
-    def time(self) -> float:
-        return god_map.get_data(identifier.time)
-
-    @property
-    def world(self) -> WorldTree:
-        return self.get_data(identifier.world)
-
-    @property
-    def monitor_manager(self) -> MonitorManager:
-        return self.get_data(identifier.monitor_manager)
-
-    @property
-    def motion_goal_manager(self) -> MotionGoalManager:
-        return self.get_data(identifier.motion_goal_manager)
-
-    @property
-    def giskard(self) -> Giskard:
-        return self.get_data(identifier.giskard)
-
-    @property
-    def debug_expression_manager(self) -> DebugExpressionManager:
-        return self.get_data(identifier.debug_expression_manager)
-
-    @property
-    def tree_manager(self) -> TreeManager:
-        return self.get_data(identifier.tree_manager)
-
-    @property
-    def collision_scene(self) -> CollisionWorldSynchronizer:
-        return self.get_data(identifier.collision_scene)
-
-    @property
-    def prediction_horizon(self) -> int:
-        return self.get_data(identifier.prediction_horizon)
-
-    @property
-    def max_derivative(self) -> Derivatives:
-        return self.get_data(identifier.max_derivative)
-
-    @property
-    def qp_controller(self) -> QPProblemBuilder:
-        return self.get_data(identifier.qp_controller)
-
-    @property
-    def qp_controller_config(self) -> QPControllerConfig:
-        return self.get_data(identifier.qp_controller_config)
-
-    @property
-    def collision_checker_id(self) -> CollisionCheckerLib:
-        return self.get_data(identifier.collision_checker)
-
-    @property
-    def world_config(self) -> WorldConfig:
-        return self.get_data(identifier.world_config)
-
-    @property
-    def collision_avoidance_config(self) -> CollisionAvoidanceConfig:
-        return self.get_data(identifier.collision_avoidance_config)
-
-    @property
-    def collision_avoidance_configs(self) -> Dict[str, CollisionAvoidanceGroupThresholds]:
-        return self.unsafe_get_data(identifier.collision_avoidance_configs)
 
     @property
     def trajectory_time_in_seconds(self):
         time = self.get_data(identifier.time)
         if self.is_closed_loop():
             return time
-        return time * self.sample_period
-
-    @property
-    def sample_period(self) -> float:
-        return self.get_data(identifier.sample_period)
-
-    @property
-    def goal_msg(self) -> MoveGoal:
-        return self.get_data(identifier.goal_msg)
-
-    @property
-    def trajectory(self) -> Trajectory:
-        return self.get_data(identifier.trajectory)
-
-    @property
-    def qp_solver_solution(self) -> NextCommands:
-        return self.get_data(identifier.qp_solver_solution)
-
-    @property
-    def tmp_folder(self) -> str:
-        return self.get_data(identifier.tmp_folder)
-
-    @property
-    def goal_package_paths(self) -> Set[str]:
-        return self.get_data(identifier.goal_package_paths)
-
-    @property
-    def added_collision_checks(self) -> Dict[Tuple[PrefixName, PrefixName], float]:
-        return self.get_data(identifier.added_collision_checks)
-
-    @property
-    def closest_point(self) -> Collisions:
-        return self.get_data(identifier.closest_point)
-
-    @property
-    def collision_matrix(self) -> Dict[Tuple[PrefixName, PrefixName], float]:
-        return self.get_data(identifier.collision_matrix)
-
-    @property
-    def time_delay(self) -> rospy.Duration:
-        return self.get_data(identifier.time_delay)
-
-    @property
-    def tracking_start_time(self) -> rospy.Time:
-        return self.get_data(identifier.tracking_start_time)
-
-    @property
-    def result_message(self) -> MoveResult:
-        return self.get_data(identifier.result_message)
+        return time * self.qp_controller_config.sample_period
 
     def is_goal_msg_type_execute(self):
         return MoveGoal.EXECUTE == self.goal_msg.type
 
     def is_goal_msg_type_projection(self):
         return MoveGoal.PROJECTION == self.goal_msg.type
-
-    def is_goal_msg_local_minimum_is_success(self):
-        return self.goal_msg.local_minimum_is_success
 
     def is_goal_msg_type_undefined(self):
         return MoveGoal.UNDEFINED == self.goal_msg.type
@@ -179,7 +96,7 @@ class GodMap(_GodMap):
         return self.tree_manager.control_mode == self.tree_manager.control_mode.open_loop
 
     def is_collision_checking_enabled(self):
-        return self.collision_checker_id != self.collision_checker_id.none
+        return self.collision_scene.collision_checker_id != self.collision_scene.collision_checker_id.none
 
 
 god_map = GodMap()

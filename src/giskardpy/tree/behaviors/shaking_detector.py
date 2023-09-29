@@ -40,8 +40,8 @@ from giskardpy.utils.decorators import record_time
 #     def initialise(self):
 #         super().initialise()
 #         self.js_samples = []
-#         god_map.sample_period = god_map.sample_period
-#         self.max_detectable_freq = 1 / (2 * god_map.sample_period)
+#         god_map.qp_controller_config.sample_period = god_map.qp_controller_config.sample_period
+#         self.max_detectable_freq = 1 / (2 * god_map.qp_controller_config.sample_period)
 #         self.min_wiggle_frequency = self.frequency_range * self.max_detectable_freq
 #         self.keys = []
 #         self.thresholds = []
@@ -84,7 +84,7 @@ from giskardpy.utils.decorators import record_time
 #         js_samples_array = np.array(self.js_samples)
 #         plot = False
 #         try:
-#             self.detect_shaking(js_samples_array, god_map.sample_period, self.min_wiggle_frequency,
+#             self.detect_shaking(js_samples_array, god_map.qp_controller_config.sample_period, self.min_wiggle_frequency,
 #                                 self.amplitude_threshold, self.thresholds, self.velocity_limits, plot)
 #         except ShakingException as e:
 #             if god_map.get_data(identifier.cut_off_shaking):

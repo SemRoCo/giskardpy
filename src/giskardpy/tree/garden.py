@@ -215,7 +215,7 @@ class TreeManager(ABC):
 
     @profile
     def __init__(self, control_mode: ControlModes):
-        god_map.set_data(identifier.tree_manager, self)
+        god_map.tree_manager = self
         self.action_server_name = god_map.giskard.action_server_name
 
         self.tree = GiskardBT(control_mode=control_mode)
@@ -363,7 +363,7 @@ class TreeManager(ABC):
                 break
 
     def render(self):
-        path = god_map.tmp_folder + 'tree'
+        path = god_map.giskard.tmp_folder + 'tree'
         create_path(path)
         render_dot_tree(self.tree.root, name=path)
 
@@ -869,7 +869,7 @@ class ClosedLoop(OpenLoop):
         planning_4 = failure_is_success(AsyncBehavior)(self.closed_loop_control_name)
         planning_4.add_child(success_is_running(SyncTfFrames)('sync tf frames close loop'))
         planning_4.add_child(success_is_running(NotifyStateChange)())
-        if god_map.collision_checker != CollisionCheckerLib.none:
+        if god_map.is_collision_checking_enabled():
             planning_4.add_child(CollisionChecker('collision checker'))
         planning_4.add_child(ControllerPlugin('controller'))
         planning_4.add_child(RosTime())

@@ -159,7 +159,7 @@ class WorldTree(WorldTreeInterface):
 
     def __init__(self):
         self.default_link_color = ColorRGBA(1, 1, 1, 0.75)
-        god_map.set_data(identifier.world, self)
+        god_map.world = self
         self.connection_prefix = 'connection'
         self.fast_all_fks = None
         self._state_version = 0
@@ -177,8 +177,7 @@ class WorldTree(WorldTreeInterface):
         self._default_limits = {
             Derivatives.velocity: 1,
         }
-        identifier.max_derivative = ['max_derivative']
-        god_map.set_data(identifier.max_derivative, Derivatives.jerk)
+        god_map.qp_controller_config.max_derivative = Derivatives.jerk
         return self
 
     @property
@@ -567,7 +566,7 @@ class WorldTree(WorldTreeInterface):
         return free_variable
 
     def update_state(self, next_commands: NextCommands, dt: float):
-        max_derivative = god_map.max_derivative
+        max_derivative = god_map.qp_controller_config.max_derivative
         for free_variable_name, command in next_commands.free_variable_data.items():
             self.state[free_variable_name][:max_derivative] += command * dt
             self.state[free_variable_name][max_derivative] = command[-1]
@@ -1072,7 +1071,7 @@ class WorldTree(WorldTreeInterface):
         if unknown_joints:
             raise UnknownGroupException(f'Trying to register unknown joints: \'{unknown_joints}\'')
         old_controlled_joints.update(new_controlled_joints)
-        god_map.set_data(identifier.controlled_joints, list(sorted(old_controlled_joints)))
+        god_map.controlled_joints = list(sorted(old_controlled_joints))
 
     @memoize
     def get_controlled_parent_joint_of_link(self, link_name: PrefixName) -> PrefixName:
@@ -1566,7 +1565,7 @@ class WorldTree(WorldTreeInterface):
             world_graph.add_edge(child_edge)
             parent_edge = pydot.Edge(str(joint.parent_link_name), str(joint_name))
             world_graph.add_edge(parent_edge)
-        file_name = f'{god_map.tmp_folder}/world_tree.pdf'
+        file_name = f'{god_map.giskard.tmp_folder}/world_tree.pdf'
         world_graph.write_pdf(file_name)
 
 

@@ -31,7 +31,7 @@ class ExternalCollisionAvoidance(Goal):
         super().__init__()
         self.root = god_map.world.root_link_name
         self.robot_name = robot_name
-        self.control_horizon = god_map.prediction_horizon - (god_map.max_derivative - 1)
+        self.control_horizon = god_map.qp_controller_config.prediction_horizon - (god_map.qp_controller_config.max_derivative - 1)
         self.control_horizon = max(1, self.control_horizon)
 
     def map_V_n_symbol(self):
@@ -73,7 +73,7 @@ class ExternalCollisionAvoidance(Goal):
         a_P_pa = self.get_closest_point_on_a_in_a()
         map_V_n = self.map_V_n_symbol()
         actual_distance = self.get_actual_distance()
-        sample_period = god_map.sample_period
+        sample_period = god_map.qp_controller_config.sample_period
         number_of_external_collisions = self.get_number_of_external_collisions()
 
         map_T_a = god_map.world.compose_fk_expression(self.root, self.link_name)
@@ -158,7 +158,7 @@ class SelfCollisionAvoidance(Goal):
         super().__init__()
         self.root = god_map.world.root_link_name
         self.robot_name = robot_name
-        self.control_horizon = god_map.prediction_horizon - (god_map.max_derivative - 1)
+        self.control_horizon = god_map.qp_controller_config.prediction_horizon - (god_map.qp_controller_config.max_derivative - 1)
         self.control_horizon = max(1, self.control_horizon)
 
     def get_contact_normal_in_b(self):
@@ -194,7 +194,7 @@ class SelfCollisionAvoidance(Goal):
         hard_threshold = w.min(self.hard_threshold, self.soft_threshold / 2)
         actual_distance = self.get_actual_distance()
         number_of_self_collisions = self.get_number_of_self_collisions()
-        sample_period = god_map.sample_period
+        sample_period = god_map.qp_controller_config.sample_period
 
         # b_T_a2 = god_map.get_world().compose_fk_evaluated_expression(self.link_b, self.link_a)
         b_T_a = god_map.world.compose_fk_expression(self.link_b, self.link_a)

@@ -54,14 +54,14 @@ class CollisionAvoidanceConfig(abc.ABC):
             logging.loginfo('Using betterpybullet for collision checking.')
             try:
                 from giskardpy.model.better_pybullet_syncer import BetterPyBulletSyncer
-                god_map.set_data(identifier.collision_scene, BetterPyBulletSyncer())
+                god_map.collision_scene = BetterPyBulletSyncer()
                 return
             except ImportError as e:
                 logging.logerr(f'{e}; turning off collision avoidance.')
                 self._collision_checker = CollisionCheckerLib.none
         logging.logwarn('Using no collision checking.')
         from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
-        god_map.set_data(identifier.collision_scene, CollisionWorldSynchronizer())
+        god_map.collision_scene = CollisionWorldSynchronizer()
 
     def set_default_self_collision_avoidance(self,
                                              number_of_repeller: int = 1,

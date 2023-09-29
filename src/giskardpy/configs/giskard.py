@@ -24,7 +24,7 @@ class Giskard:
     behavior_tree_config: BehaviorTreeConfig = None
     robot_interface_config: RobotInterfaceConfig = None
     qp_controller_config: QPControllerConfig = None
-    path_to_data_folder: str = resolve_ros_iris('package://giskardpy/tmp/')
+    tmp_folder: str = resolve_ros_iris('package://giskardpy/tmp/')
     goal_package_paths = {'giskardpy.goals'}
     action_server_name: str = '~command'
 
@@ -45,30 +45,30 @@ class Giskard:
                                               Giskard will run 'from <additional path> import *' for each additional
                                               path in the list.
         """
-        god_map.set_data(identifier.giskard, self)
-        self.world_config = world_config
-        self.robot_interface_config = robot_interface_config
+        god_map.giskard = self
+        god_map.world_config = world_config
+        god_map.robot_interface_config = robot_interface_config
         if collision_avoidance_config is None:
             collision_avoidance_config = DisableCollisionAvoidanceConfig()
-        self.collision_avoidance_config = collision_avoidance_config
+        god_map.collision_avoidance_config = collision_avoidance_config
         if behavior_tree_config is None:
             behavior_tree_config = OpenLoopBTConfig()
-        self.behavior_tree_config = behavior_tree_config
+        god_map.behavior_tree_config = behavior_tree_config
         if qp_controller_config is None:
             qp_controller_config = QPControllerConfig()
-        self.qp_controller_config = qp_controller_config
+        god_map.qp_controller_config = qp_controller_config
         if additional_goal_package_paths is None:
             additional_goal_package_paths = set()
         for additional_path in additional_goal_package_paths:
             self.add_goal_package_name(additional_path)
-        god_map.set_data(identifier.hack, 0)
+        god_map.hack = 0
 
     def set_defaults(self):
         god_map.world_config.set_defaults()
-        self.robot_interface_config.set_defaults()
-        self.qp_controller_config.set_defaults()
-        self.collision_avoidance_config.set_defaults()
-        self.behavior_tree_config.set_defaults()
+        god_map.robot_interface_config.set_defaults()
+        god_map.qp_controller_config.set_defaults()
+        god_map.collision_avoidance_config.set_defaults()
+        god_map.behavior_tree_config.set_defaults()
 
     def grow(self):
         """
@@ -76,11 +76,11 @@ class Giskard:
         """
         with god_map.world.modify_world():
             god_map.world_config.setup()
-        self.collision_avoidance_config.setup()
-        self.collision_avoidance_config._sanity_check()
-        self.behavior_tree_config._create_behavior_tree()
-        self.behavior_tree_config.setup()
-        self.robot_interface_config.setup()
+        god_map.collision_avoidance_config.setup()
+        god_map.collision_avoidance_config._sanity_check()
+        god_map.behavior_tree_config._create_behavior_tree()
+        god_map.behavior_tree_config.setup()
+        god_map.robot_interface_config.setup()
         self._controlled_joints_sanity_check()
         god_map.world.notify_model_change()
         god_map.collision_scene.sync()

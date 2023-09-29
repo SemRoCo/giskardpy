@@ -24,7 +24,7 @@ class ControllerPlugin(GiskardBehavior):
         substitutions = god_map.get_values(parameters)
 
         next_cmds = self.controller.get_cmd(substitutions)
-        god_map.set_data(identifier.qp_solver_solution, next_cmds)
+        god_map.qp_solver_solution = next_cmds
         # non_negative_entries = goal_reached_panda['data'] >= 0
         # if (goal_reached_panda.loc[non_negative_entries]['data'] == 0).any():
         #     return Status.RUNNING

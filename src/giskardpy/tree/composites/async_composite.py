@@ -19,7 +19,7 @@ class AsyncBehavior(GiskardBehavior, Composite):
         self.status_lock = RLock()
         self.looped_once = False
         if hz is not None:
-            hz = 1/god_map.sample_period
+            hz = 1/god_map.qp_controller_config.sample_period
             self.sleeper = rospy.Rate(hz)
         else:
             self.sleeper = None

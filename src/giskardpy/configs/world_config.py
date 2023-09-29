@@ -22,7 +22,7 @@ from giskardpy.my_types import my_string, PrefixName, Derivatives, derivative_ma
 class WorldConfig(ABC):
 
     def __init__(self):
-        god_map.set_data(identifier.world, WorldTree())
+        god_map.world = WorldTree()
         self.set_default_weights()
 
     @property

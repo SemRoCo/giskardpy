@@ -91,10 +91,10 @@ class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
         except KeyError:
             drive_goals = []
         drive_goals.extend(self.get_drive_goals())
-        god_map.set_data(identifier.drive_goals, drive_goals)
+        god_map.dr(identifier.drive_goals, drive_goals)
 
     def get_drive_goals(self) -> List[Goal]:
-        return [SetPredictionHorizon(prediction_horizon=god_map.prediction_horizon + 4),
+        return [SetPredictionHorizon(prediction_horizon=god_map.qp_controller_config.prediction_horizon + 4),
                 BaseTrajFollower(joint_name=self.joint.name, track_only_velocity=self.track_only_velocity)]
 
     def solver_cmd_to_twist(self, cmd: NextCommands) -> Twist:

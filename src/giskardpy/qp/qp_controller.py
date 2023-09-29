@@ -1026,7 +1026,7 @@ class QPProblemBuilder:
         self.free_variables.extend(list(sorted(free_variables, key=lambda x: x.position_name)))
         l = [x.position_name for x in free_variables]
         duplicates = set([x for x in l if l.count(x) > 1])
-        self.order = Derivatives(min(self.prediction_horizon, god_map.max_derivative))
+        self.order = Derivatives(min(self.prediction_horizon, god_map.qp_controller_config.max_derivative))
         assert duplicates == set(), f'there are free variables with the same name: {duplicates}'
 
     def add_inequality_constraints(self, constraints: List[InequalityConstraint]):
@@ -1074,7 +1074,7 @@ class QPProblemBuilder:
                   'equality_constraints': self.equality_constraints,
                   'inequality_constraints': self.inequality_constraints,
                   'derivative_constraints': self.derivative_constraints,
-                  'sample_period': god_map.sample_period,
+                  'sample_period': god_map.qp_controller_config.sample_period,
                   'prediction_horizon': self.prediction_horizon,
                   'max_derivative': self.order}
         self.weights = Weights(**kwargs)
@@ -1113,7 +1113,7 @@ class QPProblemBuilder:
                  self.p_A, self.p_lbA, self.p_ubA,
                  self.p_debug, self.p_xdot],
                 ['weights', 'lb', 'ub', 'E', 'bE', 'A', 'lbA', 'ubA', 'debug', 'xdot'],
-                god_map.tmp_folder,
+                god_map.giskard.tmp_folder,
                 god_map.time,
                 folder_name)
         else:
@@ -1123,7 +1123,7 @@ class QPProblemBuilder:
                  self.p_A, self.p_lbA, self.p_ubA,
                  self.p_debug],
                 ['weights', 'lb', 'ub', 'E', 'bE', 'A', 'lbA', 'ubA', 'debug'],
-                god_map.tmp_folder,
+                god_map.giskard.tmp_folder,
                 god_map.time,
                 folder_name)
 
@@ -1182,7 +1182,7 @@ class QPProblemBuilder:
             tmp[:len(a)] = a
             return tmp
 
-        sample_period = self.state[str(god_map.sample_period)]
+        sample_period = self.state[str(god_map.qp_controller_config.sample_period)]
         try:
             start_pos = self.state[joint_name]
         except KeyError:
@@ -1224,7 +1224,7 @@ class QPProblemBuilder:
     @profile
     def _create_debug_pandas(self, qp_solver: QPSolver):
         weights, g, lb, ub, E, bE, A, lbA, ubA, weight_filter, bE_filter, bA_filter = qp_solver.get_problem_data()
-        sample_period = god_map.sample_period
+        sample_period = god_map.qp_controller_config.sample_period
         self.free_variable_names = self.free_variable_bounds.names[weight_filter]
         self.equality_constr_names = self.equality_bounds.names[bE_filter]
         self.inequality_constr_names = self.inequality_bounds.names[bA_filter]

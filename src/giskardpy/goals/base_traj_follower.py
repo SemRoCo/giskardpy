@@ -46,7 +46,7 @@ class BaseTrajFollower(Goal):
         time = god_map.to_expr(identifier.time)
         b_result_cases = []
         for t in range(self.trajectory_length):
-            b = t * god_map.sample_period
+            b = t * god_map.qp_controller_config.sample_period
             eq_result = self.x_symbol(t, free_variable_name, derivative)
             b_result_cases.append((b, eq_result))
             # FIXME if less eq cases behavior changed
@@ -80,7 +80,7 @@ class BaseTrajFollower(Goal):
 
         frame_P_goal = map_T_base_footprint_goal.to_position()
         frame_P_current = map_T_base_footprint_current.to_position()
-        error = (frame_P_goal - frame_P_current) / god_map.sample_period
+        error = (frame_P_goal - frame_P_current) / god_map.qp_controller_config.sample_period
         return error[0], error[1]
 
     @profile
@@ -88,10 +88,10 @@ class BaseTrajFollower(Goal):
         errors_x = []
         errors_y = []
         map_T_base_footprint = god_map.world.compose_fk_expression(god_map.world.root_link_name, self.base_footprint_link)
-        for t in range(god_map.prediction_horizon):
-            x = self.current_traj_point(self.joint.x_vel.name, t * god_map.sample_period, Derivatives.velocity)
+        for t in range(god_map.qp_controller_config.prediction_horizon):
+            x = self.current_traj_point(self.joint.x_vel.name, t * god_map.qp_controller_config.sample_period, Derivatives.velocity)
             if isinstance(self.joint, OmniDrive):
-                y = self.current_traj_point(self.joint.y_vel.name, t * god_map.sample_period, Derivatives.velocity)
+                y = self.current_traj_point(self.joint.y_vel.name, t * god_map.qp_controller_config.sample_period, Derivatives.velocity)
             else:
                 y = 0
             base_footprint_P_vel = w.Vector3((x, y, 0))
@@ -127,14 +127,14 @@ class BaseTrajFollower(Goal):
     def rot_error_at(self, t_in_s: int):
         rotation_goal = self.current_traj_point(self.joint.yaw.name, t_in_s)
         rotation_current = self.joint.yaw.get_symbol(Derivatives.position)
-        error = w.shortest_angular_distance(rotation_current, rotation_goal) / god_map.sample_period
+        error = w.shortest_angular_distance(rotation_current, rotation_goal) / god_map.qp_controller_config.sample_period
         return error
 
     @profile
     def add_rot_constraints(self):
         errors = []
-        for t in range(god_map.prediction_horizon):
-            errors.append(self.current_traj_point(self.joint.yaw.name, t * god_map.sample_period, Derivatives.velocity))
+        for t in range(god_map.qp_controller_config.prediction_horizon):
+            errors.append(self.current_traj_point(self.joint.yaw.name, t * god_map.qp_controller_config.sample_period, Derivatives.velocity))
             if t == 0 and not self.track_only_velocity:
                 errors[-1] += self.rot_error_at(t)
         self.add_velocity_constraint(lower_velocity_limit=errors,
@@ -202,7 +202,6 @@ class CarryMyBullshit(Goal):
         self.enable_laser_avoidance = enable_laser_avoidance
         if CarryMyBullshit.pub is None:
             CarryMyBullshit.pub = rospy.Publisher('~visualization_marker_array', MarkerArray)
-        god_map.set_data(identifier.endless_mode, True)
         self.laser_topic_name = laser_topic_name
         if point_cloud_laser_topic_name == '':
             self.point_cloud_laser_topic_name = None
@@ -775,8 +774,8 @@ class BaseTrajFollowerPR2(BaseTrajFollower):
         map_P_current = map_T_current.to_position()
         self.add_debug_expr(f'map_P_current.x', map_P_current.x)
         self.add_debug_expr('time', god_map.to_expr(identifier.time))
-        for t in range(god_map.prediction_horizon - 2):
-            trajectory_time_in_s = t * god_map.sample_period
+        for t in range(god_map.qp_controller_config.prediction_horizon - 2):
+            trajectory_time_in_s = t * god_map.qp_controller_config.sample_period
             map_P_goal = self.make_map_T_base_footprint_goal(trajectory_time_in_s).to_position()
             map_V_error = (map_P_goal - map_P_current)
             self.add_debug_expr(f'map_P_goal.x/{t}', map_P_goal.x)
@@ -804,7 +803,7 @@ class BaseTrajFollowerPR2(BaseTrajFollower):
             #     lb_yaw1[-1] += self.rot_error_at(t)
             #     yaw1_goal_position = self.current_traj_point(self.joint.yaw1_vel.name, trajectory_time_in_s,
             #                                                  Derivatives.position)
-            forward = self.current_traj_point(self.joint.forward_vel.name, t * god_map.sample_period,
+            forward = self.current_traj_point(self.joint.forward_vel.name, t * god_map.qp_controller_config.sample_period,
                                               Derivatives.velocity) * 1.1
             lb_forward.append(forward)
         weight_vel = WEIGHT_ABOVE_CA

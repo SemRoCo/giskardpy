@@ -34,7 +34,7 @@ class SetMoveResult(GiskardBehavior):
 
         trajectory = god_map.trajectory
         joints = [god_map.world.joints[joint_name] for joint_name in god_map.world.movable_joint_names]
-        sample_period = god_map.sample_period
+        sample_period = god_map.qp_controller_config.sample_period
         move_result.trajectory = trajectory.to_msg(sample_period=sample_period, start_time=0, joints=joints)
         if move_result.error_code == MoveResult.PREEMPTED:
             logging.logwarn(f'Goal preempted: \'{move_result.error_message}\'.')
@@ -44,5 +44,5 @@ class SetMoveResult(GiskardBehavior):
                     logging.loginfo(f'{self.context} succeeded.')
                 else:
                     logging.logwarn(f'{self.context} failed: {move_result.error_message}.')
-        god_map.set_data(identifier.result_message, move_result)
+        god_map.result_message = move_result
         return Status.SUCCESS

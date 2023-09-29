@@ -18,7 +18,7 @@ class PlotTrajectory(GiskardBehavior):
         self.wait = wait
         self.normalize_position = normalize_position
         self.kwargs = kwargs
-        self.path_to_data_folder = god_map.tmp_folder
+        self.path_to_data_folder = god_map.giskard.tmp_folder
 
     @profile
     def initialise(self):
@@ -28,7 +28,7 @@ class PlotTrajectory(GiskardBehavior):
     def plot(self):
         trajectory = god_map.trajectory
         if trajectory:
-            sample_period = god_map.sample_period
+            sample_period = god_map.qp_controller_config.sample_period
             try:
                 trajectory.plot_trajectory(path_to_data_folder=self.path_to_data_folder,
                                            sample_period=sample_period,

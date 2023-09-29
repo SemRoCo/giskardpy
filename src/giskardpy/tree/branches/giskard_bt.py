@@ -22,7 +22,7 @@ class GiskardBT(BehaviourTree):
     cleanup_control_loop: CleanupControlLoop
 
     def __init__(self, control_mode: ControlModes):
-        god_map.set_data(identifier.control_mode, control_mode)
+        god_map.tree_manager.control_mode = control_mode
         # TODO reject invalid control mode
         # raise KeyError(f'Robot interface mode \'{self._control_mode}\' is not supported.')
         root = Sequence('Giskard')

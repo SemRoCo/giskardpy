@@ -571,7 +571,7 @@ class Application(QMainWindow):
         group_name = robot_name_from_urdf_string(urdf)
         self.urdf_progress.set_progress(10, f'Parsing {progress_str}')
         self.world.add_urdf(urdf, group_name)
-        self.world.god_map.set_data(identifier.controlled_joints, self.world.movable_joint_names)
+        self.world.controlled_joints = self.world.movable_joint_names
         self.urdf_progress.set_progress(50, f'Applying vhacd to concave meshes of {progress_str}')
         self.collision_scene.sync()
         self.urdf_progress.set_progress(80, f'Updating table {progress_str}')

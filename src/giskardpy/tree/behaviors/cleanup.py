@@ -35,11 +35,11 @@ class CleanUp(GiskardBehavior):
         god_map.giskard.set_defaults()
         god_map.world.fast_all_fks = None
         god_map.collision_scene.reset_cache()
-        god_map.set_data(identifier.closest_point, Collisions(1))
-        god_map.set_data(identifier.time, 1)
-        god_map.set_data(identifier.monitor_manager, MonitorManager())
-        god_map.set_data(identifier.motion_goal_manager, MotionGoalManager())
-        god_map.set_data(identifier.debug_expression_manager, DebugExpressionManager())
+        god_map.closest_point = Collisions(1)
+        god_map.time = 1
+        god_map.monitor_manager = MonitorManager()
+        god_map.motion_goal_manager = MotionGoalManager()
+        god_map.debug_expression_manager = DebugExpressionManager()
 
         if hasattr(self.get_blackboard(), 'runtime'):
             del self.get_blackboard().runtime
@@ -51,7 +51,7 @@ class CleanUp(GiskardBehavior):
 class CleanUpPlanning(CleanUp):
     def initialise(self):
         super().initialise()
-        god_map.set_data(identifier.fill_trajectory_velocity_values, None)
+        god_map.fill_trajectory_velocity_values = None
 
 
 class CleanUpBaseController(CleanUp):

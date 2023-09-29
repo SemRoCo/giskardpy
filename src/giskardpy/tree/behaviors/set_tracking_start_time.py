@@ -26,11 +26,10 @@ class SetTrackingStartTime(GiskardBehavior):
         super().initialise()
         delay = rospy.Duration(0)
         # delay = self.compute_time_offset()
-        god_map.set_data(identifier.time_delay, delay)
+        god_map.time_delay = delay
         if abs(delay.to_sec()) > 0.5:
             logging.logwarn(f'delay between joint states and current time is {delay.to_sec()}, compensating the offset.')
-        god_map.set_data(identifier.tracking_start_time,
-                              rospy.get_rostime() + self.offset - delay)
+        god_map.tracking_start_time = rospy.get_rostime() + self.offset - delay
 
     @profile
     def update(self):

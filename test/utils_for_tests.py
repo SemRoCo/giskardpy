@@ -368,7 +368,7 @@ class GiskardTestWrapper(GiskardWrapper):
                                         str(num_eq_slack_variables),
                                         str(num_neq_slack_variables),
                                         str(num_slack_variables),
-                                        str(int(god_map.max_derivative)),
+                                        str(int(god_map.qp_controller_config.max_derivative)),
                                         str(times)])
 
         logging.loginfo('saved benchmark file')
@@ -747,7 +747,7 @@ class GiskardTestWrapper(GiskardWrapper):
             diff = time() - time_spend_giskarding
             self.total_time_spend_giskarding += diff
             self.total_time_spend_moving += (len(god_map.trajectory.keys()) *
-                                             god_map.sample_period)
+                                             god_map.qp_controller_config.sample_period)
             logging.logwarn(f'Goal processing took {diff}')
             error_code = r.error_code
             error_message = r.error_message

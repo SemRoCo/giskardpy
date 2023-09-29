@@ -27,15 +27,14 @@ class InitQPController(GiskardBehavior):
             equality_constraints=list(eq_constraints.values()),
             inequality_constraints=list(neq_constraints.values()),
             derivative_constraints=list(derivative_constraints.values()),
-            sample_period=god_map.sample_period,
-            prediction_horizon=god_map.prediction_horizon,
-            solver_id=god_map.unsafe_get_data(identifier.qp_solver_name),
-            retries_with_relaxed_constraints=god_map.unsafe_get_data(
-                identifier.retries_with_relaxed_constraints),
-            retry_added_slack=god_map.unsafe_get_data(identifier.retry_added_slack),
-            retry_weight_factor=god_map.unsafe_get_data(identifier.retry_weight_factor),
+            sample_period=god_map.qp_controller_config.sample_period,
+            prediction_horizon=god_map.qp_controller_config.prediction_horizon,
+            solver_id=god_map.qp_controller_config.qp_solver,
+            retries_with_relaxed_constraints=god_map.qp_controller_config.retries_with_relaxed_constraints,
+            retry_added_slack=god_map.qp_controller_config.added_slack,
+            retry_weight_factor=god_map.qp_controller_config.weight_factor,
         )
-        god_map.set_data(identifier.qp_controller, qp_controller)
+        god_map.qp_controller = qp_controller
 
         return Status.SUCCESS
 
@@ -50,5 +49,5 @@ class InitQPController(GiskardBehavior):
                                      key=lambda x: x.position_name))
         if len(free_variables) == 0:
             raise EmptyProblemException('Goal parsing resulted in no free variables.')
-        god_map.set_data(identifier.free_variables, free_variables)
+        god_map.free_variables = free_variables
         return free_variables

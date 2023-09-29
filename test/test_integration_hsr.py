@@ -17,7 +17,7 @@ from utils_for_tests import compare_poses, GiskardTestWrapper
 
 class HSRTestWrapper(GiskardTestWrapper):
     default_pose = {
-        'arm_flex_joint': 0.0,
+        'arm_flex_joint': -0.03,
         'arm_lift_joint': 0.0,
         'arm_roll_joint': 0.0,
         'head_pan_joint': 0.0,

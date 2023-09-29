@@ -68,7 +68,9 @@ jobs:
           # Root directory of the catkin workspace
           workspace: $GITHUB_WORKSPACE/ros_ws
       - name: install pip dependencies
-        run: pip3 install -r ros_ws/src/giskardpy/requirements.txt
+        run: |
+          python3 -m pip install --upgrade pip
+          pip3 install -r ros_ws/src/giskardpy/requirements.txt
       - name: build Giskard
         run: |
           cd ros_ws

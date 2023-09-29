@@ -585,17 +585,31 @@ class WorldTree(WorldTreeInterface, GodMapWorshipper):
                 f'Failed to add group \'{group_name}\' because one with such a name already exists')
 
         urdf_root_link_name = parsed_urdf.link_map[parsed_urdf.get_root()].name
-        urdf_root_link_name = PrefixName(urdf_root_link_name, group_name)
+        urdf_root_link_name_prefixed = PrefixName(urdf_root_link_name, group_name)
 
         if parent_link_name is not None:
-            parent_link = self.links[parent_link_name]
-            urdf_root_link = Link(urdf_root_link_name)
+            urdf_link = parsed_urdf.link_map[urdf_root_link_name]
+            urdf_root_link = Link.from_urdf(urdf_link=urdf_link,
+                                            prefix=group_name,
+                                            color=self.default_link_color)
             self._add_link(urdf_root_link)
-            self._add_fixed_joint(parent_link=parent_link,
-                                  child_link=urdf_root_link,
-                                  transform=pose)
+            pose_msg = Pose()
+            position = pose.to_position().evaluate()
+            orientation = pose.to_rotation().to_quaternion().evaluate()
+            pose_msg.position.x = position[0][0]
+            pose_msg.position.y = position[1][0]
+            pose_msg.position.z = position[2][0]
+            pose_msg.orientation.x = orientation[0][0]
+            pose_msg.orientation.y = orientation[1][0]
+            pose_msg.orientation.z = orientation[2][0]
+            pose_msg.orientation.w = orientation[3][0]
+            joint = Joint6DOF(name=PrefixName(group_name, self.connection_prefix),
+                              parent_link_name=parent_link_name,
+                              child_link_name=urdf_root_link.name)
+            joint.update_transform(pose_msg)
+            self._add_joint(joint)
         else:
-            urdf_root_link = Link(urdf_root_link_name)
+            urdf_root_link = Link(urdf_root_link_name_prefixed)
             self._add_link(urdf_root_link)
             # urdf_root_link = self.links[urdf_root_link_name]
 
@@ -621,8 +635,6 @@ class WorldTree(WorldTreeInterface, GodMapWorshipper):
                 self._link_joint_to_links(joint)
                 helper(urdf, child_link)
 
-        if urdf_root_link.name.short_name not in parsed_urdf.child_map:
-            raise UnknownLinkException(f'Root link \'{urdf_root_link_name}\' of urdf \'{group_name}\' not in world.')
         number_of_links_before = len(self.links)
         helper(parsed_urdf, urdf_root_link)
         if number_of_links_before + len(parsed_urdf.links) - 1 != len(self.links):
@@ -633,7 +645,7 @@ class WorldTree(WorldTreeInterface, GodMapWorshipper):
         #     root_link = self.get_parent_link_of_link(urdf_root_link_name)
         #     self.register_group(group_name, root_link, actuated=actuated)
         # else:
-        self.register_group(group_name, urdf_root_link_name, actuated=actuated)
+        self.register_group(group_name, urdf_root_link_name_prefixed, actuated=actuated)
         self.notify_model_change()
 
     def _add_fixed_joint(self, parent_link: Link, child_link: Link, joint_name: str = None,
@@ -676,7 +688,7 @@ class WorldTree(WorldTreeInterface, GodMapWorshipper):
         if len(ret) == 0:
             raise KeyError(f'No groups found with joint name {joint_name}.')
         if len(ret) > 1:
-            raise KeyError(f'Multiple groups {ret} found with joint name {joint_name}.')
+            raise KeyError(f'Multiple groups {[x.name for x in ret]} found with joint name {joint_name}.')
         else:
             return ret.pop()
 
@@ -1282,7 +1294,7 @@ class WorldTree(WorldTreeInterface, GodMapWorshipper):
                     # for collision_id, geometry in enumerate(link.collisions):
                     #     link_name_with_id = link.name_with_collision_id(collision_id)
                     collision_fks.append(self.fks[link_name])
-                        # collision_ids.append(link_name_with_id)
+                    # collision_ids.append(link_name_with_id)
                 collision_fks = w.vstack(collision_fks)
                 # self.collision_link_order = list(collision_ids)
                 params = set()
@@ -1606,9 +1618,9 @@ class WorldBranch(WorldTreeInterface):
 
     def get_unmovable_links(self) -> List[PrefixName]:
         unmovable_links, _ = self.world.search_branch(link_name=self.root_link_name,
-                                                   stop_at_joint_when=lambda
-                                                       joint_name: joint_name in self.controlled_joints,
-                                                   collect_link_when=self.world.has_link_collisions)
+                                                      stop_at_joint_when=lambda
+                                                          joint_name: joint_name in self.controlled_joints,
+                                                      collect_link_when=self.world.has_link_collisions)
         return unmovable_links
 
     @property

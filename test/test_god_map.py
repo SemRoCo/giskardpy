@@ -1,6 +1,7 @@
 import numpy as np
 
 import giskardpy
+from giskardpy.god_map_interpreter import god_map
 
 giskardpy.WORLD_IMPLEMENTATION = None
 import unittest
@@ -14,25 +15,16 @@ from giskardpy.god_map import _GodMap
 from utils_for_tests import variable_name, keys_values, lists_of_same_length
 
 
-class Testgod_map.unittest.TestCase):
-    @given(variable_name(),
-           variable_name(),
-           st.integers())
-    def test_god_map_key_error(self, key, wrong_key, number):
-        assume(key != wrong_key)
-        db = _god_map.)
-        db.clear()
-        db.set_data([key], number)
-        try:
-            db.get_data([wrong_key])
-            assert False
-        except KeyError as e:
-            assert True
+class Test_god_map(unittest.TestCase):
+    def test_to_symbol_int(self):
+        god_map.clear()
+        god_map.asdf = 1
+        s = god_map.to_symbol(lambda: god_map.asdf)
 
     @given(variable_name(),
            st.integers())
     def test_set_get_integer(self, key, number):
-        db = _god_map.)
+        db = god_map
         db.clear()
         db.set_data([key], number)
         self.assertEqual(db.get_data([key]), number, msg='key={}, number={}'.format(key, number))
@@ -40,7 +32,7 @@ class Testgod_map.unittest.TestCase):
     @given(variable_name(),
            st.integers())
     def test_set_get_integer2(self, key, number):
-        db = _god_map.)
+        db = god_map
         db.clear()
         db.set_data([key], number)
         self.assertEqual(db.get_data([key]), number, msg='key={}, number={}'.format(key, number))
@@ -49,7 +41,7 @@ class Testgod_map.unittest.TestCase):
     @given(variable_name(),
            st.floats(allow_nan=False))
     def test_set_get_float(self, key, number):
-        db = _god_map.)
+        db = god_map
         db.clear()
         db.set_data([key], number)
         db.set_data([key], number)
@@ -61,7 +53,7 @@ class Testgod_map.unittest.TestCase):
            keys_values())
     def test_namedtuple(self, key, tuple_name, key_values):
         Frame = namedtuple(tuple_name, key_values[0])
-        db = _god_map.)
+        db = god_map
         db.clear()
         db.set_data([key], Frame(*key_values[1]))
         for k, v in zip(*key_values):
@@ -69,7 +61,7 @@ class Testgod_map.unittest.TestCase):
 
     def test_namedtuple1(self):
         Frame = namedtuple('Frame', ['pos'])
-        db = _god_map.)
+        db = god_map
         db.clear()
         db.set_data(['f12'], Frame(pos=2))
         with self.assertRaises(AttributeError):
@@ -83,7 +75,7 @@ class Testgod_map.unittest.TestCase):
         for k, v in zip(*key_values):
             setattr(c, k, None)
 
-        db = _god_map.)
+        db = god_map
         db.clear()
         db.set_data([key], c)
 
@@ -96,7 +88,7 @@ class Testgod_map.unittest.TestCase):
 
     @given(st.lists(variable_name(), unique=True))
     def test_class3(self, class_names):
-        db = _god_map.)
+        db = god_map
         db.clear()
         for i, name in enumerate(class_names):
             c = type(str(name), (object,), {})()
@@ -107,7 +99,7 @@ class Testgod_map.unittest.TestCase):
             self.assertEqual(type(c).__name__, name)
 
     def test_attribute_error(self):
-        db = _god_map.)
+        db = god_map
         db.clear()
 
         class C(object):
@@ -121,7 +113,7 @@ class Testgod_map.unittest.TestCase):
             assert True
 
     def test_index_error(self):
-        db = _god_map.)
+        db = god_map
         db.clear()
         db.unsafe_set_data(['l'], [1, 2, 3])
         try:
@@ -134,7 +126,7 @@ class Testgod_map.unittest.TestCase):
            keys_values())
     def test_dict1(self, key, key_values):
         d = {k: v for k, v in zip(*key_values)}
-        db = _god_map.)
+        db = god_map
         db.clear()
         db.set_data([key], d)
         for k, v in zip(*key_values):
@@ -144,7 +136,7 @@ class Testgod_map.unittest.TestCase):
            keys_values())
     def test_dict2(self, key, key_values):
         d = {}
-        db = _god_map.)
+        db = god_map
         db.clear()
         db.set_data([key], d)
         for k, v in zip(*key_values):
@@ -158,7 +150,7 @@ class Testgod_map.unittest.TestCase):
     def test_dict3(self, key, tuple_key, value):
         tuple_key = tuple(tuple_key)
         d = {tuple_key: value}
-        db = _god_map.)
+        db = god_map
         db.clear()
         db.set_data([key], d)
         self.assertEqual(db.get_data([key, tuple_key]), value)
@@ -166,7 +158,7 @@ class Testgod_map.unittest.TestCase):
     @given(variable_name(),
            st.lists(st.floats(allow_nan=False), min_size=1))
     def test_list1(self, key, value):
-        db = _god_map.)
+        db = god_map
         db.clear()
         db.set_data([key], value)
         for i, v in enumerate(value):
@@ -175,7 +167,7 @@ class Testgod_map.unittest.TestCase):
     def test_list_double_index(self):
         key = 'asdf'
         value = np.array([[0, 1], [2, 3]])
-        db = _god_map.)
+        db = god_map
         db.clear()
         db.set_data([key], value)
         for i in range(value.shape[0]):
@@ -186,7 +178,7 @@ class Testgod_map.unittest.TestCase):
            st.lists(st.floats(allow_nan=False), min_size=1))
     def test_tuple1(self, key, value):
         value = tuple(value)
-        db = _god_map.)
+        db = god_map
         db.clear()
         db.set_data([key], value)
         for i, v in enumerate(value):
@@ -196,7 +188,7 @@ class Testgod_map.unittest.TestCase):
            lists_of_same_length([st.floats(allow_nan=False), st.floats(allow_nan=False)]))
     def test_list_overwrite_entry(self, key, lists):
         first_values, second_values = lists
-        db = _god_map.)
+        db = god_map
         db.clear()
         db.set_data([key], first_values)
         for i, v in enumerate(first_values):
@@ -209,7 +201,7 @@ class Testgod_map.unittest.TestCase):
     @given(variable_name(),
            st.lists(st.floats(allow_nan=False), min_size=1))
     def test_list_index_error(self, key, l):
-        db = _god_map.)
+        db = god_map
         db.clear()
         db.set_data([key], l)
         with self.assertRaises(IndexError):
@@ -218,7 +210,7 @@ class Testgod_map.unittest.TestCase):
     @given(variable_name(),
            st.lists(st.floats(allow_nan=False), min_size=1))
     def test_list_negative_index(self, key, l):
-        db = _god_map.)
+        db = god_map
         db.clear()
         db.set_data([key], l)
         for i in range(len(l)):
@@ -227,7 +219,7 @@ class Testgod_map.unittest.TestCase):
     @given(variable_name(),
            variable_name())
     def test_function_1param_lambda(self, key, key2):
-        db = _god_map.)
+        db = god_map
         db.clear()
         f = lambda x: x
         db.set_data([key], f)
@@ -238,7 +230,7 @@ class Testgod_map.unittest.TestCase):
            variable_name(),
            variable_name())
     def test_function_2param_call(self, key1, key2, key3, key4):
-        db = _god_map.)
+        db = god_map
         db.clear()
 
         class MUH(object):
@@ -256,7 +248,7 @@ class Testgod_map.unittest.TestCase):
            variable_name(),
            variable_name())
     def test_function3(self, key1, key2, key3, key4, key5):
-        db = _god_map.)
+        db = god_map
         db.clear()
 
         class MUH(object):
@@ -278,7 +270,7 @@ class Testgod_map.unittest.TestCase):
            variable_name(),
            variable_name())
     def test_function4(self, key1, key2, key3, key4, key5):
-        db = _god_map.)
+        db = god_map
         db.clear()
 
         class MUH(object):
@@ -293,7 +285,7 @@ class Testgod_map.unittest.TestCase):
         self.assertEqual(key5, db.get_data([key1, key2, (key3, key4), 0]))
 
     def test_clear_cache(self):
-        db = _god_map.)
+        db = god_map
         db.clear()
 
         d = {'b': 'c'}
@@ -311,7 +303,7 @@ class Testgod_map.unittest.TestCase):
            variable_name(),
            variable_name())
     def test_function_no_param(self, key1, key2, key3):
-        db = _god_map.)
+        db = god_map
         db.clear()
 
         class MUH(object):
@@ -326,14 +318,14 @@ class Testgod_map.unittest.TestCase):
     @given(variable_name(),
            st.integers())
     def test_to_symbol(self, key, value):
-        gm = _god_map.)
+        gm = god_map
         gm.clear()
         gm.set_data([key], value)
         self.assertTrue(isinstance(gm.to_symbol([key]), w.Symbol))
         self.assertTrue(key in str(gm.to_symbol([key])))
 
     def test_to_symbol_pose_stamped(self):
-        gm = _god_map.)
+        gm = god_map
         gm.clear()
         pose = PoseStamped()
         gm.set_data(['muh'], pose)
@@ -344,7 +336,7 @@ class Testgod_map.unittest.TestCase):
     @given(lists_of_same_length([variable_name(), st.floats()], unique=True))
     def test_get_symbol_map(self, keys_values):
         keys, values = keys_values
-        gm = _god_map.)
+        gm = god_map
         gm.clear()
         for key, value in zip(keys, values):
             gm.set_data([key], value)
@@ -352,7 +344,7 @@ class Testgod_map.unittest.TestCase):
         self.assertEqual(len(gm.get_values(keys)), len(keys))
 
     def test_to_expr_ndarray(self):
-        gm = _god_map.)
+        gm = god_map
         gm.clear()
         data = np.zeros((5, 5))
         gm.set_data(['muh'], data)
@@ -360,7 +352,7 @@ class Testgod_map.unittest.TestCase):
         assert expr.shape == data.shape
 
     def test_to_expr_list(self):
-        gm = _god_map.)
+        gm = god_map
         gm.clear()
         data = [1, 2, 3]
         gm.set_data(['muh'], data)

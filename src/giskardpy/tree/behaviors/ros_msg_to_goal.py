@@ -99,9 +99,20 @@ class RosMsgToGoal(GetGoal):
                 raise e
 
     def replace_jsons_with_ros_messages(self, d):
-        for key, value in d.items():
-            if isinstance(value, dict) and 'message_type' in value:
-                d[key] = convert_dictionary_to_ros_message(value)
+        if isinstance(d, list):
+            for i, element in enumerate(d):
+                d[i] = self.replace_jsons_with_ros_messages(element)
+
+        if isinstance(d, dict):
+
+            if 'message_type' in d:
+
+                d = convert_dictionary_to_ros_message(d)
+
+            else:
+                for key, value in d.copy().items():
+                    d[key] = self.replace_jsons_with_ros_messages(value)
+
         return d
 
     @profile
@@ -197,7 +208,8 @@ class RosMsgToGoal(GetGoal):
                 try:
                     if (link_a_o, link_b_o) in self.collision_scene.self_collision_matrix:
                         continue
-                    link_a, link_b = self.world.compute_chain_reduced_to_controlled_joints(link_a_o, link_b_o, fixed_joints)
+                    link_a, link_b = self.world.compute_chain_reduced_to_controlled_joints(link_a_o, link_b_o,
+                                                                                           fixed_joints)
                     link_a, link_b = self.world.sort_links(link_a, link_b)
                     counter[link_a, link_b] += 1
                 except KeyError as e:

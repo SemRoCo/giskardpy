@@ -482,7 +482,7 @@ class GiskardWrapper:
         for k, v in kwargs.copy().items():
             if v is None:
                 del kwargs[k]
-            if isinstance(v, Message):
+            else:
                 kwargs[k] = convert_ros_message_to_dictionary(v)
         kwargs = replace_prefix_name_with_str(kwargs)
         constraint.parameter_value_pair = json.dumps(kwargs)

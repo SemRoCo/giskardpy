@@ -779,8 +779,7 @@ class OpenLoop(StandAlone):
     def grow_monitor_execution(self):
         monitor_execution = failure_is_success(Selector)('monitor execution')
         monitor_execution.add_child(success_is_failure(PublishFeedback)('publish feedback',
-                                                                        god_map.get_data(
-                                                                            identifier.action_server_name),
+                                                                        god_map.giskard.action_server_name,
                                                                         MoveFeedback.EXECUTION))
         monitor_execution.add_child(self.grow_execution_cancelled())
         monitor_execution.add_child(self.grow_move_robots())

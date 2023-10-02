@@ -439,37 +439,37 @@ class _GodMap(metaclass=SingletonMeta):
         """
         return self.key_to_expr.values()
 
-    def unsafe_set_data(self, identifier, value):
-        """
+    # def unsafe_set_data(self, identifier, value):
+    #     """
+    #
+    #     :param identifier: e.g. ['pose', 'position', 'x']
+    #     :type identifier: list
+    #     :param value:
+    #     :type value: object
+    #     """
+    #     if len(identifier) == 0:
+    #         raise ValueError('key is empty')
+    #     namespace = identifier[0]
+    #     if namespace not in self._data:
+    #         if len(identifier) > 1:
+    #             raise KeyError('Can not access member of unknown namespace: {}'.format(identifier))
+    #         else:
+    #             self._data[namespace] = value
+    #     else:
+    #         result = self._data[namespace]
+    #         for member in identifier[1:-1]:
+    #             result = get_member(result, member)
+    #         if len(identifier) > 1:
+    #             member = identifier[-1]
+    #             if isinstance(result, dict):
+    #                 result[member] = value
+    #             elif isinstance(result, list):
+    #                 result[int(member)] = value
+    #             else:
+    #                 setattr(result, member, value)
+    #         else:
+    #             self._data[namespace] = value
 
-        :param identifier: e.g. ['pose', 'position', 'x']
-        :type identifier: list
-        :param value:
-        :type value: object
-        """
-        if len(identifier) == 0:
-            raise ValueError('key is empty')
-        namespace = identifier[0]
-        if namespace not in self._data:
-            if len(identifier) > 1:
-                raise KeyError('Can not access member of unknown namespace: {}'.format(identifier))
-            else:
-                self._data[namespace] = value
-        else:
-            result = self._data[namespace]
-            for member in identifier[1:-1]:
-                result = get_member(result, member)
-            if len(identifier) > 1:
-                member = identifier[-1]
-                if isinstance(result, dict):
-                    result[member] = value
-                elif isinstance(result, list):
-                    result[int(member)] = value
-                else:
-                    setattr(result, member, value)
-            else:
-                self._data[namespace] = value
-
-    def set_data(self, identifier, value):
-        with self.lock:
-            self.unsafe_set_data(identifier, value)
+    # def set_data(self, identifier, value):
+    #     with self.lock:
+    #         self.unsafe_set_data(identifier, value)

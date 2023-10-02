@@ -777,7 +777,7 @@ class GiskardTestWrapper(GiskardWrapper):
             self.set_object_joint_state(group_name, group_last_joint_state)
 
     def get_result_trajectory_position(self):
-        trajectory = god_map.unsafe_get_data(identifier.trajectory)
+        trajectory = god_map.trajectory
         trajectory2 = {}
         for joint_name in trajectory.get_exact(0).keys():
             trajectory2[joint_name] = np.array([p[joint_name].position for t, p in trajectory.items()])

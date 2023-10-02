@@ -72,7 +72,7 @@ class GodMap(_GodMap):
 
     @property
     def trajectory_time_in_seconds(self):
-        time = self.get_data(identifier.time)
+        time = self.time
         if self.is_closed_loop():
             return time
         return time * self.qp_controller_config.sample_period

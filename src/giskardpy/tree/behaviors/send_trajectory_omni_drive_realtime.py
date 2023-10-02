@@ -73,7 +73,7 @@ class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
     def initialise(self):
         super().initialise()
         self.trajectory = god_map.trajectory
-        sample_period = god_map.unsafe_get_data(identifier.sample_period)
+        sample_period = god_map.qp_controller_config.sample_period
         self.start_time = god_map.tracking_start_time
         self.trajectory = self.trajectory.to_msg(sample_period, self.start_time, [self.joint], True)
         self.end_time = self.start_time + self.trajectory.points[-1].time_from_start + self.goal_time_tolerance
@@ -87,7 +87,9 @@ class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
 
     def put_drive_goals_on_god_map(self):
         try:
-            drive_goals = god_map.get_data(identifier.drive_goals)
+            # fixme
+            pass
+            # drive_goals = god_map.get_data(identifier.drive_goals)
         except KeyError:
             drive_goals = []
         drive_goals.extend(self.get_drive_goals())

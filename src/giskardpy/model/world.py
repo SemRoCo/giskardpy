@@ -1054,8 +1054,8 @@ class WorldTree(WorldTreeInterface):
     @property
     def controlled_joints(self) -> List[PrefixName]:
         try:
-            return god_map.unsafe_get_data(identifier.controlled_joints)
-        except KeyError:
+            return god_map.controlled_joints
+        except AttributeError:
             return []
 
     def register_controlled_joints(self, controlled_joints: List[PrefixName]):
@@ -1609,7 +1609,7 @@ class WorldBranch(WorldTreeInterface):
 
     @cached_property
     def controlled_joints(self) -> List[PrefixName]:
-        return [j for j in god_map.unsafe_get_data(identifier.controlled_joints) if j in self.joint_names_as_set]
+        return [j for j in god_map.controlled_joints if j in self.joint_names_as_set]
 
     @property
     def parent_link_of_root(self) -> PrefixName:

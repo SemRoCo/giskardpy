@@ -15,5 +15,6 @@ class SetDriveGoals(GiskardBehavior):
     @profile
     def update(self):
         god_map.motion_goal_manager.motion_goals = {}
-        drive_goals: List[Goal] = god_map.get_data(identifier.drive_goals)
+        # fixme
+        # drive_goals: List[Goal] = god_map.get_data(identifier.drive_goals)
         return Status.SUCCESS

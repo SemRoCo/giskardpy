@@ -12,6 +12,7 @@ class SymbolManager(metaclass=SingletonMeta):
 
     def __init__(self):
         self.symbol_str_to_lambda = {}
+        self.symbol_str_to_symbol = {}
         self.last_hash = -1
 
     def get_symbol(self, symbol_reference):
@@ -23,7 +24,7 @@ class SymbolManager(metaclass=SingletonMeta):
         return self.symbol_str_to_symbol[symbol_reference]
 
     def resolve_symbols(self, symbols):
-        return [self.symbol_str_to_lambda[s]() for s in symbols]
+        return np.array([self.symbol_str_to_lambda[s]() for s in symbols])
 
     def compile_resolve_symbols(self, symbols):
         self.c = eval('lambda: np.array([' + ', '.join(symbols) + '])')

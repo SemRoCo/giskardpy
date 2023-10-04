@@ -56,7 +56,7 @@ class Monitor:
 
     @profile
     def update_substitution_values(self):
-        self.substitution_values = god_map.get_values(self.substitution_keys)
+        self.substitution_values = symbol_manager.resolve_symbols(self.substitution_keys)
 
     @profile
     def get_substitution_key(self, substitution_id: int) -> cas.Symbol:

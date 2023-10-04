@@ -8,6 +8,7 @@ from giskardpy import identifier
 from giskardpy.data_types import JointStates
 from giskardpy.god_map_interpreter import god_map
 from giskardpy.model.trajectory import Trajectory
+from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils import logging
 
 
@@ -43,7 +44,7 @@ class DebugExpressionManager:
     def eval_debug_exprs(self):
         self.evaluated_debug_expressions = {}
         for name, f in self.compiled_debug_expressions.items():
-            params = god_map.get_values(f.str_params)
+            params = symbol_manager.resolve_symbols(f.str_params)
             self.evaluated_debug_expressions[name] = f.fast_call(params).copy()
         self.log_debug_expressions()
         return self.evaluated_debug_expressions

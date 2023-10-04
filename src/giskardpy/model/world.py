@@ -31,6 +31,7 @@ from giskardpy.my_types import PrefixName, Derivatives, derivative_joint_map, de
 from giskardpy.my_types import my_string
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.next_command import NextCommands
+from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import homo_matrix_to_pose, np_to_pose, msg_to_homogeneous_matrix, make_transform
 from giskardpy.utils.utils import suppress_stderr, clear_cached_properties
@@ -1275,7 +1276,7 @@ class WorldTree(WorldTreeInterface):
 
     @profile
     def compute_all_collision_fks(self):
-        params = god_map.unsafe_get_values(self._fk_computer.fast_collision_fks.str_params)
+        params = symbol_manager.resolve_symbols(self._fk_computer.fast_collision_fks.str_params)
         return self._fk_computer.fast_collision_fks.fast_call(params)
 
     @profile
@@ -1324,7 +1325,7 @@ class WorldTree(WorldTreeInterface):
             @profile
             def recompute(self):
                 self.compute_fk_np.memo.clear()
-                self.fks = self.fast_all_fks.fast_call(god_map.unsafe_get_values(self.fast_all_fks.str_params))
+                self.fks = self.fast_all_fks.fast_call(symbol_manager.resolve_symbols(self.fast_all_fks.str_params))
 
             @memoize
             @profile

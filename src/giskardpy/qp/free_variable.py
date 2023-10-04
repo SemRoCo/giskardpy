@@ -21,7 +21,7 @@ class FreeVariable:
         self._symbols = {}
         self.name = name
         for derivative in Derivatives:
-            self._symbols[derivative] = symbol_manager.get_symbol(f'god_map.world.state[{name}][{derivative}]')
+            self._symbols[derivative] = symbol_manager.get_symbol(f'god_map.world.state[\'{name}\'][{derivative}]')
         self.position_name = str(self._symbols[Derivatives.position])
         self.default_lower_limits = lower_limits
         self.default_upper_limits = upper_limits

@@ -10,6 +10,7 @@ from giskardpy.exceptions import GiskardException, UnknownConstraintException, C
 from giskardpy.goals.monitors.monitors import Monitor
 import giskard_msgs.msg as giskard_msgs
 from giskardpy.god_map_interpreter import god_map
+from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils import logging
 from giskardpy.utils.utils import json_to_kwargs, get_all_classes_in_package
 
@@ -84,7 +85,7 @@ class MonitorManager:
 
     @profile
     def evaluate_monitors(self):
-        args = god_map.get_values(self.compiled_monitors.str_params)
+        args = symbol_manager.resolve_symbols(self.compiled_monitors.str_params)
         self.update_state(self.compiled_monitors.fast_call(args))
 
     @profile

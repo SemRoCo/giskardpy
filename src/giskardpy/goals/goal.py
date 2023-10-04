@@ -8,6 +8,7 @@ from typing import Optional, Tuple, Dict, List, Union, Callable, TYPE_CHECKING
 from giskardpy.goals.monitors.monitors import Monitor
 from giskardpy.goals.tasks.task import Task, WEIGHT_BELOW_CA
 from giskardpy.god_map_interpreter import god_map
+from giskardpy.symbol_manager import symbol_manager
 
 if TYPE_CHECKING:
     from giskardpy.tree.control_modes import ControlModes
@@ -62,11 +63,11 @@ class Goal(ABC):
                 f'You have to ensure that str(self) is possible before calling parents __init__: {e}')
 
     def traj_time_in_seconds(self) -> w.Expression:
-        t = god_map.to_symbol(identifier.time)
+        t = symbol_manager.time
         if god_map.is_closed_loop():
             return t
         else:
-            return t * self.get_sampling_period_symbol()
+            return t * god_map.qp_controller_config.sample_period
 
     def transform_msg(self, target_frame: my_string, msg: transformable_message, tf_timeout: float = 1) \
             -> transformable_message:
@@ -97,9 +98,6 @@ class Goal(ABC):
         if isinstance(joint, OneDofJoint):
             return joint.get_symbol(Derivatives.position)
         raise TypeError(f'get_joint_position_symbol is only supported for OneDofJoint, not {type(joint)}')
-
-    def get_sampling_period_symbol(self) -> Union[w.Symbol, float]:
-        return god_map.to_symbol(identifier.sample_period)
 
     def connect_to_end(self, monitor: Monitor):
         for task in self.tasks:

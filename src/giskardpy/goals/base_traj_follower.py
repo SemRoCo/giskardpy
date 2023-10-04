@@ -22,6 +22,7 @@ from giskardpy.utils import logging
 from giskardpy.utils.decorators import memoize_with_counter, clear_memo
 from giskardpy.utils.tfwrapper import point_to_np
 from giskardpy.utils.utils import raise_to_blackboard
+from giskardpy.symbol_manager import symbol_manager
 
 
 class BaseTrajFollower(Goal):
@@ -37,7 +38,7 @@ class BaseTrajFollower(Goal):
     @profile
     def x_symbol(self, t: int, free_variable_name: PrefixName, derivative: Derivatives = Derivatives.position) \
             -> w.Symbol:
-        return god_map.to_symbol(identifier.trajectory + ['get_exact', (t,), free_variable_name, derivative])
+        return symbol_manager.get_symbol(identifier.trajectory + ['get_exact', (t,), free_variable_name, derivative])
 
     @profile
     def current_traj_point(self, free_variable_name: PrefixName, start_t: float,

@@ -328,7 +328,7 @@ class ShakyJointPositionRevoluteOrPrismatic(Goal):
         joint_goal = self.goal
         weight = self.weight
 
-        time = god_map.to_symbol(identifier.time)
+        time = symbol_manager.time
         time_in_secs = god_map.qp_controller_config.sample_period * time
 
         max_velocity = cas.min(self.max_velocity,
@@ -377,7 +377,7 @@ class ShakyJointPositionContinuous(Goal):
         joint_goal = self.goal
         weight = self.weight
 
-        time = god_map.to_symbol(identifier.time)
+        time = symbol_manager.time
         time_in_secs = god_map.qp_controller_config.sample_period * time
 
         max_velocity = cas.min(self.max_velocity,

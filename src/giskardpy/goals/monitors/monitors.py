@@ -7,6 +7,7 @@ from giskardpy import identifier
 from giskardpy.god_map_interpreter import god_map
 from giskardpy.my_types import Derivatives
 from giskardpy.qp.free_variable import FreeVariable
+from giskardpy.symbol_manager import symbol_manager
 
 
 class Monitor:
@@ -59,10 +60,10 @@ class Monitor:
 
     @profile
     def get_substitution_key(self, substitution_id: int) -> cas.Symbol:
-        return god_map.to_symbol(identifier.monitors + [self.id, 'substitution_values', substitution_id])
+        return symbol_manager.get_symbol(f'god_map.monitor_manager.monitors[{self.id}].substitution_values[{substitution_id}]')
 
     def get_state_expression(self):
-        return god_map.to_symbol(identifier.monitor_manager + ['state', self.id])
+        return symbol_manager.get_symbol(f'god_map.monitor_manager.state[{self.id}]')
 
 
 class LocalMinimumReached(Monitor):
@@ -70,7 +71,7 @@ class LocalMinimumReached(Monitor):
                  joint_convergence_threshold: float = 0.01):
         super().__init__(name=name, crucial=True, stay_one=False)
         condition_list = []
-        traj_length_in_sec = god_map.to_symbol(identifier.time) * god_map.qp_controller_config.sample_period
+        traj_length_in_sec = symbol_manager.time * god_map.qp_controller_config.sample_period
         condition_list.append(cas.greater(traj_length_in_sec, 1))
         for free_variable_name, free_variable in god_map.world.free_variables.items():
             velocity_limit = god_map.evaluate_expr(free_variable.get_upper_limit(Derivatives.velocity))

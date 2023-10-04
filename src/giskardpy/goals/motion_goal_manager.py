@@ -36,7 +36,7 @@ class MotionGoalManager:
                 params = json_to_kwargs(motion_goal.parameter_value_pair)
                 c: Goal = C(**params)
                 c.make_constraints()
-                self.add_motion_goal(c)
+                self.add_motion_goal(c, motion_goal.name)
                 for monitor_name in motion_goal.to_end:
                     monitor = god_map.monitor_manager.get_monitor(monitor_name)
                     c.connect_to_end(monitor)
@@ -47,8 +47,10 @@ class MotionGoalManager:
                     raise ConstraintInitalizationException(error_msg)
                 raise e
 
-    def add_motion_goal(self, goal: Goal):
-        self.motion_goals[str(goal)] = goal
+    def add_motion_goal(self, goal: Goal, name: str):
+        if name == '':
+            name = str(goal)
+        self.motion_goals[name] = goal
 
     @profile
     def parse_collision_entries(self, collision_entries: List[giskard_msgs.CollisionEntry]):

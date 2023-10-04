@@ -503,9 +503,7 @@ class JointPositionList(Goal):
                  goal_state: Dict[str, float],
                  group_name: Optional[str] = None,
                  weight: float = WEIGHT_BELOW_CA,
-                 max_velocity: float = 1,
-                 threshold: float = 0.005,
-                 hard: bool = False):
+                 max_velocity: float = 1):
         """
         Calls JointPosition for a list of joints.
         :param goal_state: maps joint_name to goal position
@@ -518,12 +516,10 @@ class JointPositionList(Goal):
         self.current_positions = []
         self.goal_positions = []
         self.velocity_limits = []
-        self.thresholds = []
         self.names = []
         self.joint_names = list(goal_state.keys())
         self.max_velocity = max_velocity
         self.weight = weight
-        self.threshold = threshold
         if len(goal_state) == 0:
             raise ConstraintInitalizationException(f'Can\'t initialize {self} with no joints.')
         for joint_name, goal_position in goal_state.items():
@@ -541,11 +537,9 @@ class JointPositionList(Goal):
             self.current_positions.append(joint.get_symbol(Derivatives.position))
             self.goal_positions.append(goal_position)
             self.velocity_limits.append(velocity_limit)
-            self.thresholds.append(self.threshold)
             task = Task(name='joint goal')
-            for name, current, goal, threshold, velocity_limit in zip(self.names, self.current_positions,
-                                                                      self.goal_positions,
-                                                                      self.thresholds, self.velocity_limits):
+            for name, current, goal, velocity_limit in zip(self.names, self.current_positions,
+                                                                      self.goal_positions, self.velocity_limits):
                 if god_map.world.is_joint_continuous(name):
                     error = cas.shortest_angular_distance(current, goal)
                 else:

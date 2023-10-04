@@ -454,9 +454,9 @@ class GiskardTestWrapper(GiskardWrapper):
     # GOAL STUFF #################################################################################################
     #
 
-    def set_joint_goal(self, goal, weight=None, hard=False, decimal=2, expected_error_codes=(MoveResult.SUCCESS,),
+    def add_joint_goal(self, goal, weight=None, decimal=2, expected_error_codes=(MoveResult.SUCCESS,),
                        check=True, group_name=None):
-        super().set_joint_goal(goal, group_name, weight=weight, hard=hard)
+        super().add_joint_goal(goal, group_name, weight=weight)
         if check:
             self.add_goal_check(JointGoalChecker(giskard=self,
                                                  goal_state=goal,

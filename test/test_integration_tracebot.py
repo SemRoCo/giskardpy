@@ -66,7 +66,7 @@ class TracebotTestWrapper(GiskardTestWrapper):
 
 class TestTracebot:
     def test_joint_goal(self, zero_pose: TracebotTestWrapper):
-        zero_pose.set_joint_goal(zero_pose.better_pose)
+        zero_pose.add_joint_goal(zero_pose.better_pose)
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
 

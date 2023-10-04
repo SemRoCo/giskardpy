@@ -84,7 +84,7 @@ class TestJointGoalsMujoco(TestJointGoals):
             'l_wrist_flex_joint': -0.10014623223021513,
             'l_wrist_roll_joint': -6.062015047706399,
         }
-        zero_pose.set_joint_goal(js)
+        zero_pose.add_joint_goal(js)
         zero_pose.allow_all_collisions()
         zero_pose.set_json_goal('EnableVelocityTrajectoryTracking', enabled=True)
         zero_pose.plan_and_execute()
@@ -94,7 +94,7 @@ class TestConstraints:
 
     def test_SetSeedConfiguration(self, zero_pose: PR2TestWrapper):
         zero_pose.set_seed_configuration(seed_configuration=zero_pose.better_pose)
-        zero_pose.set_joint_goal(zero_pose.default_pose)
+        zero_pose.add_joint_goal(zero_pose.default_pose)
         zero_pose.plan_and_execute(expected_error_codes=[MoveResult.CONSTRAINT_INITIALIZATION_ERROR])
 
 
@@ -180,6 +180,6 @@ class TestActionServerEvents:
 
     def test_plan_only(self, zero_pose: PR2TestWrapper):
         zero_pose.allow_self_collision()
-        zero_pose.set_joint_goal(pocky_pose, check=False)
+        zero_pose.add_joint_goal(pocky_pose, check=False)
         zero_pose.add_goal_check(JointGoalChecker(zero_pose, zero_pose.default_pose))
         zero_pose.send_goal(goal_type=MoveGoal.PLAN_ONLY)

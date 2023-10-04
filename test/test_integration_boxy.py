@@ -136,7 +136,7 @@ class TestJointGoals:
         zero_pose.allow_self_collision()
         js = copy(zero_pose.better_pose)
         js['triangle_base_joint'] = zero_pose.default_pose['triangle_base_joint']
-        zero_pose.set_joint_goal(js)
+        zero_pose.add_joint_goal(js)
         zero_pose.plan_and_execute()
 
 

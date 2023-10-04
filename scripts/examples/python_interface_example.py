@@ -34,7 +34,7 @@ giskard_wrapper.clear_world()
 
 rospy.loginfo('Combining a joint goal for the arm with a Cartesian goal for the base to reset the pr2.')
 # Setting the joint goal
-giskard_wrapper.set_joint_goal(start_joint_state)
+giskard_wrapper.add_joint_goal(start_joint_state)
 
 base_goal = PoseStamped()
 base_goal.header.frame_id = 'map'
@@ -78,7 +78,7 @@ rospy.loginfo('Setting Cartesian goal.')
 giskard_wrapper.set_cart_goal(root_link='base_footprint', tip_link='l_gripper_tool_frame', goal_pose=p)
 
 rospy.loginfo('Setting joint goal for only the torso.')
-giskard_wrapper.set_joint_goal({'torso_lift_joint': 0.3})
+giskard_wrapper.add_joint_goal({'torso_lift_joint': 0.3})
 
 rospy.loginfo('Executing.')
 giskard_wrapper.plan_and_execute()

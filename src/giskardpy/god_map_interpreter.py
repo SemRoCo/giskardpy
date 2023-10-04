@@ -32,7 +32,7 @@ if TYPE_CHECKING:
     from giskardpy.model.world import WorldTree
 
 
-class GodMap(_GodMap):
+class GodMap:
     goal_id: int = -1
     monitor_manager: MonitorManager
     giskard: Giskard

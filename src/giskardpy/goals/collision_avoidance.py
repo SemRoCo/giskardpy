@@ -7,6 +7,7 @@ from giskardpy.goals.monitors.monitors import Monitor
 from giskardpy.goals.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE, Task
 from giskardpy.god_map_interpreter import god_map
 from giskardpy.my_types import my_string
+from giskardpy.symbol_manager import symbol_manager
 
 
 class ExternalCollisionAvoidance(Goal):
@@ -34,42 +35,6 @@ class ExternalCollisionAvoidance(Goal):
         self.control_horizon = god_map.qp_controller_config.prediction_horizon - (god_map.qp_controller_config.max_derivative - 1)
         self.control_horizon = max(1, self.control_horizon)
 
-    def map_V_n_symbol(self):
-        return god_map.list_to_vector3(identifier.closest_point + ['get_external_collisions',
-                                                                        (self.link_name,),
-                                                                        self.idx,
-                                                                        'map_V_n'])
-
-    def get_closest_point_on_a_in_a(self):
-        return god_map.list_to_point3(identifier.closest_point + ['get_external_collisions',
-                                                                       (self.link_name,),
-                                                                       self.idx,
-                                                                       'new_a_P_pa'])
-
-    def map_P_a_symbol(self):
-        return god_map.list_to_point3(identifier.closest_point + ['get_external_collisions',
-                                                                       (self.link_name,),
-                                                                       self.idx,
-                                                                       'new_map_P_pa'])
-
-    def get_actual_distance(self):
-        return god_map.to_symbol(identifier.closest_point + ['get_external_collisions',
-                                                                  (self.link_name,),
-                                                                  self.idx,
-                                                                  'contact_distance'])
-
-    def get_link_b_hash(self):
-        return god_map.to_symbol(identifier.closest_point + ['get_external_collisions',
-                                                                  (self.link_name,),
-                                                                  self.idx,
-                                                                  'link_b_hash'])
-
-    def get_number_of_external_collisions(self):
-        return god_map.to_symbol(identifier.closest_point + ['get_number_of_external_collisions',
-                                                                  (self.link_name,)])
-
-    @profile
-    def make_constraints(self):
         a_P_pa = self.get_closest_point_on_a_in_a()
         map_V_n = self.map_V_n_symbol()
         actual_distance = self.get_actual_distance()
@@ -120,7 +85,8 @@ class ExternalCollisionAvoidance(Goal):
         distance_monitor = Monitor('distance', crucial=False)
         distance_monitor.set_expression(w.less(actual_distance, 50))
         self.add_monitor(distance_monitor)
-        task = Task('stay away', to_hold=distance_monitor)
+        task = Task('stay away')
+        task.add_to_hold_monitor(distance_monitor)
         task.add_inequality_constraint(reference_velocity=self.max_velocity,
                                        lower_error=lower_limit,
                                        upper_error=float('inf'),
@@ -129,6 +95,34 @@ class ExternalCollisionAvoidance(Goal):
                                        lower_slack_limit=-float('inf'),
                                        upper_slack_limit=upper_slack)
         self.add_task(task)
+
+    def map_V_n_symbol(self):
+        expr = f'god_map.closest_point.get_external_collisions(\'{self.link_name}\')[{self.idx}].map_V_n'
+        return symbol_manager.get_expr(expr, output_type_hint=w.Vector3)
+
+    def get_closest_point_on_a_in_a(self):
+        expr = f'god_map.closest_point.get_external_collisions(\'{self.link_name}\')[{self.idx}].new_a_P_pa'
+        return symbol_manager.get_expr(expr, output_type_hint=w.Point3)
+
+    def map_P_a_symbol(self):
+        expr = f'god_map.closest_point.get_external_collisions(\'{self.link_name}\')[{self.idx}].new_map_P_pa'
+        return symbol_manager.get_expr(expr, output_type_hint=w.Point3)
+
+    def get_actual_distance(self):
+        expr = f'god_map.closest_point.get_external_collisions(\'{self.link_name}\')[{self.idx}].contact_distance'
+        return symbol_manager.get_symbol(expr)
+
+    def get_link_b_hash(self):
+        expr = f'god_map.closest_point.get_external_collisions(\'{self.link_name}\')[{self.idx}].link_b_hash'
+        return symbol_manager.get_symbol(expr)
+
+    def get_number_of_external_collisions(self):
+        expr = f'god_map.closest_point.get_number_of_external_collisions(\'{self.link_name}\')'
+        return symbol_manager.get_symbol(expr)
+
+    @profile
+    def make_constraints(self):
+        pass
 
     def __str__(self):
         s = super().__str__()
@@ -161,36 +155,6 @@ class SelfCollisionAvoidance(Goal):
         self.control_horizon = god_map.qp_controller_config.prediction_horizon - (god_map.qp_controller_config.max_derivative - 1)
         self.control_horizon = max(1, self.control_horizon)
 
-    def get_contact_normal_in_b(self):
-        return god_map.list_to_vector3(identifier.closest_point + ['get_self_collisions',
-                                                                        (self.link_a, self.link_b),
-                                                                        self.idx,
-                                                                        'new_b_V_n'])
-
-    def get_position_on_a_in_a(self):
-        return god_map.list_to_point3(identifier.closest_point + ['get_self_collisions',
-                                                                       (self.link_a, self.link_b),
-                                                                       self.idx,
-                                                                       'new_a_P_pa'])
-
-    def get_b_T_pb(self) -> w.TransMatrix:
-        return god_map.list_to_translation3(identifier.closest_point + ['get_self_collisions',
-                                                                             (self.link_a, self.link_b),
-                                                                             self.idx,
-                                                                             'new_b_P_pb'])
-
-    def get_actual_distance(self):
-        return god_map.to_symbol(identifier.closest_point + ['get_self_collisions',
-                                                                  (self.link_a, self.link_b),
-                                                                  self.idx,
-                                                                  'contact_distance'])
-
-    def get_number_of_self_collisions(self):
-        return god_map.to_symbol(identifier.closest_point + ['get_number_of_self_collisions',
-                                                                  (self.link_a, self.link_b)])
-
-    @profile
-    def make_constraints(self):
         hard_threshold = w.min(self.hard_threshold, self.soft_threshold / 2)
         actual_distance = self.get_actual_distance()
         number_of_self_collisions = self.get_number_of_self_collisions()
@@ -233,7 +197,8 @@ class SelfCollisionAvoidance(Goal):
         distance_monitor = Monitor('distance', crucial=False)
         distance_monitor.set_expression(w.less(actual_distance, 50))
         self.add_monitor(distance_monitor)
-        task = Task('stay away', to_hold=distance_monitor)
+        task = Task('stay away')
+        task.add_to_hold_monitor(distance_monitor)
         task.add_inequality_constraint(reference_velocity=self.max_velocity,
                                        lower_error=lower_limit,
                                        upper_error=float('inf'),
@@ -242,6 +207,31 @@ class SelfCollisionAvoidance(Goal):
                                        lower_slack_limit=-float('inf'),
                                        upper_slack_limit=upper_slack)
         self.add_task(task)
+
+    def get_contact_normal_in_b(self):
+        expr = f'god_map.closest_point.get_self_collisions(\'{self.link_a}\', \'{self.link_b}\')[{self.idx}].new_b_V_n'
+        return symbol_manager.get_expr(expr, output_type_hint=w.Vector3)
+
+    def get_position_on_a_in_a(self):
+        expr = f'god_map.closest_point.get_self_collisions(\'{self.link_a}\', \'{self.link_b}\')[{self.idx}].new_a_P_pa'
+        return symbol_manager.get_expr(expr, output_type_hint=w.Point3)
+
+    def get_b_T_pb(self) -> w.TransMatrix:
+        expr = f'god_map.closest_point.get_self_collisions(\'{self.link_a}\', \'{self.link_b}\')[{self.idx}].new_b_P_pb'
+        p = symbol_manager.get_expr(expr, output_type_hint=w.Point3)
+        return w.TransMatrix.from_xyz_rpy(x=p.x, y=p.y, z=p.z)
+
+    def get_actual_distance(self):
+        expr = f'god_map.closest_point.get_self_collisions(\'{self.link_a}\', \'{self.link_b}\')[{self.idx}].contact_distance'
+        return symbol_manager.get_symbol(expr)
+
+    def get_number_of_self_collisions(self):
+        expr = f'god_map.closest_point.get_number_of_self_collisions(\'{self.link_a}\', \'{self.link_b}\')'
+        return symbol_manager.get_symbol(expr)
+
+    @profile
+    def make_constraints(self):
+        pass
 
     def __str__(self):
         s = super().__str__()

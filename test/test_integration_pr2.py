@@ -237,7 +237,7 @@ def giskard(request, ros):
 
 @pytest.fixture()
 def pocky_pose_setup(resetted_giskard: PR2TestWrapper) -> PR2TestWrapper:
-    if resetted_giskard.is_standalone():
+    if god_map.is_standalone():
         resetted_giskard.set_seed_configuration(pocky_pose)
         resetted_giskard.allow_all_collisions()
     else:
@@ -2647,6 +2647,7 @@ class TestSelfCollisionAvoidance:
         }
         zero_pose.allow_all_collisions()
         zero_pose.set_joint_goal(goal_js)
+        zero_pose.add_monitor(monitor_type='LocalMinimumReached', monitor_name='local min reached')
         zero_pose.plan_and_execute()
 
         p = PoseStamped()
@@ -2655,6 +2656,7 @@ class TestSelfCollisionAvoidance:
         p.pose.position.x = 0.2
         p.pose.orientation.w = 1
         zero_pose.set_cart_goal(goal_pose=p, tip_link=zero_pose.r_tip, root_link='base_footprint')
+        zero_pose.add_monitor(monitor_type='LocalMinimumReached', monitor_name='local min reached')
         zero_pose.send_goal()
         zero_pose.check_cpi_geq(zero_pose.get_r_gripper_links(), 0.048)
 
@@ -2924,6 +2926,7 @@ class TestCollisionAvoidanceGoals:
         r_goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 2, [0, 1, 0]))
         fake_table_setup.avoid_all_collisions(0.1)
         fake_table_setup.set_cart_goal(r_goal, fake_table_setup.r_tip)
+        fake_table_setup.add_monitor(monitor_type='LocalMinimumReached', monitor_name='local min reached')
         fake_table_setup.plan_and_execute()
         fake_table_setup.check_cpi_geq(fake_table_setup.get_l_gripper_links(), 0.05)
         fake_table_setup.check_cpi_leq(['r_gripper_l_finger_tip_link'], 0.04)

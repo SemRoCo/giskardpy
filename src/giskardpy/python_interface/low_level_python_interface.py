@@ -619,6 +619,20 @@ class LowLevelGiskardWrapper:
         collision_entry.type = CollisionEntry.ALLOW_COLLISION
         self._set_collision_entries([collision_entry])
 
+    def avoid_all_collisions(self, min_distance: Optional[float] = None):
+        """
+        Avoids all collisions for next goal.
+        If you don't want to override the distance, don't call this function. Avoid all is the default, if you don't
+        add any collision entries.
+        :param min_distance: set this to overwrite default distances
+        """
+        if min_distance is None:
+            min_distance = -1
+        collision_entry = CollisionEntry()
+        collision_entry.type = CollisionEntry.AVOID_COLLISION
+        collision_entry.distance = min_distance
+        self._set_collision_entries([collision_entry])
+
     # %% world manipulation
     def clear_world(self, timeout: float = 2) -> UpdateWorldResponse:
         """

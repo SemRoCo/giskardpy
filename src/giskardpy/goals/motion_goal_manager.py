@@ -36,7 +36,7 @@ class MotionGoalManager:
                 params = json_to_kwargs(motion_goal.parameter_value_pair)
                 c: Goal = C(**params)
                 c.make_constraints()
-                self.motion_goals[str(c)] = c
+                self.add_motion_goal(c)
                 for monitor_name in motion_goal.to_end:
                     monitor = god_map.monitor_manager.get_monitor(monitor_name)
                     c.connect_to_end(monitor)
@@ -46,6 +46,9 @@ class MotionGoalManager:
                 if not isinstance(e, GiskardException):
                     raise ConstraintInitalizationException(error_msg)
                 raise e
+
+    def add_motion_goal(self, goal: Goal):
+        self.motion_goals[str(goal)] = goal
 
     @profile
     def parse_collision_entries(self, collision_entries: List[giskard_msgs.CollisionEntry]):
@@ -66,7 +69,7 @@ class MotionGoalManager:
         collision_check_distances = self.create_collision_check_distances()
         # ignored_collisions = god_map.get_collision_scene().ignored_self_collion_pairs
         collision_matrix = god_map.collision_scene.collision_goals_to_collision_matrix(deepcopy(collision_entries),
-                                                                                        collision_check_distances)
+                                                                                       collision_check_distances)
         return collision_matrix
 
     def create_collision_check_distances(self) -> Dict[PrefixName, float]:
@@ -119,13 +122,13 @@ class MotionGoalManager:
                         soft_threshold = soft_threshold_override
                     else:
                         soft_threshold = configs[robot_name].external_collision_avoidance[joint_name].soft_threshold
-                    constraint = ExternalCollisionAvoidance(robot_name=robot_name,
-                                                            link_name=child_link,
-                                                            hard_threshold=hard_threshold,
-                                                            soft_thresholds=soft_threshold,
-                                                            idx=i,
-                                                            num_repeller=number_of_repeller)
-                    constraint._save_self_on_god_map()
+                    motion_goal = ExternalCollisionAvoidance(robot_name=robot_name,
+                                                             link_name=child_link,
+                                                             hard_threshold=hard_threshold,
+                                                             soft_thresholds=soft_threshold,
+                                                             idx=i,
+                                                             num_repeller=number_of_repeller)
+                    god_map.motion_goal_manager.add_motion_goal(motion_goal)
                     num_constrains += 1
         logging.loginfo(f'Adding {num_constrains} external collision avoidance constraints.')
 
@@ -141,7 +144,8 @@ class MotionGoalManager:
                 try:
                     if (link_a_o, link_b_o) in god_map.collision_scene.self_collision_matrix:
                         continue
-                    link_a, link_b = god_map.world.compute_chain_reduced_to_controlled_joints(link_a_o, link_b_o, fixed_joints)
+                    link_a, link_b = god_map.world.compute_chain_reduced_to_controlled_joints(link_a_o, link_b_o,
+                                                                                              fixed_joints)
                     link_a, link_b = god_map.world.sort_links(link_a, link_b)
                     counter[link_a, link_b] += 1
                 except KeyError as e:
@@ -182,14 +186,14 @@ class MotionGoalManager:
                     robot_name = groups_a
                 else:
                     raise Exception(f'Could not find group containing the link {link_a} and {link_b}.')
-                constraint = SelfCollisionAvoidance(link_a=link_a,
+                goal = SelfCollisionAvoidance(link_a=link_a,
                                                     link_b=link_b,
                                                     robot_name=robot_name,
                                                     hard_threshold=hard_threshold,
                                                     soft_threshold=soft_threshold,
                                                     idx=i,
                                                     num_repeller=number_of_repeller)
-                constraint._save_self_on_god_map()
+                self.add_motion_goal(goal)
                 num_constr += 1
         logging.loginfo(f'Adding {num_constr} self collision avoidance constraints.')
 

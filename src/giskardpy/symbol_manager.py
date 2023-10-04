@@ -84,6 +84,14 @@ class SymbolManager(metaclass=SingletonMeta):
                     ],
                 ]
             )
+        if output_type_hint == cas.Point3:
+            return cas.Point3((self.get_symbol(expr + '[0]'),
+                               self.get_symbol(expr + '[1]'),
+                               self.get_symbol(expr + '[2]')))
+        if output_type_hint == cas.Vector3:
+            return cas.Vector3((self.get_symbol(expr + '[0]'),
+                                self.get_symbol(expr + '[1]'),
+                                self.get_symbol(expr + '[2]')))
 
         # if input_type_hint == np.ndarray:
         #     data = data.tolist()

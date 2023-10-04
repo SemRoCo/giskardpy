@@ -1,3 +1,4 @@
+import numbers
 from typing import Dict, Callable
 
 from giskardpy.god_map_interpreter import god_map
@@ -51,37 +52,65 @@ class SymbolManager(metaclass=SingletonMeta):
         else:
             return result
 
-    # def to_expr(self, identifier):
-    #     try:
-    #         data = self.get_data(identifier)
-    #     except KeyError as e:
-    #         raise KeyError(f'to_expr only works, when there is already data at the path: {e}')
-    #     if isinstance(data, np.ndarray):
-    #         data = data.tolist()
-    #     if isinstance(data, numbers.Number):
-    #         return self.to_symbol(identifier)
-    #     if isinstance(data, Pose):
-    #         return self.pose_msg_to_frame(identifier)
-    #     elif isinstance(data, PoseStamped):
-    #         return self.pose_msg_to_frame(identifier + ['pose'])
-    #     elif isinstance(data, Point):
-    #         return self.point_msg_to_point3(identifier)
-    #     elif isinstance(data, PointStamped):
-    #         return self.point_msg_to_point3(identifier + ['point'])
-    #     elif isinstance(data, Vector3):
-    #         return self.vector_msg_to_vector3(identifier)
-    #     elif isinstance(data, Vector3Stamped):
-    #         return self.vector_msg_to_vector3(identifier + ['vector'])
-    #     elif isinstance(data, list):
-    #         return self.list_to_symbol_matrix(identifier, data)
-    #     elif isinstance(data, Quaternion):
-    #         return self.quaternion_msg_to_rotation(identifier)
-    #     elif isinstance(data, QuaternionStamped):
-    #         return self.quaternion_msg_to_rotation(identifier + ['quaternion'])
-    #     elif isinstance(data, np.ndarray):
-    #         return self.list_to_symbol_matrix(identifier, data)
-    #     else:
-    #         raise NotImplementedError('to_expr not implemented for type {}.'.format(type(data)))
+    def get_expr(self, expr, input_type_hint=None, output_type_hint=None):
+        if input_type_hint is None:
+            try:
+                data = eval(expr)
+            except KeyError as e:
+                raise KeyError(f'to_expr only works, when there is already data at the path: {e}')
+        if output_type_hint == cas.TransMatrix:
+            return cas.TransMatrix(
+                [
+                    [
+                        self.get_symbol(expr + '[0, 0]'),
+                        self.get_symbol(expr + '[0, 1]'),
+                        self.get_symbol(expr + '[0, 2]'),
+                        self.get_symbol(expr + '[0, 3]')
+                    ],
+                    [
+                        self.get_symbol(expr + '[1, 0]'),
+                        self.get_symbol(expr + '[1, 1]'),
+                        self.get_symbol(expr + '[1, 2]'),
+                        self.get_symbol(expr + '[1, 3]')
+                    ],
+                    [
+                        self.get_symbol(expr + '[2, 0]'),
+                        self.get_symbol(expr + '[2, 1]'),
+                        self.get_symbol(expr + '[2, 2]'),
+                        self.get_symbol(expr + '[2, 3]')
+                    ],
+                    [
+                        0, 0, 0, 1
+                    ],
+                ]
+            )
+
+        # if input_type_hint == np.ndarray:
+        #     data = data.tolist()
+        # if input_type_hint == numbers.Number:
+        #     return self.get_symbol(expr)
+        # if input_type_hint == Pose:
+        #     return self.pose_msg_to_frame(identifier)
+        # elif input_type_hint == PoseStamped:
+        #     return self.pose_msg_to_frame(identifier + ['pose'])
+        # elif input_type_hint == Point:
+        #     return self.point_msg_to_point3(identifier)
+        # elif input_type_hint == PointStamped:
+        #     return self.point_msg_to_point3(identifier + ['point'])
+        # elif input_type_hint == Vector3:
+        #     return self.vector_msg_to_vector3(identifier)
+        # elif input_type_hint == Vector3Stamped:
+        #     return self.vector_msg_to_vector3(identifier + ['vector'])
+        # elif input_type_hint == list:
+        #     return self.list_to_symbol_matrix(identifier, data)
+        # elif input_type_hint == Quaternion:
+        #     return self.quaternion_msg_to_rotation(identifier)
+        # elif input_type_hint == QuaternionStamped:
+        #     return self.quaternion_msg_to_rotation(identifier + ['quaternion'])
+        # elif input_type_hint == np.ndarray:
+        #     return self.list_to_symbol_matrix(identifier, data)
+        # else:
+        raise NotImplementedError('to_expr not implemented for type {}.'.format(type(data)))
 
     @property
     def time(self):

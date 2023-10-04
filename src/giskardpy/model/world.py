@@ -1356,7 +1356,8 @@ class WorldTree(WorldTreeInterface):
 
     @profile
     def compose_fk_evaluated_expression(self, root: PrefixName, tip: PrefixName) -> w.TransMatrix:
-        result: w.TransMatrix = god_map.list_to_frame(identifier.fk_np + [(root, tip)])
+        result: w.TransMatrix = symbol_manager.get_expr(f'god_map.world.compute_fk_np(\'{root}\', \'{tip}\')',
+                                                        output_type_hint=w.TransMatrix)
         result.reference_frame = root
         result.child_frame = tip
         return result

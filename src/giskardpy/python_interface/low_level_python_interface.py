@@ -318,7 +318,7 @@ class LowLevelGiskardWrapper:
         :param max_velocity: rad/s, strict limit, but will slow the system down
         :param weight:
         """
-        self.set_json_goal(constraint_type='CartesianOrientation',
+        self.add_motion_goal(goal_type='CartesianOrientation',
                            goal_orientation=goal_orientation,
                            tip_link=tip_link,
                            root_link=root_link,

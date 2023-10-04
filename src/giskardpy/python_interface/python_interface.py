@@ -22,11 +22,16 @@ class GiskardWrapper(LowLevelGiskardWrapper):
         :param weight:
         :param max_velocity: will be applied to all joints
         """
+        monitor_name = 'joint goal reached'
+        self.add_joint_goal_monitor(name=monitor_name,
+                                    goal_state=goal_state,
+                                    crucial=True)
         self.add_motion_goal(goal_type='JointPositionList',
                              goal_state=goal_state,
                              group_name=group_name,
                              weight=weight,
                              max_velocity=max_velocity,
+                             to_end=[monitor_name],
                              **kwargs)
 
     def set_cart_goal(self,

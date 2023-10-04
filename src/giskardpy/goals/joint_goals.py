@@ -419,7 +419,8 @@ class AvoidSingleJointLimits(Goal):
         self.percentage = percentage
         super().__init__()
         self.joint_name = god_map.world.search_for_joint_name(joint_name, group_name)
-        if not god_map.world.is_joint_revolute(self.joint_name) and not god_map.world.is_joint_prismatic(self.joint_name):
+        if not god_map.world.is_joint_revolute(self.joint_name) and not god_map.world.is_joint_prismatic(
+                self.joint_name):
             raise ConstraintException(
                 f'{self.__class__.__name__} called with non prismatic or revolute joint {joint_name}')
 
@@ -537,21 +538,21 @@ class JointPositionList(Goal):
             self.current_positions.append(joint.get_symbol(Derivatives.position))
             self.goal_positions.append(goal_position)
             self.velocity_limits.append(velocity_limit)
-            task = Task(name='joint goal')
-            for name, current, goal, velocity_limit in zip(self.names, self.current_positions,
-                                                                      self.goal_positions, self.velocity_limits):
-                if god_map.world.is_joint_continuous(name):
-                    error = cas.shortest_angular_distance(current, goal)
-                else:
-                    error = goal - current
+        task = Task(name='joint goal')
+        for name, current, goal, velocity_limit in zip(self.names, self.current_positions,
+                                                       self.goal_positions, self.velocity_limits):
+            if god_map.world.is_joint_continuous(name):
+                error = cas.shortest_angular_distance(current, goal)
+            else:
+                error = goal - current
 
-                task.add_equality_constraint(name=name,
-                                             reference_velocity=velocity_limit,
-                                             equality_bound=error,
-                                             weight=self.weight,
-                                             task_expression=current)
+            task.add_equality_constraint(name=name,
+                                         reference_velocity=velocity_limit,
+                                         equality_bound=error,
+                                         weight=self.weight,
+                                         task_expression=current)
 
-            self.add_task(task)
+        self.add_task(task)
 
     def make_constraints(self):
         pass

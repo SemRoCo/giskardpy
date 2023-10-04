@@ -82,7 +82,10 @@ class LowLevelGiskardWrapper:
         :param wait: blocks if wait=True
         :return: result from Giskard
         """
-        self.add_monitor(monitor_type='LocalMinimumReached', monitor_name='local min reached')
+        local_min_reached_monitor_name = 'local min reached'
+        self.add_monitor(monitor_type='LocalMinimumReached', monitor_name=local_min_reached_monitor_name)
+        for goal in self._goals:
+            goal.to_end.append(local_min_reached_monitor_name)
         goal = self._create_action_goal()
         goal.type = goal_type
         if wait:
@@ -148,8 +151,8 @@ class LowLevelGiskardWrapper:
     # %% predefined monitors
     def add_joint_goal_monitor(self, name: str,
                                goal_state: Dict[str, float],
-                               threshold: float,
-                               crucial: bool):
+                               threshold: float = 0.005,
+                               crucial: bool = True):
         self.add_monitor(monitor_type=JointGoalReached.__name__,
                          monitor_name=name,
                          goal_state=goal_state,

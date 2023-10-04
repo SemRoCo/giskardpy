@@ -9,16 +9,12 @@ from typing import List, Dict, Optional, Tuple, Iterable, Set, DefaultDict, Call
 
 from geometry_msgs.msg import Pose
 from lxml import etree
-import hashlib
 import numpy as np
 
 from giskard_msgs.msg import CollisionEntry
-from giskardpy import identifier
-from giskardpy.data_types import JointStates
 from giskardpy.exceptions import UnknownGroupException, UnknownLinkException
 from giskardpy.god_map_interpreter import god_map
 from giskardpy.model.world import WorldBranch
-from giskardpy.model.world import WorldTree
 from giskardpy.my_types import my_string, Derivatives, PrefixName
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.utils import logging

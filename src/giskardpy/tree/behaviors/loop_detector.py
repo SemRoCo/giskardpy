@@ -2,7 +2,6 @@ from collections import defaultdict
 
 from py_trees import Status
 
-import giskardpy.identifier as identifier
 from giskardpy.data_types import JointStates
 from giskardpy.exceptions import ExecutionException
 from giskardpy.god_map_interpreter import god_map

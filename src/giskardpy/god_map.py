@@ -15,194 +15,21 @@ from giskardpy.utils import logging
 from giskardpy.utils.singleton import SingletonMeta
 
 
-def set_default_in_override_block(block_identifier):
-    god_map = _GodMap()
-    default_value = god_map.get_data(block_identifier[:-1] + ['default'])
-    override = god_map.get_data(block_identifier)
-    d = defaultdict(lambda: default_value)
-    if isinstance(override, dict):
-        if isinstance(default_value, dict):
-            for key, value in override.items():
-                o = deepcopy(default_value)
-                o.update(value)
-                override[key] = o
-        d.update(override)
-    god_map.set_data(block_identifier, d)
-    return KeyDefaultDict(lambda key: god_map.to_symbol(block_identifier + [key]))
-
-
-def get_member(identifier, member):
-    """
-    :param identifier:
-    :type identifier: Union[None, dict, list, tuple, object]
-    :param member:
-    :type member: str
-    :return:
-    """
-    try:
-        return identifier[member]
-    except TypeError:
-        if callable(identifier):
-            return identifier(*member)
-        try:
-            return getattr(identifier, member)
-        except TypeError:
-            pass
-    except IndexError:
-        return identifier[int(member)]
-    except RuntimeError:
-        pass
-
-
-class GetMember(object):
-    def __init__(self):
-        self.member = None
-        self.child = None
-
-    def init_call(self, identifier, data):
-        self.member = identifier[0]
-        sub_data = self.c(data)
-        if len(identifier) == 2:
-            self.child = GetMemberLeaf()
-            return self.child.init_call(identifier[-1], sub_data)
-        elif len(identifier) > 2:
-            self.child = GetMember()
-            return self.child.init_call(identifier[1:], sub_data)
-        return sub_data
-
-    def __call__(self, a):
-        return self.c(a)
-
-    def c(self, a):
-        try:
-            r = a[self.member]
-            self.c = self.return_dict
-            return r
-        except TypeError:
-            if callable(a):
-                r = a(*self.member)
-                self.c = self.return_function_result
-                return r
-            try:
-                r = getattr(a, self.member)
-                self.c = self.return_attribute
-                return r
-            except TypeError:
-                pass
-        except IndexError:
-            r = a[int(self.member)]
-            self.c = self.return_list
-            return r
-        except RuntimeError:
-            pass
-        raise KeyError(a)
-
-    def return_dict(self, a):
-        return self.child.c(a[self.member])
-
-    def return_list(self, a):
-        return self.child.c(a[int(self.member)])
-
-    def return_attribute(self, a):
-        return self.child.c(getattr(a, self.member))
-
-    def return_function_result(self, a):
-        return self.child.c(a(*self.member))
-
-
-class GetMemberLeaf:
-    def __init__(self):
-        self.member = None
-        self.child = None
-
-    def init_call(self, member, data):
-        self.member = member
-        return self.c(data)
-
-    def __call__(self, a):
-        return self.c(a)
-
-    def c(self, a):
-        try:
-            r = a[self.member]
-            self.c = self.return_dict
-            return r
-        except TypeError:
-            if callable(a):
-                r = a(*self.member)
-                self.c = self.return_function_result
-                return r
-            try:
-                r = getattr(a, self.member)
-                self.c = self.return_attribute
-                return r
-            except TypeError:
-                pass
-        except IndexError:
-            r = a[int(self.member)]
-            self.c = self.return_list
-            return r
-        except RuntimeError:
-            pass
-        raise KeyError(a)
-
-    def return_dict(self, a):
-        return a[self.member]
-
-    def return_list(self, a):
-        return a[int(self.member)]
-
-    def return_attribute(self, a):
-        return getattr(a, self.member)
-
-    def return_function_result(self, a):
-        return a(*self.member)
-
-
-def get_data(identifier: Sequence[Union[str, int, Sequence[Union[str, int]]]], data: Any):
-    """
-    :param identifier: Identifier in the form of ['pose', 'position', 'x'],
-                       to access class member: robot.joint_state = ['robot', 'joint_state']
-                       to access dicts: robot.joint_state['torso_lift_joint'] = ['robot', 'joint_state', ('torso_lift_joint')]
-                       to access lists or other indexable stuff: robot.l[-1] = ['robot', 'l', -1]
-                       to access functions: lib.str_to_ascii('muh') = ['lib', 'str_to_acii', ['muh']]
-                       to access functions without params: robot.get_pybullet_id() = ['robot', 'get_pybullet_id', []]
-    :return: object that is saved at key
-    """
-    try:
-        if len(identifier) == 1:
-            shortcut = GetMemberLeaf()
-            result = shortcut.init_call(identifier[0], data)
-        else:
-            shortcut = GetMember()
-            result = shortcut.init_call(identifier, data)
-    except AttributeError as e:
-        raise KeyError(e)
-    except IndexError as e:
-        raise KeyError(e)
-    return result, shortcut
-
-
 class _GodMap(metaclass=SingletonMeta):
     """
     Data structure used by tree to exchange information.
     """
 
-    _data: dict
     key_to_expr: dict
     expr_to_key: dict
-    last_expr_values: dict
     shortcuts: dict
 
     def __init__(self):
-        self._data = {}
         self.key_to_expr = {}
         self.expr_to_key = {}
-        self.last_expr_values = {}
         self.shortcuts = {}
         self.expr_separator = '_'
         self.lock = RLock()
-
 
     def __enter__(self):
         self.lock.acquire()
@@ -210,47 +37,6 @@ class _GodMap(metaclass=SingletonMeta):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.lock.release()
-
-    def unsafe_get_data(self, identifier: Sequence):
-        """
-
-        :param identifier: Identifier in the form of ['pose', 'position', 'x'],
-                           to access class member: robot.joint_state = ['robot', 'joint_state']
-                           to access dicts: robot.joint_state['torso_lift_joint'] = ['robot', 'joint_state', ('torso_lift_joint')]
-                           to access lists or other indexable stuff: robot.l[-1] = ['robot', 'l', -1]
-                           to access functions: lib.str_to_ascii('muh') = ['lib', 'str_to_acii', ['muh']]
-                           to access functions without params: robot.get_pybullet_id() = ['robot', 'get_pybullet_id', []]
-        :return: object that is saved at key
-        """
-        identifier = tuple(identifier)
-        try:
-            if identifier not in self.shortcuts:
-                result, shortcut = get_data(identifier, self)
-                if shortcut:
-                    self.shortcuts[identifier] = shortcut
-                return result
-            return self.shortcuts[identifier].c(self)
-        except Exception as e:
-            e2 = type(e)(f'{e}; path: {identifier}')
-            raise e2
-
-    def get_data(self, identifier, default=None):
-        with self.lock:
-            try:
-                r = self.unsafe_get_data(identifier)
-            except KeyError:
-                if default is not None:
-                    self.unsafe_set_data(identifier, default)
-                    return default
-                raise
-        return r
-
-    def has_data(self, identifier):
-        try:
-            self.unsafe_get_data(identifier)
-            return True
-        except KeyError as e:
-            return False
 
     def clear_cache(self):
         self.shortcuts = {}
@@ -273,37 +59,6 @@ class _GodMap(metaclass=SingletonMeta):
             self.expr_to_key[str(expr)] = identifier_parts
         return self.key_to_expr[identifier]
 
-    def to_expr(self, identifier):
-        try:
-            data = self.get_data(identifier)
-        except KeyError as e:
-            raise KeyError(f'to_expr only works, when there is already data at the path: {e}')
-        if isinstance(data, np.ndarray):
-            data = data.tolist()
-        if isinstance(data, numbers.Number):
-            return self.to_symbol(identifier)
-        if isinstance(data, Pose):
-            return self.pose_msg_to_frame(identifier)
-        elif isinstance(data, PoseStamped):
-            return self.pose_msg_to_frame(identifier + ['pose'])
-        elif isinstance(data, Point):
-            return self.point_msg_to_point3(identifier)
-        elif isinstance(data, PointStamped):
-            return self.point_msg_to_point3(identifier + ['point'])
-        elif isinstance(data, Vector3):
-            return self.vector_msg_to_vector3(identifier)
-        elif isinstance(data, Vector3Stamped):
-            return self.vector_msg_to_vector3(identifier + ['vector'])
-        elif isinstance(data, list):
-            return self.list_to_symbol_matrix(identifier, data)
-        elif isinstance(data, Quaternion):
-            return self.quaternion_msg_to_rotation(identifier)
-        elif isinstance(data, QuaternionStamped):
-            return self.quaternion_msg_to_rotation(identifier + ['quaternion'])
-        elif isinstance(data, np.ndarray):
-            return self.list_to_symbol_matrix(identifier, data)
-        else:
-            raise NotImplementedError('to_expr not implemented for type {}.'.format(type(data)))
 
     def list_to_symbol_matrix(self, identifier, data):
         def replace_nested_list(l, f, start_index=None):
@@ -393,83 +148,3 @@ class _GodMap(metaclass=SingletonMeta):
             y=self.to_symbol(identifier + ['y']),
             z=self.to_symbol(identifier + ['z']),
         )
-
-    def get_values(self, symbols) -> np.ndarray:
-        """
-        :return: a dict which maps all registered expressions to their values or 0 if there is no number entry
-        """
-        # its a trap, this function only looks slow with lineprofiler
-        with self.lock:
-            return self.unsafe_get_values(symbols)
-
-    def unsafe_get_values(self, symbols: List[str]) -> np.ndarray:
-        """
-        :return: an array which maps all registered expressions to their values or 0 if there is no number entry
-        """
-        try:
-            return np.array([self.unsafe_get_data(self.expr_to_key[expr]) for expr in symbols], dtype=float)
-        except ValueError as e:
-            data = []
-            for expr in symbols:
-                key = self.expr_to_key[expr]
-                value = self.unsafe_get_data(key)
-                data.append(value)
-                try:
-                    np.array(data, dtype=float)
-                except:
-                    logging.logerr(f'{key} has wrong dimensions: {value}')
-                    raise e
-            raise e
-
-    def evaluate_expr(self, expr: w.Expression):
-        if isinstance(expr, (int, float)):
-            return expr
-        f = expr.compile()
-        if len(f.str_params) == 0:
-            return expr.evaluate()
-        result = f.fast_call(self.get_values(f.str_params))
-        if len(result) == 1:
-            return result[0]
-        else:
-            return result
-
-    def get_registered_symbols(self):
-        """
-        :rtype: list
-        """
-        return self.key_to_expr.values()
-
-    # def unsafe_set_data(self, identifier, value):
-    #     """
-    #
-    #     :param identifier: e.g. ['pose', 'position', 'x']
-    #     :type identifier: list
-    #     :param value:
-    #     :type value: object
-    #     """
-    #     if len(identifier) == 0:
-    #         raise ValueError('key is empty')
-    #     namespace = identifier[0]
-    #     if namespace not in self._data:
-    #         if len(identifier) > 1:
-    #             raise KeyError('Can not access member of unknown namespace: {}'.format(identifier))
-    #         else:
-    #             self._data[namespace] = value
-    #     else:
-    #         result = self._data[namespace]
-    #         for member in identifier[1:-1]:
-    #             result = get_member(result, member)
-    #         if len(identifier) > 1:
-    #             member = identifier[-1]
-    #             if isinstance(result, dict):
-    #                 result[member] = value
-    #             elif isinstance(result, list):
-    #                 result[int(member)] = value
-    #             else:
-    #                 setattr(result, member, value)
-    #         else:
-    #             self._data[namespace] = value
-
-    # def set_data(self, identifier, value):
-    #     with self.lock:
-    #         self.unsafe_set_data(identifier, value)

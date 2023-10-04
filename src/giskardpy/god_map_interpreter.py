@@ -3,7 +3,6 @@ from __future__ import annotations
 import rospy
 
 from giskard_msgs.msg import MoveGoal, MoveResult
-from giskardpy import identifier
 from typing import TYPE_CHECKING, List, Dict, Set, Tuple
 
 from giskardpy.god_map import _GodMap

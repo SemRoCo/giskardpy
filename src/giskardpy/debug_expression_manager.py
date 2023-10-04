@@ -1,10 +1,8 @@
-import traceback
 from typing import List, Dict
 
 import numpy as np
 import pandas as pd
 import giskardpy.casadi_wrapper as cas
-from giskardpy import identifier
 from giskardpy.data_types import JointStates
 from giskardpy.god_map_interpreter import god_map
 from giskardpy.model.trajectory import Trajectory

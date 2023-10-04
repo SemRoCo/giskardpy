@@ -3,7 +3,6 @@ from collections import defaultdict
 from copy import deepcopy
 from typing import List, Dict, Tuple
 
-from giskardpy import identifier
 from giskardpy.exceptions import UnknownConstraintException, GiskardException, ConstraintInitalizationException
 from giskardpy.goals.collision_avoidance import ExternalCollisionAvoidance, SelfCollisionAvoidance
 from giskardpy.goals.goal import Goal

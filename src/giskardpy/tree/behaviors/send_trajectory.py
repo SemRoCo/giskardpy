@@ -25,7 +25,6 @@ from control_msgs.msg import FollowJointTrajectoryAction, FollowJointTrajectoryG
     JointTolerance
 from py_trees_ros.actions import ActionClient
 
-import giskardpy.identifier as identifier
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
 from giskardpy.utils.logging import loginfo

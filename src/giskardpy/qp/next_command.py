@@ -1,10 +1,7 @@
-from collections import OrderedDict
 from typing import List, Dict
 
 import numpy as np
 
-from giskardpy import identifier
-from giskardpy.god_map import _GodMap
 from giskardpy.my_types import Derivatives, PrefixName
 from giskardpy.qp.free_variable import FreeVariable
 import giskardpy.utils.math as giskard_math

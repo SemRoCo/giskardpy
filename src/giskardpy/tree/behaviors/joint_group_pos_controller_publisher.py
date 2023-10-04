@@ -3,7 +3,6 @@ from copy import deepcopy
 import rospy
 from std_msgs.msg import Float64MultiArray
 
-import giskardpy.identifier as identifier
 from giskardpy.data_types import KeyDefaultDict
 from giskardpy.god_map_interpreter import god_map
 from giskardpy.my_types import Derivatives

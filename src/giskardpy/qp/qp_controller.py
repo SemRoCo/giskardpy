@@ -10,7 +10,6 @@ import numpy as np
 import pandas as pd
 
 import giskardpy.casadi_wrapper as cas
-from giskardpy import identifier
 from giskardpy.configs.qp_controller_config import SupportedQPSolver
 from giskardpy.exceptions import HardConstraintsViolatedException, QPSolverException, InfeasibleException, \
     VelocityLimitUnreachableException
@@ -23,6 +22,7 @@ from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.next_command import NextCommands
 from giskardpy.qp.pos_in_vel_limits import b_profile
 from giskardpy.qp.qp_solver import QPSolver
+from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils import logging
 from giskardpy.utils.utils import create_path, get_all_classes_in_package
 from giskardpy.utils.decorators import memoize
@@ -89,7 +89,7 @@ class ProblemDataPart(ABC):
     def replace_hack(self, expression: Union[float, cas.Expression], new_value):
         if not isinstance(expression, cas.Expression):
             return expression
-        hack = god_map.to_symbol(identifier.hack)
+        hack = symbol_manager.hack
         expression.s = cas.ca.substitute(expression.s, hack.s, new_value)
         return expression
 

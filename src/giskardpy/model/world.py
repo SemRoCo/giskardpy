@@ -16,7 +16,7 @@ from tf2_msgs.msg import TFMessage
 
 import giskardpy.utils.math as mymath
 from giskard_msgs.msg import WorldBody
-from giskardpy import casadi_wrapper as w, identifier
+from giskardpy import casadi_wrapper as w
 from giskardpy.casadi_wrapper import CompiledFunction
 from giskardpy.data_types import JointStates
 from giskardpy.exceptions import DuplicateNameException, UnknownGroupException, UnknownLinkException, \
@@ -1448,9 +1448,9 @@ class WorldTree(WorldTreeInterface):
             # joint has no limits for this derivative
             return None, None
         if not isinstance(lower_limit, (int, float)) and lower_limit is not None:
-            lower_limit = god_map.evaluate_expr(lower_limit)
+            lower_limit = symbol_manager.evaluate_expr(lower_limit)
         if not isinstance(upper_limit, (int, float)) and upper_limit is not None:
-            upper_limit = god_map.evaluate_expr(upper_limit)
+            upper_limit = symbol_manager.evaluate_expr(upper_limit)
         return lower_limit, upper_limit
 
     def get_joint_position_limits(self, joint_name: my_string) -> Tuple[Optional[float], Optional[float]]:

@@ -6,7 +6,6 @@ from py_trees.behaviours import Running
 from std_msgs.msg import Float64MultiArray
 from sensor_msgs.msg import JointState
 
-import giskardpy.identifier as identifier
 from giskardpy.data_types import KeyDefaultDict, JointStates
 from giskardpy.god_map_interpreter import god_map
 from giskardpy.my_types import Derivatives

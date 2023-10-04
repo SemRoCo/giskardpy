@@ -9,7 +9,6 @@ from py_trees import Status
 from rospy import ROSException
 from rostopic import ROSTopicException
 
-import giskardpy.identifier as identifier
 from giskardpy.exceptions import GiskardException
 from giskardpy.goals.base_traj_follower import BaseTrajFollower, BaseTrajFollowerPR2
 from giskardpy.goals.goal import Goal
@@ -93,7 +92,7 @@ class SendTrajectoryToCmdVel(GiskardBehavior, ABC):
         except KeyError:
             drive_goals = []
         drive_goals.extend(self.get_drive_goals())
-        god_map.dr(identifier.drive_goals, drive_goals)
+        god_map.drive_goals = drive_goals
 
     def get_drive_goals(self) -> List[Goal]:
         return [SetPredictionHorizon(prediction_horizon=god_map.qp_controller_config.prediction_horizon + 4),

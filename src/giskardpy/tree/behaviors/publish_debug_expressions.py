@@ -1,14 +1,9 @@
-from copy import deepcopy
-
 import numpy as np
 import rospy
 from py_trees import Status
 from sensor_msgs.msg import JointState
 
-from giskardpy import identifier
-from giskardpy.data_types import JointStates
 from giskardpy.god_map_interpreter import god_map
-from giskardpy.model.trajectory import Trajectory
 from giskardpy.qp.qp_controller import QPProblemBuilder
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.decorators import record_time

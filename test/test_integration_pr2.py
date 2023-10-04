@@ -473,6 +473,7 @@ class TestConstraints:
         zero_pose.set_translation_goal(root_link=zero_pose.default_root,
                                        tip_link=tip,
                                        goal_point=p)
+        zero_pose.add_monitor(monitor_type='LocalMinimumReached', monitor_name='local min reached')
         zero_pose.plan_and_execute()
 
     def test_CartesianPosition1(self, zero_pose: PR2TestWrapper):
@@ -1614,6 +1615,7 @@ class TestCartGoals:
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.allow_all_collisions()
         zero_pose.set_cart_goal(p, zero_pose.r_tip, 'base_footprint')
+        zero_pose.add_monitor(monitor_type='LocalMinimumReached', monitor_name='local min reached')
         zero_pose.plan_and_execute()
 
     def test_cart_goal_1eef2(self, zero_pose: PR2TestWrapper):

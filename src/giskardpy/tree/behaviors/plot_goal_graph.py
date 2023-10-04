@@ -4,9 +4,6 @@ from typing import List
 import pydot
 from py_trees import Status
 
-import giskardpy.identifier as identifier
-from giskardpy.data_types import JointStates
-from giskardpy.exceptions import ExecutionException
 from giskardpy.goals.monitors.monitors import Monitor
 from giskardpy.goals.tasks.task import Task
 from giskardpy.god_map_interpreter import god_map

@@ -1,13 +1,9 @@
 from __future__ import annotations
 
 import abc
-from collections import defaultdict
-from enum import Enum
 from typing import Dict, Optional, List, Union, DefaultDict, Tuple
 
-from giskardpy import identifier
 from giskardpy.exceptions import SetupException
-from giskardpy.god_map import _GodMap
 from giskardpy.god_map_interpreter import god_map
 from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer, CollisionAvoidanceGroupThresholds, \
     CollisionCheckerLib, CollisionAvoidanceThresholds

@@ -2,7 +2,6 @@ from collections import defaultdict
 from typing import Dict, Optional, List, Union
 import numpy as np
 import giskardpy.casadi_wrapper as w
-from giskardpy import identifier
 from giskardpy.god_map_interpreter import god_map
 from giskardpy.my_types import Derivatives, PrefixName
 from giskardpy.symbol_manager import symbol_manager
@@ -10,7 +9,6 @@ from giskardpy.utils.decorators import memoize
 
 
 class FreeVariable:
-    state_identifier: List[str] = identifier.joint_states
 
     def __init__(self,
                  name: PrefixName,
@@ -63,7 +61,7 @@ class FreeVariable:
         else:
             raise KeyError(f'Free variable {self} doesn\'t have lower limit for derivative of order {derivative}')
         if evaluated:
-            return float(god_map.evaluate_expr(expr))
+            return float(symbol_manager.evaluate_expr(expr))
         return expr
 
     def set_lower_limit(self, derivative: Derivatives, limit: Union[w.Expression, float]):
@@ -84,7 +82,7 @@ class FreeVariable:
         else:
             raise KeyError(f'Free variable {self} doesn\'t have upper limit for derivative of order {derivative}')
         if evaluated:
-            return god_map.evaluate_expr(expr)
+            return symbol_manager.evaluate_expr(expr)
         return expr
 
     def get_lower_limits(self, max_derivative: Derivatives) -> Dict[Derivatives, float]:
@@ -117,7 +115,7 @@ class FreeVariable:
         weight = a * t + start
         expr = weight * (1 / self.get_upper_limit(derivative)) ** 2
         if evaluated:
-            return god_map.evaluate_expr(expr)
+            return symbol_manager.evaluate_expr(expr)
 
     def __str__(self) -> str:
         return self.position_name

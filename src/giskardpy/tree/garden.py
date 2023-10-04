@@ -21,7 +21,6 @@ from sortedcontainers import SortedList
 
 import giskardpy
 from giskard_msgs.msg import MoveAction, MoveFeedback
-from giskardpy import identifier
 from giskardpy.configs.collision_avoidance_config import CollisionCheckerLib
 from giskardpy.exceptions import DuplicateNameException, BehaviorTreeException
 from giskardpy.god_map import _GodMap
@@ -770,7 +769,7 @@ class OpenLoop(StandAlone):
 
     def grow_execution(self):
         execution = failure_is_success(Sequence)(self.execution_name)
-        execution.add_child(IF('execute?', identifier.execute))
+        execution.add_child(IF('execute?', god_map.is_goal_msg_type_execute))
         execution.add_child(SetTrackingStartTime('start start time'))
         execution.add_child(self.grow_monitor_execution())
         execution.add_child(SetZeroVelocity('set zero vel 2'))

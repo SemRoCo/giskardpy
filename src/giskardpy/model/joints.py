@@ -8,13 +8,13 @@ import urdf_parser_py.urdf as up
 from geometry_msgs.msg import PoseStamped, Pose
 
 import giskardpy.casadi_wrapper as w
-from giskardpy import identifier
 from giskardpy.data_types import JointStates
 from giskardpy.god_map import _GodMap
 from giskardpy.god_map_interpreter import god_map
 from giskardpy.my_types import PrefixName, Derivatives
 from giskardpy.my_types import my_string, derivative_joint_map, derivative_map
 from giskardpy.qp.free_variable import FreeVariable
+from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils.math import rpy_from_quaternion
 
 
@@ -584,7 +584,7 @@ class OmniDrivePR22(MovableJoint, VirtualFreeVariables):
 
     @profile
     def create_parent_T_child(self):
-        hack = god_map.to_symbol(identifier.hack)
+        hack = symbol_manager.hack
         odom_T_bf = w.TransMatrix.from_xyz_rpy(x=self.x.get_symbol(Derivatives.position),
                                                y=self.y.get_symbol(Derivatives.position),
                                                # yaw=self.yaw.get_symbol(Derivatives.position)

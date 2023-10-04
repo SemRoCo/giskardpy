@@ -1,6 +1,5 @@
 from py_trees import Status
 
-from giskardpy import identifier
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.decorators import record_time
 

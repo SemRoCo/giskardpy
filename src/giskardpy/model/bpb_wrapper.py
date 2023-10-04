@@ -2,17 +2,13 @@ import os
 from typing import List, Tuple, Optional
 
 import betterpybullet as pb
-import numpy as np
 import trimesh
 
-from giskardpy import identifier
-from giskardpy.god_map import _GodMap
 from giskardpy.god_map_interpreter import god_map
 from giskardpy.model.collision_world_syncer import Collision
 from giskardpy.model.links import Link, LinkGeometry, BoxGeometry, SphereGeometry, CylinderGeometry, MeshGeometry
 from giskardpy.my_types import my_string, PrefixName
 from giskardpy.utils import logging
-from giskardpy.utils.math import inverse_frame
 from giskardpy.utils.utils import resolve_ros_iris, to_tmp_path, write_to_tmp, suppress_stdout
 
 CollisionObject = pb.CollisionObject

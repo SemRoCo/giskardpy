@@ -9,13 +9,8 @@ from py_trees import Status
 from rospy import ROSException
 from rostopic import ROSTopicException
 
-import giskardpy.identifier as identifier
-from giskardpy.goals.base_traj_follower import BaseTrajFollower
-from giskardpy.goals.goal import Goal
-from giskardpy.goals.set_prediction_horizon import SetPredictionHorizon
 from giskardpy.god_map_interpreter import god_map
 from giskardpy.model.joints import OmniDrive, DiffDrive
-from giskardpy.my_types import Derivatives
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
 from giskardpy.utils.decorators import catch_and_raise_to_blackboard

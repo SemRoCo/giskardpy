@@ -124,13 +124,6 @@ class LowLevelGiskardWrapper:
                         to_hold: Optional[List[str]] = None,
                         to_end: Optional[List[str]] = None,
                         **kwargs):
-
-        """
-        Set a goal for any of the goals defined in any of the files in src/giskardpy/goals/
-        :param constraint_type: Name of the Goal class
-        :param kwargs: maps constraint parameter names to their values.
-                        Values should be a float, str, dict or ros messages.
-        """
         motion_goal = MotionGoal()
         motion_goal.name = goal_name
         motion_goal.type = goal_type
@@ -265,16 +258,16 @@ class LowLevelGiskardWrapper:
         :param reference_velocity: m/s
         :param weight:
         """
-        self.set_json_goal(constraint_type='CartesianPosition',
-                           goal_point=goal_point,
-                           tip_link=tip_link,
-                           root_link=root_link,
-                           tip_group=tip_group,
-                           root_group=root_group,
-                           max_velocity=max_velocity,
-                           reference_velocity=reference_velocity,
-                           weight=weight,
-                           **kwargs)
+        self.add_motion_goal(goal_type='CartesianPosition',
+                             goal_point=goal_point,
+                             tip_link=tip_link,
+                             root_link=root_link,
+                             tip_group=tip_group,
+                             root_group=root_group,
+                             max_velocity=max_velocity,
+                             reference_velocity=reference_velocity,
+                             weight=weight,
+                             **kwargs)
 
     def set_seed_configuration(self, seed_configuration):
         self.add_motion_goal(goal_type='SetSeedConfiguration',

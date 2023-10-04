@@ -12,7 +12,6 @@ import rospy
 from sortedcontainers import SortedDict
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
-from giskardpy import identifier
 from giskardpy.data_types import JointStates
 from giskardpy.god_map import _GodMap
 from giskardpy.god_map_interpreter import god_map

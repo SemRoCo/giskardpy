@@ -1,7 +1,5 @@
 from py_trees import Status
 
-import giskardpy.identifier as identifier
-from giskard_msgs.msg import MoveResult
 from giskardpy.exceptions import *
 from giskardpy.god_map_interpreter import god_map
 from giskardpy.tree.behaviors.plugin import GiskardBehavior

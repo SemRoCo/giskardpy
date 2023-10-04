@@ -2,7 +2,6 @@ from multiprocessing import Lock
 
 from py_trees import Status
 
-import giskardpy.identifier as identifier
 from giskardpy.exceptions import SelfCollisionViolatedException
 from giskardpy.god_map_interpreter import god_map
 from giskardpy.model.collision_world_syncer import Collisions

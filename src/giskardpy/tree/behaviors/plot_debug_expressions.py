@@ -1,17 +1,12 @@
 import traceback
-from collections import defaultdict
 from threading import Lock
-from typing import Dict
-import re
 import numpy as np
 
-from giskardpy import identifier
 from giskardpy.data_types import JointStates
 from giskardpy.god_map_interpreter import god_map
 from giskardpy.model.trajectory import Trajectory
 from giskardpy.tree.behaviors.plot_trajectory import PlotTrajectory
 from giskardpy.utils.logging import logwarn
-from giskardpy.utils.utils import create_path
 
 plot_lock = Lock()
 

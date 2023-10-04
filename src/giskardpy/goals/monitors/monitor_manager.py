@@ -4,7 +4,6 @@ from typing import List
 import numpy as np
 
 import giskardpy.casadi_wrapper as cas
-from giskardpy import identifier
 from giskardpy.casadi_wrapper import CompiledFunction
 from giskardpy.exceptions import GiskardException, UnknownConstraintException, ConstraintInitalizationException
 from giskardpy.goals.monitors.monitors import Monitor

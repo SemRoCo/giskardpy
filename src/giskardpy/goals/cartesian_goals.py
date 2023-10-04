@@ -14,6 +14,7 @@ from giskardpy.goals.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_
 from giskardpy.god_map_interpreter import god_map
 from giskardpy.model.joints import DiffDrive, OmniDrivePR22
 from giskardpy.my_types import Derivatives
+from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import normalize
 
@@ -387,9 +388,9 @@ class DiffDriveBaseGoal(Goal):
         middle_angle = cas.normalize_angle(
             map_goal_angle2 + cas.shortest_angular_distance(map_goal_angle2, angle_start) / 2)
 
-        middle_angle = god_map.evaluate_expr(middle_angle)
-        a = god_map.evaluate_expr(cas.shortest_angular_distance(map_goal_angle_direction_f, middle_angle))
-        b = god_map.evaluate_expr(cas.shortest_angular_distance(map_goal_angle_direction_b, middle_angle))
+        middle_angle = symbol_manager.evaluate_expr(middle_angle)
+        a = symbol_manager.evaluate_expr(cas.shortest_angular_distance(map_goal_angle_direction_f, middle_angle))
+        b = symbol_manager.evaluate_expr(cas.shortest_angular_distance(map_goal_angle_direction_b, middle_angle))
         eps = 0.01
         if self.always_forward:
             map_goal_angle1 = map_goal_angle_direction_f

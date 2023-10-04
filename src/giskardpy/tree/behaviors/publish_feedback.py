@@ -1,7 +1,6 @@
 from py_trees import Status
 
 from giskard_msgs.msg import MoveFeedback
-from giskardpy import identifier
 from giskardpy.god_map_interpreter import god_map
 from giskardpy.tree.behaviors.action_server import ActionServerBehavior
 from giskardpy.utils.decorators import record_time

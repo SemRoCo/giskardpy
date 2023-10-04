@@ -4,9 +4,7 @@ from typing import Dict
 from py_trees import Status
 
 import giskardpy.casadi_wrapper as w
-import giskardpy.identifier as identifier
 from giskardpy.exceptions import EmptyProblemException, ConstraintInitalizationException
-from giskardpy.goals.goal import Goal
 from giskardpy.god_map_interpreter import god_map
 from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint
 from giskardpy.qp.qp_controller import QPProblemBuilder

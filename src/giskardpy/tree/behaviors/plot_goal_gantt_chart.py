@@ -4,7 +4,6 @@ from typing import List, Dict
 import matplotlib.pyplot as plt
 from py_trees import Status
 
-from giskardpy import identifier
 from giskardpy.goals.goal import Goal
 from giskardpy.god_map_interpreter import god_map
 from giskardpy.tree.behaviors.plugin import GiskardBehavior

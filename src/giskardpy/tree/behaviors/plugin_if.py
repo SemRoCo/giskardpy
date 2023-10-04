@@ -7,15 +7,15 @@ from giskardpy.utils.decorators import record_time
 
 class IF(GiskardBehavior):
     @profile
-    def __init__(self, name, identifier):
+    def __init__(self, name, lambda_f):
         super().__init__(name)
-        self.identifier = identifier
+        self.lambda_f = lambda_f
 
     @profile
     def update(self):
         # fixme
-    #     if god_map.get_data(self.identifier):
-    #         return Status.SUCCESS
+        if god_map.get_data(self.lambda_f()):
+            return Status.SUCCESS
         return Status.FAILURE
 
 

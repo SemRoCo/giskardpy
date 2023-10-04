@@ -13,7 +13,6 @@ from giskardpy.symbol_manager import symbol_manager
 if TYPE_CHECKING:
     from giskardpy.tree.control_modes import ControlModes
 
-import giskardpy.identifier as identifier
 import giskardpy.utils.tfwrapper as tf
 from giskardpy import casadi_wrapper as w
 from giskardpy.exceptions import ConstraintInitalizationException, UnknownGroupException
@@ -50,17 +49,10 @@ class Goal(ABC):
     @abc.abstractmethod
     def __str__(self) -> str:
         """
-        Make sure the returns a unique identifier, in case multiple goals of the same type are added.
+        Make sure the returns a unique str, in case multiple goals of the same type are added.
         Usage of 'self.__class__.__name__' is recommended.
         """
         return str(self.__class__.__name__)
-
-    def _get_identifier(self):
-        try:
-            return identifier.motion_goals + [str(self)]
-        except AttributeError as e:
-            raise AttributeError(
-                f'You have to ensure that str(self) is possible before calling parents __init__: {e}')
 
     def traj_time_in_seconds(self) -> w.Expression:
         t = symbol_manager.time
@@ -102,15 +94,6 @@ class Goal(ABC):
     def connect_to_end(self, monitor: Monitor):
         for task in self.tasks:
             task.add_to_end_monitor(monitor)
-
-    def get_parameter_as_symbolic_expression(self, name: str) -> Union[Union[w.Symbol, float], w.Expression]:
-        """
-        :param name: name of a class attribute, e.g. self.muh
-        :return: a symbol (or matrix of symbols) that refers to self.muh
-        """
-        if not hasattr(self, name):
-            raise AttributeError(f'{self.__class__.__name__} doesn\'t have attribute {name}')
-        return god_map.to_expr(self._get_identifier() + [name])
 
     def get_expr_velocity(self, expr: w.Expression) -> w.Expression:
         """

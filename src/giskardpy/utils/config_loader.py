@@ -5,7 +5,7 @@ import rospkg
 import rospy
 import yaml
 
-from giskardpy import identifier
+from giskardpy.god_map_interpreter import god_map
 from giskardpy.utils.utils import resolve_ros_iris
 
 rospack = rospkg.RosPack()
@@ -209,7 +209,7 @@ def ros_load_robot_config(config_file, old_data=None, test=False):
     if test:
         config = update_nested_dicts(deepcopy(config),
                                      load_robot_yaml(get_ros_pkg_path('giskardpy') + '/config/test.yaml'))
-    if identifier.robot_interface[-1] not in config:
+    if god_map.robot_interface[-1] not in config:
         config = update_nested_dicts(deepcopy(config),
                                      load_robot_yaml(get_ros_pkg_path('giskardpy') + '/config/action_server.yaml'))
     if config and not rospy.is_shutdown():

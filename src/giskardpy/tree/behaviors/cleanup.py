@@ -2,7 +2,6 @@ import rospy
 from py_trees import Status
 from visualization_msgs.msg import MarkerArray, Marker
 
-from giskardpy import identifier
 from giskardpy.debug_expression_manager import DebugExpressionManager
 from giskardpy.goals.monitors.monitor_manager import MonitorManager
 from giskardpy.goals.motion_goal_manager import MotionGoalManager

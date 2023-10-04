@@ -29,7 +29,6 @@ from rospy_message_converter.message_converter import \
 from sensor_msgs.msg import JointState
 from visualization_msgs.msg import Marker, MarkerArray
 
-from giskardpy import identifier
 from giskardpy.god_map_interpreter import god_map
 from giskardpy.my_types import PrefixName
 from giskardpy.utils import logging

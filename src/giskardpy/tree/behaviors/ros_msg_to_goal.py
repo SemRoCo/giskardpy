@@ -1,9 +1,6 @@
 import traceback
-import giskard_msgs.msg as giskard_msgs
 from py_trees import Status
 
-import giskardpy.identifier as identifier
-from giskardpy.configs.collision_avoidance_config import CollisionCheckerLib
 from giskardpy.exceptions import InvalidGoalException
 from giskardpy.god_map_interpreter import god_map
 from giskardpy.tree.behaviors.plugin import GiskardBehavior

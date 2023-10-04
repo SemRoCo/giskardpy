@@ -3,10 +3,6 @@ from typing import Dict, Tuple, List
 
 import numpy as np
 
-from giskardpy import identifier
-from giskardpy.god_map import _GodMap
-from giskardpy.god_map_interpreter import god_map
-
 
 class TimeCollector:
     qp_solver_times: Dict[Tuple[str, int, int], List[float]] = defaultdict(list)

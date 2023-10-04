@@ -8,7 +8,6 @@ from betterpybullet import ContactPoint
 from geometry_msgs.msg import PoseStamped, Quaternion, Pose
 from sortedcontainers import SortedDict
 
-from giskardpy import identifier
 from giskardpy.configs.collision_avoidance_config import CollisionCheckerLib
 from giskardpy.god_map_interpreter import god_map
 from giskardpy.model.bpb_wrapper import create_cube_shape, create_object, create_sphere_shape, create_cylinder_shape, \

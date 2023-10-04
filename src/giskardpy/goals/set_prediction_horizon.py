@@ -1,6 +1,5 @@
 from typing import Union
 
-from giskardpy import identifier
 from giskardpy.configs.qp_controller_config import SupportedQPSolver
 from giskardpy.goals.goal import Goal, NonMotionGoal
 from giskardpy.god_map_interpreter import god_map

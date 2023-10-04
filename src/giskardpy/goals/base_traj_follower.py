@@ -44,7 +44,7 @@ class BaseTrajFollower(Goal):
     def current_traj_point(self, free_variable_name: PrefixName, start_t: float,
                            derivative: Derivatives = Derivatives.position) \
             -> w.Expression:
-        time = god_map.to_expr(identifier.time)
+        time = symbol_manager.time
         b_result_cases = []
         for t in range(self.trajectory_length):
             b = t * god_map.qp_controller_config.sample_period

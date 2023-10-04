@@ -5,7 +5,6 @@ from py_trees import Status
 from rospy.timer import TimerEvent
 from std_msgs.msg import Float64MultiArray, Float64
 
-import giskardpy.identifier as identifier
 from giskardpy.data_types import KeyDefaultDict
 from giskardpy.god_map_interpreter import god_map
 from giskardpy.my_types import Derivatives

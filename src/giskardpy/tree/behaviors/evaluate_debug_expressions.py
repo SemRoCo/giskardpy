@@ -1,6 +1,5 @@
 from py_trees import Status
 
-import giskardpy.identifier as identifier
 from giskardpy.god_map_interpreter import god_map
 from giskardpy.qp.qp_controller import QPProblemBuilder
 from giskardpy.tree.behaviors.plugin import GiskardBehavior

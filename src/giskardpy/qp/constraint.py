@@ -2,8 +2,6 @@ from collections import namedtuple
 from typing import List, Union, Optional, Callable
 
 import giskardpy.casadi_wrapper as cas
-from giskardpy import identifier
-from giskardpy.god_map import _GodMap
 from giskardpy.god_map_interpreter import god_map
 from giskardpy.my_types import Derivatives
 

@@ -3,7 +3,6 @@ from typing import Union, List
 import numpy as np
 
 import giskardpy.casadi_wrapper as cas
-from giskardpy import identifier
 from giskardpy.god_map_interpreter import god_map
 from giskardpy.my_types import Derivatives
 from giskardpy.qp.free_variable import FreeVariable
@@ -37,14 +36,11 @@ class Monitor:
 
     @profile
     def substitute_with_on_flip_symbols(self, expression: cas.Expression) -> cas.Expression:
-        symbol_paths = []
         old_symbols = []
         new_symbols = []
         for i, symbol in enumerate(expression.free_symbols()):
             substitution_key = str(symbol)
             self.substitution_keys.append(substitution_key)
-            identifier_ = god_map.expr_to_key[substitution_key]
-            symbol_paths.append(identifier_)
             old_symbols.append(symbol)
             new_symbols.append(self.get_substitution_key(i))
         new_expression = cas.substitute(expression, old_symbols, new_symbols)
@@ -74,7 +70,7 @@ class LocalMinimumReached(Monitor):
         traj_length_in_sec = symbol_manager.time * god_map.qp_controller_config.sample_period
         condition_list.append(cas.greater(traj_length_in_sec, 1))
         for free_variable_name, free_variable in god_map.world.free_variables.items():
-            velocity_limit = god_map.evaluate_expr(free_variable.get_upper_limit(Derivatives.velocity))
+            velocity_limit = symbol_manager.evaluate_expr(free_variable.get_upper_limit(Derivatives.velocity))
             joint_vel_symbol = free_variable.get_symbol(Derivatives.velocity)
             velocity_limit *= joint_convergence_threshold
             velocity_limit = min(max(min_cut_off, velocity_limit), max_cut_off)

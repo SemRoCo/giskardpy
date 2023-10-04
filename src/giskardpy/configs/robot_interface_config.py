@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Optional, List, Dict
 
-from giskardpy.god_map_interpreter import god_map
+from giskardpy.god_map import god_map
 from giskardpy.tree.control_modes import ControlModes
 from giskardpy.exceptions import GiskardException
 from giskardpy.model.world import WorldTree

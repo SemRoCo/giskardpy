@@ -1,7 +1,7 @@
 import numbers
 from typing import Dict, Callable
 
-from giskardpy.god_map_interpreter import god_map
+from giskardpy.god_map import god_map
 import numpy as np
 import giskardpy.casadi_wrapper as cas
 from giskardpy.utils.singleton import SingletonMeta

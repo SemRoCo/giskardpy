@@ -9,7 +9,7 @@ from py_trees import Status
 from rospy import ROSException
 from rostopic import ROSTopicException
 
-from giskardpy.god_map_interpreter import god_map
+from giskardpy.god_map import god_map
 from giskardpy.model.joints import OmniDrive, DiffDrive
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging

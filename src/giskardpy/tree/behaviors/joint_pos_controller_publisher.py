@@ -6,7 +6,7 @@ from rospy.timer import TimerEvent
 from std_msgs.msg import Float64MultiArray, Float64
 
 from giskardpy.data_types import KeyDefaultDict
-from giskardpy.god_map_interpreter import god_map
+from giskardpy.god_map import god_map
 from giskardpy.my_types import Derivatives
 from giskardpy.tree.behaviors.cmd_publisher import CommandPublisher
 from giskardpy.tree.behaviors.plugin import GiskardBehavior

@@ -1,7 +1,7 @@
 from py_trees import Sequence, Selector
 
 from giskard_msgs.msg import MoveFeedback
-from giskardpy.god_map_interpreter import god_map
+from giskardpy.god_map import god_map
 from giskardpy.tree.behaviors.exception_to_execute import ClearBlackboardException
 from giskardpy.tree.behaviors.goal_canceled import GoalCanceled
 from giskardpy.tree.behaviors.publish_feedback import PublishFeedback

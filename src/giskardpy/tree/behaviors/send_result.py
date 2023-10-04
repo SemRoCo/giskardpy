@@ -1,7 +1,7 @@
 from py_trees import Blackboard, Status
 
 from giskard_msgs.msg import MoveResult
-from giskardpy.god_map_interpreter import god_map
+from giskardpy.god_map import god_map
 from giskardpy.tree.behaviors.action_server import ActionServerBehavior
 from giskardpy.utils import logging
 from giskardpy.utils.decorators import record_time

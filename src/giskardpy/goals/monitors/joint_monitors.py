@@ -2,7 +2,7 @@ from typing import List, Dict
 
 import giskardpy.casadi_wrapper as cas
 from giskardpy.goals.monitors.monitors import Monitor
-from giskardpy.god_map_interpreter import god_map
+from giskardpy.god_map import god_map
 from giskardpy.my_types import Derivatives
 
 

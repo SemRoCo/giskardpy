@@ -7,7 +7,7 @@ from std_msgs.msg import Float64MultiArray
 from sensor_msgs.msg import JointState
 
 from giskardpy.data_types import KeyDefaultDict, JointStates
-from giskardpy.god_map_interpreter import god_map
+from giskardpy.god_map import god_map
 from giskardpy.my_types import Derivatives
 from giskardpy.tree.behaviors.cmd_publisher import CommandPublisher
 from giskardpy.tree.behaviors.plugin import GiskardBehavior

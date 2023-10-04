@@ -13,7 +13,7 @@ from giskardpy.exceptions import GiskardException
 from giskardpy.goals.base_traj_follower import BaseTrajFollower, BaseTrajFollowerPR2
 from giskardpy.goals.goal import Goal
 from giskardpy.goals.set_prediction_horizon import SetPredictionHorizon
-from giskardpy.god_map_interpreter import god_map
+from giskardpy.god_map import god_map
 from giskardpy.model.joints import OmniDrive, DiffDrive, OmniDrivePR22
 from giskardpy.my_types import Derivatives
 from giskardpy.qp.next_command import NextCommands

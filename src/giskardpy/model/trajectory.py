@@ -13,8 +13,7 @@ from sortedcontainers import SortedDict
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
 from giskardpy.data_types import JointStates
-from giskardpy.god_map import _GodMap
-from giskardpy.god_map_interpreter import god_map
+from giskardpy.god_map import god_map
 from giskardpy.model.joints import Joint, OmniDrive, MovableJoint
 from giskardpy.my_types import PrefixName, Derivatives
 from giskardpy.utils import logging

@@ -6,7 +6,7 @@ from py_trees import Status
 
 from giskardpy.goals.monitors.monitors import Monitor
 from giskardpy.goals.tasks.task import Task
-from giskardpy.god_map_interpreter import god_map
+from giskardpy.god_map import god_map
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
 from giskardpy.utils.decorators import record_time, catch_and_raise_to_blackboard

@@ -2,7 +2,7 @@ from collections import defaultdict
 from typing import Dict, Optional, List, Union
 import numpy as np
 import giskardpy.casadi_wrapper as w
-from giskardpy.god_map_interpreter import god_map
+from giskardpy.god_map import god_map
 from giskardpy.my_types import Derivatives, PrefixName
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils.decorators import memoize

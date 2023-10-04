@@ -9,7 +9,7 @@ import rospy
 from numpy.typing import NDArray
 from std_msgs.msg import ColorRGBA
 
-from giskardpy.god_map_interpreter import god_map
+from giskardpy.god_map import god_map
 from giskardpy.model.joints import FixedJoint, OmniDrive, DiffDrive, Joint6DOF, OneDofJoint
 from giskardpy.model.links import Link
 from giskardpy.model.utils import robot_name_from_urdf_string

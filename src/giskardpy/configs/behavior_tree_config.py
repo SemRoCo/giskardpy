@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Optional
 
-from giskardpy.god_map_interpreter import god_map
+from giskardpy.god_map import god_map
 from giskardpy.tree.behaviors.compile_debug_expressions import CompileDebugExpressions
 from giskardpy.tree.behaviors.tf_publisher import TfPublishingModes
 from giskardpy.tree.garden import OpenLoop, ClosedLoop, StandAlone, TreeManager

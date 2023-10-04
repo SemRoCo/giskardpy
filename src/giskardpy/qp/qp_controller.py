@@ -13,9 +13,7 @@ import giskardpy.casadi_wrapper as cas
 from giskardpy.configs.qp_controller_config import SupportedQPSolver
 from giskardpy.exceptions import HardConstraintsViolatedException, QPSolverException, InfeasibleException, \
     VelocityLimitUnreachableException
-from giskardpy.god_map import _GodMap
-from giskardpy.god_map_interpreter import god_map
-from giskardpy.model.world import WorldTree
+from giskardpy.god_map import god_map
 from giskardpy.my_types import Derivatives
 from giskardpy.qp.constraint import InequalityConstraint, EqualityConstraint, DerivativeInequalityConstraint
 from giskardpy.qp.free_variable import FreeVariable

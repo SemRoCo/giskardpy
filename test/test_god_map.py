@@ -1,7 +1,7 @@
 import numpy as np
 
 import giskardpy
-from giskardpy.god_map_interpreter import god_map
+from giskardpy.god_map import god_map
 
 giskardpy.WORLD_IMPLEMENTATION = None
 import unittest
@@ -11,7 +11,6 @@ from geometry_msgs.msg import PoseStamped
 from hypothesis import given, assume
 import hypothesis.strategies as st
 from giskardpy import casadi_wrapper as w
-from giskardpy.god_map import _GodMap
 from utils_for_tests import variable_name, keys_values, lists_of_same_length
 
 

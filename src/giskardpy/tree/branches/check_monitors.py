@@ -1,4 +1,4 @@
-from giskardpy.god_map_interpreter import god_map
+from giskardpy.god_map import god_map
 from giskardpy.tree.behaviors.curcial_monitors_satisfied import CrucialMonitorsSatisfied
 from giskardpy.tree.behaviors.max_trajectory_length import MaxTrajectoryLength
 from giskardpy.tree.composites.running_selector import RunningSelector

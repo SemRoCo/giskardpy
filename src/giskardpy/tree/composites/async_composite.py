@@ -5,7 +5,7 @@ from time import time
 import rospy
 from py_trees import Status, Composite
 
-from giskardpy.god_map_interpreter import god_map
+from giskardpy.god_map import god_map
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.utils import raise_to_blackboard
 

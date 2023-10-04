@@ -7,7 +7,7 @@ from typing import Optional, Tuple, Dict, List, Union, Callable, TYPE_CHECKING
 
 from giskardpy.goals.monitors.monitors import Monitor
 from giskardpy.goals.tasks.task import Task, WEIGHT_BELOW_CA
-from giskardpy.god_map_interpreter import god_map
+from giskardpy.god_map import god_map
 from giskardpy.symbol_manager import symbol_manager
 
 if TYPE_CHECKING:

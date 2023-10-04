@@ -7,7 +7,7 @@ from sensor_msgs.msg import JointState
 
 import giskardpy.utils.tfwrapper as tf
 from giskardpy.data_types import JointStates
-from giskardpy.god_map_interpreter import god_map
+from giskardpy.god_map import god_map
 from giskardpy.model.world import WorldBranch
 from giskardpy.my_types import PrefixName, Derivatives
 from giskardpy.tree.behaviors.plugin import GiskardBehavior

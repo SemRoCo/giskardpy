@@ -5,7 +5,7 @@ import rospkg
 import rospy
 import yaml
 
-from giskardpy.god_map_interpreter import god_map
+from giskardpy.god_map import god_map
 from giskardpy.utils.utils import resolve_ros_iris
 
 rospack = rospkg.RosPack()

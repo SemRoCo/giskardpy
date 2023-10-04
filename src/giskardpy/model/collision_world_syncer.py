@@ -13,7 +13,7 @@ import numpy as np
 
 from giskard_msgs.msg import CollisionEntry
 from giskardpy.exceptions import UnknownGroupException, UnknownLinkException
-from giskardpy.god_map_interpreter import god_map
+from giskardpy.god_map import god_map
 from giskardpy.model.world import WorldBranch
 from giskardpy.my_types import my_string, Derivatives, PrefixName
 from giskardpy.qp.free_variable import FreeVariable
@@ -267,7 +267,7 @@ class Collisions:
             return self.external_collision[link_name]
         return SortedCollisionResults()
 
-    def get_external_collisions_long_key(self, link_a, link_b):
+    def get_external_collisions_long_key(self, link_a, link_b) -> Collision:
         """
         Collisions are saved as a list for each movable robot joint, sorted by contact distance
         :type joint_name: str

@@ -2,7 +2,7 @@ from py_trees import Sequence
 from py_trees_ros.trees import BehaviourTree
 
 from giskard_msgs.msg import MoveAction
-from giskardpy.god_map_interpreter import god_map
+from giskardpy.god_map import god_map
 from giskardpy.tree.behaviors.send_result import SendResult
 from giskardpy.tree.branches.clean_up_control_loop import CleanupControlLoop
 from giskardpy.tree.branches.post_processing import PostProcessing

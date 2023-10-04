@@ -3,7 +3,7 @@ from typing import Union, List
 import numpy as np
 
 import giskardpy.casadi_wrapper as cas
-from giskardpy.god_map_interpreter import god_map
+from giskardpy.god_map import god_map
 from giskardpy.my_types import Derivatives
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.symbol_manager import symbol_manager

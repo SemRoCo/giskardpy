@@ -9,8 +9,7 @@ from geometry_msgs.msg import PoseStamped, Pose
 
 import giskardpy.casadi_wrapper as w
 from giskardpy.data_types import JointStates
-from giskardpy.god_map import _GodMap
-from giskardpy.god_map_interpreter import god_map
+from giskardpy.god_map import god_map
 from giskardpy.my_types import PrefixName, Derivatives
 from giskardpy.my_types import my_string, derivative_joint_map, derivative_map
 from giskardpy.qp.free_variable import FreeVariable

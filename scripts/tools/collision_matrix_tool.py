@@ -17,7 +17,6 @@ import os
 
 from std_msgs.msg import ColorRGBA
 
-from giskardpy import identifier
 from giskardpy.model.better_pybullet_syncer import BetterPyBulletSyncer
 from giskardpy.model.collision_world_syncer import DisableCollisionReason
 from giskardpy.model.ros_msg_visualization import ROSMsgVisualization

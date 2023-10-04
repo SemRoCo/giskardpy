@@ -2,7 +2,7 @@ from typing import Union
 
 from giskardpy.configs.qp_controller_config import SupportedQPSolver
 from giskardpy.goals.goal import Goal, NonMotionGoal
-from giskardpy.god_map_interpreter import god_map
+from giskardpy.god_map import god_map
 from giskardpy.tree.behaviors.max_trajectory_length import MaxTrajectoryLength
 from giskardpy.utils import logging
 

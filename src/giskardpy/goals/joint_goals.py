@@ -7,7 +7,7 @@ from geometry_msgs.msg import PoseStamped
 from giskardpy import casadi_wrapper as cas
 from giskardpy.goals.monitors.monitors import Monitor
 from giskardpy.goals.tasks.joint_tasks import JointPositionTask, PositionTask
-from giskardpy.god_map_interpreter import god_map
+from giskardpy.god_map import god_map
 from giskardpy.tree.control_modes import ControlModes
 from giskardpy.exceptions import ConstraintException, ConstraintInitalizationException
 from giskardpy.goals.goal import Goal, NonMotionGoal

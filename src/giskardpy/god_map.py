@@ -1,150 +1,99 @@
-import copy
-import numbers
-from collections import defaultdict
-from copy import copy, deepcopy
-from multiprocessing import RLock
-from typing import Sequence, Union, Any, List
+from __future__ import annotations
 
-import numpy as np
-from geometry_msgs.msg import Pose, Point, Vector3, PoseStamped, PointStamped, Vector3Stamped, QuaternionStamped, \
-    Quaternion
+import rospy
 
-from giskardpy import casadi_wrapper as w
-from giskardpy.data_types import KeyDefaultDict
-from giskardpy.utils import logging
-from giskardpy.utils.singleton import SingletonMeta
+from giskard_msgs.msg import MoveGoal, MoveResult
+from typing import TYPE_CHECKING, List, Dict, Set, Tuple
 
-
-class _GodMap(metaclass=SingletonMeta):
-    """
-    Data structure used by tree to exchange information.
-    """
-
-    key_to_expr: dict
-    expr_to_key: dict
-    shortcuts: dict
-
-    def __init__(self):
-        self.key_to_expr = {}
-        self.expr_to_key = {}
-        self.shortcuts = {}
-        self.expr_separator = '_'
-        self.lock = RLock()
-
-    def __enter__(self):
-        self.lock.acquire()
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.lock.release()
-
-    def clear_cache(self):
-        self.shortcuts = {}
-
-    def to_symbol(self, identifier) -> w.Symbol:
-        """
-        All registered identifiers will be included in self.get_symbol_map().
-        :type identifier: list
-        :return: the symbol corresponding to the identifier
-        :rtype: sw.Symbol
-        """
-        assert isinstance(identifier, list) or isinstance(identifier, tuple)
-        identifier = tuple(identifier)
-        identifier_parts = identifier
-        if identifier not in self.key_to_expr:
-            expr = w.Symbol(self.expr_separator.join([str(x) for x in identifier]))
-            if expr in self.expr_to_key:
-                raise Exception(f'{self.expr_separator} not allowed in key')
-            self.key_to_expr[identifier] = expr
-            self.expr_to_key[str(expr)] = identifier_parts
-        return self.key_to_expr[identifier]
+if TYPE_CHECKING:
+    from giskardpy.model.joints import Joint
+    from giskardpy.model.ros_msg_visualization import ROSMsgVisualization
+    from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint
+    from giskardpy.qp.free_variable import FreeVariable
+    from giskardpy.qp.next_command import NextCommands
+    from giskardpy.model.trajectory import Trajectory
+    from giskardpy.qp.qp_controller import QPProblemBuilder
+    from giskardpy.configs.qp_controller_config import QPControllerConfig
+    from giskardpy.my_types import Derivatives, PrefixName
+    from giskardpy.goals.goal import Goal
+    from giskardpy.configs.giskard import Giskard
+    from giskardpy.goals.motion_goal_manager import MotionGoalManager
+    from giskardpy.debug_expression_manager import DebugExpressionManager
+    from giskardpy.goals.monitors.monitor_manager import MonitorManager
+    from giskardpy.goals.monitors.monitors import Monitor
+    from giskardpy.configs.collision_avoidance_config import CollisionAvoidanceConfig
+    from giskardpy.configs.world_config import WorldConfig
+    from giskardpy.tree.control_modes import ControlModes
+    from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer, CollisionCheckerLib, \
+    CollisionAvoidanceGroupThresholds, Collisions
+    from giskardpy.tree.garden import TreeManager
+    from giskardpy.model.world import WorldTree
 
 
-    def list_to_symbol_matrix(self, identifier, data):
-        def replace_nested_list(l, f, start_index=None):
-            if start_index is None:
-                start_index = []
-            result = []
-            for i, entry in enumerate(l):
-                index = start_index + [i]
-                if isinstance(entry, list):
-                    result.append(replace_nested_list(entry, f, index))
-                else:
-                    result.append(f(index))
-            return result
+class GodMap:
+    goal_id: int = -1
+    monitor_manager: MonitorManager
+    giskard: Giskard
+    time: float
+    world: WorldTree
+    motion_goal_manager: MotionGoalManager
+    debug_expression_manager: DebugExpressionManager
+    tree_manager: TreeManager
+    collision_scene: CollisionWorldSynchronizer
+    prediction_horizon: int
+    max_derivative: Derivatives
+    qp_controller: QPProblemBuilder
+    qp_controller_config: QPControllerConfig
+    collision_checker_id: CollisionCheckerLib
+    world_config: WorldConfig
+    collision_avoidance_config: CollisionAvoidanceConfig
+    collision_avoidance_configs: Dict[str, CollisionAvoidanceGroupThresholds]
+    goal_msg: MoveGoal
+    trajectory: Trajectory
+    qp_solver_solution: NextCommands
+    added_collision_checks: Dict[Tuple[PrefixName, PrefixName], float]
+    closest_point: Collisions
+    collision_matrix: Dict[Tuple[PrefixName, PrefixName], float]
+    time_delay: rospy.Duration
+    tracking_start_time: rospy.Time
+    result_message: MoveResult
+    eq_constraints: Dict[str, EqualityConstraint]
+    neq_constraints: Dict[str, InequalityConstraint]
+    derivative_constraints: Dict[str, DerivativeInequalityConstraint]
+    hack: float
+    fill_trajectory_velocity_values: bool
+    ros_visualizer: ROSMsgVisualization
+    free_variables: List[FreeVariable]
+    controlled_joints: List[Joint]
 
-        return w.Expression(replace_nested_list(data, lambda index: self.to_symbol(identifier + index)))
 
-    def list_to_point3(self, identifier) -> w.Point3:
-        return w.Point3((self.to_symbol(identifier + [0]),
-                         self.to_symbol(identifier + [1]),
-                         self.to_symbol(identifier + [2])))
+    @property
+    def trajectory_time_in_seconds(self):
+        time = self.time
+        if self.is_closed_loop():
+            return time
+        return time * self.qp_controller_config.sample_period
 
-    def list_to_vector3(self, identifier) -> w.Vector3:
-        return w.Vector3((self.to_symbol(identifier + [0]),
-                          self.to_symbol(identifier + [1]),
-                          self.to_symbol(identifier + [2])))
+    def is_goal_msg_type_execute(self):
+        return MoveGoal.EXECUTE == self.goal_msg.type
 
-    def list_to_translation3(self, identifier) -> w.TransMatrix:
-        return w.TransMatrix.from_xyz_rpy(
-            x=self.to_symbol(identifier + [0]),
-            y=self.to_symbol(identifier + [1]),
-            z=self.to_symbol(identifier + [2]),
-        )
+    def is_goal_msg_type_projection(self):
+        return MoveGoal.PROJECTION == self.goal_msg.type
 
-    def list_to_frame(self, identifier):
-        return w.TransMatrix(
-            [
-                [
-                    self.to_symbol(identifier + [0, 0]),
-                    self.to_symbol(identifier + [0, 1]),
-                    self.to_symbol(identifier + [0, 2]),
-                    self.to_symbol(identifier + [0, 3])
-                ],
-                [
-                    self.to_symbol(identifier + [1, 0]),
-                    self.to_symbol(identifier + [1, 1]),
-                    self.to_symbol(identifier + [1, 2]),
-                    self.to_symbol(identifier + [1, 3])
-                ],
-                [
-                    self.to_symbol(identifier + [2, 0]),
-                    self.to_symbol(identifier + [2, 1]),
-                    self.to_symbol(identifier + [2, 2]),
-                    self.to_symbol(identifier + [2, 3])
-                ],
-                [
-                    0, 0, 0, 1
-                ],
-            ]
-        )
+    def is_goal_msg_type_undefined(self):
+        return MoveGoal.UNDEFINED == self.goal_msg.type
 
-    def pose_msg_to_frame(self, identifier):
-        p = w.Point3.from_xyz(x=self.to_symbol(identifier + ['position', 'x']),
-                              y=self.to_symbol(identifier + ['position', 'y']),
-                              z=self.to_symbol(identifier + ['position', 'z']))
-        q = w.Quaternion.from_xyzw(x=self.to_symbol(identifier + ['orientation', 'x']),
-                                   y=self.to_symbol(identifier + ['orientation', 'y']),
-                                   z=self.to_symbol(identifier + ['orientation', 'z']),
-                                   w=self.to_symbol(identifier + ['orientation', 'w'])).to_rotation_matrix()
-        return w.TransMatrix.from_point_rotation_matrix(p, q)
+    def is_closed_loop(self):
+        return self.tree_manager.control_mode == self.tree_manager.control_mode.close_loop
 
-    def quaternion_msg_to_rotation(self, identifier):
-        return w.Quaternion.from_xyzw(x=self.to_symbol(identifier + ['x']),
-                                      y=self.to_symbol(identifier + ['y']),
-                                      z=self.to_symbol(identifier + ['z']),
-                                      w=self.to_symbol(identifier + ['w'])).to_rotation_matrix()
+    def is_standalone(self):
+        return self.tree_manager.control_mode == self.tree_manager.control_mode.standalone
 
-    def point_msg_to_point3(self, identifier):
-        return w.Point3.from_xyz(
-            x=self.to_symbol(identifier + ['x']),
-            y=self.to_symbol(identifier + ['y']),
-            z=self.to_symbol(identifier + ['z']),
-        )
+    def is_open_loop(self):
+        return self.tree_manager.control_mode == self.tree_manager.control_mode.open_loop
 
-    def vector_msg_to_vector3(self, identifier):
-        return w.Vector3.from_xyz(
-            x=self.to_symbol(identifier + ['x']),
-            y=self.to_symbol(identifier + ['y']),
-            z=self.to_symbol(identifier + ['z']),
-        )
+    def is_collision_checking_enabled(self):
+        return self.collision_scene.collision_checker_id != self.collision_scene.collision_checker_id.none
+
+
+god_map = GodMap()

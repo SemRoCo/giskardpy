@@ -4,7 +4,7 @@ from typing import List, Tuple, Optional
 import betterpybullet as pb
 import trimesh
 
-from giskardpy.god_map_interpreter import god_map
+from giskardpy.god_map import god_map
 from giskardpy.model.collision_world_syncer import Collision
 from giskardpy.model.links import Link, LinkGeometry, BoxGeometry, SphereGeometry, CylinderGeometry, MeshGeometry
 from giskardpy.my_types import my_string, PrefixName

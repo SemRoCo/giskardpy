@@ -4,7 +4,7 @@ import abc
 from typing import Dict, Optional, List, Union, DefaultDict, Tuple
 
 from giskardpy.exceptions import SetupException
-from giskardpy.god_map_interpreter import god_map
+from giskardpy.god_map import god_map
 from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer, CollisionAvoidanceGroupThresholds, \
     CollisionCheckerLib, CollisionAvoidanceThresholds
 from giskardpy.model.world import WorldTree

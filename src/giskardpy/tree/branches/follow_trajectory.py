@@ -1,7 +1,7 @@
 from py_trees import Sequence
 
 from giskard_msgs.msg import MoveFeedback
-from giskardpy.god_map_interpreter import god_map
+from giskardpy.god_map import god_map
 from giskardpy.my_types import PrefixName
 from giskardpy.tree.behaviors.append_zero_velocity import SetZeroVelocity
 from giskardpy.tree.behaviors.cleanup import CleanUpPlanning

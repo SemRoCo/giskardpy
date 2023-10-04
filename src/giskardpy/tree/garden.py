@@ -23,8 +23,7 @@ import giskardpy
 from giskard_msgs.msg import MoveAction, MoveFeedback
 from giskardpy.configs.collision_avoidance_config import CollisionCheckerLib
 from giskardpy.exceptions import DuplicateNameException, BehaviorTreeException
-from giskardpy.god_map import _GodMap
-from giskardpy.god_map_interpreter import god_map
+from giskardpy.god_map import god_map
 from giskardpy.my_types import PrefixName, Derivatives
 from giskardpy.tree.behaviors.debug_marker_publisher import DebugMarkerPublisher
 from giskardpy.tree.behaviors.append_zero_velocity import SetZeroVelocity

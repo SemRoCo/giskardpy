@@ -3,7 +3,7 @@ from threading import Lock
 import numpy as np
 
 from giskardpy.data_types import JointStates
-from giskardpy.god_map_interpreter import god_map
+from giskardpy.god_map import god_map
 from giskardpy.model.trajectory import Trajectory
 from giskardpy.tree.behaviors.plot_trajectory import PlotTrajectory
 from giskardpy.utils.logging import logwarn

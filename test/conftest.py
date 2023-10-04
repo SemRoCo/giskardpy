@@ -4,9 +4,7 @@ from geometry_msgs.msg import PoseStamped, Quaternion
 from tf.transformations import quaternion_about_axis
 
 import giskardpy.utils.tfwrapper as tf
-from giskardpy import identifier
-from giskardpy.god_map import _GodMap
-from giskardpy.god_map_interpreter import god_map
+from giskardpy.god_map import god_map
 from giskardpy.model.joints import OneDofJoint
 from giskardpy.utils import logging
 from giskardpy.utils.utils import launch_launchfile

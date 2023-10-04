@@ -8,7 +8,7 @@ from giskardpy.casadi_wrapper import CompiledFunction
 from giskardpy.exceptions import GiskardException, UnknownConstraintException, ConstraintInitalizationException
 from giskardpy.goals.monitors.monitors import Monitor
 import giskard_msgs.msg as giskard_msgs
-from giskardpy.god_map_interpreter import god_map
+from giskardpy.god_map import god_map
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils import logging
 from giskardpy.utils.utils import json_to_kwargs, get_all_classes_in_package

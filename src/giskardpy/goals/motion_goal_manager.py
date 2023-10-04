@@ -7,7 +7,7 @@ from giskardpy.exceptions import UnknownConstraintException, GiskardException, C
 from giskardpy.goals.collision_avoidance import ExternalCollisionAvoidance, SelfCollisionAvoidance
 from giskardpy.goals.goal import Goal
 import giskard_msgs.msg as giskard_msgs
-from giskardpy.god_map_interpreter import god_map
+from giskardpy.god_map import god_map
 from giskardpy.my_types import PrefixName
 from giskardpy.utils import logging
 from giskardpy.utils.utils import get_all_classes_in_package, json_to_kwargs

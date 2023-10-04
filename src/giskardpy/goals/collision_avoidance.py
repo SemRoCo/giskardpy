@@ -1,11 +1,10 @@
 from typing import Dict, Optional
-
+import giskardpy.casadi_wrapper as cas
 import giskardpy.utils.tfwrapper as tf
-from giskardpy import casadi_wrapper as w, identifier
 from giskardpy.goals.goal import Goal
 from giskardpy.goals.monitors.monitors import Monitor
 from giskardpy.goals.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE, Task
-from giskardpy.god_map_interpreter import god_map
+from giskardpy.god_map import god_map
 from giskardpy.my_types import my_string
 from giskardpy.symbol_manager import symbol_manager
 
@@ -32,7 +31,8 @@ class ExternalCollisionAvoidance(Goal):
         super().__init__()
         self.root = god_map.world.root_link_name
         self.robot_name = robot_name
-        self.control_horizon = god_map.qp_controller_config.prediction_horizon - (god_map.qp_controller_config.max_derivative - 1)
+        self.control_horizon = god_map.qp_controller_config.prediction_horizon - (
+                    god_map.qp_controller_config.max_derivative - 1)
         self.control_horizon = max(1, self.control_horizon)
 
         a_P_pa = self.get_closest_point_on_a_in_a()
@@ -55,35 +55,35 @@ class ExternalCollisionAvoidance(Goal):
         parent_joint = god_map.world.links[self.link_name].parent_joint_name
         direct_children = set(god_map.world.get_directly_controlled_child_links_with_collisions(parent_joint))
         b_result_cases = [(k[1].__hash__(), v) for k, v in self.soft_thresholds.items() if k[0] in direct_children]
-        soft_threshold = w.if_eq_cases(a=actual_link_b_hash,
-                                       b_result_cases=b_result_cases,
-                                       else_result=soft_threshold)
+        soft_threshold = cas.if_eq_cases(a=actual_link_b_hash,
+                                         b_result_cases=b_result_cases,
+                                         else_result=soft_threshold)
 
-        hard_threshold = w.min(self.hard_threshold, soft_threshold / 2)
+        hard_threshold = cas.min(self.hard_threshold, soft_threshold / 2)
         lower_limit = soft_threshold - actual_distance
 
-        lower_limit_limited = w.limit(lower_limit,
-                                      -qp_limits_for_lba,
-                                      qp_limits_for_lba)
+        lower_limit_limited = cas.limit(lower_limit,
+                                        -qp_limits_for_lba,
+                                        qp_limits_for_lba)
 
-        upper_slack = w.if_greater(actual_distance, hard_threshold,
-                                   w.limit(soft_threshold - hard_threshold,
-                                           -qp_limits_for_lba,
-                                           qp_limits_for_lba),
-                                   lower_limit_limited)
+        upper_slack = cas.if_greater(actual_distance, hard_threshold,
+                                     cas.limit(soft_threshold - hard_threshold,
+                                               -qp_limits_for_lba,
+                                               qp_limits_for_lba),
+                                     lower_limit_limited)
         # undo factor in A
         upper_slack /= (sample_period * self.control_horizon)
 
-        upper_slack = w.if_greater(actual_distance, 50,  # assuming that distance of unchecked closest points is 100
-                                   1e4,
-                                   w.max(0, upper_slack))
+        upper_slack = cas.if_greater(actual_distance, 50,  # assuming that distance of unchecked closest points is 100
+                                     1e4,
+                                     cas.max(0, upper_slack))
 
-        # weight = w.if_greater(actual_distance, 50, 0, WEIGHT_COLLISION_AVOIDANCE)
+        # weight = cas.if_greater(actual_distance, 50, 0, WEIGHT_COLLISION_AVOIDANCE)
 
-        weight = w.save_division(WEIGHT_COLLISION_AVOIDANCE,  # divide by number of active repeller per link
-                                 w.min(number_of_external_collisions, self.num_repeller))
+        weight = cas.save_division(WEIGHT_COLLISION_AVOIDANCE,  # divide by number of active repeller per link
+                                   cas.min(number_of_external_collisions, self.num_repeller))
         distance_monitor = Monitor('distance', crucial=False)
-        distance_monitor.set_expression(w.less(actual_distance, 50))
+        distance_monitor.set_expression(cas.less(actual_distance, 50))
         self.add_monitor(distance_monitor)
         task = Task('stay away')
         task.add_to_hold_monitor(distance_monitor)
@@ -98,15 +98,15 @@ class ExternalCollisionAvoidance(Goal):
 
     def map_V_n_symbol(self):
         expr = f'god_map.closest_point.get_external_collisions(\'{self.link_name}\')[{self.idx}].map_V_n'
-        return symbol_manager.get_expr(expr, output_type_hint=w.Vector3)
+        return symbol_manager.get_expr(expr, output_type_hint=cas.Vector3)
 
     def get_closest_point_on_a_in_a(self):
         expr = f'god_map.closest_point.get_external_collisions(\'{self.link_name}\')[{self.idx}].new_a_P_pa'
-        return symbol_manager.get_expr(expr, output_type_hint=w.Point3)
+        return symbol_manager.get_expr(expr, output_type_hint=cas.Point3)
 
     def map_P_a_symbol(self):
         expr = f'god_map.closest_point.get_external_collisions(\'{self.link_name}\')[{self.idx}].new_map_P_pa'
-        return symbol_manager.get_expr(expr, output_type_hint=w.Point3)
+        return symbol_manager.get_expr(expr, output_type_hint=cas.Point3)
 
     def get_actual_distance(self):
         expr = f'god_map.closest_point.get_external_collisions(\'{self.link_name}\')[{self.idx}].contact_distance'
@@ -152,10 +152,11 @@ class SelfCollisionAvoidance(Goal):
         super().__init__()
         self.root = god_map.world.root_link_name
         self.robot_name = robot_name
-        self.control_horizon = god_map.qp_controller_config.prediction_horizon - (god_map.qp_controller_config.max_derivative - 1)
+        self.control_horizon = god_map.qp_controller_config.prediction_horizon - (
+                    god_map.qp_controller_config.max_derivative - 1)
         self.control_horizon = max(1, self.control_horizon)
 
-        hard_threshold = w.min(self.hard_threshold, self.soft_threshold / 2)
+        hard_threshold = cas.min(self.hard_threshold, self.soft_threshold / 2)
         actual_distance = self.get_actual_distance()
         number_of_self_collisions = self.get_number_of_self_collisions()
         sample_period = god_map.qp_controller_config.sample_period
@@ -175,27 +176,27 @@ class SelfCollisionAvoidance(Goal):
 
         lower_limit = self.soft_threshold - actual_distance
 
-        lower_limit_limited = w.limit(lower_limit,
-                                      -qp_limits_for_lba,
-                                      qp_limits_for_lba)
+        lower_limit_limited = cas.limit(lower_limit,
+                                        -qp_limits_for_lba,
+                                        qp_limits_for_lba)
 
-        upper_slack = w.if_greater(actual_distance, hard_threshold,
-                                   w.limit(self.soft_threshold - hard_threshold,
-                                           -qp_limits_for_lba,
-                                           qp_limits_for_lba),
-                                   lower_limit_limited)
+        upper_slack = cas.if_greater(actual_distance, hard_threshold,
+                                     cas.limit(self.soft_threshold - hard_threshold,
+                                               -qp_limits_for_lba,
+                                               qp_limits_for_lba),
+                                     lower_limit_limited)
 
         # undo factor in A
         upper_slack /= (sample_period * self.control_horizon)
 
-        upper_slack = w.if_greater(actual_distance, 50,  # assuming that distance of unchecked closest points is 100
-                                   1e4,
-                                   w.max(0, upper_slack))
+        upper_slack = cas.if_greater(actual_distance, 50,  # assuming that distance of unchecked closest points is 100
+                                     1e4,
+                                     cas.max(0, upper_slack))
 
-        weight = w.save_division(WEIGHT_COLLISION_AVOIDANCE,  # divide by number of active repeller per link
-                                 w.min(number_of_self_collisions, self.num_repeller))
+        weight = cas.save_division(WEIGHT_COLLISION_AVOIDANCE,  # divide by number of active repeller per link
+                                   cas.min(number_of_self_collisions, self.num_repeller))
         distance_monitor = Monitor('distance', crucial=False)
-        distance_monitor.set_expression(w.less(actual_distance, 50))
+        distance_monitor.set_expression(cas.less(actual_distance, 50))
         self.add_monitor(distance_monitor)
         task = Task('stay away')
         task.add_to_hold_monitor(distance_monitor)
@@ -210,16 +211,16 @@ class SelfCollisionAvoidance(Goal):
 
     def get_contact_normal_in_b(self):
         expr = f'god_map.closest_point.get_self_collisions(\'{self.link_a}\', \'{self.link_b}\')[{self.idx}].new_b_V_n'
-        return symbol_manager.get_expr(expr, output_type_hint=w.Vector3)
+        return symbol_manager.get_expr(expr, output_type_hint=cas.Vector3)
 
     def get_position_on_a_in_a(self):
         expr = f'god_map.closest_point.get_self_collisions(\'{self.link_a}\', \'{self.link_b}\')[{self.idx}].new_a_P_pa'
-        return symbol_manager.get_expr(expr, output_type_hint=w.Point3)
+        return symbol_manager.get_expr(expr, output_type_hint=cas.Point3)
 
-    def get_b_T_pb(self) -> w.TransMatrix:
+    def get_b_T_pb(self) -> cas.TransMatrix:
         expr = f'god_map.closest_point.get_self_collisions(\'{self.link_a}\', \'{self.link_b}\')[{self.idx}].new_b_P_pb'
-        p = symbol_manager.get_expr(expr, output_type_hint=w.Point3)
-        return w.TransMatrix.from_xyz_rpy(x=p.x, y=p.y, z=p.z)
+        p = symbol_manager.get_expr(expr, output_type_hint=cas.Point3)
+        return cas.TransMatrix.from_xyz_rpy(x=p.x, y=p.y, z=p.z)
 
     def get_actual_distance(self):
         expr = f'god_map.closest_point.get_self_collisions(\'{self.link_a}\', \'{self.link_b}\')[{self.idx}].contact_distance'
@@ -270,9 +271,9 @@ class CollisionAvoidanceHint(Goal):
         else:
             spring_threshold = max(spring_threshold, max_threshold)
 
-        self.add_collision_check(god_map.world.links[self.link_name].name,
-                                 god_map.world.links[self.link_b].name,
-                                 spring_threshold)
+        god_map.collision_scene.add_collision_check(god_map.world.links[self.link_name].name,
+                                                    god_map.world.links[self.link_b].name,
+                                                    spring_threshold)
 
         self.avoidance_hint = god_map.world.transform_msg(self.root_link, avoidance_hint)
         self.avoidance_hint.vector = tf.normalize(self.avoidance_hint.vector)
@@ -283,14 +284,12 @@ class CollisionAvoidanceHint(Goal):
         self.weight = weight
 
     def get_actual_distance(self):
-        return god_map.to_symbol(identifier.closest_point + ['get_external_collisions_long_key',
-                                                                  self.key,
-                                                                  'contact_distance'])
+        expr = f'god_map.closest_point.get_external_collisions_long_key(\'{self.key}\').contact_distance'
+        return symbol_manager.get_symbol(expr)
 
     def get_link_b(self):
-        return god_map.to_symbol(identifier.closest_point + ['get_external_collisions_long_key',
-                                                                  self.key,
-                                                                  'link_b_hash'])
+        expr = f'god_map.closest_point.get_external_collisions_long_key(\'{self.key}\').link_b_hash'
+        return symbol_manager.get_symbol(expr)
 
     def make_constraints(self):
         weight = self.weight
@@ -299,21 +298,21 @@ class CollisionAvoidanceHint(Goal):
         max_threshold = self.threshold
         spring_threshold = self.threshold2
         link_b_hash = self.get_link_b()
-        actual_distance_capped = w.max(actual_distance, 0)
+        actual_distance_capped = cas.max(actual_distance, 0)
 
         root_T_a = god_map.world.compose_fk_expression(self.root_link, self.link_name)
 
         spring_error = spring_threshold - actual_distance_capped
-        spring_error = w.max(spring_error, 0)
+        spring_error = cas.max(spring_error, 0)
 
-        spring_weight = w.if_eq(spring_threshold, max_threshold, 0,
-                                weight * (spring_error / (spring_threshold - max_threshold)) ** 2)
+        spring_weight = cas.if_eq(spring_threshold, max_threshold, 0,
+                                  weight * (spring_error / (spring_threshold - max_threshold)) ** 2)
 
-        weight = w.if_less_eq(actual_distance, max_threshold, weight,
-                              spring_weight)
-        weight = w.if_eq(link_b_hash, self.link_b_hash, weight, 0)
+        weight = cas.if_less_eq(actual_distance, max_threshold, weight,
+                                spring_weight)
+        weight = cas.if_eq(link_b_hash, self.link_b_hash, weight, 0)
 
-        root_V_avoidance_hint = w.Vector3(self.avoidance_hint)
+        root_V_avoidance_hint = cas.Vector3(self.avoidance_hint)
 
         # penetration_distance = threshold - actual_distance_capped
 

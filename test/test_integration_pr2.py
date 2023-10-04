@@ -299,7 +299,7 @@ class TestJointGoals:
         }
         # zero_pose.set_joint_goal(js)
         # zero_pose.add_joint_goal_monitor('asdf', goal_state=js, threshold=0.005, crucial=False)
-        zero_pose.add_joint_goal(goal=js)
+        zero_pose.add_joint_goal(goal_state=js)
         zero_pose.allow_all_collisions()
         # zero_pose.set_json_goal('EnableVelocityTrajectoryTracking', enabled=True)
         zero_pose.plan_and_execute()

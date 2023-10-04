@@ -454,14 +454,6 @@ class GiskardTestWrapper(GiskardWrapper):
     # GOAL STUFF #################################################################################################
     #
 
-    def add_joint_goal(self, goal, weight=None, decimal=2, expected_error_codes=(MoveResult.SUCCESS,),
-                       check=True, group_name=None):
-        super().add_joint_goal(goal, group_name, weight=weight)
-        if check:
-            self.add_goal_check(JointGoalChecker(giskard=self,
-                                                 goal_state=goal,
-                                                 decimal=decimal))
-
     def teleport_base(self, goal_pose):
         pass
         # goal_pose = tf.transform_pose(self.default_root, goal_pose)

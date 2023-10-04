@@ -8,6 +8,7 @@ from giskardpy import casadi_wrapper as cas
 from giskardpy.goals.monitors.monitors import Monitor
 from giskardpy.goals.tasks.joint_tasks import JointPositionTask, PositionTask
 from giskardpy.god_map import god_map
+from giskardpy.symbol_manager import symbol_manager
 from giskardpy.tree.control_modes import ControlModes
 from giskardpy.exceptions import ConstraintException, ConstraintInitalizationException
 from giskardpy.goals.goal import Goal, NonMotionGoal

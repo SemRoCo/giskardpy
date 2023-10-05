@@ -63,7 +63,7 @@ class GiskardWrapper(LowLevelGiskardWrapper):
         :param reference_angular_velocity: rad/s
         :param weight: default WEIGHT_ABOVE_CA
         """
-        monitor_name = 'pose reached'
+        monitor_name = f'{root_link}/{tip_link} pose reached'
         self.add_cartesian_pose_reached_monitor(name=monitor_name,
                                                 root_link=root_link,
                                                 root_group=root_group,

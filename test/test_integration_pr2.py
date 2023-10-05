@@ -1560,7 +1560,7 @@ class TestCartGoals:
         r_goal = PoseStamped()
         r_goal.header.frame_id = zero_pose.r_tip
         r_goal.pose.orientation.w = 1
-        expected_pose = zero_pose.world.compute_fk_pose(zero_pose.default_root, zero_pose.r_tip)
+        expected_pose = god_map.world.compute_fk_pose(zero_pose.default_root, zero_pose.r_tip)
         expected_pose.header.stamp = rospy.Time()
         zero_pose.set_cart_goal(r_goal, zero_pose.r_tip, zero_pose.default_root)
         zero_pose.set_joint_goal(js)
@@ -1613,6 +1613,17 @@ class TestCartGoals:
         zero_pose.allow_all_collisions()
         zero_pose.set_cart_goal(p, zero_pose.r_tip, 'base_footprint')
         zero_pose.plan_and_execute()
+
+    def test_cart_goal_unreachable(self, zero_pose: PR2TestWrapper):
+        p = PoseStamped()
+        p.header.frame_id = 'map'
+        p.pose.position = Point(0, 0, -1)
+        p.pose.orientation = Quaternion(0, 0, 0, 1)
+        zero_pose.allow_all_collisions()
+        zero_pose.set_cart_goal(goal_pose=p,
+                                tip_link='base_footprint',
+                                root_link='map')
+        zero_pose.plan_and_execute(expected_error_code=MoveResult.LOCAL_MINIMUM)
 
     def test_cart_goal_1eef2(self, zero_pose: PR2TestWrapper):
         # zero_pose.set_json_goal('SetPredictionHorizon', prediction_horizon=1)

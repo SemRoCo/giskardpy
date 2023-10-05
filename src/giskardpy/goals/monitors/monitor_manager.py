@@ -12,7 +12,7 @@ from giskardpy.god_map import god_map
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils import logging
 from giskardpy.utils.utils import json_to_kwargs, get_all_classes_in_package, json_str_to_kwargs
-
+from giskardpy.goals.monitors.monitors import LocalMinimumReached
 
 def flipped_to_one(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     """
@@ -37,6 +37,7 @@ class MonitorManager:
         self.allowed_monitor_types = {}
         self.allowed_monitor_types.update(get_all_classes_in_package('giskardpy.goals.monitors', Monitor))
         self.robot_names = god_map.collision_scene.robot_names
+        self.local_minimum_monitor_id = None
 
     def compile_monitors(self):
         expressions = []
@@ -49,11 +50,22 @@ class MonitorManager:
         self.switches_state = np.zeros_like(self.stay_one_filter)
         self.crucial_filter = [m.crucial for m in self.monitors]
 
+        local_minimum_monitors = [i for i, x in enumerate(self.monitors) if isinstance(x, LocalMinimumReached)]
+        if local_minimum_monitors:
+            self.local_minimum_monitor_id = local_minimum_monitors[0]
+        else:
+            self.local_minimum_monitor_id = None
+
     def get_monitor(self, name: str) -> Monitor:
         for monitor in self.monitors:
             if monitor.name == name:
                 return monitor
         raise KeyError(f'No monitor of name {name} found.')
+
+    def is_local_minimum_reached(self):
+        if self.local_minimum_monitor_id is None:
+            return False
+        return bool(self.state[self.local_minimum_monitor_id])
 
     @profile
     def update_state(self, new_state):  # Assuming new_state is a NumPy array with only 1 and 0
@@ -75,6 +87,9 @@ class MonitorManager:
     def add_monitor(self, monitor: Monitor):
         self.monitors.append(monitor)
         monitor.set_id(len(self.monitors) - 1)
+
+    def get_state_dict(self):
+        return {monitor.name: bool(self.state[i]) for i, monitor in enumerate(self.monitors)}
 
     @profile
     def trigger_monitor_flips(self, flips: np.ndarray):

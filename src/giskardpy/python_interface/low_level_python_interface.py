@@ -139,7 +139,8 @@ class LowLevelGiskardWrapper:
         self._goals.append(motion_goal)
 
     def add_monitor(self, monitor_type: str, monitor_name: str, **kwargs):
-        assert [x for x in self._monitors if x.name == monitor_name] == []
+        if [x for x in self._monitors if x.name == monitor_name]:
+            raise KeyError(f'monitor named {monitor_name} already exists.')
         monitor = giskard_msgs.Monitor()
         monitor.type = monitor_type
         monitor.name = monitor_name

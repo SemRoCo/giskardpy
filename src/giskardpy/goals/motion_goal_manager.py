@@ -47,7 +47,7 @@ class MotionGoalManager:
                     raise ConstraintInitalizationException(error_msg)
                 raise e
 
-    def add_motion_goal(self, goal: Goal, name: str):
+    def add_motion_goal(self, goal: Goal, name: str = ''):
         if name == '':
             name = str(goal)
         self.motion_goals[name] = goal

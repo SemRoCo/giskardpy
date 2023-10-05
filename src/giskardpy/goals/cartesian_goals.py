@@ -20,63 +20,27 @@ from giskardpy.utils.tfwrapper import normalize
 
 
 class CartesianPosition(Goal):
+    default_reference_velocity = 0.2
+
     def __init__(self, root_link: str, tip_link: str, goal_point: PointStamped,
                  root_group: Optional[str] = None,
                  tip_group: Optional[str] = None,
-                 max_velocity: Optional[float] = None,
                  reference_velocity: Optional[float] = None,
-                 weight: float = WEIGHT_ABOVE_CA, root_link2: str = None):
+                 weight: float = WEIGHT_ABOVE_CA):
         """
         See CartesianPose.
         """
-        super().__init__()
-        self.threshold = 0.01
-        if reference_velocity is None:
-            reference_velocity = 0.2
-        if reference_velocity is None:
-            reference_velocity = max_velocity
-        if isinstance(goal_point, PoseStamped):
-            logging.logwarn('deprecated warning: CartesianPosition called with PoseStamped instead of PointStamped')
-            p = PointStamped()
-            p.header = goal_point.header
-            p.point = goal_point.pose.position
-            goal_point = p
         self.root_link = god_map.world.search_for_link_name(root_link, root_group)
         self.tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
-        if root_link2 is not None:
-            self.root_link2 = god_map.world.search_for_link_name(root_link2, root_group)
-            self.goal_point = self.transform_msg(self.root_link2, goal_point)
-        else:
-            self.root_link2 = None
-            self.goal_point = self.transform_msg(self.root_link, goal_point)
+        super().__init__()
+        if reference_velocity is None:
+            reference_velocity = self.default_reference_velocity
+        self.goal_point = self.transform_msg(self.root_link, goal_point)
         self.reference_velocity = reference_velocity
-        self.max_velocity = max_velocity
         self.weight = weight
-        if self.max_velocity is not None:
-            self.add_constraints_of_goal(TranslationVelocityLimit(root_link=root_link,
-                                                                  root_group=root_group,
-                                                                  tip_link=tip_link,
-                                                                  tip_group=tip_group,
-                                                                  weight=weight,
-                                                                  max_velocity=max_velocity,
-                                                                  hard=False))
 
-    @profile
-    def make_constraints(self):
         r_P_g = cas.Point3(self.goal_point)
         r_P_c = god_map.world.compose_fk_expression(self.root_link, self.tip_link).to_position()
-        if self.root_link2 is not None:
-            root_link2_T_root_link = god_map.world.compose_fk_evaluated_expression(self.root_link2, self.root_link)
-            r_P_c = root_link2_T_root_link.dot(r_P_c)
-        # self.add_debug_expr('trans', cas.norm(r_P_c))
-
-        distance_to_goal = cas.euclidean_distance(r_P_g, r_P_c)
-        distance_to_goal_monitor = Monitor('distance',
-                                           crucial=True,
-                                           stay_one=True)
-        distance_to_goal_monitor.set_expression(cas.less(distance_to_goal, self.threshold))
-        self.add_monitor(distance_to_goal_monitor)
-
         task = Task(name='position goal')
         task.add_point_goal_constraints(frame_P_goal=r_P_g,
                                         frame_P_current=r_P_c,
@@ -90,6 +54,7 @@ class CartesianPosition(Goal):
 
 
 class CartesianOrientation(Goal):
+    default_reference_velocity = 0.5
     def __init__(self,
                  root_link: str,
                  tip_link: str,
@@ -97,63 +62,24 @@ class CartesianOrientation(Goal):
                  root_group: Optional[str] = None,
                  tip_group: Optional[str] = None,
                  reference_velocity: Optional[float] = None,
-                 max_velocity: Optional[float] = None,
-                 weight: float = WEIGHT_ABOVE_CA,
-                 root_link2: str = None):
+                 weight: float = WEIGHT_ABOVE_CA):
         """
         See CartesianPose.
         """
-        super().__init__()
-        if reference_velocity is None:
-            reference_velocity = max_velocity
-        if reference_velocity is None:
-            reference_velocity = 0.5
-        if isinstance(goal_orientation, PoseStamped):
-            logging.logwarn(
-                'deprecated warning: CartesianOrientation called with PoseStamped instead of QuaternionStamped')
-            q = QuaternionStamped()
-            q.header = goal_orientation.header
-            q.quaternion = goal_orientation.pose.orientation
-            goal_orientation = q
         self.root_link = god_map.world.search_for_link_name(root_link, root_group)
         self.tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
-        if root_link2 is not None:
-            self.root_link2 = god_map.world.search_for_link_name(root_link2, root_group)
-            self.goal_orientation = self.transform_msg(self.root_link2, goal_orientation)
-        else:
-            self.root_link2 = None
-            self.goal_orientation = self.transform_msg(self.root_link, goal_orientation)
+        super().__init__()
+        if reference_velocity is None:
+            reference_velocity = self.default_reference_velocity
+        self.goal_orientation = self.transform_msg(self.root_link, goal_orientation)
         self.reference_velocity = reference_velocity
-        self.max_velocity = max_velocity
         self.weight = weight
-        # if self.max_velocity is not None:
-        #     self.add_constraints_of_goal(RotationVelocityLimit(root_link=root_link,
-        #                                                        tip_link=tip_link,
-        #                                                        weight=weight,
-        #                                                        max_velocity=max_velocity,
-        #                                                        hard=False,
-        #                                                        prefix=prefix,
-        #                                                        **kwargs))
 
-    def make_constraints(self):
         r_R_g = cas.RotationMatrix(self.goal_orientation)
         r_R_c = god_map.world.compose_fk_expression(self.root_link, self.tip_link).to_rotation()
-        if self.root_link2 is not None:
-            c_R_r_eval = god_map.world.compose_fk_evaluated_expression(self.tip_link, self.root_link2).to_rotation()
-            root_link2_T_root_link = god_map.world.compose_fk_evaluated_expression(self.root_link2, self.root_link)
-            # self.add_debug_matrix('root_link2_T_root_link', root_link2_T_root_link)
-            r_R_c = root_link2_T_root_link.dot(r_R_c)
-        else:
-            c_R_r_eval = god_map.world.compose_fk_evaluated_expression(self.tip_link, self.root_link).to_rotation()
+        c_R_r_eval = god_map.world.compose_fk_evaluated_expression(self.tip_link, self.root_link).to_rotation()
 
-        rotation_error = cas.rotational_error(r_R_c, r_R_g)
-        rotation_error_monitor = Monitor('rotation error',
-                                         crucial=True,
-                                         stay_one=True)
-        rotation_error_monitor.set_expression(cas.less(cas.abs(rotation_error), 0.01))
-        self.add_monitor(rotation_error_monitor)
-
-        task = Task(name='rotation')
+        task = Task(name='rotation goal')
         task.add_rotation_goal_constraints(frame_R_current=r_R_c,
                                            frame_R_goal=r_R_g,
                                            current_R_frame_eval=c_R_r_eval,
@@ -246,11 +172,9 @@ class CartesianPose(Goal):
     def __init__(self, root_link: str, tip_link: str, goal_pose: PoseStamped,
                  root_group: Optional[str] = None,
                  tip_group: Optional[str] = None,
-                 max_linear_velocity: Optional[float] = None,
-                 max_angular_velocity: Optional[float] = None,
                  reference_linear_velocity: Optional[float] = None,
                  reference_angular_velocity: Optional[float] = None,
-                 weight=WEIGHT_ABOVE_CA, root_link2: Optional[str] = None):
+                 weight=WEIGHT_ABOVE_CA):
         """
         This goal will use the kinematic chain between root and tip link to move tip link into the goal pose.
         The max velocities enforce a strict limit, but require a lot of additional constraints, thus making the
@@ -266,38 +190,38 @@ class CartesianPose(Goal):
         :param reference_linear_velocity: m/s
         :param reference_angular_velocity: rad/s
         :param weight: default WEIGHT_ABOVE_CA
-        :param root_link2: experimental, don't use
         """
-        self.root_link = root_link
-        self.tip_link = tip_link
+        self.root_link = god_map.world.search_for_link_name(root_link, root_group)
+        self.tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
         super().__init__()
-        goal_point = PointStamped()
-        goal_point.header = goal_pose.header
-        goal_point.point = goal_pose.pose.position
-        self.add_constraints_of_goal(CartesianPosition(root_link=root_link,
-                                                       root_group=root_group,
-                                                       tip_link=tip_link,
-                                                       tip_group=tip_group,
-                                                       goal_point=goal_point,
-                                                       max_velocity=max_linear_velocity,
-                                                       reference_velocity=reference_linear_velocity,
-                                                       weight=weight,
-                                                       root_link2=root_link2))
-        goal_orientation = QuaternionStamped()
-        goal_orientation.header = goal_pose.header
-        goal_orientation.quaternion = goal_pose.pose.orientation
-        self.add_constraints_of_goal(CartesianOrientation(root_link=root_link,
-                                                          root_group=root_group,
-                                                          tip_link=tip_link,
-                                                          tip_group=tip_group,
-                                                          goal_orientation=goal_orientation,
-                                                          max_velocity=max_angular_velocity,
-                                                          reference_velocity=reference_angular_velocity,
-                                                          weight=weight,
-                                                          root_link2=root_link2))
+        if reference_linear_velocity is None:
+            reference_linear_velocity = CartesianPosition.default_reference_velocity
+        if reference_angular_velocity is None:
+            reference_angular_velocity = CartesianOrientation.default_reference_velocity
+        self.weight = weight
+        self.goal_pose = self.transform_msg(self.root_link, goal_pose)
+        root_T_tip = cas.TransMatrix(self.goal_pose)
 
-    def make_constraints(self):
-        pass
+        #%% position goal
+        root_P_goal = root_T_tip.to_position()
+        root_P_current = god_map.world.compose_fk_expression(self.root_link, self.tip_link).to_position()
+        task = Task(name='pose goal')
+        task.add_point_goal_constraints(frame_P_goal=root_P_goal,
+                                        frame_P_current=root_P_current,
+                                        reference_velocity=reference_linear_velocity,
+                                        weight=self.weight)
+
+        #%% orientation goal
+        root_R_goal = root_T_tip.to_rotation()
+        root_R_current = god_map.world.compose_fk_expression(self.root_link, self.tip_link).to_rotation()
+        current_R_root_eval = god_map.world.compose_fk_evaluated_expression(self.tip_link, self.root_link).to_rotation()
+
+        task.add_rotation_goal_constraints(frame_R_current=root_R_current,
+                                           frame_R_goal=root_R_goal,
+                                           current_R_frame_eval=current_R_root_eval,
+                                           reference_velocity=reference_angular_velocity,
+                                           weight=self.weight)
+        self.add_task(task)
 
     def __str__(self):
         s = super().__str__()

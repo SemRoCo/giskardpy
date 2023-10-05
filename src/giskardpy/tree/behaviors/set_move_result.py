@@ -1,6 +1,8 @@
+import numpy as np
 from py_trees import Status
 
 from giskardpy.exceptions import *
+from giskardpy.goals.goal import NonMotionGoal
 from giskardpy.god_map import god_map
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.tree.control_modes import ControlModes
@@ -28,7 +30,11 @@ class SetMoveResult(GiskardBehavior):
             move_result = GiskardException(str(e)).to_move_result()
 
         if isinstance(e, EmptyProblemException) and god_map.is_standalone():
-            move_result = MoveResult()
+            motion_goals = god_map.motion_goal_manager.motion_goals.values()
+            only_non_motion_goals = np.all([isinstance(x, NonMotionGoal) for x in motion_goals])
+            if only_non_motion_goals:
+                # ignore error
+                move_result = MoveResult()
 
         trajectory = god_map.trajectory
         joints = [god_map.world.joints[joint_name] for joint_name in god_map.world.movable_joint_names]

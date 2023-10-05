@@ -3,11 +3,12 @@ from typing import Union, List
 import numpy as np
 
 import giskardpy.casadi_wrapper as cas
+from giskardpy.exceptions import UnknownGroupException
 from giskardpy.god_map import god_map
-from giskardpy.my_types import Derivatives
+from giskardpy.my_types import Derivatives, my_string, transformable_message
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.symbol_manager import symbol_manager
-
+import giskardpy.utils.tfwrapper as tf
 
 class Monitor:
     id: int
@@ -33,6 +34,25 @@ class Monitor:
 
     def notify_flipped(self, time: float):
         self.state_flip_times.append(time)
+
+    def transform_msg(self, target_frame: my_string, msg: transformable_message, tf_timeout: float = 1) \
+            -> transformable_message:
+        """
+        First tries to transform the message using the worlds internal kinematic tree.
+        If it fails, it uses tf as a backup.
+        :param target_frame:
+        :param msg:
+        :param tf_timeout: for how long Giskard should wait for tf.
+        :return: message relative to target frame
+        """
+        try:
+            try:
+                msg.header.frame_id = god_map.world.search_for_link_name(msg.header.frame_id)
+            except UnknownGroupException:
+                pass
+            return god_map.world.transform_msg(target_frame, msg)
+        except KeyError:
+            return tf.transform_msg(target_frame, msg, timeout=tf_timeout)
 
     @profile
     def substitute_with_on_flip_symbols(self, expression: cas.Expression) -> cas.Expression:

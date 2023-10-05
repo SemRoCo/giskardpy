@@ -79,7 +79,7 @@ class DonbotTestWrapper(GiskardTestWrapper):
     def set_gripper(self, width: float, gripper_joint: str = 'gripper_joint'):
         width = max(0.0065, min(0.109, width))
         js = {gripper_joint: width}
-        self.add_joint_goal(js)
+        self.set_joint_goal(js)
         self.allow_all_collisions()
         self.plan_and_execute()
 
@@ -121,7 +121,7 @@ def giskard(request, ros) -> DonbotTestWrapper:
 
 @pytest.fixture()
 def self_collision_pose(resetted_giskard: DonbotTestWrapper) -> DonbotTestWrapper:
-    resetted_giskard.add_joint_goal(self_collision_js)
+    resetted_giskard.set_joint_goal(self_collision_js)
     resetted_giskard.allow_all_collisions()
     resetted_giskard.plan_and_execute()
     return resetted_giskard
@@ -142,7 +142,7 @@ def fake_table_setup(zero_pose: DonbotTestWrapper) -> DonbotTestWrapper:
 class TestJointGoals:
     def test_joint_movement1(self, zero_pose: DonbotTestWrapper):
         zero_pose.allow_self_collision()
-        zero_pose.add_joint_goal(floor_detection_js)
+        zero_pose.set_joint_goal(floor_detection_js)
         zero_pose.plan_and_execute()
 
     def test_joint_movement_gaya(self, zero_pose: DonbotTestWrapper):
@@ -160,14 +160,14 @@ class TestJointGoals:
             "ur5_wrist_2_joint": 1.5707963267948966,
             "ur5_wrist_3_joint": - 1.6503928343402308
         }
-        zero_pose.add_joint_goal(js2)
+        zero_pose.set_joint_goal(js2)
         zero_pose.plan_and_execute()
-        zero_pose.add_joint_goal(js1)
+        zero_pose.set_joint_goal(js1)
         zero_pose.plan_and_execute()
 
     def test_empty_joint_goal(self, zero_pose: DonbotTestWrapper):
         zero_pose.allow_self_collision()
-        zero_pose.add_joint_goal({
+        zero_pose.set_joint_goal({
             'ur5_shoulder_pan_joint': -0.15841275850404912,
             'ur5_shoulder_lift_joint': -2.2956998983966272,
             'ur5_elbow_joint': 2.240689277648926,
@@ -175,7 +175,7 @@ class TestJointGoals:
             'ur5_wrist_2_joint': -2.7356796900378626,
             'ur5_wrist_3_joint': -2.5249870459186,
         })
-        zero_pose.add_joint_goal({})
+        zero_pose.set_joint_goal({})
         zero_pose.plan_and_execute(expected_error_codes=[MoveResult.CONSTRAINT_INITIALIZATION_ERROR])
 
     def test_joint_movement2(self, zero_pose: DonbotTestWrapper):
@@ -188,7 +188,7 @@ class TestJointGoals:
             'ur5_wrist_3_joint': -1.57543737093,
         }
         zero_pose.allow_self_collision()
-        zero_pose.add_joint_goal(js)
+        zero_pose.set_joint_goal(js)
         zero_pose.plan_and_execute()
 
         js2 = {
@@ -200,7 +200,7 @@ class TestJointGoals:
             'ur5_wrist_3_joint': -np.pi / 2,
         }
         zero_pose.allow_self_collision()
-        zero_pose.add_joint_goal(js2)
+        zero_pose.set_joint_goal(js2)
         zero_pose.plan_and_execute()
 
     def test_joint_movement3(self, zero_pose: DonbotTestWrapper):
@@ -216,13 +216,13 @@ class TestJointGoals:
             'ur5_wrist_3_joint': -1.57543737093,
         }
         zero_pose.allow_self_collision()
-        zero_pose.add_joint_goal(js)
+        zero_pose.set_joint_goal(js)
         zero_pose.plan_and_execute()
 
     def test_partial_joint_state_goal1(self, zero_pose: DonbotTestWrapper):
         zero_pose.allow_self_collision()
         js = dict(list(floor_detection_js.items())[:3])
-        zero_pose.add_joint_goal(js)
+        zero_pose.set_joint_goal(js)
         zero_pose.plan_and_execute()
 
 
@@ -302,7 +302,7 @@ class TestConstraints:
 
         # kitchen_setup.plan_and_execute()
 
-        kitchen_setup.add_joint_goal(kitchen_setup.better_pose)
+        kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
         kitchen_setup.plan_and_execute()
 
 
@@ -326,7 +326,7 @@ class TestCartGoals:
             'ur5_wrist_2_joint': -0.22007495561708623,
             'ur5_wrist_3_joint': 0,
         }
-        zero_pose.add_joint_goal(js)
+        zero_pose.set_joint_goal(js)
         zero_pose.plan_and_execute()
         p = PoseStamped()
         p.header.frame_id = 'camera_link'
@@ -351,7 +351,7 @@ class TestCartGoals:
         }
 
         zero_pose.allow_self_collision()
-        zero_pose.add_joint_goal(start_pose)
+        zero_pose.set_joint_goal(start_pose)
         zero_pose.plan_and_execute()
 
         goal_pose = PoseStamped()

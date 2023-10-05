@@ -55,7 +55,7 @@ class HSRTestWrapper(GiskardTestWrapper):
 
     def command_gripper(self, width):
         js = {'hand_motor_joint': width}
-        self.add_joint_goal(js)
+        self.set_joint_goal(js)
         self.plan_and_execute()
 
     def reset_base(self):
@@ -120,7 +120,7 @@ class TestJointGoals:
         compare_poses(hand_T_finger_current.pose, hand_T_finger_expected.pose)
 
         js = {'torso_lift_joint': 0.1}
-        zero_pose.add_joint_goal(js, check=False)
+        zero_pose.set_joint_goal(js, check=False)
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
         np.testing.assert_almost_equal(zero_pose.world.state[arm_lift_joint].position, 0.2, decimal=2)
@@ -194,7 +194,7 @@ class TestJointGoals:
         assert ll == -0.075
         assert ul == 0.075
         joint_goal = {'torso_lift_joint': 0.25}
-        zero_pose.add_joint_goal(joint_goal, check=False)
+        zero_pose.set_joint_goal(joint_goal, check=False)
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
         np.testing.assert_almost_equal(zero_pose.world.state['hsrb/arm_lift_joint'].position, 0.5, decimal=2)
@@ -341,7 +341,7 @@ class TestConstraints:
 
         kitchen_setup.plan_and_execute()
 
-        kitchen_setup.add_joint_goal(kitchen_setup.better_pose)
+        kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
         kitchen_setup.allow_self_collision()
         kitchen_setup.plan_and_execute()
 
@@ -411,7 +411,7 @@ class TestCollisionAvoidanceGoals:
 
     def test_collision_avoidance(self, zero_pose: HSRTestWrapper):
         js = {'arm_flex_joint': -np.pi / 2}
-        zero_pose.add_joint_goal(js)
+        zero_pose.set_joint_goal(js)
         zero_pose.plan_and_execute()
 
         p = PoseStamped()
@@ -423,7 +423,7 @@ class TestCollisionAvoidanceGoals:
         zero_pose.add_box(name='box', size=(1, 1, 0.01), pose=p)
 
         js = {'arm_flex_joint': 0}
-        zero_pose.add_joint_goal(js, check=False)
+        zero_pose.set_joint_goal(js, check=False)
         zero_pose.plan_and_execute()
 
 
@@ -439,5 +439,5 @@ class TestAddObject:
                           pose=pose,
                           parent_link='hand_palm_link')
 
-        zero_pose.add_joint_goal({'arm_flex_joint': -0.7})
+        zero_pose.set_joint_goal({'arm_flex_joint': -0.7})
         zero_pose.plan_and_execute()

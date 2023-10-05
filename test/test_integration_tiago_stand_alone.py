@@ -135,7 +135,7 @@ class TiagoTestWrapper(GiskardTestWrapper):
             'gripper_left_left_finger_joint': goal,
             'gripper_left_right_finger_joint': goal,
         }
-        self.add_joint_goal(js)
+        self.set_joint_goal(js)
         self.plan_and_execute()
 
     def reset(self):
@@ -251,7 +251,7 @@ class TestCartGoals:
         zero_pose.move_base(goal)
 
     def test_drive7(self, apartment_setup: TiagoTestWrapper):
-        apartment_setup.add_joint_goal(apartment_setup.better_pose2)
+        apartment_setup.set_joint_goal(apartment_setup.better_pose2)
         apartment_setup.plan_and_execute()
 
         goal = PoseStamped()
@@ -259,7 +259,7 @@ class TestCartGoals:
         goal.pose.position.x = 1.1
         goal.pose.position.y = 2
         goal.pose.orientation = Quaternion(*quaternion_about_axis(-np.pi, [0, 0, 1]))
-        apartment_setup.add_joint_goal(apartment_setup.better_pose2)
+        apartment_setup.set_joint_goal(apartment_setup.better_pose2)
         apartment_setup.move_base(goal)
 
         goal = PoseStamped()
@@ -321,7 +321,7 @@ class TestCartGoals:
 
 class TestCollisionAvoidance:
     def test_avoid_all(self, zero_pose: TiagoTestWrapper):
-        zero_pose.add_joint_goal(zero_pose.better_pose)
+        zero_pose.set_joint_goal(zero_pose.better_pose)
         zero_pose.avoid_collision(0.1, group1=zero_pose.robot_name)
         zero_pose.plan_and_execute()
 
@@ -337,7 +337,7 @@ class TestCollisionAvoidance:
                             pose=box_pose,
                             parent_link=parent_link,
                             parent_link_group=better_pose.robot_name)
-        better_pose.add_joint_goal(better_pose.default_pose)
+        better_pose.set_joint_goal(better_pose.default_pose)
         better_pose.plan_and_execute()
 
     def test_demo1(self, apartment_setup: TiagoTestWrapper):
@@ -441,7 +441,7 @@ class TestCollisionAvoidance:
         js2 = {
             'torso_lift_joint': 0.3400000002235174,
         }
-        zero_pose.add_joint_goal(js2)
+        zero_pose.set_joint_goal(js2)
         zero_pose.plan()
 
     def test_avoid_self_collision4(self, zero_pose: TiagoTestWrapper):
@@ -471,7 +471,7 @@ class TestCollisionAvoidance:
         zero_pose.set_seed_configuration(js)
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
-        zero_pose.add_joint_goal(zero_pose.better_pose2)
+        zero_pose.set_joint_goal(zero_pose.better_pose2)
         zero_pose.plan_and_execute()
 
     def test_left_arm(self, zero_pose: TiagoTestWrapper):
@@ -611,7 +611,7 @@ class TestJointGoals:
             'arm_right_5_joint': -2.1031066629465776,
         }
         zero_pose.set_seed_configuration(js)
-        zero_pose.add_joint_goal(zero_pose.better_pose2, check=False)
+        zero_pose.set_joint_goal(zero_pose.better_pose2, check=False)
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
         zero_pose.are_joint_limits_violated()
@@ -684,7 +684,7 @@ class TestJointGoals:
         zero_pose.set_seed_configuration(js)
         js2 = deepcopy(js)
         # del js2['arm_right_2_joint']
-        zero_pose.add_joint_goal(js2, check=False)
+        zero_pose.set_joint_goal(js2, check=False)
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
         zero_pose.are_joint_limits_violated()
@@ -708,8 +708,8 @@ class TestJointGoals:
             'arm_right_6_joint': 0.5,
             'arm_right_7_joint': 0.0,
         }
-        zero_pose.add_joint_goal(js1)
-        zero_pose.add_joint_goal(js2)
+        zero_pose.set_joint_goal(js1)
+        zero_pose.set_joint_goal(js2)
 
         zero_pose.plan_and_execute()
 
@@ -719,7 +719,7 @@ class TestJointGoals:
             # 'arm_left_5_joint': -3
         }
         # zero_pose.set_seed_configuration(start_state)
-        zero_pose.add_joint_goal(js1, check=False, weight=WEIGHT_ABOVE_CA)
+        zero_pose.set_joint_goal(js1, check=False, weight=WEIGHT_ABOVE_CA)
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
         zero_pose.are_joint_limits_violated()
@@ -731,7 +731,7 @@ class TestJointGoals:
         }
         zero_pose.set_json_goal('SetSeedConfiguration',
                                 seed_configuration=js)
-        zero_pose.add_joint_goal(zero_pose.default_pose)
+        zero_pose.set_joint_goal(zero_pose.default_pose)
         zero_pose.plan_and_execute()
         zero_pose.are_joint_limits_violated()
 
@@ -764,7 +764,7 @@ class TestJointGoals:
         }
         zero_pose.set_json_goal('SetSeedConfiguration',
                                 seed_configuration=js)
-        zero_pose.add_joint_goal(js, check=False)
+        zero_pose.set_joint_goal(js, check=False)
         zero_pose.world.state[PrefixName('arm_right_5_joint', 'tiago_dual')].velocity = 1
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
@@ -782,6 +782,6 @@ class TestJointGoals:
         }
         zero_pose.set_json_goal('SetSeedConfiguration',
                                 seed_configuration=js)
-        zero_pose.add_joint_goal(js2, check=False)
+        zero_pose.set_joint_goal(js2, check=False)
         zero_pose.plan()
         zero_pose.are_joint_limits_violated()

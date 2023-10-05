@@ -40,13 +40,6 @@ class Goal(ABC):
         return None
 
     @abc.abstractmethod
-    def make_constraints(self):
-        """
-        This is where you create your constraints using casadi_wrapper.
-        Use self.add_constraint.
-        """
-
-    @abc.abstractmethod
     def __str__(self) -> str:
         """
         Make sure the returns a unique str, in case multiple goals of the same type are added.

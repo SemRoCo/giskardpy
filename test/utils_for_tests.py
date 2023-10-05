@@ -529,34 +529,6 @@ class GiskardTestWrapper(GiskardWrapper):
                                               max_velocity=max_velocity, weight=weight,
                                               **kwargs)
 
-    def set_cart_goal(self, goal_pose, tip_link, root_link=None, tip_group=None, root_group=None, weight=None,
-                      linear_velocity=None,
-                      angular_velocity=None, check=True, **kwargs):
-        goal_point = PointStamped()
-        goal_point.header = goal_pose.header
-        goal_point.point = goal_pose.pose.position
-        self.set_translation_goal(goal_point=goal_point,
-                                  tip_link=tip_link,
-                                  tip_group=tip_group,
-                                  root_link=root_link,
-                                  root_group=root_group,
-                                  weight=weight,
-                                  max_velocity=linear_velocity,
-                                  check=check,
-                                  **kwargs)
-        goal_orientation = QuaternionStamped()
-        goal_orientation.header = goal_pose.header
-        goal_orientation.quaternion = goal_pose.pose.orientation
-        self.set_rotation_goal(goal_orientation=goal_orientation,
-                               tip_link=tip_link,
-                               tip_group=tip_group,
-                               root_link=root_link,
-                               root_group=root_group,
-                               weight=weight,
-                               max_velocity=angular_velocity,
-                               check=check,
-                               **kwargs)
-
     def set_move_base_goal(self, goal_pose, check=True):
         self.set_json_goal(constraint_type='PR2DiffDriveBaseGoal',
                            goal_pose=goal_pose)

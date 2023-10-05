@@ -110,7 +110,7 @@ class TestJointGoalsMujoco(TestJointGoals):
             'l_wrist_flex_joint': -0.10014623223021513,
             'l_wrist_roll_joint': -6.062015047706399,
         }
-        zero_pose.add_joint_goal(js)
+        zero_pose.set_joint_goal(js)
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
 
@@ -166,7 +166,7 @@ class TestMoveBaseGoals:
         # base_goal.pose.position.y = 0.05
         base_goal.pose.orientation.w = 1
         # zero_pose.set_json_goal('PR2CasterConstraints')
-        zero_pose.add_joint_goal(zero_pose.better_pose)
+        zero_pose.set_joint_goal(zero_pose.better_pose)
         zero_pose.move_base(base_goal)
 
     def test_forward_1m(self, zero_pose: PR2TestWrapper):
@@ -226,7 +226,7 @@ class TestMoveBaseGoals:
                                 radius=0.05,
                                 tip_link='base_footprint',
                                 scale=2)
-        zero_pose.add_joint_goal(zero_pose.better_pose, check=False)
+        zero_pose.set_joint_goal(zero_pose.better_pose, check=False)
         zero_pose.plan_and_execute()
 
     def test_forward_1cm(self, zero_pose: PR2TestWrapper):
@@ -351,7 +351,7 @@ class TestConstraints:
 
     def test_SetSeedConfiguration(self, zero_pose: PR2TestWrapper):
         zero_pose.set_seed_configuration(seed_configuration=zero_pose.better_pose)
-        zero_pose.add_joint_goal(zero_pose.default_pose)
+        zero_pose.set_joint_goal(zero_pose.default_pose)
         zero_pose.plan_and_execute(expected_error_codes=[MoveResult.CONSTRAINT_INITIALIZATION_ERROR])
 
     def test_bowl_and_cup(self, kitchen_setup: PR2TestWrapper):
@@ -420,7 +420,7 @@ class TestConstraints:
         kitchen_setup.plan_and_execute()
         kitchen_setup.set_kitchen_js({drawer_joint: 0.48})
 
-        kitchen_setup.add_joint_goal(kitchen_setup.better_pose)
+        kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
         base_pose = PoseStamped()
         base_pose.header.frame_id = 'map'
         base_pose.pose.position.y = 1
@@ -473,7 +473,7 @@ class TestConstraints:
         kitchen_setup.update_parent_link_of_group(name=bowl_name, parent_link=kitchen_setup.l_tip)
         kitchen_setup.update_parent_link_of_group(name=cup_name, parent_link=kitchen_setup.r_tip)
 
-        kitchen_setup.add_joint_goal(kitchen_setup.better_pose)
+        kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
         kitchen_setup.plan_and_execute()
         base_goal = PoseStamped()
         base_goal.header.frame_id = 'base_footprint'
@@ -502,7 +502,7 @@ class TestConstraints:
         kitchen_setup.detach_group(name=cup_name)
         kitchen_setup.allow_collision(group1=kitchen_setup.robot_name, group2=cup_name)
         kitchen_setup.allow_collision(group1=kitchen_setup.robot_name, group2=bowl_name)
-        kitchen_setup.add_joint_goal(kitchen_setup.better_pose)
+        kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
         kitchen_setup.plan_and_execute()
 
 
@@ -578,7 +578,7 @@ class TestActionServerEvents:
 
     def test_plan_only(self, zero_pose: PR2TestWrapper):
         zero_pose.allow_self_collision()
-        zero_pose.add_joint_goal(pocky_pose, check=False)
+        zero_pose.set_joint_goal(pocky_pose, check=False)
         zero_pose.add_goal_check(JointGoalChecker(zero_pose, zero_pose.default_pose))
         zero_pose.send_goal(goal_type=MoveGoal.PLAN_ONLY)
 

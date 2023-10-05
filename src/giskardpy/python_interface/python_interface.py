@@ -2,6 +2,7 @@ from typing import Dict, Optional, List
 
 from geometry_msgs.msg import PoseStamped, PointStamped, QuaternionStamped, Vector3Stamped
 
+from giskardpy.goals.cartesian_goals import CartesianPose
 from giskardpy.goals.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
 from giskardpy.my_types import goal_parameter
 from giskardpy.python_interface.low_level_python_interface import LowLevelGiskardWrapper
@@ -9,7 +10,7 @@ from giskardpy.python_interface.low_level_python_interface import LowLevelGiskar
 
 class GiskardWrapper(LowLevelGiskardWrapper):
     # %% predefined goals
-    def add_joint_goal(self,
+    def set_joint_goal(self,
                        goal_state: Dict[str, float],
                        group_name: Optional[str] = None,
                        weight: Optional[float] = None,
@@ -23,9 +24,9 @@ class GiskardWrapper(LowLevelGiskardWrapper):
         :param max_velocity: will be applied to all joints
         """
         monitor_name = 'joint goal reached'
-        self.add_joint_goal_monitor(name=monitor_name,
-                                    goal_state=goal_state,
-                                    crucial=True)
+        self.add_joint_pose_reached_monitor(name=monitor_name,
+                                            goal_state=goal_state,
+                                            crucial=True)
         self.add_motion_goal(goal_type='JointPositionList',
                              goal_state=goal_state,
                              group_name=group_name,
@@ -62,7 +63,15 @@ class GiskardWrapper(LowLevelGiskardWrapper):
         :param reference_angular_velocity: rad/s
         :param weight: default WEIGHT_ABOVE_CA
         """
-        self.add_motion_goal(goal_type='CartesianPose',
+        monitor_name = 'pose reached'
+        self.add_cartesian_pose_reached_monitor(name=monitor_name,
+                                                root_link=root_link,
+                                                root_group=root_group,
+                                                tip_link=tip_link,
+                                                tip_group=tip_group,
+                                                goal_pose=goal_pose)
+        self.add_motion_goal(goal_type=CartesianPose.__name__,
+                             to_end=[monitor_name],
                              goal_pose=goal_pose,
                              tip_link=tip_link,
                              root_link=root_link,

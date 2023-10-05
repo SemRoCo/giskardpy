@@ -36,7 +36,6 @@ class MotionGoalManager:
             try:
                 params = json_str_to_kwargs(motion_goal.parameter_value_pair)
                 c: Goal = C(**params)
-                c.make_constraints()
                 self.add_motion_goal(c, motion_goal.name)
                 for monitor_name in motion_goal.to_end:
                     monitor = god_map.monitor_manager.get_monitor(monitor_name)

@@ -13,7 +13,7 @@ import sys
 from collections import OrderedDict
 from contextlib import contextmanager
 from functools import cached_property
-from typing import Type, Optional, Dict, Any, List
+from typing import Type, Optional, Dict, Any, List, Union
 
 import numpy as np
 import roslaunch
@@ -368,14 +368,31 @@ def make_pose_from_parts(pose, frame_id, position, orientation):
     return pose
 
 
-def convert_ros_message_to_dictionary(message: Message) -> dict:
-    type_str_parts = str(type(message)).split('.')
-    part1 = type_str_parts[0].split('\'')[1]
-    part2 = type_str_parts[-1].split('\'')[0]
-    message_type = f'{part1}/{part2}'
-    d = {'message_type': message_type,
-         'message': original_convert_ros_message_to_dictionary(message)}
-    return d
+def convert_ros_message_to_dictionary(message) -> dict:
+    if isinstance(message, list):
+        for i, element in enumerate(message):
+            message[i] = convert_ros_message_to_dictionary(element)
+    elif isinstance(message, dict):
+        for k, v in message.copy().items():
+            message[k] = convert_ros_message_to_dictionary(v)
+
+    elif isinstance(message, tuple):
+        list_values = list(message)
+        for i, element in enumerate(list_values):
+            list_values[i] = convert_ros_message_to_dictionary(element)
+        message = tuple(list_values)
+
+    elif isinstance(message, Message):
+
+        type_str_parts = str(type(message)).split('.')
+        part1 = type_str_parts[0].split('\'')[1]
+        part2 = type_str_parts[-1].split('\'')[0]
+        message_type = f'{part1}/{part2}'
+        d = {'message_type': message_type,
+             'message': original_convert_ros_message_to_dictionary(message)}
+        return d
+
+    return message
 
 
 def replace_prefix_name_with_str(d: dict) -> dict:
@@ -444,12 +461,24 @@ def int_to_bit_list(number: int) -> List[int]:
     return [2 ** i * int(bit) for i, bit in enumerate(reversed("{0:b}".format(number))) if int(bit) != 0]
 
 
-def json_to_kwargs(json_str: str) -> Dict[str, Any]:
-    parsed_json = json.loads(json_str)
-    for key, value in parsed_json.items():
-        if isinstance(value, dict) and 'message_type' in value:
-            parsed_json[key] = convert_dictionary_to_ros_message(value)
-    return parsed_json
+def json_str_to_kwargs(json_str: str) -> Dict[str, Any]:
+    d = json.loads(json_str)
+    return json_to_kwargs(d)
+
+
+def json_to_kwargs(d: dict) -> Dict[str, Any]:
+    if isinstance(d, list):
+        for i, element in enumerate(d):
+            d[i] = json_to_kwargs(element)
+
+    if isinstance(d, dict):
+        if 'message_type' in d:
+            d = convert_dictionary_to_ros_message(d)
+        else:
+            for key, value in d.copy().items():
+                d[key] = json_to_kwargs(value)
+
+    return d
 
 
 def kwargs_to_json(kwargs: Dict[str, Any]) -> str:

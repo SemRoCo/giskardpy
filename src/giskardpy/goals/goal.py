@@ -133,7 +133,7 @@ class Goal(ABC):
         self._inequality_constraints = OrderedDict()
         self._derivative_constraints = OrderedDict()
         self._debug_expressions = OrderedDict()
-        # self.make_constraints()
+
         for task in self.tasks:
             for constraint in task.get_eq_constraints():
                 name = f'{str(self)}/{task.name}/{constraint.name}'
@@ -153,6 +153,7 @@ class Goal(ABC):
             self._inequality_constraints.update(_prepend_prefix(self.__class__.__name__, inequality_constraints))
             self._derivative_constraints.update(_prepend_prefix(self.__class__.__name__, derivative_constraints))
             self._debug_expressions.update(_prepend_prefix(self.__class__.__name__, debug_expressions))
+
         return self._equality_constraints, self._inequality_constraints, self._derivative_constraints, \
             self._debug_expressions
 

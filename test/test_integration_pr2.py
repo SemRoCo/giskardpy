@@ -29,7 +29,7 @@ from giskardpy.model.world import WorldTree
 from giskardpy.my_types import PrefixName
 from giskardpy.goals.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE
 from giskardpy.python_interface.python_interface import GiskardWrapper
-from giskardpy.utils.utils import launch_launchfile, suppress_stderr
+from giskardpy.utils.utils import launch_launchfile, suppress_stderr, resolve_ros_iris
 from giskardpy.utils.math import compare_points
 from utils_for_tests import compare_poses, publish_marker_vector, \
     GiskardTestWrapper, pr2_urdf
@@ -2400,6 +2400,19 @@ class TestWorldManipulation:
         kitchen_setup.detach_group(object_name)
         kitchen_setup.set_kitchen_js({drawer_joint: 0})
         kitchen_setup.plan_and_execute()
+
+    def test_single_joint_urdf(self, zero_pose: PR2TestWrapper):
+        object_name = 'spoon'
+        path = resolve_ros_iris('package://giskardpy/test/spoon/urdf/spoon.urdf')
+        with open(path, 'r')as f:
+            urdf_str = hacky_urdf_parser_fix(f.read())
+        pose = PoseStamped()
+        pose.header.frame_id = 'map'
+        pose.pose.position.x = 1
+        pose.pose.orientation.w = 1
+        zero_pose.add_urdf(name=object_name, urdf=urdf_str, pose=pose, parent_link='map')
+        pose.pose.position.x = 1.5
+        zero_pose.update_group_pose(group_name=object_name, new_pose=pose)
 
     def test_update_group_pose1(self, zero_pose: PR2TestWrapper):
         group_name = 'muh'

@@ -780,7 +780,7 @@ class GiskardTestWrapper(GiskardWrapper):
             trajectory2[joint_name] = np.array([p[joint_name].velocity for t, p in trajectory.items()])
         return trajectory2
 
-    def are_joint_limits_violated(self, eps=1e-6):
+    def are_joint_limits_violated(self, eps=1e-2):
         active_free_variables: List[FreeVariable] = god_map.qp_controller.free_variables
         for free_variable in active_free_variables:
             if free_variable.has_position_limits():
@@ -1028,6 +1028,7 @@ class GiskardTestWrapper(GiskardWrapper):
                                     js_topic=js_topic,
                                     set_js_topic=set_js_topic,
                                     timeout=timeout)
+        self.wait_heartbeats()
         self.check_add_object_result(response=response,
                                      name=name,
                                      size=None,

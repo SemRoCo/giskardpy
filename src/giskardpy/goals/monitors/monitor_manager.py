@@ -11,7 +11,7 @@ import giskard_msgs.msg as giskard_msgs
 from giskardpy.god_map import god_map
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils import logging
-from giskardpy.utils.utils import json_to_kwargs, get_all_classes_in_package
+from giskardpy.utils.utils import json_to_kwargs, get_all_classes_in_package, json_str_to_kwargs
 
 
 def flipped_to_one(a: np.ndarray, b: np.ndarray) -> np.ndarray:
@@ -101,7 +101,7 @@ class MonitorManager:
             except KeyError:
                 raise UnknownConstraintException(f'unknown monitor type: \'{monitor_msg.type}\'.')
             try:
-                params = json_to_kwargs(monitor_msg.parameter_value_pair)
+                params = json_str_to_kwargs(monitor_msg.parameter_value_pair)
                 monitor: Monitor = C(monitor_msg.name, **params)
                 self.add_monitor(monitor)
             except Exception as e:

@@ -85,7 +85,9 @@ jobs:
           path: 'ros_ws/src/giskardpy'
           repository: SemRoCo/giskardpy
       - name: install pip dependencies
-        run: pip3 install -r ros_ws/src/giskardpy/requirements.txt
+        run: |
+          python3 -m pip install --upgrade pip
+          pip3 install -r ros_ws/src/giskardpy/requirements.txt
       - name: Checkout giskard msgs
         uses: actions/checkout@v3
         with:

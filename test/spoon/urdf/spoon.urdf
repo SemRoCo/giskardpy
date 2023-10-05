@@ -1,0 +1,113 @@
+<?xml version="1.0" ?>
+<robot name="spoon">
+    <link name="spoon">
+        <visual>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="package://giskardpy/test/spoon/meshes/obj/SM_Spoon.obj"/>
+            </geometry>
+        </visual>
+        <collision>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="package://giskardpy/test/spoon/meshes/stl/SM_Spoon_1.stl"/>
+            </geometry>
+        </collision>
+        <collision>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="package://giskardpy/test/spoon/meshes/stl/SM_Spoon_2.stl"/>
+            </geometry>
+        </collision>
+        <collision>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="package://giskardpy/test/spoon/meshes/stl/SM_Spoon_3.stl"/>
+            </geometry>
+        </collision>
+        <collision>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="package://giskardpy/test/spoon/meshes/stl/SM_Spoon_4.stl"/>
+            </geometry>
+        </collision>
+        <collision>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="package://giskardpy/test/spoon/meshes/stl/SM_Spoon_5.stl"/>
+            </geometry>
+        </collision>
+        <collision>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="package://giskardpy/test/spoon/meshes/stl/SM_Spoon_6.stl"/>
+            </geometry>
+        </collision>
+        <collision>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="package://giskardpy/test/spoon/meshes/stl/SM_Spoon_7.stl"/>
+            </geometry>
+        </collision>
+        <collision>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="package://giskardpy/test/spoon/meshes/stl/SM_Spoon_8.stl"/>
+            </geometry>
+        </collision>
+        <collision>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="package://giskardpy/test/spoon/meshes/stl/SM_Spoon_9.stl"/>
+            </geometry>
+        </collision>
+        <collision>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="package://giskardpy/test/spoon/meshes/stl/SM_Spoon_10.stl"/>
+            </geometry>
+        </collision>
+        <collision>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="package://giskardpy/test/spoon/meshes/stl/SM_Spoon_11.stl"/>
+            </geometry>
+        </collision>
+        <collision>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="package://giskardpy/test/spoon/meshes/stl/SM_Spoon_12.stl"/>
+            </geometry>
+        </collision>
+        <collision>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="package://giskardpy/test/spoon/meshes/stl/SM_Spoon_13.stl"/>
+            </geometry>
+        </collision>
+        <collision>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="package://giskardpy/test/spoon/meshes/stl/SM_Spoon_14.stl"/>
+            </geometry>
+        </collision>
+        <collision>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="package://giskardpy/test/spoon/meshes/stl/SM_Spoon_15.stl"/>
+            </geometry>
+        </collision>
+        <collision>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="package://giskardpy/test/spoon/meshes/stl/SM_Spoon_16.stl"/>
+            </geometry>
+        </collision>
+        <collision>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="package://giskardpy/test/spoon/meshes/stl/SM_Spoon_17.stl"/>
+            </geometry>
+        </collision>
+    </link>
+</robot>

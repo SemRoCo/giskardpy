@@ -10,7 +10,8 @@ import giskard_msgs.msg as giskard_msgs
 from giskardpy.god_map import god_map
 from giskardpy.my_types import PrefixName
 from giskardpy.utils import logging
-from giskardpy.utils.utils import get_all_classes_in_package, json_to_kwargs
+from giskardpy.utils.utils import get_all_classes_in_package, json_to_kwargs, convert_dictionary_to_ros_message, \
+    json_str_to_kwargs
 
 
 class MotionGoalManager:
@@ -33,7 +34,7 @@ class MotionGoalManager:
             except KeyError:
                 raise UnknownConstraintException(f'unknown constraint {motion_goal.type}.')
             try:
-                params = json_to_kwargs(motion_goal.parameter_value_pair)
+                params = json_str_to_kwargs(motion_goal.parameter_value_pair)
                 c: Goal = C(**params)
                 c.make_constraints()
                 self.add_motion_goal(c, motion_goal.name)
@@ -218,3 +219,21 @@ class MotionGoalManager:
         god_map.neq_constraints = neq_constraints
         god_map.derivative_constraints = derivative_constraints
         return eq_constraints, neq_constraints, derivative_constraints
+
+
+    def replace_jsons_with_ros_messages(self, d):
+        if isinstance(d, list):
+            for i, element in enumerate(d):
+                d[i] = self.replace_jsons_with_ros_messages(element)
+
+        if isinstance(d, dict):
+
+            if 'message_type' in d:
+
+                d = convert_dictionary_to_ros_message(d)
+
+            else:
+                for key, value in d.copy().items():
+                    d[key] = self.replace_jsons_with_ros_messages(value)
+
+        return d

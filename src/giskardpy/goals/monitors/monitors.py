@@ -84,15 +84,20 @@ class Monitor:
 
 class LocalMinimumReached(Monitor):
     def __init__(self, name: str = 'local minimum reached', min_cut_off: float = 0.01, max_cut_off: float = 0.06,
-                 joint_convergence_threshold: float = 0.01):
+                 joint_convergence_threshold: float = 0.01, windows_size: int = 1):
         super().__init__(name=name, crucial=True, stay_one=False)
         condition_list = []
         traj_length_in_sec = symbol_manager.time * god_map.qp_controller_config.sample_period
         condition_list.append(cas.greater(traj_length_in_sec, 1))
         for free_variable_name, free_variable in god_map.world.free_variables.items():
             velocity_limit = symbol_manager.evaluate_expr(free_variable.get_upper_limit(Derivatives.velocity))
-            joint_vel_symbol = free_variable.get_symbol(Derivatives.velocity)
             velocity_limit *= joint_convergence_threshold
             velocity_limit = min(max(min_cut_off, velocity_limit), max_cut_off)
-            condition_list.append(cas.less(cas.abs(joint_vel_symbol), velocity_limit))
+            for t in range(windows_size):
+                if t == 0:
+                    joint_vel_symbol = free_variable.get_symbol(Derivatives.velocity)
+                else:
+                    expr = f'god_map.trajectory.get_exact({-t})[\'{free_variable_name}\'].velocity'
+                    joint_vel_symbol = symbol_manager.get_symbol(expr)
+                condition_list.append(cas.less(cas.abs(joint_vel_symbol), velocity_limit))
         self.expression = cas.logic_all(cas.Expression(condition_list))

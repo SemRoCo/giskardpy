@@ -21,6 +21,7 @@ from giskardpy.configs.behavior_tree_config import StandAloneBTConfig
 from giskardpy.configs.giskard import Giskard
 from giskardpy.configs.iai_robots.pr2 import PR2CollisionAvoidance, PR2StandaloneInterface, WorldWithPR2Config
 from giskardpy.configs.qp_controller_config import QPControllerConfig, SupportedQPSolver
+from giskardpy.goals.cartesian_goals import RelativePositionSequence
 from giskardpy.god_map import god_map
 from giskardpy.model.better_pybullet_syncer import BetterPyBulletSyncer
 from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
@@ -636,11 +637,11 @@ class TestConstraints:
         goal2 = PointStamped()
         goal2.header.frame_id = 'base_footprint'
         goal2.point.y = 1
-        zero_pose.set_json_goal('RelativePositionSequence',
-                                goal1=goal1,
-                                goal2=goal2,
-                                root_link='map',
-                                tip_link='base_footprint')
+        zero_pose.add_motion_goal(goal_type=RelativePositionSequence.__name__,
+                                  goal1=goal1,
+                                  goal2=goal2,
+                                  root_link='map',
+                                  tip_link='base_footprint')
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
 
@@ -2414,7 +2415,7 @@ class TestWorldManipulation:
     def test_single_joint_urdf(self, zero_pose: PR2TestWrapper):
         object_name = 'spoon'
         path = resolve_ros_iris('package://giskardpy/test/spoon/urdf/spoon.urdf')
-        with open(path, 'r')as f:
+        with open(path, 'r') as f:
             urdf_str = hacky_urdf_parser_fix(f.read())
         pose = PoseStamped()
         pose.header.frame_id = 'map'

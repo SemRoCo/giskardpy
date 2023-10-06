@@ -54,7 +54,7 @@ class ControlLoop(AsyncBehavior):
         else:
             self.add_child(success_is_running(TimePlugin)('increase time closed loop'))
             self.add_child(success_is_running(KinSimPlugin)('kin sim'))
-            self.add_child(success_is_running(LogTrajPlugin)('log closed loop control'))
+            self.add_child(success_is_running(LogTrajPlugin)('add traj point'))
 
         self.add_child(self.check_monitors)
         self.add_child(self.publish_state)

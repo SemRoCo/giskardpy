@@ -8,6 +8,7 @@ import numpy as np
 from sensor_msgs.msg import JointState
 
 from giskardpy.my_types import PrefixName, Derivatives
+from typing import Generic, TypeVar, Dict
 
 
 class KeyDefaultDict(defaultdict):
@@ -132,7 +133,11 @@ class _JointState:
         return _JointState(*self.state)
 
 
-class JointStates(defaultdict):
+K = TypeVar('K', bound=PrefixName)
+V = TypeVar('V', bound=JointState)
+
+
+class JointStates(defaultdict, Dict[K, V], Generic[K, V]):
     def __init__(self, *args, **kwargs):
         super().__init__(_JointState, *args, **kwargs)
 
@@ -157,7 +162,7 @@ class JointStates(defaultdict):
             new_js[joint_name] = deepcopy(joint_state)
         return new_js
 
-    def to_position_dict(self):
+    def to_position_dict(self) -> Dict[PrefixName, float]:
         return {k: v.position for k, v in self.items()}
 
     def pretty_print(self):

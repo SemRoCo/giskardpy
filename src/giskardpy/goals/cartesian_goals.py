@@ -55,6 +55,7 @@ class CartesianPosition(Goal):
 
 class CartesianOrientation(Goal):
     default_reference_velocity = 0.5
+
     def __init__(self,
                  root_link: str,
                  tip_link: str,
@@ -202,7 +203,7 @@ class CartesianPose(Goal):
         self.goal_pose = self.transform_msg(self.root_link, goal_pose)
         root_T_tip = cas.TransMatrix(self.goal_pose)
 
-        #%% position goal
+        # %% position goal
         root_P_goal = root_T_tip.to_position()
         root_P_current = god_map.world.compose_fk_expression(self.root_link, self.tip_link).to_position()
         task = Task(name='pose goal')
@@ -211,7 +212,7 @@ class CartesianPose(Goal):
                                         reference_velocity=reference_linear_velocity,
                                         weight=self.weight)
 
-        #%% orientation goal
+        # %% orientation goal
         root_R_goal = root_T_tip.to_rotation()
         root_R_current = god_map.world.compose_fk_expression(self.root_link, self.tip_link).to_rotation()
         current_R_root_eval = god_map.world.compose_fk_evaluated_expression(self.tip_link, self.root_link).to_rotation()
@@ -582,8 +583,6 @@ class RelativePositionSequence(Goal):
         self.max_velocity = 0.1
         self.weight = WEIGHT_BELOW_CA
 
-    @profile
-    def make_constraints(self):
         root_P_current = god_map.world.compose_fk_expression(self.root_link, self.tip_link).to_position()
 
         root_P_goal1 = cas.Point3(self.root_P_goal1)
@@ -606,18 +605,23 @@ class RelativePositionSequence(Goal):
         error2 = cas.euclidean_distance(root_P_goal2_cached, root_P_current)
         error2_monitor.set_expression(cas.less(cas.abs(error2), 0.01))
 
-        step1 = Task(name='step1',
-                     to_end=error1_monitor)
+        step1 = Task(name='step1')
+        step1.add_to_end_monitor(error1_monitor)
         step1.add_point_goal_constraints(root_P_current, root_P_goal1,
                                          reference_velocity=self.max_velocity,
                                          weight=self.weight)
         self.add_task(step1)
 
-        step2 = Task(name='step2', to_start=error1_monitor, to_end=error2_monitor)
-        step2.add_point_goal_constraints(root_P_current, root_P_goal2_cached,
-                                         reference_velocity=self.max_velocity,
-                                         weight=self.weight)
-        self.add_task(step2)
+        self.step2 = Task(name='step2')
+        self.step2.add_to_start_monitor(error1_monitor)
+        self.step2.add_to_end_monitor(error2_monitor)
+        self.step2.add_point_goal_constraints(root_P_current, root_P_goal2_cached,
+                                              reference_velocity=self.max_velocity,
+                                              weight=self.weight)
+        self.add_task(self.step2)
+
+    def connect_to_end(self, monitor: Monitor):
+        self.step2.add_to_end_monitor(monitor)
 
     def __str__(self) -> str:
         return super().__str__()

@@ -31,8 +31,9 @@ class Trajectory:
     def clear(self):
         self._points = OrderedDict()
 
-    def get_exact(self, time):
-        return self._points[time]
+    def get_exact(self, time: int) -> JointStates:
+        time = max(-len(self), min(len(self), time))
+        return list(self._points.values())[time]
 
     def set(self, time: int, point: JointStates):
         if len(self._points) > 0 and list(self._points.keys())[-1] > time:

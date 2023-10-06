@@ -448,18 +448,19 @@ class TranslationVelocityLimit(Goal):
         self.weight = weight
         self.max_velocity = max_velocity
 
-    def make_constraints(self):
         r_P_c = god_map.world.compose_fk_expression(self.root_link, self.tip_link).to_position()
         # self.add_debug_expr('limit', -self.max_velocity)
+        task = Task(name='limit translation vel')
         if not self.hard:
-            self.add_translational_velocity_limit(frame_P_current=r_P_c,
+            task.add_translational_velocity_limit(frame_P_current=r_P_c,
                                                   max_velocity=self.max_velocity,
                                                   weight=self.weight)
         else:
-            self.add_translational_velocity_limit(frame_P_current=r_P_c,
+            task.add_translational_velocity_limit(frame_P_current=r_P_c,
                                                   max_velocity=self.max_velocity,
                                                   weight=self.weight,
                                                   max_violation=0)
+        self.add_task(task)
 
     def __str__(self):
         s = super(TranslationVelocityLimit, self).__str__()
@@ -481,17 +482,19 @@ class RotationVelocityLimit(Goal):
         self.weight = weight
         self.max_velocity = max_velocity
 
-    def make_constraints(self):
         r_R_c = god_map.world.compose_fk_expression(self.root_link, self.tip_link).to_rotation()
+
+        task = Task(name='rot vel limit')
         if self.hard:
-            self.add_rotational_velocity_limit(frame_R_current=r_R_c,
+            task.add_rotational_velocity_limit(frame_R_current=r_R_c,
                                                max_velocity=self.max_velocity,
                                                weight=self.weight)
         else:
-            self.add_rotational_velocity_limit(frame_R_current=r_R_c,
+            task.add_rotational_velocity_limit(frame_R_current=r_R_c,
                                                max_velocity=self.max_velocity,
                                                weight=self.weight,
                                                max_violation=0)
+        self.add_task(task)
 
     def __str__(self):
         s = super().__str__()
@@ -537,9 +540,6 @@ class CartesianVelocityLimit(Goal):
                                                            max_velocity=max_angular_velocity,
                                                            weight=weight,
                                                            hard=hard))
-
-    def make_constraints(self):
-        pass
 
     def __str__(self):
         s = super().__str__()

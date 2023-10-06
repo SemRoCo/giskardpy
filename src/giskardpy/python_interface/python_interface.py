@@ -3,7 +3,7 @@ from typing import Dict, Optional, List
 from geometry_msgs.msg import PoseStamped, PointStamped, QuaternionStamped, Vector3Stamped
 
 from giskardpy.goals.cartesian_goals import CartesianPose, CartesianPosition, CartesianOrientation, \
-    CartesianPoseStraight
+    CartesianPoseStraight, CartesianVelocityLimit
 from giskardpy.goals.set_prediction_horizon import SetPredictionHorizon, SetMaxTrajLength
 from giskardpy.goals.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
 from giskardpy.my_types import goal_parameter
@@ -318,7 +318,7 @@ class GiskardWrapper(LowLevelGiskardWrapper):
         :param weight: default WEIGHT_ABOVE_CA
         :param hard: Turn this into a hard constraint. This make create unsolvable optimization problems
         """
-        self.add_motion_goal(goal_type='CartesianVelocityLimit',
+        self.add_motion_goal(goal_type=CartesianVelocityLimit.__name__,
                              root_link=root_link,
                              root_group=root_group,
                              tip_link=tip_link,

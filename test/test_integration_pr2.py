@@ -625,7 +625,7 @@ class TestConstraints:
         goal_position.pose.position.z = 1
         goal_position.pose.orientation.w = 1
 
-        start_pose = better_pose.world.compute_fk_pose('map', better_pose.l_tip)
+        start_pose = god_map.world.compute_fk_pose('map', better_pose.l_tip)
         map_T_goal_position = better_pose.transform_msg('map', goal_position)
 
         object_pose = PoseStamped()
@@ -686,8 +686,9 @@ class TestConstraints:
         zero_pose.allow_all_collisions()
         zero_pose.set_cart_goal(goal_pose=goal_position,
                                 tip_link='r_gripper_tool_frame',
-                                linear_velocity=eef_linear_velocity,
-                                angular_velocity=eef_angular_velocity,
+                                root_link='map',
+                                reference_linear_velocity=eef_linear_velocity,
+                                reference_angular_velocity=eef_angular_velocity,
                                 weight=WEIGHT_BELOW_CA)
         zero_pose.plan_and_execute()
 

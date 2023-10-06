@@ -155,7 +155,7 @@ class Goal(ABC):
             self._debug_expressions
 
     def add_constraints_of_goal(self, goal: Goal):
-        self._sub_goals.append(goal)
+        self.add_tasks(goal.tasks)
 
     def add_task(self, task: Task):
         self.tasks.append(task)

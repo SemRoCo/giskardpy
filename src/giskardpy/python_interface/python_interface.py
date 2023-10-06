@@ -2,7 +2,8 @@ from typing import Dict, Optional, List
 
 from geometry_msgs.msg import PoseStamped, PointStamped, QuaternionStamped, Vector3Stamped
 
-from giskardpy.goals.cartesian_goals import CartesianPose, CartesianPosition
+from giskardpy.goals.cartesian_goals import CartesianPose, CartesianPosition, CartesianOrientation, \
+    CartesianPoseStraight
 from giskardpy.goals.set_prediction_horizon import SetPredictionHorizon, SetMaxTrajLength
 from giskardpy.goals.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
 from giskardpy.my_types import goal_parameter
@@ -119,7 +120,7 @@ class GiskardWrapper(LowLevelGiskardWrapper):
         :param reference_angular_velocity: rad/s
         :param weight: default WEIGHT_ABOVE_CA
         """
-        self.add_motion_goal(goal_type='CartesianPoseStraight',
+        self.add_motion_goal(goal_type=CartesianPoseStraight.__name__,
                              goal_pose=goal_pose,
                              tip_link=tip_link,
                              tip_group=tip_group,
@@ -151,7 +152,7 @@ class GiskardWrapper(LowLevelGiskardWrapper):
         :param weight:
         """
         if add_monitor:
-            monitor_name = f'{root_link}/{tip_link} pose reached'
+            monitor_name = f'{root_link}/{tip_link} position reached'
             self.add_cartesian_position_reached_monitor(name=monitor_name,
                                                         root_link=root_link,
                                                         root_group=root_group,
@@ -207,8 +208,8 @@ class GiskardWrapper(LowLevelGiskardWrapper):
                           tip_group: Optional[str] = None,
                           root_group: Optional[str] = None,
                           reference_velocity: Optional[float] = None,
-                          max_velocity: Optional[float] = None,
                           weight=WEIGHT_ABOVE_CA,
+                          add_monitor: bool = True,
                           **kwargs: goal_parameter):
         """
         Will use kinematic chain between root_link and tip_link to move tip_link to goal_orientation.
@@ -221,14 +222,25 @@ class GiskardWrapper(LowLevelGiskardWrapper):
         :param max_velocity: rad/s, strict limit, but will slow the system down
         :param weight:
         """
-        self.add_motion_goal(goal_type='CartesianOrientation',
+        if add_monitor:
+            monitor_name = f'{root_link}/{tip_link} orientation reached'
+            self.add_cartesian_orientation_reached_monitor(name=monitor_name,
+                                                           root_link=root_link,
+                                                           root_group=root_group,
+                                                           tip_link=tip_link,
+                                                           tip_group=tip_group,
+                                                           goal_orientation=goal_orientation)
+            to_end_monitors = [monitor_name]
+        else:
+            to_end_monitors = []
+        self.add_motion_goal(goal_type=CartesianOrientation.__name__,
+                             to_end=to_end_monitors,
                              goal_orientation=goal_orientation,
                              tip_link=tip_link,
                              root_link=root_link,
                              tip_group=tip_group,
                              root_group=root_group,
                              reference_velocity=reference_velocity,
-                             max_velocity=max_velocity,
                              weight=weight,
                              **kwargs)
 

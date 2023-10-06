@@ -468,31 +468,6 @@ class GiskardTestWrapper(GiskardWrapper):
         # # self.set_base.call(goal)
         # rospy.sleep(0.5)
 
-    def set_rotation_goal(self,
-                          goal_orientation: QuaternionStamped,
-                          tip_link: str,
-                          root_link: Optional[str] = None,
-                          tip_group: Optional[str] = None,
-                          root_group: Optional[str] = None,
-                          weight: Optional[float] = None,
-                          max_velocity: Optional[float] = None,
-                          check: bool = False,
-                          **kwargs):
-        if root_link is None:
-            root_link = god_map.world.root_link_name
-            root_group = None
-        super().set_rotation_goal(goal_orientation=goal_orientation,
-                                  tip_link=tip_link,
-                                  tip_group=tip_group,
-                                  root_link=root_link,
-                                  root_group=root_group,
-                                  max_velocity=max_velocity,
-                                  weight=weight, **kwargs)
-        if check:
-            full_root_link, full_tip_link = self.get_root_and_tip_link(root_link=root_link, root_group=root_group,
-                                                                       tip_link=tip_link, tip_group=tip_group)
-            self.add_goal_check(RotationGoalChecker(self, full_tip_link, full_root_link, goal_orientation))
-
     def set_straight_translation_goal(self, goal_pose, tip_link, root_link=None, tip_group=None, root_group=None,
                                       weight=None, max_velocity=None,
                                       **kwargs):
@@ -612,44 +587,6 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def add_goal_check(self, goal_checker):
         self.goal_checks.append(goal_checker)
-
-    def set_straight_cart_goal(self,
-                               goal_pose: PoseStamped,
-                               tip_link: str,
-                               root_link: str,
-                               tip_group: Optional[str] = None,
-                               root_group: Optional[str] = None,
-                               max_linear_velocity: Optional[float] = None,
-                               max_angular_velocity: Optional[float] = None,
-                               reference_linear_velocity: Optional[float] = None,
-                               reference_angular_velocity: Optional[float] = None,
-                               weight: Optional[float] = None,
-                               check=False):
-        if root_link is None:
-            root_link = god_map.world.root_link_name
-            root_group = None
-        super().set_straight_cart_goal(goal_pose=goal_pose,
-                                       tip_link=tip_link,
-                                       root_link=root_link,
-                                       tip_group=tip_group,
-                                       root_group=root_group,
-                                       max_linear_velocity=max_linear_velocity,
-                                       max_angular_velocity=max_angular_velocity,
-                                       reference_linear_velocity=reference_linear_velocity,
-                                       reference_angular_velocity=reference_angular_velocity,
-                                       weight=weight)
-
-        if check:
-            full_root_link, full_tip_link = self.get_root_and_tip_link(root_link=root_link, root_group=root_group,
-                                                                       tip_link=tip_link, tip_group=tip_group)
-            goal_point = PointStamped()
-            goal_point.header = goal_pose.header
-            goal_point.point = goal_pose.pose.position
-            self.add_goal_check(TranslationGoalChecker(self, full_tip_link, full_root_link, goal_point))
-            goal_orientation = QuaternionStamped()
-            goal_orientation.header = goal_pose.header
-            goal_orientation.quaternion = goal_pose.pose.orientation
-            self.add_goal_check(RotationGoalChecker(self, full_tip_link, full_root_link, goal_orientation))
 
     #
     # GENERAL GOAL STUFF ###############################################################################################
@@ -1036,7 +973,7 @@ class GiskardTestWrapper(GiskardWrapper):
     def compute_collisions(self, collision_entries: List[CollisionEntry]) -> Collisions:
         god_map.collision_scene.reset_cache()
         collision_matrix = god_map.collision_scene.collision_goals_to_collision_matrix(collision_entries,
-                                                                                        defaultdict(lambda: 0.3))
+                                                                                       defaultdict(lambda: 0.3))
 
         return god_map.collision_scene.check_collisions(collision_matrix, 15)
 

@@ -160,20 +160,12 @@ class Goal(ABC):
     def add_task(self, task: Task):
         self.tasks.append(task)
 
+    def add_tasks(self, tasks: List[Task]):
+        for task in tasks:
+            self.add_task(task)
+
     def add_monitor(self, monitor: Monitor):
         god_map.monitor_manager.add_monitor(monitor)
-
-    # def add_debug_expr(self, name: str, expr: w.all_expressions_float):
-    #     """
-    #     Add any expression for debug purposes. They will be evaluated as well and can be plotted by activating
-    #     the debug plotter in this Giskard config.
-    #     :param name:
-    #     :param expr:
-    #     """
-    #     name = f'{self}/{name}'
-    #     if not isinstance(expr, w.Symbol_):
-    #         expr = w.Expression(expr)
-    #     self._debug_expressions[name] = expr
 
 
 def _prepend_prefix(prefix, d):

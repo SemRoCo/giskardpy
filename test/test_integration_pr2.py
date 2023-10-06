@@ -534,32 +534,17 @@ class TestConstraints:
         np.testing.assert_almost_equal(god_map.world.state[joint].position, joint_goal, decimal=3)
         np.testing.assert_array_less(god_map.trajectory.to_dict()[1][joint], vel_limit + 1e-5)
 
-    def test_JointPositionContinuous(self, zero_pose: PR2TestWrapper):
-        joint = 'r_wrist_roll_joint'
-        joint_goal = 4
-        zero_pose.allow_all_collisions()
-        zero_pose.set_json_goal('JointPositionContinuous',
-                                joint_name=joint,
-                                goal=joint_goal,
-                                max_velocity=1)
-        zero_pose.plan_and_execute()
-        joint = zero_pose.world.search_for_joint_name(joint)
-        np.testing.assert_almost_equal(zero_pose.world.state[joint].position, -2.283, decimal=2)
-
     def test_JointPosition_kitchen(self, kitchen_setup: PR2TestWrapper):
         joint_name1 = 'iai_fridge_door_joint'
         joint_name2 = 'sink_area_left_upper_drawer_main_joint'
         group_name = 'iai_kitchen'
         joint_goal = 0.4
+        goal_state = {
+            joint_name1: joint_goal,
+            joint_name2: joint_goal
+        }
         # kitchen_setup.allow_all_collisions()
-        kitchen_setup.set_json_goal('JointPosition',
-                                    joint_name=joint_name1,
-                                    goal=joint_goal,
-                                    max_velocity=1)
-        kitchen_setup.set_json_goal('JointPosition',
-                                    joint_name=joint_name2,
-                                    goal=joint_goal,
-                                    max_velocity=1)
+        kitchen_setup.set_joint_goal(goal_state=goal_state)
         kitchen_setup.plan_and_execute()
         np.testing.assert_almost_equal(
             god_map.trajectory.get_last()[
@@ -577,15 +562,12 @@ class TestConstraints:
         q.header.frame_id = tip
         q.quaternion = Quaternion(*quaternion_about_axis(4, [0, 0, 1]))
 
-        expected = zero_pose.transform_msg('map', q)
-
         zero_pose.allow_all_collisions()
         zero_pose.set_rotation_goal(root_link=root,
                                     root_group=None,
                                     tip_link=tip,
                                     tip_group=zero_pose.robot_name,
-                                    goal_orientation=q,
-                                    max_velocity=0.15)
+                                    goal_orientation=q)
         zero_pose.plan_and_execute()
 
     def test_CartesianPoseStraight1(self, zero_pose: PR2TestWrapper):
@@ -597,7 +579,7 @@ class TestConstraints:
         goal_position.pose.position.z = 1
         goal_position.pose.orientation.w = 1
 
-        start_pose = zero_pose.world.compute_fk_pose('map', zero_pose.l_tip)
+        start_pose = god_map.world.compute_fk_pose('map', zero_pose.l_tip)
         map_T_goal_position = zero_pose.transform_msg('map', goal_position)
 
         object_pose = PoseStamped()

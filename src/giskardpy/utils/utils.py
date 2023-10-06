@@ -13,7 +13,7 @@ import sys
 from collections import OrderedDict
 from contextlib import contextmanager
 from functools import cached_property
-from typing import Type, Optional, Dict, Any, List, Union
+from typing import Type, Optional, Dict, Any, List, Union, Tuple
 
 import numpy as np
 import roslaunch
@@ -459,6 +459,17 @@ def publish_pose(pose: PoseStamped):
 
 def int_to_bit_list(number: int) -> List[int]:
     return [2 ** i * int(bit) for i, bit in enumerate(reversed("{0:b}".format(number))) if int(bit) != 0]
+
+
+def split_pose_stamped(pose: PoseStamped) -> Tuple[PointStamped, QuaternionStamped]:
+    point = PointStamped()
+    point.header = pose.header
+    point.point = pose.pose.position
+
+    quaternion = QuaternionStamped()
+    quaternion.header = pose.header
+    quaternion.quaternion = pose.pose.orientation
+    return point, quaternion
 
 
 def json_str_to_kwargs(json_str: str) -> Dict[str, Any]:

@@ -17,6 +17,7 @@ from giskardpy.my_types import Derivatives
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import normalize
+from giskardpy.utils.utils import split_pose_stamped
 
 
 class CartesianPosition(Goal):
@@ -101,24 +102,19 @@ class CartesianPositionStraight(Goal):
                  root_group: Optional[str] = None,
                  tip_group: Optional[str] = None,
                  reference_velocity: Optional[float] = None,
-                 max_velocity: Optional[float] = None,
                  weight: float = WEIGHT_ABOVE_CA):
         """
         Same as CartesianPosition, but tries to move the tip_link in a straight line to the goal_point.
         """
         super().__init__()
         if reference_velocity is None:
-            reference_velocity = max_velocity
-        if reference_velocity is None:
             reference_velocity = 0.2
         self.reference_velocity = reference_velocity
-        self.max_velocity = max_velocity
         self.weight = weight
         self.root_link = god_map.world.search_for_link_name(root_link, root_group)
         self.tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
         self.goal_point = self.transform_msg(self.root_link, goal_point)
 
-    def make_constraints(self):
         root_P_goal = cas.Point3(self.goal_point)
         root_P_tip = god_map.world.compose_fk_expression(self.root_link, self.tip_link).to_position()
         t_T_r = god_map.world.compose_fk_expression(self.tip_link, self.root_link)
@@ -146,12 +142,8 @@ class CartesianPositionStraight(Goal):
         expr_p = a_T_t.to_position()
         dist = cas.norm(root_P_goal - root_P_tip)
 
-        # self.add_debug_vector(self.tip_link + '_P_goal', tip_P_error)
-        # self.add_debug_matrix(self.tip_link + '_R_frame', t_R_a)
-        # self.add_debug_matrix(self.tip_link + '_T_a', cas.inverse_frame(a_T_t))
-        # self.add_debug_expr('error', dist)
-
-        self.add_equality_constraint_vector(reference_velocities=[self.reference_velocity] * 3,
+        task = Task(name='position straight')
+        task.add_equality_constraint_vector(reference_velocities=[self.reference_velocity] * 3,
                                             equality_bounds=[dist, 0, 0],
                                             weights=[WEIGHT_ABOVE_CA, WEIGHT_ABOVE_CA * 2, WEIGHT_ABOVE_CA * 2],
                                             task_expression=expr_p[:3],
@@ -159,10 +151,7 @@ class CartesianPositionStraight(Goal):
                                                    'line/y',
                                                    'line/z'])
 
-        if self.max_velocity is not None:
-            self.add_translational_velocity_limit(frame_P_current=root_P_tip,
-                                                  max_velocity=self.max_velocity,
-                                                  weight=self.weight)
+        self.add_task(task)
 
     def __str__(self):
         s = super().__str__()
@@ -201,28 +190,26 @@ class CartesianPose(Goal):
             reference_angular_velocity = CartesianOrientation.default_reference_velocity
         self.weight = weight
         self.goal_pose = self.transform_msg(self.root_link, goal_pose)
-        root_T_tip = cas.TransMatrix(self.goal_pose)
 
-        # %% position goal
-        root_P_goal = root_T_tip.to_position()
-        root_P_current = god_map.world.compose_fk_expression(self.root_link, self.tip_link).to_position()
-        task = Task(name='pose goal')
-        task.add_point_goal_constraints(frame_P_goal=root_P_goal,
-                                        frame_P_current=root_P_current,
-                                        reference_velocity=reference_linear_velocity,
-                                        weight=self.weight)
+        goal_point, goal_quaternion = split_pose_stamped(goal_pose)
 
-        # %% orientation goal
-        root_R_goal = root_T_tip.to_rotation()
-        root_R_current = god_map.world.compose_fk_expression(self.root_link, self.tip_link).to_rotation()
-        current_R_root_eval = god_map.world.compose_fk_evaluated_expression(self.tip_link, self.root_link).to_rotation()
+        position_goal = CartesianPosition(root_link=root_link,
+                                          tip_link=tip_link,
+                                          goal_point=goal_point,
+                                          root_group=root_group,
+                                          tip_group=tip_group,
+                                          reference_velocity=reference_linear_velocity,
+                                          weight=self.weight)
+        self.add_tasks(position_goal.tasks)
 
-        task.add_rotation_goal_constraints(frame_R_current=root_R_current,
-                                           frame_R_goal=root_R_goal,
-                                           current_R_frame_eval=current_R_root_eval,
-                                           reference_velocity=reference_angular_velocity,
-                                           weight=self.weight)
-        self.add_task(task)
+        orientation_goal = CartesianOrientation(root_link=root_link,
+                                                tip_link=tip_link,
+                                                goal_orientation=goal_quaternion,
+                                                root_group=root_group,
+                                                tip_group=tip_group,
+                                                reference_velocity=reference_angular_velocity,
+                                                weight=self.weight)
+        self.add_tasks(orientation_goal.tasks)
 
     def __str__(self):
         s = super().__str__()
@@ -416,8 +403,6 @@ class CartesianPoseStraight(Goal):
     def __init__(self, root_link: str, tip_link: str, goal_pose: PoseStamped,
                  root_group: Optional[str] = None,
                  tip_group: Optional[str] = None,
-                 max_linear_velocity: Optional[float] = None,
-                 max_angular_velocity: Optional[float] = None,
                  reference_linear_velocity: Optional[float] = None,
                  reference_angular_velocity: Optional[float] = None,
                  weight: float = WEIGHT_ABOVE_CA):
@@ -427,31 +412,23 @@ class CartesianPoseStraight(Goal):
         self.root_link = root_link
         self.tip_link = tip_link
         super().__init__()
-        goal_point = PointStamped()
-        goal_point.header = goal_pose.header
-        goal_point.point = goal_pose.pose.position
-        self.add_constraints_of_goal(CartesianPositionStraight(root_link=root_link,
-                                                               root_group=root_group,
-                                                               tip_link=tip_link,
-                                                               tip_group=tip_group,
-                                                               goal_point=goal_point,
-                                                               max_velocity=max_linear_velocity,
-                                                               reference_velocity=reference_linear_velocity,
-                                                               weight=weight))
-        goal_orientation = QuaternionStamped()
-        goal_orientation.header = goal_pose.header
-        goal_orientation.quaternion = goal_pose.pose.orientation
-        self.add_constraints_of_goal(CartesianOrientation(root_link=root_link,
-                                                          root_group=root_group,
-                                                          tip_link=tip_link,
-                                                          tip_group=tip_group,
-                                                          goal_orientation=goal_orientation,
-                                                          max_velocity=max_angular_velocity,
-                                                          reference_velocity=reference_angular_velocity,
-                                                          weight=weight))
-
-    def make_constraints(self):
-        pass
+        goal_point, goal_orientation = split_pose_stamped(goal_pose)
+        goal = CartesianPositionStraight(root_link=root_link,
+                                         root_group=root_group,
+                                         tip_link=tip_link,
+                                         tip_group=tip_group,
+                                         goal_point=goal_point,
+                                         reference_velocity=reference_linear_velocity,
+                                         weight=weight)
+        self.add_tasks(goal.tasks)
+        goal = CartesianOrientation(root_link=root_link,
+                                    root_group=root_group,
+                                    tip_link=tip_link,
+                                    tip_group=tip_group,
+                                    goal_orientation=goal_orientation,
+                                    reference_velocity=reference_angular_velocity,
+                                    weight=weight)
+        self.add_tasks(goal.tasks)
 
     def __str__(self):
         s = super().__str__()

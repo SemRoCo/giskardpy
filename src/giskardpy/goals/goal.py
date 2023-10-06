@@ -126,7 +126,8 @@ class Goal(ABC):
         self._inequality_constraints = OrderedDict()
         self._derivative_constraints = OrderedDict()
         self._debug_expressions = OrderedDict()
-
+        if not isinstance(self, NonMotionGoal) and not self.tasks:
+            raise ConstraintInitalizationException(f'Goal {str(self)} has no tasks.')
         for task in self.tasks:
             for constraint in task.get_eq_constraints():
                 name = f'{str(self)}/{task.name}/{constraint.name}'
@@ -136,7 +137,10 @@ class Goal(ABC):
                 name = f'{str(self)}/{task.name}/{constraint.name}'
                 constraint.name = name
                 self._inequality_constraints[name] = constraint
-            # self._equality_constraints.update(_prepend_prefix(self.__class__.__name__, equality_constraints))
+            for constraint in task.get_derivative_constraints():
+                name = f'{str(self)}/{task.name}/{constraint.name}'
+                constraint.name = name
+                self._derivative_constraints[name] = constraint
 
         for sub_goal in self._sub_goals:
             equality_constraints, inequality_constraints, derivative_constraints, debug_expressions = \

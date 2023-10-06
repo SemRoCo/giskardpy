@@ -190,9 +190,9 @@ class JointPositionPrismatic(Goal):
         return f'{s}/{self.joint_name}'
 
 
-class JointVelocityRevolute(Goal):
+class JointVelocityLimit(Goal):
     def __init__(self,
-                 joint_name: str,
+                 joint_names: List[str],
                  group_name: Optional[str] = None,
                  weight: float = WEIGHT_BELOW_CA,
                  max_velocity: float = 1,
@@ -208,39 +208,38 @@ class JointVelocityRevolute(Goal):
         self.weight = weight
         self.max_velocity = max_velocity
         self.hard = hard
+        self.joint_names = joint_names
         super().__init__()
-        self.joint_name = god_map.world.search_for_joint_name(joint_name, group_name)
-        if not god_map.world.is_joint_revolute(self.joint_name):
-            raise ConstraintException(f'{self.__class__.__name__} called with non revolute joint {joint_name}')
 
-    def make_constraints(self):
-        current_joint = self.get_joint_position_symbol(self.joint_name)
-
-        try:
-            limit_expr = god_map.world.get_joint_velocity_limits(self.joint_name)[1]
-            max_velocity = cas.min(self.max_velocity,
-                                   limit_expr)
-        except IndexError:
-            max_velocity = self.max_velocity
-
-        if self.hard:
-            self.add_velocity_constraint(lower_velocity_limit=-max_velocity,
-                                         upper_velocity_limit=max_velocity,
-                                         weight=self.weight,
-                                         task_expression=current_joint,
-                                         velocity_limit=max_velocity,
-                                         lower_slack_limit=0,
-                                         upper_slack_limit=0)
-        else:
-            self.add_velocity_constraint(lower_velocity_limit=-max_velocity,
-                                         upper_velocity_limit=max_velocity,
-                                         weight=self.weight,
-                                         task_expression=current_joint,
-                                         velocity_limit=max_velocity)
+        task = Task(name='joint vel limit')
+        for joint_name in self.joint_names:
+            joint_name = god_map.world.search_for_joint_name(joint_name, group_name)
+            joint: OneDofJoint = god_map.world.joints[joint_name]
+            current_joint = joint.get_symbol(Derivatives.position)
+            try:
+                limit_expr = joint.get_limit_expressions(Derivatives.velocity)[1]
+                max_velocity = cas.min(self.max_velocity, limit_expr)
+            except IndexError:
+                max_velocity = self.max_velocity
+            if self.hard:
+                task.add_velocity_constraint(lower_velocity_limit=-max_velocity,
+                                             upper_velocity_limit=max_velocity,
+                                             weight=self.weight,
+                                             task_expression=current_joint,
+                                             velocity_limit=max_velocity,
+                                             lower_slack_limit=0,
+                                             upper_slack_limit=0)
+            else:
+                task.add_velocity_constraint(lower_velocity_limit=-max_velocity,
+                                             upper_velocity_limit=max_velocity,
+                                             weight=self.weight,
+                                             task_expression=current_joint,
+                                             velocity_limit=max_velocity)
+        self.add_task(task)
 
     def __str__(self):
         s = super().__str__()
-        return f'{s}/{self.joint_name}'
+        return f'{s}/{self.joint_names}'
 
 
 class JointPositionRevolute(Goal):

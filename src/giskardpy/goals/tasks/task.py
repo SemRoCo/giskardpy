@@ -1,4 +1,4 @@
-from typing import Optional, List, Union, Dict, Callable
+from typing import Optional, List, Union, Dict, Callable, Iterable
 
 import giskard_msgs.msg
 import giskardpy.casadi_wrapper as cas
@@ -51,8 +51,18 @@ class Task:
         self.to_end.append(monitor)
 
     def get_eq_constraints(self):
-        constraints = []
-        for constraint in self.eq_constraints.values():
+        return self._apply_monitors_to_constraints(self.eq_constraints.values())
+
+    def get_neq_constraints(self):
+        return self._apply_monitors_to_constraints(self.neq_constraints.values())
+
+    def get_derivative_constraints(self):
+        return self._apply_monitors_to_constraints(self.derivative_constraints.values())
+
+    def _apply_monitors_to_constraints(self, constraints: Iterable[Union[EqualityConstraint, InequalityConstraint,
+    DerivativeInequalityConstraint]]):
+        output_constraints = []
+        for constraint in constraints:
             for monitor in self.to_start:
                 constraint.quadratic_weight *= monitor.get_state_expression()
             for monitor in self.to_hold:
@@ -61,20 +71,8 @@ class Task:
             for monitor in self.to_end:
                 end_weight *= monitor.get_state_expression()
             constraint.quadratic_weight *= (1 - end_weight)
-            constraints.append(constraint)
-        return constraints
-
-    def get_neq_constraints(self):
-        constraints = []
-        for constraint in self.neq_constraints.values():
-            for monitor in self.to_start:
-                constraint.quadratic_weight *= monitor.get_state_expression()
-            for monitor in self.to_hold:
-                constraint.quadratic_weight *= monitor.get_state_expression()
-            for monitor in self.to_end:
-                constraint.quadratic_weight *= (1 - monitor.get_state_expression())
-            constraints.append(constraint)
-        return constraints
+            output_constraints.append(constraint)
+        return output_constraints
 
     def add_equality_constraint(self,
                                 reference_velocity: cas.symbol_expr_float,
@@ -357,9 +355,9 @@ class Task:
         """
         name_suffix = name_suffix if name_suffix else ''
         name = str(self) + name_suffix
-        if name in self._derivative_constraints:
+        if name in self.derivative_constraints:
             raise KeyError(f'a constraint with name \'{name}\' already exists')
-        self._derivative_constraints[name] = DerivativeInequalityConstraint(name=name,
+        self.derivative_constraints[name] = DerivativeInequalityConstraint(name=name,
                                                                             derivative=Derivatives.velocity,
                                                                             expression=task_expression,
                                                                             lower_limit=lower_velocity_limit,
@@ -398,9 +396,9 @@ class Task:
         """
         name_suffix = name_suffix if name_suffix else ''
         name = str(self) + name_suffix
-        if name in self._derivative_constraints:
+        if name in self.derivative_constraints:
             raise KeyError(f'a constraint with name \'{name}\' already exists')
-        self._derivative_constraints[name] = DerivativeInequalityConstraint(name=name,
+        self.derivative_constraints[name] = DerivativeInequalityConstraint(name=name,
                                                                             derivative=Derivatives.acceleration,
                                                                             expression=task_expression,
                                                                             lower_limit=lower_acceleration_limit,
@@ -423,9 +421,9 @@ class Task:
                             horizon_function: Optional[Callable[[float, int], float]] = None):
         name_suffix = name_suffix if name_suffix else ''
         name = str(self) + name_suffix
-        if name in self._derivative_constraints:
+        if name in self.derivative_constraints:
             raise KeyError(f'a constraint with name \'{name}\' already exists')
-        self._derivative_constraints[name] = DerivativeInequalityConstraint(name=name,
+        self.derivative_constraints[name] = DerivativeInequalityConstraint(name=name,
                                                                             derivative=Derivatives.jerk,
                                                                             expression=task_expression,
                                                                             lower_limit=lower_jerk_limit,

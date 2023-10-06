@@ -2,7 +2,7 @@ from typing import Dict, Optional, List
 
 from geometry_msgs.msg import PoseStamped, PointStamped, QuaternionStamped, Vector3Stamped
 
-from giskardpy.goals.cartesian_goals import CartesianPose
+from giskardpy.goals.cartesian_goals import CartesianPose, CartesianPosition
 from giskardpy.goals.set_prediction_horizon import SetPredictionHorizon, SetMaxTrajLength
 from giskardpy.goals.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
 from giskardpy.my_types import goal_parameter
@@ -136,9 +136,9 @@ class GiskardWrapper(LowLevelGiskardWrapper):
                              root_link: str,
                              tip_group: Optional[str] = None,
                              root_group: Optional[str] = None,
-                             max_velocity: Optional[float] = None,
                              reference_velocity: Optional[float] = 0.2,
                              weight: float = WEIGHT_ABOVE_CA,
+                             add_monitor: bool = True,
                              **kwargs: goal_parameter):
         """
         Will use kinematic chain between root_link and tip_link to move tip_link to goal_point.
@@ -147,17 +147,27 @@ class GiskardWrapper(LowLevelGiskardWrapper):
         :param root_link: root link of the kinematic chain
         :param tip_group: if tip link is not unique, you can use this to tell Giskard in which group to search.
         :param root_group: if root link is not unique, you can use this to tell Giskard in which group to search.
-        :param max_velocity: m/s
         :param reference_velocity: m/s
         :param weight:
         """
-        self.add_motion_goal(goal_type='CartesianPosition',
+        if add_monitor:
+            monitor_name = f'{root_link}/{tip_link} pose reached'
+            self.add_cartesian_position_reached_monitor(name=monitor_name,
+                                                        root_link=root_link,
+                                                        root_group=root_group,
+                                                        tip_link=tip_link,
+                                                        tip_group=tip_group,
+                                                        goal_point=goal_point)
+            to_end_monitors = [monitor_name]
+        else:
+            to_end_monitors = []
+        self.add_motion_goal(goal_type=CartesianPosition.__name__,
+                             to_end=to_end_monitors,
                              goal_point=goal_point,
                              tip_link=tip_link,
                              root_link=root_link,
                              tip_group=tip_group,
                              root_group=root_group,
-                             max_velocity=max_velocity,
                              reference_velocity=reference_velocity,
                              weight=weight,
                              **kwargs)

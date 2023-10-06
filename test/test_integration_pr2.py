@@ -24,6 +24,7 @@ from giskardpy.configs.qp_controller_config import QPControllerConfig, Supported
 from giskardpy.goals.cartesian_goals import RelativePositionSequence
 from giskardpy.goals.collision_avoidance import CollisionAvoidanceHint
 from giskardpy.goals.goals_tests import DebugGoal
+from giskardpy.goals.joint_goals import JointVelocityLimit
 from giskardpy.god_map import god_map
 from giskardpy.model.better_pybullet_syncer import BetterPyBulletSyncer
 from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
@@ -468,13 +469,10 @@ class TestConstraints:
         p.header.frame_id = tip
         p.point = Point(-0.4, -0.2, -0.3)
 
-        expected = zero_pose.transform_msg('map', p)
-
         zero_pose.allow_all_collisions()
         zero_pose.set_translation_goal(root_link=zero_pose.default_root,
                                        tip_link=tip,
                                        goal_point=p)
-        zero_pose.add_monitor(monitor_type='LocalMinimumReached', monitor_name='local min reached')
         zero_pose.plan_and_execute()
 
     def test_CartesianPosition1(self, zero_pose: PR2TestWrapper):
@@ -513,40 +511,28 @@ class TestConstraints:
         expected = zero_pose.transform_msg('map', p)
 
         zero_pose.allow_all_collisions()
-        zero_pose.set_json_goal('CartesianPose',
-                                root_link=zero_pose.default_root,
+        zero_pose.set_cart_goal(root_link=zero_pose.default_root,
                                 root_group=None,
                                 tip_link=tip,
                                 tip_group=zero_pose.robot_name,
                                 goal_pose=p)
         zero_pose.plan_and_execute()
-        new_pose = zero_pose.world.compute_fk_pose('map', tip)
+        new_pose = god_map.world.compute_fk_pose('map', tip)
         compare_points(expected.pose.position, new_pose.pose.position)
 
-    def test_JointPositionRevolute(self, zero_pose: PR2TestWrapper):
-        joint = zero_pose.world.search_for_joint_name('r_shoulder_lift_joint')
-        joint_goal = 1
-        zero_pose.allow_all_collisions()
-        zero_pose.set_json_goal('JointPositionRevolute',
-                                joint_name=joint,
-                                goal=joint_goal,
-                                max_velocity=0.23)
-        zero_pose.plan_and_execute()
-        np.testing.assert_almost_equal(zero_pose.world.state[joint].position, joint_goal, decimal=3)
-
     def test_JointVelocityRevolute(self, zero_pose: PR2TestWrapper):
-        joint = zero_pose.world.search_for_joint_name('r_shoulder_lift_joint')
+        joint = god_map.world.search_for_joint_name('r_shoulder_lift_joint')
+        vel_limit = 0.4
         joint_goal = 1
         zero_pose.allow_all_collisions()
-        zero_pose.set_json_goal('JointVelocityRevolute',
-                                joint_name=joint,
-                                max_velocity=0.4,
-                                hard=True)
-        zero_pose.set_json_goal('JointPositionRevolute',
-                                joint_name=joint,
-                                goal=joint_goal)
+        zero_pose.add_motion_goal(JointVelocityLimit.__name__,
+                                  joint_names=[joint.short_name],
+                                  max_velocity=vel_limit,
+                                  hard=True)
+        zero_pose.set_joint_goal(goal_state={joint.short_name: joint_goal})
         zero_pose.plan_and_execute()
-        np.testing.assert_almost_equal(zero_pose.world.state[joint].position, joint_goal, decimal=3)
+        np.testing.assert_almost_equal(god_map.world.state[joint].position, joint_goal, decimal=3)
+        np.testing.assert_array_less(god_map.trajectory.to_dict()[1][joint], vel_limit + 1e-5)
 
     def test_JointPositionContinuous(self, zero_pose: PR2TestWrapper):
         joint = 'r_wrist_roll_joint'

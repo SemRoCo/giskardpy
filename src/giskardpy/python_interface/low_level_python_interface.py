@@ -19,7 +19,7 @@ from giskard_msgs.srv import RegisterGroupResponse
 from giskard_msgs.srv import UpdateWorld, UpdateWorldRequest, UpdateWorldResponse, GetGroupInfo, \
     GetGroupNames, RegisterGroup
 from giskardpy.exceptions import DuplicateNameException, UnknownGroupException
-from giskardpy.goals.monitors.cartesian_monitors import PoseReached
+from giskardpy.goals.monitors.cartesian_monitors import PoseReached, PositionReached
 from giskardpy.goals.monitors.joint_monitors import JointGoalReached
 from giskardpy.goals.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
 from giskardpy.model.utils import make_world_body_box
@@ -180,6 +180,25 @@ class LowLevelGiskardWrapper:
                          tip_group=tip_group,
                          position_threshold=position_threshold,
                          orientation_threshold=orientation_threshold,
+                         crucial=crucial)
+
+    def add_cartesian_position_reached_monitor(self,
+                                               name: str,
+                                               root_link: str,
+                                               tip_link: str,
+                                               goal_point: PointStamped,
+                                               root_group: Optional[str] = None,
+                                               tip_group: Optional[str] = None,
+                                               threshold: float = 0.01,
+                                               crucial: bool = True):
+        self.add_monitor(monitor_type=PositionReached.__name__,
+                         monitor_name=name,
+                         root_link=root_link,
+                         tip_link=tip_link,
+                         goal_point=goal_point,
+                         root_group=root_group,
+                         tip_group=tip_group,
+                         threshold=threshold,
                          crucial=crucial)
 
     # %% collision avoidance

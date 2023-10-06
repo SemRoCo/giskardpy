@@ -493,28 +493,6 @@ class GiskardTestWrapper(GiskardWrapper):
                                                                        tip_link=tip_link, tip_group=tip_group)
             self.add_goal_check(RotationGoalChecker(self, full_tip_link, full_root_link, goal_orientation))
 
-    def set_translation_goal(self, goal_point, tip_link, root_link=None, tip_group=None, root_group=None,
-                             weight=None, max_velocity=None, check=False,
-                             **kwargs):
-        if root_link is None:
-            root_link = god_map.world.root_link_name
-            root_group = None
-        super().set_translation_goal(goal_point=goal_point,
-                                     tip_link=tip_link,
-                                     tip_group=tip_group,
-                                     root_link=root_link,
-                                     root_group=root_group,
-                                     max_velocity=max_velocity,
-                                     weight=weight,
-                                     **kwargs)
-        if check:
-            full_root_link, full_tip_link = self.get_root_and_tip_link(root_link=root_link, root_group=root_group,
-                                                                       tip_link=tip_link, tip_group=tip_group)
-            self.add_goal_check(TranslationGoalChecker(giskard=self,
-                                                       tip_link=full_tip_link,
-                                                       root_link=full_root_link,
-                                                       expected=goal_point))
-
     def set_straight_translation_goal(self, goal_pose, tip_link, root_link=None, tip_group=None, root_group=None,
                                       weight=None, max_velocity=None,
                                       **kwargs):

@@ -4,6 +4,7 @@ from geometry_msgs.msg import PoseStamped, PointStamped, QuaternionStamped, Vect
 
 from giskardpy.goals.cartesian_goals import CartesianPose, CartesianPosition, CartesianOrientation, \
     CartesianPoseStraight, CartesianVelocityLimit
+from giskardpy.goals.joint_goals import AvoidJointLimits
 from giskardpy.goals.set_prediction_horizon import SetPredictionHorizon, SetMaxTrajLength
 from giskardpy.goals.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
 from giskardpy.my_types import goal_parameter
@@ -17,6 +18,7 @@ class GiskardWrapper(LowLevelGiskardWrapper):
                        group_name: Optional[str] = None,
                        weight: Optional[float] = None,
                        max_velocity: Optional[float] = None,
+                       add_monitor: bool = True,
                        **kwargs: goal_parameter):
         """
         Sets joint position goals for all pairs in goal_state
@@ -25,16 +27,20 @@ class GiskardWrapper(LowLevelGiskardWrapper):
         :param weight:
         :param max_velocity: will be applied to all joints
         """
-        monitor_name = 'joint goal reached'
-        self.add_joint_pose_reached_monitor(name=monitor_name,
-                                            goal_state=goal_state,
-                                            crucial=True)
+        if add_monitor:
+            monitor_name = 'joint goal reached'
+            self.add_joint_pose_reached_monitor(name=monitor_name,
+                                                goal_state=goal_state,
+                                                crucial=True)
+            to_end_monitors = [monitor_name]
+        else:
+            to_end_monitors = []
         self.add_motion_goal(goal_type='JointPositionList',
                              goal_state=goal_state,
                              group_name=group_name,
                              weight=weight,
                              max_velocity=max_velocity,
-                             to_end=[monitor_name],
+                             to_end=to_end_monitors,
                              **kwargs)
 
     def set_cart_goal(self,
@@ -457,7 +463,7 @@ class GiskardWrapper(LowLevelGiskardWrapper):
         This goal will push joints away from their position limits. For example if percentage is 15 and the joint
         limits are 0-100, it will push it into the 15-85 range.
         """
-        self.add_motion_goal(goal_type='AvoidJointLimits',
+        self.add_motion_goal(goal_type=AvoidJointLimits.__name__,
                              percentage=percentage,
                              weight=weight,
                              joint_list=joint_list)

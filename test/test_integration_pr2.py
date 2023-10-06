@@ -708,14 +708,14 @@ class TestConstraints:
         zero_pose.plan_and_execute()
 
         joint_non_continuous = [j for j in zero_pose.robot.controlled_joints if
-                                not zero_pose.world.is_joint_continuous(j) and
-                                (zero_pose.world.is_joint_prismatic(j) or zero_pose.world.is_joint_revolute(j))]
+                                not god_map.world.is_joint_continuous(j) and
+                                (god_map.world.is_joint_prismatic(j) or god_map.world.is_joint_revolute(j))]
 
-        current_joint_state = zero_pose.world.state.to_position_dict()
+        current_joint_state = god_map.world.state.to_position_dict()
         percentage *= 0.95  # it will not reach the exact percentage, because the weight is so low
         for joint in joint_non_continuous:
             position = current_joint_state[joint]
-            lower_limit, upper_limit = zero_pose.world.get_joint_position_limits(joint)
+            lower_limit, upper_limit = god_map.world.get_joint_position_limits(joint)
             joint_range = upper_limit - lower_limit
             center = (upper_limit + lower_limit) / 2.
             upper_limit2 = center + joint_range / 2. * (1 - percentage / 100.)
@@ -725,25 +725,23 @@ class TestConstraints:
     def test_AvoidJointLimits2(self, zero_pose: PR2TestWrapper):
         percentage = 10
         joint_non_continuous = [j for j in zero_pose.robot.controlled_joints if
-                                not zero_pose.world.is_joint_continuous(j) and
-                                (zero_pose.world.is_joint_prismatic(j) or zero_pose.world.is_joint_revolute(j))]
-        goal_state = {j: zero_pose.world.get_joint_position_limits(j)[1] for j in joint_non_continuous}
-        zero_pose.set_json_goal('AvoidJointLimits',
-                                percentage=percentage)
-        zero_pose.set_joint_goal(goal_state, check=False)
+                                not god_map.world.is_joint_continuous(j) and
+                                (god_map.world.is_joint_prismatic(j) or god_map.world.is_joint_revolute(j))]
+        goal_state = {j: god_map.world.get_joint_position_limits(j)[1] for j in joint_non_continuous}
+        zero_pose.set_avoid_joint_limits_goal(percentage=percentage)
+        zero_pose.set_joint_goal(goal_state, add_monitor=False)
         zero_pose.allow_self_collision()
         zero_pose.plan_and_execute()
 
-        zero_pose.set_json_goal('AvoidJointLimits',
-                                percentage=percentage)
+        zero_pose.set_avoid_joint_limits_goal(percentage=percentage)
         zero_pose.allow_self_collision()
         zero_pose.plan_and_execute()
 
-        current_joint_state = zero_pose.world.state.to_position_dict()
+        current_joint_state = god_map.world.state.to_position_dict()
         percentage *= 0.9  # it will not reach the exact percentage, because the weight is so low
         for joint in joint_non_continuous:
             position = current_joint_state[joint]
-            lower_limit, upper_limit = zero_pose.world.get_joint_position_limits(joint)
+            lower_limit, upper_limit = god_map.world.get_joint_position_limits(joint)
             joint_range = upper_limit - lower_limit
             center = (upper_limit + lower_limit) / 2.
             upper_limit2 = center + joint_range / 2. * (1 - percentage / 100.)

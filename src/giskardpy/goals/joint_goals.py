@@ -399,65 +399,6 @@ class ShakyJointPositionContinuous(Goal):
         return f'{s}/{self.joint_name}'
 
 
-class AvoidSingleJointLimits(Goal):
-    def __init__(self,
-                 joint_name,
-                 group_name: Optional[str] = None,
-                 weight: float = 0.1,
-                 max_linear_velocity: float = 100,
-                 percentage: float = 5):
-        """
-        This goal will push revolute joints away from their position limits
-        :param joint_name:
-        :param group_name: if joint_name is not unique, will search in this group for matches.
-        :param weight:
-        :param max_linear_velocity: m/s for prismatic joints, rad/s for revolute joints
-        :param percentage: default 15, if limits are 0-100, the constraint will push into the 15-85 range
-        """
-        self.weight = weight
-        self.max_velocity = max_linear_velocity
-        self.percentage = percentage
-        super().__init__()
-        self.joint_name = god_map.world.search_for_joint_name(joint_name, group_name)
-        if not god_map.world.is_joint_revolute(self.joint_name) and not god_map.world.is_joint_prismatic(
-                self.joint_name):
-            raise ConstraintException(
-                f'{self.__class__.__name__} called with non prismatic or revolute joint {joint_name}')
-
-    def make_constraints(self):
-        weight = self.weight
-        joint_symbol = self.get_joint_position_symbol(self.joint_name)
-        percentage = self.percentage / 100.
-        lower_limit, upper_limit = god_map.world.get_joint_position_limits(self.joint_name)
-        max_velocity = self.max_velocity
-        max_velocity = cas.min(max_velocity,
-                               god_map.world.get_joint_velocity_limits(self.joint_name)[1])
-
-        joint_range = upper_limit - lower_limit
-        center = (upper_limit + lower_limit) / 2.
-
-        max_error = joint_range / 2. * percentage
-
-        upper_goal = center + joint_range / 2. * (1 - percentage)
-        lower_goal = center - joint_range / 2. * (1 - percentage)
-
-        upper_err = upper_goal - joint_symbol
-        lower_err = lower_goal - joint_symbol
-
-        error = cas.max(cas.abs(cas.min(upper_err, 0)), cas.abs(cas.max(lower_err, 0)))
-        weight = weight * (error / max_error)
-
-        self.add_inequality_constraint(reference_velocity=max_velocity,
-                                       lower_error=lower_err,
-                                       upper_error=upper_err,
-                                       weight=weight,
-                                       task_expression=joint_symbol)
-
-    def __str__(self):
-        s = super().__str__()
-        return f'{s}/{self.joint_name}'
-
-
 class AvoidJointLimits(Goal):
     def __init__(self,
                  percentage: float = 15,
@@ -472,28 +413,47 @@ class AvoidJointLimits(Goal):
         """
         self.joint_list = joint_list
         super().__init__()
+        self.weight = weight
+        self.percentage = percentage
         if joint_list is not None:
-            for joint_name in joint_list:
-                joint_name = god_map.world.search_for_joint_name(joint_name, group_name)
-                if god_map.world.is_joint_prismatic(joint_name) or god_map.world.is_joint_revolute(joint_name):
-                    self.add_constraints_of_goal(AvoidSingleJointLimits(joint_name=joint_name.short_name,
-                                                                        group_name=None,
-                                                                        percentage=percentage,
-                                                                        weight=weight))
+            joint_list = [god_map.world.search_for_joint_name(joint_name, group_name) for joint_name in joint_list]
         else:
             if group_name is None:
                 joint_list = god_map.world.controlled_joints
             else:
                 joint_list = god_map.world.groups[group_name].controlled_joints
-            for joint_name in joint_list:
-                if god_map.world.is_joint_prismatic(joint_name) or god_map.world.is_joint_revolute(joint_name):
-                    self.add_constraints_of_goal(AvoidSingleJointLimits(joint_name=joint_name.short_name,
-                                                                        group_name=None,
-                                                                        percentage=percentage,
-                                                                        weight=weight))
+        task = Task('avoid joint limits')
+        for joint_name in joint_list:
+            if god_map.world.is_joint_prismatic(joint_name) or god_map.world.is_joint_revolute(joint_name):
+                weight = self.weight
+                joint_symbol = self.get_joint_position_symbol(joint_name)
+                percentage = self.percentage / 100.
+                lower_limit, upper_limit = god_map.world.get_joint_position_limits(joint_name)
+                max_velocity = 100
+                max_velocity = cas.min(max_velocity,
+                                       god_map.world.get_joint_velocity_limits(joint_name)[1])
 
-    def make_constraints(self):
-        pass
+                joint_range = upper_limit - lower_limit
+                center = (upper_limit + lower_limit) / 2.
+
+                max_error = joint_range / 2. * percentage
+
+                upper_goal = center + joint_range / 2. * (1 - percentage)
+                lower_goal = center - joint_range / 2. * (1 - percentage)
+
+                upper_err = upper_goal - joint_symbol
+                lower_err = lower_goal - joint_symbol
+
+                error = cas.max(cas.abs(cas.min(upper_err, 0)), cas.abs(cas.max(lower_err, 0)))
+                weight = weight * (error / max_error)
+
+                task.add_inequality_constraint(reference_velocity=max_velocity,
+                                               name=str(joint_name),
+                                               lower_error=lower_err,
+                                               upper_error=upper_err,
+                                               weight=weight,
+                                               task_expression=joint_symbol)
+        self.add_task(task)
 
     def __str__(self) -> str:
         return f'{super().__str__()}/{self.joint_list}'

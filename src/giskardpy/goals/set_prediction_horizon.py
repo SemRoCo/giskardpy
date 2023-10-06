@@ -17,8 +17,6 @@ class SetPredictionHorizon(Goal):
         super().__init__()
         self.new_prediction_horizon = prediction_horizon
 
-    def make_constraints(self):
-        pass
         if self.new_prediction_horizon < 7:
             logging.logwarn('Prediction horizon must be >= 7.')
         god_map.qp_controller_config.prediction_horizon = self.new_prediction_horizon

@@ -22,6 +22,7 @@ from giskardpy.configs.giskard import Giskard
 from giskardpy.configs.iai_robots.pr2 import PR2CollisionAvoidance, PR2StandaloneInterface, WorldWithPR2Config
 from giskardpy.configs.qp_controller_config import QPControllerConfig, SupportedQPSolver
 from giskardpy.goals.cartesian_goals import RelativePositionSequence
+from giskardpy.goals.collision_avoidance import CollisionAvoidanceHint
 from giskardpy.goals.goals_tests import DebugGoal
 from giskardpy.god_map import god_map
 from giskardpy.model.better_pybullet_syncer import BetterPyBulletSyncer
@@ -393,13 +394,13 @@ class TestConstraints:
         apartment_setup.set_cart_goal(goal_pose=base_pose,
                                       tip_link='base_footprint',
                                       root_link=apartment_setup.default_root,
-                                      check=False)
+                                      add_monitor=False)
         apartment_setup.plan_and_execute()
 
     def test_VelocityLimitUnreachableException(self, zero_pose: PR2TestWrapper):
         zero_pose.set_prediction_horizon(prediction_horizon=7)
         zero_pose.set_joint_goal(zero_pose.better_pose)
-        zero_pose.plan_and_execute(expected_error_codes=[MoveResult.QP_SOLVER_ERROR])
+        zero_pose.plan_and_execute(expected_error_code=MoveResult.VELOCITY_LIMIT_UNREACHABLE)
 
     def test_SetPredictionHorizon11(self, zero_pose: PR2TestWrapper):
         default_prediction_horizon = god_map.qp_controller_config.prediction_horizon
@@ -419,12 +420,12 @@ class TestConstraints:
         base_goal.pose.orientation.w = 1
         zero_pose.set_max_traj_length(new_length)
         zero_pose.set_cart_goal(base_goal, tip_link='base_footprint', root_link='map')
-        result = zero_pose.plan_and_execute(expected_error_codes=[MoveResult.PLANNING_ERROR])
+        result = zero_pose.plan_and_execute(expected_error_code=MoveResult.CONTROL_ERROR)
         dt = god_map.qp_controller_config.sample_period
         np.testing.assert_almost_equal(len(result.trajectory.points) * dt, new_length + dt * 2)
 
         zero_pose.set_cart_goal(base_goal, tip_link='base_footprint', root_link='map')
-        result = zero_pose.plan_and_execute(expected_error_codes=[MoveResult.PLANNING_ERROR])
+        result = zero_pose.plan_and_execute(expected_error_code=MoveResult.CONTROL_ERROR)
         dt = god_map.qp_controller_config.sample_period
         assert len(result.trajectory.points) * dt > new_length + 1
 
@@ -445,17 +446,18 @@ class TestConstraints:
         avoidance_hint.header.frame_id = 'map'
         avoidance_hint.vector.y = -1
         kitchen_setup.avoid_all_collisions(0.1)
-        kitchen_setup.set_json_goal('CollisionAvoidanceHint',
-                                    tip_link='base_link',
-                                    max_threshold=0.4,
-                                    spring_threshold=0.5,
-                                    # max_linear_velocity=1,
-                                    object_link_name='kitchen_island',
-                                    weight=WEIGHT_COLLISION_AVOIDANCE,
-                                    avoidance_hint=avoidance_hint)
+        kitchen_setup.add_motion_goal(goal_type=CollisionAvoidanceHint.__name__,
+                                      tip_link='base_link',
+                                      max_threshold=0.4,
+                                      spring_threshold=0.5,
+                                      # max_linear_velocity=1,
+                                      object_link_name='kitchen_island',
+                                      weight=WEIGHT_COLLISION_AVOIDANCE,
+                                      avoidance_hint=avoidance_hint)
         kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
 
-        kitchen_setup.set_cart_goal(base_pose, tip, weight=WEIGHT_BELOW_CA, linear_velocity=0.5)
+        kitchen_setup.set_cart_goal(goal_pose=base_pose, tip_link=tip, root_link='map',
+                                    weight=WEIGHT_BELOW_CA, reference_linear_velocity=0.5)
         # kitchen_setup.allow_all_collisions()
         kitchen_setup.plan_and_execute()
 

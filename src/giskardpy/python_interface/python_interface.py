@@ -3,6 +3,7 @@ from typing import Dict, Optional, List
 from geometry_msgs.msg import PoseStamped, PointStamped, QuaternionStamped, Vector3Stamped
 
 from giskardpy.goals.cartesian_goals import CartesianPose
+from giskardpy.goals.set_prediction_horizon import SetPredictionHorizon, SetMaxTrajLength
 from giskardpy.goals.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
 from giskardpy.my_types import goal_parameter
 from giskardpy.python_interface.low_level_python_interface import LowLevelGiskardWrapper
@@ -46,6 +47,7 @@ class GiskardWrapper(LowLevelGiskardWrapper):
                       reference_linear_velocity: Optional[float] = None,
                       reference_angular_velocity: Optional[float] = None,
                       weight: Optional[float] = None,
+                      add_monitor: bool = True,
                       **kwargs: goal_parameter):
         """
         This goal will use the kinematic chain between root and tip link to move tip link into the goal pose.
@@ -63,15 +65,19 @@ class GiskardWrapper(LowLevelGiskardWrapper):
         :param reference_angular_velocity: rad/s
         :param weight: default WEIGHT_ABOVE_CA
         """
-        monitor_name = f'{root_link}/{tip_link} pose reached'
-        self.add_cartesian_pose_reached_monitor(name=monitor_name,
-                                                root_link=root_link,
-                                                root_group=root_group,
-                                                tip_link=tip_link,
-                                                tip_group=tip_group,
-                                                goal_pose=goal_pose)
+        if add_monitor:
+            monitor_name = f'{root_link}/{tip_link} pose reached'
+            self.add_cartesian_pose_reached_monitor(name=monitor_name,
+                                                    root_link=root_link,
+                                                    root_group=root_group,
+                                                    tip_link=tip_link,
+                                                    tip_group=tip_group,
+                                                    goal_pose=goal_pose)
+            to_end_monitors = [monitor_name]
+        else:
+            to_end_monitors = []
         self.add_motion_goal(goal_type=CartesianPose.__name__,
-                             to_end=[monitor_name],
+                             to_end=to_end_monitors,
                              goal_pose=goal_pose,
                              tip_link=tip_link,
                              root_link=root_link,
@@ -254,7 +260,7 @@ class GiskardWrapper(LowLevelGiskardWrapper):
         Setting it to 1 will turn of acceleration and jerk limits.
         :param prediction_horizon: size of the prediction horizon, a number that should be 1 or above 5.
         """
-        self.add_motion_goal(goal_type='SetPredictionHorizon',
+        self.add_motion_goal(goal_type=SetPredictionHorizon.__name__,
                              prediction_horizon=prediction_horizon,
                              **kwargs)
 
@@ -264,7 +270,7 @@ class GiskardWrapper(LowLevelGiskardWrapper):
         If the trajectory is longer than new_length, Giskard will prempt the goal.
         :param new_length: in seconds
         """
-        self.add_motion_goal(goal_type='SetMaxTrajLength',
+        self.add_motion_goal(goal_type=SetMaxTrajLength.__name__,
                              new_length=new_length,
                              **kwargs)
 

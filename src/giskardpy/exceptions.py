@@ -34,7 +34,7 @@ class InfeasibleException(QPSolverException):
 
 
 class VelocityLimitUnreachableException(QPSolverException):
-    error_code = MoveResult.VELOCITYLIMITUNREACHABLE
+    error_code = MoveResult.VELOCITY_LIMIT_UNREACHABLE
 
 
 class OutOfJointLimitsException(InfeasibleException):

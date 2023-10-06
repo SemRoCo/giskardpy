@@ -282,17 +282,6 @@ class CollisionAvoidanceHint(Goal):
         self.threshold = max_threshold
         self.threshold2 = spring_threshold
         self.weight = weight
-
-    def get_actual_distance(self):
-        expr = f'god_map.closest_point.get_external_collisions_long_key(\'{self.key}\').contact_distance'
-        return symbol_manager.get_symbol(expr)
-
-    def get_link_b(self):
-        expr = f'god_map.closest_point.get_external_collisions_long_key(\'{self.key}\').link_b_hash'
-        return symbol_manager.get_symbol(expr)
-
-    def make_constraints(self):
-        weight = self.weight
         actual_distance = self.get_actual_distance()
         max_velocity = self.max_velocity
         max_threshold = self.threshold
@@ -320,11 +309,21 @@ class CollisionAvoidanceHint(Goal):
         expr = root_V_avoidance_hint.dot(root_P_a)
 
         # self.add_debug_expr('dist', actual_distance)
-        self.add_equality_constraint(name='avoidance_hint',
-                                     reference_velocity=max_velocity,
+        task = Task(name='avoidance_hint')
+        task.add_equality_constraint(reference_velocity=max_velocity,
                                      equality_bound=max_velocity,
                                      weight=weight,
                                      task_expression=expr)
+        self.add_task(task)
+
+    def get_actual_distance(self):
+        expr = f'god_map.closest_point.get_external_collisions_long_key(\'{self.key[0]}\', \'{self.key[1]}\').contact_distance'
+        return symbol_manager.get_symbol(expr)
+
+    def get_link_b(self):
+        expr = f'god_map.closest_point.get_external_collisions_long_key(\'{self.key[0]}\', \'{self.key[1]}\').link_b_hash'
+        return symbol_manager.get_symbol(expr)
+
 
     def __str__(self):
         s = super().__str__()

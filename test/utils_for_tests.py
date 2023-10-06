@@ -535,36 +535,6 @@ class GiskardTestWrapper(GiskardWrapper):
                            weight=weight,
                            **kwargs)
 
-    def set_pointing_goal(self,
-                          goal_point: PointStamped,
-                          tip_link: str,
-                          pointing_axis: Vector3Stamped,
-                          root_link: str,
-                          tip_group: Optional[str] = None,
-                          root_group: Optional[str] = None,
-                          max_velocity: float = 0.3,
-                          weight: float = WEIGHT_BELOW_CA,
-                          check=False):
-        if root_link is None:
-            root_link = god_map.world.root_link_name
-            root_group = None
-        super().set_pointing_goal(goal_point=goal_point,
-                                  tip_link=tip_link,
-                                  pointing_axis=pointing_axis,
-                                  root_link=root_link,
-                                  tip_group=tip_group,
-                                  root_group=root_group,
-                                  max_velocity=max_velocity,
-                                  weight=weight)
-        if check:
-            full_root_link, full_tip_link = self.get_root_and_tip_link(root_link=root_link, root_group=root_group,
-                                                                       tip_link=tip_link, tip_group=tip_group)
-            self.add_goal_check(PointingGoalChecker(self,
-                                                    tip_link=full_tip_link,
-                                                    goal_point=goal_point,
-                                                    root_link=full_root_link,
-                                                    pointing_axis=pointing_axis))
-
     def set_align_planes_goal(self, tip_link, tip_normal, root_link=None, tip_group=None, root_group=None,
                               goal_normal=None, max_angular_velocity=None,
                               weight=None, check=False):

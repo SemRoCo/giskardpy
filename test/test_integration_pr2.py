@@ -844,7 +844,7 @@ class TestConstraints:
 
         rospy.loginfo("Starting looking")
         tip = 'head_mount_kinect_rgb_link'
-        goal_point = kitchen_setup.world.compute_fk_point('map', kitchen_setup.r_tip)
+        goal_point = god_map.world.compute_fk_point('map', kitchen_setup.r_tip)
         goal_point.header.stamp = rospy.Time()
         pointing_axis = Vector3Stamped()
         pointing_axis.header.frame_id = tip
@@ -868,49 +868,9 @@ class TestConstraints:
                                     tip_link=kitchen_setup.r_tip,
                                     root_link='base_footprint',
                                     weight=WEIGHT_BELOW_CA,
-                                    check=False)
+                                    add_monitor=False)
+        kitchen_setup.allow_all_collisions()
         kitchen_setup.plan_and_execute()
-
-    # def test_pointing_bug(self, zero_pose: PR2TestWrapper):
-    #     initial_joint_state = {
-    #         'torso_lift_joint': 0.31261531343064947,
-    #         'head_pan_joint': -2.8762399155129605,
-    #         'head_tilt_joint': 1.227067553622289,
-    #         'r_upper_arm_roll_joint': -1.4298359538624308,
-    #         'r_shoulder_pan_joint': -0.03837121868433646,
-    #         'r_shoulder_lift_joint': -0.2777931728916727,
-    #         'r_forearm_roll_joint': -35.932852605836715,
-    #         'r_elbow_flex_joint': -2.1155076122857492,
-    #         'r_wrist_flex_joint': -0.10505779734036036,
-    #         'r_wrist_roll_joint': -12.515290560123026,
-    #         'l_upper_arm_roll_joint': 1.3837617139225475,
-    #         'l_shoulder_pan_joint': 1.965374844556896,
-    #         'l_shoulder_lift_joint': -0.2649135724042734,
-    #         'l_forearm_roll_joint': 117.52740957656653,
-    #         'l_elbow_flex_joint': -2.1157971537085163,
-    #         'l_wrist_flex_joint': -0.10313747048706379,
-    #         'l_wrist_roll_joint': 6.28332367137161,
-    #     }
-    #     zero_pose.set_seed_configuration(initial_joint_state)
-    #     initial_base_pose = PoseStamped()
-    #     initial_base_pose.header.frame_id = 'map'
-    #     initial_base_pose.pose.position = Point(1.576, 2.535, -0.000)
-    #     initial_base_pose.pose.orientation = Quaternion(0.0, 0.0, 0.0, 1.000)
-    #     zero_pose.set_seed_odometry(initial_base_pose)
-    #     zero_pose.plan_and_execute()
-    #
-    #     pointing_axis = Vector3Stamped()
-    #     pointing_axis.header.frame_id = 'narrow_stereo_optical_frame'
-    #     pointing_axis.vector.z = 1
-    #
-    #     goal_point = PointStamped()
-    #     goal_point.header.frame_id = 'map'
-    #     goal_point.point = Point(2.0, 2.6, 1.0)
-    #     zero_pose.set_pointing_goal(goal_point=goal_point,
-    #                                     pointing_axis=pointing_axis,
-    #                                     tip_link='narrow_stereo_optical_frame',
-    #                                     root_link='base_footprint')
-    #     zero_pose.plan_and_execute()
 
     # def test_open_fridge(self, kitchen_setup: PR2TestWrapper):
     #     handle_frame_id = 'iai_kitchen/iai_fridge_door_handle'

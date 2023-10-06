@@ -7,7 +7,7 @@ from geometry_msgs.msg import Vector3Stamped, PointStamped
 import giskardpy.utils.tfwrapper as tf
 from giskardpy import casadi_wrapper as w
 from giskardpy.goals.goal import Goal
-from giskardpy.goals.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE
+from giskardpy.goals.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE, Task
 from giskardpy.god_map import god_map
 from giskardpy.utils.logging import logwarn
 
@@ -49,7 +49,6 @@ class Pointing(Goal):
             self.tip_V_pointing_axis.header.frame_id = self.tip
             self.tip_V_pointing_axis.vector.z = 1
 
-    def make_constraints(self):
         root_T_tip = god_map.world.compose_fk_expression(self.root, self.tip)
         root_P_goal_point = w.Point3(self.root_P_goal_point)
         tip_V_pointing_axis = w.Vector3(self.tip_V_pointing_axis)
@@ -59,13 +58,15 @@ class Pointing(Goal):
         root_V_pointing_axis = root_T_tip.dot(tip_V_pointing_axis)
         root_V_pointing_axis.vis_frame = self.tip
         root_V_goal_axis.vis_frame = self.tip
-        self.add_debug_expr('goal_point', root_P_goal_point)
-        self.add_debug_expr('root_V_pointing_axis', root_V_pointing_axis)
-        self.add_debug_expr('root_V_goal_axis', root_V_goal_axis)
-        self.add_vector_goal_constraints(frame_V_current=root_V_pointing_axis,
+        # self.add_debug_expr('goal_point', root_P_goal_point)
+        # self.add_debug_expr('root_V_pointing_axis', root_V_pointing_axis)
+        # self.add_debug_expr('root_V_goal_axis', root_V_goal_axis)
+        task = Task('pointing')
+        task.add_vector_goal_constraints(frame_V_current=root_V_pointing_axis,
                                          frame_V_goal=root_V_goal_axis,
                                          reference_velocity=self.max_velocity,
                                          weight=self.weight)
+        self.add_task(task)
 
     def __str__(self):
         s = super().__str__()

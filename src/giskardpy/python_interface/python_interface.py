@@ -5,6 +5,7 @@ from geometry_msgs.msg import PoseStamped, PointStamped, QuaternionStamped, Vect
 from giskardpy.goals.cartesian_goals import CartesianPose, CartesianPosition, CartesianOrientation, \
     CartesianPoseStraight, CartesianVelocityLimit
 from giskardpy.goals.joint_goals import AvoidJointLimits
+from giskardpy.goals.pointing import Pointing
 from giskardpy.goals.set_prediction_horizon import SetPredictionHorizon, SetMaxTrajLength
 from giskardpy.goals.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
 from giskardpy.my_types import goal_parameter
@@ -432,6 +433,7 @@ class GiskardWrapper(LowLevelGiskardWrapper):
                           root_group: Optional[str] = None,
                           max_velocity: float = 0.3,
                           weight: float = WEIGHT_BELOW_CA,
+                          add_monitor: bool = True,
                           **kwargs: goal_parameter):
         """
         Will orient pointing_axis at goal_point.
@@ -444,7 +446,20 @@ class GiskardWrapper(LowLevelGiskardWrapper):
         :param max_velocity: rad/s
         :param weight:
         """
-        self.add_motion_goal(goal_type='Pointing',
+        if add_monitor:
+            monitor_name = f'{root_link}/{tip_link} pointing at'
+            self.add_pointing_at_monitor(name=monitor_name,
+                                         goal_point=goal_point,
+                                         tip_link=tip_link,
+                                         pointing_axis=pointing_axis,
+                                         root_link=root_link,
+                                         tip_group=tip_group,
+                                         root_group=root_group)
+            to_end_monitors = [monitor_name]
+        else:
+            to_end_monitors = []
+        self.add_motion_goal(goal_type=Pointing.__name__,
+                             to_end=to_end_monitors,
                              tip_link=tip_link,
                              tip_group=tip_group,
                              goal_point=goal_point,

@@ -22,6 +22,7 @@ from giskardpy.configs.giskard import Giskard
 from giskardpy.configs.iai_robots.pr2 import PR2CollisionAvoidance, PR2StandaloneInterface, WorldWithPR2Config
 from giskardpy.configs.qp_controller_config import QPControllerConfig, SupportedQPSolver
 from giskardpy.goals.cartesian_goals import RelativePositionSequence
+from giskardpy.goals.goals_tests import DebugGoal
 from giskardpy.god_map import god_map
 from giskardpy.model.better_pybullet_syncer import BetterPyBulletSyncer
 from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
@@ -374,7 +375,7 @@ class TestConstraints:
     # TODO write buggy constraints that test sanity checks
 
     def test_add_debug_expr(self, zero_pose: PR2TestWrapper):
-        zero_pose.set_json_goal(constraint_type='DebugGoal')
+        zero_pose.add_motion_goal(goal_type=DebugGoal.__name__)
         zero_pose.plan_and_execute()
 
     def test_SetSeedConfiguration(self, zero_pose: PR2TestWrapper):

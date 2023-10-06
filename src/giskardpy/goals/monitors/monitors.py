@@ -1,14 +1,16 @@
-from typing import Union, List
+from typing import Union, List, TypeVar
 
 import numpy as np
 
 import giskardpy.casadi_wrapper as cas
+from giskardpy.casadi_wrapper import PreservedCasType
 from giskardpy.exceptions import UnknownGroupException
 from giskardpy.god_map import god_map
 from giskardpy.my_types import Derivatives, my_string, transformable_message
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.symbol_manager import symbol_manager
 import giskardpy.utils.tfwrapper as tf
+
 
 class Monitor:
     id: int
@@ -55,7 +57,7 @@ class Monitor:
             return tf.transform_msg(target_frame, msg, timeout=tf_timeout)
 
     @profile
-    def substitute_with_on_flip_symbols(self, expression: cas.Expression) -> cas.Expression:
+    def substitute_with_on_flip_symbols(self, expression: PreservedCasType) -> PreservedCasType:
         old_symbols = []
         new_symbols = []
         for i, symbol in enumerate(expression.free_symbols()):

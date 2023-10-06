@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import builtins
 from copy import copy
-from typing import Union, List
+from typing import Union, List, TypeVar
 import math
 import casadi as ca  # type: ignore
 import numpy as np
@@ -1329,6 +1329,7 @@ all_expressions = Union[Symbol_, Symbol, Expression, Point3, Vector3, RotationMa
 all_expressions_float = Union[Symbol, Expression, Point3, Vector3, RotationMatrix, TransMatrix, float, Quaternion]
 symbol_expr_float = Union[Symbol, Expression, float]
 symbol_expr = Union[Symbol, Expression]
+PreservedCasType = TypeVar('PreservedCasType', Point3, Vector3, TransMatrix, RotationMatrix, Quaternion, Expression)
 
 
 def var(variables_names: str):
@@ -2134,4 +2135,4 @@ def substitute(expression, old_symbols, new_symbols):
     old_symbols = Expression([_to_sx(s) for s in old_symbols]).s
     new_symbols = Expression([_to_sx(s) for s in new_symbols]).s
     sx = ca.substitute(sx, old_symbols, new_symbols)
-    return Expression(sx)
+    return type(expression)(sx)

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import functools
-from typing import overload, Union, Iterable, Tuple, Optional, Callable, List, Any, Sequence, Dict
+from typing import overload, Union, Iterable, Tuple, Optional, Callable, List, Any, Sequence, Dict, TypeVar
 import numpy as np
 import casadi as ca  # type: ignore
 import geometry_msgs.msg as geometry_msgs
@@ -13,6 +13,7 @@ all_expressions = Union[Symbol_, Symbol, Expression, Point3, Vector3, RotationMa
 all_expressions_float = Union[Symbol, Expression, Point3, Vector3, RotationMatrix, TransMatrix, float, Quaternion]
 symbol_expr_float = Union[Symbol, Expression, float]
 symbol_expr = Union[Symbol, Expression]
+PreservedCasType = TypeVar('PreservedCasType', Point3, Vector3, TransMatrix, RotationMatrix, Quaternion, Expression)
 
 pi: float
 
@@ -878,5 +879,5 @@ def gauss(n: symbol_expr_float) -> Expression: ...
 def r_gauss(integral: symbol_expr_float) -> Expression: ...
 
 
-def substitute(expression: Expression, old_symbols: List[Symbol], new_symbols: List[Expression]) -> Expression:
+def substitute(expression: PreservedCasType, old_symbols: List[Symbol], new_symbols: List[Symbol]) -> PreservedCasType:
     ...

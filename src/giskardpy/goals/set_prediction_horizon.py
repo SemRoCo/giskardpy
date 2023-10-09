@@ -7,7 +7,7 @@ from giskardpy.tree.behaviors.max_trajectory_length import MaxTrajectoryLength
 from giskardpy.utils import logging
 
 
-class SetPredictionHorizon(Goal):
+class SetPredictionHorizon(NonMotionGoal):
     def __init__(self, prediction_horizon: int):
         """
         Will overwrite the prediction horizon for a single goal.

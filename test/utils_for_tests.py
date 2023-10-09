@@ -535,26 +535,6 @@ class GiskardTestWrapper(GiskardWrapper):
                            weight=weight,
                            **kwargs)
 
-    def set_align_planes_goal(self, tip_link, tip_normal, root_link=None, tip_group=None, root_group=None,
-                              goal_normal=None, max_angular_velocity=None,
-                              weight=None, check=False):
-        if root_link is None:
-            root_link = god_map.world.root_link_name
-            root_group = None
-        super().set_align_planes_goal(tip_link=tip_link,
-                                      tip_group=tip_group,
-                                      root_link=root_link,
-                                      root_group=root_group,
-                                      tip_normal=tip_normal,
-                                      goal_normal=goal_normal,
-                                      max_angular_velocity=max_angular_velocity,
-                                      weight=weight)
-        if check:
-            full_root_link, full_tip_link = self.get_root_and_tip_link(root_link=root_link, root_group=root_group,
-                                                                       tip_link=tip_link, tip_group=tip_group)
-            self.add_goal_check(
-                AlignPlanesGoalChecker(self, full_tip_link, tip_normal, full_root_link, goal_normal))
-
     def add_goal_check(self, goal_checker):
         self.goal_checks.append(goal_checker)
 

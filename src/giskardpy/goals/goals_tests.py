@@ -1,12 +1,12 @@
 import numpy as np
 from geometry_msgs.msg import QuaternionStamped, PointStamped, PoseStamped, Vector3Stamped
 import giskardpy.casadi_wrapper as w
-from giskardpy.goals.goal import Goal
+from giskardpy.goals.goal import Goal, NonMotionGoal
 from giskardpy.god_map import god_map
 from giskardpy.symbol_manager import symbol_manager
 
 
-class DebugGoal(Goal):
+class DebugGoal(NonMotionGoal):
     def __init__(self):
         super().__init__()
         q = QuaternionStamped()

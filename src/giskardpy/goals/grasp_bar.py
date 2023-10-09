@@ -7,7 +7,7 @@ from geometry_msgs.msg import Vector3Stamped, PointStamped
 import giskardpy.utils.tfwrapper as tf
 from giskardpy import casadi_wrapper as w
 from giskardpy.goals.goal import Goal
-from giskardpy.goals.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE
+from giskardpy.goals.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE, Task
 from giskardpy.god_map import god_map
 
 
@@ -60,11 +60,7 @@ class GraspBar(Goal):
         self.reference_angular_velocity = reference_angular_velocity
         self.weight = weight
 
-    def __str__(self):
-        s = super().__str__()
-        return f'{s}/{self.root}/{self.tip}'
 
-    def make_constraints(self):
         root_V_bar_axis = w.Vector3(self.bar_axis)
         tip_V_tip_grasp_axis = w.Vector3(self.tip_grasp_axis)
         root_P_bar_center = w.Point3(self.bar_center)
@@ -72,7 +68,9 @@ class GraspBar(Goal):
         root_T_tip = god_map.world.compose_fk_expression(self.root, self.tip)
         root_V_tip_normal = w.dot(root_T_tip, tip_V_tip_grasp_axis)
 
-        self.add_vector_goal_constraints(frame_V_current=root_V_tip_normal,
+        task = Task('grasp bar')
+
+        task.add_vector_goal_constraints(frame_V_current=root_V_tip_normal,
                                          frame_V_goal=root_V_bar_axis,
                                          reference_velocity=self.reference_angular_velocity,
                                          weight=self.weight)
@@ -84,7 +82,12 @@ class GraspBar(Goal):
 
         dist, nearest = w.distance_point_to_line_segment(root_P_tip, root_P_line_start, root_P_line_end)
 
-        self.add_point_goal_constraints(frame_P_current=root_T_tip.to_position(),
+        task.add_point_goal_constraints(frame_P_current=root_T_tip.to_position(),
                                         frame_P_goal=nearest,
                                         reference_velocity=self.reference_linear_velocity,
                                         weight=self.weight)
+        self.add_task(task)
+
+    def __str__(self):
+        s = super().__str__()
+        return f'{s}/{self.root}/{self.tip}'

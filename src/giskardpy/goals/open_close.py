@@ -5,7 +5,7 @@ from typing import Optional
 from giskardpy.goals.cartesian_goals import CartesianPose
 from giskardpy.goals.goal import Goal
 from giskardpy.goals.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE
-from giskardpy.goals.joint_goals import JointPosition
+from giskardpy.goals.joint_goals import JointPosition, JointPositionList
 from giskardpy.god_map import god_map
 
 
@@ -50,14 +50,11 @@ class Open(Goal):
                                                    tip_group=tip_group,
                                                    goal_pose=self.handle_T_tip,
                                                    weight=self.weight))
-        self.add_constraints_of_goal(JointPosition(joint_name=self.joint_name.short_name,
-                                                   group_name=self.joint_group.name,
-                                                   goal=goal_joint_state,
-                                                   max_velocity=max_velocity,
-                                                   weight=WEIGHT_BELOW_CA))
-
-    def make_constraints(self):
-        pass
+        goal_state = {self.joint_name.short_name: goal_joint_state}
+        self.add_constraints_of_goal(JointPositionList(goal_state=goal_state,
+                                                       group_name=self.joint_group.name,
+                                                       max_velocity=max_velocity,
+                                                       weight=WEIGHT_BELOW_CA))
 
     def __str__(self):
         return f'{super().__str__()}/{self.tip_link}/{self.handle_link}'
@@ -90,9 +87,6 @@ class Close(Goal):
                                           environment_group=environment_group,
                                           goal_joint_state=goal_joint_state,
                                           weight=weight))
-
-    def make_constraints(self):
-        pass
 
     def __str__(self):
         return f'{super().__str__()}/{self.tip_link}/{self.environment_link}'

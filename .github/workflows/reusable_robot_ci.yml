@@ -80,6 +80,9 @@ jobs:
           cd ~/bpb/bullet3
           echo 'export PYTHONPATH=${PYTHONPATH}':"${PWD}/build_cmake/better_python:${PWD}/examples/pybullet" >> ~/.bashrc
       #pull github deps ================================================================================================
+      - name: Get the branch name
+        id: extract_branch
+        run: echo "::set-output name=branch::${GITHUB_REF#refs/heads/}"
       - uses: actions/checkout@v3
         with:
           path: 'ros_ws/src/giskardpy'
@@ -93,6 +96,7 @@ jobs:
         with:
           path: 'ros_ws/src/giskard_msgs'
           repository: SemRoCo/giskard_msgs
+          ref: ${{ steps.extract_branch.outputs.branch }}
       - name: Checkout iai_maps
         uses: actions/checkout@v3
         with:

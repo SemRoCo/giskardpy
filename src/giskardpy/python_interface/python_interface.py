@@ -6,7 +6,7 @@ from giskardpy.goals.align_planes import AlignPlanes
 from giskardpy.goals.cartesian_goals import CartesianPose, CartesianPosition, CartesianOrientation, \
     CartesianPoseStraight, CartesianVelocityLimit
 from giskardpy.goals.grasp_bar import GraspBar
-from giskardpy.goals.joint_goals import AvoidJointLimits
+from giskardpy.goals.joint_goals import AvoidJointLimits, SetSeedConfiguration
 from giskardpy.goals.open_close import Close, Open
 from giskardpy.goals.pointing import Pointing
 from giskardpy.goals.set_prediction_horizon import SetPredictionHorizon, SetMaxTrajLength
@@ -183,9 +183,10 @@ class GiskardWrapper(LowLevelGiskardWrapper):
                              weight=weight,
                              **kwargs)
 
-    def set_seed_configuration(self, seed_configuration):
-        self.add_motion_goal(goal_type='SetSeedConfiguration',
-                             seed_configuration=seed_configuration)
+    def set_seed_configuration(self, seed_configuration, group_name: Optional[str] = None):
+        self.add_motion_goal(goal_type=SetSeedConfiguration.__name__,
+                             seed_configuration=seed_configuration,
+                             group_name = group_name)
 
     def set_straight_translation_goal(self,
                                       goal_pose: PoseStamped,

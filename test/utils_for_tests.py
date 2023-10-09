@@ -30,6 +30,9 @@ from giskard_msgs.srv import UpdateWorldResponse, DyeGroupResponse
 from giskardpy.configs.giskard import Giskard
 from giskardpy.configs.qp_controller_config import QPControllerConfig, SupportedQPSolver
 from giskardpy.data_types import KeyDefaultDict, JointStates
+from giskardpy.goals.cartesian_goals import DiffDriveBaseGoal, PR2DiffDriveBaseGoal
+from giskardpy.goals.diff_drive_goals import DiffDriveTangentialToPoint, KeepHandInWorkspace
+from giskardpy.goals.joint_goals import SetOdometry
 from giskardpy.goals.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
 from giskardpy.god_map import god_map
 from giskardpy.model.collision_world_syncer import Collisions, Collision
@@ -282,7 +285,7 @@ class GiskardTestWrapper(GiskardWrapper):
     def set_seed_odometry(self, base_pose, group_name: Optional[str] = None):
         if group_name is None:
             group_name = self.robot_name
-        self.add_motion_goal('SetOdometry',
+        self.add_motion_goal(goal_type=SetOdometry.__name__,
                              group_name=group_name,
                              base_pose=base_pose)
 
@@ -468,72 +471,35 @@ class GiskardTestWrapper(GiskardWrapper):
         # # self.set_base.call(goal)
         # rospy.sleep(0.5)
 
-    def set_straight_translation_goal(self, goal_pose, tip_link, root_link=None, tip_group=None, root_group=None,
-                                      weight=None, max_velocity=None,
-                                      **kwargs):
-        if root_link is None:
-            root_link = god_map.world.root_link_name
-            root_group = None
-        super().set_straight_translation_goal(goal_pose=goal_pose,
-                                              tip_link=tip_link,
-                                              root_link=root_link,
-                                              tip_group=tip_group,
-                                              root_group=root_group,
-                                              max_velocity=max_velocity, weight=weight,
-                                              **kwargs)
-
-    def set_move_base_goal(self, goal_pose, check=True):
-        self.set_json_goal(constraint_type='PR2DiffDriveBaseGoal',
-                           goal_pose=goal_pose)
-        if check:
-            full_root_link = self.default_root
-            full_tip_link = god_map.world.get_link_name('base_footprint')
-            goal_point = PointStamped()
-            goal_point.header = goal_pose.header
-            goal_point.point = goal_pose.pose.position
-            self.add_goal_check(TranslationGoalChecker(giskard=self,
-                                                       tip_link=full_tip_link,
-                                                       root_link=full_root_link,
-                                                       expected=goal_point))
-            goal_orientation = QuaternionStamped()
-            goal_orientation.header = goal_pose.header
-            goal_orientation.quaternion = goal_pose.pose.orientation
-            self.add_goal_check(RotationGoalChecker(self, full_tip_link, full_root_link, goal_orientation))
+    def set_move_base_goal(self, goal_pose):
+        self.add_motion_goal(goal_type=PR2DiffDriveBaseGoal.__name__,
+                             goal_pose=goal_pose)
 
     def set_diff_drive_base_goal(self, goal_pose, tip_link=None, root_link=None, weight=None, linear_velocity=None,
-                                 angular_velocity=None, check=True, **kwargs):
+                                 angular_velocity=None, **kwargs):
         if tip_link is None:
             tip_link = 'base_footprint'
         if root_link is None:
             root_link = self.default_root
-        self.set_json_goal(constraint_type='DiffDriveBaseGoal',
-                           tip_link=tip_link,
-                           root_link=root_link,
-                           goal_pose=goal_pose,
-                           max_linear_velocity=linear_velocity,
-                           max_angular_velocity=angular_velocity,
-                           weight=weight)
-        if check:
-            goal_point = PointStamped()
-            goal_point.header = goal_pose.header
-            goal_point.point = goal_pose.pose.position
-            self.add_goal_check(TranslationGoalChecker(self, tip_link, root_link, goal_point))
-            goal_orientation = QuaternionStamped()
-            goal_orientation.header = goal_pose.header
-            goal_orientation.quaternion = goal_pose.pose.orientation
-            self.add_goal_check(RotationGoalChecker(self, tip_link, root_link, goal_orientation))
+        self.add_motion_goal(goal_type=DiffDriveBaseGoal.__name__,
+                             tip_link=tip_link,
+                             root_link=root_link,
+                             goal_pose=goal_pose,
+                             max_linear_velocity=linear_velocity,
+                             max_angular_velocity=angular_velocity,
+                             weight=weight)
 
     def set_keep_hand_in_workspace(self, tip_link, map_frame=None, base_footprint=None):
-        self.set_json_goal('KeepHandInWorkspace',
-                           tip_link=tip_link,
-                           map_frame=map_frame,
-                           base_footprint=base_footprint)
+        self.add_motion_goal(goal_type=KeepHandInWorkspace.__name__,
+                             tip_link=tip_link,
+                             map_frame=map_frame,
+                             base_footprint=base_footprint)
 
     def set_diff_drive_tangential_to_point(self, goal_point: PointStamped, weight: float = WEIGHT_ABOVE_CA, **kwargs):
-        self.set_json_goal('DiffDriveTangentialToPoint',
-                           goal_point=goal_point,
-                           weight=weight,
-                           **kwargs)
+        self.add_motion_goal(DiffDriveTangentialToPoint.__name__,
+                             goal_point=goal_point,
+                             weight=weight,
+                             **kwargs)
 
     def add_goal_check(self, goal_checker):
         self.goal_checks.append(goal_checker)
@@ -1057,114 +1023,3 @@ class SuccessfulActionServer(object):
         rospy.sleep(goal.trajectory.points[-1].time_from_start)
         if self._as.is_active():
             self._as.set_succeeded()
-
-
-class GoalChecker:
-    def __init__(self, giskard: GiskardTestWrapper):
-        self.giskard = giskard
-        self.world: WorldTree = god_map.world
-        # self.robot: SubWorldTree = self.world.groups[self.god_map.unsafe_get_data(identifier.robot_group_name)]
-
-
-class JointGoalChecker(GoalChecker):
-    def __init__(self, giskard, goal_state, decimal=2):
-        super().__init__(giskard)
-        self.goal_state = goal_state
-        self.decimal = decimal
-
-    def get_current_joint_state(self) -> JointStates:
-        return self.world.state
-
-    def __call__(self):
-        current_joint_state = self.get_current_joint_state()
-        self.compare_joint_state(current_joint_state, self.goal_state, decimal=self.decimal)
-
-    def compare_joint_state(self, current_js, goal_js, decimal=2):
-        """
-        :type current_js: dict
-        :type goal_js: dict
-        :type decimal: int
-        """
-        for joint_name in goal_js:
-            full_joint_name = self.world.search_for_joint_name(joint_name)
-            goal = goal_js[joint_name]
-            current = current_js[full_joint_name].position
-            if self.world.is_joint_continuous(full_joint_name):
-                np.testing.assert_almost_equal(shortest_angular_distance(goal, current), 0, decimal=decimal,
-                                               err_msg='{}: actual: {} desired: {}'.format(full_joint_name, current,
-                                                                                           goal))
-            else:
-                np.testing.assert_almost_equal(current, goal, decimal,
-                                               err_msg='{}: actual: {} desired: {}'.format(full_joint_name, current,
-                                                                                           goal))
-
-
-class TranslationGoalChecker(GoalChecker):
-    def __init__(self, giskard, tip_link, root_link, expected):
-        super().__init__(giskard)
-        self.expected = deepcopy(expected)
-        self.tip_link = tip_link
-        self.root_link = root_link
-        self.expected = self.giskard.transform_msg(self.root_link, self.expected)
-
-    def __call__(self):
-        expected = self.expected
-        current_pose = self.world.compute_fk_pose(self.root_link, self.tip_link)
-        np.testing.assert_array_almost_equal(msg_to_list(expected.point),
-                                             msg_to_list(current_pose.pose.position), decimal=2)
-
-
-class AlignPlanesGoalChecker(GoalChecker):
-    def __init__(self, giskard, tip_link, tip_normal, root_link, root_normal):
-        super().__init__(giskard)
-        self.tip_normal = tip_normal
-        self.tip_link = tip_link
-        self.root_link = root_link
-        self.expected = self.giskard.transform_msg(self.root_link, root_normal)
-
-    def __call__(self):
-        expected = self.expected
-        current = self.giskard.transform_msg(self.root_link, self.tip_normal)
-        np.testing.assert_array_almost_equal(msg_to_list(expected.vector), msg_to_list(current.vector), decimal=2)
-
-
-class PointingGoalChecker(GoalChecker):
-    def __init__(self, giskard, tip_link, goal_point, root_link, pointing_axis=None):
-        super().__init__(giskard)
-        self.tip_link = tip_link
-        self.root_link = root_link
-        if pointing_axis:
-            self.tip_V_pointer = self.giskard.transform_msg(self.tip_link, pointing_axis)
-        else:
-            self.tip_V_pointer = Vector3Stamped()
-            self.tip_V_pointer.vector.z = 1
-            self.tip_V_pointer.header.frame_id = tip_link
-        self.tip_V_pointer = tf.msg_to_homogeneous_matrix(self.tip_V_pointer)
-        self.goal_point = self.giskard.transform_msg(self.root_link, goal_point)
-        self.goal_point.header.stamp = rospy.Time()
-
-    def __call__(self):
-        tip_P_goal = tf.msg_to_homogeneous_matrix(self.giskard.transform_msg(self.tip_link, self.goal_point))
-        tip_P_goal[-1] = 0
-        tip_P_goal = tip_P_goal / np.linalg.norm(tip_P_goal)
-        np.testing.assert_array_almost_equal(tip_P_goal, self.tip_V_pointer, decimal=2)
-
-
-class RotationGoalChecker(GoalChecker):
-    def __init__(self, giskard, tip_link, root_link, expected: QuaternionStamped):
-        super().__init__(giskard)
-        self.expected = deepcopy(expected)
-        self.tip_link = tip_link
-        self.root_link = root_link
-        self.expected = self.giskard.transform_msg(self.root_link, self.expected)
-
-    def __call__(self):
-        expected = self.expected
-        current_pose = self.world.compute_fk_pose(self.root_link, self.tip_link)
-
-        try:
-            np.testing.assert_array_almost_equal(msg_to_list(expected.quaternion),
-                                                 msg_to_list(current_pose.pose.orientation), decimal=2)
-        except AssertionError:
-            np.testing.assert_array_almost_equal(msg_to_list(expected.quaternion),
-                                                 -np.array(msg_to_list(current_pose.pose.orientation)), decimal=2)

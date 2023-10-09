@@ -15,16 +15,18 @@ from shape_msgs.msg import SolidPrimitive
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
 import giskardpy.utils.tfwrapper as tf
-from giskard_msgs.msg import MoveResult, WorldBody, MoveGoal
+from giskard_msgs.msg import MoveResult, WorldBody
 from giskard_msgs.srv import UpdateWorldResponse, UpdateWorldRequest
 from giskardpy.configs.behavior_tree_config import StandAloneBTConfig
 from giskardpy.configs.giskard import Giskard
 from giskardpy.configs.iai_robots.pr2 import PR2CollisionAvoidance, PR2StandaloneInterface, WorldWithPR2Config
-from giskardpy.configs.qp_controller_config import QPControllerConfig, SupportedQPSolver
+from giskardpy.configs.qp_controller_config import SupportedQPSolver
 from giskardpy.goals.cartesian_goals import RelativePositionSequence
+from giskardpy.goals.caster import Circle, Wave
 from giskardpy.goals.collision_avoidance import CollisionAvoidanceHint
 from giskardpy.goals.goals_tests import DebugGoal
 from giskardpy.goals.joint_goals import JointVelocityLimit
+from giskardpy.goals.set_prediction_horizon import SetQPSolver
 from giskardpy.god_map import god_map
 from giskardpy.model.better_pybullet_syncer import BetterPyBulletSyncer
 from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
@@ -1222,11 +1224,11 @@ class TestMoveBaseGoals:
     def test_circle(self, zero_pose: PR2TestWrapper):
         center = PointStamped()
         center.header.frame_id = zero_pose.default_root
-        zero_pose.set_json_goal(constraint_type='Circle',
-                                center=center,
-                                radius=0.5,
-                                tip_link='base_footprint',
-                                scale=0.1)
+        zero_pose.add_motion_goal(goal_type=Circle.__name__,
+                                  center=center,
+                                  radius=0.5,
+                                  tip_link='base_footprint',
+                                  scale=0.1)
         # zero_pose.set_json_goal('PR2CasterConstraints')
         zero_pose.set_max_traj_length(new_length=60)
         zero_pose.allow_all_collisions()
@@ -1253,11 +1255,11 @@ class TestMoveBaseGoals:
         center = PointStamped()
         center.header.frame_id = zero_pose.default_root
         zero_pose.allow_all_collisions()
-        zero_pose.set_json_goal(constraint_type='Wave',
-                                center=center,
-                                radius=0.05,
-                                tip_link='base_footprint',
-                                scale=2)
+        zero_pose.add_motion_goal(goal_type=Wave.__name__,
+                                  center=center,
+                                  radius=0.05,
+                                  tip_link='base_footprint',
+                                  scale=2)
         zero_pose.set_joint_goal(zero_pose.better_pose, check=False)
         zero_pose.plan_and_execute()
 
@@ -1344,7 +1346,7 @@ class TestCartGoals:
         r_goal = PoseStamped()
         r_goal.header.frame_id = zero_pose.r_tip
         r_goal.pose.orientation = Quaternion(*quaternion_about_axis(pi, [1, 0, 0]))
-        zero_pose.set_cart_goal(r_goal, zero_pose.r_tip)
+        zero_pose.set_cart_goal(goal_pose=r_goal, tip_link=zero_pose.r_tip, root_link='map')
         zero_pose.plan_and_execute()
 
     def test_keep_position1(self, zero_pose: PR2TestWrapper):
@@ -1562,194 +1564,6 @@ class TestCartGoals:
         zero_pose.allow_self_collision()
         zero_pose.set_cart_goal(p, zero_pose.r_tip, 'torso_lift_link')
         zero_pose.plan_and_execute()
-
-
-class TestWayPoints:
-    def test_waypoints2(self, zero_pose: PR2TestWrapper):
-        zero_pose.set_joint_goal(pocky_pose, check=False)
-        zero_pose.allow_all_collisions()
-        zero_pose.add_cmd()
-        zero_pose.set_joint_goal(pick_up_pose, check=False)
-        zero_pose.allow_all_collisions()
-        zero_pose.add_cmd()
-        zero_pose.set_joint_goal(zero_pose.better_pose, check=False)
-        zero_pose.allow_all_collisions()
-
-        traj = zero_pose.plan_and_execute().trajectory
-        for i, p in enumerate(traj.points):
-            js = {joint_name: position for joint_name, position in zip(traj.joint_names, p.positions)}
-            try:
-                zero_pose.compare_joint_state(js, pocky_pose)
-                break
-            except AssertionError:
-                pass
-        else:  # if no break
-            assert False, 'pocky pose not in trajectory'
-
-        traj.points = traj.points[i:]
-        for i, p in enumerate(traj.points):
-            js = {joint_name: position for joint_name, position in zip(traj.joint_names, p.positions)}
-            try:
-                zero_pose.compare_joint_state(js, pick_up_pose)
-                break
-            except AssertionError:
-                pass
-        else:  # if no break
-            assert False, 'pick_up_pose not in trajectory'
-
-        traj.points = traj.points[i:]
-        for i, p in enumerate(traj.points):
-            js = {joint_name: position for joint_name, position in zip(traj.joint_names, p.positions)}
-            try:
-                zero_pose.compare_joint_state(js, zero_pose.better_pose)
-                break
-            except AssertionError:
-                pass
-        else:  # if no break
-            assert False, 'gaya_pose not in trajectory'
-
-        pass
-
-    def test_waypoints_with_fail(self, zero_pose: PR2TestWrapper):
-        zero_pose.set_joint_goal(pocky_pose)
-        zero_pose.add_cmd()
-        zero_pose.set_json_goal('muh')
-        zero_pose.add_cmd()
-        zero_pose.set_joint_goal(zero_pose.better_pose)
-
-        traj = zero_pose.send_goal(expected_error_code=[MoveResult.SUCCESS,
-                                                        MoveResult.UNKNOWN_CONSTRAINT,
-                                                        MoveResult.SUCCESS],
-                                   goal_type=MoveGoal.PLAN_AND_EXECUTE_AND_SKIP_FAILURES).trajectory
-
-        for i, p in enumerate(traj.points):
-            js = {joint_name: position for joint_name, position in zip(traj.joint_names, p.positions)}
-            try:
-                zero_pose.compare_joint_state(js, pocky_pose)
-                break
-            except AssertionError:
-                pass
-        else:  # if no break
-            assert False, 'pocky pose not in trajectory'
-
-        traj.points = traj.points[i:]
-        for i, p in enumerate(traj.points):
-            js = {joint_name: position for joint_name, position in zip(traj.joint_names, p.positions)}
-            try:
-                zero_pose.compare_joint_state(js, zero_pose.better_pose)
-                break
-            except AssertionError:
-                pass
-        else:  # if no break
-            assert False, 'gaya_pose not in trajectory'
-
-    def test_waypoints_with_fail1(self, zero_pose: PR2TestWrapper):
-        zero_pose.set_json_goal('muh')
-        zero_pose.add_cmd()
-        zero_pose.set_joint_goal(pocky_pose)
-        zero_pose.add_cmd()
-        zero_pose.set_joint_goal(zero_pose.better_pose)
-
-        traj = zero_pose.send_goal(expected_error_code=[MoveResult.UNKNOWN_CONSTRAINT,
-                                                        MoveResult.SUCCESS,
-                                                        MoveResult.SUCCESS],
-                                   goal_type=MoveGoal.PLAN_AND_EXECUTE_AND_SKIP_FAILURES).trajectory
-
-        for i, p in enumerate(traj.points):
-            js = {joint_name: position for joint_name, position in zip(traj.joint_names, p.positions)}
-            try:
-                zero_pose.compare_joint_state(js, pocky_pose)
-                break
-            except AssertionError:
-                pass
-        else:  # if no break
-            assert False, 'pocky pose not in trajectory'
-
-        traj.points = traj.points[i:]
-        for i, p in enumerate(traj.points):
-            js = {joint_name: position for joint_name, position in zip(traj.joint_names, p.positions)}
-            try:
-                zero_pose.compare_joint_state(js, zero_pose.better_pose)
-                break
-            except AssertionError:
-                pass
-        else:  # if no break
-            assert False, 'gaya_pose not in trajectory'
-
-    def test_waypoints_with_fail2(self, zero_pose: PR2TestWrapper):
-        zero_pose.set_joint_goal(pocky_pose)
-        zero_pose.add_cmd()
-        zero_pose.set_joint_goal(zero_pose.better_pose)
-        zero_pose.add_cmd()
-        zero_pose.set_json_goal('muh')
-
-        traj = zero_pose.send_goal(expected_error_code=[MoveResult.SUCCESS,
-                                                        MoveResult.SUCCESS,
-                                                        MoveResult.UNKNOWN_CONSTRAINT, ],
-                                   goal_type=MoveGoal.PLAN_AND_EXECUTE_AND_SKIP_FAILURES).trajectory
-
-        for i, p in enumerate(traj.points):
-            js = {joint_name: position for joint_name, position in zip(traj.joint_names, p.positions)}
-            try:
-                zero_pose.compare_joint_state(js, pocky_pose)
-                break
-            except AssertionError:
-                pass
-        else:  # if no break
-            assert False, 'pocky pose not in trajectory'
-
-        traj.points = traj.points[i:]
-        for i, p in enumerate(traj.points):
-            js = {joint_name: position for joint_name, position in zip(traj.joint_names, p.positions)}
-            try:
-                zero_pose.compare_joint_state(js, zero_pose.better_pose)
-                break
-            except AssertionError:
-                pass
-        else:  # if no break
-            assert False, 'gaya_pose not in trajectory'
-
-    def test_waypoints_with_fail3(self, zero_pose: PR2TestWrapper):
-        zero_pose.set_joint_goal(pocky_pose)
-        zero_pose.add_cmd()
-        zero_pose.set_json_goal('muh')
-        zero_pose.add_cmd()
-        zero_pose.set_joint_goal(zero_pose.better_pose)
-
-        traj = zero_pose.send_goal(expected_error_code=[MoveResult.SUCCESS,
-                                                        MoveResult.UNKNOWN_CONSTRAINT,
-                                                        MoveResult.ERROR],
-                                   goal_type=MoveGoal.PLAN_AND_EXECUTE).trajectory
-
-        for i, p in enumerate(traj.points):
-            js = {joint_name: position for joint_name, position in zip(traj.joint_names, p.positions)}
-            try:
-                zero_pose.compare_joint_state(js, zero_pose.default_pose)
-                break
-            except AssertionError:
-                pass
-        else:  # if no break
-            assert False, 'pocky pose not in trajectory'
-
-    def test_skip_failures1(self, zero_pose: PR2TestWrapper):
-        zero_pose.set_json_goal('muh')
-        zero_pose.send_goal(expected_error_code=[MoveResult.UNKNOWN_CONSTRAINT, ],
-                            goal_type=MoveGoal.PLAN_AND_EXECUTE_AND_SKIP_FAILURES)
-
-    def test_skip_failures2(self, zero_pose: PR2TestWrapper):
-        zero_pose.set_joint_goal(pocky_pose)
-        traj = zero_pose.send_goal(expected_error_code=[MoveResult.SUCCESS, ],
-                                   goal_type=MoveGoal.PLAN_AND_EXECUTE_AND_SKIP_FAILURES).trajectory
-
-        for i, p in enumerate(traj.points):
-            js = {joint_name: position for joint_name, position in zip(traj.joint_names, p.positions)}
-            try:
-                zero_pose.compare_joint_state(js, pocky_pose)
-                break
-            except AssertionError:
-                pass
-        else:  # if no break
-            assert False, 'pocky pose not in trajectory'
 
 
 # class TestShaking(object):
@@ -2006,19 +1820,19 @@ class TestWayPoints:
 class TestWorldManipulation:
 
     def test_save_graph_pdf(self, kitchen_setup):
-        kitchen_setup.world.save_graph_pdf()
+        god_map.world.save_graph_pdf()
 
     def test_dye_group(self, kitchen_setup: PR2TestWrapper):
-        old_color = kitchen_setup.world.groups[kitchen_setup.robot_name].get_link('base_link').collisions[0].color
+        old_color = god_map.world.groups[kitchen_setup.robot_name].get_link('base_link').collisions[0].color
         kitchen_setup.dye_group(kitchen_setup.robot_name, (1, 0, 0, 1))
-        kitchen_setup.world.groups[kitchen_setup.robot_name].get_link('base_link')
-        color_robot = kitchen_setup.world.groups[kitchen_setup.robot_name].get_link('base_link').collisions[0].color
+        god_map.world.groups[kitchen_setup.robot_name].get_link('base_link')
+        color_robot = god_map.world.groups[kitchen_setup.robot_name].get_link('base_link').collisions[0].color
         assert color_robot.r == 1
         assert color_robot.g == 0
         assert color_robot.b == 0
         assert color_robot.a == 1
         kitchen_setup.dye_group('iai_kitchen', (0, 1, 0, 1))
-        color_kitchen = kitchen_setup.world.groups['iai_kitchen'].get_link('iai_kitchen/sink_area_sink').collisions[
+        color_kitchen = god_map.world.groups['iai_kitchen'].get_link('iai_kitchen/sink_area_sink').collisions[
             0].color
         assert color_robot.r == 1
         assert color_robot.g == 0
@@ -2029,7 +1843,7 @@ class TestWorldManipulation:
         assert color_kitchen.b == 0
         assert color_kitchen.a == 1
         kitchen_setup.dye_group(kitchen_setup.r_gripper_group, (0, 0, 1, 1))
-        color_hand = kitchen_setup.world.groups[kitchen_setup.robot_name].get_link('r_gripper_palm_link').collisions[
+        color_hand = god_map.world.groups[kitchen_setup.robot_name].get_link('r_gripper_palm_link').collisions[
             0].color
         assert color_robot.r == 1
         assert color_robot.g == 0
@@ -2058,7 +1872,7 @@ class TestWorldManipulation:
         assert color_hand.b == 1
         assert color_hand.a == 1
         kitchen_setup.clear_world()
-        color_robot = kitchen_setup.world.groups[kitchen_setup.robot_name].get_link('base_link').collisions[0].color
+        color_robot = god_map.world.groups[kitchen_setup.robot_name].get_link('base_link').collisions[0].color
         assert color_robot.r == old_color.r
         assert color_robot.g == old_color.g
         assert color_robot.b == old_color.b
@@ -2150,7 +1964,7 @@ class TestWorldManipulation:
         p.header.frame_id = 'map'
         p.pose.position.x = 1
         p.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0, 0, 1]))
-        if kitchen_setup.is_standalone():
+        if god_map.is_standalone():
             js_topic = ''
             set_js_topic = ''
         else:
@@ -2572,7 +2386,7 @@ class TestSelfCollisionAvoidance:
         zero_pose.set_cart_goal(p, zero_pose.l_tip, 'base_footprint')
         zero_pose.allow_all_collisions()
         zero_pose.send_goal()
-        zero_pose.send_goal(expected_error_code=[MoveResult.SELF_COLLISION_VIOLATED])
+        zero_pose.send_goal(expected_error_code=MoveResult.SELF_COLLISION_VIOLATED)
 
 
 class TestCollisionAvoidanceGoals:
@@ -2654,7 +2468,7 @@ class TestCollisionAvoidanceGoals:
         zero_pose.set_cart_goal(p, pocky, zero_pose.default_root)
         p = zero_pose.transform_msg(zero_pose.default_root, p)
         zero_pose.plan_and_execute()
-        p2 = zero_pose.world.compute_fk_pose(zero_pose.default_root, pocky)
+        p2 = god_map.world.compute_fk_pose(zero_pose.default_root, pocky)
         compare_poses(p2.pose, p.pose)
         zero_pose.detach_group(pocky)
         p = PoseStamped()
@@ -2670,15 +2484,15 @@ class TestCollisionAvoidanceGoals:
         pose.pose.position = Point(2, 0, 0)
         pose.pose.orientation = Quaternion(w=1)
         kitchen_setup.teleport_base(pose)
-        kitchen_setup.plan_and_execute(expected_error_codes=[MoveResult.HARD_CONSTRAINTS_VIOLATED])
+        kitchen_setup.plan_and_execute(expected_error_code=MoveResult.HARD_CONSTRAINTS_VIOLATED)
 
     def test_unknown_group1(self, box_setup: PR2TestWrapper):
         box_setup.avoid_collision(min_distance=0.05, group1='muh')
-        box_setup.plan_and_execute([MoveResult.UNKNOWN_GROUP])
+        box_setup.plan_and_execute(MoveResult.UNKNOWN_GROUP)
 
     def test_unknown_group2(self, box_setup: PR2TestWrapper):
         box_setup.avoid_collision(group2='muh')
-        box_setup.plan_and_execute([MoveResult.UNKNOWN_GROUP])
+        box_setup.plan_and_execute(MoveResult.UNKNOWN_GROUP)
 
     def test_base_link_in_collision(self, zero_pose: PR2TestWrapper):
         zero_pose.allow_self_collision()
@@ -2764,7 +2578,7 @@ class TestCollisionAvoidanceGoals:
         r_goal.pose.position.z = 0.84
         r_goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 2, [0, 1, 0]))
         fake_table_setup.avoid_all_collisions(0.1)
-        fake_table_setup.set_cart_goal(r_goal, fake_table_setup.r_tip)
+        fake_table_setup.set_cart_goal(goal_pose=r_goal, tip_link=fake_table_setup.r_tip, root_link='map')
         fake_table_setup.add_monitor(monitor_type='LocalMinimumReached', monitor_name='local min reached')
         fake_table_setup.plan_and_execute()
         fake_table_setup.check_cpi_geq(fake_table_setup.get_l_gripper_links(), 0.05)
@@ -2870,12 +2684,12 @@ class TestCollisionAvoidanceGoals:
         y_map = Vector3Stamped()
         y_map.header.frame_id = 'map'
         y_map.vector.y = 1
-        pocky_pose_setup.set_align_planes_goal(tip_link='box', tip_normal=x, goal_normal=x_map)
-        pocky_pose_setup.set_align_planes_goal(tip_link='box', tip_normal=y, goal_normal=y_map)
+        pocky_pose_setup.set_align_planes_goal(tip_link='box', tip_normal=x, goal_normal=x_map, root_link='map')
+        pocky_pose_setup.set_align_planes_goal(tip_link='box', tip_normal=y, goal_normal=y_map, root_link='map')
         pocky_pose_setup.allow_self_collision()
 
         pocky_pose_setup.plan_and_execute()
-        assert ('box', 'bl') not in pocky_pose_setup.collision_scene.self_collision_matrix
+        assert ('box', 'bl') not in god_map.collision_scene.self_collision_matrix
         pocky_pose_setup.check_cpi_geq(pocky_pose_setup.get_group_info('r_gripper').links, 0.04)
 
     def test_avoid_collision_box_between_cylinders(self, pocky_pose_setup: PR2TestWrapper):
@@ -2930,7 +2744,7 @@ class TestCollisionAvoidanceGoals:
         base_pose.header.frame_id = 'base_footprint'
         base_pose.pose.position.y = 1
         base_pose.pose.orientation = Quaternion(*quaternion_about_axis(0, [0, 0, 1]))
-        kitchen_setup.set_cart_goal(base_pose, tip_link='base_footprint')
+        kitchen_setup.set_cart_goal(goal_pose=base_pose, tip_link='base_footprint', root_link='map')
         kitchen_setup.plan_and_execute()
 
     def test_get_out_of_collision(self, box_setup: PR2TestWrapper):
@@ -3243,7 +3057,8 @@ class TestCollisionAvoidanceGoals:
         x_map.vector.x = 1
         kitchen_setup.set_align_planes_goal(tip_link=kitchen_setup.l_tip,
                                             tip_normal=x,
-                                            goal_normal=x_map)
+                                            goal_normal=x_map,
+                                            root_link='map')
 
         kitchen_setup.plan_and_execute()
 
@@ -3443,27 +3258,27 @@ class TestCollisionAvoidanceGoals:
                                                                       [0, -1, 0, 0],
                                                                       [-1, 0, 0, 0],
                                                                       [0, 0, 0, 1]]))
-        kitchen_setup.set_json_goal('AvoidJointLimits', percentage=percentage)
+        kitchen_setup.set_avoid_joint_limits_goal(percentage=percentage)
         kitchen_setup.set_cart_goal(l_goal, kitchen_setup.l_tip, kitchen_setup.default_root)
         kitchen_setup.plan_and_execute()
 
         l_goal.pose.position.z -= .2
         # kitchen_setup.allow_collision([CollisionEntry.ALL], spoon_name, [CollisionEntry.ALL])
         kitchen_setup.set_cart_goal(l_goal, kitchen_setup.l_tip, kitchen_setup.default_root)
-        kitchen_setup.set_json_goal('AvoidJointLimits', percentage=percentage)
+        kitchen_setup.set_avoid_joint_limits_goal(percentage=percentage)
         kitchen_setup.plan_and_execute()
         kitchen_setup.update_parent_link_of_group(spoon_name, kitchen_setup.l_tip)
 
         l_goal.pose.position.z += .2
         # kitchen_setup.allow_collision([CollisionEntry.ALL], spoon_name, [CollisionEntry.ALL])
         kitchen_setup.set_cart_goal(l_goal, kitchen_setup.l_tip, kitchen_setup.default_root)
-        kitchen_setup.set_json_goal('AvoidJointLimits', percentage=percentage)
+        kitchen_setup.set_avoid_joint_limits_goal(percentage=percentage)
         kitchen_setup.plan_and_execute()
 
         l_goal.pose.position.z -= .2
         # kitchen_setup.allow_collision([CollisionEntry.ALL], spoon_name, [CollisionEntry.ALL])
         kitchen_setup.set_cart_goal(l_goal, kitchen_setup.l_tip, kitchen_setup.default_root)
-        kitchen_setup.set_json_goal('AvoidJointLimits', percentage=percentage)
+        kitchen_setup.set_avoid_joint_limits_goal(percentage=percentage)
         kitchen_setup.plan_and_execute()
 
         kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
@@ -3496,8 +3311,8 @@ class TestCollisionAvoidanceGoals:
                                                                       [0, -1, 0, 0],
                                                                       [0, 0, 0, 1]]))
 
-        kitchen_setup.set_cart_goal(l_goal, kitchen_setup.l_tip)
-        kitchen_setup.set_cart_goal(r_goal, kitchen_setup.r_tip)
+        kitchen_setup.set_cart_goal(goal_pose=l_goal, tip_link=kitchen_setup.l_tip, root_link='map')
+        kitchen_setup.set_cart_goal(goal_pose=r_goal, tip_link=kitchen_setup.r_tip, root_link='map')
         kitchen_setup.allow_collision(kitchen_setup.robot_name, tray_name)
         kitchen_setup.set_avoid_joint_limits_goal(percentage=percentage)
         # grasp tray
@@ -3510,7 +3325,7 @@ class TestCollisionAvoidanceGoals:
         r_goal.pose.orientation.w = 1
         kitchen_setup.set_cart_goal(r_goal, kitchen_setup.l_tip, tray_name)
 
-        tray_goal = kitchen_setup.world.compute_fk_pose('base_footprint', tray_name)
+        tray_goal = god_map.world.compute_fk_pose('base_footprint', tray_name)
         tray_goal.pose.position.y = 0
         tray_goal.pose.orientation = Quaternion(*quaternion_from_matrix([[-1, 0, 0, 0],
                                                                          [0, -1, 0, 0],
@@ -3535,7 +3350,7 @@ class TestCollisionAvoidanceGoals:
         r_goal.pose.orientation.w = 1
         kitchen_setup.set_cart_goal(r_goal, kitchen_setup.l_tip, tray_name)
 
-        expected_pose = kitchen_setup.world.compute_fk_pose(tray_name, kitchen_setup.l_tip)
+        expected_pose = god_map.world.compute_fk_pose(tray_name, kitchen_setup.l_tip)
         expected_pose.header.stamp = rospy.Time()
 
         tray_goal = PoseStamped()
@@ -3913,7 +3728,7 @@ class TestWorld:
     def test_get_parent_joint_of_joint(self, world_setup: WorldTree):
         # TODO shouldn't this return a not found error?
         with pytest.raises(KeyError) as e_info:
-            world_setup.get_controlled_parent_joint_of_joint('pr2/brumbrum')
+            world_setup.get_controlled_parent_joint_of_joint(PrefixName('brumbrum', 'pr2'))
         with pytest.raises(KeyError) as e_info:
             world_setup.search_for_parent_joint(world_setup.search_for_joint_name('r_wrist_roll_joint'),
                                                 stop_when=lambda x: False)
@@ -3957,7 +3772,7 @@ class TestBenchmark:
             for h in horizons:
                 js = {'torso_lift_joint': 1}
                 zero_pose.set_prediction_horizon(h)
-                zero_pose.set_json_goal('SetQPSolver', qp_solver_id=qp_solver)
+                zero_pose.add_motion_goal(SetQPSolver.__name__, qp_solver_id=qp_solver)
                 zero_pose.set_joint_goal(js, check=False)
                 zero_pose.allow_all_collisions()
                 zero_pose.plan_and_execute()
@@ -3973,7 +3788,7 @@ class TestBenchmark:
         for qp_solver in self.qp_solvers:
             for h in horizons:
                 zero_pose.set_prediction_horizon(h)
-                zero_pose.set_json_goal('SetQPSolver', qp_solver_id=qp_solver)
+                zero_pose.add_motion_goal(SetQPSolver.__name__, qp_solver_id=qp_solver)
                 zero_pose.set_joint_goal(zero_pose.better_pose, check=False)
                 zero_pose.allow_all_collisions()
                 zero_pose.plan_and_execute()
@@ -3988,7 +3803,7 @@ class TestBenchmark:
         for qp_solver in self.qp_solvers:
             for h in horizons:
                 zero_pose.set_prediction_horizon(h)
-                zero_pose.set_json_goal('SetQPSolver', qp_solver_id=qp_solver)
+                zero_pose.add_motion_goal(SetQPSolver.__name__, qp_solver_id=qp_solver)
                 root = 'odom_combined'
 
                 r_goal = PoseStamped()
@@ -4015,7 +3830,7 @@ class TestBenchmark:
         for qp_solver in self.qp_solvers:
             for h in horizons:
                 fake_table_setup.set_prediction_horizon(h)
-                fake_table_setup.set_json_goal('SetQPSolver', qp_solver_id=qp_solver)
+                fake_table_setup.add_motion_goal(SetQPSolver.__name__, qp_solver_id=qp_solver)
                 r_goal = PoseStamped()
                 r_goal.header.frame_id = 'map'
                 r_goal.pose.position.x = 0.8
@@ -4023,7 +3838,8 @@ class TestBenchmark:
                 r_goal.pose.position.z = 0.84
                 r_goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 2, [0, 1, 0]))
                 fake_table_setup.avoid_all_collisions(0.1)
-                fake_table_setup.set_cart_goal(r_goal, fake_table_setup.r_tip, check=False)
+                fake_table_setup.set_cart_goal(goal_pose=r_goal, tip_link=fake_table_setup.r_tip, root_link='map',
+                                               add_monitor=False)
                 fake_table_setup.plan_and_execute()
 
                 fake_table_setup.set_seed_configuration(pocky_pose)

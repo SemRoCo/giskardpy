@@ -23,4 +23,6 @@ class PrepareControlLoop(Sequence):
         self.add_child(InitQPController('InitQPController'))
         self.add_child(CompileMonitors())
         self.add_child(SetTrackingStartTime('start tracking time'))
+
+    def add_plot_goal_graph(self):
         self.add_child(PlotGoalGraph())

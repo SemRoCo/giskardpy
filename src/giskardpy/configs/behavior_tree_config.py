@@ -98,6 +98,14 @@ class BehaviorTreeConfig(ABC):
         self.add_evaluate_debug_expressions()
         self.tree_manager.tree.post_processing.add_plot_debug_trajectory(normalize_position=normalize_position, wait=wait)
 
+    def add_gantt_chart_plotter(self):
+        self.add_evaluate_debug_expressions()
+        self.tree_manager.tree.post_processing.add_plot_gantt_chart()
+
+    def add_goal_graph_plotter(self):
+        self.add_evaluate_debug_expressions()
+        self.tree_manager.tree.prepare_control_loop.add_plot_goal_graph()
+
     def add_debug_marker_publisher(self):
         """
         Publishes debug expressions defined in goals.
@@ -120,15 +128,19 @@ class BehaviorTreeConfig(ABC):
 
 
 class StandAloneBTConfig(BehaviorTreeConfig):
-    def __init__(self, planning_sleep: Optional[float] = None):
+    def __init__(self, planning_sleep: Optional[float] = None, debug_mode: bool = False):
         super().__init__(ControlModes.standalone)
         self.planning_sleep = planning_sleep
+        self.debug_mode = debug_mode
 
     def setup(self):
         self.add_visualization_marker_publisher(add_to_sync=True, add_to_planning=False, add_to_control_loop=True)
         self.add_tf_publisher(include_prefix=True, mode=TfPublishingModes.all)
-        self.add_trajectory_plotter()
-        self.add_debug_trajectory_plotter()
+        if self.debug_mode:
+            self.add_trajectory_plotter()
+            self.add_debug_trajectory_plotter()
+            self.add_gantt_chart_plotter()
+            self.add_goal_graph_plotter()
         # self.add_debug_marker_publisher()
         if self.planning_sleep is not None:
             self.add_sleeper(self.planning_sleep)

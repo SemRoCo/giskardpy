@@ -56,17 +56,29 @@ class DebugExpressionManager:
             js = JointStates()
             for name, value in self.evaluated_debug_expressions.items():
                 if len(value) > 1:
-                    continue
-                if last_mjs is not None:
-                    velocity = value - last_mjs[name].position
-                else:
-                    if isinstance(value, np.ndarray):
-                        velocity = np.zeros(value.shape)
+                    if len(value.shape) == 2:
+                        for x in range(value.shape[0]):
+                            for y in range(value.shape[1]):
+                                tmp_name = f'{name}|{x}_{y}'
+                                self.evaluated_expr_to_js(tmp_name, last_mjs, js, value[x, y])
                     else:
-                        velocity = 0
-                js[name].position = value
-                js[name].velocity = velocity/god_map.qp_controller_config.sample_period
+                        for x in range(value.shape[0]):
+                            tmp_name = f'{name}|{x}'
+                            self.evaluated_expr_to_js(tmp_name, last_mjs, js, value[x])
+                else:
+                    self.evaluated_expr_to_js(name, last_mjs, js, value)
             self.debug_trajectory.set(time, js)
+
+    def evaluated_expr_to_js(self, name, last_js, next_js, value):
+        if last_js is not None:
+            velocity = value - last_js[name].position
+        else:
+            if isinstance(value, np.ndarray):
+                velocity = np.zeros(value.shape)
+            else:
+                velocity = 0
+        next_js[name].position = value
+        next_js[name].velocity = velocity / god_map.qp_controller_config.sample_period
 
     def to_pandas(self):
         p_debug = {}

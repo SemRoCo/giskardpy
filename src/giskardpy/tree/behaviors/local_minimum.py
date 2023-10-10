@@ -1,3 +1,5 @@
+import json
+
 from py_trees import Status
 
 from giskardpy.exceptions import PlanningException, LocalMinimumException
@@ -16,6 +18,7 @@ class LocalMinimum(GiskardBehavior):
     @profile
     def update(self):
         if god_map.monitor_manager.is_local_minimum_reached():
-            raise LocalMinimumException(f'local min reached, but not all crucial monitors satisfied: '
-                                        f'{god_map.monitor_manager.get_state_dict()}')
+            pretty_str = json.dumps(god_map.monitor_manager.get_state_dict(), indent=4)
+            raise LocalMinimumException(f'local min reached, but not all crucial monitors satisfied:\n'
+                                        f'{pretty_str}')
         return Status.RUNNING

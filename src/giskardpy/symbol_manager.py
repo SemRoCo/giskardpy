@@ -25,7 +25,7 @@ class SymbolManager(metaclass=SingletonMeta):
         return self.symbol_str_to_symbol[symbol_reference]
 
     def resolve_symbols(self, symbols):
-        return np.array([self.symbol_str_to_lambda[s]() for s in symbols])
+        return np.array([self.symbol_str_to_lambda[s]() for s in symbols], dtype=float)
 
     def compile_resolve_symbols(self, symbols):
         self.c = eval('lambda: np.array([' + ', '.join(symbols) + '])')

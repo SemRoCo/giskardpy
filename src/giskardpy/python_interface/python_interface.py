@@ -107,11 +107,10 @@ class GiskardWrapper(LowLevelGiskardWrapper):
                                root_link: str,
                                tip_group: Optional[str] = None,
                                root_group: Optional[str] = None,
-                               max_linear_velocity: Optional[float] = None,
-                               max_angular_velocity: Optional[float] = None,
                                reference_linear_velocity: Optional[float] = None,
                                reference_angular_velocity: Optional[float] = None,
                                weight: Optional[float] = None,
+                               add_monitor: bool = True,
                                **kwargs: goal_parameter):
         """
         This goal will use the kinematic chain between root and tip link to move tip link into the goal pose.
@@ -130,15 +129,27 @@ class GiskardWrapper(LowLevelGiskardWrapper):
         :param reference_angular_velocity: rad/s
         :param weight: default WEIGHT_ABOVE_CA
         """
+        if add_monitor:
+            monitor_name = f'{root_link}/{tip_link} pose reached'
+            self.add_cartesian_pose_reached_monitor(name=monitor_name,
+                                                    root_link=root_link,
+                                                    root_group=root_group,
+                                                    tip_link=tip_link,
+                                                    tip_group=tip_group,
+                                                    goal_pose=goal_pose)
+            to_end_monitors = [monitor_name]
+        else:
+            to_end_monitors = []
         self.add_motion_goal(goal_type=CartesianPoseStraight.__name__,
+                             to_end=to_end_monitors,
                              goal_pose=goal_pose,
                              tip_link=tip_link,
                              tip_group=tip_group,
                              root_link=root_link,
                              root_group=root_group,
                              weight=weight,
-                             max_linear_velocity=max_linear_velocity,
-                             max_angular_velocity=max_angular_velocity,
+                             reference_linear_velocity=reference_linear_velocity,
+                             reference_angular_velocity=reference_angular_velocity,
                              **kwargs)
 
     def set_translation_goal(self,

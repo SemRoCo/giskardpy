@@ -508,6 +508,20 @@ class GiskardTestWrapper(GiskardWrapper):
     # GENERAL GOAL STUFF ###############################################################################################
     #
 
+    def execute(self, expected_error_code: int = MoveResult.SUCCESS, stop_after: float = None,
+                         wait: bool = True) -> MoveResult:
+        return self.send_goal(expected_error_code=expected_error_code, stop_after=stop_after, wait=wait)
+
+    def projection(self, expected_error_code: int = MoveResult.SUCCESS, wait: bool = True) -> MoveResult:
+        """
+        Plans, but doesn't execute the goal. Useful, if you just want to look at the planning ghost.
+        :param wait: this function blocks if wait=True
+        :return: result from Giskard
+        """
+        return self.send_goal(expected_error_code=expected_error_code,
+                              goal_type=MoveGoal.PROJECTION,
+                              wait=wait)
+
     def plan_and_execute(self, expected_error_code: int = MoveResult.SUCCESS, stop_after: float = None,
                          wait: bool = True) -> MoveResult:
         return self.send_goal(expected_error_code=expected_error_code, stop_after=stop_after, wait=wait)

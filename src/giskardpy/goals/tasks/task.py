@@ -67,10 +67,11 @@ class Task:
                 constraint.quadratic_weight *= monitor.get_state_expression()
             for monitor in self.to_hold:
                 constraint.quadratic_weight *= monitor.get_state_expression()
-            end_weight = 1
-            for monitor in self.to_end:
-                end_weight *= monitor.get_state_expression()
-            constraint.quadratic_weight *= (1 - end_weight)
+            if self.to_end:
+                end_weight = 1
+                for monitor in self.to_end:
+                    end_weight *= monitor.get_state_expression()
+                constraint.quadratic_weight *= (1 - end_weight)
             output_constraints.append(constraint)
         return output_constraints
 

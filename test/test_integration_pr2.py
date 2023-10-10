@@ -2300,7 +2300,6 @@ class TestSelfCollisionAvoidance:
         }
         zero_pose.allow_all_collisions()
         zero_pose.set_joint_goal(goal_js)
-        zero_pose.add_monitor(monitor_type='LocalMinimumReached', monitor_name='local min reached')
         zero_pose.plan_and_execute()
 
         p = PoseStamped()
@@ -2309,7 +2308,6 @@ class TestSelfCollisionAvoidance:
         p.pose.position.x = 0.2
         p.pose.orientation.w = 1
         zero_pose.set_cart_goal(goal_pose=p, tip_link=zero_pose.r_tip, root_link='base_footprint')
-        zero_pose.add_monitor(monitor_type='LocalMinimumReached', monitor_name='local min reached')
         zero_pose.send_goal()
         zero_pose.check_cpi_geq(zero_pose.get_r_gripper_links(), 0.048)
 

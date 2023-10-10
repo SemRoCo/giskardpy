@@ -186,7 +186,7 @@ class GiskardWrapper(LowLevelGiskardWrapper):
     def set_seed_configuration(self, seed_configuration, group_name: Optional[str] = None):
         self.add_motion_goal(goal_type=SetSeedConfiguration.__name__,
                              seed_configuration=seed_configuration,
-                             group_name = group_name)
+                             group_name=group_name)
 
     def set_straight_translation_goal(self,
                                       goal_pose: PoseStamped,
@@ -264,6 +264,7 @@ class GiskardWrapper(LowLevelGiskardWrapper):
                               root_group: str = None,
                               max_angular_velocity: Optional[float] = None,
                               weight: Optional[float] = None,
+                              add_monitor: bool = True,
                               **kwargs: goal_parameter):
         """
         This goal will use the kinematic chain between tip and root to align tip_normal with goal_normal.
@@ -276,7 +277,20 @@ class GiskardWrapper(LowLevelGiskardWrapper):
         :param max_angular_velocity: rad/s
         :param weight:
         """
+        if add_monitor:
+            monitor_name = f'{root_link}/{tip_link} vectors aligned {len(self._monitors)}'
+            self.add_vectors_aligned_monitor(name=monitor_name,
+                                             root_link=root_link,
+                                             tip_link=tip_link,
+                                             goal_normal=goal_normal,
+                                             tip_normal=tip_normal,
+                                             root_group=root_group,
+                                             tip_group=tip_group)
+            to_end_monitors = [monitor_name]
+        else:
+            to_end_monitors = []
         self.add_motion_goal(goal_type=AlignPlanes.__name__,
+                             to_end=to_end_monitors,
                              tip_link=tip_link,
                              tip_group=tip_group,
                              tip_normal=tip_normal,

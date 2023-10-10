@@ -107,3 +107,33 @@ class PointingAt(Monitor):
         root_V_goal_axis.vis_frame = self.tip
         expr = cas.less(cas.abs(cas.angle_between_vector(root_V_pointing_axis, root_V_goal_axis)), threshold)
         self.set_expression(expr)
+
+
+class VectorsAligned(Monitor):
+    def __init__(self,
+                 name: str,
+                 root_link: str,
+                 tip_link: str,
+                 goal_normal: Vector3Stamped,
+                 tip_normal: Vector3Stamped,
+                 root_group: Optional[str] = None,
+                 tip_group: Optional[str] = None,
+                 threshold: float = 0.01,
+                 crucial: bool = True):
+        super().__init__(name, crucial=crucial)
+        self.root = god_map.world.search_for_link_name(root_link, root_group)
+        self.tip = god_map.world.search_for_link_name(tip_link, tip_group)
+
+        self.tip_V_tip_normal = self.transform_msg(self.tip, tip_normal)
+        self.tip_V_tip_normal.vector = tf.normalize(self.tip_V_tip_normal.vector)
+
+        self.root_V_root_normal = self.transform_msg(self.root, goal_normal)
+        self.root_V_root_normal.vector = tf.normalize(self.root_V_root_normal.vector)
+
+        tip_V_tip_normal = cas.Vector3(self.tip_V_tip_normal)
+        root_R_tip = god_map.world.compose_fk_expression(self.root, self.tip).to_rotation()
+        root_V_tip_normal = root_R_tip.dot(tip_V_tip_normal)
+        root_V_root_normal = cas.Vector3(self.root_V_root_normal)
+        error = cas.angle_between_vector(root_V_tip_normal, root_V_root_normal)
+        expr = cas.less(error, threshold)
+        self.set_expression(expr)

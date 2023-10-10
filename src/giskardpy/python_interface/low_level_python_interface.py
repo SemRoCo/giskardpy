@@ -152,15 +152,19 @@ class LowLevelGiskardWrapper:
         self.last_feedback = msg
 
     # %% predefined monitors
-    def add_joint_pose_reached_monitor(self, name: str,
-                                       goal_state: Dict[str, float],
-                                       threshold: float = 0.005,
-                                       crucial: bool = True):
+    def add_joint_position_reached_monitor(self,
+                                           goal_state: Dict[str, float],
+                                           name: Optional[str] = None,
+                                           threshold: float = 0.005,
+                                           crucial: bool = True) -> str:
+        if name is None:
+            name = f'joint position reached {list(goal_state.keys())}'
         self.add_monitor(monitor_type=JointGoalReached.__name__,
                          monitor_name=name,
                          goal_state=goal_state,
                          threshold=threshold,
                          crucial=crucial)
+        return name
 
     def add_cartesian_pose_reached_monitor(self,
                                            name: str,

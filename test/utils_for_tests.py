@@ -322,12 +322,6 @@ class GiskardTestWrapper(GiskardWrapper):
         while behavior_tree.count < c + number:
             rospy.sleep(0.001)
 
-    def get_robot(self, group_name):
-        """
-        :rtype: giskardpy.model.world.WorldBranch
-        """
-        return god_map.world.groups[group_name]
-
     def dye_group(self, group_name: str, rgba: Tuple[float, float, float, float],
                   expected_error_codes=(DyeGroupResponse.SUCCESS,)):
         res = super().dye_group(group_name, rgba)
@@ -433,26 +427,6 @@ class GiskardTestWrapper(GiskardWrapper):
                                                err_msg='{}: actual: {} desired: {}'.format(joint_name, current,
                                                                                            goal))
 
-    def get_robot_short_root_link_name(self, root_group: str = None):
-        # If robots exist
-        if len(god_map.world.robot_names) != 0:
-            # If a group is given, just return the root_link_name of the SubTreeWorld
-            if root_group is not None:
-                root_link = god_map.world.groups[root_group].root_link_name
-            else:
-                # If only one robot is imported
-                if len(god_map.world.robot_names) == 1:
-                    root_link = god_map.world.groups[god_map.world.robot_names[0]].root_link_name
-                else:
-                    raise Exception('Multiple Robots detected: root group is needed'
-                                    ' to get the root link automatically.')
-            return root_link.short_name if type(root_link) == PrefixName else root_link
-
-    def get_root_and_tip_link(self, root_link: str, tip_link: str,
-                              root_group: str = None, tip_group: str = None) -> Tuple[PrefixName, PrefixName]:
-        return god_map.world.search_for_link_name(root_link, root_group), \
-            god_map.world.search_for_link_name(tip_link, tip_group)
-
     #
     # GOAL STUFF #################################################################################################
     #
@@ -501,15 +475,12 @@ class GiskardTestWrapper(GiskardWrapper):
                              weight=weight,
                              **kwargs)
 
-    def add_goal_check(self, goal_checker):
-        self.goal_checks.append(goal_checker)
-
     #
     # GENERAL GOAL STUFF ###############################################################################################
     #
 
     def execute(self, expected_error_code: int = MoveResult.SUCCESS, stop_after: float = None,
-                         wait: bool = True) -> MoveResult:
+                wait: bool = True) -> MoveResult:
         return self.send_goal(expected_error_code=expected_error_code, stop_after=stop_after, wait=wait)
 
     def projection(self, expected_error_code: int = MoveResult.SUCCESS, wait: bool = True) -> MoveResult:
@@ -1008,32 +979,3 @@ def publish_marker_vector(start: Point, end: Point, diameter_shaft: float = 0.01
     rospy.sleep(0.3)
 
     pub.publish(m)
-
-
-class SuccessfulActionServer(object):
-    def __init__(self):
-        self.name_space = rospy.get_param('~name_space')
-        self.joint_names = rospy.get_param('~joint_names')
-        self.state = {j: 0 for j in self.joint_names}
-        self.pub = rospy.Publisher('{}/state'.format(self.name_space), control_msgs.msg.JointTrajectoryControllerState,
-                                   queue_size=10)
-        self.timer = rospy.Timer(rospy.Duration(0.1), self.state_cb)
-        self._as = actionlib.SimpleActionServer(self.name_space, control_msgs.msg.FollowJointTrajectoryAction,
-                                                execute_cb=self.execute_cb, auto_start=False)
-        self._as.start()
-        self._as.register_preempt_callback(self.preempt_requested)
-
-    def state_cb(self, timer_event):
-        msg = control_msgs.msg.JointTrajectoryControllerState()
-        msg.header.stamp = timer_event.current_real
-        msg.joint_names = self.joint_names
-        self.pub.publish(msg)
-
-    def preempt_requested(self):
-        print('cancel called')
-        self._as.set_preempted()
-
-    def execute_cb(self, goal):
-        rospy.sleep(goal.trajectory.points[-1].time_from_start)
-        if self._as.is_active():
-            self._as.set_succeeded()

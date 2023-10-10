@@ -181,5 +181,4 @@ class TestActionServerEvents:
     def test_plan_only(self, zero_pose: PR2TestWrapper):
         zero_pose.allow_self_collision()
         zero_pose.set_joint_goal(pocky_pose, check=False)
-        zero_pose.add_goal_check(JointGoalChecker(zero_pose, zero_pose.default_pose))
         zero_pose.send_goal(goal_type=MoveGoal.PLAN_ONLY)

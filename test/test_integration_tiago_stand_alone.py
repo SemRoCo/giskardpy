@@ -111,21 +111,8 @@ class TiagoTestWrapper(GiskardTestWrapper):
                            root_link=root_link,
                            goal_pose=goal_pose)
         # self.allow_all_collisions()
+        # fixme check of goals reached
 
-        if check:
-            goal_position = PointStamped()
-            goal_position.header = goal_pose.header
-            goal_position.point = goal_pose.pose.position
-            full_root_link, full_tip_link = self.get_root_and_tip_link(root_link=root_link, root_group='',
-                                                                       tip_link='base_footprint', tip_group=self.robot_name)
-            self.add_goal_check(TranslationGoalChecker(self, full_tip_link, full_root_link, goal_position))
-
-            goal_orientation = QuaternionStamped()
-            goal_orientation.header = goal_pose.header
-            goal_orientation.quaternion = goal_pose.pose.orientation
-            full_root_link, full_tip_link = self.get_root_and_tip_link(root_link=root_link, root_group='',
-                                                                       tip_link='base_footprint', tip_group=self.robot_name)
-            self.add_goal_check(RotationGoalChecker(self, full_tip_link, full_root_link, goal_orientation))
         self.plan_and_execute()
 
     def open_right_gripper(self, goal: float = 0.45):

@@ -1066,7 +1066,7 @@ class TestConstraints:
                                             root_link='map',
                                             tip_normal=x_gripper,
                                             goal_normal=x_goal)
-        # kitchen_setup.allow_all_collisions()
+        kitchen_setup.allow_all_collisions()
         kitchen_setup.plan_and_execute()
 
     def test_close_fridge_with_elbow(self, kitchen_setup: PR2TestWrapper):

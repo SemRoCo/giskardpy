@@ -33,9 +33,9 @@ class GiskardWrapper(LowLevelGiskardWrapper):
         """
         if add_monitor:
             monitor_name = 'joint goal reached'
-            self.add_joint_pose_reached_monitor(name=monitor_name,
-                                                goal_state=goal_state,
-                                                crucial=True)
+            self.add_joint_position_reached_monitor(name=monitor_name,
+                                                    goal_state=goal_state,
+                                                    crucial=True)
             to_end_monitors = [monitor_name]
         else:
             to_end_monitors = []
@@ -444,7 +444,8 @@ class GiskardWrapper(LowLevelGiskardWrapper):
                                 tip_group: Optional[str] = None,
                                 environment_group: Optional[str] = None,
                                 goal_joint_state: Optional[float] = None,
-                                weight=WEIGHT_ABOVE_CA, ):
+                                weight=WEIGHT_ABOVE_CA,
+                                add_monitor: bool = True):
         """
         Open a container in an environment.
         Only works with the environment was added as urdf.

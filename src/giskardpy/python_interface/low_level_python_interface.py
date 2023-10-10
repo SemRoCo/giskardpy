@@ -20,7 +20,7 @@ from giskard_msgs.srv import UpdateWorld, UpdateWorldRequest, UpdateWorldRespons
     GetGroupNames, RegisterGroup
 from giskardpy.exceptions import DuplicateNameException, UnknownGroupException
 from giskardpy.goals.monitors.cartesian_monitors import PoseReached, PositionReached, OrientationReached, PointingAt, \
-    VectorsAligned
+    VectorsAligned, DistanceToLine
 from giskardpy.goals.monitors.joint_monitors import JointGoalReached
 from giskardpy.goals.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
 from giskardpy.model.utils import make_world_body_box
@@ -184,14 +184,17 @@ class LowLevelGiskardWrapper:
                          crucial=crucial)
 
     def add_cartesian_position_reached_monitor(self,
-                                               name: str,
+                                               *,
                                                root_link: str,
                                                tip_link: str,
                                                goal_point: PointStamped,
+                                               name: Optional[str] = None,
                                                root_group: Optional[str] = None,
                                                tip_group: Optional[str] = None,
                                                threshold: float = 0.01,
-                                               crucial: bool = True):
+                                               crucial: bool = True) -> str:
+        if name is None:
+            name = f'{root_link}/{tip_link} position reached'
         self.add_monitor(monitor_type=PositionReached.__name__,
                          monitor_name=name,
                          root_link=root_link,
@@ -201,6 +204,35 @@ class LowLevelGiskardWrapper:
                          tip_group=tip_group,
                          threshold=threshold,
                          crucial=crucial)
+
+        return name
+
+    def add_distance_to_line_monitor(self,
+                                     *,
+                                     root_link: str,
+                                     tip_link: str,
+                                     center_point: PointStamped,
+                                     line_axis: Vector3Stamped,
+                                     line_length: float,
+                                     name: Optional[str] = None,
+                                     root_group: Optional[str] = None,
+                                     tip_group: Optional[str] = None,
+                                     threshold: float = 0.01,
+                                     crucial: bool = True):
+        if name is None:
+            name = f'{root_link}/{tip_link} distance to line'
+        self.add_monitor(monitor_type=DistanceToLine.__name__,
+                         monitor_name=name,
+                         center_point=center_point,
+                         line_axis=line_axis,
+                         line_length=line_length,
+                         root_link=root_link,
+                         tip_link=tip_link,
+                         root_group=root_group,
+                         tip_group=tip_group,
+                         threshold=threshold,
+                         crucial=crucial)
+        return name
 
     def add_cartesian_orientation_reached_monitor(self,
                                                   name: str,
@@ -230,7 +262,7 @@ class LowLevelGiskardWrapper:
                                 tip_group: Optional[str] = None,
                                 root_group: Optional[str] = None,
                                 threshold: float = 0.01,
-                                crucial: bool = True):
+                                crucial: bool = True) -> str:
         self.add_monitor(monitor_type=PointingAt.__name__,
                          monitor_name=name,
                          tip_link=tip_link,
@@ -243,15 +275,18 @@ class LowLevelGiskardWrapper:
                          crucial=crucial)
 
     def add_vectors_aligned_monitor(self,
-                                    name: str,
+                                    *,
                                     root_link: str,
                                     tip_link: str,
                                     goal_normal: Vector3Stamped,
                                     tip_normal: Vector3Stamped,
+                                    name: Optional[str] = None,
                                     root_group: Optional[str] = None,
                                     tip_group: Optional[str] = None,
                                     threshold: float = 0.01,
-                                    crucial: bool = True):
+                                    crucial: bool = True) -> str:
+        if name is None:
+            name = f'{root_link}/{tip_link} {goal_normal}/{tip_normal} vectors aligned'
         self.add_monitor(monitor_type=VectorsAligned.__name__,
                          monitor_name=name,
                          root_link=root_link,
@@ -262,6 +297,7 @@ class LowLevelGiskardWrapper:
                          tip_group=tip_group,
                          threshold=threshold,
                          crucial=crucial)
+        return name
 
     # %% collision avoidance
     def _set_collision_entries(self, collisions: List[CollisionEntry]):

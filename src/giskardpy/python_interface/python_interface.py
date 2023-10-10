@@ -4,7 +4,7 @@ from geometry_msgs.msg import PoseStamped, PointStamped, QuaternionStamped, Vect
 
 from giskardpy.goals.align_planes import AlignPlanes
 from giskardpy.goals.cartesian_goals import CartesianPose, CartesianPosition, CartesianOrientation, \
-    CartesianPoseStraight, CartesianVelocityLimit
+    CartesianPoseStraight, CartesianVelocityLimit, CartesianPositionStraight
 from giskardpy.goals.grasp_bar import GraspBar
 from giskardpy.goals.joint_goals import AvoidJointLimits, SetSeedConfiguration
 from giskardpy.goals.open_close import Close, Open
@@ -200,26 +200,37 @@ class GiskardWrapper(LowLevelGiskardWrapper):
                              group_name=group_name)
 
     def set_straight_translation_goal(self,
-                                      goal_pose: PoseStamped,
+                                      goal_point: PointStamped,
                                       tip_link: str,
                                       root_link: str,
                                       tip_group: Optional[str] = None,
                                       root_group: Optional[str] = None,
                                       reference_velocity: float = None,
-                                      max_velocity: float = 0.2,
                                       weight: float = WEIGHT_ABOVE_CA,
+                                      add_monitor: bool = True,
                                       **kwargs: goal_parameter):
         """
         Same as set_translation_goal, but will try to move in a straight line.
         """
-        self.add_motion_goal(goal_type='CartesianPositionStraight',
-                             goal_pose=goal_pose,
+        if add_monitor:
+            monitor_name = f'{root_link}/{tip_link} position reached'
+            self.add_cartesian_position_reached_monitor(name=monitor_name,
+                                                        root_link=root_link,
+                                                        root_group=root_group,
+                                                        tip_link=tip_link,
+                                                        tip_group=tip_group,
+                                                        goal_point=goal_point)
+            to_end_monitors = [monitor_name]
+        else:
+            to_end_monitors = []
+        self.add_motion_goal(goal_type=CartesianPositionStraight.__name__,
+                             to_end=to_end_monitors,
+                             goal_point=goal_point,
                              tip_link=tip_link,
                              root_link=root_link,
                              tip_group=tip_group,
                              root_group=root_group,
                              reference_velocity=reference_velocity,
-                             max_velocity=max_velocity,
                              weight=weight,
                              **kwargs)
 
@@ -377,6 +388,7 @@ class GiskardWrapper(LowLevelGiskardWrapper):
                            reference_linear_velocity: Optional[float] = None,
                            reference_angular_velocity: Optional[float] = None,
                            weight: float = WEIGHT_ABOVE_CA,
+                           add_monitor: bool = True,
                            **kwargs: goal_parameter):
         """
         Like a CartesianPose but with more freedom.
@@ -394,7 +406,25 @@ class GiskardWrapper(LowLevelGiskardWrapper):
         :param reference_angular_velocity: rad/s
         :param weight:
         """
+        to_end_monitors = []
+        if add_monitor:
+            monitor_name = self.add_distance_to_line_monitor(root_link=root_link,
+                                                             tip_link=tip_link,
+                                                             center_point=bar_center,
+                                                             line_axis=bar_axis,
+                                                             line_length=bar_length,
+                                                             root_group=root_group,
+                                                             tip_group=tip_group)
+            to_end_monitors.append(monitor_name)
+            monitor_name = self.add_vectors_aligned_monitor(root_link=root_link,
+                                                            tip_link=tip_link,
+                                                            goal_normal=bar_axis,
+                                                            tip_normal=tip_grasp_axis,
+                                                            root_group=root_group,
+                                                            tip_group=tip_group)
+            to_end_monitors.append(monitor_name)
         self.add_motion_goal(goal_type=GraspBar.__name__,
+                             to_end=to_end_monitors,
                              root_link=root_link,
                              tip_link=tip_link,
                              tip_grasp_axis=tip_grasp_axis,

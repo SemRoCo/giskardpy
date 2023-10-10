@@ -8,6 +8,7 @@ from giskardpy.god_map import god_map
 from giskardpy.my_types import Derivatives
 import giskardpy.utils.tfwrapper as tf
 
+
 class PoseReached(Monitor):
     def __init__(self,
                  name: str,
@@ -136,4 +137,36 @@ class VectorsAligned(Monitor):
         root_V_root_normal = cas.Vector3(self.root_V_root_normal)
         error = cas.angle_between_vector(root_V_tip_normal, root_V_root_normal)
         expr = cas.less(error, threshold)
+        self.set_expression(expr)
+
+
+class DistanceToLine(Monitor):
+    def __init__(self,
+                 name: str,
+                 root_link: str,
+                 tip_link: str,
+                 center_point: PointStamped,
+                 line_axis: Vector3Stamped,
+                 line_length: float,
+                 root_group: Optional[str] = None,
+                 tip_group: Optional[str] = None,
+                 threshold: float = 0.01,
+                 crucial: bool = True):
+        super().__init__(name, crucial=crucial)
+        self.root = god_map.world.search_for_link_name(root_link, root_group)
+        self.tip = god_map.world.search_for_link_name(tip_link, tip_group)
+
+        root_P_current = god_map.world.compose_fk_expression(self.root, self.tip).to_position()
+        root_V_line_axis = self.transform_msg(self.root, line_axis)
+        root_V_line_axis = cas.Vector3(root_V_line_axis)
+        root_V_line_axis.scale(1)
+        root_P_center = self.transform_msg(self.root, center_point)
+        root_P_center = cas.Point3(root_P_center)
+        root_P_line_start = root_P_center + root_V_line_axis * (line_length / 2)
+        root_P_line_end = root_P_center - root_V_line_axis * (line_length / 2)
+
+        distance, closest_point = cas.distance_point_to_line_segment(frame_P_current=root_P_current,
+                                                                     frame_P_line_start=root_P_line_start,
+                                                                     frame_P_line_end=root_P_line_end)
+        expr = cas.less(distance, threshold)
         self.set_expression(expr)

@@ -3858,5 +3858,5 @@ class TestBenchmark:
 # pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_avoid_self_collision'])
 # pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_avoid_collision_at_kitchen_corner'])
 # pytest.main(['-s', __file__ + '::TestWayPoints::test_waypoints2'])
-# pytest.main(['-s', __file__ + '::TestCartGoals::test_keep_position3'])
+# pytest.main(['-s', __file__ + '::TestCartGoals::test_cart_goal_2eef2'])
 # pytest.main(['-s', __file__ + '::TestWorld::test_compute_self_collision_matrix'])

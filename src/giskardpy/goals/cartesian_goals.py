@@ -42,7 +42,7 @@ class CartesianPosition(Goal):
 
         r_P_g = cas.Point3(self.goal_point)
         r_P_c = god_map.world.compose_fk_expression(self.root_link, self.tip_link).to_position()
-        task = Task(name='position goal')
+        task = Task(name='')
         task.add_point_goal_constraints(frame_P_goal=r_P_g,
                                         frame_P_current=r_P_c,
                                         reference_velocity=self.reference_velocity,
@@ -81,7 +81,7 @@ class CartesianOrientation(Goal):
         r_R_c = god_map.world.compose_fk_expression(self.root_link, self.tip_link).to_rotation()
         c_R_r_eval = god_map.world.compose_fk_evaluated_expression(self.tip_link, self.root_link).to_rotation()
 
-        task = Task(name='rotation goal')
+        task = Task(name='')
         task.add_rotation_goal_constraints(frame_R_current=r_R_c,
                                            frame_R_goal=r_R_g,
                                            current_R_frame_eval=c_R_r_eval,
@@ -193,23 +193,21 @@ class CartesianPose(Goal):
 
         goal_point, goal_quaternion = split_pose_stamped(goal_pose)
 
-        position_goal = CartesianPosition(root_link=root_link,
+        self.add_constraints_of_goal(CartesianPosition(root_link=root_link,
                                           tip_link=tip_link,
                                           goal_point=goal_point,
                                           root_group=root_group,
                                           tip_group=tip_group,
                                           reference_velocity=reference_linear_velocity,
-                                          weight=self.weight)
-        self.add_tasks(position_goal.tasks)
+                                          weight=self.weight))
 
-        orientation_goal = CartesianOrientation(root_link=root_link,
+        self.add_constraints_of_goal(CartesianOrientation(root_link=root_link,
                                                 tip_link=tip_link,
                                                 goal_orientation=goal_quaternion,
                                                 root_group=root_group,
                                                 tip_group=tip_group,
                                                 reference_velocity=reference_angular_velocity,
-                                                weight=self.weight)
-        self.add_tasks(orientation_goal.tasks)
+                                                weight=self.weight))
 
     def __str__(self):
         s = super().__str__()

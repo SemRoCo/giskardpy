@@ -43,6 +43,7 @@ class ControlLoop(AsyncBehavior):
             self.add_child(CollisionChecker('collision checker'))
 
         self.add_child(success_is_running(EvaluateMonitors)())
+        self.add_child(self.check_monitors)
         self.add_child(ControllerPlugin('controller'))
 
         if god_map.is_closed_loop():
@@ -56,7 +57,6 @@ class ControlLoop(AsyncBehavior):
             self.add_child(success_is_running(KinSimPlugin)('kin sim'))
             self.add_child(success_is_running(LogTrajPlugin)('add traj point'))
 
-        self.add_child(self.check_monitors)
         self.add_child(self.publish_state)
 
     def add_evaluate_debug_expressions(self):

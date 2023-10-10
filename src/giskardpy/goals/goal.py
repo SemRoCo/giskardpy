@@ -130,15 +130,15 @@ class Goal(ABC):
             raise ConstraintInitalizationException(f'Goal {str(self)} has no tasks.')
         for task in self.tasks:
             for constraint in task.get_eq_constraints():
-                name = f'{str(self)}/{task.name}/{constraint.name}'
+                name = f'{task.name}/{constraint.name}'
                 constraint.name = name
                 self._equality_constraints[name] = constraint
             for constraint in task.get_neq_constraints():
-                name = f'{str(self)}/{task.name}/{constraint.name}'
+                name = f'{task.name}/{constraint.name}'
                 constraint.name = name
                 self._inequality_constraints[name] = constraint
             for constraint in task.get_derivative_constraints():
-                name = f'{str(self)}/{task.name}/{constraint.name}'
+                name = f'{task.name}/{constraint.name}'
                 constraint.name = name
                 self._derivative_constraints[name] = constraint
 
@@ -155,9 +155,14 @@ class Goal(ABC):
             self._debug_expressions
 
     def add_constraints_of_goal(self, goal: Goal):
-        self.add_tasks(goal.tasks)
+        for task in goal.tasks:
+            self.tasks.append(task)
 
     def add_task(self, task: Task):
+        if task.name != '':
+            task.name = f'{str(self)}/{task.name}'
+        else:
+            task.name = str(self)
         self.tasks.append(task)
 
     def add_tasks(self, tasks: List[Task]):

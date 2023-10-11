@@ -5,7 +5,7 @@ from typing import Optional
 from giskardpy.goals.cartesian_goals import CartesianPose
 from giskardpy.goals.goal import Goal
 from giskardpy.goals.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE
-from giskardpy.goals.joint_goals import JointPosition, JointPositionList
+from giskardpy.goals.joint_goals import JointPositionList
 from giskardpy.god_map import god_map
 
 

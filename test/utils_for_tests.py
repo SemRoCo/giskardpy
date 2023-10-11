@@ -4,16 +4,13 @@ from collections import defaultdict
 from copy import deepcopy
 from multiprocessing import Queue
 from time import time
-from typing import Tuple, Optional, List, Type
+from typing import Tuple, Optional, List
 
-import actionlib
-import control_msgs
 import hypothesis.strategies as st
 import numpy as np
 import rospy
 from angles import shortest_angular_distance
-from control_msgs.msg import FollowJointTrajectoryActionGoal
-from geometry_msgs.msg import PoseStamped, Point, Vector3Stamped, PointStamped, QuaternionStamped
+from geometry_msgs.msg import PoseStamped, Point, PointStamped
 from hypothesis import assume
 from hypothesis.strategies import composite
 from numpy import pi
@@ -28,28 +25,27 @@ from giskard_msgs.msg import CollisionEntry, MoveResult, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse, DyeGroupResponse
 
 from giskardpy.configs.giskard import Giskard
-from giskardpy.configs.qp_controller_config import QPControllerConfig, SupportedQPSolver
-from giskardpy.data_types import KeyDefaultDict, JointStates
+from giskardpy.configs.qp_controller_config import SupportedQPSolver
+from giskardpy.data_types import KeyDefaultDict
 from giskardpy.goals.cartesian_goals import DiffDriveBaseGoal, PR2DiffDriveBaseGoal
 from giskardpy.goals.diff_drive_goals import DiffDriveTangentialToPoint, KeepHandInWorkspace
 from giskardpy.goals.joint_goals import SetOdometry
-from giskardpy.goals.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
+from giskardpy.goals.tasks.task import WEIGHT_ABOVE_CA
 from giskardpy.god_map import god_map
 from giskardpy.model.collision_world_syncer import Collisions, Collision
 from giskardpy.my_types import PrefixName, Derivatives
 from giskardpy.exceptions import UnknownGroupException
 from giskardpy.model.joints import OneDofJoint, OmniDrive, DiffDrive
-from giskardpy.model.world import WorldTree
 from giskardpy.python_interface.python_interface import GiskardWrapper
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.qp_controller import available_solvers
 from giskardpy.tree.behaviors.plot_debug_expressions import PlotDebugExpressions
 from giskardpy.tree.behaviors.plot_trajectory import PlotTrajectory
 from giskardpy.tree.behaviors.visualization import VisualizationBehavior
-from giskardpy.tree.garden import TreeManager, ControlModes
+from giskardpy.tree.garden import TreeManager
 from giskardpy.utils import logging, utils
 from giskardpy.utils.math import compare_poses
-from giskardpy.utils.utils import msg_to_list, resolve_ros_iris
+from giskardpy.utils.utils import resolve_ros_iris
 import os
 
 BIG_NUMBER = 1e100
@@ -254,7 +250,7 @@ class GiskardTestWrapper(GiskardWrapper):
                 for node in god_map.tree_manager.get_nodes_of_type(behavior_type):
                     god_map.tree_manager.disable_node(node.name)
         if 'QP_SOLVER' in os.environ:
-            self.giskard.qp_controller_config.set_qp_solver(SupportedQPSolver[os.environ['QP_SOLVER']])
+            god_map.qp_controller_config.set_qp_solver(SupportedQPSolver[os.environ['QP_SOLVER']])
         # self.tree_manager = TreeManager.from_param_server(robot_names, namespaces)
         self.heart = Timer(period=rospy.Duration(god_map.tree_manager.tick_rate), callback=self.heart_beat)
         # self.namespaces = namespaces

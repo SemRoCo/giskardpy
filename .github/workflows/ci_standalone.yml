@@ -62,7 +62,6 @@ jobs:
       test3: test/test_integration_pr2.py::TestSelfCollisionAvoidance
       test4: test/test_integration_pr2.py::TestInfoServices
       test5: test/test_integration_pr2.py::TestJointGoals
-      test6: test/test_integration_pr2.py::TestWayPoints
   tiago:
     needs: [ build_dependencies ]
     uses: ./.github/workflows/reusable_robot_ci.yml

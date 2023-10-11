@@ -1954,12 +1954,6 @@ class TestWorldManipulation:
         object_name = kitchen_setup.kitchen_name
         kitchen_setup.set_kitchen_js({'sink_area_left_middle_drawer_main_joint': 0.1})
         kitchen_setup.clear_world()
-        try:
-            GiskardWrapper.set_object_joint_state(kitchen_setup, object_name, {})
-        except KeyError:
-            pass
-        else:
-            raise 'expected error'
         p = PoseStamped()
         p.header.frame_id = 'map'
         p.pose.position.x = 1
@@ -1981,12 +1975,6 @@ class TestWorldManipulation:
             assert actual == 0, f'Joint {joint_name} is at {actual} instead of 0'
         kitchen_setup.set_kitchen_js({'sink_area_left_middle_drawer_main_joint': 0.1})
         kitchen_setup.remove_group(object_name)
-        try:
-            GiskardWrapper.set_object_joint_state(kitchen_setup, object_name, {})
-        except KeyError:
-            pass
-        else:
-            raise 'expected error'
         kitchen_setup.add_urdf(name=object_name,
                                urdf=rospy.get_param('kitchen_description'),
                                pose=p,

@@ -49,7 +49,7 @@ class HSRTestWrapper(GiskardTestWrapper):
         self.plan_and_execute()
 
     def open_gripper(self):
-        self.command_gripper(1.24)
+        self.command_gripper(1.23)
 
     def close_gripper(self):
         self.command_gripper(0)
@@ -424,7 +424,7 @@ class TestCollisionAvoidanceGoals:
         zero_pose.add_box(name='box', size=(1, 1, 0.01), pose=p)
 
         js = {'arm_flex_joint': 0}
-        zero_pose.set_joint_goal(js, check=False)
+        zero_pose.set_joint_goal(js, add_monitor=False)
         zero_pose.plan_and_execute()
 
 

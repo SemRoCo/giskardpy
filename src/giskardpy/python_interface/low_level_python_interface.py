@@ -22,7 +22,9 @@ from giskardpy.exceptions import DuplicateNameException, UnknownGroupException
 from giskardpy.goals.monitors.cartesian_monitors import PoseReached, PositionReached, OrientationReached, PointingAt, \
     VectorsAligned, DistanceToLine
 from giskardpy.goals.monitors.joint_monitors import JointGoalReached
+from giskardpy.goals.monitors.monitors import LocalMinimumReached
 from giskardpy.goals.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
+from giskardpy.god_map import god_map
 from giskardpy.model.utils import make_world_body_box
 from giskardpy.my_types import goal_parameter
 from giskardpy.utils.utils import position_dict_to_joint_states, convert_ros_message_to_dictionary, \
@@ -85,7 +87,7 @@ class LowLevelGiskardWrapper:
         :return: result from Giskard
         """
         local_min_reached_monitor_name = 'local min reached'
-        self.add_monitor(monitor_type='LocalMinimumReached', monitor_name=local_min_reached_monitor_name)
+        self.add_monitor(monitor_type=LocalMinimumReached.__name__, monitor_name=local_min_reached_monitor_name)
         for goal in self._goals:
             goal.to_end.append(local_min_reached_monitor_name)
         goal = self._create_action_goal()

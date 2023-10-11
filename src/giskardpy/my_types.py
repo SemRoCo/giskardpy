@@ -8,13 +8,19 @@ from geometry_msgs.msg import PoseStamped, PointStamped, Vector3Stamped, Quatern
 
 
 class PrefixName:
-    separator = '/'
+    primary_separator = '/'
+    secondary_separator = '_'
 
-    def __init__(self, name, prefix):
-        self.short_name = name
-        self.prefix = prefix
+    def __init__(self, name: str, prefix: Union[str, PrefixName]):
+        if isinstance(prefix, PrefixName):
+            self.prefix = prefix.prefix
+            old_suffix = prefix.short_name
+            self.short_name = f'{old_suffix}{self.secondary_separator}{name}'
+        else:
+            self.short_name = name
+            self.prefix = prefix
         if prefix:
-            self.long_name = f'{self.prefix}{self.separator}{self.short_name}'
+            self.long_name = f'{self.prefix}{self.primary_separator}{self.short_name}'
         else:
             self.long_name = name
 
@@ -22,7 +28,7 @@ class PrefixName:
     def from_string(cls, name: my_string, set_none_if_no_slash: bool = False):
         if isinstance(name, PrefixName):
             return name
-        parts = name.split(cls.separator)
+        parts = name.split(cls.primary_separator)
         if len(parts) != 2:
             if set_none_if_no_slash:
                 return cls(parts[0], None)

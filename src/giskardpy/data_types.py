@@ -141,6 +141,14 @@ class JointStates(defaultdict, Dict[K, V], Generic[K, V]):
     def __init__(self, *args, **kwargs):
         super().__init__(_JointState, *args, **kwargs)
 
+    def __setitem__(self, key: PrefixName, value: JointState):
+        if not isinstance(key, PrefixName):
+            if isinstance(key, str):
+                key = PrefixName.from_string(key)
+            else:
+                raise KeyError(f'{key} is not of type {PrefixName}')
+        super().__setitem__(key, value)
+
     @classmethod
     def from_msg(cls, msg: JointState, prefix: Optional[str] = None) -> JointStates:
         self = cls()

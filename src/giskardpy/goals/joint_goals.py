@@ -514,9 +514,6 @@ class JointPositionList(Goal):
 
         self.add_task(task)
 
-    def make_constraints(self):
-        pass
-
     def __str__(self):
         s = super().__str__()
         return f'{s}'

@@ -955,9 +955,9 @@ class OpenLoop(StandAlone):
         #     sync.add_child(running_is_success(SyncOdometry)(**odometry_kwargs))
         # if self.god_map.get_data(identifier.TFPublisher_enabled):
         #     sync.add_child(TFPublisher('publish tf', **self.god_map.get_data(identifier.TFPublisher)))
+        # sync.add_child(SyncMujocoSim(name='update from mujoco sim', only_creation=True))
         sync.add_child(CollisionSceneUpdater('update collision scene'))
         sync.add_child(running_is_success(VisualizationBehavior)('visualize collision scene'))
-        # sync.add_child(SyncMujocoSim(name='update from mujoco sim', only_creation=True))
         return sync
 
     def grow_execution(self):
@@ -1059,20 +1059,20 @@ class ClosedLoop(OpenLoop):
 
     def grow_closed_loop_control(self):
         planning_4 = failure_is_success(AsyncBehavior)(self.closed_loop_control_name)
-        # planning_4.add_child(SyncMujocoSim('sync mujoco sim'))
         planning_4.add_child(success_is_running(SyncTfFrames)('sync tf frames close loop'))
-        planning_4.add_child(success_is_running(NotifyStateChange)())
+        planning_4.add_child(success_is_running(NotifyStateChange)()) #what does this do? why error when mujoco sync before this?
         if self.god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none:
             planning_4.add_child(CollisionChecker('collision checker'))
         planning_4.add_child(ControllerPlugin('controller'))
         planning_4.add_child(RosTime())
         planning_4.add_child(RealKinSimPlugin('kin sim'))
         # planning_4.add_child(LoopDetector('loop detector'))
-        # planning_4.add_child(GoalReached('goal reached', real_time=True))
+        planning_4.add_child(GoalReached('goal reached', real_time=True))
         # planning_4.add_child(MaxTrajectoryLength('traj length check', real_time=True))
         # planning_4.add_child(GoalDone('goal done check'))
         # planning_4.add_child(SyncBoxPose('sync box pose'))
-        planning_4.add_child(SyncPouringActions('syncPouring'))
+        # planning_4.add_child(SyncPouringActions('syncPouring'))
+        # planning_4.add_child(SyncMujocoSim('sync mujoco sim'))
         return planning_4
 
 # def sanity_check(god_map):

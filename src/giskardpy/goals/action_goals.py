@@ -1,22 +1,14 @@
 from __future__ import division
 
-from typing import Optional
-
-import numpy as np
 from geometry_msgs.msg import PointStamped, PoseStamped, QuaternionStamped
 from geometry_msgs.msg import Vector3Stamped
-from tf.transformations import rotation_from_matrix
-
 from giskardpy import casadi_wrapper as w
 from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
-from giskardpy.model.joints import DiffDrive, OmniDrivePR22
-from giskardpy.my_types import Derivatives
-from giskardpy.utils import logging
-from giskardpy.utils.tfwrapper import normalize
 from giskardpy import identifier
-from giskardpy.goals.cartesian_goals import CartesianOrientation
+from giskardpy.goals.cartesian_goals import CartesianOrientation, CartesianPose
 from giskardpy.goals.pouring_goals import KeepObjectAbovePlane
-from giskardpy.goals.pouring_goals import TiltObject, KeepObjectUpright
+import rospy
+from std_msgs.msg import String
 import math
 
 
@@ -102,7 +94,7 @@ class PouringAction(Goal):
                                             names=['tipr1', 'tipr2', 'tipr3', 'tipr4'])
         self.add_equality_constraint_vector(reference_velocities=[self.max_vel] * 3,
                                             equality_bounds=[0] * 3,
-                                            weights=[self.weight * w.max(is_tilt_left, is_tilt_right)]*3,
+                                            weights=[self.weight * w.max(is_tilt_left, is_tilt_right)] * 3,
                                             task_expression=root_P_tip[:3],
                                             names=['tipp1', 'tipp2', 'tipp3'])
         root_V_tip_z = root_R_tip[:3, 2]
@@ -187,5 +179,116 @@ class PouringAction(Goal):
         self.add_debug_expr('forward', is_forward)
 
     def __str__(self):
+        s = super().__str__()
+        return f'{s}/{self.root_link}/{self.tip_link}'
+
+
+class PouringAdaptiveTilt(Goal):
+    def __init__(self, root, tip, tilt_angle, max_vel=0.3, weight=WEIGHT_BELOW_CA):
+        super().__init__()
+        self.action_sub = rospy.Subscriber('/adapt_tilt', String, self.callback)
+        self.root_link = self.world.search_for_link_name(root, None)
+        self.tip_link = self.world.search_for_link_name(tip, None)
+        self.root = root
+        self.tip = tip
+        self.max_vel = max_vel
+        self.weight = weight
+        self.action_string = ''
+        self.tilt_angle = tilt_angle
+
+        self.root_P_current = self.get_fk_evaluated(self.root_link, self.tip_link).to_position()
+        self.was_close = False
+        self.counter = 0
+        self.forward = False
+        self.backward = False
+        self.current_angle = 0
+        self.stop_plan = 0
+
+    # def reached_goal_pose(self):
+    #     if self.was_close:
+    #         return 1
+    #     if abs(abs(self.tilt_angle) - self.current_angle) < 0.01:
+    #         self.was_close = True
+    #     return 0
+
+    def callback(self, action_string: String):
+        self.action_string = action_string.data
+        if action_string.data == 'forward':
+            self.forward = True
+            self.backward = False
+            self.stop_plan = 1
+        elif action_string.data == 'backward':
+            self.backward = True
+            self.forward = False
+            self.stop_plan = 1
+        else:
+            self.forward = False
+            self.backward = False
+
+    def make_constraints(self):
+        root_R_start = w.RotationMatrix([[0, 0, 1, 0],
+                                         [0, -1, 0, 0],
+                                         [1, 0, 0, 0],
+                                         [0, 0, 0, 1]])
+        root_R_tip = self.get_fk(self.root_link, self.tip_link).to_rotation()
+        stop_planned = self.get_parameter_as_symbolic_expression('stop_plan')
+        self.add_debug_expr('stop_planned', stop_planned)
+        tip_R_tip = w.RotationMatrix()
+        angle = self.tilt_angle
+        tip_R_tip[0, 0] = w.cos(angle)
+        tip_R_tip[1, 0] = w.sin(angle)
+        tip_R_tip[0, 1] = -w.sin(angle)
+        tip_R_tip[1, 1] = w.cos(angle)
+        tip_R_tip[2, 2] = 1
+        root_R_tip_desire = root_R_start.dot(tip_R_tip)
+        self.add_equality_constraint_vector(reference_velocities=[self.max_vel] * 4,
+                                            equality_bounds=[root_R_tip_desire[0, 0] - root_R_tip[0, 0],
+                                                             root_R_tip_desire[1, 0] - root_R_tip[1, 0],
+                                                             root_R_tip_desire[0, 1] - root_R_tip[0, 1],
+                                                             root_R_tip_desire[1, 1] - root_R_tip[1, 1]
+                                                             ],
+                                            weights=[self.weight * (1 - stop_planned)] * 4,
+                                            task_expression=[root_R_tip[0, 0],
+                                                             root_R_tip[1, 0],
+                                                             root_R_tip[0, 1],
+                                                             root_R_tip[1, 1]],
+                                            names=['tipr1', 'tipr2', 'tipr3', 'tipr4'])
+        root_V_tip_z = root_R_tip[:3, 2]
+        root_V_z = w.Vector3([0, 0, 1])
+        exp = root_V_tip_z.dot(root_V_z[:3])
+        self.add_equality_constraint(reference_velocity=self.max_vel,
+                                     equality_bound=0 - exp,
+                                     weight=self.weight,
+                                     task_expression=exp)
+
+        tip_R_tip_a = w.RotationMatrix()
+        angle_a = -1 * self.get_parameter_as_symbolic_expression('forward') + \
+                  1 * self.get_parameter_as_symbolic_expression('backward')
+        tip_R_tip_a[0, 0] = w.cos(angle_a)
+        tip_R_tip_a[1, 0] = w.sin(angle_a)
+        tip_R_tip_a[0, 1] = -w.sin(angle_a)
+        tip_R_tip_a[1, 1] = w.cos(angle_a)
+        tip_R_tip_a[2, 2] = 1
+        root_R_tip_desired_a = root_R_tip.dot(tip_R_tip_a)
+        angle = w.angle_between_vector(w.Vector3(root_R_tip[:, 0]), w.Vector3([0, 0, 1]))
+        stop_to_large = w.if_greater(angle, 3, 0, 1)
+        stop_to_small = w.if_less(angle, 0.1, 0, 1)
+        self.add_equality_constraint_vector(reference_velocities=[self.max_vel] * 4,
+                                            equality_bounds=[root_R_tip_desired_a[0, 0] - root_R_tip[0, 0],
+                                                             root_R_tip_desired_a[1, 0] - root_R_tip[1, 0],
+                                                             root_R_tip_desired_a[0, 1] - root_R_tip[0, 1],
+                                                             root_R_tip_desired_a[1, 1] - root_R_tip[1, 1]
+                                                             ],
+                                            weights=[self.weight
+                                                     * stop_planned
+                                                     * stop_to_large
+                                                     * stop_to_small] * 4,
+                                            task_expression=[root_R_tip[0, 0],
+                                                             root_R_tip[1, 0],
+                                                             root_R_tip[0, 1],
+                                                             root_R_tip[1, 1]],
+                                            names=['tipr1a', 'tipr2a', 'tipr3a', 'tipr4a'])
+
+    def __str__(self) -> str:
         s = super().__str__()
         return f'{s}/{self.root_link}/{self.tip_link}'

@@ -93,12 +93,12 @@ class WorldWithHSRConfigMujoco(WorldConfig):
                                   y_name=PrefixName('odom_y', self.robot_group_name),
                                   yaw_vel_name=PrefixName('odom_t', self.robot_group_name),
                                   translation_limits={
-                                      Derivatives.velocity: 0.2,
+                                      Derivatives.velocity: 0.1,
                                       Derivatives.acceleration: 1,
                                       Derivatives.jerk: 6,
                                   },
                                   rotation_limits={
-                                      Derivatives.velocity: 0.2,
+                                      Derivatives.velocity: 0.1,
                                       Derivatives.acceleration: 1,
                                       Derivatives.jerk: 6
                                   },
@@ -259,7 +259,8 @@ class HSRMujocoVelocityInterface(RobotInterfaceConfig):
                                                        'hsrb4s/head_pan_joint_velocity_controller',
                                                        'hsrb4s/head_tilt_joint_velocity_controller',
                                                        'hsrb4s/wrist_flex_joint_velocity_controller',
-                                                       'hsrb4s/wrist_roll_joint_velocity_controller'])
+                                                       'hsrb4s/wrist_roll_joint_velocity_controller',
+                                                       'hsrb4s/hand_motor_joint_velocity_controller'])
 
         self.add_base_cmd_velocity(cmd_vel_topic='/hsrb4s/cmd_vel',
                                    joint_name=self.drive_joint_name)

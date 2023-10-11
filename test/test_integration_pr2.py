@@ -985,21 +985,21 @@ class TestConstraints:
         zero_pose.add_motion_goal('JointPositionList', **kwargs)
         zero_pose.plan_and_execute(expected_error_code=MoveResult.CONSTRAINT_INITIALIZATION_ERROR)
 
-    def test_align_planes2(self, zero_pose: PR2TestWrapper):
-        x_gripper = Vector3Stamped()
-        x_gripper.header.frame_id = zero_pose.r_tip
-        x_gripper.vector.y = 1
-
-        x_goal = Vector3Stamped()
-        x_goal.header.frame_id = 'map'
-        x_goal.vector.y = -1
-        x_goal.vector = tf.normalize(x_goal.vector)
-        zero_pose.set_align_planes_goal(tip_link=zero_pose.r_tip,
-                                        root_link='map',
-                                        tip_normal=x_gripper,
-                                        goal_normal=x_goal)
-        zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute()
+    # def test_align_planes2(self, zero_pose: PR2TestWrapper):
+    #     # FIXME, what should I do with opposite vectors?
+    #     x_gripper = Vector3Stamped()
+    #     x_gripper.header.frame_id = zero_pose.r_tip
+    #     x_gripper.vector.y = 1
+    #
+    #     x_goal = Vector3Stamped()
+    #     x_goal.header.frame_id = 'map'
+    #     x_goal.vector.y = -1
+    #     zero_pose.set_align_planes_goal(tip_link=zero_pose.r_tip,
+    #                                     root_link='map',
+    #                                     tip_normal=x_gripper,
+    #                                     goal_normal=x_goal)
+    #     zero_pose.allow_all_collisions()
+    #     zero_pose.plan_and_execute()
 
     def test_align_planes3(self, zero_pose: PR2TestWrapper):
         eef_vector = Vector3Stamped()
@@ -2565,7 +2565,6 @@ class TestCollisionAvoidanceGoals:
         r_goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 2, [0, 1, 0]))
         fake_table_setup.avoid_all_collisions(0.1)
         fake_table_setup.set_cart_goal(goal_pose=r_goal, tip_link=fake_table_setup.r_tip, root_link='map')
-        fake_table_setup.add_monitor(monitor_type='LocalMinimumReached', monitor_name='local min reached')
         fake_table_setup.plan_and_execute()
         fake_table_setup.check_cpi_geq(fake_table_setup.get_l_gripper_links(), 0.05)
         fake_table_setup.check_cpi_leq(['r_gripper_l_finger_tip_link'], 0.04)

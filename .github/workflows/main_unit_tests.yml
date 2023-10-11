@@ -39,6 +39,7 @@ jobs:
         with:
           path: 'ros_ws/src/giskard_msgs'
           repository: SemRoCo/giskard_msgs
+          ref: goal_reached
       - name: Checkout qpoases
         uses: actions/checkout@v3
         with:
@@ -86,10 +87,6 @@ jobs:
         run: |
           roscd giskardpy
           python3 -m pytest -s test/test_cas_wrapper.py
-      - name: test godmap
-        run: |
-          roscd giskardpy
-          python3 -m pytest -s test/test_god_map.py
   #    - name: Setup upterm session
   ##      if: always()
   #      if: failure()

@@ -1260,7 +1260,7 @@ class TestMoveBaseGoals:
                                   radius=0.05,
                                   tip_link='base_footprint',
                                   scale=2)
-        zero_pose.set_joint_goal(zero_pose.better_pose, check=False)
+        zero_pose.set_joint_goal(zero_pose.better_pose, add_monitor=False)
         zero_pose.plan_and_execute()
 
     def test_forward_1cm(self, zero_pose: PR2TestWrapper):
@@ -2406,11 +2406,11 @@ class TestCollisionAvoidanceGoals:
         r_goal.pose.position.y = -0.08
         r_goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0, 0, 1]))
         # kitchen_setup.allow_all_collisions()
-        kitchen_setup.set_cart_goal(r_goal,
+        kitchen_setup.set_cart_goal(goal_pose=r_goal,
                                     tip_link=kitchen_setup.r_tip,
                                     root_link=kitchen_setup.l_tip,
-                                    linear_velocity=0.2,
-                                    angular_velocity=1
+                                    reference_linear_velocity=0.2,
+                                    reference_angular_velocity=1
                                     )
         kitchen_setup.allow_collision(group1=kitchen_setup.robot_name, group2='box')
         kitchen_setup.plan_and_execute()
@@ -2422,7 +2422,7 @@ class TestCollisionAvoidanceGoals:
         r_goal2.pose.position.x -= -.1
         r_goal2.pose.orientation.w = 1
 
-        kitchen_setup.set_cart_goal(r_goal2, 'box', root_link=kitchen_setup.l_tip)
+        kitchen_setup.set_cart_goal(goal_pose=r_goal2, tip_link='box', root_link=kitchen_setup.l_tip)
         kitchen_setup.allow_self_collision()
         kitchen_setup.plan_and_execute()
         # kitchen_setup.check_cart_goal('box', r_goal2)
@@ -2713,8 +2713,8 @@ class TestCollisionAvoidanceGoals:
         base_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 2, [0, 0, 1]))
         kitchen_setup.teleport_base(base_pose)
         base_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0, 0, 1]))
-        kitchen_setup.set_joint_goal(kitchen_setup.better_pose, weight=WEIGHT_ABOVE_CA, check=False)
-        kitchen_setup.set_cart_goal(goal_pose=base_pose, tip_link='base_footprint', root_link='map', check=False)
+        kitchen_setup.set_joint_goal(kitchen_setup.better_pose, weight=WEIGHT_ABOVE_CA, add_monitor=False)
+        kitchen_setup.set_cart_goal(goal_pose=base_pose, tip_link='base_footprint', root_link='map', add_monitor=False)
         kitchen_setup.plan_and_execute()
 
     def test_avoid_collision_drive_under_drawer(self, kitchen_setup: PR2TestWrapper):
@@ -2789,7 +2789,7 @@ class TestCollisionAvoidanceGoals:
         p.pose.position.x = 0.1
         p.pose.orientation.w = 1
         box_setup.set_cart_goal(goal_pose=p, tip_link=box_setup.r_tip,
-                                root_link=box_setup.default_root, check=False)
+                                root_link=box_setup.default_root, add_monitor=False)
         box_setup.plan_and_execute()
         box_setup.check_cpi_geq([attached_link_name], -0.008)
         box_setup.check_cpi_leq([attached_link_name], 0.01)
@@ -2820,7 +2820,7 @@ class TestCollisionAvoidanceGoals:
         p.header.stamp = rospy.get_rostime()
         p.pose.position.x = 0.05
         p.pose.orientation.w = 1
-        box_setup.set_cart_goal(p, box_setup.r_tip, box_setup.default_root, weight=WEIGHT_BELOW_CA, check=False)
+        box_setup.set_cart_goal(p, box_setup.r_tip, box_setup.default_root, weight=WEIGHT_BELOW_CA, add_monitor=False)
         box_setup.plan_and_execute()
         box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.048)
         box_setup.check_cpi_geq([attached_link_name], 0.048)
@@ -2856,7 +2856,7 @@ class TestCollisionAvoidanceGoals:
         p.header.stamp = rospy.get_rostime()
         p.pose.position.x = 0.08
         p.pose.orientation.w = 1
-        box_setup.set_cart_goal(p, box_setup.r_tip, box_setup.default_root, check=False)
+        box_setup.set_cart_goal(p, box_setup.r_tip, box_setup.default_root, add_monitor=False)
         box_setup.plan_and_execute()
         box_setup.check_cpi_geq([attached_link_name], -0.005)
         box_setup.check_cpi_leq([attached_link_name], 0.01)
@@ -3057,7 +3057,7 @@ class TestCollisionAvoidanceGoals:
         base_goal = PoseStamped()
         base_goal.header.frame_id = 'base_footprint'
         base_goal.pose.orientation.w = 1
-        kitchen_setup.set_joint_goal(kitchen_setup.better_pose, check=False)
+        kitchen_setup.set_joint_goal(kitchen_setup.better_pose, add_monitor=False)
         kitchen_setup.move_base(base_goal)
 
         # place milk back
@@ -3759,7 +3759,7 @@ class TestBenchmark:
                 js = {'torso_lift_joint': 1}
                 zero_pose.set_prediction_horizon(h)
                 zero_pose.add_motion_goal(SetQPSolver.__name__, qp_solver_id=qp_solver)
-                zero_pose.set_joint_goal(js, check=False)
+                zero_pose.set_joint_goal(js, add_monitor=False)
                 zero_pose.allow_all_collisions()
                 zero_pose.plan_and_execute()
 
@@ -3775,7 +3775,7 @@ class TestBenchmark:
             for h in horizons:
                 zero_pose.set_prediction_horizon(h)
                 zero_pose.add_motion_goal(SetQPSolver.__name__, qp_solver_id=qp_solver)
-                zero_pose.set_joint_goal(zero_pose.better_pose, check=False)
+                zero_pose.set_joint_goal(zero_pose.better_pose, add_monitor=False)
                 zero_pose.allow_all_collisions()
                 zero_pose.plan_and_execute()
 

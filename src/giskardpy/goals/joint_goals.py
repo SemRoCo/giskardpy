@@ -346,4 +346,4 @@ class JointPositionList(Goal):
 
     def __str__(self):
         s = super().__str__()
-        return f'{s}'
+        return f'{s} {self.joint_names}'

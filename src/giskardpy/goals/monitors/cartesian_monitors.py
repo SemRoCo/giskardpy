@@ -109,6 +109,8 @@ class PointingAt(Monitor):
                                               frame_V_line_direction=root_V_pointing_axis)
         expr = cas.less(cas.abs(distance), threshold)
         self.set_expression(expr)
+        god_map.debug_expression_manager.add_debug_expression('point', root_P_goal_point)
+        god_map.debug_expression_manager.add_debug_expression('pointing', root_V_pointing_axis)
 
 
 class VectorsAligned(Monitor):

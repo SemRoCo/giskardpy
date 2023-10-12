@@ -105,11 +105,12 @@ class TiagoTestWrapper(GiskardTestWrapper):
                               qp_controller_config=QPControllerConfig())
         super().__init__(giskard)
 
-    def move_base(self, goal_pose: PoseStamped, check: bool = True):
+    def move_base(self, goal_pose: PoseStamped, add_monitor: bool = True):
         root_link = self.default_root
         self.set_diff_drive_base_goal(tip_link='base_footprint',
                                       root_link=root_link,
-                                      goal_pose=goal_pose)
+                                      goal_pose=goal_pose,
+                                      add_monitor=add_monitor)
         self.plan_and_execute()
 
     def open_right_gripper(self, goal: float = 0.45):
@@ -328,16 +329,11 @@ class TestCollisionAvoidance:
         # setup
         apartment_name = apartment_setup.environment_name
         l_tcp = 'gripper_left_grasping_frame'
-        r_tcp = 'gripper_right_grasping_frame'
         handle_name = 'handle_cab1_top_door'
         handle_name_frame = 'handle_cab1_top_door'
         cupboard_floor_frame = 'cabinet1_coloksu_level4'
         cupboard_floor = 'cabinet1_coloksu_level4'
-        base_footprint = 'base_footprint'
-        countertop_frame = 'island_countertop'
-        countertop = 'island_countertop'
         grasp_offset = 0.1
-        start_base_pose = apartment_setup.world.compute_fk_pose(apartment_setup.default_root, base_footprint)
 
         # spawn cup
         cup_name = 'cup'
@@ -367,7 +363,7 @@ class TestCollisionAvoidance:
                                       tip_link=l_tcp,
                                       root_link=apartment_setup.default_root,
                                       weight=WEIGHT_ABOVE_CA * 10,
-                                      check=False)
+                                      add_monitor=False)
         goal_point = PointStamped()
         goal_point.header.frame_id = 'cabinet1_door_top_left'
         # apartment_setup.set_diff_drive_tangential_to_point(goal_point)
@@ -379,13 +375,12 @@ class TestCollisionAvoidance:
         apartment_setup.set_cart_goal(left_pose,
                                       tip_link=l_tcp,
                                       root_link=apartment_setup.default_root,
-                                      check=False)
+                                      add_monitor=False)
         apartment_setup.plan_and_execute()
 
-        apartment_setup.set_json_goal('Open',
-                                      tip_link=l_tcp,
-                                      environment_link=handle_name,
-                                      goal_joint_state=goal_angle)
+        apartment_setup.set_open_container_goal(tip_link=l_tcp,
+                                                environment_link=handle_name,
+                                                goal_joint_state=goal_angle)
         apartment_setup.set_diff_drive_tangential_to_point(goal_point=goal_point)
         apartment_setup.set_avoid_joint_limits_goal(
             joint_list=['arm_left_1_joint', 'arm_left_2_joint', 'arm_left_3_joint',
@@ -537,7 +532,7 @@ class TestCollisionAvoidance:
         base_goal.header.frame_id = 'base_footprint'
         base_goal.pose.position.x = 2
         base_goal.pose.orientation.w = 1
-        apartment_setup.move_base(base_goal, check=False)
+        apartment_setup.move_base(base_goal, add_monitor=False)
 
     def test_open_cabinet_left(self, apartment_setup: TiagoTestWrapper):
         tcp = 'gripper_left_grasping_frame'
@@ -553,30 +548,25 @@ class TestCollisionAvoidance:
                                                                          [0, 0, 0, 1]]))
         apartment_setup.set_cart_goal(left_pose,
                                       tip_link=tcp,
-                                      root_link=apartment_setup.world.root_link_name,
-                                      check=False)
+                                      root_link=god_map.world.root_link_name,
+                                      add_monitor=False)
         goal_point = PointStamped()
         goal_point.header.frame_id = 'cabinet1_door_top_left'
-        apartment_setup.set_json_goal('DiffDriveTangentialToPoint',
-                                      goal_point=goal_point)
+        apartment_setup.set_diff_drive_tangential_to_point(goal_point=goal_point)
         apartment_setup.set_avoid_joint_limits_goal(50)
         apartment_setup.plan_and_execute()
 
-        apartment_setup.set_json_goal('Open',
-                                      tip_link=tcp,
+        apartment_setup.set_open_container_goal(tip_link=tcp,
                                       environment_link=handle_name,
                                       goal_joint_state=goal_angle)
-        apartment_setup.set_json_goal('DiffDriveTangentialToPoint',
-                                      goal_point=goal_point)
+        apartment_setup.set_diff_drive_tangential_to_point(goal_point=goal_point)
         apartment_setup.set_avoid_joint_limits_goal(50)
         apartment_setup.plan_and_execute()
 
-        apartment_setup.set_json_goal('Open',
-                                      tip_link=tcp,
+        apartment_setup.set_open_container_goal(tip_link=tcp,
                                       environment_link=handle_name,
                                       goal_joint_state=0)
-        apartment_setup.set_json_goal('DiffDriveTangentialToPoint',
-                                      goal_point=goal_point)
+        apartment_setup.set_diff_drive_tangential_to_point(goal_point=goal_point)
         apartment_setup.set_avoid_joint_limits_goal(50)
         apartment_setup.plan_and_execute()
 
@@ -595,7 +585,7 @@ class TestJointGoals:
             'arm_right_5_joint': -2.1031066629465776,
         }
         zero_pose.set_seed_configuration(js)
-        zero_pose.set_joint_goal(zero_pose.better_pose2, check=False)
+        zero_pose.set_joint_goal(zero_pose.better_pose2, add_monitor=False)
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
         zero_pose.are_joint_limits_violated()
@@ -631,7 +621,7 @@ class TestJointGoals:
         pointing_goal.point.x = 2
         z = Vector3Stamped()
         z.header.frame_id = 'xtion_link'
-        z.vector.z = 1
+        z.vector.x = 1
         zero_pose.set_pointing_goal(tip_link='xtion_link',
                                     root_link='base_footprint',
                                     goal_point=pointing_goal,
@@ -668,7 +658,7 @@ class TestJointGoals:
         zero_pose.set_seed_configuration(js)
         js2 = deepcopy(js)
         # del js2['arm_right_2_joint']
-        zero_pose.set_joint_goal(js2, check=False)
+        zero_pose.set_joint_goal(js2, add_monitor=False)
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
         zero_pose.are_joint_limits_violated()
@@ -703,7 +693,7 @@ class TestJointGoals:
             # 'arm_left_5_joint': -3
         }
         # zero_pose.set_seed_configuration(start_state)
-        zero_pose.set_joint_goal(js1, check=False, weight=WEIGHT_ABOVE_CA)
+        zero_pose.set_joint_goal(js1, add_monitor=False, weight=WEIGHT_ABOVE_CA)
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
         zero_pose.are_joint_limits_violated()
@@ -713,8 +703,7 @@ class TestJointGoals:
             'head_1_joint': 2,
             'head_2_joint': -2
         }
-        zero_pose.set_json_goal('SetSeedConfiguration',
-                                seed_configuration=js)
+        zero_pose.set_seed_configuration(seed_configuration=js)
         zero_pose.set_joint_goal(zero_pose.default_pose)
         zero_pose.plan_and_execute()
         zero_pose.are_joint_limits_violated()
@@ -724,8 +713,7 @@ class TestJointGoals:
             'arm_right_5_joint': 3,
             # 'arm_left_5_joint': -3
         }
-        zero_pose.set_json_goal('SetSeedConfiguration',
-                                seed_configuration=js)
+        zero_pose.set_seed_configuration(seed_configuration=js)
         zero_pose.plan_and_execute()
         zero_pose.are_joint_limits_violated()
 
@@ -734,9 +722,8 @@ class TestJointGoals:
             'arm_right_5_joint': 3,
             # 'arm_left_5_joint': -3
         }
-        zero_pose.set_json_goal('SetSeedConfiguration',
-                                seed_configuration=js)
-        zero_pose.world.state[PrefixName('arm_right_5_joint', 'tiago_dual')].velocity = 1
+        zero_pose.set_seed_configuration(seed_configuration=js)
+        god_map.world.state[PrefixName('arm_right_5_joint', 'tiago_dual')].velocity = 1
         # zero_pose.world.state[PrefixName('arm_left_5_joint', 'tiago_dual')].velocity = -1
         zero_pose.plan_and_execute()
         zero_pose.are_joint_limits_violated()
@@ -746,10 +733,9 @@ class TestJointGoals:
             'arm_right_5_joint': 3,
             # 'arm_left_5_joint': -3
         }
-        zero_pose.set_json_goal('SetSeedConfiguration',
-                                seed_configuration=js)
-        zero_pose.set_joint_goal(js, check=False)
-        zero_pose.world.state[PrefixName('arm_right_5_joint', 'tiago_dual')].velocity = 1
+        zero_pose.set_seed_configuration(seed_configuration=js)
+        zero_pose.set_joint_goal(js, add_monitor=False)
+        god_map.world.state[PrefixName('arm_right_5_joint', 'tiago_dual')].velocity = 1
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
         zero_pose.are_joint_limits_violated()
@@ -764,8 +750,7 @@ class TestJointGoals:
             'head_2_joint': 0,
             'torso_lift_joint': 1.5
         }
-        zero_pose.set_json_goal('SetSeedConfiguration',
-                                seed_configuration=js)
-        zero_pose.set_joint_goal(js2, check=False)
+        zero_pose.set_seed_configuration(seed_configuration=js)
+        zero_pose.set_joint_goal(js2, add_monitor=False)
         zero_pose.plan()
         zero_pose.are_joint_limits_violated()

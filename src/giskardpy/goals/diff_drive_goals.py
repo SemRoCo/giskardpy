@@ -7,7 +7,7 @@ from geometry_msgs.msg import Vector3Stamped, PointStamped
 import giskardpy.utils.tfwrapper as tf
 from giskardpy import casadi_wrapper as w
 from giskardpy.goals.goal import Goal
-from giskardpy.goals.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE
+from giskardpy.goals.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE, Task
 from giskardpy.god_map import god_map
 from giskardpy.model.joints import OmniDrivePR22
 from giskardpy.my_types import Derivatives
@@ -33,7 +33,6 @@ class DiffDriveTangentialToPoint(Goal):
             self.tip_V_pointing_axis.header.frame_id = self.tip
             self.tip_V_pointing_axis.vector.x = 1
 
-    def make_constraints(self):
         map_P_center = w.Point3(self.goal_point)
         map_T_base = god_map.world.compose_fk_expression(self.root, self.tip)
         map_P_base = map_T_base.to_position()
@@ -44,9 +43,10 @@ class DiffDriveTangentialToPoint(Goal):
         tip_V_pointing_axis = w.Vector3(self.tip_V_pointing_axis)
         map_V_forward = w.dot(map_T_base, tip_V_pointing_axis)
 
+        task = Task()
         if self.drive:
             angle = w.abs(w.angle_between_vector(map_V_forward, map_V_tangent))
-            self.add_equality_constraint(reference_velocity=0.5,
+            task.add_equality_constraint(reference_velocity=0.5,
                                          equality_bound=-angle,
                                          weight=self.weight,
                                          task_expression=angle,
@@ -59,11 +59,12 @@ class DiffDriveTangentialToPoint(Goal):
             axis, map_current_angle = map_R_base.to_axis_angle()
             map_current_angle = w.if_greater_zero(axis[2], map_current_angle, -map_current_angle)
             angle_error = w.shortest_angular_distance(map_current_angle, goal_angle)
-            self.add_equality_constraint(reference_velocity=0.5,
+            task.add_equality_constraint(reference_velocity=0.5,
                                          equality_bound=angle_error,
                                          weight=self.weight,
                                          task_expression=map_current_angle,
                                          name='/rot')
+        self.add_task(task)
 
     def __str__(self) -> str:
         return f'{super().__str__()}/{self.root}/{self.tip}'
@@ -141,7 +142,6 @@ class KeepHandInWorkspace(Goal):
             self.map_V_pointing_axis.header.frame_id = self.map_frame
             self.map_V_pointing_axis.vector.x = 1
 
-    def make_constraints(self):
         weight = WEIGHT_ABOVE_CA
         base_footprint_V_pointing_axis = w.Vector3(self.map_V_pointing_axis)
         map_T_base_footprint = god_map.world.compose_fk_expression(self.map_frame, self.base_footprint)
@@ -155,44 +155,17 @@ class KeepHandInWorkspace(Goal):
         map_P_base_footprint = map_T_base_footprint.to_position()
         map_P_base_footprint.z = 0
         base_footprint_V_tip = map_P_tip - map_P_base_footprint
-        # distance_to_base = w.norm(base_footprint_V_tip)
 
         map_V_tip.scale(1)
         angle_error = w.angle_between_vector(base_footprint_V_tip, map_V_pointing_axis)
-        # self.add_debug_expr('rot', angle_error)
-        self.add_inequality_constraint(reference_velocity=0.5,
+        task = Task()
+        task.add_inequality_constraint(reference_velocity=0.5,
                                        lower_error=-angle_error - 0.2,
                                        upper_error=-angle_error + 0.2,
                                        weight=weight,
                                        task_expression=angle_error,
                                        name='/rot')
-        # self.add_vector_goal_constraints(frame_V_current=map_V_pointing_axis,
-        #                                  frame_V_goal=base_footprint_V_tip,
-        #                                  reference_velocity=0.5)
-
-        # self.add_debug_expr('distance_to_base', distance_to_base)
-        # self.add_constraint(reference_velocity=0.1,
-        #                     lower_error=-distance_to_base + 0.35,
-        #                     upper_error=-distance_to_base + 0.6,
-        #                     weight=weight,
-        #                     expression=distance_to_base,
-        #                     name_suffix='/dist')
-
-        # fk_vel = self.get_fk_velocity(self.base_footprint, self.tip_link)
-        # eef_root_V_eef_tip = w.vector3(fk_vel[0], fk_vel[1], 0)
-        # eef_root_V_eef_tip_normed = w.scale(eef_root_V_eef_tip, 1)
-        # base_root_T_eef_root = god_map.get_world().compose_fk_expression(self.map_frame, self.base_footprint)
-        # base_root_V_eef_tip = w.dot(base_root_T_eef_root, eef_root_V_eef_tip_normed)
-        #
-        # base_root_T_base_tip = god_map.get_world().compose_fk_expression(self.map_frame, self.base_tip)
-        # base_root_V_pointing_axis = w.dot(base_root_T_base_tip, tip_V_pointing_axis)
-        #
-        # weight = WEIGHT_ABOVE_CA * w.norm(eef_root_V_eef_tip_normed)
-        #
-        # self.add_vector_goal_constraints(frame_V_current=base_root_V_pointing_axis,
-        #                                  frame_V_goal=base_root_V_eef_tip,
-        #                                  reference_velocity=self.max_velocity,
-        #                                  weight=weight)
+        self.add_task(task)
 
     def __str__(self):
         s = super().__str__()

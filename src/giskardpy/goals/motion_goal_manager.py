@@ -3,7 +3,8 @@ from collections import defaultdict
 from copy import deepcopy
 from typing import List, Dict, Tuple
 
-from giskardpy.exceptions import UnknownConstraintException, GiskardException, ConstraintInitalizationException
+from giskardpy.exceptions import UnknownConstraintException, GiskardException, ConstraintInitalizationException, \
+    DuplicateNameException
 from giskardpy.goals.collision_avoidance import ExternalCollisionAvoidance, SelfCollisionAvoidance
 from giskardpy.goals.goal import Goal
 import giskard_msgs.msg as giskard_msgs
@@ -50,6 +51,8 @@ class MotionGoalManager:
     def add_motion_goal(self, goal: Goal, name: str = ''):
         if name == '':
             name = str(goal)
+        if name in self.motion_goals:
+            raise DuplicateNameException(f'Motion goal with name {name} already exists.')
         self.motion_goals[name] = goal
 
     @profile

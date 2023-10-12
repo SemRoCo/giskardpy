@@ -32,10 +32,8 @@ class GiskardWrapper(LowLevelGiskardWrapper):
         :param max_velocity: will be applied to all joints
         """
         if add_monitor:
-            monitor_name = 'joint goal reached'
-            self.add_joint_position_reached_monitor(name=monitor_name,
-                                                    goal_state=goal_state,
-                                                    crucial=True)
+            monitor_name = self.add_joint_position_reached_monitor(goal_state=goal_state,
+                                                                   crucial=True)
             to_end_monitors = [monitor_name]
         else:
             to_end_monitors = []
@@ -507,14 +505,12 @@ class GiskardWrapper(LowLevelGiskardWrapper):
         :param weight:
         """
         if add_monitor:
-            monitor_name = f'{root_link}/{tip_link} pointing at'
-            self.add_pointing_at_monitor(name=monitor_name,
-                                         goal_point=goal_point,
-                                         tip_link=tip_link,
-                                         pointing_axis=pointing_axis,
-                                         root_link=root_link,
-                                         tip_group=tip_group,
-                                         root_group=root_group)
+            monitor_name = self.add_pointing_at_monitor(goal_point=goal_point,
+                                                        tip_link=tip_link,
+                                                        pointing_axis=pointing_axis,
+                                                        root_link=root_link,
+                                                        tip_group=tip_group,
+                                                        root_group=root_group)
             to_end_monitors = [monitor_name]
         else:
             to_end_monitors = []

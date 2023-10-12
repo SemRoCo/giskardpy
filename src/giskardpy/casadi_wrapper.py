@@ -1945,6 +1945,17 @@ def distance_point_to_line_segment(frame_P_current, frame_P_line_start, frame_P_
     return dist, Point3(nearest)
 
 
+def distance_point_to_line(frame_P_point, frame_P_line_point, frame_V_line_direction):
+    frame_P_current = Point3(frame_P_point)
+    frame_P_line_point = Point3(frame_P_line_point)
+    frame_V_line_direction = Vector3(frame_V_line_direction)
+
+    lp_vector = frame_P_current - frame_P_line_point
+    cross_product = cross(lp_vector, frame_V_line_direction)
+    distance = norm(cross_product) / norm(frame_V_line_direction)
+    return distance
+
+
 def angle_between_vector(v1, v2):
     v1 = v1[:3]
     v2 = v2[:3]

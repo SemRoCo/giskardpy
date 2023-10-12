@@ -144,7 +144,7 @@ class JointStates(defaultdict, Dict[K, V], Generic[K, V]):
     def __setitem__(self, key: PrefixName, value: JointState):
         if not isinstance(key, PrefixName):
             if isinstance(key, str):
-                key = PrefixName.from_string(key)
+                key = PrefixName.from_string(key, set_none_if_no_slash=True)
             else:
                 raise KeyError(f'{key} is not of type {PrefixName}')
         super().__setitem__(key, value)

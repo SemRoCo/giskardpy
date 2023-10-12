@@ -88,8 +88,9 @@ class MonitorManager:
         self.monitors.append(monitor)
         monitor.set_id(len(self.monitors) - 1)
 
-    def get_state_dict(self):
-        return {monitor.name: bool(self.state[i]) for i, monitor in enumerate(self.monitors)}
+    def get_state_dict(self, only_crucial: bool = False):
+        return {monitor.name: bool(self.state[i]) for i, monitor in enumerate(self.monitors)
+                if not only_crucial or monitor.crucial}
 
     @profile
     def trigger_monitor_flips(self, flips: np.ndarray):

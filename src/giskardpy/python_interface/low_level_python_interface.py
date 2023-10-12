@@ -260,15 +260,17 @@ class LowLevelGiskardWrapper:
                          crucial=crucial)
 
     def add_pointing_at_monitor(self,
-                                name: str,
                                 goal_point: PointStamped,
                                 tip_link: str,
                                 pointing_axis: Vector3Stamped,
                                 root_link: str,
+                                name: Optional[str] = None,
                                 tip_group: Optional[str] = None,
                                 root_group: Optional[str] = None,
                                 threshold: float = 0.01,
                                 crucial: bool = True) -> str:
+        if name is None:
+            name = f'{root_link}/{tip_link} pointing at'
         self.add_monitor(monitor_type=PointingAt.__name__,
                          monitor_name=name,
                          tip_link=tip_link,
@@ -279,6 +281,7 @@ class LowLevelGiskardWrapper:
                          pointing_axis=pointing_axis,
                          threshold=threshold,
                          crucial=crucial)
+        return name
 
     def add_vectors_aligned_monitor(self,
                                     *,

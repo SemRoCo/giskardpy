@@ -111,7 +111,7 @@ class BehaviorTreeConfig(ABC):
         Publishes debug expressions defined in goals.
         """
         self.add_evaluate_debug_expressions()
-        self.tree_manager.add_debug_marker_publisher()
+        self.tree_manager.tree.process_goal.control_loop_branch.publish_state.add_debug_marker_publisher()
 
     def add_tf_publisher(self, include_prefix: bool = True, tf_topic: str = 'tf',
                          mode: TfPublishingModes = TfPublishingModes.attached_and_world_objects):
@@ -141,6 +141,7 @@ class StandAloneBTConfig(BehaviorTreeConfig):
             self.add_debug_trajectory_plotter()
             self.add_gantt_chart_plotter()
             self.add_goal_graph_plotter()
+            self.add_debug_marker_publisher()
         # self.add_debug_marker_publisher()
         if self.planning_sleep is not None:
             self.add_sleeper(self.planning_sleep)

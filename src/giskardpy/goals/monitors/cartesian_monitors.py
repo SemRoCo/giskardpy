@@ -98,15 +98,16 @@ class PointingAt(Monitor):
         tip_V_pointing_axis = self.transform_msg(self.tip, pointing_axis)
         tip_V_pointing_axis.vector = tf.normalize(tip_V_pointing_axis.vector)
         root_T_tip = god_map.world.compose_fk_expression(self.root, self.tip)
+        root_P_tip = root_T_tip.to_position()
         root_P_goal_point = cas.Point3(self.root_P_goal_point)
         tip_V_pointing_axis = cas.Vector3(tip_V_pointing_axis)
 
-        root_V_goal_axis = root_P_goal_point - root_T_tip.to_position()
-        root_V_goal_axis.scale(1)
         root_V_pointing_axis = root_T_tip.dot(tip_V_pointing_axis)
         root_V_pointing_axis.vis_frame = self.tip
-        root_V_goal_axis.vis_frame = self.tip
-        expr = cas.less(cas.abs(cas.angle_between_vector(root_V_pointing_axis, root_V_goal_axis)), threshold)
+        distance = cas.distance_point_to_line(frame_P_point=root_P_goal_point,
+                                              frame_P_line_point=root_P_tip,
+                                              frame_V_line_direction=root_V_pointing_axis)
+        expr = cas.less(cas.abs(distance), threshold)
         self.set_expression(expr)
 
 

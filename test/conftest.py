@@ -57,6 +57,7 @@ def ros(request):
 def resetted_giskard(giskard: GiskardTestWrapper) -> GiskardTestWrapper:
     logging.loginfo('resetting giskard')
     giskard.restart_ticking()
+    giskard.clear_cmds()
     if god_map.is_standalone() and giskard.has_odometry_joint():
         zero = PoseStamped()
         zero.header.frame_id = 'map'

@@ -18,17 +18,17 @@ from giskardpy.utils.tfwrapper import normalize_quaternion_msg, np_to_kdl, point
 
 
 class DebugMarkerPublisher(GiskardBehavior):
-    colors = [ColorRGBA(0, 0, 0, 1),  # black
-              ColorRGBA(1, 0, 0, 1),  # red
-              ColorRGBA(0, 1, 0, 1),  # green
-              ColorRGBA(1, 1, 0, 1),  # yellow
-              ColorRGBA(0, 0, 1, 1),  # blue
-              ColorRGBA(1, 0, 1, 1),  # violet
-              ColorRGBA(0, 1, 1, 1),  # cyan
-              ColorRGBA(1, 1, 1, 1)]  # white
+    colors = [ColorRGBA(r=0, g=0, b=0, a=1),  # black
+              ColorRGBA(r=1, g=0, b=0, a=1),  # red
+              ColorRGBA(r=0, g=1, b=0, a=1),  # green
+              ColorRGBA(r=1, g=1, b=0, a=1),  # yellow
+              ColorRGBA(r=0, g=0, b=1, a=1),  # blue
+              ColorRGBA(r=1, g=0, b=1, a=1),  # violet
+              ColorRGBA(r=0, g=1, b=1, a=1),  # cyan
+              ColorRGBA(r=1, g=1, b=1, a=1)]  # white
 
     @profile
-    def __init__(self, name, tf_topic='/tf', map_frame: Optional[str] = None):
+    def __init__(self, name: str = 'debug marker', tf_topic: str = '/tf', map_frame: Optional[str] = None):
         super().__init__(name)
         if map_frame is None:
             self.map_frame = str(god_map.world.root_link_name)
@@ -40,6 +40,7 @@ class DebugMarkerPublisher(GiskardBehavior):
     @record_time
     def setup(self, timeout):
         self.clear_markers()
+        return super().setup(timeout)
 
     def publish_debug_markers(self):
         ms = MarkerArray()

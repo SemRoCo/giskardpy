@@ -6,7 +6,7 @@ from abc import ABC
 from copy import deepcopy
 from functools import cached_property
 from itertools import combinations
-from typing import Dict, Union, Tuple, Set, Optional, List, Callable, Sequence
+from typing import Dict, Union, Tuple, Set, Optional, List, Callable, Sequence, Type
 
 import numpy as np
 import urdf_parser_py.urdf as up
@@ -236,6 +236,9 @@ class WorldTree(WorldTreeInterface):
         if len(matches) == 0:
             raise ValueError(f'No matches for \'{joint_name}\' found: \'{matches}\'.')
         return matches[0]
+
+    def search_for_joint_of_type(self, joint_types: Tuple[Type[Joint]]) -> List[Joint]:
+        return [j for j in self.joints.values() if isinstance(j, joint_types)]
 
     def rename_link(self, old_name: PrefixName, new_name: PrefixName):
         if old_name not in self.link_names:

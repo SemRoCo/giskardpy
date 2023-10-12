@@ -5,6 +5,7 @@ from giskardpy.model.collision_world_syncer import CollisionCheckerLib
 from giskardpy.tree.behaviors.collision_checker import CollisionChecker
 from giskardpy.tree.behaviors.evaluate_debug_expressions import EvaluateDebugExpressions
 from giskardpy.tree.behaviors.evaluate_monitors import EvaluateMonitors
+from giskardpy.tree.behaviors.goal_canceled import GoalCanceled
 from giskardpy.tree.behaviors.goal_done import GoalDone
 from giskardpy.tree.behaviors.instantaneous_controller import ControllerPlugin
 from giskardpy.tree.behaviors.kinematic_sim import KinSimPlugin
@@ -21,7 +22,7 @@ from giskardpy.tree.branches.send_controls import SendControls
 from giskardpy.tree.branches.synchronization import Synchronization
 from giskardpy.tree.composites.async_composite import AsyncBehavior
 from giskardpy.tree.control_modes import ControlModes
-from giskardpy.tree.decorators import success_is_running
+from giskardpy.tree.decorators import success_is_running, failure_is_running
 
 
 class ControlLoop(AsyncBehavior):
@@ -31,12 +32,13 @@ class ControlLoop(AsyncBehavior):
     check_monitors: CheckMonitors
     debug_added: bool = False
 
-    def __init__(self, name: str = 'control_loop'):
+    def __init__(self, name: str = 'control_loop', projection: bool = False):
         super().__init__(name)
         self.publish_state = success_is_running(PublishState)('publish state 2')
         self.synchronization = success_is_running(Synchronization)()
         self.check_monitors = CheckMonitors()
 
+        self.add_child(failure_is_running(GoalCanceled)('goal canceled', god_map.giskard.action_server_name))
         self.add_child(self.synchronization)
 
         if god_map.is_collision_checking_enabled():
@@ -46,7 +48,7 @@ class ControlLoop(AsyncBehavior):
         self.add_child(self.check_monitors)
         self.add_child(ControllerPlugin('controller'))
 
-        if god_map.is_closed_loop():
+        if not projection:
             self.send_controls = success_is_running(SendControls)()
 
             self.add_child(success_is_running(RosTime)())

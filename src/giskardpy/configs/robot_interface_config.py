@@ -46,7 +46,9 @@ class RobotInterfaceConfig(ABC):
         """
         joint_name = self.world.search_for_joint_name(joint_name)
         self.tree_manager.tree.wait_for_goal.synchronization.sync_odometry_topic(odometry_topic, joint_name)
-        self.tree_manager.tree.process_goal.control_loop_branch.synchronization.sync_odometry_topic(odometry_topic, joint_name)
+        if god_map.is_closed_loop():
+            self.tree_manager.tree.process_goal.control_loop_branch.synchronization.sync_odometry_topic(odometry_topic,
+                                                                                                        joint_name)
 
     def sync_6dof_joint_with_tf_frame(self, joint_name: str, tf_parent_frame: str, tf_child_frame: str):
         """
@@ -56,10 +58,11 @@ class RobotInterfaceConfig(ABC):
         self.tree_manager.tree.wait_for_goal.synchronization.sync_6dof_joint_with_tf_frame(joint_name,
                                                                                            tf_parent_frame,
                                                                                            tf_child_frame)
-        self.tree_manager.tree.process_goal.control_loop_branch.synchronization.sync_6dof_joint_with_tf_frame(
-            joint_name,
-            tf_parent_frame,
-            tf_child_frame)
+        if god_map.is_closed_loop():
+            self.tree_manager.tree.process_goal.control_loop_branch.synchronization.sync_6dof_joint_with_tf_frame(
+                joint_name,
+                tf_parent_frame,
+                tf_child_frame)
 
     def sync_joint_state_topic(self, topic_name: str, group_name: Optional[str] = None):
         """
@@ -69,9 +72,10 @@ class RobotInterfaceConfig(ABC):
             group_name = self.world.robot_name
         self.tree_manager.tree.wait_for_goal.synchronization.sync_joint_state_topic(group_name=group_name,
                                                                                     topic_name=topic_name)
-        self.tree_manager.tree.process_goal.control_loop_branch.synchronization.sync_joint_state2_topic(
-            group_name=group_name,
-            topic_name=topic_name)
+        if god_map.is_closed_loop():
+            self.tree_manager.tree.process_goal.control_loop_branch.synchronization.sync_joint_state2_topic(
+                group_name=group_name,
+                topic_name=topic_name)
 
     def add_base_cmd_velocity(self,
                               cmd_vel_topic: str,
@@ -85,8 +89,12 @@ class RobotInterfaceConfig(ABC):
         :param joint_name: name of the omni or diff drive joint. Doesn't need to be specified if there is only one.
         """
         joint_name = self.world.search_for_joint_name(joint_name)
-        self.tree_manager.tree.process_goal.control_loop_branch.send_controls.add_base_traj_action_server(cmd_vel_topic,
-                                                                                                          joint_name)
+        if god_map.is_closed_loop():
+            self.tree_manager.tree.process_goal.control_loop_branch.send_controls.add_send_cmd_velocity(cmd_vel_topic,
+                                                                                                        joint_name)
+        elif god_map.is_planning():
+            self.tree_manager.tree.send_trajectories.add_base_traj_action_server(cmd_vel_topic,
+                                                                                 joint_name)
 
     def register_controlled_joints(self, joint_names: List[str], group_name: Optional[str] = None):
         """
@@ -115,10 +123,13 @@ class RobotInterfaceConfig(ABC):
         """
         if group_name is None:
             group_name = self.world.robot_name
-        self.tree_manager.add_follow_joint_traj_action_server(namespace=namespace, state_topic=state_topic,
-                                                              group_name=group_name,
-                                                              fill_velocity_values=fill_velocity_values,
-                                                              path_tolerance=path_tolerance)
+        if not god_map.is_planning():
+            raise GiskardException('add_follow_joint_trajectory_server only works in planning mode')
+        self.tree_manager.tree.send_trajectories.add_follow_joint_traj_action_server(namespace=namespace,
+                                                                                     state_topic=state_topic,
+                                                                                     group_name=group_name,
+                                                                                     fill_velocity_values=fill_velocity_values,
+                                                                                     path_tolerance=path_tolerance)
 
     def add_joint_velocity_controller(self, namespaces: List[str]):
         """
@@ -132,7 +143,8 @@ class RobotInterfaceConfig(ABC):
         For closed loop mode. Tell Giskard how it can send velocities for a group of joints.
         :param namespace: where Giskard can find the topic and rosparams.
         """
-        self.tree_manager.tree.process_goal.control_loop_branch.send_controls.add_joint_velocity_group_controllers(namespace)
+        self.tree_manager.tree.process_goal.control_loop_branch.send_controls.add_joint_velocity_group_controllers(
+            namespace)
 
 
 class StandAloneRobotInterfaceConfig(RobotInterfaceConfig):

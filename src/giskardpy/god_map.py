@@ -89,7 +89,7 @@ class GodMap:
     def is_standalone(self):
         return self.tree_manager.control_mode == self.tree_manager.control_mode.standalone
 
-    def is_open_loop(self):
+    def is_planning(self):
         return self.tree_manager.control_mode == self.tree_manager.control_mode.open_loop
 
     def is_collision_checking_enabled(self):

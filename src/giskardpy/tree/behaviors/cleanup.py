@@ -8,7 +8,7 @@ from giskardpy.goals.motion_goal_manager import MotionGoalManager
 from giskardpy.god_map import god_map
 from giskardpy.model.collision_world_syncer import Collisions
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
-from giskardpy.utils.decorators import record_time
+from giskardpy.utils.decorators import record_time, catch_and_raise_to_blackboard
 
 
 class CleanUp(GiskardBehavior):
@@ -51,6 +51,6 @@ class CleanUpPlanning(CleanUp):
         super().initialise()
         god_map.fill_trajectory_velocity_values = None
 
-
-class CleanUpBaseController(CleanUp):
-    pass
+    @catch_and_raise_to_blackboard
+    def update(self):
+        return super().update()

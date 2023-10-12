@@ -14,7 +14,7 @@ from visualization_msgs.msg import MarkerArray, Marker
 from giskardpy import casadi_wrapper as w
 from giskardpy.exceptions import GiskardException, ConstraintInitalizationException
 from giskardpy.goals.goal import Goal
-from giskardpy.goals.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE
+from giskardpy.goals.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE, Task
 from giskardpy.god_map import god_map
 from giskardpy.model.joints import OmniDrive, OmniDrivePR22
 from giskardpy.my_types import my_string, Derivatives, PrefixName
@@ -34,11 +34,18 @@ class BaseTrajFollower(Goal):
         self.odom_link = self.joint.parent_link_name
         self.base_footprint_link = self.joint.child_link_name
         self.track_only_velocity = track_only_velocity
+        self.task = Task()
+        self.add_task(self.task)
+        trajectory = god_map.trajectory
+        self.trajectory_length = len(trajectory.items())
+        self.add_trans_constraints()
+        self.add_rot_constraints()
 
     @profile
     def x_symbol(self, t: int, free_variable_name: PrefixName, derivative: Derivatives = Derivatives.position) \
             -> w.Symbol:
-        return symbol_manager.get_symbol(identifier.trajectory + ['get_exact', (t,), free_variable_name, derivative])
+        expr = f'god_map.trajectory.get_exact({t})[\'{free_variable_name}\'][{derivative}]'
+        return symbol_manager.get_symbol(expr)
 
     @profile
     def current_traj_point(self, free_variable_name: PrefixName, start_t: float,
@@ -77,7 +84,8 @@ class BaseTrajFollower(Goal):
         odom_T_base_footprint_goal = self.make_odom_T_base_footprint_goal(t_in_s)
         map_T_odom = god_map.world.compose_fk_evaluated_expression(god_map.world.root_link_name, self.odom_link)
         map_T_base_footprint_goal = w.dot(map_T_odom, odom_T_base_footprint_goal)
-        map_T_base_footprint_current = god_map.world.compose_fk_expression(god_map.world.root_link_name, self.base_footprint_link)
+        map_T_base_footprint_current = god_map.world.compose_fk_expression(god_map.world.root_link_name,
+                                                                           self.base_footprint_link)
 
         frame_P_goal = map_T_base_footprint_goal.to_position()
         frame_P_current = map_T_base_footprint_current.to_position()
@@ -88,11 +96,14 @@ class BaseTrajFollower(Goal):
     def add_trans_constraints(self):
         errors_x = []
         errors_y = []
-        map_T_base_footprint = god_map.world.compose_fk_expression(god_map.world.root_link_name, self.base_footprint_link)
+        map_T_base_footprint = god_map.world.compose_fk_expression(god_map.world.root_link_name,
+                                                                   self.base_footprint_link)
         for t in range(god_map.qp_controller_config.prediction_horizon):
-            x = self.current_traj_point(self.joint.x_vel.name, t * god_map.qp_controller_config.sample_period, Derivatives.velocity)
+            x = self.current_traj_point(self.joint.x_vel.name, t * god_map.qp_controller_config.sample_period,
+                                        Derivatives.velocity)
             if isinstance(self.joint, OmniDrive):
-                y = self.current_traj_point(self.joint.y_vel.name, t * god_map.qp_controller_config.sample_period, Derivatives.velocity)
+                y = self.current_traj_point(self.joint.y_vel.name, t * god_map.qp_controller_config.sample_period,
+                                            Derivatives.velocity)
             else:
                 y = 0
             base_footprint_P_vel = w.Vector3((x, y, 0))
@@ -110,47 +121,42 @@ class BaseTrajFollower(Goal):
         lba_y = errors_y
         uba_y = errors_y
 
-        self.add_velocity_constraint(lower_velocity_limit=lba_x,
-                                     upper_velocity_limit=uba_x,
-                                     weight=weight_vel,
-                                     task_expression=map_T_base_footprint.to_position().x,
-                                     velocity_limit=0.5,
-                                     name_suffix='/vel x')
+        self.task.add_velocity_constraint(lower_velocity_limit=lba_x,
+                                          upper_velocity_limit=uba_x,
+                                          weight=weight_vel,
+                                          task_expression=map_T_base_footprint.to_position().x,
+                                          velocity_limit=0.5,
+                                          name_suffix='/vel x')
         if isinstance(self.joint, OmniDrive):
-            self.add_velocity_constraint(lower_velocity_limit=lba_y,
-                                         upper_velocity_limit=uba_y,
-                                         weight=weight_vel,
-                                         task_expression=map_T_base_footprint.to_position().y,
-                                         velocity_limit=0.5,
-                                         name_suffix='/vel y')
+            self.task.add_velocity_constraint(lower_velocity_limit=lba_y,
+                                              upper_velocity_limit=uba_y,
+                                              weight=weight_vel,
+                                              task_expression=map_T_base_footprint.to_position().y,
+                                              velocity_limit=0.5,
+                                              name_suffix='/vel y')
 
     @profile
     def rot_error_at(self, t_in_s: int):
         rotation_goal = self.current_traj_point(self.joint.yaw.name, t_in_s)
         rotation_current = self.joint.yaw.get_symbol(Derivatives.position)
-        error = w.shortest_angular_distance(rotation_current, rotation_goal) / god_map.qp_controller_config.sample_period
+        error = w.shortest_angular_distance(rotation_current,
+                                            rotation_goal) / god_map.qp_controller_config.sample_period
         return error
 
     @profile
     def add_rot_constraints(self):
         errors = []
         for t in range(god_map.qp_controller_config.prediction_horizon):
-            errors.append(self.current_traj_point(self.joint.yaw.name, t * god_map.qp_controller_config.sample_period, Derivatives.velocity))
+            errors.append(self.current_traj_point(self.joint.yaw.name, t * god_map.qp_controller_config.sample_period,
+                                                  Derivatives.velocity))
             if t == 0 and not self.track_only_velocity:
                 errors[-1] += self.rot_error_at(t)
-        self.add_velocity_constraint(lower_velocity_limit=errors,
-                                     upper_velocity_limit=errors,
-                                     weight=WEIGHT_BELOW_CA,
-                                     task_expression=self.joint.yaw.get_symbol(Derivatives.position),
-                                     velocity_limit=0.5,
-                                     name_suffix='/rot')
-
-    @profile
-    def make_constraints(self):
-        trajectory = god_map.trajectory
-        self.trajectory_length = len(trajectory.items())
-        self.add_trans_constraints()
-        self.add_rot_constraints()
+        self.task.add_velocity_constraint(lower_velocity_limit=errors,
+                                          upper_velocity_limit=errors,
+                                          weight=WEIGHT_BELOW_CA,
+                                          task_expression=self.joint.yaw.get_symbol(Derivatives.position),
+                                          velocity_limit=0.5,
+                                          name_suffix='/rot')
 
     def __str__(self):
         return f'{super().__str__()}/{self.joint_name}'
@@ -181,7 +187,7 @@ class CarryMyBullshit(Goal):
                  laser_scan_age_threshold: float = 2,
                  laser_distance_threshold: float = 0.5,
                  laser_distance_threshold_width: float = 0.8,
-                 laser_avoidance_angle_cutout: float = np.pi/4,
+                 laser_avoidance_angle_cutout: float = np.pi / 4,
                  laser_avoidance_sideways_buffer: float = 0.04,
                  base_orientation_threshold: float = np.pi / 16,
                  wait_for_patrick_timeout: int = 30,
@@ -351,7 +357,6 @@ class CarryMyBullshit(Goal):
         x_start = x_positive[0]
         x_end = x_positive[-1]
 
-
         front_violation = xs_error[x_start:x_end][violations[x_start:x_end]]
         if len(closest_laser_left) > 0:
             closest_laser_left = min(closest_laser_left)
@@ -490,9 +495,9 @@ class CarryMyBullshit(Goal):
         # p.y = self.thresholds[0, 1]
         # square.points.append(p)
         p = Point()
-        idx = np.where(self.thresholds[:,-1] < -self.laser_avoidance_angle_cutout)[0][-1]
-        p.x = self.thresholds[idx,0]
-        p.y = self.thresholds[idx,1]
+        idx = np.where(self.thresholds[:, -1] < -self.laser_avoidance_angle_cutout)[0][-1]
+        p.x = self.thresholds[idx, 0]
+        p.y = self.thresholds[idx, 1]
         square.points.append(p)
         p = Point()
         square.points.append(p)
@@ -804,7 +809,8 @@ class BaseTrajFollowerPR2(BaseTrajFollower):
             #     lb_yaw1[-1] += self.rot_error_at(t)
             #     yaw1_goal_position = self.current_traj_point(self.joint.yaw1_vel.name, trajectory_time_in_s,
             #                                                  Derivatives.position)
-            forward = self.current_traj_point(self.joint.forward_vel.name, t * god_map.qp_controller_config.sample_period,
+            forward = self.current_traj_point(self.joint.forward_vel.name,
+                                              t * god_map.qp_controller_config.sample_period,
                                               Derivatives.velocity) * 1.1
             lb_forward.append(forward)
         weight_vel = WEIGHT_ABOVE_CA

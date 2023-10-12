@@ -157,7 +157,7 @@ class LowLevelGiskardWrapper:
     def add_joint_position_reached_monitor(self,
                                            goal_state: Dict[str, float],
                                            name: Optional[str] = None,
-                                           threshold: float = 0.005,
+                                           threshold: float = 0.01,
                                            crucial: bool = True) -> str:
         if name is None:
             name = f'joint position reached {list(goal_state.keys())}'

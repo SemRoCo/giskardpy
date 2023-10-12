@@ -155,7 +155,7 @@ class PR2TestWrapper(GiskardTestWrapper):
 
     def move_base(self, goal_pose):
         # self.set_move_base_goal(goal_pose=goal_pose)
-        self.set_cart_goal(goal_pose, tip_link='base_footprint', root_link='odom_combined')
+        self.set_cart_goal(goal_pose, tip_link='base_footprint', root_link='map')
         self.plan_and_execute()
 
     def get_l_gripper_links(self):

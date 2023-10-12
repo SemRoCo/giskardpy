@@ -2,7 +2,10 @@ import traceback
 from py_trees import Status
 
 from giskardpy.exceptions import InvalidGoalException
+from giskardpy.goals.base_traj_follower import BaseTrajFollower
+from giskardpy.goals.monitors.monitors import TimeAbove
 from giskardpy.god_map import god_map
+from giskardpy.model.joints import OmniDrive, DiffDrive
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.logging import loginfo
 from giskardpy.utils.decorators import catch_and_raise_to_blackboard, record_time
@@ -33,3 +36,23 @@ class ParseActionGoal(GiskardBehavior):
             god_map.motion_goal_manager.parse_collision_entries(move_goal.collisions)
         loginfo('Done parsing goal message.')
         return Status.SUCCESS
+
+
+class AddBaseTrajFollowerGoal(GiskardBehavior):
+    def __init__(self, name: str = 'add base traj goal'):
+        super().__init__(name)
+        joints = god_map.world.search_for_joint_of_type((OmniDrive, DiffDrive))
+        assert len(joints) == 1
+        self.joint = joints[0]
+
+    @catch_and_raise_to_blackboard
+    @record_time
+    @profile
+    def update(self):
+        goal = BaseTrajFollower(self.joint.name)
+        time_monitor = TimeAbove(threshold=god_map.trajectory_time_in_seconds)
+        goal.connect_to_end(time_monitor)
+        god_map.monitor_manager.add_monitor(time_monitor)
+        god_map.motion_goal_manager.add_motion_goal(goal)
+        return Status.SUCCESS
+

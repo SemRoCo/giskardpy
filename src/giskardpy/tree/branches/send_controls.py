@@ -18,5 +18,5 @@ class SendControls(Sequence):
     def add_joint_velocity_group_controllers(self, namespace: str):
         self.add_child(JointGroupVelController(namespace))
 
-    def add_base_traj_action_server(self, cmd_vel_topic: str, joint_name: PrefixName = None):
+    def add_send_cmd_velocity(self, cmd_vel_topic: str, joint_name: PrefixName = None):
         self.add_child(SendCmdVel(cmd_vel_topic, joint_name=joint_name))

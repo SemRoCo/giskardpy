@@ -78,7 +78,8 @@ class Monitor:
 
     @profile
     def get_substitution_key(self, substitution_id: int) -> cas.Symbol:
-        return symbol_manager.get_symbol(f'god_map.monitor_manager.monitors[{self.id}].substitution_values[{substitution_id}]')
+        return symbol_manager.get_symbol(
+            f'god_map.monitor_manager.monitors[{self.id}].substitution_values[{substitution_id}]')
 
     def get_state_expression(self):
         return symbol_manager.get_symbol(f'god_map.monitor_manager.state[{self.id}]')
@@ -103,3 +104,11 @@ class LocalMinimumReached(Monitor):
                     joint_vel_symbol = symbol_manager.get_symbol(expr)
                 condition_list.append(cas.less(cas.abs(joint_vel_symbol), velocity_limit))
         self.expression = cas.logic_all(cas.Expression(condition_list))
+
+
+class TimeAbove(Monitor):
+    def __init__(self, *, threshold: float, name: str = 'time above'):
+        super().__init__(name=name, crucial=True, stay_one=False)
+        traj_length_in_sec = symbol_manager.time * god_map.qp_controller_config.sample_period
+        condition = cas.greater(traj_length_in_sec, threshold)
+        self.set_expression(condition)

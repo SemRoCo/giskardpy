@@ -14,12 +14,10 @@ from giskardpy.tree.decorators import success_is_failure
 class ProcessGoal(Selector):
     control_loop_branch: ControlLoop
 
-    def __init__(self, name: str = 'process goal'):
+    def __init__(self, name: str = 'process goal', projection: bool = False):
         super().__init__(name)
-        self.control_loop_branch = success_is_failure(ControlLoop)()
+        self.control_loop_branch = success_is_failure(ControlLoop)(projection=projection)
 
-        self.add_child(GoalCanceled('goal canceled2', god_map.giskard.action_server_name))
-        self.add_child(success_is_failure(PublishFeedback)('publish feedback1', MoveFeedback.PLANNING))
+        # self.add_child(success_is_failure(PublishFeedback)('publish feedback1', MoveFeedback.PLANNING))
         # planning_2.add_child(success_is_failure(StartTimer)('start runtime timer'))
         self.add_child(self.control_loop_branch)
-

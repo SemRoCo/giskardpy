@@ -41,13 +41,11 @@ class BehaviorTreeConfig(ABC):
 
     def add_visualization_marker_publisher(self,
                                            add_to_sync: Optional[bool] = None,
-                                           add_to_planning: Optional[bool] = None,
                                            add_to_control_loop: Optional[bool] = None,
                                            use_decomposed_meshes: bool = True):
         """
 
         :param add_to_sync: Markers are published while waiting for a goal.
-        :param add_to_planning: Markers are published during planning, only relevant in open loop mode.
         :param add_to_control_loop: Markers are published during the closed loop control sequence, this is slow.
         :param use_decomposed_meshes: True: publish decomposed meshes used for collision avoidance, these likely only
                                             available on the machine where Giskard is running.
@@ -56,8 +54,8 @@ class BehaviorTreeConfig(ABC):
         if add_to_sync:
             self.tree_manager.tree.wait_for_goal.publish_state.add_visualization_marker_behavior(use_decomposed_meshes)
         if add_to_control_loop:
-            self.tree_manager.tree.process_goal.control_loop_branch.publish_state.add_visualization_marker_behavior(use_decomposed_meshes)
-        # FIXME add to planning
+            self.tree_manager.tree.process_goal.control_loop_branch.publish_state.add_visualization_marker_behavior(
+                use_decomposed_meshes)
 
     def add_qp_data_publisher(self, publish_lb: bool = False, publish_ub: bool = False,
                               publish_lbA: bool = False, publish_ubA: bool = False,
@@ -89,18 +87,19 @@ class BehaviorTreeConfig(ABC):
         :param wait: True: Behavior tree waits for this plotter to finish.
                      False: Plot is generated in a separate thread to not slow down Giskard.
         """
-        self.tree_manager.tree.post_processing.add_plot_trajectory(normalize_position, wait)
+        self.tree_manager.tree.cleanup_control_loop.add_plot_trajectory(normalize_position, wait)
 
     def add_debug_trajectory_plotter(self, normalize_position: bool = False, wait: bool = False):
         """
         Plots debug expressions defined in goals.
         """
         self.add_evaluate_debug_expressions()
-        self.tree_manager.tree.post_processing.add_plot_debug_trajectory(normalize_position=normalize_position, wait=wait)
+        self.tree_manager.tree.cleanup_control_loop.add_plot_debug_trajectory(normalize_position=normalize_position,
+                                                                              wait=wait)
 
     def add_gantt_chart_plotter(self):
         self.add_evaluate_debug_expressions()
-        self.tree_manager.tree.post_processing.add_plot_gantt_chart()
+        self.tree_manager.tree.cleanup_control_loop.add_plot_gantt_chart()
 
     def add_goal_graph_plotter(self):
         self.add_evaluate_debug_expressions()
@@ -134,13 +133,13 @@ class StandAloneBTConfig(BehaviorTreeConfig):
         self.debug_mode = debug_mode
 
     def setup(self):
-        self.add_visualization_marker_publisher(add_to_sync=True, add_to_planning=False, add_to_control_loop=True)
+        self.add_visualization_marker_publisher(add_to_sync=True, add_to_control_loop=True)
         self.add_tf_publisher(include_prefix=True, mode=TfPublishingModes.all)
         if self.debug_mode:
             self.add_trajectory_plotter()
             self.add_debug_trajectory_plotter()
-            self.add_gantt_chart_plotter()
-            self.add_goal_graph_plotter()
+            # self.add_gantt_chart_plotter()
+            # self.add_goal_graph_plotter()
             self.add_debug_marker_publisher()
         # self.add_debug_marker_publisher()
         if self.planning_sleep is not None:
@@ -148,12 +147,19 @@ class StandAloneBTConfig(BehaviorTreeConfig):
 
 
 class OpenLoopBTConfig(BehaviorTreeConfig):
-    def __init__(self, planning_sleep: Optional[float] = None):
+    def __init__(self, planning_sleep: Optional[float] = None, debug_mode: bool = False):
         super().__init__(ControlModes.open_loop)
         self.planning_sleep = planning_sleep
+        self.debug_mode = debug_mode
 
     def setup(self):
-        self.add_visualization_marker_publisher(add_to_sync=True, add_to_planning=True, add_to_control_loop=False)
+        self.add_visualization_marker_publisher(add_to_sync=True, add_to_control_loop=True)
+        if self.debug_mode:
+            self.add_trajectory_plotter(wait=True)
+            self.add_debug_trajectory_plotter(wait=True)
+            # self.add_gantt_chart_plotter()
+            # self.add_goal_graph_plotter()
+            self.add_debug_marker_publisher()
         if self.planning_sleep is not None:
             self.add_sleeper(self.planning_sleep)
 
@@ -163,5 +169,5 @@ class ClosedLoopBTConfig(BehaviorTreeConfig):
         super().__init__(ControlModes.close_loop)
 
     def setup(self):
-        self.add_visualization_marker_publisher(add_to_sync=True, add_to_planning=False, add_to_control_loop=False)
-        #self.add_qp_data_publisher(publish_xdot=True, publish_lb=True, publish_ub=True)
+        self.add_visualization_marker_publisher(add_to_sync=True, add_to_control_loop=False)
+        # self.add_qp_data_publisher(publish_xdot=True, publish_lb=True, publish_ub=True)

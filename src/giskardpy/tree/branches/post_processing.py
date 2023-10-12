@@ -12,12 +12,3 @@ class PostProcessing(Sequence):
         super().__init__(name)
         self.add_child(SetMoveResult('set move result', 'Planning'))
         self.add_child(ClearBlackboardException('clear exception'))
-
-    def add_plot_trajectory(self, normalize_position: bool = False, wait: bool = False):
-        self.add_child(PlotTrajectory('plot trajectory', wait=wait, normalize_position=normalize_position))
-
-    def add_plot_debug_trajectory(self, normalize_position: bool = False, wait: bool = False):
-        self.add_child(PlotDebugExpressions('plot debug trajectory', wait=wait, normalize_position=normalize_position))
-
-    def add_plot_gantt_chart(self):
-        self.add_child(PlotGanttChart())

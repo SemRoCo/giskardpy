@@ -17,7 +17,6 @@ from giskardpy.configs.iai_robots.pr2 import PR2CollisionAvoidance, PR2JointTraj
 from giskardpy.configs.qp_controller_config import QPControllerConfig
 from giskardpy.configs.world_config import WorldWithOmniDriveRobot
 from test_integration_pr2 import PR2TestWrapper, TestJointGoals, pocky_pose
-from utils_for_tests import JointGoalChecker
 
 
 class PR2TestWrapperMujoco(PR2TestWrapper):
@@ -33,7 +32,7 @@ class PR2TestWrapperMujoco(PR2TestWrapper):
         giskard = Giskard(world_config=WorldWithPR2Config(),
                           collision_avoidance_config=PR2CollisionAvoidance(),
                           robot_interface_config=PR2JointTrajServerMujocoInterface(),
-                          behavior_tree_config=OpenLoopBTConfig(),
+                          behavior_tree_config=OpenLoopBTConfig(debug_mode=True),
                           qp_controller_config=QPControllerConfig())
         super().__init__(giskard)
 
@@ -86,7 +85,7 @@ class TestJointGoalsMujoco(TestJointGoals):
         }
         zero_pose.set_joint_goal(js)
         zero_pose.allow_all_collisions()
-        zero_pose.set_json_goal('EnableVelocityTrajectoryTracking', enabled=True)
+        # zero_pose.set_json_goal('EnableVelocityTrajectoryTracking', enabled=True)
         zero_pose.plan_and_execute()
 
 

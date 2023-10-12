@@ -1,6 +1,7 @@
 from typing import List, Dict
 
 import control_msgs
+from actionlib import SimpleActionClient
 from rospy import ROSException
 from rostopic import ROSTopicException
 from sensor_msgs.msg import JointState
@@ -44,6 +45,8 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
     except NameError:
         supported_action_types = [control_msgs.msg.FollowJointTrajectoryAction]
         supported_state_types = [control_msgs.msg.JointTrajectoryControllerState]
+
+    action_client: SimpleActionClient
 
     @record_time
     @profile
@@ -137,7 +140,9 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
         fill_velocity_values = god_map.fill_trajectory_velocity_values
         if fill_velocity_values is None:
             fill_velocity_values = self.fill_velocity_values
-        goal.trajectory = trajectory.to_msg(god_map.qp_controller_config.sample_period, start_time, self.controlled_joints,
+        goal.trajectory = trajectory.to_msg(god_map.qp_controller_config.sample_period,
+                                            start_time,
+                                            self.controlled_joints,
                                             fill_velocity_values)
 
         if self.path_tolerance is not None:
@@ -171,16 +176,16 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
         current_time = rospy.get_rostime()
         # self.logger.debug("{0}.update()".format(self.__class__.__name__))
         if not self.action_client:
-            self.feedback_message = "no action client, did you call setup() on your tree?"
+            self.feedback_message = 'no action client, did you call setup() on your tree?'
             return py_trees.Status.INVALID
         # pity there is no 'is_connected' api like there is for c++
         if not self.sent_goal:
-            self.action_client._send_action_goal(self.action_goal)
-            logging.loginfo('Sending trajectory to \'{}\'.'.format(self.action_namespace))
+            self.action_client.send_goal(self.action_goal)
+            logging.loginfo(f'Sending trajectory to \'{self.action_namespace}\'.')
             self.sent_goal = True
             self.feedback_message = "sent goal to the action server"
             return py_trees.Status.RUNNING
-        if self.action_client.get_state() == GoalStatus.ABORTED:
+        if self.action_client.get_state() in [GoalStatus.ABORTED, GoalStatus.REJECTED]:
             result = self.action_client.get_result()
             self.feedback_message = self.error_code_to_str[result.error_code]
             msg = f'\'{self.action_namespace}\' failed to execute goal. ' \
@@ -202,11 +207,11 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
             return py_trees.Status.FAILURE
         if self.action_client.get_state() in [GoalStatus.PREEMPTED, GoalStatus.PREEMPTING]:
             if rospy.get_rostime() > self.max_deadline:
-                msg = '\'{}\' preempted, ' \
-                      'probably because it took to long to execute the goal.'.format(self.action_namespace)
+                msg = f'\'{self.action_namespace}\' preempted, ' \
+                      'probably because it took to long to execute the goal.'
                 raise_to_blackboard(ExecutionTimeoutException(msg))
             else:
-                msg = '\'{}\' preempted. Stopping execution.'.format(self.action_namespace)
+                msg = f'\'{self.action_namespace}\' preempted. Stopping execution.'
                 raise_to_blackboard(ExecutionPreemptedException(msg))
             logging.logerr(msg)
             return py_trees.Status.FAILURE
@@ -214,12 +219,12 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
         result = self.action_client.get_result()
         if result:
             if current_time < self.min_deadline:
-                msg = '\'{}\' executed too quickly, stopping execution.'.format(self.action_namespace)
+                msg = f'\'{self.action_namespace}\' executed too quickly, stopping execution.'
                 e = ExecutionSucceededPrematurely(msg)
                 raise_to_blackboard(e)
                 return py_trees.Status.FAILURE
             self.feedback_message = "goal reached"
-            logging.loginfo('\'{}\' successfully executed the trajectory.'.format(self.action_namespace))
+            logging.loginfo(f'\'{self.action_namespace}\' successfully executed the trajectory.')
             return py_trees.Status.SUCCESS
 
         if current_time > self.max_deadline:

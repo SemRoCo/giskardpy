@@ -3,94 +3,26 @@ from __future__ import annotations
 from enum import Enum
 from typing import Type, TypeVar, Union, Dict, List, Optional, Any
 
-import inspect
-import abc
 from abc import ABC
 from collections import defaultdict
 from copy import copy
-from time import time
 
 import numpy as np
 import py_trees
 import pydot
 import rospy
-from py_trees import Chooser, common, Composite
+from py_trees import Chooser, common
 from py_trees import Selector, Sequence
-from py_trees_ros.trees import BehaviourTree
 from sortedcontainers import SortedList
 
-import giskardpy
-from giskard_msgs.msg import MoveAction, MoveFeedback
-from giskardpy.configs.collision_avoidance_config import CollisionCheckerLib
-from giskardpy.exceptions import DuplicateNameException, BehaviorTreeException
 from giskardpy.god_map import god_map
-from giskardpy.my_types import PrefixName, Derivatives
-from giskardpy.tree.behaviors.debug_marker_publisher import DebugMarkerPublisher
-from giskardpy.tree.behaviors.append_zero_velocity import SetZeroVelocity
-from giskardpy.tree.behaviors.cleanup import CleanUp, CleanUpPlanning, CleanUpBaseController
-from giskardpy.tree.behaviors.collision_checker import CollisionChecker
-from giskardpy.tree.behaviors.collision_scene_updater import CollisionSceneUpdater
-from giskardpy.tree.behaviors.evaluate_debug_expressions import EvaluateDebugExpressions
-from giskardpy.tree.behaviors.exception_to_execute import ClearBlackboardException
-from giskardpy.tree.behaviors.goal_canceled import GoalCanceled
-from giskardpy.tree.behaviors.goal_cleanup import GoalCleanUp
-from giskardpy.tree.behaviors.goal_done import GoalDone
-from giskardpy.tree.behaviors.goal_received import GoalReceived
-from giskardpy.tree.behaviors.init_qp_controller import InitQPController
-from giskardpy.tree.behaviors.instantaneous_controller import ControllerPlugin
-from giskardpy.tree.behaviors.instantaneous_controller_base import ControllerPluginBase
-from giskardpy.tree.behaviors.joint_group_pos_controller_publisher import JointGroupPosController
-from giskardpy.tree.behaviors.joint_group_vel_controller_publisher import JointGroupVelController
-from giskardpy.tree.behaviors.joint_pos_controller_publisher import JointPosController
-from giskardpy.tree.behaviors.joint_vel_controller_publisher import JointVelController
-from giskardpy.tree.behaviors.kinematic_sim import KinSimPlugin
-from giskardpy.tree.behaviors.log_trajectory import LogTrajPlugin
-from giskardpy.tree.behaviors.loop_detector import LoopDetector
-from giskardpy.tree.behaviors.max_trajectory_length import MaxTrajectoryLength
-from giskardpy.tree.behaviors.new_trajectory import NewTrajectory
-from giskardpy.tree.behaviors.notify_state_change import NotifyStateChange
-from giskardpy.tree.behaviors.plot_debug_expressions import PlotDebugExpressions
-from giskardpy.tree.behaviors.plot_trajectory import PlotTrajectory
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
-from giskardpy.tree.behaviors.plugin_if import IF
-from giskardpy.tree.behaviors.publish_debug_expressions import PublishDebugExpressions
-from giskardpy.tree.behaviors.publish_feedback import PublishFeedback
-from giskardpy.tree.behaviors.real_kinematic_sim import RealKinSimPlugin
-from giskardpy.tree.behaviors.ros_msg_to_goal import ParseActionGoal
-from giskardpy.tree.behaviors.send_result import SendResult
-from giskardpy.tree.behaviors.send_trajectory import SendFollowJointTrajectory
-from giskardpy.tree.behaviors.send_trajectory_omni_drive_realtime import SendTrajectoryToCmdVel
-from giskardpy.tree.behaviors.send_trajectory_omni_drive_realtime2 import SendCmdVel
-from giskardpy.tree.behaviors.set_move_result import SetMoveResult
-from giskardpy.tree.behaviors.set_tracking_start_time import SetTrackingStartTime
-from giskardpy.tree.behaviors.setup_base_traj_constraints import SetDriveGoals
-from giskardpy.tree.behaviors.sleep import Sleep
-from giskardpy.tree.behaviors.sync_configuration import SyncConfiguration
-from giskardpy.tree.behaviors.sync_configuration2 import SyncConfiguration2
-from giskardpy.tree.behaviors.sync_odometry import SyncOdometry, SyncOdometryNoLock
-from giskardpy.tree.behaviors.sync_tf_frames import SyncTfFrames
-from giskardpy.tree.behaviors.tf_publisher import TFPublisher, TfPublishingModes
-from giskardpy.tree.behaviors.time import TimePlugin
-from giskardpy.tree.behaviors.time_real import RosTime
-from giskardpy.tree.behaviors.visualization import VisualizationBehavior
-from giskardpy.tree.behaviors.world_updater import WorldUpdater
-from giskardpy.tree.branches.clean_up_control_loop import CleanupControlLoop
-from giskardpy.tree.branches.control_loop import ControlLoop
 from giskardpy.tree.branches.giskard_bt import GiskardBT
-from giskardpy.tree.branches.post_processing import PostProcessing
-from giskardpy.tree.branches.prepare_control_loop import PrepareControlLoop
-from giskardpy.tree.branches.process_goal import ProcessGoal
-from giskardpy.tree.branches.publish_state import PublishState
-from giskardpy.tree.branches.synchronization import Synchronization
-from giskardpy.tree.branches.wait_for_goal import WaitForGoal
 from giskardpy.tree.composites.async_composite import AsyncBehavior
-from giskardpy.tree.composites.better_parallel import ParallelPolicy, Parallel
+from giskardpy.tree.composites.better_parallel import Parallel
 from giskardpy.tree.control_modes import ControlModes
-from giskardpy.tree.decorators import failure_is_success, success_is_running, running_is_success, success_is_failure, \
-    anything_is_success
 from giskardpy.utils import logging
 from giskardpy.utils.utils import create_path
-from giskardpy.utils.utils import get_all_classes_in_package
 
 
 def behavior_is_instance_of(obj: Any, type_: Type) -> bool:

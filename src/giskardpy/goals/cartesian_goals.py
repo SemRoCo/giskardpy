@@ -189,7 +189,6 @@ class CartesianPose(Goal):
         if reference_angular_velocity is None:
             reference_angular_velocity = CartesianOrientation.default_reference_velocity
         self.weight = weight
-        self.goal_pose = self.transform_msg(self.root_link, goal_pose)
 
         goal_point, goal_quaternion = split_pose_stamped(goal_pose)
 
@@ -234,6 +233,7 @@ class DiffDriveBaseGoal(Goal):
         :param pointing_axis: the forward direction. default is x-axis
         :param always_forward: if false, it will drive backwards, if it requires less rotation.
         """
+        # TODO make pretty
         super().__init__()
         self.always_forward = always_forward
         self.max_linear_velocity = max_linear_velocity
@@ -260,7 +260,6 @@ class DiffDriveBaseGoal(Goal):
             self.base_footprint_V_pointing_axis.header.frame_id = self.base_footprint
             self.base_footprint_V_pointing_axis.vector.z = 1
 
-    def make_constraints(self):
         map_T_base_current = cas.TransMatrix(god_map.world.compute_fk_np(self.map, self.base_footprint))
         map_T_odom_current = god_map.world.compute_fk_np(self.map, self.odom)
         map_odom_angle, _, _ = rotation_from_matrix(map_T_odom_current)
@@ -280,7 +279,7 @@ class DiffDriveBaseGoal(Goal):
 
         # axis, map_current_angle = map_R_base_footprint.to_axis_angle()
         # map_current_angle = cas.if_greater_zero(axis.z, map_current_angle, -map_current_angle)
-        odom_current_angle = self.joint.yacas.get_symbol(Derivatives.position)
+        odom_current_angle = self.joint.yaw.get_symbol(Derivatives.position)
         map_current_angle = map_odom_angle + odom_current_angle
 
         axis2, map_goal_angle2 = map_R_base_footprint_goal.to_axis_angle()
@@ -323,21 +322,22 @@ class DiffDriveBaseGoal(Goal):
                                                        cas.greater_equal(cas.abs(distance), eps)),
                                          self.weight,
                                          0)
-
-        self.add_equality_constraint(reference_velocity=self.max_angular_velocity,
+        task = Task()
+        task.add_equality_constraint(reference_velocity=self.max_angular_velocity,
                                      equality_bound=rotate_to_goal_error,
                                      weight=weight_rotate_to_goal,
                                      task_expression=map_current_angle,
                                      name='/rot1')
-        self.add_point_goal_constraints(frame_P_current=map_P_base_footprint,
+        task.add_point_goal_constraints(frame_P_current=map_P_base_footprint,
                                         frame_P_goal=map_P_base_footprint_goal,
                                         reference_velocity=self.max_linear_velocity,
                                         weight=weight_translation)
-        self.add_equality_constraint(reference_velocity=self.max_angular_velocity,
+        task.add_equality_constraint(reference_velocity=self.max_angular_velocity,
                                      equality_bound=final_rotation_error,
                                      weight=weight_final_rotation,
                                      task_expression=map_current_angle,
                                      name='/rot2')
+        self.add_task(task)
 
     def __str__(self):
         s = super().__str__()

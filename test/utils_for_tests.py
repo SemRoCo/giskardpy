@@ -445,20 +445,6 @@ class GiskardTestWrapper(GiskardWrapper):
         self.add_motion_goal(goal_type=PR2DiffDriveBaseGoal.__name__,
                              goal_pose=goal_pose)
 
-    def set_diff_drive_base_goal(self, goal_pose, tip_link=None, root_link=None, weight=None, linear_velocity=None,
-                                 angular_velocity=None, **kwargs):
-        if tip_link is None:
-            tip_link = 'base_footprint'
-        if root_link is None:
-            root_link = self.default_root
-        self.add_motion_goal(goal_type=DiffDriveBaseGoal.__name__,
-                             tip_link=tip_link,
-                             root_link=root_link,
-                             goal_pose=goal_pose,
-                             max_linear_velocity=linear_velocity,
-                             max_angular_velocity=angular_velocity,
-                             weight=weight)
-
     def set_keep_hand_in_workspace(self, tip_link, map_frame=None, base_footprint=None):
         self.add_motion_goal(goal_type=KeepHandInWorkspace.__name__,
                              tip_link=tip_link,

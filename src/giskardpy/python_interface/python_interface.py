@@ -4,7 +4,7 @@ from geometry_msgs.msg import PoseStamped, PointStamped, QuaternionStamped, Vect
 
 from giskardpy.goals.align_planes import AlignPlanes
 from giskardpy.goals.cartesian_goals import CartesianPose, CartesianPosition, CartesianOrientation, \
-    CartesianPoseStraight, CartesianVelocityLimit, CartesianPositionStraight
+    CartesianPoseStraight, CartesianVelocityLimit, CartesianPositionStraight, DiffDriveBaseGoal
 from giskardpy.goals.grasp_bar import GraspBar
 from giskardpy.goals.joint_goals import AvoidJointLimits, SetSeedConfiguration, JointPositionList
 from giskardpy.goals.open_close import Close, Open
@@ -94,6 +94,55 @@ class GiskardWrapper(LowLevelGiskardWrapper):
                              tip_group=tip_group,
                              max_linear_velocity=max_linear_velocity,
                              max_angular_velocity=max_angular_velocity,
+                             reference_linear_velocity=reference_linear_velocity,
+                             reference_angular_velocity=reference_angular_velocity,
+                             weight=weight,
+                             **kwargs)
+
+    def set_diff_drive_base_goal(self,
+                                 goal_pose: PoseStamped,
+                                 tip_link: str,
+                                 root_link: str,
+                                 tip_group: Optional[str] = None,
+                                 root_group: Optional[str] = None,
+                                 reference_linear_velocity: Optional[float] = None,
+                                 reference_angular_velocity: Optional[float] = None,
+                                 weight: Optional[float] = None,
+                                 add_monitor: bool = True,
+                                 **kwargs: goal_parameter):
+        """
+        This goal will use the kinematic chain between root and tip link to move tip link into the goal pose.
+        The max velocities enforce a strict limit, but require a lot of additional constraints, thus making the
+        system noticeably slower.
+        The reference velocities don't enforce a strict limit, but also don't require any additional constraints.
+        :param root_link: name of the root link of the kin chain
+        :param tip_link: name of the tip link of the kin chain
+        :param goal_pose: the goal pose
+        :param root_group: a group name, where to search for root_link, only required to avoid name conflicts
+        :param tip_group: a group name, where to search for tip_link, only required to avoid name conflicts
+        :param reference_linear_velocity: m/s
+        :param reference_angular_velocity: rad/s
+        :param weight: default WEIGHT_ABOVE_CA
+        """
+        if add_monitor:
+            monitor_name = f'{root_link}/{tip_link} pose reached'
+            self.add_cartesian_pose_reached_monitor(name=monitor_name,
+                                                    root_link=root_link,
+                                                    root_group=root_group,
+                                                    tip_link=tip_link,
+                                                    tip_group=tip_group,
+                                                    position_threshold=0.02,
+                                                    goal_pose=goal_pose)
+            to_end_monitors = [monitor_name]
+        else:
+            to_end_monitors = []
+        self.add_motion_goal(goal_type=DiffDriveBaseGoal.__name__,
+                             to_end=to_end_monitors,
+                             goal_pose=goal_pose,
+                             tip_link=tip_link,
+                             root_link=root_link,
+                             root_group=root_group,
+                             tip_group=tip_group,
                              reference_linear_velocity=reference_linear_velocity,
                              reference_angular_velocity=reference_angular_velocity,
                              weight=weight,

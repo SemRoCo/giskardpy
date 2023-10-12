@@ -175,4 +175,4 @@ class DebugMarkerPublisher(GiskardBehavior):
         if len(self.debugs) > 0:
             self.debugs_evaluated = god_map.debug_expression_manager.evaluated_debug_expressions
             self.publish_debug_markers()
-        return Status.RUNNING
+        return Status.SUCCESS

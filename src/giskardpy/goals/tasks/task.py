@@ -26,7 +26,7 @@ class Task:
     to_end: List[Monitor]
     name: Optional[str]
 
-    def __init__(self, name: Optional[str]):
+    def __init__(self, name: Optional[str] = None):
         if name is None:
             self.name = str(self.__class__.__name__)
         else:

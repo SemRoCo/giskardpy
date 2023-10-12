@@ -3,7 +3,7 @@ from typing import Optional
 
 import numpy as np
 import pytest
-from geometry_msgs.msg import PoseStamped, Quaternion, Point, PointStamped, Vector3Stamped, QuaternionStamped
+from geometry_msgs.msg import PoseStamped, Quaternion, Point, PointStamped, Vector3Stamped
 from tf.transformations import quaternion_about_axis, quaternion_from_matrix
 
 import giskardpy.utils.tfwrapper as tf
@@ -12,10 +12,12 @@ from giskardpy.configs.giskard import Giskard
 from giskardpy.configs.qp_controller_config import QPControllerConfig
 from giskardpy.configs.iai_robots.tiago import TiagoStandaloneInterface, TiagoCollisionAvoidanceConfig
 from giskardpy.configs.world_config import WorldWithDiffDriveRobot
-from giskardpy.goals.goal import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
+from giskardpy.goals.goal import WEIGHT_BELOW_CA
+from giskardpy.goals.tasks.task import WEIGHT_ABOVE_CA
+from giskardpy.god_map import god_map
 from giskardpy.my_types import PrefixName
 from giskardpy.utils.utils import launch_launchfile
-from utils_for_tests import GiskardTestWrapper, RotationGoalChecker, TranslationGoalChecker
+from utils_for_tests import GiskardTestWrapper
 
 
 @pytest.fixture(scope='module')
@@ -99,20 +101,15 @@ class TiagoTestWrapper(GiskardTestWrapper):
             giskard = Giskard(world_config=WorldWithDiffDriveRobot(),
                               collision_avoidance_config=TiagoCollisionAvoidanceConfig(),
                               robot_interface_config=TiagoStandaloneInterface(),
-                              behavior_tree_config=StandAloneBTConfig(),
+                              behavior_tree_config=StandAloneBTConfig(debug_mode=True),
                               qp_controller_config=QPControllerConfig())
         super().__init__(giskard)
 
     def move_base(self, goal_pose: PoseStamped, check: bool = True):
-        tip_link = PrefixName('base_footprint', self.robot_name)
         root_link = self.default_root
-        self.set_json_goal(constraint_type='DiffDriveBaseGoal',
-                           tip_link=tip_link,
-                           root_link=root_link,
-                           goal_pose=goal_pose)
-        # self.allow_all_collisions()
-        # fixme check of goals reached
-
+        self.set_diff_drive_base_goal(tip_link='base_footprint',
+                                      root_link=root_link,
+                                      goal_pose=goal_pose)
         self.plan_and_execute()
 
     def open_right_gripper(self, goal: float = 0.45):
@@ -133,7 +130,7 @@ class TiagoTestWrapper(GiskardTestWrapper):
         p = PoseStamped()
         p.header.frame_id = 'map'
         p.pose.orientation.w = 1
-        if self.is_standalone():
+        if god_map.is_standalone():
             self.teleport_base(p)
         else:
             self.move_base(p)
@@ -468,7 +465,7 @@ class TestCollisionAvoidance:
         box_pose.pose.position.x = 0.1
         box_pose.pose.orientation.w = 1
         zero_pose.add_box('box',
-                          size=(0.05,0.05,0.05),
+                          size=(0.05, 0.05, 0.05),
                           pose=box_pose)
         box_pose = PoseStamped()
         box_pose.header.frame_id = 'arm_left_5_link'
@@ -476,7 +473,7 @@ class TestCollisionAvoidance:
         box_pose.pose.position.y = -0.1
         box_pose.pose.orientation.w = 1
         zero_pose.add_box('box2',
-                          size=(0.05,0.05,0.05),
+                          size=(0.05, 0.05, 0.05),
                           pose=box_pose)
         zero_pose.plan_and_execute()
 

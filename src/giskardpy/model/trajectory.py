@@ -93,6 +93,10 @@ class Trajectory:
             trajectory_msg.points.append(p)
         return trajectory_msg
 
+    @property
+    def length_in_seconds(self) -> float:
+        return len(self) * god_map.qp_controller_config.sample_period
+
     def to_dict(self, normalize_position: bool = False, filter_0_vel: bool = True) -> Dict[
         Derivatives, Dict[PrefixName, np.ndarray]]:
         data = defaultdict(lambda: defaultdict(list))

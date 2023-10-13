@@ -61,7 +61,7 @@ class ControlLoop(AsyncBehavior):
 
         self.add_child(self.publish_state)
 
-    def add_evaluate_debug_expressions(self):
+    def add_evaluate_debug_expressions(self, log_traj: bool):
         if not self.debug_added:
-            self.insert_child(EvaluateDebugExpressions(), 1)
+            self.insert_child(EvaluateDebugExpressions(log_traj=log_traj), 1)
             self.debug_added = True

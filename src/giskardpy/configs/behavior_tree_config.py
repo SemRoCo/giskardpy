@@ -67,18 +67,18 @@ class BehaviorTreeConfig(ABC):
         QP data is streamed and can be visualized in e.g. plotjuggler. Useful for debugging.
         """
         self.add_evaluate_debug_expressions()
-        self.tree_manager.add_qp_data_publisher(publish_lb=publish_lb,
-                                                publish_ub=publish_ub,
-                                                publish_lbA=publish_lbA,
-                                                publish_ubA=publish_ubA,
-                                                publish_bE=publish_bE,
-                                                publish_Ax=publish_Ax,
-                                                publish_Ex=publish_Ex,
-                                                publish_xdot=publish_xdot,
-                                                publish_weights=publish_weights,
-                                                publish_g=publish_g,
-                                                publish_debug=publish_debug,
-                                                add_to_base=add_to_base)
+        self.tree_manager.tree.execute_traj.base_closed_loop.publish_state.add_qp_data_publisher(
+            publish_lb=publish_lb,
+            publish_ub=publish_ub,
+            publish_lbA=publish_lbA,
+            publish_ubA=publish_ubA,
+            publish_bE=publish_bE,
+            publish_Ax=publish_Ax,
+            publish_Ex=publish_Ex,
+            publish_xdot=publish_xdot,
+            publish_weights=publish_weights,
+            publish_g=publish_g,
+            publish_debug=publish_debug)
 
     def add_trajectory_plotter(self, normalize_position: bool = False, wait: bool = False):
         """
@@ -122,8 +122,14 @@ class BehaviorTreeConfig(ABC):
                                                                             mode=mode)
 
     def add_evaluate_debug_expressions(self):
-        self.tree_manager.tree.prepare_control_loop.add_child(CompileDebugExpressions())
-        self.tree_manager.tree.process_goal.control_loop_branch.add_evaluate_debug_expressions()
+        self.tree_manager.tree.prepare_control_loop.add_compile_debug_expressions()
+        if god_map.is_closed_loop():
+            self.tree_manager.tree.process_goal.control_loop_branch.add_evaluate_debug_expressions(log_traj=False)
+        else:
+            self.tree_manager.tree.process_goal.control_loop_branch.add_evaluate_debug_expressions(log_traj=True)
+        if god_map.is_planning():
+            god_map.tree_manager.tree.execute_traj.prepare_base_control.add_compile_debug_expressions()
+            god_map.tree_manager.tree.execute_traj.base_closed_loop.add_evaluate_debug_expressions(log_traj=False)
 
 
 class StandAloneBTConfig(BehaviorTreeConfig):
@@ -160,6 +166,7 @@ class OpenLoopBTConfig(BehaviorTreeConfig):
             # self.add_gantt_chart_plotter()
             # self.add_goal_graph_plotter()
             self.add_debug_marker_publisher()
+            self.add_qp_data_publisher(publish_debug=True, publish_xdot=True)
         if self.planning_sleep is not None:
             self.add_sleeper(self.planning_sleep)
 

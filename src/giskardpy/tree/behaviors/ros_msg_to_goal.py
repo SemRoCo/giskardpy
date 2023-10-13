@@ -50,7 +50,7 @@ class AddBaseTrajFollowerGoal(GiskardBehavior):
     @profile
     def update(self):
         goal = BaseTrajFollower(self.joint.name)
-        time_monitor = TimeAbove(threshold=god_map.trajectory_time_in_seconds)
+        time_monitor = TimeAbove(threshold=god_map.trajectory.length_in_seconds)
         goal.connect_to_end(time_monitor)
         god_map.monitor_manager.add_monitor(time_monitor)
         god_map.motion_goal_manager.add_motion_goal(goal)

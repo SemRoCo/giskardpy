@@ -109,6 +109,7 @@ class LocalMinimumReached(Monitor):
 class TimeAbove(Monitor):
     def __init__(self, *, threshold: float, name: str = 'time above'):
         super().__init__(name=name, crucial=True, stay_one=False)
-        traj_length_in_sec = symbol_manager.time * god_map.qp_controller_config.sample_period
+        traj_length_in_sec = symbol_manager.time
         condition = cas.greater(traj_length_in_sec, threshold)
+        god_map.debug_expression_manager.add_debug_expression('time', traj_length_in_sec)
         self.set_expression(condition)

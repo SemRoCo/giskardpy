@@ -2,6 +2,7 @@ from py_trees import Sequence
 
 from giskard_msgs.msg import MoveFeedback
 from giskardpy.tree.behaviors.cleanup import CleanUpPlanning
+from giskardpy.tree.behaviors.compile_debug_expressions import CompileDebugExpressions
 from giskardpy.tree.behaviors.compile_monitors import CompileMonitors
 from giskardpy.tree.behaviors.init_qp_controller import InitQPController
 from giskardpy.tree.behaviors.new_trajectory import NewTrajectory
@@ -13,8 +14,11 @@ from giskardpy.tree.decorators import success_is_failure
 
 
 class PrepareControlLoop(Sequence):
+    has_compile_debug_expressions: bool
+
     def __init__(self, name: str = 'prepare control loop'):
         super().__init__(name)
+        self.has_compile_debug_expressions = False
         self.add_child(PublishFeedback('publish feedback2',
                                        MoveFeedback.PLANNING))
         self.add_child(CleanUpPlanning('CleanUpPlanning'))
@@ -27,10 +31,18 @@ class PrepareControlLoop(Sequence):
     def add_plot_goal_graph(self):
         self.add_child(PlotGoalGraph())
 
+    def add_compile_debug_expressions(self):
+        if not self.has_compile_debug_expressions:
+            self.add_child(CompileDebugExpressions())
+            self.has_compile_debug_expressions = True
+
 
 class PrepareBaseTrajControlLoop(Sequence):
+    has_compile_debug_expressions: bool
+
     def __init__(self, name: str = 'prepare control loop'):
         super().__init__(name)
+        self.has_compile_debug_expressions = False
         self.add_child(PublishFeedback('publish feedback2',
                                        MoveFeedback.PLANNING))
         self.add_child(CleanUpPlanning('CleanUpPlanning'))
@@ -41,3 +53,8 @@ class PrepareBaseTrajControlLoop(Sequence):
 
     def add_plot_goal_graph(self):
         self.add_child(PlotGoalGraph())
+
+    def add_compile_debug_expressions(self):
+        if not self.has_compile_debug_expressions:
+            self.add_child(CompileDebugExpressions())
+            self.has_compile_debug_expressions = True

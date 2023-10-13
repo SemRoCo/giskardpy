@@ -1,3 +1,4 @@
+import traceback
 from typing import List, Dict
 
 import numpy as np
@@ -14,16 +15,20 @@ class DebugExpressionManager:
     debug_expressions: Dict[str, cas.Expression]
     compiled_debug_expressions: Dict[str, cas.CompiledFunction]
     evaluated_debug_expressions: Dict[str, np.ndarray]
-    debug_trajectory: Trajectory
+    _debug_trajectory: Trajectory
 
     def __init__(self):
         self.debug_expressions = {}
-        self.debug_trajectory = Trajectory()
 
     def add_debug_expression(self, name: str, expression: cas.Expression):
         self.debug_expressions[name] = expression
 
+    @property
+    def debug_trajectory(self):
+        return self._debug_trajectory
+
     def compile_debug_expressions(self):
+        self._debug_trajectory = Trajectory()
         for name, expr in self.debug_expressions.items():
             if isinstance(expr, (int, float)):
                 self.debug_expressions[name] = cas.Expression(expr)
@@ -39,12 +44,13 @@ class DebugExpressionManager:
             logging.loginfo(f'Compiled {len(self.compiled_debug_expressions)} debug expressions.')
 
     @profile
-    def eval_debug_exprs(self):
+    def eval_debug_expressions(self, log_traj: bool = True):  # renamed
         self.evaluated_debug_expressions = {}
         for name, f in self.compiled_debug_expressions.items():
             params = symbol_manager.resolve_symbols(f.str_params)
             self.evaluated_debug_expressions[name] = f.fast_call(params).copy()
-        self.log_debug_expressions()
+        if log_traj:
+            self.log_debug_expressions()
         return self.evaluated_debug_expressions
 
     def log_debug_expressions(self):
@@ -52,7 +58,7 @@ class DebugExpressionManager:
             time = god_map.time - 1
             last_mjs = None
             if time >= 1:
-                last_mjs = self.debug_trajectory.get_exact(time-1)
+                last_mjs = self._debug_trajectory.get_exact(time - 1)
             js = JointStates()
             for name, value in self.evaluated_debug_expressions.items():
                 if len(value) > 1:
@@ -67,7 +73,7 @@ class DebugExpressionManager:
                             self.evaluated_expr_to_js(tmp_name, last_mjs, js, value[x])
                 else:
                     self.evaluated_expr_to_js(name, last_mjs, js, value)
-            self.debug_trajectory.set(time, js)
+            self._debug_trajectory.set(time, js)
 
     def evaluated_expr_to_js(self, name, last_js, next_js, value):
         if last_js is not None:

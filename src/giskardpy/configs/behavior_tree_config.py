@@ -166,7 +166,7 @@ class OpenLoopBTConfig(BehaviorTreeConfig):
             # self.add_gantt_chart_plotter()
             # self.add_goal_graph_plotter()
             self.add_debug_marker_publisher()
-            self.add_qp_data_publisher(publish_debug=True, publish_xdot=True)
+            # self.add_qp_data_publisher(publish_debug=True, publish_xdot=True, publish_lbA=True, publish_ubA=True)
         if self.planning_sleep is not None:
             self.add_sleeper(self.planning_sleep)
 

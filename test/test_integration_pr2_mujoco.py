@@ -94,7 +94,7 @@ class TestConstraints:
     def test_SetSeedConfiguration(self, zero_pose: PR2TestWrapper):
         zero_pose.set_seed_configuration(seed_configuration=zero_pose.better_pose)
         zero_pose.set_joint_goal(zero_pose.default_pose)
-        zero_pose.plan_and_execute(expected_error_codes=[MoveResult.CONSTRAINT_INITIALIZATION_ERROR])
+        zero_pose.plan_and_execute(expected_error_code=MoveResult.CONSTRAINT_INITIALIZATION_ERROR)
 
 
 class TestCartGoals:
@@ -106,78 +106,43 @@ class TestCartGoals:
         base_goal.pose.orientation = Quaternion(*quaternion_about_axis(-np.pi / 4, [0, 0, 1]))
         zero_pose.move_base(base_goal)
 
+    def test_forward(self, zero_pose: PR2TestWrapper):
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = 'map'
+        base_goal.pose.position.x = 1
+        base_goal.pose.orientation.w = 1
+        zero_pose.move_base(base_goal)
+
 
 class TestActionServerEvents:
-    def test_interrupt_way_points1(self, zero_pose: PR2TestWrapper):
-        p = PoseStamped()
-        p.header.frame_id = 'base_footprint'
-        p.pose.position = Point(0, 0, 0)
-        p.pose.orientation = Quaternion(0, 0, 0, 1)
-        zero_pose.set_cart_goal(deepcopy(p), 'base_footprint')
-        zero_pose.add_cmd()
-        p.pose.position.x += 10
-        zero_pose.set_cart_goal(deepcopy(p), 'base_footprint')
-        zero_pose.add_cmd()
-        p.pose.position.x += 10
-        zero_pose.set_cart_goal(p, 'base_footprint')
-        zero_pose.plan_and_execute(expected_error_codes=[MoveResult.SUCCESS,
-                                                         MoveResult.PREEMPTED,
-                                                         MoveResult.PREEMPTED],
-                                   stop_after=2)
-
-        p = PoseStamped()
-        p.header.frame_id = zero_pose.r_tip
-        p.header.stamp = rospy.get_rostime()
-        p.pose.position = Point(-0.1, 0, 0)
-        p.pose.orientation = Quaternion(0, 0, 0, 1)
-        zero_pose.set_cart_goal(p, zero_pose.r_tip, zero_pose.default_root)
-
-        zero_pose.add_cmd()
-        p = PoseStamped()
-        p.header.frame_id = zero_pose.r_tip
-        p.header.stamp = rospy.get_rostime()
-        p.pose.position = Point(0.0, -0.1, -0.1)
-        p.pose.orientation = Quaternion(0, 0, 0, 1)
-        zero_pose.set_cart_goal(p, zero_pose.r_tip, zero_pose.default_root)
-
-        zero_pose.add_cmd()
-        p = PoseStamped()
-        p.header.frame_id = zero_pose.r_tip
-        p.header.stamp = rospy.get_rostime()
-        p.pose.position = Point(0.1, 0.1, 0.1)
-        p.pose.orientation = Quaternion(0, 0, 0, 1)
-        zero_pose.set_cart_goal(p, zero_pose.r_tip, zero_pose.default_root)
-
-        zero_pose.plan_and_execute()
-
     def test_interrupt1(self, zero_pose: PR2TestWrapper):
         p = PoseStamped()
         p.header.frame_id = 'base_footprint'
         p.pose.position = Point(1, 0, 0)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
-        zero_pose.set_cart_goal(p, 'base_footprint')
+        zero_pose.set_cart_goal(goal_pose=p, tip_link='base_footprint', root_link='map')
         zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute(expected_error_codes=[MoveResult.PREEMPTED], stop_after=1)
+        zero_pose.plan_and_execute(expected_error_code=MoveResult.PREEMPTED, stop_after=1)
 
     def test_interrupt2(self, zero_pose: PR2TestWrapper):
         p = PoseStamped()
         p.header.frame_id = 'base_footprint'
         p.pose.position = Point(2, 0, 0)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
-        zero_pose.set_cart_goal(p, 'base_footprint')
+        zero_pose.set_cart_goal(goal_pose=p, tip_link='base_footprint', root_link='map')
         zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute(expected_error_codes=[MoveResult.PREEMPTED], stop_after=6)
+        zero_pose.plan_and_execute(expected_error_code=MoveResult.PREEMPTED, stop_after=6)
 
     def test_undefined_type(self, zero_pose: PR2TestWrapper):
         zero_pose.allow_all_collisions()
         zero_pose.send_goal(goal_type=MoveGoal.UNDEFINED,
-                            expected_error_code=[MoveResult.INVALID_GOAL])
+                            expected_error_code=MoveResult.INVALID_GOAL)
 
     def test_empty_goal(self, zero_pose: PR2TestWrapper):
-        zero_pose.cmd_seq = []
-        zero_pose.plan_and_execute(expected_error_codes=[MoveResult.INVALID_GOAL])
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute(expected_error_code=MoveResult.EMPTY_PROBLEM)
 
     def test_plan_only(self, zero_pose: PR2TestWrapper):
         zero_pose.allow_self_collision()
-        zero_pose.set_joint_goal(pocky_pose, check=False)
-        zero_pose.send_goal(goal_type=MoveGoal.PLAN_ONLY)
+        zero_pose.set_joint_goal(pocky_pose, add_monitor=False)
+        zero_pose.projection()

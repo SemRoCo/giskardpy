@@ -49,7 +49,7 @@ class AddBaseTrajFollowerGoal(GiskardBehavior):
     @record_time
     @profile
     def update(self):
-        goal = BaseTrajFollower(self.joint.name)
+        goal = BaseTrajFollower(self.joint.name, track_only_velocity=True)
         time_monitor = TimeAbove(threshold=god_map.trajectory.length_in_seconds)
         goal.connect_to_end(time_monitor)
         god_map.monitor_manager.add_monitor(time_monitor)

@@ -22,7 +22,6 @@ from giskardpy.qp.constraint import InequalityConstraint, EqualityConstraint, De
 
 
 class Goal(ABC):
-    _sub_goals: List[Goal]
     tasks: List[Task]
 
     @abc.abstractmethod
@@ -30,7 +29,6 @@ class Goal(ABC):
         """
         This is where you specify goal parameters and save them as self attributes.
         """
-        self._sub_goals = []
         self.tasks = []
 
     def clean_up(self):
@@ -130,26 +128,11 @@ class Goal(ABC):
             raise ConstraintInitalizationException(f'Goal {str(self)} has no tasks.')
         for task in self.tasks:
             for constraint in task.get_eq_constraints():
-                name = f'{task.name}/{constraint.name}'
-                constraint.name = name
-                self._equality_constraints[name] = constraint
+                self._equality_constraints[constraint.name] = constraint
             for constraint in task.get_neq_constraints():
-                name = f'{task.name}/{constraint.name}'
-                constraint.name = name
-                self._inequality_constraints[name] = constraint
+                self._inequality_constraints[constraint.name] = constraint
             for constraint in task.get_derivative_constraints():
-                name = f'{task.name}/{constraint.name}'
-                constraint.name = name
-                self._derivative_constraints[name] = constraint
-
-        for sub_goal in self._sub_goals:
-            equality_constraints, inequality_constraints, derivative_constraints, debug_expressions = \
-                sub_goal.get_constraints()
-
-            self._equality_constraints.update(_prepend_prefix(self.__class__.__name__, equality_constraints))
-            self._inequality_constraints.update(_prepend_prefix(self.__class__.__name__, inequality_constraints))
-            self._derivative_constraints.update(_prepend_prefix(self.__class__.__name__, derivative_constraints))
-            self._debug_expressions.update(_prepend_prefix(self.__class__.__name__, debug_expressions))
+                self._derivative_constraints[constraint.name] = constraint
 
         return self._equality_constraints, self._inequality_constraints, self._derivative_constraints, \
             self._debug_expressions

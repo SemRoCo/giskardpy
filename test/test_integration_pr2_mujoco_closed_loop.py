@@ -57,7 +57,7 @@ class PR2TestWrapperMujoco(PR2TestWrapper):
         giskard = Giskard(world_config=WorldWithPR2Config(),
                           collision_avoidance_config=PR2CollisionAvoidance(),
                           robot_interface_config=PR2VelocityMujocoInterface(),
-                          behavior_tree_config=ClosedLoopBTConfig(),
+                          behavior_tree_config=ClosedLoopBTConfig(debug_mode=True),
                           qp_controller_config=QPControllerConfig())
         super().__init__(giskard)
 

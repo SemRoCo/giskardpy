@@ -102,8 +102,12 @@ class LocalMinimumReached(Monitor):
                 else:
                     expr = f'god_map.trajectory.get_exact({-t})[\'{free_variable_name}\'].velocity'
                     joint_vel_symbol = symbol_manager.get_symbol(expr)
+                god_map.debug_expression_manager.add_debug_expression(f'{free_variable_name} loc min, vel', cas.abs(joint_vel_symbol))
+                god_map.debug_expression_manager.add_debug_expression(f'{free_variable_name} loc min, thr', velocity_limit)
                 condition_list.append(cas.less(cas.abs(joint_vel_symbol), velocity_limit))
+
         self.expression = cas.logic_all(cas.Expression(condition_list))
+        god_map.debug_expression_manager.add_debug_expression(f'loc min reached', self.expression)
 
 
 class TimeAbove(Monitor):

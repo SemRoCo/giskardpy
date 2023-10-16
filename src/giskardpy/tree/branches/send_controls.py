@@ -6,10 +6,11 @@ from giskardpy.my_types import PrefixName
 from giskardpy.tree.behaviors.joint_group_vel_controller_publisher import JointGroupVelController
 from giskardpy.tree.behaviors.joint_vel_controller_publisher import JointVelController
 from giskardpy.tree.behaviors.send_trajectory_omni_drive_realtime2 import SendCmdVel
-from giskardpy.tree.decorators import success_is_running
+from giskardpy.tree.composites.running_selector import RunningSelector
+from giskardpy.tree.decorators import success_is_running, running_is_success
 
 
-class SendControls(Sequence):
+class SendControls(RunningSelector):
     def __init__(self, name: str = 'send controls'):
         super().__init__(name)
 

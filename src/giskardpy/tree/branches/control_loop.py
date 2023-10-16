@@ -52,7 +52,7 @@ class ControlLoop(AsyncBehavior):
             self.send_controls = success_is_running(SendControls)()
 
             self.add_child(success_is_running(RosTime)())
-            self.add_child(success_is_running(RealKinSimPlugin)('kin sim'))
+            self.add_child(success_is_running(RealKinSimPlugin)('real kin sim'))
             self.add_child(self.send_controls)
         else:
             self.add_child(success_is_running(TimePlugin)('increase time closed loop'))
@@ -63,5 +63,5 @@ class ControlLoop(AsyncBehavior):
 
     def add_evaluate_debug_expressions(self, log_traj: bool):
         if not self.debug_added:
-            self.insert_child(EvaluateDebugExpressions(log_traj=log_traj), 1)
+            self.insert_child(EvaluateDebugExpressions(log_traj=log_traj), 3)
             self.debug_added = True

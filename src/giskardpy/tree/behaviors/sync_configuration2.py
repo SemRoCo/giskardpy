@@ -55,4 +55,4 @@ class SyncConfiguration2(GiskardBehavior):
             joint_name = PrefixName(joint_name, self.group_name)
             god_map.world.state[joint_name][Derivatives.position] = position
 
-        return Status.RUNNING
+        return Status.SUCCESS

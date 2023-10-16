@@ -20,9 +20,10 @@ class JointGoalReached(Monitor):
                 error = cas.shortest_angular_distance(current, goal)
             else:
                 error = goal - current
-            god_map.debug_expression_manager.add_debug_expression(str(joint_name), cas.min(cas.abs(error), 0.01))
+            # god_map.debug_expression_manager.add_debug_expression(str(joint_name), cas.min(cas.abs(error), 0.01))
             comparison_list.append(cas.less(cas.abs(error), threshold))
         expression = cas.logic_all(cas.Expression(comparison_list))
         super().__init__(name, crucial=crucial)
         self.set_expression(expression)
+        god_map.debug_expression_manager.add_debug_expression(f'joints reached', self.expression)
 

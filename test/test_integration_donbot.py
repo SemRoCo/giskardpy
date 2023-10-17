@@ -67,7 +67,7 @@ class DonbotTestWrapper(GiskardTestWrapper):
         giskard = Giskard(world_config=WorldWithBoxyBaseConfig(),
                           collision_avoidance_config=DonbotCollisionAvoidanceConfig(),
                           robot_interface_config=DonbotStandaloneInterfaceConfig(),
-                          behavior_tree_config=StandAloneBTConfig(debug_mode=True),
+                          behavior_tree_config=StandAloneBTConfig(),
                           qp_controller_config=QPControllerConfig())
         super().__init__(giskard)
 

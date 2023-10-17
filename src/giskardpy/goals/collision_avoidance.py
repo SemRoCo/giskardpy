@@ -82,7 +82,7 @@ class ExternalCollisionAvoidance(Goal):
 
         weight = cas.save_division(WEIGHT_COLLISION_AVOIDANCE,  # divide by number of active repeller per link
                                    cas.min(number_of_external_collisions, self.num_repeller))
-        distance_monitor = Monitor('collision distance', crucial=False)
+        distance_monitor = Monitor(f'collision distance {self.link_name}/{self.idx}', crucial=False)
         distance_monitor.set_expression(cas.less(actual_distance, 50))
         self.add_monitor(distance_monitor)
         task = Task('stay away')
@@ -195,8 +195,9 @@ class SelfCollisionAvoidance(Goal):
 
         weight = cas.save_division(WEIGHT_COLLISION_AVOIDANCE,  # divide by number of active repeller per link
                                    cas.min(number_of_self_collisions, self.num_repeller))
-        distance_monitor = Monitor('collision distance', crucial=False)
+        distance_monitor = Monitor(f'collision distance {self.link_a}/{self.link_b}/{self.idx}', crucial=False)
         distance_monitor.set_expression(cas.less(actual_distance, 50))
+        god_map.debug_expression_manager.add_debug_expression(f'distance {str(self)}', actual_distance)
         self.add_monitor(distance_monitor)
         task = Task('stay away')
         task.add_to_hold_monitor(distance_monitor)

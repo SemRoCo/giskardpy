@@ -85,6 +85,8 @@ class MonitorManager:
         self.state = next_state
 
     def add_monitor(self, monitor: Monitor):
+        if [x for x in self.monitors if x.name == monitor.name]:
+            raise GiskardException(f'Monitor named {monitor.name} already exists.')
         self.monitors.append(monitor)
         monitor.set_id(len(self.monitors) - 1)
 

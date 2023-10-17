@@ -84,30 +84,41 @@ class Monitor:
     def get_state_expression(self):
         return symbol_manager.get_symbol(f'god_map.monitor_manager.state[{self.id}]')
 
+    def compile(self):
+        # use this if you need to do stuff, after the qp controller has been initialized
+        pass
+
 
 class LocalMinimumReached(Monitor):
     def __init__(self, name: str = 'local minimum reached', min_cut_off: float = 0.01, max_cut_off: float = 0.06,
                  joint_convergence_threshold: float = 0.01, windows_size: int = 1):
         super().__init__(name=name, crucial=True, stay_one=False)
+        self.joint_convergence_threshold = joint_convergence_threshold
+        self.min_cut_off = min_cut_off
+        self.max_cut_off = max_cut_off
+        self.windows_size = windows_size
+
+    def compile(self):
         condition_list = []
-        traj_length_in_sec = symbol_manager.time * god_map.qp_controller_config.sample_period
+        if god_map.is_closed_loop():
+            traj_length_in_sec = symbol_manager.time
+        else:
+            traj_length_in_sec = symbol_manager.time * god_map.qp_controller_config.sample_period
         condition_list.append(cas.greater(traj_length_in_sec, 1))
-        for free_variable_name, free_variable in god_map.world.free_variables.items():
+        for free_variable in god_map.free_variables:
+            free_variable_name = free_variable.name
             velocity_limit = symbol_manager.evaluate_expr(free_variable.get_upper_limit(Derivatives.velocity))
-            velocity_limit *= joint_convergence_threshold
-            velocity_limit = min(max(min_cut_off, velocity_limit), max_cut_off)
-            for t in range(windows_size):
+            velocity_limit *= self.joint_convergence_threshold
+            velocity_limit = min(max(self.min_cut_off, velocity_limit), self.max_cut_off)
+            for t in range(self.windows_size):
                 if t == 0:
                     joint_vel_symbol = free_variable.get_symbol(Derivatives.velocity)
                 else:
                     expr = f'god_map.trajectory.get_exact({-t})[\'{free_variable_name}\'].velocity'
                     joint_vel_symbol = symbol_manager.get_symbol(expr)
-                god_map.debug_expression_manager.add_debug_expression(f'{free_variable_name} loc min, vel', cas.abs(joint_vel_symbol))
-                god_map.debug_expression_manager.add_debug_expression(f'{free_variable_name} loc min, thr', velocity_limit)
                 condition_list.append(cas.less(cas.abs(joint_vel_symbol), velocity_limit))
 
         self.expression = cas.logic_all(cas.Expression(condition_list))
-        god_map.debug_expression_manager.add_debug_expression(f'loc min reached', self.expression)
 
 
 class TimeAbove(Monitor):

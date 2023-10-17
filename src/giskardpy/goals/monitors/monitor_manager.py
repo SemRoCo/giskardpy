@@ -42,6 +42,7 @@ class MonitorManager:
     def compile_monitors(self):
         expressions = []
         for monitor in self.monitors:
+            monitor.compile()
             expressions.append(monitor.get_expression())
         expressions = cas.Expression(expressions)
         self.compiled_monitors = expressions.compile(expressions.free_symbols())

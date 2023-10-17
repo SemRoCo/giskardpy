@@ -2,6 +2,7 @@ from py_trees import Sequence
 
 from giskardpy.god_map import god_map
 from giskardpy.model.collision_world_syncer import CollisionCheckerLib
+from giskardpy.symbol_manager import symbol_manager
 from giskardpy.tree.behaviors.collision_checker import CollisionChecker
 from giskardpy.tree.behaviors.evaluate_debug_expressions import EvaluateDebugExpressions
 from giskardpy.tree.behaviors.evaluate_monitors import EvaluateMonitors

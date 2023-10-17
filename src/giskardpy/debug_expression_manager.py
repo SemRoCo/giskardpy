@@ -19,6 +19,7 @@ class DebugExpressionManager:
 
     def __init__(self):
         self.debug_expressions = {}
+        self._debug_trajectory = Trajectory()
 
     def add_debug_expression(self, name: str, expression: cas.Expression):
         self.debug_expressions[name] = expression
@@ -28,7 +29,6 @@ class DebugExpressionManager:
         return self._debug_trajectory
 
     def compile_debug_expressions(self):
-        self._debug_trajectory = Trajectory()
         for name, expr in self.debug_expressions.items():
             if isinstance(expr, (int, float)):
                 self.debug_expressions[name] = cas.Expression(expr)

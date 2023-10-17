@@ -31,7 +31,8 @@ class GiskardBT(BehaviourTree):
         self.process_goal = failure_is_success(ProcessGoal)(projection=not god_map.is_closed_loop())
         self.post_processing = failure_is_success(PostProcessing)()
         self.cleanup_control_loop = CleanupControlLoop()
-        self.execute_traj = failure_is_success(ExecuteTraj)()
+        if god_map.is_planning():
+            self.execute_traj = failure_is_success(ExecuteTraj)()
 
         root.add_child(self.wait_for_goal)
         root.add_child(self.prepare_control_loop)

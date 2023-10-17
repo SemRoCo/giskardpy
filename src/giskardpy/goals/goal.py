@@ -128,10 +128,16 @@ class Goal(ABC):
             raise ConstraintInitalizationException(f'Goal {str(self)} has no tasks.')
         for task in self.tasks:
             for constraint in task.get_eq_constraints():
+                name = f'{task.name}/{constraint.name}'
+                constraint.name = name
                 self._equality_constraints[constraint.name] = constraint
             for constraint in task.get_neq_constraints():
+                name = f'{task.name}/{constraint.name}'
+                constraint.name = name
                 self._inequality_constraints[constraint.name] = constraint
             for constraint in task.get_derivative_constraints():
+                name = f'{task.name}/{constraint.name}'
+                constraint.name = name
                 self._derivative_constraints[constraint.name] = constraint
 
         return self._equality_constraints, self._inequality_constraints, self._derivative_constraints, \

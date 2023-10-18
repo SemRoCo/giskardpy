@@ -82,7 +82,7 @@ class MonitorManager:
         if np.any(any_flips):
             for i, state in enumerate(any_flips):
                 if state:
-                    self.monitors[i].notify_flipped(god_map.trajectory_time_in_seconds)
+                    self.monitors[i].notify_flipped(god_map.time)
         self.state = next_state
 
     def add_monitor(self, monitor: Monitor):

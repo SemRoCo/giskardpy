@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     from giskardpy.configs.world_config import WorldConfig
     from giskardpy.tree.control_modes import ControlModes
     from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer, CollisionCheckerLib, \
-    CollisionAvoidanceGroupThresholds, Collisions
+        CollisionAvoidanceGroupThresholds, Collisions
     from giskardpy.tree.garden import TreeManager
     from giskardpy.model.world import WorldTree
 
@@ -66,14 +66,6 @@ class GodMap:
     ros_visualizer: ROSMsgVisualization
     free_variables: List[FreeVariable]
     controlled_joints: List[Joint]
-
-
-    @property
-    def trajectory_time_in_seconds(self):
-        time = self.time
-        if self.is_closed_loop():
-            return time
-        return time * self.qp_controller_config.sample_period
 
     def is_goal_msg_type_execute(self):
         return MoveGoal.EXECUTE == self.goal_msg.type

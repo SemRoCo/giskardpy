@@ -500,3 +500,22 @@ def kwargs_to_json(kwargs: Dict[str, Any]) -> str:
             kwargs[k] = convert_ros_message_to_dictionary(v)
     kwargs = replace_prefix_name_with_str(kwargs)
     return json.dumps(kwargs)
+
+
+def string_shortener(original_str: str, max_lines: int, max_line_length: int) -> str:
+    if len(original_str) < max_line_length:
+        return original_str
+    lines = []
+    start = 0
+    for _ in range(max_lines):
+        end = start + max_line_length
+        lines.append(original_str[start:end])
+        start = end
+
+    result = '\n'.join(lines)
+
+    # Check if string is cut off and add "..."
+    if len(original_str) > start:
+        result = result + '...'
+
+    return result

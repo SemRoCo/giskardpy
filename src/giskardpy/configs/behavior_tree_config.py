@@ -156,10 +156,10 @@ class StandAloneBTConfig(BehaviorTreeConfig):
         self.add_visualization_marker_publisher(add_to_sync=True, add_to_control_loop=True)
         self.add_tf_publisher(include_prefix=True, mode=TfPublishingModes.all)
         if self.debug_mode:
-            self.add_trajectory_plotter()
-            self.add_debug_trajectory_plotter()
-            # self.add_gantt_chart_plotter()
-            # self.add_goal_graph_plotter()
+            self.add_trajectory_plotter(wait=True)
+            self.add_debug_trajectory_plotter(wait=True)
+            self.add_gantt_chart_plotter()
+            self.add_goal_graph_plotter()
             self.add_debug_marker_publisher()
         # self.add_debug_marker_publisher()
         if self.planning_sleep is not None:

@@ -4,8 +4,7 @@ from giskardpy.god_map import god_map
 from giskardpy.my_types import PrefixName
 from giskardpy.tree.behaviors.collision_scene_updater import CollisionSceneUpdater
 from giskardpy.tree.behaviors.notify_state_change import NotifyStateChange
-from giskardpy.tree.behaviors.sync_configuration import SyncConfiguration
-from giskardpy.tree.behaviors.sync_configuration2 import SyncConfiguration2
+from giskardpy.tree.behaviors.sync_joint_state import SyncJointState, SyncJointStatePosition
 from giskardpy.tree.behaviors.sync_odometry import SyncOdometry
 from giskardpy.tree.behaviors.sync_tf_frames import SyncTfFrames
 
@@ -18,7 +17,8 @@ class Synchronization(Sequence):
         super().__init__(f'synchronize{suffix}')
         self.sync_tf_frames = SyncTfFrames('sync tf frames1')
         self.collision_scene_updater = CollisionSceneUpdater('update collision scene')
-        self.add_child(self.sync_tf_frames)
+        if not god_map.is_standalone():
+            self.add_child(self.sync_tf_frames)
         self.add_child(self.collision_scene_updater)
         if not god_map.is_standalone():
             self.add_child(NotifyStateChange())
@@ -27,11 +27,11 @@ class Synchronization(Sequence):
         self.sync_tf_frames.sync_6dof_joint_with_tf_frame(joint_name, tf_parent_frame, tf_child_frame)
 
     def sync_joint_state_topic(self, group_name: str, topic_name: str):
-        behavior = SyncConfiguration(group_name=group_name, joint_state_topic=topic_name)
+        behavior = SyncJointState(group_name=group_name, joint_state_topic=topic_name)
         self.insert_child(child=behavior, index=1)
 
     def sync_joint_state2_topic(self, group_name: str, topic_name: str):
-        behavior = SyncConfiguration2(group_name=group_name, joint_state_topic=topic_name)
+        behavior = SyncJointStatePosition(group_name=group_name, joint_state_topic=topic_name)
         self.insert_child(child=behavior, index=1)
 
     def sync_odometry_topic(self, topic_name: str, joint_name: PrefixName):

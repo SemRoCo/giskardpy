@@ -23,7 +23,7 @@ from giskardpy.god_map import god_map
 from giskardpy.model.world import WorldBranch
 from giskardpy.my_types import PrefixName
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
-from giskardpy.tree.behaviors.sync_configuration import SyncConfiguration
+from giskardpy.tree.behaviors.sync_joint_state import SyncJointState
 from giskardpy.tree.behaviors.sync_tf_frames import SyncTfFrames
 from giskardpy.utils import logging
 from giskardpy.utils.decorators import record_time
@@ -226,8 +226,8 @@ class WorldUpdater(GiskardBehavior):
         logging.loginfo(f'Attached object \'{req.group_name}\' at \'{req.parent_link}\'.')
         if world_body.joint_state_topic:
             # plugin_name = str(PrefixName(req.group_name, 'js'))
-            plugin = running_is_success(SyncConfiguration)(group_name=req.group_name,
-                                                           joint_state_topic=world_body.joint_state_topic)
+            plugin = running_is_success(SyncJointState)(group_name=req.group_name,
+                                                        joint_state_topic=world_body.joint_state_topic)
             god_map.tree_manager.insert_node(plugin, 'Synchronize', 1)
             self.added_plugin_names[req.group_name].append(plugin.name)
             logging.loginfo(f'Added configuration plugin for \'{req.group_name}\' to tree.')

@@ -4,7 +4,7 @@ from sensor_msgs.msg import JointState
 
 from giskardpy.god_map import god_map
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
-from giskardpy.tree.behaviors.sync_configuration import SyncConfiguration
+from giskardpy.tree.behaviors.sync_joint_state import SyncJointState
 from giskardpy.utils import logging
 
 
@@ -14,7 +14,7 @@ class SetTrackingStartTime(GiskardBehavior):
         self.offset = rospy.Duration(offset)
 
     def compute_time_offset(self) -> rospy.Duration:
-        sync_node = god_map.tree_manager.get_nodes_of_type(SyncConfiguration)
+        sync_node = god_map.tree_manager.get_nodes_of_type(SyncJointState)
         topic_name = sync_node[0].joint_state_topic
         msg = rospy.wait_for_message(topic_name, JointState, rospy.Duration(5))
         current_time = rospy.get_rostime()

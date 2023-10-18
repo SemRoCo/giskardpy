@@ -16,7 +16,7 @@ from giskardpy.tree.behaviors.publish_feedback import PublishFeedback
 from giskardpy.tree.behaviors.ros_msg_to_goal import ParseActionGoal
 from giskardpy.tree.behaviors.set_move_result import SetMoveResult
 from giskardpy.tree.behaviors.set_tracking_start_time import SetTrackingStartTime
-from giskardpy.tree.behaviors.sync_configuration import SyncConfiguration
+from giskardpy.tree.behaviors.sync_joint_state import SyncJointState
 from giskardpy.tree.behaviors.sync_odometry import SyncOdometry
 from giskardpy.tree.behaviors.sync_tf_frames import SyncTfFrames
 from giskardpy.tree.behaviors.time import TimePlugin

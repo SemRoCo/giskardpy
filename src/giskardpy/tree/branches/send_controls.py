@@ -5,7 +5,7 @@ from py_trees import Sequence
 from giskardpy.my_types import PrefixName
 from giskardpy.tree.behaviors.joint_group_vel_controller_publisher import JointGroupVelController
 from giskardpy.tree.behaviors.joint_vel_controller_publisher import JointVelController
-from giskardpy.tree.behaviors.send_trajectory_omni_drive_realtime2 import SendCmdVel
+from giskardpy.tree.behaviors.send_cmd_vel import SendCmdVel
 from giskardpy.tree.composites.running_selector import RunningSelector
 from giskardpy.tree.decorators import success_is_running, running_is_success
 

@@ -220,6 +220,19 @@ class WorldConfig(ABC):
         god_map.world.register_group(robot_group_name, root_link_name=parent_link_name, actuated=True)
 
 
+class EmptyWorld(WorldConfig):
+    def __init__(self):
+        super().__init__()
+
+    def setup(self):
+        self._default_limits = {
+            Derivatives.velocity: 1,
+        }
+        self.set_default_weights(velocity_weight=1, acceleration_weight=1, jerk_weight=1)
+        self.set_default_limits(self._default_limits)
+        self.add_empty_link('map')
+
+
 class WorldWithFixedRobot(WorldConfig):
     def __init__(self, joint_limits: Dict[Derivatives, float] = None):
         super().__init__()

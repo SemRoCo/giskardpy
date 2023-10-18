@@ -85,14 +85,10 @@ class Giskard:
     def _controlled_joints_sanity_check(self):
         world = god_map.world
         non_controlled_joints = set(world.movable_joint_names).difference(set(world.controlled_joints))
-        if len(world.controlled_joints) == 0:
+        if len(world.controlled_joints) == 0 and len(world.joints) > 0:
             raise GiskardException('No joints are flagged as controlled.')
         logging.loginfo(f'The following joints are non-fixed according to the urdf, '
                         f'but not flagged as controlled: {non_controlled_joints}.')
-        # FIXME
-        # if not god_map.get_tree_manager().base_tracking_enabled() \
-        #         and not god_map.control_mode == ControlModes.standalone:
-        #     logging.loginfo('No cmd_vel topic has been registered.')
 
     def add_goal_package_name(self, package_name: str):
         new_goals = get_all_classes_in_package(package_name, Goal)

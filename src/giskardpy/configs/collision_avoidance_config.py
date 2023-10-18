@@ -198,6 +198,16 @@ class LoadSelfCollisionMatrixConfig(CollisionAvoidanceConfig):
         self.load_self_collision_matrix(self._path_to_self_collision_matrix)
 
 
+class _BPBCollisionAvoidanceConfig(CollisionAvoidanceConfig):
+    def __init__(self, collision_checker: CollisionCheckerLib = CollisionCheckerLib.bpb):
+        super().__init__(collision_checker)
+
+    def setup(self):
+        pass
+
+    def _sanity_check(self):
+        pass
+
 class DisableCollisionAvoidanceConfig(CollisionAvoidanceConfig):
     def __init__(self):
         super().__init__(CollisionCheckerLib.none)

@@ -28,12 +28,6 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
         self.query: Optional[DefaultDict[PrefixName, Set[Tuple[bpb.CollisionObject, float]]]] = None
         super().__init__()
 
-    @classmethod
-    def empty(cls):
-        self = super().empty()
-        god_map.collision_scene.collision_checker_id = CollisionCheckerLib.bpb
-        return self
-
     @profile
     def add_object(self, link: Link):
         if not link.has_collisions():

@@ -166,20 +166,6 @@ class WorldTree(WorldTreeInterface):
         self._model_version = 0
         self._clear()
 
-    @classmethod
-    def empty_world(cls):
-        self = WorldTree()
-        self._default_weights = {
-            Derivatives.velocity: 1,
-            Derivatives.acceleration: 1,
-            Derivatives.jerk: 1,
-        }
-        self._default_limits = {
-            Derivatives.velocity: 1,
-        }
-        god_map.qp_controller_config.max_derivative = Derivatives.jerk
-        return self
-
     @property
     def root_link_name(self) -> PrefixName:
         return self._root_link_name

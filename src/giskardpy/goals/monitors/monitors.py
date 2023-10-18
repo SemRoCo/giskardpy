@@ -100,10 +100,7 @@ class LocalMinimumReached(Monitor):
 
     def compile(self):
         condition_list = []
-        if god_map.is_closed_loop():
-            traj_length_in_sec = symbol_manager.time
-        else:
-            traj_length_in_sec = symbol_manager.time * god_map.qp_controller_config.sample_period
+        traj_length_in_sec = symbol_manager.time
         condition_list.append(cas.greater(traj_length_in_sec, 1))
         for free_variable in god_map.free_variables:
             free_variable_name = free_variable.name

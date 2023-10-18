@@ -7,7 +7,7 @@ from giskardpy.tree.behaviors.instantaneous_controller import ControllerPlugin
 from giskardpy.tree.behaviors.kinematic_sim import KinSimPlugin
 from giskardpy.tree.behaviors.log_trajectory import LogTrajPlugin
 from giskardpy.tree.behaviors.real_kinematic_sim import RealKinSimPlugin
-from giskardpy.tree.behaviors.time import TimePlugin, RosTime
+from giskardpy.tree.behaviors.time import TimePlugin, RosTime, ControlCycleCounter
 from giskardpy.tree.branches.check_monitors import CheckMonitors
 from giskardpy.tree.branches.publish_state import PublishState
 from giskardpy.tree.branches.send_controls import SendControls
@@ -40,6 +40,7 @@ class ControlLoop(AsyncBehavior):
         self.add_child(self.check_monitors)
         self.add_child(ControllerPlugin('controller'))
 
+        self.add_child(success_is_running(ControlCycleCounter)())
         if not projection:
             self.send_controls = success_is_running(SendControls)()
 

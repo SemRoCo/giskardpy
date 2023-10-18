@@ -55,10 +55,10 @@ class DebugExpressionManager:
 
     def log_debug_expressions(self):
         if len(self.evaluated_debug_expressions) > 0:
-            time = god_map.time - 1
+            control_cycle_counter = god_map.control_cycle_counter - 1
             last_mjs = None
-            if time >= 1:
-                last_mjs = self._debug_trajectory.get_exact(time - 1)
+            if control_cycle_counter >= 1:
+                last_mjs = self._debug_trajectory.get_exact(control_cycle_counter - 1)
             js = JointStates()
             for name, value in self.evaluated_debug_expressions.items():
                 if len(value) > 1:
@@ -73,7 +73,7 @@ class DebugExpressionManager:
                             self.evaluated_expr_to_js(tmp_name, last_mjs, js, value[x])
                 else:
                     self.evaluated_expr_to_js(name, last_mjs, js, value)
-            self._debug_trajectory.set(time, js)
+            self._debug_trajectory.set(control_cycle_counter, js)
 
     def evaluated_expr_to_js(self, name, last_js, next_js, value):
         if last_js is not None:

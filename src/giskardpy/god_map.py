@@ -35,6 +35,7 @@ class GodMap:
     monitor_manager: MonitorManager
     giskard: Giskard
     time: float
+    control_cycle_counter: int
     world: WorldTree
     motion_goal_manager: MotionGoalManager
     debug_expression_manager: DebugExpressionManager

@@ -34,7 +34,8 @@ class CleanUp(GiskardBehavior):
         god_map.world.fast_all_fks = None
         god_map.collision_scene.reset_cache()
         god_map.closest_point = Collisions(1)
-        god_map.time = 1
+        god_map.time = 0
+        god_map.control_cycle_counter = 1
         god_map.monitor_manager = MonitorManager()
         god_map.motion_goal_manager = MotionGoalManager()
         god_map.debug_expression_manager = DebugExpressionManager()

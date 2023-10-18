@@ -2,35 +2,11 @@ from typing import Dict
 
 from py_trees import Sequence
 
-from giskardpy.god_map import god_map
-from giskardpy.model.collision_world_syncer import CollisionCheckerLib
 from giskardpy.my_types import PrefixName, Derivatives
-from giskardpy.tree.behaviors.collision_checker import CollisionChecker
-from giskardpy.tree.behaviors.evaluate_debug_expressions import EvaluateDebugExpressions
-from giskardpy.tree.behaviors.evaluate_monitors import EvaluateMonitors
-from giskardpy.tree.behaviors.goal_done import GoalDone
-from giskardpy.tree.behaviors.instantaneous_controller import ControllerPlugin
-from giskardpy.tree.behaviors.kinematic_sim import KinSimPlugin
-from giskardpy.tree.behaviors.log_trajectory import LogTrajPlugin
-from giskardpy.tree.behaviors.loop_detector import LoopDetector
-from giskardpy.tree.behaviors.max_trajectory_length import MaxTrajectoryLength
-from giskardpy.tree.behaviors.notify_state_change import NotifyStateChange
-from giskardpy.tree.behaviors.real_kinematic_sim import RealKinSimPlugin
 from giskardpy.tree.behaviors.send_trajectory import SendFollowJointTrajectory
-from giskardpy.tree.behaviors.time import TimePlugin
-from giskardpy.tree.behaviors.time_real import RosTime
-from giskardpy.tree.branches.check_monitors import CheckMonitors
 from giskardpy.tree.branches.control_loop import ControlLoop
-from giskardpy.tree.branches.prepare_control_loop import PrepareControlLoop, PrepareBaseTrajControlLoop
-from giskardpy.tree.branches.process_goal import ProcessGoal
-from giskardpy.tree.branches.publish_state import PublishState
-from giskardpy.tree.branches.send_controls import SendControls
-from giskardpy.tree.branches.synchronization import Synchronization
-from giskardpy.tree.composites.async_composite import AsyncBehavior
+from giskardpy.tree.branches.prepare_control_loop import PrepareBaseTrajControlLoop
 from giskardpy.tree.composites.better_parallel import Parallel, ParallelPolicy
-from giskardpy.tree.control_modes import ControlModes
-from giskardpy.tree.decorators import success_is_running
-from giskardpy.utils.decorators import catch_and_raise_to_blackboard
 
 
 class ExecuteTraj(Sequence):

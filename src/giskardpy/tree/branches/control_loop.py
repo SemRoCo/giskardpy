@@ -1,22 +1,13 @@
-from py_trees import Sequence
-
 from giskardpy.god_map import god_map
-from giskardpy.model.collision_world_syncer import CollisionCheckerLib
-from giskardpy.symbol_manager import symbol_manager
 from giskardpy.tree.behaviors.collision_checker import CollisionChecker
 from giskardpy.tree.behaviors.evaluate_debug_expressions import EvaluateDebugExpressions
 from giskardpy.tree.behaviors.evaluate_monitors import EvaluateMonitors
 from giskardpy.tree.behaviors.goal_canceled import GoalCanceled
-from giskardpy.tree.behaviors.goal_done import GoalDone
 from giskardpy.tree.behaviors.instantaneous_controller import ControllerPlugin
 from giskardpy.tree.behaviors.kinematic_sim import KinSimPlugin
 from giskardpy.tree.behaviors.log_trajectory import LogTrajPlugin
-from giskardpy.tree.behaviors.loop_detector import LoopDetector
-from giskardpy.tree.behaviors.max_trajectory_length import MaxTrajectoryLength
-from giskardpy.tree.behaviors.notify_state_change import NotifyStateChange
 from giskardpy.tree.behaviors.real_kinematic_sim import RealKinSimPlugin
-from giskardpy.tree.behaviors.time import TimePlugin
-from giskardpy.tree.behaviors.time_real import RosTime
+from giskardpy.tree.behaviors.time import TimePlugin, RosTime
 from giskardpy.tree.branches.check_monitors import CheckMonitors
 from giskardpy.tree.branches.publish_state import PublishState
 from giskardpy.tree.branches.send_controls import SendControls
@@ -56,7 +47,7 @@ class ControlLoop(AsyncBehavior):
             self.add_child(success_is_running(RealKinSimPlugin)('real kin sim'))
             self.add_child(self.send_controls)
         else:
-            self.add_child(success_is_running(TimePlugin)('increase time closed loop'))
+            self.add_child(success_is_running(TimePlugin)())
             self.add_child(success_is_running(KinSimPlugin)('kin sim'))
             self.add_child(success_is_running(LogTrajPlugin)('add traj point'))
 

@@ -356,19 +356,18 @@ def generate_pydot_graph(root, visibility_level):
                                  common.BlackBoxLevel.COMPONENT: "lawngreen",
                                  common.BlackBoxLevel.BIG_PICTURE: "white"
                                  }
-        node_type = type(node)
         if hasattr(node, 'original'):
-            node_type = type(node.original)
+            node = node.original
 
-        if node_type == Chooser:
+        if isinstance(node, Chooser):
             attributes = ('doubleoctagon', 'cyan', 'black')  # octagon
-        elif node_type == Selector:
+        elif isinstance(node, Selector):
             attributes = ('octagon', 'cyan', 'black')  # octagon
-        elif node_type == Sequence:
+        elif isinstance(node, Sequence):
             attributes = ('box', 'orange', 'black')
-        elif node_type == Parallel:
+        elif isinstance(node, Parallel):
             attributes = ('note', 'gold', 'black')
-        elif node_type == AsyncBehavior:
+        elif isinstance(node, AsyncBehavior):
             attributes = ('house', 'green', 'black')
         # elif isinstance(node, PluginBase) or node.children != []:
         #     attributes = ('ellipse', 'ghostwhite', 'black')  # encapsulating behaviour (e.g. wait)

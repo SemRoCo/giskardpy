@@ -9,7 +9,6 @@ from giskardpy.tree.branches.clean_up_control_loop import CleanupControlLoop
 from giskardpy.tree.branches.control_loop import ControlLoop
 from giskardpy.tree.branches.post_processing import PostProcessing
 from giskardpy.tree.branches.prepare_control_loop import PrepareControlLoop
-from giskardpy.tree.branches.process_goal import ProcessGoal
 from giskardpy.tree.branches.send_trajectories import ExecuteTraj
 from giskardpy.tree.branches.wait_for_goal import WaitForGoal
 from giskardpy.tree.control_modes import ControlModes

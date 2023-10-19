@@ -1,5 +1,8 @@
 from __future__ import division
 import hashlib
+
+import genpy
+import rostopic
 # I only do this, because otherwise test/test_integration_pr2.py::TestWorldManipulation::test_unsupported_options
 # fails on github actions
 import urdf_parser_py.urdf as up
@@ -23,9 +26,11 @@ from genpy import Message
 from geometry_msgs.msg import PointStamped, Point, Vector3Stamped, Vector3, Pose, PoseStamped, QuaternionStamped, \
     Quaternion
 from py_trees import Blackboard
+from rospy import ROSException
 from rospy_message_converter.message_converter import \
     convert_ros_message_to_dictionary as original_convert_ros_message_to_dictionary, \
     convert_dictionary_to_ros_message as original_convert_dictionary_to_ros_message
+from rostopic import ROSTopicException
 from sensor_msgs.msg import JointState
 from visualization_msgs.msg import Marker, MarkerArray
 
@@ -519,3 +524,23 @@ def string_shortener(original_str: str, max_lines: int, max_line_length: int) ->
         result = result + '...'
 
     return result
+
+
+def wait_for_topic_to_appear(topic_name: str, supported_types: List[Type[genpy.Message]]) -> Type[genpy.Message]:
+    waiting_message = f'Waiting for topic \'{topic_name}\' to appear...'
+    msg_type = None
+    while msg_type is None and not rospy.is_shutdown():
+        logging.loginfo(waiting_message)
+        try:
+            rostopic.get_info_text(topic_name)
+            msg_type, _, _ = rostopic.get_topic_class(topic_name)
+            if msg_type is None:
+                raise ROSTopicException()
+            if msg_type not in supported_types:
+                raise TypeError(f'Topic of type \'{msg_type}\' is not supported. '
+                                f'Must be one of: \'{supported_types}\'')
+            else:
+                logging.loginfo(f'\'{topic_name}\' appeared.')
+                return msg_type
+        except (ROSException, ROSTopicException) as e:
+            rospy.sleep(1)

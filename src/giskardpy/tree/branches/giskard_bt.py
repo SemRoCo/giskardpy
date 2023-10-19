@@ -2,6 +2,7 @@ from py_trees import Sequence
 from py_trees_ros.trees import BehaviourTree
 
 from giskard_msgs.msg import MoveAction
+from giskardpy.exceptions import GiskardException
 from giskardpy.god_map import god_map
 from giskardpy.tree.behaviors.send_result import SendResult
 from giskardpy.tree.branches.clean_up_control_loop import CleanupControlLoop
@@ -23,8 +24,8 @@ class GiskardBT(BehaviourTree):
 
     def __init__(self, control_mode: ControlModes):
         god_map.tree_manager.control_mode = control_mode
-        # TODO reject invalid control mode
-        # raise KeyError(f'Robot interface mode \'{self._control_mode}\' is not supported.')
+        if control_mode not in ControlModes:
+            raise AttributeError(f'Control mode {control_mode} doesn\'t exist.')
         root = Sequence('Giskard')
         self.wait_for_goal = WaitForGoal()
         self.prepare_control_loop = failure_is_success(PrepareControlLoop)()

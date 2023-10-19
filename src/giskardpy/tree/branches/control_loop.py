@@ -13,7 +13,6 @@ from giskardpy.tree.branches.publish_state import PublishState
 from giskardpy.tree.branches.send_controls import SendControls
 from giskardpy.tree.branches.synchronization import Synchronization
 from giskardpy.tree.composites.async_composite import AsyncBehavior
-from giskardpy.tree.control_modes import ControlModes
 from giskardpy.tree.decorators import success_is_running, failure_is_running
 
 

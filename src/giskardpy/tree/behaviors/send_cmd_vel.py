@@ -15,6 +15,7 @@ from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
 from giskardpy.utils.decorators import catch_and_raise_to_blackboard
 from giskardpy.utils.logging import loginfo
+from giskardpy.utils.utils import wait_for_topic_to_appear
 
 
 # can be used during closed-loop control, instead of for tracking a trajectory
@@ -30,18 +31,9 @@ class SendCmdVel(GiskardBehavior, ABC):
         self.goal_time_tolerance = rospy.Duration(goal_time_tolerance)
         self.track_only_velocity = track_only_velocity
 
-        loginfo(f'Waiting for cmd_vel topic \'{self.cmd_vel_topic}\' to appear.')
-        try:
-            msg_type, _, _ = rostopic.get_topic_class(self.cmd_vel_topic)
-            if msg_type is None:
-                raise ROSTopicException()
-            if msg_type not in self.supported_state_types:
-                raise TypeError(f'Cmd_vel topic of type \'{msg_type}\' is not supported. '
-                                f'Must be one of: \'{self.supported_state_types}\'')
-            self.vel_pub = rospy.Publisher(self.cmd_vel_topic, Twist, queue_size=10)
-        except ROSException as e:
-            logging.logwarn(f'Couldn\'t connect to {self.cmd_vel_topic}. Is it running?')
-            rospy.sleep(1)
+        wait_for_topic_to_appear(self.cmd_vel_topic, self.supported_state_types)
+
+        self.vel_pub = rospy.Publisher(self.cmd_vel_topic, Twist, queue_size=10)
 
         if joint_name is None:
             for joint in god_map.world.joints.values():

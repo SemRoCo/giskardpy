@@ -12,6 +12,7 @@ from giskardpy.my_types import Derivatives
 from giskardpy.tree.behaviors.cmd_publisher import CommandPublisher
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.decorators import catch_and_raise_to_blackboard, record_time
+from giskardpy.utils.utils import wait_for_topic_to_appear
 
 
 class JointGroupVelController(GiskardBehavior):
@@ -20,6 +21,7 @@ class JointGroupVelController(GiskardBehavior):
         super().__init__(namespace)
         self.namespace = namespace
         self.cmd_topic = f'{self.namespace}/command'
+        wait_for_topic_to_appear(topic_name=self.cmd_topic, supported_types=[Float64MultiArray])
         self.cmd_pub = rospy.Publisher(self.cmd_topic, Float64MultiArray, queue_size=10)
         self.joint_names = rospy.get_param(f'{self.namespace}/joints')
         for i in range(len(self.joint_names)):

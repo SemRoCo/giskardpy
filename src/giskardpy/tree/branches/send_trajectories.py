@@ -24,10 +24,10 @@ class ExecuteTraj(Sequence):
         self.base_closed_loop = ControlLoop()
         self.move_robots.add_child(self.base_closed_loop)
 
-    def add_follow_joint_traj_action_server(self, namespace: str, state_topic: str, group_name: str,
+    def add_follow_joint_traj_action_server(self, namespace: str, group_name: str,
                                             fill_velocity_values: bool,
                                             path_tolerance: Dict[Derivatives, float] = None):
-        behavior = SendFollowJointTrajectory(action_namespace=namespace, state_topic=state_topic, group_name=group_name,
+        behavior = SendFollowJointTrajectory(namespace=namespace, group_name=group_name,
                                              fill_velocity_values=fill_velocity_values, path_tolerance=path_tolerance)
         self.move_robots.add_child(behavior)
 

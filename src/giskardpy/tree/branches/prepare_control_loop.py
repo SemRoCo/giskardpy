@@ -10,7 +10,6 @@ from giskardpy.tree.behaviors.plot_goal_graph import PlotGoalGraph
 from giskardpy.tree.behaviors.publish_feedback import PublishFeedback
 from giskardpy.tree.behaviors.ros_msg_to_goal import ParseActionGoal, AddBaseTrajFollowerGoal
 from giskardpy.tree.behaviors.set_tracking_start_time import SetTrackingStartTime
-from giskardpy.tree.decorators import success_is_failure
 
 
 class PrepareControlLoop(Sequence):

@@ -24,11 +24,9 @@ class TracyJointTrajServerMujocoInterface(RobotInterfaceConfig):
     def setup(self):
         self.sync_joint_state_topic('joint_states')
         self.add_follow_joint_trajectory_server(
-            namespace='/left_arm/scaled_pos_joint_traj_controller_left/follow_joint_trajectory',
-            state_topic='/left_arm/scaled_pos_joint_traj_controller_left/state')
+            namespace='/left_arm/scaled_pos_joint_traj_controller_left')
         self.add_follow_joint_trajectory_server(
-            namespace='/right_arm/scaled_pos_joint_traj_controller_right/follow_joint_trajectory',
-            state_topic='/right_arm/scaled_pos_joint_traj_controller_right/state')
+            namespace='/right_arm/scaled_pos_joint_traj_controller_right')
 
 
 class TracyStandAloneRobotInterfaceConfig(StandAloneRobotInterfaceConfig):

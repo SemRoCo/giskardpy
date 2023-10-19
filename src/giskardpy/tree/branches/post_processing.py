@@ -1,9 +1,6 @@
 from py_trees import Sequence
 
 from giskardpy.tree.behaviors.exception_to_execute import ClearBlackboardException
-from giskardpy.tree.behaviors.plot_debug_expressions import PlotDebugExpressions
-from giskardpy.tree.behaviors.plot_goal_gantt_chart import PlotGanttChart
-from giskardpy.tree.behaviors.plot_trajectory import PlotTrajectory
 from giskardpy.tree.behaviors.set_move_result import SetMoveResult
 
 

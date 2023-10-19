@@ -3,15 +3,14 @@ from typing import Optional
 
 import rospy
 from py_trees import Status
-from rospy import ROSException
 from sensor_msgs.msg import JointState
 
 from giskardpy.data_types import JointStates
 from giskardpy.god_map import god_map
 from giskardpy.my_types import PrefixName, Derivatives
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
-from giskardpy.utils import logging
 from giskardpy.utils.decorators import record_time
+from giskardpy.utils.utils import wait_for_topic_to_appear
 
 
 class SyncJointState(GiskardBehavior):
@@ -30,13 +29,7 @@ class SyncJointState(GiskardBehavior):
     @record_time
     @profile
     def setup(self, timeout=0.0):
-        msg = None
-        while msg is None and not rospy.is_shutdown():
-            try:
-                msg = rospy.wait_for_message(self.joint_state_topic, JointState, rospy.Duration(1))
-                self.lock.put(msg)
-            except ROSException as e:
-                logging.logwarn(f'Waiting for topic \'{self.joint_state_topic}\' to appear.')
+        wait_for_topic_to_appear(topic_name=self.joint_state_topic, supported_types=[JointState])
         self.joint_state_sub = rospy.Subscriber(self.joint_state_topic, JointState, self.cb, queue_size=1)
         return super().setup(timeout)
 
@@ -81,6 +74,7 @@ class SyncJointStatePosition(GiskardBehavior):
         self.joint_state_topic = joint_state_topic
         if not self.joint_state_topic.startswith('/'):
             self.joint_state_topic = '/' + self.joint_state_topic
+        wait_for_topic_to_appear(topic_name=self.joint_state_topic, supported_types=[JointState])
         super().__init__(str(self))
         self.mjs: Optional[JointStates] = None
         self.group_name = group_name

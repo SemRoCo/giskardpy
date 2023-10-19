@@ -109,7 +109,6 @@ class RobotInterfaceConfig(ABC):
 
     def add_follow_joint_trajectory_server(self,
                                            namespace: str,
-                                           state_topic: str,
                                            group_name: Optional[str] = None,
                                            fill_velocity_values: bool = False,
                                            path_tolerance: Dict[Derivatives, float] = None):
@@ -117,7 +116,6 @@ class RobotInterfaceConfig(ABC):
         Connect Giskard to a follow joint trajectory server. It will automatically figure out which joints are offered
         and can be controlled.
         :param namespace: namespace of the action server
-        :param state_topic: name of the state topic of the action server
         :param group_name: set if there are multiple robots
         :param fill_velocity_values: whether to fill the velocity entries in the message send to the robot
         """
@@ -126,7 +124,6 @@ class RobotInterfaceConfig(ABC):
         if not god_map.is_planning():
             raise GiskardException('add_follow_joint_trajectory_server only works in planning mode')
         self.tree_manager.tree.execute_traj.add_follow_joint_traj_action_server(namespace=namespace,
-                                                                                state_topic=state_topic,
                                                                                 group_name=group_name,
                                                                                 fill_velocity_values=fill_velocity_values,
                                                                                 path_tolerance=path_tolerance)

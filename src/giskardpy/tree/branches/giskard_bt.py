@@ -6,6 +6,7 @@ from giskardpy.exceptions import GiskardException
 from giskardpy.god_map import god_map
 from giskardpy.tree.behaviors.send_result import SendResult
 from giskardpy.tree.branches.clean_up_control_loop import CleanupControlLoop
+from giskardpy.tree.branches.control_loop import ControlLoop
 from giskardpy.tree.branches.post_processing import PostProcessing
 from giskardpy.tree.branches.prepare_control_loop import PrepareControlLoop
 from giskardpy.tree.branches.process_goal import ProcessGoal
@@ -18,9 +19,9 @@ from giskardpy.tree.decorators import failure_is_success
 class GiskardBT(BehaviourTree):
     wait_for_goal: WaitForGoal
     prepare_control_loop: PrepareControlLoop
-    process_goal: ProcessGoal
     post_processing: PostProcessing
     cleanup_control_loop: CleanupControlLoop
+    control_loop_branch: ControlLoop
 
     def __init__(self, control_mode: ControlModes):
         god_map.tree_manager.control_mode = control_mode
@@ -29,7 +30,7 @@ class GiskardBT(BehaviourTree):
         root = Sequence('Giskard')
         self.wait_for_goal = WaitForGoal()
         self.prepare_control_loop = failure_is_success(PrepareControlLoop)()
-        self.process_goal = failure_is_success(ProcessGoal)(projection=not god_map.is_closed_loop())
+        self.control_loop_branch = failure_is_success(ControlLoop)(projection=not god_map.is_closed_loop())
         self.post_processing = failure_is_success(PostProcessing)()
         self.cleanup_control_loop = CleanupControlLoop()
         if god_map.is_planning():
@@ -37,7 +38,7 @@ class GiskardBT(BehaviourTree):
 
         root.add_child(self.wait_for_goal)
         root.add_child(self.prepare_control_loop)
-        root.add_child(self.process_goal)
+        root.add_child(self.control_loop_branch)
         root.add_child(self.cleanup_control_loop)
         if god_map.is_planning():
             root.add_child(self.execute_traj)

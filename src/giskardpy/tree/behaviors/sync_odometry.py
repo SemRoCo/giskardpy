@@ -64,7 +64,7 @@ class SyncOdometryNoLock(SyncOdometry):
     @profile
     def __init__(self, odometry_topic: str, joint_name: PrefixName, name_suffix: str = ''):
         self.odometry_topic = odometry_topic
-        super().__init__(str(self) + name_suffix)
+        GiskardBehavior.__init__(self, str(self) + name_suffix)
         self.joint_name = joint_name
         self.last_msg = None
 

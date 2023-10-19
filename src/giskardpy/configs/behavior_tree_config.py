@@ -54,7 +54,7 @@ class BehaviorTreeConfig(ABC):
         if add_to_sync:
             self.tree_manager.tree.wait_for_goal.publish_state.add_visualization_marker_behavior(use_decomposed_meshes)
         if add_to_control_loop:
-            self.tree_manager.tree.process_goal.control_loop_branch.publish_state.add_visualization_marker_behavior(
+            self.tree_manager.tree.control_loop_branch.publish_state.add_visualization_marker_behavior(
                 use_decomposed_meshes)
 
     def add_qp_data_publisher(self, publish_lb: bool = False, publish_ub: bool = False,
@@ -81,7 +81,7 @@ class BehaviorTreeConfig(ABC):
                 publish_g=publish_g,
                 publish_debug=publish_debug)
         else:
-            self.tree_manager.tree.process_goal.control_loop_branch.publish_state.add_qp_data_publisher(
+            self.tree_manager.tree.control_loop_branch.publish_state.add_qp_data_publisher(
                 publish_lb=publish_lb,
                 publish_ub=publish_ub,
                 publish_lbA=publish_lbA,
@@ -124,7 +124,7 @@ class BehaviorTreeConfig(ABC):
         Publishes debug expressions defined in goals.
         """
         self.add_evaluate_debug_expressions()
-        self.tree_manager.tree.process_goal.control_loop_branch.publish_state.add_debug_marker_publisher()
+        self.tree_manager.tree.control_loop_branch.publish_state.add_debug_marker_publisher()
 
     def add_tf_publisher(self, include_prefix: bool = True, tf_topic: str = 'tf',
                          mode: TfPublishingModes = TfPublishingModes.attached_and_world_objects):
@@ -138,9 +138,9 @@ class BehaviorTreeConfig(ABC):
     def add_evaluate_debug_expressions(self):
         self.tree_manager.tree.prepare_control_loop.add_compile_debug_expressions()
         if god_map.is_closed_loop():
-            self.tree_manager.tree.process_goal.control_loop_branch.add_evaluate_debug_expressions(log_traj=False)
+            self.tree_manager.tree.control_loop_branch.add_evaluate_debug_expressions(log_traj=False)
         else:
-            self.tree_manager.tree.process_goal.control_loop_branch.add_evaluate_debug_expressions(log_traj=True)
+            self.tree_manager.tree.control_loop_branch.add_evaluate_debug_expressions(log_traj=True)
         if god_map.is_planning():
             god_map.tree_manager.tree.execute_traj.prepare_base_control.add_compile_debug_expressions()
             god_map.tree_manager.tree.execute_traj.base_closed_loop.add_evaluate_debug_expressions(log_traj=False)

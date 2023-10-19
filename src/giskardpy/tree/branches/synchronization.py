@@ -5,7 +5,7 @@ from giskardpy.my_types import PrefixName
 from giskardpy.tree.behaviors.collision_scene_updater import CollisionSceneUpdater
 from giskardpy.tree.behaviors.notify_state_change import NotifyStateChange
 from giskardpy.tree.behaviors.sync_joint_state import SyncJointState, SyncJointStatePosition
-from giskardpy.tree.behaviors.sync_odometry import SyncOdometry
+from giskardpy.tree.behaviors.sync_odometry import SyncOdometry, SyncOdometryNoLock
 from giskardpy.tree.behaviors.sync_tf_frames import SyncTfFrames
 
 
@@ -36,4 +36,8 @@ class Synchronization(Sequence):
 
     def sync_odometry_topic(self, topic_name: str, joint_name: PrefixName):
         behavior = SyncOdometry(topic_name, joint_name)
+        self.insert_child(child=behavior, index=1)
+
+    def sync_odometry_topic_no_lock(self, topic_name: str, joint_name: PrefixName):
+        behavior = SyncOdometryNoLock(topic_name, joint_name)
         self.insert_child(child=behavior, index=1)

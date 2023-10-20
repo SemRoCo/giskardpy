@@ -47,8 +47,9 @@ class RobotInterfaceConfig(ABC):
         joint_name = self.world.search_for_joint_name(joint_name)
         self.tree_manager.tree.wait_for_goal.synchronization.sync_odometry_topic(odometry_topic, joint_name)
         if god_map.is_closed_loop():
-            self.tree_manager.tree.control_loop_branch.synchronization.sync_odometry_topic_no_lock(odometry_topic,
-                                                                                                   joint_name)
+            self.tree_manager.tree.control_loop_branch.closed_loop_synchronization.sync_odometry_topic_no_lock(
+                odometry_topic,
+                joint_name)
 
     def sync_6dof_joint_with_tf_frame(self, joint_name: str, tf_parent_frame: str, tf_child_frame: str):
         """
@@ -59,7 +60,7 @@ class RobotInterfaceConfig(ABC):
                                                                                            tf_parent_frame,
                                                                                            tf_child_frame)
         if god_map.is_closed_loop():
-            self.tree_manager.tree.control_loop_branch.synchronization.sync_6dof_joint_with_tf_frame(
+            self.tree_manager.tree.control_loop_branch.closed_loop_synchronization.sync_6dof_joint_with_tf_frame(
                 joint_name,
                 tf_parent_frame,
                 tf_child_frame)
@@ -73,7 +74,7 @@ class RobotInterfaceConfig(ABC):
         self.tree_manager.tree.wait_for_goal.synchronization.sync_joint_state_topic(group_name=group_name,
                                                                                     topic_name=topic_name)
         if god_map.is_closed_loop():
-            self.tree_manager.tree.control_loop_branch.synchronization.sync_joint_state2_topic(
+            self.tree_manager.tree.control_loop_branch.closed_loop_synchronization.sync_joint_state2_topic(
                 group_name=group_name,
                 topic_name=topic_name)
 

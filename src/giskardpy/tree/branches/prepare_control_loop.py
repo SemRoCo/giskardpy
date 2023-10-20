@@ -8,7 +8,7 @@ from giskardpy.tree.behaviors.init_qp_controller import InitQPController
 from giskardpy.tree.behaviors.new_trajectory import NewTrajectory
 from giskardpy.tree.behaviors.plot_goal_graph import PlotGoalGraph
 from giskardpy.tree.behaviors.publish_feedback import PublishFeedback
-from giskardpy.tree.behaviors.ros_msg_to_goal import ParseActionGoal, AddBaseTrajFollowerGoal
+from giskardpy.tree.behaviors.ros_msg_to_goal import ParseActionGoal, AddBaseTrajFollowerGoal, SetExecutionMode
 from giskardpy.tree.behaviors.set_tracking_start_time import SetTrackingStartTime
 
 
@@ -22,6 +22,7 @@ class PrepareControlLoop(Sequence):
                                        MoveFeedback.PLANNING))
         self.add_child(CleanUpPlanning('CleanUpPlanning'))
         self.add_child(NewTrajectory('NewTrajectory'))
+        self.add_child(SetExecutionMode())
         self.add_child(ParseActionGoal('RosMsgToGoal'))
         self.add_child(InitQPController('InitQPController'))
         self.add_child(CompileMonitors())

@@ -17,7 +17,7 @@ class WaitForGoal(Sequence):
     def __init__(self, name: str = 'wait for goal'):
         super().__init__(name)
         self.world_updater = WorldUpdater('update world')
-        self.synchronization = Synchronization('sync 1')
+        self.synchronization = Synchronization()
         self.publish_state = PublishState()
         self.goal_received = GoalReceived('has goal?',
                                           god_map.giskard.action_server_name,

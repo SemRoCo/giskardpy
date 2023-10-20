@@ -13,17 +13,17 @@ class Synchronization(Sequence):
     sync_tf_frames: SyncTfFrames
     collision_scene_updater: CollisionSceneUpdater
 
-    def __init__(self, suffix: str = ''):
-        super().__init__(f'synchronize{suffix}')
-        self.sync_tf_frames = SyncTfFrames('sync tf frames1')
+    def __init__(self):
+        super().__init__('synchronize')
+        self.sync_tf_frames = None
         self.collision_scene_updater = CollisionSceneUpdater('update collision scene')
-        if not god_map.is_standalone():
-            self.add_child(self.sync_tf_frames)
         self.add_child(self.collision_scene_updater)
-        if not god_map.is_standalone():
-            self.add_child(NotifyStateChange())
+        self.add_child(NotifyStateChange())
 
     def sync_6dof_joint_with_tf_frame(self, joint_name: PrefixName, tf_parent_frame: str, tf_child_frame: str):
+        if self.sync_tf_frames is None:
+            self.sync_tf_frames = SyncTfFrames('sync tf frames1')
+            self.add_child(self.sync_tf_frames)
         self.sync_tf_frames.sync_6dof_joint_with_tf_frame(joint_name, tf_parent_frame, tf_child_frame)
 
     def sync_joint_state_topic(self, group_name: str, topic_name: str):

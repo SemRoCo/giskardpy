@@ -21,28 +21,52 @@ class GiskardBT(BehaviourTree):
     post_processing: PostProcessing
     cleanup_control_loop: CleanupControlLoop
     control_loop_branch: ControlLoop
+    root: Sequence
+    execute_traj: ExecuteTraj
+    projection_mode: bool
 
     def __init__(self, control_mode: ControlModes):
+        self.projection_mode = True
         god_map.tree_manager.control_mode = control_mode
         if control_mode not in ControlModes:
             raise AttributeError(f'Control mode {control_mode} doesn\'t exist.')
-        root = Sequence('Giskard')
+        self.root = Sequence('Giskard')
         self.wait_for_goal = WaitForGoal()
         self.prepare_control_loop = failure_is_success(PrepareControlLoop)()
-        self.control_loop_branch = failure_is_success(ControlLoop)(projection=not god_map.is_closed_loop())
+        self.control_loop_branch = failure_is_success(ControlLoop)()
+        if god_map.is_closed_loop():
+            self.control_loop_branch.add_closed_loop_behaviors()
+        else:
+            self.control_loop_branch.add_projection_behaviors()
+
         self.post_processing = failure_is_success(PostProcessing)()
         self.cleanup_control_loop = CleanupControlLoop()
         if god_map.is_planning():
             self.execute_traj = failure_is_success(ExecuteTraj)()
 
-        root.add_child(self.wait_for_goal)
-        root.add_child(self.prepare_control_loop)
-        root.add_child(self.control_loop_branch)
-        root.add_child(self.cleanup_control_loop)
-        if god_map.is_planning():
-            root.add_child(self.execute_traj)
-        root.add_child(self.post_processing)
-        root.add_child(SendResult('send result',
+        self.root.add_child(self.wait_for_goal)
+        self.root.add_child(self.prepare_control_loop)
+        self.root.add_child(self.control_loop_branch)
+        self.root.add_child(self.cleanup_control_loop)
+        self.root.add_child(self.post_processing)
+        self.root.add_child(SendResult('send result',
                                   god_map.giskard.action_server_name,
                                   MoveAction))
-        super().__init__(root)
+        super().__init__(self.root)
+        self.switch_to_execution()
+
+    def switch_to_projection(self):
+        if not self.projection_mode:
+            if god_map.is_planning():
+                self.root.remove_child(self.execute_traj)
+            elif god_map.is_closed_loop():
+                self.control_loop_branch.switch_to_projection()
+            self.projection_mode = True
+
+    def switch_to_execution(self):
+        if self.projection_mode:
+            if god_map.is_planning():
+                self.root.insert_child(self.execute_traj, -2)
+            elif god_map.is_closed_loop():
+                self.control_loop_branch.switch_to_closed_loop()
+            self.projection_mode = False

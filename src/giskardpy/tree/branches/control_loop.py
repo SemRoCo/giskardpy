@@ -28,8 +28,9 @@ class ControlLoop(AsyncBehavior):
     kin_sim: KinSimPlugin
     real_kin_sim: RealKinSimPlugin
     send_controls: SendControls
+    log_traj: LogTrajPlugin
 
-    def __init__(self, name: str = 'control_loop', projection: bool = False):
+    def __init__(self, name: str = 'control_loop', log_traj: bool = True):
         super().__init__(name)
         self.publish_state = success_is_running(PublishState)('publish state 2')
         self.projection_synchronization = success_is_running(Synchronization)()
@@ -38,11 +39,10 @@ class ControlLoop(AsyncBehavior):
         self.time = success_is_running(TimePlugin)()
         self.kin_sim = success_is_running(KinSimPlugin)('kin sim')
 
-        if god_map.is_closed_loop():
-            self.ros_time = success_is_running(RosTime)()
-            self.real_kin_sim = success_is_running(RealKinSimPlugin)('real kin sim')
-            self.send_controls = success_is_running(SendControls)()
-            self.closed_loop_synchronization = success_is_running(Synchronization)()
+        self.ros_time = success_is_running(RosTime)()
+        self.real_kin_sim = success_is_running(RealKinSimPlugin)('real kin sim')
+        self.send_controls = success_is_running(SendControls)()
+        self.closed_loop_synchronization = success_is_running(Synchronization)()
 
         self.add_child(failure_is_running(GoalCanceled)('goal canceled', god_map.giskard.action_server_name))
 
@@ -55,28 +55,22 @@ class ControlLoop(AsyncBehavior):
 
         self.add_child(success_is_running(ControlCycleCounter)())
 
-        self.add_child(success_is_running(LogTrajPlugin)('add traj point'))
-        self.add_child(self.publish_state)
+        self.log_traj = success_is_running(LogTrajPlugin)('add traj point')
 
-        if projection:
-            self.in_projection = True
-            self.add_projection_behaviors()
-        else:
-            self.in_projection = False
-            self.add_closed_loop_behaviors()
+        if log_traj:
+            self.add_child(self.log_traj)
+        self.add_child(self.publish_state)
 
     def switch_to_projection(self):
         if not self.in_projection:
             self.remove_closed_loop_behaviors()
             self.add_projection_behaviors()
-            self.in_projection = True
 
     def switch_to_closed_loop(self):
         if self.in_projection:
             if god_map.is_closed_loop():
                 self.remove_projection_behaviors()
                 self.add_closed_loop_behaviors()
-            self.in_projection = False
 
     def remove_projection_behaviors(self):
         self.remove_child(self.projection_synchronization)
@@ -93,12 +87,14 @@ class ControlLoop(AsyncBehavior):
         self.insert_child(self.projection_synchronization, 1)
         self.insert_child(self.time, -2)
         self.insert_child(self.kin_sim, -2)
+        self.in_projection = True
 
     def add_closed_loop_behaviors(self):
         self.insert_child(self.closed_loop_synchronization, 1)
         self.insert_child(self.ros_time, -2)
         self.insert_child(self.real_kin_sim, -2)
         self.insert_child(self.send_controls, -2)
+        self.in_projection = False
 
     def add_evaluate_debug_expressions(self, log_traj: bool):
         if not self.debug_added:

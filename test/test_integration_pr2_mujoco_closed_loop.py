@@ -132,21 +132,16 @@ class TestJointGoalsMujoco(TestJointGoals):
             'l_wrist_flex_joint': -0.1,
             'l_wrist_roll_joint': -6.062015047706399,
         }
-        # zero_pose.set_joint_goal(js)
-        # zero_pose.add_joint_goal_monitor('asdf', goal_state=js, threshold=0.005, crucial=False)
         zero_pose.set_joint_goal(goal_state=js)
         zero_pose.allow_all_collisions()
-        # zero_pose.set_json_goal('EnableVelocityTrajectoryTracking', enabled=True)
         zero_pose.projection()
 
         zero_pose.set_joint_goal(goal_state=js)
         zero_pose.allow_all_collisions()
-        # zero_pose.set_json_goal('EnableVelocityTrajectoryTracking', enabled=True)
         zero_pose.execute()
 
         zero_pose.set_joint_goal(goal_state=js)
         zero_pose.allow_all_collisions()
-        # zero_pose.set_json_goal('EnableVelocityTrajectoryTracking', enabled=True)
         zero_pose.projection()
 
 

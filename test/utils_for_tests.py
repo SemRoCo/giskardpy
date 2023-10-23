@@ -4,7 +4,7 @@ from collections import defaultdict
 from copy import deepcopy
 from multiprocessing import Queue
 from time import time
-from typing import Tuple, Optional, List
+from typing import Tuple, Optional, List, Dict, Union
 
 import hypothesis.strategies as st
 import numpy as np
@@ -409,19 +409,20 @@ class GiskardTestWrapper(GiskardWrapper):
         else:
             self.set_object_joint_state(self.environment_name, joint_state)
 
-    def compare_joint_state(self, current_js: dict, goal_js: dict, decimal: int = 2):
+    def compare_joint_state(self, current_js: Dict[Union[str, PrefixName], float],
+                            goal_js: Dict[Union[str, PrefixName], float],
+                            decimal: int = 2):
         for joint_name in goal_js:
             goal = goal_js[joint_name]
             current = current_js[joint_name]
-            joint_name = god_map.world.search_for_joint_name(joint_name)
-            if god_map.world.is_joint_continuous(joint_name):
+            if isinstance(joint_name, str):
+                joint_name = god_map.world.search_for_joint_name(joint_name)
+            if joint_name in god_map.world.joints and god_map.world.is_joint_continuous(joint_name):
                 np.testing.assert_almost_equal(shortest_angular_distance(goal, current), 0, decimal=decimal,
-                                               err_msg='{}: actual: {} desired: {}'.format(joint_name, current,
-                                                                                           goal))
+                                               err_msg=f'{joint_name}: actual: {current} desired: {goal}')
             else:
                 np.testing.assert_almost_equal(current, goal, decimal,
-                                               err_msg='{}: actual: {} desired: {}'.format(joint_name, current,
-                                                                                           goal))
+                                               err_msg=f'{joint_name}: actual: {current} desired: {goal}')
 
     #
     # GOAL STUFF #################################################################################################
@@ -471,9 +472,19 @@ class GiskardTestWrapper(GiskardWrapper):
         :param wait: this function blocks if wait=True
         :return: result from Giskard
         """
-        return self.send_goal(expected_error_code=expected_error_code,
-                              goal_type=MoveGoal.PROJECTION,
-                              wait=wait)
+        last_js = god_map.world.state.to_position_dict()
+        for key, value in list(last_js.items()):
+            if key not in god_map.controlled_joints:
+                del last_js[key]
+        result = self.send_goal(expected_error_code=expected_error_code,
+                                goal_type=MoveGoal.PROJECTION,
+                                wait=wait)
+        new_js = god_map.world.state.to_position_dict()
+        for key, value in list(new_js.items()):
+            if key not in god_map.controlled_joints:
+                del new_js[key]
+        self.compare_joint_state(new_js, last_js)
+        return result
 
     def plan_and_execute(self, expected_error_code: int = MoveResult.SUCCESS, stop_after: float = None,
                          wait: bool = True) -> MoveResult:

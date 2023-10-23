@@ -48,13 +48,11 @@ class SetExecutionMode(GiskardBehavior):
     @record_time
     @profile
     def update(self):
+        loginfo(f'Goal is of type {god_map.goal_msg.type}')
         if god_map.goal_msg.type == god_map.goal_msg.PROJECTION:
-            god_map.tree_manager.tree.control_loop_branch.switch_to_projection()
+            god_map.tree_manager.tree.switch_to_projection()
         elif god_map.goal_msg.type in [god_map.goal_msg.EXECUTE, god_map.goal_msg.PLAN_AND_EXECUTE]:
-            if god_map.is_closed_loop():
-                god_map.tree_manager.tree.control_loop_branch.switch_to_closed_loop()
-            else:
-                pass  # TODO
+            god_map.tree_manager.tree.switch_to_execution()
         else:
             raise GiskardException(f'Goal of type {god_map.goal_msg.type} is not supported.')
         return Status.SUCCESS

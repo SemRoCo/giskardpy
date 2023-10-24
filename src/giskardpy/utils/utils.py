@@ -544,3 +544,12 @@ def wait_for_topic_to_appear(topic_name: str, supported_types: List[Type[genpy.M
                 return msg_type
         except (ROSException, ROSTopicException) as e:
             rospy.sleep(1)
+
+
+def get_ros_msgs_constant_name_by_value(ros_msg_class: genpy.Message, value: Union[str, int, float]) -> str:
+    for attr_name in dir(ros_msg_class):
+        if not attr_name.startswith('_'):
+            attr_value = getattr(ros_msg_class, attr_name)
+            if attr_value == value:
+                return attr_name
+    raise AttributeError(f'Message type {ros_msg_class} has no constant that matches {value}.')

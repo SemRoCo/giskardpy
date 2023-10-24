@@ -9,6 +9,7 @@ from giskardpy.model.joints import OmniDrive, DiffDrive
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.logging import loginfo
 from giskardpy.utils.decorators import catch_and_raise_to_blackboard, record_time
+from giskardpy.utils.utils import get_ros_msgs_constant_name_by_value
 
 
 class ParseActionGoal(GiskardBehavior):
@@ -48,7 +49,7 @@ class SetExecutionMode(GiskardBehavior):
     @record_time
     @profile
     def update(self):
-        loginfo(f'Goal is of type {god_map.goal_msg.type}')
+        loginfo(f'Goal is of type {get_ros_msgs_constant_name_by_value(type(god_map.goal_msg), god_map.goal_msg.type)}')
         if god_map.is_goal_msg_type_projection():
             god_map.tree_manager.tree.switch_to_projection()
         elif god_map.is_goal_msg_type_execute():

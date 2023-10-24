@@ -342,6 +342,7 @@ class TestJointGoals:
         # zero_pose.set_json_goal('EnableVelocityTrajectoryTracking', enabled=True)
         zero_pose.execute()
 
+        zero_pose.set_seed_configuration(zero_pose.better_pose)
         zero_pose.set_joint_goal(goal_state=js)
         zero_pose.allow_all_collisions()
         # zero_pose.set_json_goal('EnableVelocityTrajectoryTracking', enabled=True)

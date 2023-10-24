@@ -49,9 +49,9 @@ class SetExecutionMode(GiskardBehavior):
     @profile
     def update(self):
         loginfo(f'Goal is of type {god_map.goal_msg.type}')
-        if god_map.goal_msg.type == god_map.goal_msg.PROJECTION:
+        if god_map.is_goal_msg_type_projection():
             god_map.tree_manager.tree.switch_to_projection()
-        elif god_map.goal_msg.type in [god_map.goal_msg.EXECUTE, god_map.goal_msg.PLAN_AND_EXECUTE]:
+        elif god_map.is_goal_msg_type_execute():
             god_map.tree_manager.tree.switch_to_execution()
         else:
             raise GiskardException(f'Goal of type {god_map.goal_msg.type} is not supported.')

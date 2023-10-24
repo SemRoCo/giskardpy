@@ -24,7 +24,7 @@ class PlotGanttChart(GiskardBehavior):
         for goal_name, goal in goals.items():
             for task in goal.tasks:
                 tasks.append(string_shortener(f'{goal_name} - {task.name}',
-                                              max_lines=2, max_line_length=15))
+                                              max_lines=5, max_line_length=50))
                 if not task.to_start:
                     start_dates.append([0])
                 else:

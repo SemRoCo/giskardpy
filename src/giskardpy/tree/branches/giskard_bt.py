@@ -61,6 +61,7 @@ class GiskardBT(BehaviourTree):
                 self.root.remove_child(self.execute_traj)
             elif god_map.is_closed_loop():
                 self.control_loop_branch.switch_to_projection()
+            self.cleanup_control_loop.add_reset_world_state()
             self.projection_mode = True
 
     def switch_to_execution(self):
@@ -69,4 +70,5 @@ class GiskardBT(BehaviourTree):
                 self.root.insert_child(self.execute_traj, -2)
             elif god_map.is_closed_loop():
                 self.control_loop_branch.switch_to_closed_loop()
+            self.cleanup_control_loop.remove_reset_world_state()
             self.projection_mode = False

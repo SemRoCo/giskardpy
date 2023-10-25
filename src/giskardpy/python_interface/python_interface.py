@@ -2,6 +2,7 @@ from typing import Dict, Optional, List
 
 from geometry_msgs.msg import PoseStamped, PointStamped, QuaternionStamped, Vector3Stamped
 
+from giskard_msgs.msg import MoveResult
 from giskardpy.goals.align_planes import AlignPlanes
 from giskardpy.goals.cartesian_goals import CartesianPose, CartesianPosition, CartesianOrientation, \
     CartesianPoseStraight, CartesianVelocityLimit, CartesianPositionStraight, DiffDriveBaseGoal
@@ -16,6 +17,19 @@ from giskardpy.python_interface.low_level_python_interface import LowLevelGiskar
 
 
 class GiskardWrapper(LowLevelGiskardWrapper):
+    def _send_action_goal(self, goal_type: int, wait: bool = True) -> Optional[MoveResult]:
+        """
+        Send goal to Giskard. Use this if you want to specify the goal_type, otherwise stick to wrappers like
+        plan_and_execute.
+        :param goal_type: one of the constants in MoveGoal
+        :param wait: blocks if wait=True
+        :return: result from Giskard
+        """
+        local_min_reached_monitor_name = self.add_local_minimum_reached_monitor()
+        for goal in self._goals:
+            goal.to_end.append(local_min_reached_monitor_name)
+        return super()._send_action_goal(goal_type=goal_type, wait=wait)
+
     # %% predefined goals
     def set_joint_goal(self,
                        goal_state: Dict[str, float],
@@ -37,13 +51,12 @@ class GiskardWrapper(LowLevelGiskardWrapper):
             to_end_monitors = [monitor_name]
         else:
             to_end_monitors = []
-        self.add_motion_goal(goal_type=JointPositionList.__name__,
-                             goal_state=goal_state,
-                             group_name=group_name,
-                             weight=weight,
-                             max_velocity=max_velocity,
-                             to_end=to_end_monitors,
-                             **kwargs)
+        super().set_joint_goal(goal_state=goal_state,
+                               group_name=group_name,
+                               weight=weight,
+                               max_velocity=max_velocity,
+                               to_end=to_end_monitors,
+                               **kwargs)
 
     def set_cart_goal(self,
                       goal_pose: PoseStamped,

@@ -148,6 +148,9 @@ class PR2TestWrapper(GiskardTestWrapper):
         super().__init__(giskard)
         self.robot = god_map.world.groups[self.robot_name]
 
+    def low_level_interface(self):
+        return super(GiskardWrapper, self)
+
     def teleport_base(self, goal_pose, group_name: Optional[str] = None):
         self.set_seed_odometry(base_pose=goal_pose, group_name=group_name)
         self.allow_all_collisions()
@@ -998,6 +1001,16 @@ class TestConstraints:
                                         goal_normal=y_goal)
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
+
+    # def test_sequence(self, zero_pose: PR2TestWrapper):
+    #     monitor_name = zero_pose.add_joint_position_reached_monitor(zero_pose.better_pose)
+    #     end_monitor = zero_pose.add_local_minimum_reached_monitor()
+    #     zero_pose.low_level_interface().set_joint_goal(goal_state=zero_pose.better_pose,
+    #                                                    to_end=[monitor_name])
+    #     zero_pose.low_level_interface().set_joint_goal(goal_state=pocky_pose,
+    #                                                    to_start=[monitor_name],
+    #                                                    to_end=end_monitor)
+    #     zero_pose.low_level_interface().execute()
 
     def test_wrong_constraint_type(self, zero_pose: PR2TestWrapper):
         goal_state = {'r_elbow_flex_joint': -1.0}

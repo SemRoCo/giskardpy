@@ -140,7 +140,6 @@ def toggle_on(state_var: str):
     def decorator(func: T) -> T:
         def wrapper(self, *args, **kwargs) -> T:
             if getattr(self, state_var, False):
-                print(f"{func.__name__} is already active. Skipping.")
                 return
             setattr(self, state_var, True)
             return func(self, *args, **kwargs)
@@ -154,7 +153,6 @@ def toggle_off(state_var: str):
     def decorator(func: T) -> T:
         def wrapper(self, *args, **kwargs) -> T:
             if not getattr(self, state_var, True):
-                print(f"{func.__name__} is already inactive. Skipping.")
                 return
             setattr(self, state_var, False)
             return func(self, *args, **kwargs)

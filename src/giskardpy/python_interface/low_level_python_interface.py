@@ -19,6 +19,7 @@ from giskard_msgs.srv import RegisterGroupResponse
 from giskard_msgs.srv import UpdateWorld, UpdateWorldRequest, UpdateWorldResponse, GetGroupInfo, \
     GetGroupNames, RegisterGroup
 from giskardpy.exceptions import DuplicateNameException, UnknownGroupException
+from giskardpy.goals.joint_goals import JointPositionList
 from giskardpy.goals.monitors.cartesian_monitors import PoseReached, PositionReached, OrientationReached, PointingAt, \
     VectorsAligned, DistanceToLine
 from giskardpy.goals.monitors.joint_monitors import JointGoalReached
@@ -86,10 +87,6 @@ class LowLevelGiskardWrapper:
         :param wait: blocks if wait=True
         :return: result from Giskard
         """
-        local_min_reached_monitor_name = 'local min reached'
-        self.add_monitor(monitor_type=LocalMinimumReached.__name__, monitor_name=local_min_reached_monitor_name)
-        for goal in self._goals:
-            goal.to_end.append(local_min_reached_monitor_name)
         goal = self._create_action_goal()
         goal.type = goal_type
         if wait:
@@ -153,7 +150,40 @@ class LowLevelGiskardWrapper:
     def _feedback_cb(self, msg: MoveFeedback):
         self.last_feedback = msg
 
+    # %% predefined motion goals
+    def set_joint_goal(self,
+                       goal_state: Dict[str, float],
+                       group_name: Optional[str] = None,
+                       weight: Optional[float] = None,
+                       max_velocity: Optional[float] = None,
+                       to_start: List[str] = None,
+                       to_hold: List[str] = None,
+                       to_end: List[str] = None,
+                       **kwargs: goal_parameter):
+        """
+        Sets joint position goals for all pairs in goal_state
+        :param goal_state: maps joint_name to goal position
+        :param group_name: if joint_name is not unique, search in this group for matches.
+        :param weight:
+        :param max_velocity: will be applied to all joints
+        """
+        self.add_motion_goal(goal_type=JointPositionList.__name__,
+                             goal_state=goal_state,
+                             group_name=group_name,
+                             weight=weight,
+                             max_velocity=max_velocity,
+                             to_start=to_start,
+                             to_hold=to_hold,
+                             to_end=to_end,
+                             **kwargs)
+
     # %% predefined monitors
+    def add_local_minimum_reached_monitor(self, name: Optional[str] = None):
+        if name is None:
+            name = 'local min reached'
+        self.add_monitor(monitor_type=LocalMinimumReached.__name__, monitor_name=name)
+        return name
+
     def add_joint_position_reached_monitor(self,
                                            goal_state: Dict[str, float],
                                            name: Optional[str] = None,

@@ -595,6 +595,7 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def clear_world(self, timeout: float = TimeOut) -> UpdateWorldResponse:
         respone = super().clear_world(timeout=timeout)
+        self.default_env_name = None
         assert respone.error_codes == UpdateWorldResponse.SUCCESS
         assert len(god_map.world.groups) == 1
         assert len(self.get_group_names()) == 1
@@ -624,6 +625,8 @@ class GiskardTestWrapper(GiskardWrapper):
         if name in self.env_joint_state_pubs:
             self.env_joint_state_pubs[name].unregister()
             del self.env_joint_state_pubs[name]
+        if name == self.default_env_name:
+            self.default_env_name = None
         return r
 
     def detach_group(self, name, timeout: float = TimeOut, expected_response=UpdateWorldResponse.SUCCESS):

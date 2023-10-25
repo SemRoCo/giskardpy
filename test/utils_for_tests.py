@@ -374,14 +374,14 @@ class GiskardTestWrapper(GiskardWrapper):
         logging.loginfo('stopping tree')
 
     def set_env_state(self, joint_state: Dict[str, float], object_name: Optional[str] = None):
+        if object_name is None:
+            object_name = self.default_env_name
         if god_map.is_standalone():
             self.set_seed_configuration(joint_state)
             self.allow_all_collisions()
             self.plan_and_execute()
         else:
             joint_state_msg = position_dict_to_joint_states(joint_state)
-            if object_name is None:
-                object_name = list(self.env_joint_state_pubs.keys())[0]
             self.env_joint_state_pubs[object_name].publish(joint_state_msg)
         self.wait_heartbeats(3)
         current_js = god_map.world.groups[object_name].state

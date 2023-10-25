@@ -8,11 +8,11 @@ from giskardpy.tree.behaviors.plot_goal_gantt_chart import PlotGanttChart
 from giskardpy.tree.behaviors.plot_trajectory import PlotTrajectory
 from giskardpy.tree.behaviors.reset_joint_state import ResetWorldState
 from giskardpy.tree.behaviors.time import TimePlugin
+from giskardpy.utils.decorators import toggle_on, toggle_off
 
 
 class CleanupControlLoop(Sequence):
     reset_world_state = ResetWorldState
-    has_reset_world_state: bool
 
     def __init__(self, name: str = 'clean up control loop'):
         super().__init__(name)
@@ -21,7 +21,7 @@ class CleanupControlLoop(Sequence):
         self.add_child(LogTrajPlugin('log post processing'))
         self.add_child(GoalCleanUp('clean up goals'))
         self.reset_world_state = ResetWorldState()
-        self.has_reset_world_state = False
+        self.remove_reset_world_state()
 
     def add_plot_trajectory(self, normalize_position: bool = False, wait: bool = False):
         self.add_child(PlotTrajectory('plot trajectory', wait=wait, normalize_position=normalize_position))
@@ -32,12 +32,13 @@ class CleanupControlLoop(Sequence):
     def add_plot_gantt_chart(self):
         self.add_child(PlotGanttChart())
 
+    @toggle_on('has_reset_world_state')
     def add_reset_world_state(self):
-        if not self.has_reset_world_state:
-            self.add_child(self.reset_world_state)
-            self.has_reset_world_state = True
+        self.add_child(self.reset_world_state)
 
+    @toggle_off('has_reset_world_state')
     def remove_reset_world_state(self):
-        if self.has_reset_world_state:
+        try:
             self.remove_child(self.reset_world_state)
-            self.has_reset_world_state = False
+        except ValueError as e:
+            pass  # it's fine, happens if it's called before add

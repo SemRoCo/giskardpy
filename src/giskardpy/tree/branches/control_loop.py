@@ -14,6 +14,7 @@ from giskardpy.tree.branches.send_controls import SendControls
 from giskardpy.tree.branches.synchronization import Synchronization
 from giskardpy.tree.composites.async_composite import AsyncBehavior
 from giskardpy.tree.decorators import success_is_running, failure_is_running
+from giskardpy.utils.decorators import toggle_on, toggle_off
 
 
 class ControlLoop(AsyncBehavior):
@@ -61,16 +62,16 @@ class ControlLoop(AsyncBehavior):
             self.add_child(self.log_traj)
         self.add_child(self.publish_state)
 
+    @toggle_on('in_projection')
     def switch_to_projection(self):
-        if not self.in_projection:
-            self.remove_closed_loop_behaviors()
-            self.add_projection_behaviors()
+        self.remove_closed_loop_behaviors()
+        self.add_projection_behaviors()
 
+    @toggle_off('in_projection')
     def switch_to_closed_loop(self):
-        if self.in_projection:
-            if god_map.is_closed_loop():
-                self.remove_projection_behaviors()
-                self.add_closed_loop_behaviors()
+        assert god_map.is_closed_loop()
+        self.remove_projection_behaviors()
+        self.add_closed_loop_behaviors()
 
     def remove_projection_behaviors(self):
         self.remove_child(self.projection_synchronization)

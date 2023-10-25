@@ -133,3 +133,32 @@ def catch_and_raise_to_blackboard(function: T) -> T:
         return r
 
     return wrapper
+
+
+# %% these two decorators automatically add a state variable to an object that prevents multiple calls for off on pairs
+def toggle_on(state_var: str):
+    def decorator(func: T) -> T:
+        def wrapper(self, *args, **kwargs) -> T:
+            if getattr(self, state_var, False):
+                print(f"{func.__name__} is already active. Skipping.")
+                return
+            setattr(self, state_var, True)
+            return func(self, *args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
+def toggle_off(state_var: str):
+    def decorator(func: T) -> T:
+        def wrapper(self, *args, **kwargs) -> T:
+            if not getattr(self, state_var, True):
+                print(f"{func.__name__} is already inactive. Skipping.")
+                return
+            setattr(self, state_var, False)
+            return func(self, *args, **kwargs)
+
+        return wrapper
+
+    return decorator

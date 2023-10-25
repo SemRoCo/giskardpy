@@ -4,6 +4,7 @@ import rospy
 
 from giskard_msgs.msg import MoveGoal, MoveResult
 from typing import TYPE_CHECKING, List, Dict, Set, Tuple
+import os
 
 if TYPE_CHECKING:
     from giskardpy.model.joints import Joint
@@ -87,6 +88,10 @@ class GodMap:
 
     def is_collision_checking_enabled(self):
         return self.collision_scene.collision_checker_id != self.collision_scene.collision_checker_id.none
+
+    @staticmethod
+    def is_in_github_workflow():
+        return 'GITHUB_WORKFLOW' in os.environ
 
 
 god_map = GodMap()

@@ -243,12 +243,9 @@ class GiskardTestWrapper(GiskardWrapper):
 
         self.giskard = giskard
         self.giskard.grow()
-        if 'GITHUB_WORKFLOW' in os.environ:
+        if god_map.is_in_github_workflow():
             logging.loginfo('Inside github workflow, turning off visualization')
-            plugins_to_disable = [VisualizationBehavior, PlotTrajectory, PlotDebugExpressions]
-            for behavior_type in plugins_to_disable:
-                for node in god_map.tree_manager.get_nodes_of_type(behavior_type):
-                    god_map.tree_manager.disable_node(node.name)
+            god_map.tree_manager.tree.turn_off_visualization()
         if 'QP_SOLVER' in os.environ:
             god_map.qp_controller_config.set_qp_solver(SupportedQPSolver[os.environ['QP_SOLVER']])
         # self.tree_manager = TreeManager.from_param_server(robot_names, namespaces)

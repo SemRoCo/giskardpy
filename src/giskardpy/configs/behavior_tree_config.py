@@ -150,6 +150,8 @@ class StandAloneBTConfig(BehaviorTreeConfig):
     def __init__(self, planning_sleep: Optional[float] = None, debug_mode: bool = False):
         super().__init__(ControlModes.standalone)
         self.planning_sleep = planning_sleep
+        if god_map.is_in_github_workflow():
+            debug_mode = False
         self.debug_mode = debug_mode
 
     def setup(self):
@@ -170,6 +172,8 @@ class OpenLoopBTConfig(BehaviorTreeConfig):
     def __init__(self, planning_sleep: Optional[float] = None, debug_mode: bool = False):
         super().__init__(ControlModes.open_loop)
         self.planning_sleep = planning_sleep
+        if god_map.is_in_github_workflow():
+            debug_mode = False
         self.debug_mode = debug_mode
 
     def setup(self):
@@ -193,6 +197,8 @@ class OpenLoopBTConfig(BehaviorTreeConfig):
 class ClosedLoopBTConfig(BehaviorTreeConfig):
     def __init__(self, debug_mode: bool = False):
         super().__init__(ControlModes.close_loop)
+        if god_map.is_in_github_workflow():
+            debug_mode = False
         self.debug_mode = debug_mode
 
     def setup(self):

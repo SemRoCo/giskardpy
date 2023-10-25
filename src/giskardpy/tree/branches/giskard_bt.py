@@ -13,6 +13,7 @@ from giskardpy.tree.branches.send_trajectories import ExecuteTraj
 from giskardpy.tree.branches.wait_for_goal import WaitForGoal
 from giskardpy.tree.control_modes import ControlModes
 from giskardpy.tree.decorators import failure_is_success
+from giskardpy.utils.decorators import toggle_on, toggle_off
 
 
 class GiskardBT(BehaviourTree):
@@ -23,10 +24,8 @@ class GiskardBT(BehaviourTree):
     control_loop_branch: ControlLoop
     root: Sequence
     execute_traj: ExecuteTraj
-    projection_mode: bool
 
     def __init__(self, control_mode: ControlModes):
-        self.projection_mode = True
         god_map.tree_manager.control_mode = control_mode
         if control_mode not in ControlModes:
             raise AttributeError(f'Control mode {control_mode} doesn\'t exist.')
@@ -50,25 +49,33 @@ class GiskardBT(BehaviourTree):
         self.root.add_child(self.cleanup_control_loop)
         self.root.add_child(self.post_processing)
         self.root.add_child(SendResult('send result',
-                                  god_map.giskard.action_server_name,
-                                  MoveAction))
+                                       god_map.giskard.action_server_name,
+                                       MoveAction))
         super().__init__(self.root)
         self.switch_to_execution()
 
-    def switch_to_projection(self):
-        if not self.projection_mode:
-            if god_map.is_planning():
-                self.root.remove_child(self.execute_traj)
-            elif god_map.is_closed_loop():
-                self.control_loop_branch.switch_to_projection()
-            self.cleanup_control_loop.add_reset_world_state()
-            self.projection_mode = True
+    @toggle_on('visualization_mode')
+    def turn_on_visualization(self):
+        self.wait_for_goal.publish_state.add_visualization_marker_behavior()
+        self.control_loop_branch.publish_state.add_visualization_marker_behavior()
 
+    @toggle_off('visualization_mode')
+    def turn_off_visualization(self):
+        self.wait_for_goal.publish_state.remove_visualization_marker_behavior()
+        self.control_loop_branch.publish_state.remove_visualization_marker_behavior()
+
+    @toggle_on('projection_mode')
+    def switch_to_projection(self):
+        if god_map.is_planning():
+            self.root.remove_child(self.execute_traj)
+        elif god_map.is_closed_loop():
+            self.control_loop_branch.switch_to_projection()
+        self.cleanup_control_loop.add_reset_world_state()
+
+    @toggle_off('projection_mode')
     def switch_to_execution(self):
-        if self.projection_mode:
-            if god_map.is_planning():
-                self.root.insert_child(self.execute_traj, -2)
-            elif god_map.is_closed_loop():
-                self.control_loop_branch.switch_to_closed_loop()
-            self.cleanup_control_loop.remove_reset_world_state()
-            self.projection_mode = False
+        if god_map.is_planning():
+            self.root.insert_child(self.execute_traj, -2)
+        elif god_map.is_closed_loop():
+            self.control_loop_branch.switch_to_closed_loop()
+        self.cleanup_control_loop.remove_reset_world_state()

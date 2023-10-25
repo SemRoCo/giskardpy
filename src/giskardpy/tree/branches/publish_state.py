@@ -1,17 +1,30 @@
+from typing import Optional
+
 from py_trees import Sequence
 
 from giskardpy.tree.behaviors.debug_marker_publisher import DebugMarkerPublisher
 from giskardpy.tree.behaviors.publish_debug_expressions import PublishDebugExpressions
 from giskardpy.tree.behaviors.tf_publisher import TfPublishingModes, TFPublisher
 from giskardpy.tree.behaviors.visualization import VisualizationBehavior
+from giskardpy.utils.decorators import toggle_on, toggle_off
 
 
 class PublishState(Sequence):
+    visualization_behavior: Optional[VisualizationBehavior]
+
     def __init__(self, name: str = 'publish state'):
         super().__init__(name)
+        self.visualization_behavior = None
 
+    @toggle_on('visualization_marker_behavior')
     def add_visualization_marker_behavior(self, use_decomposed_meshes: bool = True):
-        self.add_child(VisualizationBehavior(name='visualization', use_decomposed_meshes=use_decomposed_meshes))
+        if self.visualization_behavior is None:
+            self.visualization_behavior = VisualizationBehavior(use_decomposed_meshes=use_decomposed_meshes)
+        self.add_child(self.visualization_behavior)
+
+    @toggle_off('visualization_marker_behavior')
+    def remove_visualization_marker_behavior(self):
+        self.remove_child(self.visualization_behavior)
 
     def add_debug_marker_publisher(self):
         self.add_child(DebugMarkerPublisher())

@@ -275,22 +275,7 @@ class TreeManager(ABC):
     def get_nodes_of_type(self, node_type: Type[GiskardBehavior_]) -> List[GiskardBehavior_]:
         return [node.node for node in self.tree_nodes.values() if behavior_is_instance_of(node.node, node_type)]
 
-    def insert_node_behind_every_node_of_type(self, node_type: Type[GiskardBehavior],
-                                              node_to_be_added: GiskardBehavior):
-        nodes = self.get_nodes_of_type(node_type)
-        for idx, node in enumerate(nodes):
-            node_copy = copy(node_to_be_added)
-            manager_node = self.tree_nodes[node.name]
-            parent = manager_node.parent.node
-            self.insert_node(node_copy, parent.name, self.tree_nodes[node.name].position + 1)
 
-    def insert_node_behind_node_of_type(self, parent_node_name: str, node_type: Type[GiskardBehavior],
-                                        node_to_be_added: GiskardBehavior):
-        parent_node = self.tree_nodes[parent_node_name]
-        for child_node in parent_node.enabled_children:
-            if isinstance(child_node.node, node_type):
-                self.insert_node(node_to_be_added, parent_node_name, child_node.position + 1)
-                break
 
     def render(self):
         path = god_map.giskard.tmp_folder + 'tree'

@@ -13,13 +13,6 @@ class SetTrackingStartTime(GiskardBehavior):
         super().__init__(name)
         self.offset = rospy.Duration(offset)
 
-    def compute_time_offset(self) -> rospy.Duration:
-        sync_node = god_map.tree_manager.get_nodes_of_type(SyncJointState)
-        topic_name = sync_node[0].joint_state_topic
-        msg = rospy.wait_for_message(topic_name, JointState, rospy.Duration(5))
-        current_time = rospy.get_rostime()
-        return current_time - msg.header.stamp
-
     @profile
     def initialise(self):
         super().initialise()

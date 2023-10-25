@@ -326,7 +326,7 @@ class TestMoveBaseGoals:
 
 class TestWorldManipulation:
     def test_add_urdf_body(self, kitchen_setup: PR2TestWrapper):
-        assert god_map.tree_manager.tree.wait_for_goal.synchronization._number_of_synchronisation_behaviors() == 2
+        assert god_map.tree.wait_for_goal.synchronization._number_of_synchronisation_behaviors() == 2
         joint_goal = 0.2
         object_name = kitchen_setup.default_env_name
         kitchen_setup.set_env_state({'sink_area_left_middle_drawer_main_joint': joint_goal})
@@ -334,7 +334,7 @@ class TestWorldManipulation:
         joint_state = JointStates.from_msg(joint_state)
         assert joint_state['sink_area_left_middle_drawer_main_joint'].position == joint_goal
         kitchen_setup.clear_world()
-        assert god_map.tree_manager.tree.wait_for_goal.synchronization._number_of_synchronisation_behaviors() == 1
+        assert god_map.tree.wait_for_goal.synchronization._number_of_synchronisation_behaviors() == 1
         p = PoseStamped()
         p.header.frame_id = 'map'
         p.pose.position.x = 1
@@ -351,7 +351,7 @@ class TestWorldManipulation:
                                js_topic=js_topic,
                                set_js_topic=set_js_topic)
         kitchen_setup.wait_heartbeats(1)
-        assert god_map.tree_manager.tree.wait_for_goal.synchronization._number_of_synchronisation_behaviors() == 2
+        assert god_map.tree.wait_for_goal.synchronization._number_of_synchronisation_behaviors() == 2
         joint_state = kitchen_setup.get_group_info(object_name).joint_state
         joint_state = JointStates.from_msg(joint_state)
         assert joint_state['iai_kitchen/sink_area_left_middle_drawer_main_joint'].position == joint_goal
@@ -359,14 +359,14 @@ class TestWorldManipulation:
         joint_goal = 0.1
         kitchen_setup.set_env_state({'sink_area_left_middle_drawer_main_joint': joint_goal})
         kitchen_setup.remove_group(object_name)
-        assert god_map.tree_manager.tree.wait_for_goal.synchronization._number_of_synchronisation_behaviors() == 1
+        assert god_map.tree.wait_for_goal.synchronization._number_of_synchronisation_behaviors() == 1
         kitchen_setup.add_urdf(name=object_name,
                                urdf=rospy.get_param('kitchen_description'),
                                pose=p,
                                js_topic=js_topic,
                                set_js_topic=set_js_topic)
         kitchen_setup.wait_heartbeats(1)
-        assert god_map.tree_manager.tree.wait_for_goal.synchronization._number_of_synchronisation_behaviors() == 2
+        assert god_map.tree.wait_for_goal.synchronization._number_of_synchronisation_behaviors() == 2
         joint_state = kitchen_setup.get_group_info(object_name).joint_state
         joint_state = JointStates.from_msg(joint_state)
         assert joint_state['iai_kitchen/sink_area_left_middle_drawer_main_joint'].position == joint_goal

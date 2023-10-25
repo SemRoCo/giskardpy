@@ -42,7 +42,6 @@ from giskardpy.qp.qp_controller import available_solvers
 from giskardpy.tree.behaviors.plot_debug_expressions import PlotDebugExpressions
 from giskardpy.tree.behaviors.plot_trajectory import PlotTrajectory
 from giskardpy.tree.behaviors.visualization import VisualizationBehavior
-from giskardpy.tree.garden import TreeManager
 from giskardpy.utils import logging, utils
 from giskardpy.utils.math import compare_poses
 from giskardpy.utils.utils import resolve_ros_iris, position_dict_to_joint_states
@@ -226,7 +225,6 @@ class GiskardTestWrapper(GiskardWrapper):
     default_pose = {}
     better_pose = {}
     odom_root = 'odom'
-    tree: TreeManager
 
     def __init__(self,
                  giskard: Giskard):
@@ -247,11 +245,10 @@ class GiskardTestWrapper(GiskardWrapper):
         self.giskard.grow()
         if god_map.is_in_github_workflow():
             logging.loginfo('Inside github workflow, turning off visualization')
-            god_map.tree_manager.tree.turn_off_visualization()
+            god_map.tree.turn_off_visualization()
         if 'QP_SOLVER' in os.environ:
             god_map.qp_controller_config.set_qp_solver(SupportedQPSolver[os.environ['QP_SOLVER']])
-        # self.tree_manager = TreeManager.from_param_server(robot_names, namespaces)
-        self.heart = Timer(period=rospy.Duration(god_map.tree_manager.tick_rate), callback=self.heart_beat)
+        self.heart = Timer(period=rospy.Duration(god_map.tree.tick_rate), callback=self.heart_beat)
         # self.namespaces = namespaces
         self.robot_names = [list(god_map.world.groups.keys())[0]]
         super().__init__(node_name='tests')
@@ -312,7 +309,7 @@ class GiskardTestWrapper(GiskardWrapper):
             return god_map.world.transform_msg(target_frame, result_msg)
 
     def wait_heartbeats(self, number=2):
-        behavior_tree = god_map.tree_manager.tree
+        behavior_tree = god_map.tree
         c = behavior_tree.count
         while behavior_tree.count < c + number:
             rospy.sleep(0.001)
@@ -324,7 +321,7 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def heart_beat(self, timer_thing):
         if self._alive:
-            god_map.tree_manager.tick()
+            god_map.tree.tick()
 
     def stop_ticking(self):
         self._alive = False
@@ -368,7 +365,7 @@ class GiskardTestWrapper(GiskardWrapper):
         rospy.sleep(1)
         self.heart.shutdown()
         # TODO it is strange that I need to kill the services... should be investigated. (:
-        god_map.tree_manager.kill_all_services()
+        god_map.tree.kill_all_services()
         giskarding_time = self.total_time_spend_giskarding
         if not god_map.is_standalone():
             giskarding_time -= self.total_time_spend_moving

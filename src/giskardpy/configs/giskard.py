@@ -80,7 +80,7 @@ class Giskard:
         self._controlled_joints_sanity_check()
         god_map.world.notify_model_change()
         god_map.collision_scene.sync()
-        god_map.tree_manager.setup()
+        god_map.tree.setup(30)
 
     def _controlled_joints_sanity_check(self):
         world = god_map.world
@@ -102,4 +102,4 @@ class Giskard:
         Start Giskard.
         """
         self.grow()
-        god_map.tree_manager.live()
+        god_map.tree.live()

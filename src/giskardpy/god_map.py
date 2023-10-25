@@ -6,7 +6,9 @@ from giskard_msgs.msg import MoveGoal, MoveResult
 from typing import TYPE_CHECKING, List, Dict, Set, Tuple
 import os
 
+
 if TYPE_CHECKING:
+    from giskardpy.tree.branches.giskard_bt import GiskardBT
     from giskardpy.model.joints import Joint
     from giskardpy.model.ros_msg_visualization import ROSMsgVisualization
     from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint
@@ -27,7 +29,6 @@ if TYPE_CHECKING:
     from giskardpy.tree.control_modes import ControlModes
     from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer, CollisionCheckerLib, \
         CollisionAvoidanceGroupThresholds, Collisions
-    from giskardpy.tree.garden import TreeManager
     from giskardpy.model.world import WorldTree
 
 
@@ -40,7 +41,7 @@ class GodMap:
     world: WorldTree
     motion_goal_manager: MotionGoalManager
     debug_expression_manager: DebugExpressionManager
-    tree_manager: TreeManager
+    tree: GiskardBT
     collision_scene: CollisionWorldSynchronizer
     prediction_horizon: int
     max_derivative: Derivatives
@@ -78,13 +79,13 @@ class GodMap:
         return MoveGoal.UNDEFINED == self.goal_msg.type
 
     def is_closed_loop(self):
-        return self.tree_manager.control_mode == self.tree_manager.control_mode.close_loop
+        return self.tree.is_closed_loop()
 
     def is_standalone(self):
-        return self.tree_manager.control_mode == self.tree_manager.control_mode.standalone
+        return self.tree.is_standalone()
 
     def is_planning(self):
-        return self.tree_manager.control_mode == self.tree_manager.control_mode.open_loop
+        return self.tree.is_planning()
 
     def is_collision_checking_enabled(self):
         return self.collision_scene.collision_checker_id != self.collision_scene.collision_checker_id.none
@@ -94,7 +95,7 @@ class GodMap:
         return 'GITHUB_WORKFLOW' in os.environ
 
     def is_tree_alive(self):
-        return self.tree_manager.tree.count > 1
+        return self.tree.count > 1
 
 
 god_map = GodMap()

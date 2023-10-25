@@ -218,7 +218,7 @@ class WorldUpdater(GiskardBehavior):
         # SUB-CASE: If it is an articulated object, open up a joint state subscriber
         logging.loginfo(f'Attached object \'{req.group_name}\' at \'{req.parent_link}\'.')
         if world_body.joint_state_topic:
-            god_map.tree_manager.tree.wait_for_goal.synchronization.sync_joint_state_topic(
+            god_map.tree.wait_for_goal.synchronization.sync_joint_state_topic(
                 group_name=req.group_name,
                 topic_name=world_body.joint_state_topic)
         # FIXME also keep track of base pose
@@ -268,14 +268,14 @@ class WorldUpdater(GiskardBehavior):
             raise UnknownGroupException(f'Can not remove unknown group: {name}.')
         god_map.world.delete_group(name)
         god_map.world.cleanup_unused_free_variable()
-        god_map.tree_manager.tree.wait_for_goal.synchronization.remove_group_behaviors(name)
+        god_map.tree.wait_for_goal.synchronization.remove_group_behaviors(name)
         logging.loginfo(f'Deleted \'{name}\'.')
 
     @profile
     def clear_world(self):
         tmp_state = deepcopy(god_map.world.state)
         god_map.world.delete_all_but_robots()
-        god_map.tree_manager.tree.wait_for_goal.synchronization.remove_added_behaviors()
+        god_map.tree.wait_for_goal.synchronization.remove_added_behaviors()
         # copy only state of joints that didn't get deleted
         remaining_free_variables = list(god_map.world.free_variables.keys()) + list(
             god_map.world.virtual_free_variables.keys())

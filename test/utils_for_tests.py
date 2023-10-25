@@ -45,7 +45,7 @@ from giskardpy.tree.behaviors.visualization import VisualizationBehavior
 from giskardpy.tree.garden import TreeManager
 from giskardpy.utils import logging, utils
 from giskardpy.utils.math import compare_poses
-from giskardpy.utils.utils import resolve_ros_iris
+from giskardpy.utils.utils import resolve_ros_iris, position_dict_to_joint_states
 import os
 
 BIG_NUMBER = 1e100
@@ -233,6 +233,8 @@ class GiskardTestWrapper(GiskardWrapper):
         self.total_time_spend_giskarding = 0
         self.total_time_spend_moving = 0
         self._alive = True
+        self.default_env_name: Optional[str] = None
+        self.env_joint_state_pubs: Dict[str, rospy.Publisher] = {}
 
         try:
             from iai_naive_kinematics_sim.srv import UpdateTransform
@@ -374,8 +376,16 @@ class GiskardTestWrapper(GiskardWrapper):
         logging.loginfo(f'total time spend moving: {self.total_time_spend_moving}')
         logging.loginfo('stopping tree')
 
-    def set_object_joint_state(self, object_name, joint_state):
-        super().set_object_joint_state(object_name, joint_state)
+    def set_env_state(self, joint_state: Dict[str, float], object_name: Optional[str] = None):
+        if god_map.is_standalone():
+            self.set_seed_configuration(joint_state)
+            self.allow_all_collisions()
+            self.plan_and_execute()
+        else:
+            joint_state_msg = position_dict_to_joint_states(joint_state)
+            if object_name is None:
+                object_name = list(self.env_joint_state_pubs.keys())[0]
+            self.env_joint_state_pubs[object_name].publish(joint_state_msg)
         self.wait_heartbeats(3)
         current_js = god_map.world.groups[object_name].state
         joint_names_with_prefix = set(j.long_name for j in current_js)
@@ -389,22 +399,6 @@ class GiskardTestWrapper(GiskardWrapper):
         for joint_name, state in current_js.items():
             if joint_name.short_name in joint_state:
                 np.testing.assert_almost_equal(state.position, joint_state[joint_name.short_name], 2)
-
-    def set_kitchen_js(self, joint_state):
-        if god_map.is_standalone():
-            self.set_seed_configuration(joint_state)
-            self.allow_all_collisions()
-            self.plan_and_execute()
-        else:
-            self.set_object_joint_state(self.kitchen_name, joint_state)
-
-    def set_apartment_js(self, joint_state):
-        if god_map.is_standalone():
-            self.set_seed_configuration(joint_state)
-            self.allow_all_collisions()
-            self.plan_and_execute()
-        else:
-            self.set_object_joint_state(self.environment_name, joint_state)
 
     def compare_joint_state(self, current_js: Dict[Union[str, PrefixName], float],
                             goal_js: Dict[Union[str, PrefixName], float],
@@ -542,7 +536,7 @@ class GiskardTestWrapper(GiskardWrapper):
         for group_name in self._object_js_topics:
             group_joints = self.get_group_info(group_name).joint_state.name
             group_last_joint_state = {str(k): v for k, v in whole_last_joint_state.items() if k in group_joints}
-            self.set_object_joint_state(group_name, group_last_joint_state)
+            self.set_env_state(group_last_joint_state, group_name)
 
     def get_result_trajectory_position(self):
         trajectory = god_map.trajectory
@@ -630,6 +624,9 @@ class GiskardTestWrapper(GiskardWrapper):
                 assert old_link_name not in god_map.world.link_names_as_set
             for old_joint_name in old_joint_names:
                 assert old_joint_name not in god_map.world.joint_names
+        if name in self.env_joint_state_pubs:
+            self.env_joint_state_pubs[name].unregister()
+            del self.env_joint_state_pubs[name]
         return r
 
     def detach_group(self, name, timeout: float = TimeOut, expected_response=UpdateWorldResponse.SUCCESS):
@@ -814,6 +811,10 @@ class GiskardTestWrapper(GiskardWrapper):
                                      parent_link=parent_link,
                                      parent_link_group=parent_link_group,
                                      expected_error_code=expected_error_code)
+        if set_js_topic:
+            self.env_joint_state_pubs[name] = rospy.Publisher(set_js_topic, JointState, queue_size=10)
+        if self.default_env_name is None:
+            self.default_env_name = name
         return response
 
     def update_parent_link_of_group(self,

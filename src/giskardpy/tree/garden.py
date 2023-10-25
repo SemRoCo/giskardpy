@@ -180,54 +180,6 @@ class TreeManager(ABC):
                 if isinstance(attribute, rospy.Service):
                     attribute.shutdown(reason='life is pain')
 
-    def __init_map(self, node, parent, idx):
-        """
-        initialises the internal map that represents the behavior tree. This method calls itself recursively for every
-        node  in the tree
-        :param node: the root node of the behavior tree
-        :param parent: None if root
-        :param idx: 0 if root
-        :return:
-        """
-        manager_node = ManagerNode(node=node, parent=parent, position=idx)
-        if parent is not None:
-            parent.enabled_children.add(manager_node)
-        # if isinstance(node, AsyncBehavior) or hasattr(node, 'original') and isinstance(node.original, AsyncBehavior):
-        #     children = node._children
-        #     for idx, child_name in enumerate(children):
-        #         child_node = ManagerNode(node=children[child_name], parent=manager_node, position=idx)
-        #         self.tree_nodes[child_name] = child_node
-        #         manager_node.enabled_children.add(child_node)
-        if node.name in self.tree_nodes:
-            raise KeyError(f'node named {node.name} already exists')
-        self.tree_nodes[node.name] = manager_node
-        for idx, child in enumerate(node.children):
-            self.__init_map(child, manager_node, idx)
-
-    def disable_node(self, node_name):
-        """
-        disables the node with the given name
-        :param node_name: the name of the node
-        :return:
-        """
-        t = self.tree_nodes[node_name]
-        if t.parent is not None:
-            return t.parent.disable_child(t)
-        else:
-            logging.logwarn('cannot disable root node')
-            return False
-
-    def enable_node(self, node_name: str):
-        """
-        enables the node with the given name
-        :param node_name: the name of the node
-        """
-        t = self.tree_nodes[node_name]
-        if t.parent is not None:
-            t.parent.enable_child(t)
-        else:
-            logging.loginfo('root node')
-
     def insert_node(self, node: GiskardBehavior, parent_name: str, position: int = -1):
         """
         inserts a node into the behavior tree.
@@ -259,23 +211,6 @@ class TreeManager(ABC):
         parent = node.parent
         del self.tree_nodes[node_name]
         parent.remove_child(node)
-
-    def get_node(self, node_name):
-        """
-        returns the behavior with the given name
-        :param node_name:
-        :type node_name: str
-        :return: the behavior with the given name
-        :rtype py_trees.behaviour.Behaviour:
-        """
-        return self.tree_nodes[node_name].node
-
-    GiskardBehavior_ = TypeVar('GiskardBehavior_', bound=GiskardBehavior)
-
-    def get_nodes_of_type(self, node_type: Type[GiskardBehavior_]) -> List[GiskardBehavior_]:
-        return [node.node for node in self.tree_nodes.values() if behavior_is_instance_of(node.node, node_type)]
-
-
 
     def render(self):
         path = god_map.giskard.tmp_folder + 'tree'

@@ -9,6 +9,7 @@ from giskardpy.data_types import JointStates
 from giskardpy.god_map import god_map
 from giskardpy.my_types import PrefixName, Derivatives
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
+from giskardpy.utils import logging
 from giskardpy.utils.decorators import record_time
 from giskardpy.utils.utils import wait_for_topic_to_appear
 
@@ -45,12 +46,13 @@ class SyncJointState(GiskardBehavior):
     def update(self):
         try:
             if self.mjs is None:
-                js = self.lock.get()
+                js = self.lock.get(timeout=0.5)
             else:
                 js = self.lock.get_nowait()
             self.mjs = JointStates.from_msg(js, self.group_name)
         except Empty:
-            pass
+            logging.logwarn(f'Waiting for messages on {self.joint_state_topic}')
+            return Status.RUNNING
 
         god_map.world.state.update(self.mjs)
         return Status.SUCCESS

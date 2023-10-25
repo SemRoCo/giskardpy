@@ -118,7 +118,7 @@ def kitchen_setup(better_pose: GiskardTestWrapper) -> GiskardTestWrapper:
                 js[str(joint.free_variable.name)] = 0.0
             else:
                 js[str(joint.free_variable.name.short_name)] = 0.0
-    better_pose.set_kitchen_js(js)
+    better_pose.set_env_state(js)
     return better_pose
 
 
@@ -143,7 +143,7 @@ def apartment_setup(better_pose: GiskardTestWrapper) -> GiskardTestWrapper:
         joint = god_map.world.joints[joint_name]
         if isinstance(joint, OneDofJoint):
             js[str(joint.free_variable.name)] = 0.0
-    better_pose.set_apartment_js(js)
+    better_pose.set_env_state(js)
     base_pose = PoseStamped()
     base_pose.header.frame_id = 'iai_apartment/side_B'
     base_pose.pose.position.x = 1.5

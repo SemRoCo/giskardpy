@@ -227,7 +227,7 @@ class TestConstraints:
         kitchen_setup.allow_all_collisions()  # makes execution faster
         kitchen_setup.plan_and_execute()  # send goal to Giskard
         # Update kitchen object
-        kitchen_setup.set_kitchen_js({'sink_area_left_middle_drawer_main_joint': 0.48})
+        kitchen_setup.set_env_state({'sink_area_left_middle_drawer_main_joint': 0.48})
 
         # Close drawer partially
         kitchen_setup.set_open_container_goal(tip_link=kitchen_setup.l_tip,
@@ -236,11 +236,11 @@ class TestConstraints:
         kitchen_setup.allow_all_collisions()  # makes execution faster
         kitchen_setup.plan_and_execute()  # send goal to Giskard
         # Update kitchen object
-        kitchen_setup.set_kitchen_js({'sink_area_left_middle_drawer_main_joint': 0.2})
+        kitchen_setup.set_env_state({'sink_area_left_middle_drawer_main_joint': 0.2})
 
         kitchen_setup.set_close_container_goal(tip_link=kitchen_setup.l_tip,
                                                environment_link=handle_name)
         kitchen_setup.allow_all_collisions()  # makes execution faster
         kitchen_setup.plan_and_execute()  # send goal to Giskard
         # Update kitchen object
-        kitchen_setup.set_kitchen_js({'sink_area_left_middle_drawer_main_joint': 0.0})
+        kitchen_setup.set_env_state({'sink_area_left_middle_drawer_main_joint': 0.0})

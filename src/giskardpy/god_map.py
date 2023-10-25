@@ -93,5 +93,8 @@ class GodMap:
     def is_in_github_workflow():
         return 'GITHUB_WORKFLOW' in os.environ
 
+    def is_tree_alive(self):
+        return self.tree_manager.tree.count > 1
+
 
 god_map = GodMap()

@@ -330,7 +330,7 @@ class TestConstraints:
         kitchen_setup.allow_all_collisions()
         # kitchen_setup.add_json_goal('AvoidJointLimits')
         kitchen_setup.plan_and_execute()
-        kitchen_setup.set_kitchen_js({'iai_fridge_door_joint': 1.5})
+        kitchen_setup.set_env_state({'iai_fridge_door_joint': 1.5})
 
         kitchen_setup.set_open_container_goal(tip_link=kitchen_setup.tip,
                                               environment_link=handle_name,
@@ -338,7 +338,7 @@ class TestConstraints:
         kitchen_setup.allow_all_collisions()
         # kitchen_setup.set_json_goal('AvoidJointLimits', percentage=40)
         kitchen_setup.plan_and_execute()
-        kitchen_setup.set_kitchen_js({'iai_fridge_door_joint': 0})
+        kitchen_setup.set_env_state({'iai_fridge_door_joint': 0})
 
         kitchen_setup.plan_and_execute()
 

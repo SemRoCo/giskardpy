@@ -150,12 +150,10 @@ def write_dict(d, f):
     f.write('\n')
 
 
-def position_dict_to_joint_states(joint_state_dict):
+def position_dict_to_joint_states(joint_state_dict: Dict[str, float]) -> JointState:
     """
     :param joint_state_dict: maps joint_name to position
-    :type joint_state_dict: dict
     :return: velocity and effort are filled with 0
-    :rtype: JointState
     """
     js = JointState()
     for k, v in joint_state_dict.items():

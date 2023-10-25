@@ -1,6 +1,7 @@
 import traceback
 from py_trees import Status
 
+from giskard_msgs.msg import MoveGoal
 from giskardpy.exceptions import InvalidGoalException, GiskardException
 from giskardpy.goals.base_traj_follower import BaseTrajFollower
 from giskardpy.goals.monitors.monitors import TimeAbove
@@ -24,6 +25,7 @@ class ParseActionGoal(GiskardBehavior):
     def update(self):
         loginfo('Parsing goal message.')
         move_goal = god_map.goal_msg
+        self.goal_msg_sanity_check(move_goal)
         god_map.goal_id += 1
         try:
             god_map.monitor_manager.parse_monitors(move_goal.monitors)
@@ -38,6 +40,9 @@ class ParseActionGoal(GiskardBehavior):
         loginfo('Done parsing goal message.')
         return Status.SUCCESS
 
+    def goal_msg_sanity_check(self, goal_msg: MoveGoal):
+        if not goal_msg.goals:
+            raise InvalidGoalException(f'No goals have been defined in message.')
 
 class SetExecutionMode(GiskardBehavior):
     @record_time
@@ -55,7 +60,7 @@ class SetExecutionMode(GiskardBehavior):
         elif god_map.is_goal_msg_type_execute():
             god_map.tree_manager.tree.switch_to_execution()
         else:
-            raise GiskardException(f'Goal of type {god_map.goal_msg.type} is not supported.')
+            raise InvalidGoalException(f'Goal of type {god_map.goal_msg.type} is not supported.')
         return Status.SUCCESS
 
 

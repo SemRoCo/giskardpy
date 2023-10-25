@@ -893,7 +893,7 @@ class TestConstraints:
         kitchen_setup.allow_all_collisions()  # makes execution faster
         kitchen_setup.plan_and_execute()  # send goal to Giskard
         # Update kitchen object
-        kitchen_setup.set_kitchen_js({'sink_area_left_middle_drawer_main_joint': 0.48})
+        kitchen_setup.set_env_state({'sink_area_left_middle_drawer_main_joint': 0.48})
 
         # Close drawer partially
         kitchen_setup.set_open_container_goal(tip_link=kitchen_setup.l_tip,
@@ -902,14 +902,14 @@ class TestConstraints:
         kitchen_setup.allow_all_collisions()  # makes execution faster
         kitchen_setup.plan_and_execute()  # send goal to Giskard
         # Update kitchen object
-        kitchen_setup.set_kitchen_js({'sink_area_left_middle_drawer_main_joint': 0.2})
+        kitchen_setup.set_env_state({'sink_area_left_middle_drawer_main_joint': 0.2})
 
         kitchen_setup.set_close_container_goal(tip_link=kitchen_setup.l_tip,
                                                environment_link=handle_name)
         kitchen_setup.allow_all_collisions()  # makes execution faster
         kitchen_setup.plan_and_execute()  # send goal to Giskard
         # Update kitchen object
-        kitchen_setup.set_kitchen_js({'sink_area_left_middle_drawer_main_joint': 0.0})
+        kitchen_setup.set_env_state({'sink_area_left_middle_drawer_main_joint': 0.0})
 
     def test_open_close_dishwasher(self, kitchen_setup: PR2TestWrapper):
         p = PoseStamped()
@@ -965,14 +965,14 @@ class TestConstraints:
         # kitchen_setup.allow_all_collisions()
         kitchen_setup.allow_collision(group1=kitchen_setup.kitchen_name, group2=kitchen_setup.r_gripper_group)
         kitchen_setup.plan_and_execute()
-        kitchen_setup.set_kitchen_js({'sink_area_dish_washer_door_joint': goal_angle})
+        kitchen_setup.set_env_state({'sink_area_dish_washer_door_joint': goal_angle})
 
         kitchen_setup.set_open_container_goal(tip_link=hand,
                                               environment_link=handle_name,
                                               goal_joint_state=0)
         kitchen_setup.allow_all_collisions()
         kitchen_setup.plan_and_execute()
-        kitchen_setup.set_kitchen_js({'sink_area_dish_washer_door_joint': 0})
+        kitchen_setup.set_env_state({'sink_area_dish_washer_door_joint': 0})
 
     def test_align_planes1(self, zero_pose: PR2TestWrapper):
         x_gripper = Vector3Stamped()
@@ -1117,7 +1117,7 @@ class TestConstraints:
         handle_frame_id = 'iai_fridge_door_handle'
         handle_name = 'iai_fridge_door_handle'
 
-        kitchen_setup.set_kitchen_js({'iai_fridge_door_joint': np.pi / 2})
+        kitchen_setup.set_env_state({'iai_fridge_door_joint': np.pi / 2})
 
         elbow = 'r_elbow_flex_link'
 
@@ -1149,7 +1149,7 @@ class TestConstraints:
                                                environment_link=handle_name)
         kitchen_setup.allow_all_collisions()
         kitchen_setup.plan_and_execute()
-        kitchen_setup.set_kitchen_js({'iai_fridge_door_joint': 0})
+        kitchen_setup.set_env_state({'iai_fridge_door_joint': 0})
 
     def test_open_close_oven(self, kitchen_setup: PR2TestWrapper):
         goal_angle = 0.5
@@ -1195,13 +1195,13 @@ class TestConstraints:
                                               goal_joint_state=goal_angle)
         kitchen_setup.allow_all_collisions()
         kitchen_setup.plan_and_execute()
-        kitchen_setup.set_kitchen_js({'oven_area_oven_door_joint': goal_angle})
+        kitchen_setup.set_env_state({'oven_area_oven_door_joint': goal_angle})
 
         kitchen_setup.set_close_container_goal(tip_link=kitchen_setup.l_tip,
                                                environment_link=handle_name)
         kitchen_setup.allow_all_collisions()
         kitchen_setup.plan_and_execute()
-        kitchen_setup.set_kitchen_js({'oven_area_oven_door_joint': 0})
+        kitchen_setup.set_env_state({'oven_area_oven_door_joint': 0})
 
     def test_grasp_dishwasher_handle(self, kitchen_setup: PR2TestWrapper):
         handle_name = 'iai_kitchen/sink_area_dish_washer_door_handle'
@@ -1990,7 +1990,7 @@ class TestWorldManipulation:
 
     def test_add_urdf_body(self, kitchen_setup: PR2TestWrapper):
         object_name = kitchen_setup.kitchen_name
-        kitchen_setup.set_kitchen_js({'sink_area_left_middle_drawer_main_joint': 0.1})
+        kitchen_setup.set_env_state({'sink_area_left_middle_drawer_main_joint': 0.1})
         kitchen_setup.clear_world()
         p = PoseStamped()
         p.header.frame_id = 'map'
@@ -2011,7 +2011,7 @@ class TestWorldManipulation:
         for i, joint_name in enumerate(joint_state.name):
             actual = joint_state.position[i]
             assert actual == 0, f'Joint {joint_name} is at {actual} instead of 0'
-        kitchen_setup.set_kitchen_js({'sink_area_left_middle_drawer_main_joint': 0.1})
+        kitchen_setup.set_env_state({'sink_area_left_middle_drawer_main_joint': 0.1})
         kitchen_setup.remove_group(object_name)
         kitchen_setup.add_urdf(name=object_name,
                                urdf=rospy.get_param('kitchen_description'),
@@ -2064,10 +2064,10 @@ class TestWorldManipulation:
 
         kitchen_setup.add_cylinder(object_name, height=0.07, radius=0.04, pose=cup_pose,
                                    parent_link_group='iai_kitchen', parent_link='sink_area_left_middle_drawer_main')
-        kitchen_setup.set_kitchen_js({drawer_joint: 0.48})
+        kitchen_setup.set_env_state({drawer_joint: 0.48})
         kitchen_setup.plan_and_execute()
         kitchen_setup.detach_group(object_name)
-        kitchen_setup.set_kitchen_js({drawer_joint: 0})
+        kitchen_setup.set_env_state({drawer_joint: 0})
         kitchen_setup.plan_and_execute()
 
     def test_single_joint_urdf(self, zero_pose: PR2TestWrapper):
@@ -2757,7 +2757,7 @@ class TestCollisionAvoidanceGoals:
 
     def test_avoid_collision_drive_under_drawer(self, kitchen_setup: PR2TestWrapper):
         kitchen_js = {'sink_area_left_middle_drawer_main_joint': 0.45}
-        kitchen_setup.set_kitchen_js(kitchen_js)
+        kitchen_setup.set_env_state(kitchen_js)
         base_pose = PoseStamped()
         base_pose.header.frame_id = 'map'
         base_pose.pose.position.x = 0.57
@@ -3029,7 +3029,7 @@ class TestCollisionAvoidanceGoals:
         milk_name = 'milk'
 
         # take milk out of fridge
-        kitchen_setup.set_kitchen_js({'iai_fridge_door_joint': 1.56})
+        kitchen_setup.set_env_state({'iai_fridge_door_joint': 1.56})
 
         base_goal = PoseStamped()
         base_goal.header.frame_id = 'map'
@@ -3175,7 +3175,7 @@ class TestCollisionAvoidanceGoals:
         kitchen_setup.set_open_container_goal(tip_link=kitchen_setup.l_tip,
                                               environment_link=drawer_handle)
         kitchen_setup.plan_and_execute()
-        kitchen_setup.set_kitchen_js({drawer_joint: 0.48})
+        kitchen_setup.set_env_state({drawer_joint: 0.48})
 
         kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
         base_pose = PoseStamped()

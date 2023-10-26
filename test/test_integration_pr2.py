@@ -966,7 +966,7 @@ class TestConstraints:
                                               environment_link=handle_name,
                                               goal_joint_state=goal_angle)
         # kitchen_setup.allow_all_collisions()
-        kitchen_setup.allow_collision(group1=kitchen_setup.kitchen_name, group2=kitchen_setup.r_gripper_group)
+        kitchen_setup.allow_collision(group1=kitchen_setup.default_env_name, group2=kitchen_setup.r_gripper_group)
         kitchen_setup.plan_and_execute()
         kitchen_setup.set_env_state({'sink_area_dish_washer_door_joint': goal_angle})
 
@@ -2002,7 +2002,7 @@ class TestWorldManipulation:
         zero_pose.remove_group(object_name)
 
     def test_add_urdf_body(self, kitchen_setup: PR2TestWrapper):
-        object_name = kitchen_setup.kitchen_name
+        object_name = kitchen_setup.default_env_name
         kitchen_setup.set_env_state({'sink_area_left_middle_drawer_main_joint': 0.1})
         kitchen_setup.clear_world()
         p = PoseStamped()

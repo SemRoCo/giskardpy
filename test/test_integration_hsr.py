@@ -349,6 +349,7 @@ class TestConstraints:
 class TestCollisionAvoidanceGoals:
 
     def test_self_collision_avoidance_empty(self, zero_pose: HSRTestWrapper):
+        zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute(expected_error_code=MoveResult.INVALID_GOAL)
         current_state = god_map.world.state.to_position_dict()
         current_state = {k.short_name: v for k, v in current_state.items()}

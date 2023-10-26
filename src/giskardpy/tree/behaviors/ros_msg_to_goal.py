@@ -41,7 +41,7 @@ class ParseActionGoal(GiskardBehavior):
         return Status.SUCCESS
 
     def goal_msg_sanity_check(self, goal_msg: MoveGoal):
-        if not goal_msg.goals and god_map.collision_scene.is_allow_all_collision(goal_msg.collisions[-1]):
+        if not goal_msg.goals and goal_msg.collisions and god_map.collision_scene.is_allow_all_collision(goal_msg.collisions[-1]):
             raise InvalidGoalException(f'No goals have been defined in message.')
 
 

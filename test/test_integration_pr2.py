@@ -1002,15 +1002,59 @@ class TestConstraints:
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
 
-    # def test_sequence(self, zero_pose: PR2TestWrapper):
-    #     monitor_name = zero_pose.add_joint_position_reached_monitor(zero_pose.better_pose)
-    #     end_monitor = zero_pose.add_local_minimum_reached_monitor()
-    #     zero_pose.low_level_interface().set_joint_goal(goal_state=zero_pose.better_pose,
-    #                                                    to_end=[monitor_name])
-    #     zero_pose.low_level_interface().set_joint_goal(goal_state=pocky_pose,
-    #                                                    to_start=[monitor_name],
-    #                                                    to_end=end_monitor)
-    #     zero_pose.low_level_interface().execute()
+    def test_joint_sequence(self, zero_pose: PR2TestWrapper):
+        joint_monitor1 = zero_pose.add_joint_position_reached_monitor(zero_pose.better_pose,
+                                                                      name='joint_monitor1')
+        joint_monitor2 = zero_pose.add_joint_position_reached_monitor(pocky_pose,
+                                                                      name='joint_monitor2')
+        end_monitor = zero_pose.add_local_minimum_reached_monitor()
+
+        zero_pose.low_level_interface().set_joint_goal(goal_state=zero_pose.better_pose,
+                                                       to_end=[joint_monitor1])
+        zero_pose.low_level_interface().set_joint_goal(goal_state=pocky_pose,
+                                                       to_start=[joint_monitor1],
+                                                       to_end=[end_monitor, joint_monitor2])
+        zero_pose.allow_all_collisions()
+        zero_pose.execute()
+
+    def test_cart_goal_sequence(self, zero_pose: PR2TestWrapper):
+        pose1 = PoseStamped()
+        pose1.header.frame_id = 'map'
+        pose1.pose.position.x = 1
+        pose1.pose.orientation.w = 1
+
+        pose2 = PoseStamped()
+        pose2.header.frame_id = 'map'
+        pose2.pose.position.y = 1
+        pose2.pose.orientation.w = 1
+
+        root_link = 'map'
+        tip_link = 'base_footprint'
+
+        monitor1 = zero_pose.add_cartesian_pose_reached_monitor(name='pose1',
+                                                                root_link=root_link,
+                                                                tip_link=tip_link,
+                                                                goal_pose=pose1)
+
+        monitor2 = zero_pose.add_cartesian_pose_reached_monitor(name='pose2',
+                                                                root_link=root_link,
+                                                                tip_link=tip_link,
+                                                                goal_pose=pose2)
+        end_monitor = zero_pose.add_local_minimum_reached_monitor()
+
+        zero_pose.low_level_interface().set_cart_goal(goal_pose=pose1,
+                                                      goal_name='g1',
+                                                      root_link=root_link,
+                                                      tip_link=tip_link,
+                                                      to_end=[monitor1])
+        zero_pose.low_level_interface().set_cart_goal(goal_pose=pose2,
+                                                      goal_name='g2',
+                                                      root_link=root_link,
+                                                      tip_link=tip_link,
+                                                      to_start=[monitor1],
+                                                      to_end=[monitor2, end_monitor])
+        zero_pose.allow_all_collisions()
+        zero_pose.execute()
 
     def test_wrong_constraint_type(self, zero_pose: PR2TestWrapper):
         goal_state = {'r_elbow_flex_joint': -1.0}

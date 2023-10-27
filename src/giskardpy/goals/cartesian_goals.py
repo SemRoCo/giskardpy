@@ -27,13 +27,14 @@ class CartesianPosition(Goal):
                  root_group: Optional[str] = None,
                  tip_group: Optional[str] = None,
                  reference_velocity: Optional[float] = None,
-                 weight: float = WEIGHT_ABOVE_CA):
+                 weight: float = WEIGHT_ABOVE_CA,
+                 name: Optional[str] = None):
         """
         See CartesianPose.
         """
         self.root_link = god_map.world.search_for_link_name(root_link, root_group)
         self.tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
-        super().__init__()
+        super().__init__(name)
         if reference_velocity is None:
             reference_velocity = self.default_reference_velocity
         self.goal_point = self.transform_msg(self.root_link, goal_point)
@@ -49,10 +50,6 @@ class CartesianPosition(Goal):
                                         weight=self.weight)
         self.add_task(task)
 
-    def __str__(self):
-        s = super().__str__()
-        return f'{s}/{self.root_link}/{self.tip_link}'
-
 
 class CartesianOrientation(Goal):
     default_reference_velocity = 0.5
@@ -64,13 +61,14 @@ class CartesianOrientation(Goal):
                  root_group: Optional[str] = None,
                  tip_group: Optional[str] = None,
                  reference_velocity: Optional[float] = None,
-                 weight: float = WEIGHT_ABOVE_CA):
+                 weight: float = WEIGHT_ABOVE_CA,
+                 name: Optional[str] = None):
         """
         See CartesianPose.
         """
         self.root_link = god_map.world.search_for_link_name(root_link, root_group)
         self.tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
-        super().__init__()
+        super().__init__(name)
         if reference_velocity is None:
             reference_velocity = self.default_reference_velocity
         self.goal_orientation = self.transform_msg(self.root_link, goal_orientation)
@@ -88,10 +86,6 @@ class CartesianOrientation(Goal):
                                            reference_velocity=self.reference_velocity,
                                            weight=self.weight)
         self.add_task(task)
-
-    def __str__(self):
-        s = super().__str__()
-        return f'{s}/{self.root_link}/{self.tip_link}'
 
 
 class CartesianPositionStraight(Goal):
@@ -159,11 +153,15 @@ class CartesianPositionStraight(Goal):
 
 
 class CartesianPose(Goal):
-    def __init__(self, root_link: str, tip_link: str, goal_pose: PoseStamped,
+    def __init__(self,
+                 root_link: str,
+                 tip_link: str,
+                 goal_pose: PoseStamped,
                  root_group: Optional[str] = None,
                  tip_group: Optional[str] = None,
                  reference_linear_velocity: Optional[float] = None,
                  reference_angular_velocity: Optional[float] = None,
+                 name: Optional[str] = None,
                  weight=WEIGHT_ABOVE_CA):
         """
         This goal will use the kinematic chain between root and tip link to move tip link into the goal pose.
@@ -183,7 +181,11 @@ class CartesianPose(Goal):
         """
         self.root_link = god_map.world.search_for_link_name(root_link, root_group)
         self.tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
-        super().__init__()
+        if name is None:
+            name = f'{self.__class__.__name__}/{self.root_link}/{self.tip_link}'
+        super().__init__(name)
+        position_name = f'{self.name}/position'
+        orientation_name = f'{self.name}/orientation'
         if reference_linear_velocity is None:
             reference_linear_velocity = CartesianPosition.default_reference_velocity
         if reference_angular_velocity is None:
@@ -193,24 +195,22 @@ class CartesianPose(Goal):
         goal_point, goal_quaternion = split_pose_stamped(goal_pose)
 
         self.add_constraints_of_goal(CartesianPosition(root_link=root_link,
-                                          tip_link=tip_link,
-                                          goal_point=goal_point,
-                                          root_group=root_group,
-                                          tip_group=tip_group,
-                                          reference_velocity=reference_linear_velocity,
-                                          weight=self.weight))
+                                                       tip_link=tip_link,
+                                                       goal_point=goal_point,
+                                                       root_group=root_group,
+                                                       tip_group=tip_group,
+                                                       reference_velocity=reference_linear_velocity,
+                                                       weight=self.weight,
+                                                       name=position_name))
 
         self.add_constraints_of_goal(CartesianOrientation(root_link=root_link,
-                                                tip_link=tip_link,
-                                                goal_orientation=goal_quaternion,
-                                                root_group=root_group,
-                                                tip_group=tip_group,
-                                                reference_velocity=reference_angular_velocity,
-                                                weight=self.weight))
-
-    def __str__(self):
-        s = super().__str__()
-        return f'{s}/{self.root_link}/{self.tip_link}'
+                                                          tip_link=tip_link,
+                                                          goal_orientation=goal_quaternion,
+                                                          root_group=root_group,
+                                                          tip_group=tip_group,
+                                                          reference_velocity=reference_angular_velocity,
+                                                          weight=self.weight,
+                                                          name=orientation_name))
 
 
 class DiffDriveBaseGoal(Goal):

@@ -1,9 +1,10 @@
 from collections import defaultdict
-from typing import List
+from typing import List, Dict
 
 import pydot
 from py_trees import Status
 
+from giskardpy.goals.goal import Goal
 from giskardpy.goals.monitors.monitors import Monitor
 from giskardpy.goals.tasks.task import Task
 from giskardpy.god_map import god_map
@@ -13,7 +14,7 @@ from giskardpy.utils.decorators import record_time, catch_and_raise_to_blackboar
 from giskardpy.utils.utils import create_path, string_shortener
 
 
-def generate_graph(tasks: List[Task], monitors: List[Monitor], output_file: str = 'graph.png'):
+def generate_graph(goals: Dict[str, Goal], monitors: List[Monitor], output_file: str = 'graph.png'):
     def shorten(string: str) -> str:
         return string_shortener(original_str=string,
                                 max_lines=4,
@@ -31,24 +32,26 @@ def generate_graph(tasks: List[Task], monitors: List[Monitor], output_file: str 
         graph.add_node(pydot.Node(shorten(monitor.name), shape='ellipse', color='black', fontcolor='black'))
 
     # Add task nodes with black border and text (default)
-    for task in tasks:
-        graph.add_node(pydot.Node(shorten(task.name), shape='box', color='black', fontcolor='black'))
+    for goal_name, goal in goals.items():
+        for task in goal.tasks:
+            task_name = shorten(f'{goal_name} - {task.name}')
+            graph.add_node(pydot.Node(task_name, shape='box', color='black', fontcolor='black'))
 
-        for monitor in task.to_start:
-            to_start = shorten(monitor.name)
-            if to_start:
-                graph.add_edge(pydot.Edge(to_start, shorten(task.name), color='green'))
-                to_end_only_monitors.discard(to_start)
-            else:
-                add_t0 = True
-                graph.add_edge(pydot.Edge('t_0', shorten(task.name), color='green'))
-        for monitor in task.to_hold:
-            to_hold = shorten(monitor.name)
-            graph.add_edge(pydot.Edge(to_hold, shorten(task.name), color='orange'))
-            to_end_only_monitors.discard(to_hold)
-        for monitor in task.to_end:
-            to_end = shorten(monitor.name)
-            graph.add_edge(pydot.Edge(shorten(task.name), to_end, color='red'))
+            for monitor in task.to_start:
+                to_start = shorten(monitor.name)
+                if to_start:
+                    graph.add_edge(pydot.Edge(to_start, task_name, color='green'))
+                    to_end_only_monitors.discard(to_start)
+                else:
+                    add_t0 = True
+                    graph.add_edge(pydot.Edge('t_0', task_name, color='green'))
+            for monitor in task.to_hold:
+                to_hold = shorten(monitor.name)
+                graph.add_edge(pydot.Edge(to_hold, task_name, color='orange'))
+                to_end_only_monitors.discard(to_hold)
+            for monitor in task.to_end:
+                to_end = shorten(monitor.name)
+                graph.add_edge(pydot.Edge(task_name, to_end, color='red'))
 
 
     # Add "t_0" node with red border and black text if needed
@@ -77,9 +80,6 @@ class PlotGoalGraph(GiskardBehavior):
     @record_time
     @profile
     def update(self):
-        tasks = []
-        for goal in god_map.motion_goal_manager.motion_goals.values():
-            tasks.extend(goal.tasks)
         file_name = god_map.giskard.tmp_folder + f'task_graphs/goal_{god_map.goal_id}.png'
-        generate_graph(tasks, god_map.monitor_manager.monitors, file_name)
+        generate_graph(god_map.motion_goal_manager.motion_goals, god_map.monitor_manager.monitors, file_name)
         return Status.SUCCESS

@@ -11,7 +11,8 @@ class JointGoalReached(Monitor):
                  name: str,
                  goal_state: Dict[str, float],
                  threshold: float,
-                 crucial: bool):
+                 crucial: bool,
+                 stay_one: bool = True):
         comparison_list = []
         for joint_name, goal in goal_state.items():
             joint_name = god_map.world.search_for_joint_name(joint_name)
@@ -23,7 +24,7 @@ class JointGoalReached(Monitor):
             # god_map.debug_expression_manager.add_debug_expression(str(joint_name), cas.min(cas.abs(error), 0.01))
             comparison_list.append(cas.less(cas.abs(error), threshold))
         expression = cas.logic_all(cas.Expression(comparison_list))
-        super().__init__(name, crucial=crucial)
+        super().__init__(name, crucial=crucial, stay_one=stay_one)
         self.set_expression(expression)
         god_map.debug_expression_manager.add_debug_expression(f'joints reached', self.expression)
 

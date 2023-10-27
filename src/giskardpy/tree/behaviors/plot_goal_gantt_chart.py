@@ -28,7 +28,7 @@ class PlotGanttChart(GiskardBehavior):
                 if not task.to_start:
                     start_dates.append([0])
                 else:
-                    start_dates.append([x.state_flip_times[0] for x in task.to_start])
+                    start_dates.append([x.state_flip_times[0] if x.state_flip_times else None for x in task.to_start])
                 if not task.to_end:
                     end_dates.append([god_map.time])
                 else:
@@ -37,11 +37,15 @@ class PlotGanttChart(GiskardBehavior):
         plt.figure(figsize=(10, 5))
 
         for i, (task, start_date, end_date) in enumerate(zip(tasks, start_dates, end_dates)):
+            if None in start_date:
+                start_date = god_map.time
+            else:
+                start_date = max(start_date)
             if None in end_date:
                 end_date = god_map.time
             else:
                 end_date = max(end_date)
-            plt.barh(task, end_date - max(start_date), height=0.8, left=start_date,
+            plt.barh(task, end_date - start_date, height=0.8, left=start_date,
                      color=(133 / 255, 232 / 255, 133 / 255))
 
         for monitor in god_map.monitor_manager.monitors:

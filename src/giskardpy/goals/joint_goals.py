@@ -18,7 +18,8 @@ from giskardpy.utils.math import axis_angle_from_quaternion
 class SetSeedConfiguration(NonMotionGoal):
     def __init__(self,
                  seed_configuration: Dict[str, float],
-                 group_name: Optional[str] = None):
+                 group_name: Optional[str] = None,
+                 name: Optional[str] = None):
         """
         Overwrite the configuration of the world to allow starting the planning from a different state.
         Can only be used in plan only mode.
@@ -26,7 +27,9 @@ class SetSeedConfiguration(NonMotionGoal):
         :param group_name: if joint names are not unique, it will search in this group for matches.
         """
         self.seed_configuration = seed_configuration
-        super().__init__()
+        if name is None:
+            name = f'{str(self.__class__.__name__)}/{list(self.seed_configuration.keys())}'
+        super().__init__(name)
         if group_name is not None:
             seed_configuration = {PrefixName(joint_name, group_name): v for joint_name, v in seed_configuration.items()}
         if god_map.is_goal_msg_type_execute() and not god_map.is_standalone():
@@ -38,14 +41,13 @@ class SetSeedConfiguration(NonMotionGoal):
             god_map.world.state[joint_name].position = initial_joint_value
         god_map.world.notify_state_change()
 
-    def __str__(self) -> str:
-        return f'{str(self.__class__.__name__)}/{list(self.seed_configuration.keys())}'
-
 
 class SetOdometry(NonMotionGoal):
-    def __init__(self, group_name: str, base_pose: PoseStamped):
-        super().__init__()
+    def __init__(self, group_name: str, base_pose: PoseStamped, name: Optional[str] = None):
         self.group_name = group_name
+        if name is None:
+            name = f'{self.__class__.__name__}/{self.group_name}'
+        super().__init__(name)
         if god_map.is_goal_msg_type_execute() and not god_map.is_standalone():
             raise ConstraintInitalizationException(f'It is not allowed to combine {str(self)} with plan and execute.')
         brumbrum_joint_name = god_map.world.groups[group_name].root_link.child_joint_names[0]
@@ -68,9 +70,6 @@ class SetOdometry(NonMotionGoal):
         else:
             god_map.world.state[brumbrum_joint.yaw.name].position = angle
         god_map.world.notify_state_change()
-
-    def __str__(self) -> str:
-        return f'{str(self.__class__.__name__)}/{self.group_name}'
 
 
 class JointVelocityLimit(Goal):

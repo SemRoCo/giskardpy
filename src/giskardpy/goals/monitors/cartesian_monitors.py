@@ -18,8 +18,9 @@ class PoseReached(Monitor):
                  tip_group: Optional[str] = None,
                  position_threshold: float = 0.01,
                  orientation_threshold: float = 0.01,
-                 crucial: bool = True):
-        super().__init__(name, crucial=crucial)
+                 crucial: bool = True,
+                 stay_one: bool = True):
+        super().__init__(name, crucial=crucial, stay_one=stay_one)
         root_link = god_map.world.search_for_link_name(root_link, root_group)
         tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
         goal_pose = self.transform_msg(root_link, goal_pose)
@@ -48,8 +49,9 @@ class PositionReached(Monitor):
                  root_group: Optional[str] = None,
                  tip_group: Optional[str] = None,
                  threshold: float = 0.01,
-                 crucial: bool = True):
-        super().__init__(name, crucial=crucial)
+                 crucial: bool = True,
+                 stay_one: bool = True):
+        super().__init__(name, crucial=crucial, stay_one=stay_one)
         root_link = god_map.world.search_for_link_name(root_link, root_group)
         tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
         goal_point = self.transform_msg(root_link, goal_point)
@@ -68,8 +70,9 @@ class OrientationReached(Monitor):
                  root_group: Optional[str] = None,
                  tip_group: Optional[str] = None,
                  threshold: float = 0.01,
-                 crucial: bool = True):
-        super().__init__(name, crucial=crucial)
+                 crucial: bool = True,
+                 stay_one: bool = True):
+        super().__init__(name, crucial=crucial, stay_one=stay_one)
         root_link = god_map.world.search_for_link_name(root_link, root_group)
         tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
         goal_orientation = self.transform_msg(root_link, goal_orientation)
@@ -89,8 +92,9 @@ class PointingAt(Monitor):
                  root_group: Optional[str] = None,
                  pointing_axis: Vector3Stamped = None,
                  threshold: float = 0.01,
-                 crucial: bool = True):
-        super().__init__(name, crucial=crucial)
+                 crucial: bool = True,
+                 stay_one: bool = True):
+        super().__init__(name, crucial=crucial, stay_one=stay_one)
         self.root = god_map.world.search_for_link_name(root_link, root_group)
         self.tip = god_map.world.search_for_link_name(tip_link, tip_group)
         self.root_P_goal_point = self.transform_msg(self.root, goal_point)
@@ -123,8 +127,9 @@ class VectorsAligned(Monitor):
                  root_group: Optional[str] = None,
                  tip_group: Optional[str] = None,
                  threshold: float = 0.01,
-                 crucial: bool = True):
-        super().__init__(name, crucial=crucial)
+                 crucial: bool = True,
+                 stay_one: bool = True):
+        super().__init__(name, crucial=crucial, stay_one=stay_one)
         self.root = god_map.world.search_for_link_name(root_link, root_group)
         self.tip = god_map.world.search_for_link_name(tip_link, tip_group)
 
@@ -154,8 +159,9 @@ class DistanceToLine(Monitor):
                  root_group: Optional[str] = None,
                  tip_group: Optional[str] = None,
                  threshold: float = 0.01,
-                 crucial: bool = True):
-        super().__init__(name, crucial=crucial)
+                 crucial: bool = True,
+                 stay_one: bool = True):
+        super().__init__(name, crucial=crucial, stay_one=stay_one)
         self.root = god_map.world.search_for_link_name(root_link, root_group)
         self.tip = god_map.world.search_for_link_name(tip_link, tip_group)
 

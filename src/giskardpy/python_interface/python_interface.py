@@ -17,18 +17,17 @@ from giskardpy.python_interface.low_level_python_interface import LowLevelGiskar
 
 
 class GiskardWrapper(LowLevelGiskardWrapper):
-    def _send_action_goal(self, goal_type: int, wait: bool = True) -> Optional[MoveResult]:
-        """
-        Send goal to Giskard. Use this if you want to specify the goal_type, otherwise stick to wrappers like
-        plan_and_execute.
-        :param goal_type: one of the constants in MoveGoal
-        :param wait: blocks if wait=True
-        :return: result from Giskard
-        """
+    def execute(self, wait: bool = True) -> MoveResult:
         local_min_reached_monitor_name = self.add_local_minimum_reached_monitor()
         for goal in self._goals:
             goal.to_end.append(local_min_reached_monitor_name)
-        return super()._send_action_goal(goal_type=goal_type, wait=wait)
+        return super().execute(wait)
+
+    def projection(self, wait: bool = True) -> MoveResult:
+        local_min_reached_monitor_name = self.add_local_minimum_reached_monitor()
+        for goal in self._goals:
+            goal.to_end.append(local_min_reached_monitor_name)
+        return super().projection(wait)
 
     # %% predefined goals
     def set_joint_goal(self,
@@ -88,29 +87,26 @@ class GiskardWrapper(LowLevelGiskardWrapper):
         :param weight: default WEIGHT_ABOVE_CA
         """
         if add_monitor:
-            monitor_name = f'{root_link}/{tip_link} pose reached'
-            self.add_cartesian_pose_reached_monitor(name=monitor_name,
-                                                    root_link=root_link,
-                                                    root_group=root_group,
-                                                    tip_link=tip_link,
-                                                    tip_group=tip_group,
-                                                    goal_pose=goal_pose)
+            monitor_name = self.add_cartesian_pose_reached_monitor(root_link=root_link,
+                                                                   root_group=root_group,
+                                                                   tip_link=tip_link,
+                                                                   tip_group=tip_group,
+                                                                   goal_pose=goal_pose)
             to_end_monitors = [monitor_name]
         else:
             to_end_monitors = []
-        self.add_motion_goal(goal_type=CartesianPose.__name__,
-                             to_end=to_end_monitors,
-                             goal_pose=goal_pose,
-                             tip_link=tip_link,
-                             root_link=root_link,
-                             root_group=root_group,
-                             tip_group=tip_group,
-                             max_linear_velocity=max_linear_velocity,
-                             max_angular_velocity=max_angular_velocity,
-                             reference_linear_velocity=reference_linear_velocity,
-                             reference_angular_velocity=reference_angular_velocity,
-                             weight=weight,
-                             **kwargs)
+        super().set_cart_goal(goal_pose=goal_pose,
+                              tip_link=tip_link,
+                              root_link=root_link,
+                              root_group=root_group,
+                              tip_group=tip_group,
+                              max_linear_velocity=max_linear_velocity,
+                              max_angular_velocity=max_angular_velocity,
+                              reference_linear_velocity=reference_linear_velocity,
+                              reference_angular_velocity=reference_angular_velocity,
+                              weight=weight,
+                              to_end=to_end_monitors,
+                              **kwargs)
 
     def set_diff_drive_base_goal(self,
                                  goal_pose: PoseStamped,

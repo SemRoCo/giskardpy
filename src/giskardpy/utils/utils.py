@@ -551,3 +551,17 @@ def get_ros_msgs_constant_name_by_value(ros_msg_class: genpy.Message, value: Uni
             if attr_value == value:
                 return attr_name
     raise AttributeError(f'Message type {ros_msg_class} has no constant that matches {value}.')
+
+
+class ImmutableDict(dict):
+    """
+    A dict that prevent reassignment of keys.
+    """
+    def __setitem__(self, key, value):
+        if key in self:
+            raise ValueError(f'Key "{key}" already exists. Cannot reassign value.')
+        super().__setitem__(key, value)
+
+    def update(self, *args, **kwargs):
+        for k, v in dict(*args, **kwargs).items():
+            self.__setitem__(k, v)

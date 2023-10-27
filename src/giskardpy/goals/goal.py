@@ -23,13 +23,15 @@ from giskardpy.qp.constraint import InequalityConstraint, EqualityConstraint, De
 
 class Goal(ABC):
     tasks: List[Task]
+    name: str
 
     @abc.abstractmethod
-    def __init__(self):
+    def __init__(self, name: str):
         """
         This is where you specify goal parameters and save them as self attributes.
         """
         self.tasks = []
+        self.name = name
 
     def clean_up(self):
         pass
@@ -37,13 +39,11 @@ class Goal(ABC):
     def is_done(self):
         return None
 
-    @abc.abstractmethod
     def __str__(self) -> str:
-        """
-        Make sure the returns a unique str, in case multiple goals of the same type are added.
-        Usage of 'self.__class__.__name__' is recommended.
-        """
-        return str(self.__class__.__name__)
+        return self.name
+
+    def __repr__(self) -> str:
+        return self.name
 
     def traj_time_in_seconds(self) -> w.Expression:
         t = symbol_manager.time
@@ -81,6 +81,14 @@ class Goal(ABC):
         if isinstance(joint, OneDofJoint):
             return joint.get_symbol(Derivatives.position)
         raise TypeError(f'get_joint_position_symbol is only supported for OneDofJoint, not {type(joint)}')
+
+    def connect_to_start(self, monitor: Monitor):
+        for task in self.tasks:
+            task.add_to_start_monitor(monitor)
+
+    def connect_to_hold(self, monitor: Monitor):
+        for task in self.tasks:
+            task.add_to_hold_monitor(monitor)
 
     def connect_to_end(self, monitor: Monitor):
         for task in self.tasks:
@@ -145,13 +153,16 @@ class Goal(ABC):
 
     def add_constraints_of_goal(self, goal: Goal):
         for task in goal.tasks:
-            self.tasks.append(task)
+            if not [t for t in self.tasks if t.name == task.name]:
+                self.tasks.append(task)
+            else:
+                raise ConstraintInitalizationException(f'Constraint with name {task.name} already exists.')
 
     def add_task(self, task: Task):
         if task.name != '':
-            task.name = f'{str(self)}/{task.name}'
+            task.name = f'{self.name}/{task.name}'
         else:
-            task.name = str(self)
+            task.name = self.name
         self.tasks.append(task)
 
     def add_tasks(self, tasks: List[Task]):

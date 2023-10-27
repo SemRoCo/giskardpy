@@ -12,7 +12,7 @@ from giskardpy.god_map import god_map
 from giskardpy.my_types import PrefixName
 from giskardpy.utils import logging
 from giskardpy.utils.utils import get_all_classes_in_package, json_to_kwargs, convert_dictionary_to_ros_message, \
-    json_str_to_kwargs
+    json_str_to_kwargs, ImmutableDict
 
 
 class MotionGoalManager:
@@ -36,8 +36,14 @@ class MotionGoalManager:
                 raise UnknownConstraintException(f'unknown constraint {motion_goal.type}.')
             try:
                 params = json_str_to_kwargs(motion_goal.parameter_value_pair)
-                c: Goal = C(**params)
+                c: Goal = C(name=motion_goal.name, **params)
                 self.add_motion_goal(c, motion_goal.name)
+                for monitor_name in motion_goal.to_start:
+                    monitor = god_map.monitor_manager.get_monitor(monitor_name)
+                    c.connect_to_start(monitor)
+                for monitor_name in motion_goal.to_hold:
+                    monitor = god_map.monitor_manager.get_monitor(monitor_name)
+                    c.connect_to_hold(monitor)
                 for monitor_name in motion_goal.to_end:
                     monitor = god_map.monitor_manager.get_monitor(monitor_name)
                     c.connect_to_end(monitor)
@@ -204,9 +210,9 @@ class MotionGoalManager:
 
     @profile
     def get_constraints_from_goals(self):
-        eq_constraints = {}
-        neq_constraints = {}
-        derivative_constraints = {}
+        eq_constraints = ImmutableDict()
+        neq_constraints = ImmutableDict()
+        derivative_constraints = ImmutableDict()
         goals: Dict[str, Goal] = god_map.motion_goal_manager.motion_goals
         for goal_name, goal in list(goals.items()):
             try:

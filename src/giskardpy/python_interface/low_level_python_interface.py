@@ -19,6 +19,7 @@ from giskard_msgs.srv import RegisterGroupResponse
 from giskard_msgs.srv import UpdateWorld, UpdateWorldRequest, UpdateWorldResponse, GetGroupInfo, \
     GetGroupNames, RegisterGroup
 from giskardpy.exceptions import DuplicateNameException, UnknownGroupException
+from giskardpy.goals.cartesian_goals import CartesianPose
 from giskardpy.goals.joint_goals import JointPositionList
 from giskardpy.goals.monitors.cartesian_monitors import PoseReached, PositionReached, OrientationReached, PointingAt, \
     VectorsAligned, DistanceToLine
@@ -177,6 +178,54 @@ class LowLevelGiskardWrapper:
                              to_end=to_end,
                              **kwargs)
 
+
+    def set_cart_goal(self,
+                      goal_pose: PoseStamped,
+                      tip_link: str,
+                      root_link: str,
+                      tip_group: Optional[str] = None,
+                      root_group: Optional[str] = None,
+                      max_linear_velocity: Optional[float] = None,
+                      max_angular_velocity: Optional[float] = None,
+                      reference_linear_velocity: Optional[float] = None,
+                      reference_angular_velocity: Optional[float] = None,
+                      weight: Optional[float] = None,
+                      to_start: List[str] = None,
+                      to_hold: List[str] = None,
+                      to_end: List[str] = None,
+                      **kwargs: goal_parameter):
+        """
+        This goal will use the kinematic chain between root and tip link to move tip link into the goal pose.
+        The max velocities enforce a strict limit, but require a lot of additional constraints, thus making the
+        system noticeably slower.
+        The reference velocities don't enforce a strict limit, but also don't require any additional constraints.
+        :param root_link: name of the root link of the kin chain
+        :param tip_link: name of the tip link of the kin chain
+        :param goal_pose: the goal pose
+        :param root_group: a group name, where to search for root_link, only required to avoid name conflicts
+        :param tip_group: a group name, where to search for tip_link, only required to avoid name conflicts
+        :param max_linear_velocity: m/s
+        :param max_angular_velocity: rad/s
+        :param reference_linear_velocity: m/s
+        :param reference_angular_velocity: rad/s
+        :param weight: default WEIGHT_ABOVE_CA
+        """
+        self.add_motion_goal(goal_type=CartesianPose.__name__,
+                             goal_pose=goal_pose,
+                             tip_link=tip_link,
+                             root_link=root_link,
+                             root_group=root_group,
+                             tip_group=tip_group,
+                             max_linear_velocity=max_linear_velocity,
+                             max_angular_velocity=max_angular_velocity,
+                             reference_linear_velocity=reference_linear_velocity,
+                             reference_angular_velocity=reference_angular_velocity,
+                             weight=weight,
+                             to_start=to_start,
+                             to_hold=to_hold,
+                             to_end=to_end,
+                             **kwargs)
+
     # %% predefined monitors
     def add_local_minimum_reached_monitor(self, name: Optional[str] = None):
         if name is None:
@@ -188,14 +237,16 @@ class LowLevelGiskardWrapper:
                                            goal_state: Dict[str, float],
                                            name: Optional[str] = None,
                                            threshold: float = 0.01,
-                                           crucial: bool = True) -> str:
+                                           crucial: bool = True,
+                                           stay_one: bool = True) -> str:
         if name is None:
             name = f'joint position reached {list(goal_state.keys())}'
         self.add_monitor(monitor_type=JointGoalReached.__name__,
                          monitor_name=name,
                          goal_state=goal_state,
                          threshold=threshold,
-                         crucial=crucial)
+                         crucial=crucial,
+                         stay_one=stay_one)
         return name
 
     def add_cartesian_pose_reached_monitor(self,
@@ -207,7 +258,10 @@ class LowLevelGiskardWrapper:
                                            tip_group: Optional[str] = None,
                                            position_threshold: float = 0.01,
                                            orientation_threshold: float = 0.01,
-                                           crucial: bool = True):
+                                           crucial: bool = True,
+                                           stay_one: bool = True):
+        if name is None:
+            name = f'{root_link}/{tip_link} pose reached'
         self.add_monitor(monitor_type=PoseReached.__name__,
                          monitor_name=name,
                          root_link=root_link,
@@ -217,7 +271,9 @@ class LowLevelGiskardWrapper:
                          tip_group=tip_group,
                          position_threshold=position_threshold,
                          orientation_threshold=orientation_threshold,
-                         crucial=crucial)
+                         crucial=crucial,
+                         stay_one=stay_one)
+        return name
 
     def add_cartesian_position_reached_monitor(self,
                                                *,
@@ -228,7 +284,8 @@ class LowLevelGiskardWrapper:
                                                root_group: Optional[str] = None,
                                                tip_group: Optional[str] = None,
                                                threshold: float = 0.01,
-                                               crucial: bool = True) -> str:
+                                               crucial: bool = True,
+                                               stay_one: bool = True) -> str:
         if name is None:
             name = f'{root_link}/{tip_link} position reached'
         self.add_monitor(monitor_type=PositionReached.__name__,
@@ -239,7 +296,8 @@ class LowLevelGiskardWrapper:
                          root_group=root_group,
                          tip_group=tip_group,
                          threshold=threshold,
-                         crucial=crucial)
+                         crucial=crucial,
+                         stay_one=stay_one)
 
         return name
 
@@ -278,7 +336,8 @@ class LowLevelGiskardWrapper:
                                                   root_group: Optional[str] = None,
                                                   tip_group: Optional[str] = None,
                                                   threshold: float = 0.01,
-                                                  crucial: bool = True):
+                                                  crucial: bool = True,
+                                                  stay_one: bool = True):
         self.add_monitor(monitor_type=OrientationReached.__name__,
                          monitor_name=name,
                          root_link=root_link,
@@ -287,7 +346,8 @@ class LowLevelGiskardWrapper:
                          root_group=root_group,
                          tip_group=tip_group,
                          threshold=threshold,
-                         crucial=crucial)
+                         crucial=crucial,
+                         stay_one=stay_one)
 
     def add_pointing_at_monitor(self,
                                 goal_point: PointStamped,

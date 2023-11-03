@@ -1,0 +1,17 @@
+<launch>
+
+    <include file="$(find stretch_description)/launch/upload.launch"/>
+
+    <node pkg="giskardpy" type="stretch_standalone.py" name="giskard" output="screen"/>
+
+    <node pkg="giskardpy" type="interactive_marker.py" name="giskard_interactive_marker" output="screen">
+        <rosparam param="enable_self_collision">False</rosparam>
+        <rosparam param="interactive_marker_chains">
+            - [map, stretch/link_grasp_center]
+            - [map, stretch/base_link]
+        </rosparam>
+    </node>
+
+    <node name="rviz" pkg="rviz" type="rviz" args="-d $(find giskardpy)/launch/rviz_config/standalone.rviz"/>
+
+</launch>

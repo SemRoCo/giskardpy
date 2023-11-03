@@ -19,11 +19,17 @@ class StretchStandaloneInterface(StandAloneRobotInterfaceConfig):
 
     def __init__(self, drive_joint_name: str = 'brumbrum'):
         super().__init__([
-            'torso_lift_joint', 'head_1_joint', 'head_2_joint', drive_joint_name,
-            'arm_left_1_joint', 'arm_left_2_joint', 'arm_left_3_joint', 'arm_left_4_joint',
-            'arm_left_5_joint', 'arm_left_6_joint', 'arm_left_7_joint', 'arm_right_1_joint', 'arm_right_2_joint',
-            'arm_right_3_joint',
-            'arm_right_4_joint', 'arm_right_5_joint', 'arm_right_6_joint',
-            'arm_right_7_joint', 'gripper_right_left_finger_joint', 'gripper_right_right_finger_joint',
-            'gripper_left_left_finger_joint', 'gripper_left_right_finger_joint'
+            drive_joint_name,
+            'joint_gripper_finger_left',
+            'joint_gripper_finger_right',
+            'joint_right_wheel',
+            'joint_left_wheel',
+            'joint_lift',
+            'joint_arm_l3',
+            'joint_arm_l2',
+            'joint_arm_l1',
+            'joint_arm_l0',
+            'joint_wrist_yaw',
+            'joint_head_pan',
+            'joint_head_tilt',
         ])

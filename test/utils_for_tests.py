@@ -451,18 +451,24 @@ class GiskardTestWrapper(GiskardWrapper):
     #
 
     def execute(self, expected_error_code: int = MoveResult.SUCCESS, stop_after: float = None,
-                wait: bool = True) -> MoveResult:
-        local_min_reached_monitor_name = self.add_local_minimum_reached_monitor()
-        for goal in self._goals:
-            goal.to_end.append(local_min_reached_monitor_name)
+                wait: bool = True, add_local_minimum_reached: bool = True) -> MoveResult:
+        if add_local_minimum_reached:
+            local_min_reached_monitor_name = self.add_local_minimum_reached_monitor()
+            for goal in self._goals:
+                goal.to_end.append(local_min_reached_monitor_name)
         return self.send_goal(expected_error_code=expected_error_code, stop_after=stop_after, wait=wait)
 
-    def projection(self, expected_error_code: int = MoveResult.SUCCESS, wait: bool = True) -> MoveResult:
+    def projection(self, expected_error_code: int = MoveResult.SUCCESS, wait: bool = True,
+                   add_local_minimum_reached: bool = True) -> MoveResult:
         """
         Plans, but doesn't execute the goal. Useful, if you just want to look at the planning ghost.
         :param wait: this function blocks if wait=True
         :return: result from Giskard
         """
+        if add_local_minimum_reached:
+            local_min_reached_monitor_name = self.add_local_minimum_reached_monitor()
+            for goal in self._goals:
+                goal.to_end.append(local_min_reached_monitor_name)
         last_js = god_map.world.state.to_position_dict()
         for key, value in list(last_js.items()):
             if key not in god_map.controlled_joints:
@@ -481,13 +487,11 @@ class GiskardTestWrapper(GiskardWrapper):
                          wait: bool = True) -> MoveResult:
         return self.execute(expected_error_code, stop_after, wait)
 
-    def plan(self, expected_error_codes: int = MoveResult.SUCCESS, wait: bool = True) -> MoveResult:
-        local_min_reached_monitor_name = self.add_local_minimum_reached_monitor()
-        for goal in self._goals:
-            goal.to_end.append(local_min_reached_monitor_name)
-        return self.send_goal(expected_error_code=expected_error_codes,
-                              goal_type=MoveGoal.PROJECTION,
-                              wait=wait)
+    def plan(self, expected_error_codes: int = MoveResult.SUCCESS, wait: bool = True,
+             add_local_minimum_reached: bool = True) -> MoveResult:
+        return self.projection(expected_error_code=expected_error_codes,
+                               wait=wait,
+                               add_local_minimum_reached=add_local_minimum_reached)
 
     def send_goal(self,
                   expected_error_code: int = MoveResult.SUCCESS,

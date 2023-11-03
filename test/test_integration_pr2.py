@@ -1019,7 +1019,7 @@ class TestConstraints:
                                                        to_start=[joint_monitor1],
                                                        to_end=[end_monitor, joint_monitor2])
         zero_pose.allow_all_collisions()
-        zero_pose.execute()
+        zero_pose.execute(add_local_minimum_reached=False)
 
     def test_cart_goal_sequence(self, zero_pose: PR2TestWrapper):
         pose1 = PoseStamped()
@@ -1058,7 +1058,7 @@ class TestConstraints:
                                                       to_start=[monitor1],
                                                       to_end=[monitor2, end_monitor])
         zero_pose.allow_all_collisions()
-        zero_pose.execute()
+        zero_pose.execute(add_local_minimum_reached=False)
 
     def test_wrong_constraint_type(self, zero_pose: PR2TestWrapper):
         goal_state = {'r_elbow_flex_joint': -1.0}

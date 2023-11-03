@@ -17,10 +17,13 @@ class DiffDriveTangentialToPoint(Goal):
 
     def __init__(self, goal_point: PointStamped, forward: Optional[Vector3Stamped] = None,
                  group_name: Optional[str] = None,
-                 reference_velocity: float = 0.5, weight: bool = WEIGHT_ABOVE_CA, drive: bool = False):
-        super().__init__()
+                 reference_velocity: float = 0.5, weight: bool = WEIGHT_ABOVE_CA, drive: bool = False,
+                 name: Optional[str] = None):
         self.tip = god_map.world.search_for_link_name('base_footprint', group_name)
         self.root = god_map.world.root_link_name
+        if name is None:
+            name = f'{self.__class__.__name__}/{self.root}/{self.tip}'
+        super().__init__(name)
         self.goal_point = self.transform_msg(god_map.world.root_link_name, goal_point)
         self.goal_point.point.z = 0
         self.weight = weight
@@ -66,20 +69,19 @@ class DiffDriveTangentialToPoint(Goal):
                                          name='/rot')
         self.add_task(task)
 
-    def __str__(self) -> str:
-        return f'{super().__str__()}/{self.root}/{self.tip}'
-
 
 class PointingDiffDriveEEF(Goal):
     def __init__(self, base_tip, base_root, eef_tip, eef_root, pointing_axis=None, max_velocity=0.3,
-                 weight=WEIGHT_ABOVE_CA):
-        super().__init__()
+                 weight=WEIGHT_ABOVE_CA, name: Optional[str] = None):
         self.weight = weight
         self.max_velocity = max_velocity
         self.base_tip = base_tip
         self.base_root = base_root
         self.eef_tip = eef_tip
         self.eef_root = eef_root
+        if name is None:
+            name = f'{self.__class__.name}/{self.eef_root}/{self.eef_tip}'
+        super().__init__(name)
 
         if pointing_axis is not None:
             self.tip_V_pointing_axis = tf.transform_vector(self.base_tip, pointing_axis)
@@ -114,15 +116,10 @@ class PointingDiffDriveEEF(Goal):
                                          reference_velocity=self.max_velocity,
                                          weight=weight)
 
-    def __str__(self):
-        s = super().__str__()
-        return f'{s}/{self.eef_root}/{self.eef_tip}'
-
 
 class KeepHandInWorkspace(Goal):
     def __init__(self, tip_link, base_footprint=None, map_frame=None, pointing_axis=None, max_velocity=0.3,
-                 group_name: Optional[str] = None, weight=WEIGHT_ABOVE_CA):
-        super().__init__()
+                 group_name: Optional[str] = None, weight=WEIGHT_ABOVE_CA, name: Optional[str] = None):
         if base_footprint is None:
             base_footprint = 'base_footprint'
         base_footprint = god_map.world.search_for_link_name(base_footprint, group_name)
@@ -133,6 +130,9 @@ class KeepHandInWorkspace(Goal):
         self.map_frame = map_frame
         self.tip_link = god_map.world.search_for_link_name(tip_link, group_name)
         self.base_footprint = base_footprint
+        if name is None:
+            name = f'{self.__class__.__name__}/{self.base_footprint}/{self.tip_link}'
+        super().__init__(name)
 
         if pointing_axis is not None:
             self.map_V_pointing_axis = tf.transform_vector(self.base_footprint, pointing_axis)
@@ -166,10 +166,6 @@ class KeepHandInWorkspace(Goal):
                                        task_expression=angle_error,
                                        name='/rot')
         self.add_task(task)
-
-    def __str__(self):
-        s = super().__str__()
-        return f'{s}/{self.base_footprint}/{self.tip_link}'
 
 
 class PR2DiffDriveOrient(Goal):

@@ -1,3 +1,5 @@
+from typing import Optional
+
 import numpy as np
 from geometry_msgs.msg import QuaternionStamped, PointStamped, PoseStamped, Vector3Stamped
 import giskardpy.casadi_wrapper as w
@@ -7,8 +9,10 @@ from giskardpy.symbol_manager import symbol_manager
 
 
 class DebugGoal(NonMotionGoal):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, name: Optional[str] = None):
+        if name is None:
+            name = self.__class__.__name__
+        super().__init__(name=name)
         q = QuaternionStamped()
         q.header.frame_id = god_map.world.root_link_name
         q.quaternion.w = 1
@@ -50,6 +54,3 @@ class DebugGoal(NonMotionGoal):
         god_map.debug_expression_manager.add_debug_expression('t', t)
 
         god_map.debug_expression_manager.add_debug_expression('f', 23)
-
-    def __str__(self) -> str:
-        return super().__str__()

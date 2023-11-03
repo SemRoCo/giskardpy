@@ -1009,9 +1009,11 @@ class TestConstraints:
                                                                       name='joint_monitor2')
         end_monitor = zero_pose.add_local_minimum_reached_monitor()
 
-        zero_pose.low_level_interface().set_joint_goal(goal_state=zero_pose.better_pose,
+        zero_pose.low_level_interface().set_joint_goal(goal_name='g1',
+                                                       goal_state=zero_pose.better_pose,
                                                        to_end=[joint_monitor1])
-        zero_pose.low_level_interface().set_joint_goal(goal_state=pocky_pose,
+        zero_pose.low_level_interface().set_joint_goal(goal_name='g2',
+                                                       goal_state=pocky_pose,
                                                        to_start=[joint_monitor1],
                                                        to_end=[end_monitor, joint_monitor2])
         zero_pose.allow_all_collisions()
@@ -1024,7 +1026,7 @@ class TestConstraints:
         pose1.pose.orientation.w = 1
 
         pose2 = PoseStamped()
-        pose2.header.frame_id = 'map'
+        pose2.header.frame_id = 'base_footprint'
         pose2.pose.position.y = 1
         pose2.pose.orientation.w = 1
 

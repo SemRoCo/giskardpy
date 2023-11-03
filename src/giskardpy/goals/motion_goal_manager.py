@@ -36,8 +36,10 @@ class MotionGoalManager:
                 raise UnknownConstraintException(f'unknown constraint {motion_goal.type}.')
             try:
                 params = json_str_to_kwargs(motion_goal.parameter_value_pair)
+                if motion_goal.name == '':
+                    motion_goal.name = None
                 c: Goal = C(name=motion_goal.name, **params)
-                self.add_motion_goal(c, motion_goal.name)
+                self.add_motion_goal(c)
                 for monitor_name in motion_goal.to_start:
                     monitor = god_map.monitor_manager.get_monitor(monitor_name)
                     c.connect_to_start(monitor)
@@ -54,9 +56,8 @@ class MotionGoalManager:
                     raise ConstraintInitalizationException(error_msg)
                 raise e
 
-    def add_motion_goal(self, goal: Goal, name: str = ''):
-        if name == '':
-            name = str(goal)
+    def add_motion_goal(self, goal: Goal):
+        name = goal.name
         if name in self.motion_goals:
             raise DuplicateNameException(f'Motion goal with name {name} already exists.')
         self.motion_goals[name] = goal

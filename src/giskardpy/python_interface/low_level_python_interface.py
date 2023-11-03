@@ -250,10 +250,10 @@ class LowLevelGiskardWrapper:
         return name
 
     def add_cartesian_pose_reached_monitor(self,
-                                           name: str,
                                            root_link: str,
                                            tip_link: str,
                                            goal_pose: PoseStamped,
+                                           name: Optional[str] = None,
                                            root_group: Optional[str] = None,
                                            tip_group: Optional[str] = None,
                                            position_threshold: float = 0.01,

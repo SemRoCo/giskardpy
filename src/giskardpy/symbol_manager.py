@@ -17,7 +17,6 @@ class SymbolManager(metaclass=SingletonMeta):
         self.last_hash = -1
 
     def get_symbol(self, symbol_reference):
-        # TODO check for start with god_map?
         if symbol_reference not in self.symbol_str_to_lambda:
             lambda_expr = eval(f'lambda: {symbol_reference}')
             self.symbol_str_to_lambda[symbol_reference] = lambda_expr

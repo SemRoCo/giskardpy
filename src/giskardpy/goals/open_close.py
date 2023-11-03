@@ -17,7 +17,8 @@ class Open(Goal):
                  environment_group: Optional[str] = None,
                  goal_joint_state: Optional[float] = None,
                  max_velocity: float = 100,
-                 weight: float = WEIGHT_ABOVE_CA):
+                 weight: float = WEIGHT_ABOVE_CA,
+                 name: Optional[str] = None):
         """
         Open a container in an environment.
         Only works with the environment was added as urdf.
@@ -30,13 +31,15 @@ class Open(Goal):
         :param goal_joint_state: goal state for the container. default is maximum joint state.
         :param weight:
         """
-        super().__init__()
         self.weight = weight
         self.tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
         self.handle_link = god_map.world.search_for_link_name(environment_link, environment_group)
         self.joint_name = god_map.world.get_movable_parent_joint(self.handle_link)
         self.joint_group = god_map.world.get_group_of_joint(self.joint_name)
         self.handle_T_tip = god_map.world.compute_fk_pose(self.handle_link, self.tip_link)
+        if name is None:
+            name = f'{self.__class__.__name__}/{self.tip_link}/{self.handle_link}'
+        super().__init__(name)
 
         _, max_position = god_map.world.get_joint_position_limits(self.joint_name)
         if goal_joint_state is None:
@@ -56,9 +59,6 @@ class Open(Goal):
                                                        max_velocity=max_velocity,
                                                        weight=WEIGHT_BELOW_CA))
 
-    def __str__(self):
-        return f'{super().__str__()}/{self.tip_link}/{self.handle_link}'
-
 
 class Close(Goal):
     def __init__(self,
@@ -67,13 +67,16 @@ class Close(Goal):
                  tip_group: Optional[str] = None,
                  environment_group: Optional[str] = None,
                  goal_joint_state: Optional[float] = None,
-                 weight: float = WEIGHT_ABOVE_CA):
+                 weight: float = WEIGHT_ABOVE_CA,
+                 name: Optional[str] = None):
         """
         Same as Open, but will use minimum value as default for goal_joint_state
         """
-        super().__init__()
         self.tip_link = tip_link
         self.environment_link = environment_link
+        if name is None:
+            name = f'{self.__class__.__name__}/{self.tip_link}/{self.environment_link}'
+        super().__init__(name)
         handle_link = god_map.world.search_for_link_name(environment_link, environment_group)
         joint_name = god_map.world.get_movable_parent_joint(handle_link)
         min_position, _ = god_map.world.get_joint_position_limits(joint_name)
@@ -87,6 +90,3 @@ class Close(Goal):
                                           environment_group=environment_group,
                                           goal_joint_state=goal_joint_state,
                                           weight=weight))
-
-    def __str__(self):
-        return f'{super().__str__()}/{self.tip_link}/{self.environment_link}'

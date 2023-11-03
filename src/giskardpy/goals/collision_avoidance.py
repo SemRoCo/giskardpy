@@ -28,11 +28,12 @@ class ExternalCollisionAvoidance(Goal):
         self.num_repeller = num_repeller
         self.link_name = link_name
         self.idx = idx
-        super().__init__()
+        name = f'{self.__class__.__name__}/{self.link_name}/{self.idx}'
+        super().__init__(name)
         self.root = god_map.world.root_link_name
         self.robot_name = robot_name
         self.control_horizon = god_map.qp_controller_config.prediction_horizon - (
-                    god_map.qp_controller_config.max_derivative - 1)
+                god_map.qp_controller_config.max_derivative - 1)
         self.control_horizon = max(1, self.control_horizon)
 
         a_P_pa = self.get_closest_point_on_a_in_a()
@@ -120,14 +121,6 @@ class ExternalCollisionAvoidance(Goal):
         expr = f'god_map.closest_point.get_number_of_external_collisions(\'{self.link_name}\')'
         return symbol_manager.get_symbol(expr)
 
-    @profile
-    def make_constraints(self):
-        pass
-
-    def __str__(self):
-        s = super().__str__()
-        return f'{s}/{self.link_name}/{self.idx}'
-
 
 class SelfCollisionAvoidance(Goal):
 
@@ -149,11 +142,12 @@ class SelfCollisionAvoidance(Goal):
         self.idx = idx
         if self.link_a.prefix != self.link_b.prefix:
             raise Exception(f'Links {self.link_a} and {self.link_b} have different prefix.')
-        super().__init__()
+        name = f'{self.__class__.__name__}/{self.link_a}/{self.link_b}/{self.idx}'
+        super().__init__(name)
         self.root = god_map.world.root_link_name
         self.robot_name = robot_name
         self.control_horizon = god_map.qp_controller_config.prediction_horizon - (
-                    god_map.qp_controller_config.max_derivative - 1)
+                god_map.qp_controller_config.max_derivative - 1)
         self.control_horizon = max(1, self.control_horizon)
 
         hard_threshold = cas.min(self.hard_threshold, self.soft_threshold / 2)
@@ -231,18 +225,11 @@ class SelfCollisionAvoidance(Goal):
         expr = f'god_map.closest_point.get_number_of_self_collisions(\'{self.link_a}\', \'{self.link_b}\')'
         return symbol_manager.get_symbol(expr)
 
-    @profile
-    def make_constraints(self):
-        pass
-
-    def __str__(self):
-        s = super().__str__()
-        return f'{s}/{self.link_a}/{self.link_b}/{self.idx}'
-
 
 class CollisionAvoidanceHint(Goal):
     def __init__(self, tip_link, avoidance_hint, object_link_name, object_group=None, max_linear_velocity=0.1,
-                 root_link=None, max_threshold=0.05, spring_threshold=None, weight=WEIGHT_ABOVE_CA):
+                 root_link=None, max_threshold=0.05, spring_threshold=None, weight=WEIGHT_ABOVE_CA,
+                 name: Optional[str] = None):
         """
         This goal pushes the link_name in the direction of avoidance_hint, if it is closer than spring_threshold
         to body_b/link_b.
@@ -256,9 +243,11 @@ class CollisionAvoidanceHint(Goal):
                                         sprint_threshold to max_threshold linearly, to smooth motions
         :param weight: float, default WEIGHT_ABOVE_CA
         """
-        super().__init__()
         self.link_name = god_map.world.search_for_link_name(tip_link)
         self.link_b = god_map.world.search_for_link_name(object_link_name)
+        if name is None:
+            name = f'{self.__class__.__name__}/{self.link_name}/{self.link_b}'
+        super().__init__(name)
         self.key = (self.link_name, self.link_b)
         self.object_group = object_group
         self.link_b_hash = self.link_b.__hash__()
@@ -324,8 +313,3 @@ class CollisionAvoidanceHint(Goal):
     def get_link_b(self):
         expr = f'god_map.closest_point.get_external_collisions_long_key(\'{self.key[0]}\', \'{self.key[1]}\').link_b_hash'
         return symbol_manager.get_symbol(expr)
-
-
-    def __str__(self):
-        s = super().__str__()
-        return f'{s}/{self.link_name}/{self.link_b}'

@@ -34,6 +34,8 @@ class CartesianPosition(Goal):
         """
         self.root_link = god_map.world.search_for_link_name(root_link, root_group)
         self.tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
+        if name is None:
+            name = f'{self.__class__.__name__}/{self.root_link}/{self.tip_link}'
         super().__init__(name)
         if reference_velocity is None:
             reference_velocity = self.default_reference_velocity
@@ -68,6 +70,8 @@ class CartesianOrientation(Goal):
         """
         self.root_link = god_map.world.search_for_link_name(root_link, root_group)
         self.tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
+        if name is None:
+            name = f'{self.__class__.__name__}/{self.root_link}/{self.tip_link}'
         super().__init__(name)
         if reference_velocity is None:
             reference_velocity = self.default_reference_velocity
@@ -96,11 +100,11 @@ class CartesianPositionStraight(Goal):
                  root_group: Optional[str] = None,
                  tip_group: Optional[str] = None,
                  reference_velocity: Optional[float] = None,
+                 name: Optional[str] = None,
                  weight: float = WEIGHT_ABOVE_CA):
         """
         Same as CartesianPosition, but tries to move the tip_link in a straight line to the goal_point.
         """
-        super().__init__()
         if reference_velocity is None:
             reference_velocity = 0.2
         self.reference_velocity = reference_velocity
@@ -108,6 +112,9 @@ class CartesianPositionStraight(Goal):
         self.root_link = god_map.world.search_for_link_name(root_link, root_group)
         self.tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
         self.goal_point = self.transform_msg(self.root_link, goal_point)
+        if name is None:
+            name = f'{self.__class__.__name__}/{self.root_link}/{self.tip_link}'
+        super().__init__(name)
 
         root_P_goal = cas.Point3(self.goal_point)
         root_P_tip = god_map.world.compose_fk_expression(self.root_link, self.tip_link).to_position()
@@ -146,10 +153,6 @@ class CartesianPositionStraight(Goal):
                                                    'line/z'])
 
         self.add_task(task)
-
-    def __str__(self):
-        s = super().__str__()
-        return f'{s}/{self.root_link}/{self.tip_link}'
 
 
 class CartesianPose(Goal):
@@ -218,7 +221,7 @@ class DiffDriveBaseGoal(Goal):
     def __init__(self, root_link: str, tip_link: str, goal_pose: PoseStamped, max_linear_velocity: float = 0.1,
                  max_angular_velocity: float = 0.5, weight: float = WEIGHT_ABOVE_CA, pointing_axis=None,
                  root_group: Optional[str] = None, tip_group: Optional[str] = None,
-                 always_forward: bool = False):
+                 always_forward: bool = False, name: Optional[str] = None):
         """
         Like a CartesianPose, but specifically for differential drives. It will achieve the goal in 3 phases.
         1. orient towards goal.
@@ -234,7 +237,6 @@ class DiffDriveBaseGoal(Goal):
         :param always_forward: if false, it will drive backwards, if it requires less rotation.
         """
         # TODO make pretty
-        super().__init__()
         self.always_forward = always_forward
         self.max_linear_velocity = max_linear_velocity
         self.max_angular_velocity = max_angular_velocity
@@ -245,6 +247,9 @@ class DiffDriveBaseGoal(Goal):
         self.weight = weight
         self.map = god_map.world.search_for_link_name(root_link, root_group)
         self.base_footprint = god_map.world.search_for_link_name(tip_link, tip_group)
+        if name is None:
+            name = f'{self.__class__.__name__}/{self.map}/{self.base_footprint}'
+        super().__init__(name)
         self.goal_pose = self.transform_msg(self.map, goal_pose)
         self.goal_pose.pose.position.z = 0
         diff_drive_joints = [v for k, v in god_map.world.joints.items() if isinstance(v, DiffDrive)]
@@ -339,10 +344,6 @@ class DiffDriveBaseGoal(Goal):
                                      name='/rot2')
         self.add_task(task)
 
-    def __str__(self):
-        s = super().__str__()
-        return f'{s}/{self.map}/{self.base_footprint}'
-
 
 class PR2DiffDriveBaseGoal(Goal):
 
@@ -403,13 +404,16 @@ class CartesianPoseStraight(Goal):
                  tip_group: Optional[str] = None,
                  reference_linear_velocity: Optional[float] = None,
                  reference_angular_velocity: Optional[float] = None,
-                 weight: float = WEIGHT_ABOVE_CA):
+                 weight: float = WEIGHT_ABOVE_CA,
+                 name: Optional[str] = None):
         """
         See CartesianPose. In contrast to it, this goal will try to move tip_link in a straight line.
         """
         self.root_link = root_link
         self.tip_link = tip_link
-        super().__init__()
+        if name is None:
+            name = f'{self.__class__.__name__}/{self.root_link}/{self.tip_link}'
+        super().__init__(name)
         goal_point, goal_orientation = split_pose_stamped(goal_pose)
         goal = CartesianPositionStraight(root_link=root_link,
                                          root_group=root_group,
@@ -428,20 +432,18 @@ class CartesianPoseStraight(Goal):
                                     weight=weight)
         self.add_tasks(goal.tasks)
 
-    def __str__(self):
-        s = super().__str__()
-        return f'{s}/{self.root_link}/{self.tip_link}'
-
 
 class TranslationVelocityLimit(Goal):
     def __init__(self, root_link: str, tip_link: str, root_group: Optional[str] = None, tip_group: Optional[str] = None,
-                 weight=WEIGHT_ABOVE_CA, max_velocity=0.1, hard=True):
+                 weight=WEIGHT_ABOVE_CA, max_velocity=0.1, hard=True, name: Optional[str] = None):
         """
         See CartesianVelocityLimit
         """
-        super().__init__()
         self.root_link = god_map.world.search_for_link_name(root_link, root_group)
         self.tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
+        if name is None:
+            name = f'{self.__class__.__name__}/{self.root_link}/{self.tip_link}'
+        super().__init__(name)
         self.hard = hard
         self.weight = weight
         self.max_velocity = max_velocity
@@ -460,21 +462,18 @@ class TranslationVelocityLimit(Goal):
                                                   max_violation=0)
         self.add_task(task)
 
-    def __str__(self):
-        s = super(TranslationVelocityLimit, self).__str__()
-        return f'{s}/{self.root_link}/{self.tip_link}'
-
 
 class RotationVelocityLimit(Goal):
     def __init__(self, root_link: str, tip_link: str, root_group: Optional[str] = None, tip_group: Optional[str] = None,
-                 weight=WEIGHT_ABOVE_CA, max_velocity=0.5, hard=True):
+                 weight=WEIGHT_ABOVE_CA, max_velocity=0.5, hard=True, name: Optional[str] = None):
         """
         See CartesianVelocityLimit
         """
-
-        super().__init__()
         self.root_link = god_map.world.search_for_link_name(root_link, root_group)
         self.tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
+        if name is None:
+            name = f'{self.__class__.__name__}/{self.root_link}/{self.tip_link}'
+        super().__init__(name)
         self.hard = hard
 
         self.weight = weight
@@ -494,10 +493,6 @@ class RotationVelocityLimit(Goal):
                                                max_violation=0)
         self.add_task(task)
 
-    def __str__(self):
-        s = super().__str__()
-        return f'{s}/{self.root_link}/{self.tip_link}'
-
 
 class CartesianVelocityLimit(Goal):
     def __init__(self,
@@ -508,7 +503,8 @@ class CartesianVelocityLimit(Goal):
                  max_linear_velocity: float = 0.1,
                  max_angular_velocity: float = 0.5,
                  weight: float = WEIGHT_ABOVE_CA,
-                 hard: bool = False):
+                 hard: bool = False,
+                 name: Optional[str] = None):
         """
         This goal will use put a strict limit on the Cartesian velocity. This will require a lot of constraints, thus
         slowing down the system noticeably.
@@ -523,7 +519,9 @@ class CartesianVelocityLimit(Goal):
         """
         self.root_link = root_link
         self.tip_link = tip_link
-        super().__init__()
+        if name is None:
+            name = f'{self.__class__.__name__}/{self.root_link}/{self.tip_link}'
+        super().__init__(name)
         self.add_constraints_of_goal(TranslationVelocityLimit(root_link=root_link,
                                                               root_group=root_group,
                                                               tip_link=tip_link,
@@ -539,20 +537,19 @@ class CartesianVelocityLimit(Goal):
                                                            weight=weight,
                                                            hard=hard))
 
-    def __str__(self):
-        s = super().__str__()
-        return f'{s}/{self.root_link}/{self.tip_link}'
-
 
 class RelativePositionSequence(Goal):
     def __init__(self,
                  goal1: PointStamped,
                  goal2: PointStamped,
                  root_link: str,
-                 tip_link: str):
-        super().__init__()
+                 tip_link: str,
+                 name: Optional[str] = None):
         self.root_link = god_map.world.search_for_link_name(root_link)
         self.tip_link = god_map.world.search_for_link_name(tip_link)
+        if name is None:
+            name = f'{self.__class__.__name__}/{self.root_link}/{self.tip_link}'
+        super().__init__(name)
         self.root_P_goal1 = self.transform_msg(self.root_link, goal1)
         self.tip_P_goal2 = self.transform_msg(self.tip_link, goal2)
         self.max_velocity = 0.1
@@ -575,7 +572,7 @@ class RelativePositionSequence(Goal):
                                  crucial=True,
                                  stay_one=True)
         self.add_monitor(error2_monitor)
-        root_P_goal2_cached = error1_monitor.substitute_with_on_flip_symbols(root_P_goal2)
+        root_P_goal2_cached = god_map.monitor_manager.register_expression_updater(root_P_goal2, (error1_monitor.name,))
 
         error2 = cas.euclidean_distance(root_P_goal2_cached, root_P_current)
         error2_monitor.set_expression(cas.less(cas.abs(error2), 0.01))
@@ -597,6 +594,3 @@ class RelativePositionSequence(Goal):
 
     def connect_to_end(self, monitor: Monitor):
         self.step2.add_to_end_monitor(monitor)
-
-    def __str__(self) -> str:
-        return super().__str__()

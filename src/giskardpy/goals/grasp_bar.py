@@ -23,7 +23,8 @@ class GraspBar(Goal):
                  tip_group: Optional[str] = None,
                  reference_linear_velocity: float = 0.1,
                  reference_angular_velocity: float = 0.5,
-                 weight: float = WEIGHT_ABOVE_CA):
+                 weight: float = WEIGHT_ABOVE_CA,
+                 name: Optional[str] = None):
         """
         Like a CartesianPose but with more freedom.
         tip_link is allowed to be at any point along bar_axis, that is without bar_center +/- bar_length.
@@ -40,9 +41,11 @@ class GraspBar(Goal):
         :param reference_angular_velocity: rad/s
         :param weight: 
         """
-        super().__init__()
         self.root = god_map.world.search_for_link_name(root_link, root_group)
         self.tip = god_map.world.search_for_link_name(tip_link, tip_group)
+        if name is None:
+            name = f'{self.__class__.__name__}/{self.root}/{self.tip}'
+        super().__init__(name)
 
         bar_center = self.transform_msg(self.root, bar_center)
 
@@ -87,7 +90,3 @@ class GraspBar(Goal):
                                         reference_velocity=self.reference_linear_velocity,
                                         weight=self.weight)
         self.add_task(task)
-
-    def __str__(self):
-        s = super().__str__()
-        return f'{s}/{self.root}/{self.tip}'

@@ -56,30 +56,8 @@ class Monitor:
         except KeyError:
             return tf.transform_msg(target_frame, msg, timeout=tf_timeout)
 
-    @profile
-    def substitute_with_on_flip_symbols(self, expression: PreservedCasType) -> PreservedCasType:
-        old_symbols = []
-        new_symbols = []
-        for i, symbol in enumerate(expression.free_symbols()):
-            substitution_key = str(symbol)
-            self.substitution_keys.append(substitution_key)
-            old_symbols.append(symbol)
-            new_symbols.append(self.get_substitution_key(i))
-        new_expression = cas.substitute(expression, old_symbols, new_symbols)
-        self.update_substitution_values()
-        return new_expression
-
     def get_expression(self):
         return self.expression
-
-    @profile
-    def update_substitution_values(self):
-        self.substitution_values = symbol_manager.resolve_symbols(self.substitution_keys)
-
-    @profile
-    def get_substitution_key(self, substitution_id: int) -> cas.Symbol:
-        return symbol_manager.get_symbol(
-            f'god_map.monitor_manager.monitors[{self.id}].substitution_values[{substitution_id}]')
 
     def get_state_expression(self):
         return symbol_manager.get_symbol(f'god_map.monitor_manager.state[{self.id}]')

@@ -78,7 +78,8 @@ class JointVelocityLimit(Goal):
                  group_name: Optional[str] = None,
                  weight: float = WEIGHT_BELOW_CA,
                  max_velocity: float = 1,
-                 hard: bool = False):
+                 hard: bool = False,
+                 name: Optional[str] = None):
         """
         Limits the joint velocity of a revolute joint.
         :param joint_name:
@@ -91,7 +92,9 @@ class JointVelocityLimit(Goal):
         self.max_velocity = max_velocity
         self.hard = hard
         self.joint_names = joint_names
-        super().__init__()
+        if name is None:
+            name = f'{self.__class__.__name__}/{self.joint_names}'
+        super().__init__(name)
 
         task = Task(name='joint vel limit')
         for joint_name in self.joint_names:
@@ -118,10 +121,6 @@ class JointVelocityLimit(Goal):
                                              task_expression=current_joint,
                                              velocity_limit=max_velocity)
         self.add_task(task)
-
-    def __str__(self):
-        s = super().__str__()
-        return f'{s}/{self.joint_names}'
 
 
 class ShakyJointPositionRevoluteOrPrismatic(Goal):
@@ -232,7 +231,8 @@ class AvoidJointLimits(Goal):
                  percentage: float = 15,
                  joint_list: Optional[List[str]] = None,
                  group_name: Optional[str] = None,
-                 weight: float = WEIGHT_BELOW_CA):
+                 weight: float = WEIGHT_BELOW_CA,
+                 name: Optional[str] = None):
         """
         Calls AvoidSingleJointLimits for each joint in joint_list
         :param percentage:
@@ -240,7 +240,9 @@ class AvoidJointLimits(Goal):
         :param weight:
         """
         self.joint_list = joint_list
-        super().__init__()
+        if name is None:
+            name = f'{self.__class__.__name__}/{self.joint_list}'
+        super().__init__(name)
         self.weight = weight
         self.percentage = percentage
         if joint_list is not None:
@@ -283,16 +285,14 @@ class AvoidJointLimits(Goal):
                                                task_expression=joint_symbol)
         self.add_task(task)
 
-    def __str__(self) -> str:
-        return f'{super().__str__()}/{self.joint_list}'
-
 
 class JointPositionList(Goal):
     def __init__(self,
                  goal_state: Dict[str, float],
                  group_name: Optional[str] = None,
                  weight: float = WEIGHT_BELOW_CA,
-                 max_velocity: float = 1):
+                 max_velocity: float = 1,
+                 name: Optional[str] = None):
         """
         Calls JointPosition for a list of joints.
         :param goal_state: maps joint_name to goal position
@@ -301,12 +301,14 @@ class JointPositionList(Goal):
         :param max_velocity: will be applied to all joints, you should group joint types, e.g., prismatic joints
         :param hard: turns this into a hard constraint.
         """
-        super().__init__()
         self.current_positions = []
         self.goal_positions = []
         self.velocity_limits = []
         self.names = []
-        self.joint_names = list(goal_state.keys())
+        self.joint_names = list(sorted(goal_state.keys()))
+        if name is None:
+            name = f'{self.__class__.__name__} {self.joint_names}'
+        super().__init__(name)
         self.max_velocity = max_velocity
         self.weight = weight
         if len(goal_state) == 0:
@@ -342,7 +344,3 @@ class JointPositionList(Goal):
                                          task_expression=current)
 
         self.add_task(task)
-
-    def __str__(self):
-        s = super().__str__()
-        return f'{s} {self.joint_names}'

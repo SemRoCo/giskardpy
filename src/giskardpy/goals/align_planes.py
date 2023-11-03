@@ -20,6 +20,7 @@ class AlignPlanes(Goal):
                  tip_group: Optional[str] = None,
                  reference_velocity: float = 0.5,
                  weight: float = WEIGHT_ABOVE_CA,
+                 name: Optional[str] = None,
                  **kwargs):
         """
         This goal will use the kinematic chain between tip and root to align tip_normal with goal_normal.
@@ -32,7 +33,6 @@ class AlignPlanes(Goal):
         :param reference_velocity: rad/s
         :param weight:
         """
-        super().__init__()
         if 'root_normal' in kwargs:
             logwarn('Deprecated warning: use goal_normal instead of root_normal')
             goal_normal = kwargs['root_normal']
@@ -47,6 +47,13 @@ class AlignPlanes(Goal):
         self.root_V_root_normal = self.transform_msg(self.root, goal_normal)
         self.root_V_root_normal.vector = tf.normalize(self.root_V_root_normal.vector)
 
+        if name is None:
+            name = f'{self.__class__.__name__}/{self.root}/{self.tip}' \
+                   f'_X:{self.tip_V_tip_normal.vector.x}' \
+                   f'_Y:{self.tip_V_tip_normal.vector.y}' \
+                   f'_Z:{self.tip_V_tip_normal.vector.z}'
+        super().__init__(name)
+
         task = Task('align planes')
         tip_V_tip_normal = w.Vector3(self.tip_V_tip_normal)
         root_R_tip = god_map.world.compose_fk_expression(self.root, self.tip).to_rotation()
@@ -57,10 +64,3 @@ class AlignPlanes(Goal):
                                          reference_velocity=self.reference_velocity,
                                          weight=self.weight)
         self.add_task(task)
-
-    def __str__(self):
-        s = super().__str__()
-        return f'{s}/{self.root}/{self.tip}' \
-               f'_X:{self.tip_V_tip_normal.vector.x}' \
-               f'_Y:{self.tip_V_tip_normal.vector.y}' \
-               f'_Z:{self.tip_V_tip_normal.vector.z}'

@@ -27,9 +27,9 @@ from giskardpy.symbol_manager import symbol_manager
 
 class BaseTrajFollower(Goal):
     def __init__(self, joint_name: my_string, track_only_velocity: bool = False, weight: float = WEIGHT_ABOVE_CA):
-        super().__init__()
         self.weight = weight
         self.joint_name = joint_name
+        super().__init__(name=f'{self.__class__.__name__}/{self.joint_name}')
         self.joint: OmniDrive = god_map.world.joints[joint_name]
         self.odom_link = self.joint.parent_link_name
         self.base_footprint_link = self.joint.child_link_name
@@ -157,9 +157,6 @@ class BaseTrajFollower(Goal):
                                           task_expression=self.joint.yaw.get_symbol(Derivatives.position),
                                           velocity_limit=0.5,
                                           name_suffix='/rot')
-
-    def __str__(self):
-        return f'{super().__str__()}/{self.joint_name}'
 
 
 class CarryMyBullshit(Goal):

@@ -21,7 +21,8 @@ class Pointing(Goal):
                  root_group: Optional[str] = None,
                  pointing_axis: Vector3Stamped = None,
                  max_velocity: float = 0.3,
-                 weight: float = WEIGHT_BELOW_CA):
+                 weight: float = WEIGHT_BELOW_CA,
+                 name: Optional[str] = None):
         """
         Will orient pointing_axis at goal_point.
         :param tip_link: tip link of the kinematic chain.
@@ -33,12 +34,14 @@ class Pointing(Goal):
         :param max_velocity: rad/s
         :param weight:
         """
-        super().__init__()
         self.weight = weight
         self.max_velocity = max_velocity
         self.root = god_map.world.search_for_link_name(root_link, root_group)
         self.tip = god_map.world.search_for_link_name(tip_link, tip_group)
         self.root_P_goal_point = self.transform_msg(self.root, goal_point)
+        if name is None:
+            name = f'{self.__class__.__name__}/{self.root}/{self.tip}'
+        super().__init__(name)
 
         if pointing_axis is not None:
             self.tip_V_pointing_axis = self.transform_msg(self.tip, pointing_axis)
@@ -67,7 +70,3 @@ class Pointing(Goal):
                                          reference_velocity=self.max_velocity,
                                          weight=self.weight)
         self.add_task(task)
-
-    def __str__(self):
-        s = super().__str__()
-        return f'{s}/{self.root}/{self.tip}'

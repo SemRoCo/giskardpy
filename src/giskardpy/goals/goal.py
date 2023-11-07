@@ -26,7 +26,11 @@ class Goal(ABC):
     name: str
 
     @abc.abstractmethod
-    def __init__(self, name: str):
+    def __init__(self,
+                 name: str,
+                 to_start: Optional[List[Monitor]] = None,
+                 to_hold: Optional[List[Monitor]] = None,
+                 to_end: Optional[List[Monitor]] = None):
         """
         This is where you specify goal parameters and save them as self attributes.
         """
@@ -82,17 +86,25 @@ class Goal(ABC):
             return joint.get_symbol(Derivatives.position)
         raise TypeError(f'get_joint_position_symbol is only supported for OneDofJoint, not {type(joint)}')
 
-    def connect_to_start(self, monitor: Monitor):
-        for task in self.tasks:
-            task.add_to_start_monitor(monitor)
+    def connect_to_start_to_all_tasks(self, monitors: List[Monitor]):
+        for monitor in monitors:
+            for task in self.tasks:
+                task.add_to_start_monitor(monitor)
 
-    def connect_to_hold(self, monitor: Monitor):
-        for task in self.tasks:
-            task.add_to_hold_monitor(monitor)
+    def connect_to_hold_to_all_tasks(self, monitors: List[Monitor]):
+        for monitor in monitors:
+            for task in self.tasks:
+                task.add_to_hold_monitor(monitor)
 
-    def connect_to_end(self, monitor: Monitor):
-        for task in self.tasks:
-            task.add_to_end_monitor(monitor)
+    def connect_to_end_to_all_tasks(self, monitors: List[Monitor]):
+        for monitor in monitors:
+            for task in self.tasks:
+                task.add_to_end_monitor(monitor)
+
+    def connect_monitors_to_all_tasks(self, to_start: List[Monitor], to_hold: List[Monitor], to_end: List[Monitor]):
+        self.connect_to_start_to_all_tasks(to_start)
+        self.connect_to_hold_to_all_tasks(to_hold)
+        self.connect_to_end_to_all_tasks(to_end)
 
     def get_expr_velocity(self, expr: w.Expression) -> w.Expression:
         """

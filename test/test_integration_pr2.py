@@ -1043,7 +1043,9 @@ class TestConstraints:
         monitor2 = zero_pose.add_cartesian_pose_reached_monitor(name='pose2',
                                                                 root_link=root_link,
                                                                 tip_link=tip_link,
-                                                                goal_pose=pose2)
+                                                                goal_pose=pose2,
+                                                                update_goal_on=[monitor1]
+                                                                )
         end_monitor = zero_pose.add_local_minimum_reached_monitor()
 
         zero_pose.low_level_interface().set_cart_goal(goal_pose=pose1,
@@ -1055,6 +1057,7 @@ class TestConstraints:
                                                       goal_name='g2',
                                                       root_link=root_link,
                                                       tip_link=tip_link,
+                                                      relative=True,
                                                       to_start=[monitor1],
                                                       to_end=[monitor2, end_monitor])
         zero_pose.allow_all_collisions()

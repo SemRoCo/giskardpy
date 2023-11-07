@@ -38,17 +38,11 @@ class MotionGoalManager:
                 params = json_str_to_kwargs(motion_goal.parameter_value_pair)
                 if motion_goal.name == '':
                     motion_goal.name = None
-                c: Goal = C(name=motion_goal.name, **params)
+                to_start = [god_map.monitor_manager.get_monitor(monitor_name) for monitor_name in motion_goal.to_start]
+                to_hold = [god_map.monitor_manager.get_monitor(monitor_name) for monitor_name in motion_goal.to_hold]
+                to_end = [god_map.monitor_manager.get_monitor(monitor_name) for monitor_name in motion_goal.to_end]
+                c: Goal = C(name=motion_goal.name, to_start=to_start, to_hold=to_hold, to_end=to_end, **params)
                 self.add_motion_goal(c)
-                for monitor_name in motion_goal.to_start:
-                    monitor = god_map.monitor_manager.get_monitor(monitor_name)
-                    c.connect_to_start(monitor)
-                for monitor_name in motion_goal.to_hold:
-                    monitor = god_map.monitor_manager.get_monitor(monitor_name)
-                    c.connect_to_hold(monitor)
-                for monitor_name in motion_goal.to_end:
-                    monitor = god_map.monitor_manager.get_monitor(monitor_name)
-                    c.connect_to_end(monitor)
             except Exception as e:
                 traceback.print_exc()
                 error_msg = f'Initialization of \'{C.__name__}\' constraint failed: \n {e} \n'

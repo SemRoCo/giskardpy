@@ -258,6 +258,7 @@ class LowLevelGiskardWrapper:
                                            tip_group: Optional[str] = None,
                                            position_threshold: float = 0.01,
                                            orientation_threshold: float = 0.01,
+                                           update_goal_on: Optional[List[str]] = None,
                                            crucial: bool = True,
                                            stay_one: bool = True):
         if name is None:
@@ -271,6 +272,7 @@ class LowLevelGiskardWrapper:
                          tip_group=tip_group,
                          position_threshold=position_threshold,
                          orientation_threshold=orientation_threshold,
+                         update_goal_on=update_goal_on,
                          crucial=crucial,
                          stay_one=stay_one)
         return name

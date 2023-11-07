@@ -1,5 +1,5 @@
 import traceback
-from typing import List, Tuple, Dict, Optional, Callable
+from typing import List, Tuple, Dict, Optional, Callable, Union
 
 import numpy as np
 
@@ -95,16 +95,17 @@ class MonitorManager:
         self.monitors.append(monitor)
         monitor.set_id(len(self.monitors) - 1)
 
-    def get_state_dict(self, only_crucial: bool = False):
+    def get_state_dict(self, only_crucial: bool = False) -> Dict[str, bool]:
         return {monitor.name: bool(self.state[i]) for i, monitor in enumerate(self.monitors)
                 if not only_crucial or monitor.crucial}
 
-    def register_expression_updater(self, expression: cas.PreservedCasType, monitor_names: Tuple[str, ...]) \
+    def register_expression_updater(self, expression: cas.PreservedCasType,
+                                    monitors: Tuple[Union[str, Monitor], ...]) \
             -> cas.PreservedCasType:
         """
         Expression is updated when all monitors are 1 at the same time, but only once.
         """
-        monitor_names = tuple(sorted(monitor_names))
+        monitor_names = tuple(sorted(monitor.name if isinstance(monitor, Monitor) else monitor for monitor in monitors))
         old_symbols = []
         new_symbols = []
         for i, symbol in enumerate(expression.free_symbols()):

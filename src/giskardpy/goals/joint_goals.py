@@ -5,6 +5,7 @@ from typing import Dict, Optional, List
 from geometry_msgs.msg import PoseStamped
 
 from giskardpy import casadi_wrapper as cas
+from giskardpy.goals.monitors.monitors import Monitor
 from giskardpy.god_map import god_map
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.exceptions import ConstraintException, ConstraintInitalizationException
@@ -19,7 +20,10 @@ class SetSeedConfiguration(NonMotionGoal):
     def __init__(self,
                  seed_configuration: Dict[str, float],
                  group_name: Optional[str] = None,
-                 name: Optional[str] = None):
+                 name: Optional[str] = None,
+                 to_start: Optional[List[Monitor]] = None,
+                 to_hold: Optional[List[Monitor]] = None,
+                 to_end: Optional[List[Monitor]] = None):
         """
         Overwrite the configuration of the world to allow starting the planning from a different state.
         Can only be used in plan only mode.
@@ -40,10 +44,17 @@ class SetSeedConfiguration(NonMotionGoal):
                 raise KeyError(f'World has no joint \'{joint_name}\'.')
             god_map.world.state[joint_name].position = initial_joint_value
         god_map.world.notify_state_change()
+        self.connect_monitors_to_all_tasks(to_start, to_hold, to_end)
 
 
 class SetOdometry(NonMotionGoal):
-    def __init__(self, group_name: str, base_pose: PoseStamped, name: Optional[str] = None):
+    def __init__(self,
+                 group_name: str,
+                 base_pose: PoseStamped,
+                 name: Optional[str] = None,
+                 to_start: Optional[List[Monitor]] = None,
+                 to_hold: Optional[List[Monitor]] = None,
+                 to_end: Optional[List[Monitor]] = None):
         self.group_name = group_name
         if name is None:
             name = f'{self.__class__.__name__}/{self.group_name}'
@@ -70,6 +81,7 @@ class SetOdometry(NonMotionGoal):
         else:
             god_map.world.state[brumbrum_joint.yaw.name].position = angle
         god_map.world.notify_state_change()
+        self.connect_monitors_to_all_tasks(to_start, to_hold, to_end)
 
 
 class JointVelocityLimit(Goal):

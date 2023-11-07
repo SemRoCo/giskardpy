@@ -18,22 +18,32 @@ class PoseReached(Monitor):
                  tip_group: Optional[str] = None,
                  position_threshold: float = 0.01,
                  orientation_threshold: float = 0.01,
+                 update_goal_on: Optional[List[str]] = None,
                  crucial: bool = True,
                  stay_one: bool = True):
         super().__init__(name, crucial=crucial, stay_one=stay_one)
         root_link = god_map.world.search_for_link_name(root_link, root_group)
         tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
-        goal_pose = self.transform_msg(root_link, goal_pose)
-        r_T_g = cas.TransMatrix(goal_pose)
+        if update_goal_on is None:
+            goal_pose = self.transform_msg(root_link, goal_pose)
+            root_T_goal = cas.TransMatrix(goal_pose)
+        else:
+            goal_frame_id = god_map.world.search_for_link_name(goal_pose.header.frame_id)
+            goal_frame_id_T_goal = self.transform_msg(goal_frame_id, goal_pose)
+            root_T_goal_frame_id = god_map.world.compose_fk_expression(root_link, goal_frame_id)
+            root_T_goal_frame_id = god_map.monitor_manager.register_expression_updater(root_T_goal_frame_id,
+                                                                                       tuple(update_goal_on))
+            goal_frame_id_T_goal = cas.TransMatrix(goal_frame_id_T_goal)
+            root_T_goal = root_T_goal_frame_id.dot(goal_frame_id_T_goal)
 
         # %% position error
-        r_P_g = r_T_g.to_position()
+        r_P_g = root_T_goal.to_position()
         r_P_c = god_map.world.compose_fk_expression(root_link, tip_link).to_position()
         distance_to_goal = cas.euclidean_distance(r_P_g, r_P_c)
         position_reached = cas.less(distance_to_goal, position_threshold)
 
         # %% orientation error
-        r_R_g = r_T_g.to_rotation()
+        r_R_g = root_T_goal.to_rotation()
         r_R_c = god_map.world.compose_fk_expression(root_link, tip_link).to_rotation()
         rotation_error = cas.rotational_error(r_R_c, r_R_g)
         orientation_reached = cas.less(cas.abs(rotation_error), orientation_threshold)

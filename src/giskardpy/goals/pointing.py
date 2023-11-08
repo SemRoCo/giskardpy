@@ -1,14 +1,16 @@
 from __future__ import division
 
-from typing import Optional
+from typing import Optional, List
 
 from geometry_msgs.msg import Vector3Stamped, PointStamped
 
 import giskardpy.utils.tfwrapper as tf
 from giskardpy import casadi_wrapper as w
 from giskardpy.goals.goal import Goal
+from giskardpy.goals.monitors.monitors import Monitor
 from giskardpy.goals.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE, Task
 from giskardpy.god_map import god_map
+from giskardpy.utils.expression_definition_utils import transform_msg
 from giskardpy.utils.logging import logwarn
 
 
@@ -22,7 +24,10 @@ class Pointing(Goal):
                  pointing_axis: Vector3Stamped = None,
                  max_velocity: float = 0.3,
                  weight: float = WEIGHT_BELOW_CA,
-                 name: Optional[str] = None):
+                 name: Optional[str] = None,
+                 to_start: Optional[List[Monitor]] = None,
+                 to_hold: Optional[List[Monitor]] = None,
+                 to_end: Optional[List[Monitor]] = None):
         """
         Will orient pointing_axis at goal_point.
         :param tip_link: tip link of the kinematic chain.
@@ -38,13 +43,13 @@ class Pointing(Goal):
         self.max_velocity = max_velocity
         self.root = god_map.world.search_for_link_name(root_link, root_group)
         self.tip = god_map.world.search_for_link_name(tip_link, tip_group)
-        self.root_P_goal_point = self.transform_msg(self.root, goal_point)
+        self.root_P_goal_point = transform_msg(self.root, goal_point)
         if name is None:
             name = f'{self.__class__.__name__}/{self.root}/{self.tip}'
         super().__init__(name)
 
         if pointing_axis is not None:
-            self.tip_V_pointing_axis = self.transform_msg(self.tip, pointing_axis)
+            self.tip_V_pointing_axis = transform_msg(self.tip, pointing_axis)
             self.tip_V_pointing_axis.vector = tf.normalize(self.tip_V_pointing_axis.vector)
         else:
             logwarn(f'Deprecated warning: Please set pointing_axis.')

@@ -14,6 +14,7 @@ from visualization_msgs.msg import MarkerArray, Marker
 from giskardpy import casadi_wrapper as w
 from giskardpy.exceptions import GiskardException, ConstraintInitalizationException
 from giskardpy.goals.goal import Goal
+from giskardpy.goals.monitors.monitors import Monitor
 from giskardpy.goals.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE, Task
 from giskardpy.god_map import god_map
 from giskardpy.model.joints import OmniDrive, OmniDrivePR22
@@ -26,7 +27,13 @@ from giskardpy.symbol_manager import symbol_manager
 
 
 class BaseTrajFollower(Goal):
-    def __init__(self, joint_name: my_string, track_only_velocity: bool = False, weight: float = WEIGHT_ABOVE_CA):
+    def __init__(self,
+                 joint_name: my_string,
+                 track_only_velocity: bool = False,
+                 weight: float = WEIGHT_ABOVE_CA,
+                 to_start: Optional[List[Monitor]] = None,
+                 to_hold: Optional[List[Monitor]] = None,
+                 to_end: Optional[List[Monitor]] = None):
         self.weight = weight
         self.joint_name = joint_name
         super().__init__(name=f'{self.__class__.__name__}/{self.joint_name}')
@@ -40,6 +47,7 @@ class BaseTrajFollower(Goal):
         self.trajectory_length = len(trajectory.items())
         self.add_trans_constraints()
         self.add_rot_constraints()
+        self.connect_monitors_to_all_tasks(to_start, to_hold, to_end)
 
     @profile
     def x_symbol(self, t: int, free_variable_name: PrefixName, derivative: Derivatives = Derivatives.position) \

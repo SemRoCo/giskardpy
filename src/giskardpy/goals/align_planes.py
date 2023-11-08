@@ -1,12 +1,14 @@
-from typing import Optional
+from typing import Optional, List
 
 from geometry_msgs.msg import Vector3Stamped
 
 import giskardpy.utils.tfwrapper as tf
 from giskardpy import casadi_wrapper as w
 from giskardpy.goals.goal import Goal
+from giskardpy.goals.monitors.monitors import Monitor
 from giskardpy.goals.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE, Task
 from giskardpy.god_map import god_map
+from giskardpy.utils.expression_definition_utils import transform_msg
 from giskardpy.utils.logging import logwarn
 
 
@@ -21,6 +23,9 @@ class AlignPlanes(Goal):
                  reference_velocity: float = 0.5,
                  weight: float = WEIGHT_ABOVE_CA,
                  name: Optional[str] = None,
+                 to_start: Optional[List[Monitor]] = None,
+                 to_hold: Optional[List[Monitor]] = None,
+                 to_end: Optional[List[Monitor]] = None,
                  **kwargs):
         """
         This goal will use the kinematic chain between tip and root to align tip_normal with goal_normal.
@@ -41,10 +46,10 @@ class AlignPlanes(Goal):
         self.reference_velocity = reference_velocity
         self.weight = weight
 
-        self.tip_V_tip_normal = self.transform_msg(self.tip, tip_normal)
+        self.tip_V_tip_normal = transform_msg(self.tip, tip_normal)
         self.tip_V_tip_normal.vector = tf.normalize(self.tip_V_tip_normal.vector)
 
-        self.root_V_root_normal = self.transform_msg(self.root, goal_normal)
+        self.root_V_root_normal = transform_msg(self.root, goal_normal)
         self.root_V_root_normal.vector = tf.normalize(self.root_V_root_normal.vector)
 
         if name is None:
@@ -64,3 +69,4 @@ class AlignPlanes(Goal):
                                          reference_velocity=self.reference_velocity,
                                          weight=self.weight)
         self.add_task(task)
+        self.connect_monitors_to_all_tasks(to_start, to_hold, to_end)

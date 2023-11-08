@@ -42,12 +42,21 @@ class Task:
         return self.name
 
     def add_to_start_monitor(self, monitor: Monitor):
+        if [m for m in self.to_start if m.name == monitor.name]:
+            raise AttributeError(f'Monitor with name {monitor.name} '
+                                 f'already registered for to_start of task {self.name}')
         self.to_start.append(monitor)
 
     def add_to_hold_monitor(self, monitor: Monitor):
+        if [m for m in self.to_hold if m.name == monitor.name]:
+            raise AttributeError(f'Monitor with name {monitor.name} '
+                                 f'already registered for to_hold of task {self.name}')
         self.to_hold.append(monitor)
 
     def add_to_end_monitor(self, monitor: Monitor):
+        if [m for m in self.to_end if m.name == monitor.name]:
+            raise AttributeError(f'Monitor with name {monitor.name} '
+                                 f'already registered for to_end of task {self.name}')
         self.to_end.append(monitor)
 
     def get_eq_constraints(self):

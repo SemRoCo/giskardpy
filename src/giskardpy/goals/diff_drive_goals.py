@@ -1,16 +1,18 @@
 from __future__ import division
 
-from typing import Optional
+from typing import Optional, List
 
 from geometry_msgs.msg import Vector3Stamped, PointStamped
 
 import giskardpy.utils.tfwrapper as tf
 from giskardpy import casadi_wrapper as w
 from giskardpy.goals.goal import Goal
+from giskardpy.goals.monitors.monitors import Monitor
 from giskardpy.goals.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE, Task
 from giskardpy.god_map import god_map
 from giskardpy.model.joints import OmniDrivePR22
 from giskardpy.my_types import Derivatives
+from giskardpy.utils.expression_definition_utils import transform_msg
 
 
 class DiffDriveTangentialToPoint(Goal):
@@ -18,13 +20,17 @@ class DiffDriveTangentialToPoint(Goal):
     def __init__(self, goal_point: PointStamped, forward: Optional[Vector3Stamped] = None,
                  group_name: Optional[str] = None,
                  reference_velocity: float = 0.5, weight: bool = WEIGHT_ABOVE_CA, drive: bool = False,
-                 name: Optional[str] = None):
+                 name: Optional[str] = None,
+                 to_start: Optional[List[Monitor]] = None,
+                 to_hold: Optional[List[Monitor]] = None,
+                 to_end: Optional[List[Monitor]] = None
+                 ):
         self.tip = god_map.world.search_for_link_name('base_footprint', group_name)
         self.root = god_map.world.root_link_name
         if name is None:
             name = f'{self.__class__.__name__}/{self.root}/{self.tip}'
         super().__init__(name)
-        self.goal_point = self.transform_msg(god_map.world.root_link_name, goal_point)
+        self.goal_point = transform_msg(god_map.world.root_link_name, goal_point)
         self.goal_point.point.z = 0
         self.weight = weight
         self.drive = drive
@@ -72,7 +78,11 @@ class DiffDriveTangentialToPoint(Goal):
 
 class PointingDiffDriveEEF(Goal):
     def __init__(self, base_tip, base_root, eef_tip, eef_root, pointing_axis=None, max_velocity=0.3,
-                 weight=WEIGHT_ABOVE_CA, name: Optional[str] = None):
+                 weight=WEIGHT_ABOVE_CA, name: Optional[str] = None,
+                 to_start: Optional[List[Monitor]] = None,
+                 to_hold: Optional[List[Monitor]] = None,
+                 to_end: Optional[List[Monitor]] = None
+                 ):
         self.weight = weight
         self.max_velocity = max_velocity
         self.base_tip = base_tip
@@ -119,7 +129,11 @@ class PointingDiffDriveEEF(Goal):
 
 class KeepHandInWorkspace(Goal):
     def __init__(self, tip_link, base_footprint=None, map_frame=None, pointing_axis=None, max_velocity=0.3,
-                 group_name: Optional[str] = None, weight=WEIGHT_ABOVE_CA, name: Optional[str] = None):
+                 group_name: Optional[str] = None, weight=WEIGHT_ABOVE_CA, name: Optional[str] = None,
+                 to_start: Optional[List[Monitor]] = None,
+                 to_hold: Optional[List[Monitor]] = None,
+                 to_end: Optional[List[Monitor]] = None
+                 ):
         if base_footprint is None:
             base_footprint = 'base_footprint'
         base_footprint = god_map.world.search_for_link_name(base_footprint, group_name)
@@ -166,6 +180,7 @@ class KeepHandInWorkspace(Goal):
                                        task_expression=angle_error,
                                        name='/rot')
         self.add_task(task)
+        self.connect_monitors_to_all_tasks(to_start, to_hold, to_end)
 
 
 class PR2DiffDriveOrient(Goal):

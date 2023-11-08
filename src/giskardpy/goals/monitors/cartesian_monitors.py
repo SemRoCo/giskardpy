@@ -7,6 +7,7 @@ from giskardpy.goals.monitors.monitors import Monitor
 from giskardpy.god_map import god_map
 from giskardpy.my_types import Derivatives
 import giskardpy.utils.tfwrapper as tf
+from giskardpy.utils.expression_definition_utils import transform_msg
 
 
 class PoseReached(Monitor):
@@ -18,21 +19,21 @@ class PoseReached(Monitor):
                  tip_group: Optional[str] = None,
                  position_threshold: float = 0.01,
                  orientation_threshold: float = 0.01,
-                 update_goal_on: Optional[List[str]] = None,
+                 update_pose_on: Optional[List[str]] = None,
                  crucial: bool = True,
                  stay_one: bool = True):
         super().__init__(name, crucial=crucial, stay_one=stay_one)
         root_link = god_map.world.search_for_link_name(root_link, root_group)
         tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
-        if update_goal_on is None:
-            goal_pose = self.transform_msg(root_link, goal_pose)
+        if update_pose_on is None:
+            goal_pose = transform_msg(root_link, goal_pose)
             root_T_goal = cas.TransMatrix(goal_pose)
         else:
             goal_frame_id = god_map.world.search_for_link_name(goal_pose.header.frame_id)
-            goal_frame_id_T_goal = self.transform_msg(goal_frame_id, goal_pose)
+            goal_frame_id_T_goal = transform_msg(goal_frame_id, goal_pose)
             root_T_goal_frame_id = god_map.world.compose_fk_expression(root_link, goal_frame_id)
             root_T_goal_frame_id = god_map.monitor_manager.register_expression_updater(root_T_goal_frame_id,
-                                                                                       tuple(update_goal_on))
+                                                                                       tuple(update_pose_on))
             goal_frame_id_T_goal = cas.TransMatrix(goal_frame_id_T_goal)
             root_T_goal = root_T_goal_frame_id.dot(goal_frame_id_T_goal)
 
@@ -64,7 +65,7 @@ class PositionReached(Monitor):
         super().__init__(name, crucial=crucial, stay_one=stay_one)
         root_link = god_map.world.search_for_link_name(root_link, root_group)
         tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
-        goal_point = self.transform_msg(root_link, goal_point)
+        goal_point = transform_msg(root_link, goal_point)
         r_P_g = cas.Point3(goal_point)
         r_P_c = god_map.world.compose_fk_expression(root_link, tip_link).to_position()
         distance_to_goal = cas.euclidean_distance(r_P_g, r_P_c)
@@ -85,7 +86,7 @@ class OrientationReached(Monitor):
         super().__init__(name, crucial=crucial, stay_one=stay_one)
         root_link = god_map.world.search_for_link_name(root_link, root_group)
         tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
-        goal_orientation = self.transform_msg(root_link, goal_orientation)
+        goal_orientation = transform_msg(root_link, goal_orientation)
         r_R_g = cas.RotationMatrix(goal_orientation)
         r_R_c = god_map.world.compose_fk_expression(root_link, tip_link).to_rotation()
         rotation_error = cas.rotational_error(r_R_c, r_R_g)
@@ -107,9 +108,9 @@ class PointingAt(Monitor):
         super().__init__(name, crucial=crucial, stay_one=stay_one)
         self.root = god_map.world.search_for_link_name(root_link, root_group)
         self.tip = god_map.world.search_for_link_name(tip_link, tip_group)
-        self.root_P_goal_point = self.transform_msg(self.root, goal_point)
+        self.root_P_goal_point = transform_msg(self.root, goal_point)
 
-        tip_V_pointing_axis = self.transform_msg(self.tip, pointing_axis)
+        tip_V_pointing_axis = transform_msg(self.tip, pointing_axis)
         tip_V_pointing_axis.vector = tf.normalize(tip_V_pointing_axis.vector)
         root_T_tip = god_map.world.compose_fk_expression(self.root, self.tip)
         root_P_tip = root_T_tip.to_position()
@@ -143,10 +144,10 @@ class VectorsAligned(Monitor):
         self.root = god_map.world.search_for_link_name(root_link, root_group)
         self.tip = god_map.world.search_for_link_name(tip_link, tip_group)
 
-        self.tip_V_tip_normal = self.transform_msg(self.tip, tip_normal)
+        self.tip_V_tip_normal = transform_msg(self.tip, tip_normal)
         self.tip_V_tip_normal.vector = tf.normalize(self.tip_V_tip_normal.vector)
 
-        self.root_V_root_normal = self.transform_msg(self.root, goal_normal)
+        self.root_V_root_normal = transform_msg(self.root, goal_normal)
         self.root_V_root_normal.vector = tf.normalize(self.root_V_root_normal.vector)
 
         tip_V_tip_normal = cas.Vector3(self.tip_V_tip_normal)
@@ -176,10 +177,10 @@ class DistanceToLine(Monitor):
         self.tip = god_map.world.search_for_link_name(tip_link, tip_group)
 
         root_P_current = god_map.world.compose_fk_expression(self.root, self.tip).to_position()
-        root_V_line_axis = self.transform_msg(self.root, line_axis)
+        root_V_line_axis = transform_msg(self.root, line_axis)
         root_V_line_axis = cas.Vector3(root_V_line_axis)
         root_V_line_axis.scale(1)
-        root_P_center = self.transform_msg(self.root, center_point)
+        root_P_center = transform_msg(self.root, center_point)
         root_P_center = cas.Point3(root_P_center)
         root_P_line_start = root_P_center + root_V_line_axis * (line_length / 2)
         root_P_line_end = root_P_center - root_V_line_axis * (line_length / 2)

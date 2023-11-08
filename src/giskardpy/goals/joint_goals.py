@@ -13,6 +13,7 @@ from giskardpy.goals.goal import Goal, NonMotionGoal
 from giskardpy.goals.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE, Task
 from giskardpy.model.joints import OmniDrive, DiffDrive, OmniDrivePR22, OneDofJoint
 from giskardpy.my_types import PrefixName, Derivatives
+from giskardpy.utils.expression_definition_utils import transform_msg
 from giskardpy.utils.math import axis_angle_from_quaternion
 
 
@@ -65,7 +66,7 @@ class SetOdometry(NonMotionGoal):
         brumbrum_joint = god_map.world.joints[brumbrum_joint_name]
         if not isinstance(brumbrum_joint, (OmniDrive, DiffDrive, OmniDrivePR22)):
             raise ConstraintInitalizationException(f'Group {group_name} has no odometry joint.')
-        base_pose = self.transform_msg(brumbrum_joint.parent_link_name, base_pose).pose
+        base_pose = transform_msg(brumbrum_joint.parent_link_name, base_pose).pose
         god_map.world.state[brumbrum_joint.x.name].position = base_pose.position.x
         god_map.world.state[brumbrum_joint.y.name].position = base_pose.position.y
         axis, angle = axis_angle_from_quaternion(base_pose.orientation.x,
@@ -91,7 +92,11 @@ class JointVelocityLimit(Goal):
                  weight: float = WEIGHT_BELOW_CA,
                  max_velocity: float = 1,
                  hard: bool = False,
-                 name: Optional[str] = None):
+                 name: Optional[str] = None,
+                 to_start: Optional[List[Monitor]] = None,
+                 to_hold: Optional[List[Monitor]] = None,
+                 to_end: Optional[List[Monitor]] = None
+                 ):
         """
         Limits the joint velocity of a revolute joint.
         :param joint_name:
@@ -133,6 +138,7 @@ class JointVelocityLimit(Goal):
                                              task_expression=current_joint,
                                              velocity_limit=max_velocity)
         self.add_task(task)
+        self.connect_monitors_to_all_tasks(to_start, to_hold, to_end)
 
 
 class ShakyJointPositionRevoluteOrPrismatic(Goal):
@@ -244,7 +250,11 @@ class AvoidJointLimits(Goal):
                  joint_list: Optional[List[str]] = None,
                  group_name: Optional[str] = None,
                  weight: float = WEIGHT_BELOW_CA,
-                 name: Optional[str] = None):
+                 name: Optional[str] = None,
+                 to_start: Optional[List[Monitor]] = None,
+                 to_hold: Optional[List[Monitor]] = None,
+                 to_end: Optional[List[Monitor]] = None
+                 ):
         """
         Calls AvoidSingleJointLimits for each joint in joint_list
         :param percentage:
@@ -296,6 +306,7 @@ class AvoidJointLimits(Goal):
                                                weight=weight,
                                                task_expression=joint_symbol)
         self.add_task(task)
+        self.connect_monitors_to_all_tasks(to_start, to_hold, to_end)
 
 
 class JointPositionList(Goal):
@@ -304,7 +315,11 @@ class JointPositionList(Goal):
                  group_name: Optional[str] = None,
                  weight: float = WEIGHT_BELOW_CA,
                  max_velocity: float = 1,
-                 name: Optional[str] = None):
+                 name: Optional[str] = None,
+                 to_start: Optional[List[Monitor]] = None,
+                 to_hold: Optional[List[Monitor]] = None,
+                 to_end: Optional[List[Monitor]] = None
+                 ):
         """
         Calls JointPosition for a list of joints.
         :param goal_state: maps joint_name to goal position
@@ -356,3 +371,4 @@ class JointPositionList(Goal):
                                          task_expression=current)
 
         self.add_task(task)
+        self.connect_monitors_to_all_tasks(to_start, to_hold, to_end)

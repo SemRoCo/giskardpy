@@ -37,25 +37,6 @@ class Monitor:
     def notify_flipped(self, time: float):
         self.state_flip_times.append(time)
 
-    def transform_msg(self, target_frame: my_string, msg: transformable_message, tf_timeout: float = 1) \
-            -> transformable_message:
-        """
-        First tries to transform the message using the worlds internal kinematic tree.
-        If it fails, it uses tf as a backup.
-        :param target_frame:
-        :param msg:
-        :param tf_timeout: for how long Giskard should wait for tf.
-        :return: message relative to target frame
-        """
-        try:
-            try:
-                msg.header.frame_id = god_map.world.search_for_link_name(msg.header.frame_id)
-            except UnknownGroupException:
-                pass
-            return god_map.world.transform_msg(target_frame, msg)
-        except KeyError:
-            return tf.transform_msg(target_frame, msg, timeout=tf_timeout)
-
     def get_expression(self):
         return self.expression
 

@@ -1,14 +1,16 @@
 from __future__ import division
 
-from typing import Optional
+from typing import Optional, List
 
 from geometry_msgs.msg import Vector3Stamped, PointStamped
 
 import giskardpy.utils.tfwrapper as tf
 from giskardpy import casadi_wrapper as w
 from giskardpy.goals.goal import Goal
+from giskardpy.goals.monitors.monitors import Monitor
 from giskardpy.goals.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE, Task
 from giskardpy.god_map import god_map
+from giskardpy.utils.expression_definition_utils import transform_msg
 
 
 class GraspBar(Goal):
@@ -24,7 +26,11 @@ class GraspBar(Goal):
                  reference_linear_velocity: float = 0.1,
                  reference_angular_velocity: float = 0.5,
                  weight: float = WEIGHT_ABOVE_CA,
-                 name: Optional[str] = None):
+                 name: Optional[str] = None,
+                 to_start: Optional[List[Monitor]] = None,
+                 to_hold: Optional[List[Monitor]] = None,
+                 to_end: Optional[List[Monitor]] = None
+                 ):
         """
         Like a CartesianPose but with more freedom.
         tip_link is allowed to be at any point along bar_axis, that is without bar_center +/- bar_length.
@@ -47,12 +53,12 @@ class GraspBar(Goal):
             name = f'{self.__class__.__name__}/{self.root}/{self.tip}'
         super().__init__(name)
 
-        bar_center = self.transform_msg(self.root, bar_center)
+        bar_center = transform_msg(self.root, bar_center)
 
-        tip_grasp_axis = self.transform_msg(self.tip, tip_grasp_axis)
+        tip_grasp_axis = transform_msg(self.tip, tip_grasp_axis)
         tip_grasp_axis.vector = tf.normalize(tip_grasp_axis.vector)
 
-        bar_axis = self.transform_msg(self.root, bar_axis)
+        bar_axis = transform_msg(self.root, bar_axis)
         bar_axis.vector = tf.normalize(bar_axis.vector)
 
         self.bar_axis = bar_axis

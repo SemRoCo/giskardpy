@@ -1044,8 +1044,7 @@ class TestConstraints:
                                                                 root_link=root_link,
                                                                 tip_link=tip_link,
                                                                 goal_pose=pose2,
-                                                                update_goal_on=[monitor1]
-                                                                )
+                                                                update_pose_on=[monitor1])
         end_monitor = zero_pose.add_local_minimum_reached_monitor()
 
         zero_pose.low_level_interface().set_cart_goal(goal_pose=pose1,

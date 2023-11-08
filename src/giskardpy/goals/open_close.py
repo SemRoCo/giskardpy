@@ -1,9 +1,10 @@
 from __future__ import division
 
-from typing import Optional
+from typing import Optional, List
 
 from giskardpy.goals.cartesian_goals import CartesianPose
 from giskardpy.goals.goal import Goal
+from giskardpy.goals.monitors.monitors import Monitor
 from giskardpy.goals.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE
 from giskardpy.goals.joint_goals import JointPositionList
 from giskardpy.god_map import god_map
@@ -18,7 +19,11 @@ class Open(Goal):
                  goal_joint_state: Optional[float] = None,
                  max_velocity: float = 100,
                  weight: float = WEIGHT_ABOVE_CA,
-                 name: Optional[str] = None):
+                 name: Optional[str] = None,
+                 to_start: Optional[List[Monitor]] = None,
+                 to_hold: Optional[List[Monitor]] = None,
+                 to_end: Optional[List[Monitor]] = None
+                 ):
         """
         Open a container in an environment.
         Only works with the environment was added as urdf.
@@ -52,12 +57,18 @@ class Open(Goal):
                                                    tip_link=tip_link,
                                                    tip_group=tip_group,
                                                    goal_pose=self.handle_T_tip,
-                                                   weight=self.weight))
+                                                   weight=self.weight,
+                                                   to_start=to_start,
+                                                   to_hold=to_hold,
+                                                   to_end=to_end))
         goal_state = {self.joint_name.short_name: goal_joint_state}
         self.add_constraints_of_goal(JointPositionList(goal_state=goal_state,
                                                        group_name=self.joint_group.name,
                                                        max_velocity=max_velocity,
-                                                       weight=WEIGHT_BELOW_CA))
+                                                       weight=WEIGHT_BELOW_CA,
+                                                       to_start=to_start,
+                                                       to_hold=to_hold,
+                                                       to_end=to_end))
 
 
 class Close(Goal):
@@ -68,7 +79,11 @@ class Close(Goal):
                  environment_group: Optional[str] = None,
                  goal_joint_state: Optional[float] = None,
                  weight: float = WEIGHT_ABOVE_CA,
-                 name: Optional[str] = None):
+                 name: Optional[str] = None,
+                 to_start: Optional[List[Monitor]] = None,
+                 to_hold: Optional[List[Monitor]] = None,
+                 to_end: Optional[List[Monitor]] = None
+                 ):
         """
         Same as Open, but will use minimum value as default for goal_joint_state
         """
@@ -89,4 +104,7 @@ class Close(Goal):
                                           environment_link=environment_link,
                                           environment_group=environment_group,
                                           goal_joint_state=goal_joint_state,
-                                          weight=weight))
+                                          weight=weight,
+                                          to_start=to_start,
+                                          to_hold=to_hold,
+                                          to_end=to_end))

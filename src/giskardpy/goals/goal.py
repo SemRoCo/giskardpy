@@ -3,7 +3,9 @@ from __future__ import annotations
 import abc
 from abc import ABC
 from collections import OrderedDict
-from typing import Optional, Tuple, Dict, List, Union, Callable, TYPE_CHECKING
+from typing import Optional, Tuple, Dict, List, Union, Callable, TYPE_CHECKING, overload
+
+from geometry_msgs.msg import PoseStamped, PointStamped, QuaternionStamped, Vector3Stamped
 
 from giskardpy.goals.monitors.monitors import Monitor
 from giskardpy.goals.tasks.task import Task, WEIGHT_BELOW_CA
@@ -48,32 +50,6 @@ class Goal(ABC):
 
     def __repr__(self) -> str:
         return self.name
-
-    def traj_time_in_seconds(self) -> w.Expression:
-        t = symbol_manager.time
-        if god_map.is_closed_loop():
-            return t
-        else:
-            return t * god_map.qp_controller_config.sample_period
-
-    def transform_msg(self, target_frame: my_string, msg: transformable_message, tf_timeout: float = 1) \
-            -> transformable_message:
-        """
-        First tries to transform the message using the worlds internal kinematic tree.
-        If it fails, it uses tf as a backup.
-        :param target_frame:
-        :param msg:
-        :param tf_timeout: for how long Giskard should wait for tf.
-        :return: message relative to target frame
-        """
-        try:
-            try:
-                msg.header.frame_id = god_map.world.search_for_link_name(msg.header.frame_id)
-            except UnknownGroupException:
-                pass
-            return god_map.world.transform_msg(target_frame, msg)
-        except KeyError:
-            return tf.transform_msg(target_frame, msg, timeout=tf_timeout)
 
     def get_joint_position_symbol(self, joint_name: PrefixName) -> Union[w.Symbol, float]:
         """
@@ -183,18 +159,6 @@ class Goal(ABC):
 
     def add_monitor(self, monitor: Monitor):
         god_map.monitor_manager.add_monitor(monitor)
-
-
-def _prepend_prefix(prefix, d):
-    new_dict = OrderedDict()
-    for key, value in d.items():
-        new_key = f'{prefix}/{key}'
-        try:
-            value.name = f'{prefix}/{value.name}'
-        except AttributeError:
-            pass
-        new_dict[new_key] = value
-    return new_dict
 
 
 class NonMotionGoal(Goal):

@@ -1,4 +1,4 @@
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 import giskardpy.casadi_wrapper as cas
 import giskardpy.utils.tfwrapper as tf
 from giskardpy.goals.goal import Goal
@@ -18,7 +18,11 @@ class ExternalCollisionAvoidance(Goal):
                  hard_threshold: float = 0.0,
                  soft_thresholds: Optional[Dict[my_string, float]] = None,
                  idx: int = 0,
-                 num_repeller: int = 1):
+                 num_repeller: int = 1,
+                 to_start: Optional[List[Monitor]] = None,
+                 to_hold: Optional[List[Monitor]] = None,
+                 to_end: Optional[List[Monitor]] = None
+                 ):
         """
         Don't use me
         """
@@ -132,7 +136,10 @@ class SelfCollisionAvoidance(Goal):
                  hard_threshold: float = 0.0,
                  soft_threshold: float = 0.05,
                  idx: float = 0,
-                 num_repeller: int = 1):
+                 num_repeller: int = 1,
+                 to_start: Optional[List[Monitor]] = None,
+                 to_hold: Optional[List[Monitor]] = None,
+                 to_end: Optional[List[Monitor]] = None):
         self.link_a = link_a
         self.link_b = link_b
         self.max_velocity = max_velocity
@@ -229,7 +236,11 @@ class SelfCollisionAvoidance(Goal):
 class CollisionAvoidanceHint(Goal):
     def __init__(self, tip_link, avoidance_hint, object_link_name, object_group=None, max_linear_velocity=0.1,
                  root_link=None, max_threshold=0.05, spring_threshold=None, weight=WEIGHT_ABOVE_CA,
-                 name: Optional[str] = None):
+                 name: Optional[str] = None,
+                 to_start: Optional[List[Monitor]] = None,
+                 to_hold: Optional[List[Monitor]] = None,
+                 to_end: Optional[List[Monitor]] = None
+                 ):
         """
         This goal pushes the link_name in the direction of avoidance_hint, if it is closer than spring_threshold
         to body_b/link_b.
@@ -305,6 +316,7 @@ class CollisionAvoidanceHint(Goal):
                                      weight=weight,
                                      task_expression=expr)
         self.add_task(task)
+        self.connect_monitors_to_all_tasks(to_start, to_hold, to_end)
 
     def get_actual_distance(self):
         expr = f'god_map.closest_point.get_external_collisions_long_key(\'{self.key[0]}\', \'{self.key[1]}\').contact_distance'

@@ -1,6 +1,7 @@
 from typing import Dict, Optional, List
 import giskardpy.casadi_wrapper as cas
 import giskardpy.utils.tfwrapper as tf
+from giskard_msgs.msg import CollisionEntry
 from giskardpy.goals.goal import Goal
 from giskardpy.goals.monitors.monitors import Monitor
 from giskardpy.goals.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE, Task
@@ -325,3 +326,19 @@ class CollisionAvoidanceHint(Goal):
     def get_link_b(self):
         expr = f'god_map.closest_point.get_external_collisions_long_key(\'{self.key[0]}\', \'{self.key[1]}\').link_b_hash'
         return symbol_manager.get_symbol(expr)
+
+
+# use cases
+# avoid all
+# allow all
+# avoid all then allow something
+# avoid only something
+
+class CollisionAvoidance(Goal):
+    def __init__(self,
+                 name: str,
+                 collision_entries: List[CollisionEntry],
+                 to_start: Optional[List[Monitor]] = None,
+                 to_hold: Optional[List[Monitor]] = None,
+                 to_end: Optional[List[Monitor]] = None):
+        pass

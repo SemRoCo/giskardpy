@@ -52,15 +52,12 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
         return self.query
 
     @profile
-    def check_collisions(self, cut_off_distances: Dict[Tuple[PrefixName, PrefixName], float],
-                         collision_list_sizes: int, buffer: float = 0.05) -> Collisions:
+    def check_collisions(self, collision_list_sizes: int = 1000, buffer: float = 0.05) -> Collisions:
         """
-        :param cut_off_distances: (link_a, link_b) -> max distance. Contacts between objects not in this
-                                    dict or further away than the cutoff distance will be ignored.
         :param collision_list_sizes: max number of collisions
         """
-
-        query = self.cut_off_distances_to_query(cut_off_distances, buffer=buffer)
+        # god_map.collision_scene.sync()
+        query = self.cut_off_distances_to_query(self.collision_matrix, buffer=buffer)
         result: List[bpb.Collision] = self.kw.get_closest_filtered_map_batch(query)
         return self.bpb_result_to_collisions(result, collision_list_sizes)
 
@@ -70,11 +67,11 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
                                     update_query: bool) -> Set[Tuple[PrefixName, PrefixName, float]]:
         if update_query:
             self.query = None
-            cut_off_distance = {link_combination: distance for link_combination in link_combinations}
+            self.collision_matrix = {link_combination: distance for link_combination in link_combinations}
         else:
-            cut_off_distance = {}
+            self.collision_matrix = {}
         self.sync()
-        collisions = self.check_collisions(cut_off_distance, 15, buffer=0.0)
+        collisions = self.check_collisions(buffer=0.0)
         colliding_combinations = {(c.original_link_a, c.original_link_b, c.contact_distance) for c in collisions.all_collisions
                                   if c.contact_distance <= distance}
         return colliding_combinations

@@ -61,50 +61,12 @@ class MotionGoalManager:
         """
         Adds a constraint for each link that pushed it away from its closest point.
         """
-        collision_matrix = self.collision_entries_to_collision_matrix(collision_entries)
-        god_map.collision_matrix = collision_matrix
+        god_map.collision_scene.create_collision_matrix(deepcopy(collision_entries))
         if not collision_entries or not god_map.collision_scene.is_allow_all_collision(collision_entries[-1]):
-            self.add_external_collision_avoidance_constraints(soft_threshold_override=collision_matrix)
+            self.add_external_collision_avoidance_constraints(soft_threshold_override=god_map.collision_scene.collision_matrix)
         if not collision_entries or (not god_map.collision_scene.is_allow_all_collision(collision_entries[-1]) and
                                      not god_map.collision_scene.is_allow_all_self_collision(collision_entries[-1])):
             self.add_self_collision_avoidance_constraints()
-
-    def collision_entries_to_collision_matrix(self, collision_entries: List[giskard_msgs.CollisionEntry]) \
-            -> Dict[Tuple[PrefixName, PrefixName], float]:
-        god_map.collision_scene.sync()
-        collision_check_distances = self.create_collision_check_distances()
-        # ignored_collisions = god_map.get_collision_scene().ignored_self_collion_pairs
-        collision_matrix = god_map.collision_scene.collision_goals_to_collision_matrix(deepcopy(collision_entries),
-                                                                                       collision_check_distances)
-        return collision_matrix
-
-    def create_collision_check_distances(self) -> Dict[PrefixName, float]:
-        for robot_name in self.robot_names:
-            collision_avoidance_config = god_map.collision_scene.collision_avoidance_configs[robot_name]
-            external_distances = collision_avoidance_config.external_collision_avoidance
-            self_distances = collision_avoidance_config.self_collision_avoidance
-
-        max_distances = {}
-        # override max distances based on external distances dict
-        for robot in god_map.collision_scene.robots:
-            for link_name in robot.link_names_with_collisions:
-                try:
-                    controlled_parent_joint = god_map.world.get_controlled_parent_joint_of_link(link_name)
-                except KeyError as e:
-                    continue  # this happens when the root link of a robot has a collision model
-                distance = external_distances[controlled_parent_joint].soft_threshold
-                for child_link_name in god_map.world.get_directly_controlled_child_links_with_collisions(
-                        controlled_parent_joint):
-                    max_distances[child_link_name] = distance
-
-        for link_name in self_distances:
-            distance = self_distances[link_name].soft_threshold
-            if link_name in max_distances:
-                max_distances[link_name] = max(distance, max_distances[link_name])
-            else:
-                max_distances[link_name] = distance
-
-        return max_distances
 
     @profile
     def add_external_collision_avoidance_constraints(self, soft_threshold_override=None):
@@ -193,12 +155,12 @@ class MotionGoalManager:
                 else:
                     raise Exception(f'Could not find group containing the link {link_a} and {link_b}.')
                 goal = SelfCollisionAvoidance(link_a=link_a,
-                                                    link_b=link_b,
-                                                    robot_name=robot_name,
-                                                    hard_threshold=hard_threshold,
-                                                    soft_threshold=soft_threshold,
-                                                    idx=i,
-                                                    num_repeller=number_of_repeller)
+                                              link_b=link_b,
+                                              robot_name=robot_name,
+                                              hard_threshold=hard_threshold,
+                                              soft_threshold=soft_threshold,
+                                              idx=i,
+                                              num_repeller=number_of_repeller)
                 self.add_motion_goal(goal)
                 num_constr += 1
         logging.loginfo(f'Adding {num_constr} self collision avoidance constraints.')
@@ -222,7 +184,6 @@ class MotionGoalManager:
         god_map.neq_constraints = neq_constraints
         god_map.derivative_constraints = derivative_constraints
         return eq_constraints, neq_constraints, derivative_constraints
-
 
     def replace_jsons_with_ros_messages(self, d):
         if isinstance(d, list):

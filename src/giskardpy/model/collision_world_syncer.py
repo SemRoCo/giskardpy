@@ -200,8 +200,11 @@ class Collisions:
             collision = self.transform_self_collision(collision, robot)
             key = collision.link_a, collision.link_b
             self.self_collisions[key].add(collision)
-            self.number_of_self_collisions[key] = min(self.collision_list_size,
-                                                      self.number_of_self_collisions[key] + 1)
+            try:
+                self.number_of_self_collisions[key] = min(self.collision_list_size,
+                                                          self.number_of_self_collisions[key] + 1)
+            except Exception as e:
+                pass
         self.all_collisions.add(collision)
 
     @profile
@@ -767,12 +770,8 @@ class CollisionWorldSynchronizer:
                                     update_query: bool) -> Set[Tuple[PrefixName, PrefixName]]:
         raise NotImplementedError('Collision checking is turned off.')
 
-    def check_collisions(self, cut_off_distances: dict, collision_list_size: float = 15, buffer: float = 0.05) \
+    def check_collisions(self, collision_list_size: float = 1000, buffer: float = 0.05) \
             -> Collisions:
-        """
-        :param cut_off_distances: (link_a, link_b) -> cut off distance. Contacts between objects not in this
-                                    dict or further away than the cut off distance will be ignored.
-        """
         pass
 
     def in_collision(self, link_a: my_string, link_b: my_string, distance: float) -> bool:
@@ -790,17 +789,59 @@ class CollisionWorldSynchronizer:
             if link1 not in god_map.world.link_names or link2 not in god_map.world.link_names:
                 del self.self_collision_matrix[key]
 
-    def collision_goals_to_collision_matrix(self,
-                                            collision_goals: List[CollisionEntry],
-                                            collision_check_distances: Dict[PrefixName, float]) \
-            -> Dict[Tuple[PrefixName, PrefixName], float]:
+    def add_added_checks(self):
+        try:
+            added_checks = god_map.added_collision_checks
+            god_map.added_collision_checks = {}
+        except AttributeError:
+            # no collision checks added
+            added_checks = {}
+        for key, distance in added_checks.items():
+            if key in self.collision_matrix:
+                self.collision_matrix[key] = max(distance, self.collision_matrix[key])
+            else:
+                self.collision_matrix[key] = distance
+
+    def create_collision_check_distances(self) -> Dict[PrefixName, float]:
+        for robot_name in self.robot_names:
+            collision_avoidance_config = god_map.collision_scene.collision_avoidance_configs[robot_name]
+            external_distances = collision_avoidance_config.external_collision_avoidance
+            self_distances = collision_avoidance_config.self_collision_avoidance
+
+        max_distances = {}
+        # override max distances based on external distances dict
+        for robot in god_map.collision_scene.robots:
+            for link_name in robot.link_names_with_collisions:
+                try:
+                    controlled_parent_joint = god_map.world.get_controlled_parent_joint_of_link(link_name)
+                except KeyError as e:
+                    continue  # this happens when the root link of a robot has a collision model
+                distance = external_distances[controlled_parent_joint].soft_threshold
+                for child_link_name in god_map.world.get_directly_controlled_child_links_with_collisions(
+                        controlled_parent_joint):
+                    max_distances[child_link_name] = distance
+
+        for link_name in self_distances:
+            distance = self_distances[link_name].soft_threshold
+            if link_name in max_distances:
+                max_distances[link_name] = max(distance, max_distances[link_name])
+            else:
+                max_distances[link_name] = distance
+
+        return max_distances
+
+    def create_collision_matrix(self, collision_goals: List[CollisionEntry],
+                                collision_check_distances: Optional[Dict[PrefixName, float]] = None):
         """
         :param collision_goals: list of CollisionEntry
         :return: dict mapping (link_a, link_b) -> collision checking distance
         """
+        self.sync()
+        if collision_check_distances is None:
+            collision_check_distances = self.create_collision_check_distances()
         collision_goals = self.verify_collision_entries(collision_goals)
-        collision_matrix = {}
-        for collision_entry in collision_goals:  # type: CollisionEntry
+        self.collision_matrix = {}
+        for collision_entry in collision_goals:
             if collision_entry.group1 == collision_entry.ALL:
                 group1_links = god_map.world.link_names_with_collisions
             else:
@@ -820,17 +861,17 @@ class CollisionWorldSynchronizer:
                         robot_link, env_link = env_link, robot_link
                     collision_matrix_key = (robot_link, env_link)
                     if self.is_allow_collision(collision_entry):
-                        if collision_matrix_key in collision_matrix:
-                            del collision_matrix[collision_matrix_key]
+                        if collision_matrix_key in self.collision_matrix:
+                            del self.collision_matrix[collision_matrix_key]
                     elif self.is_avoid_collision(collision_entry):
                         if black_list_key not in self.self_collision_matrix:
                             if collision_entry.distance == -1:
-                                collision_matrix[collision_matrix_key] = collision_check_distances[robot_link]
+                                self.collision_matrix[collision_matrix_key] = collision_check_distances[robot_link]
                             else:
-                                collision_matrix[collision_matrix_key] = collision_entry.distance
+                                self.collision_matrix[collision_matrix_key] = collision_entry.distance
                     else:
                         raise AttributeError(f'Invalid collision entry type: {collision_entry.type}')
-        return collision_matrix
+        self.add_added_checks()
 
     def verify_collision_entries(self, collision_goals: List[CollisionEntry]) -> List[CollisionEntry]:
         for collision_entry in collision_goals:

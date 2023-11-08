@@ -56,7 +56,7 @@ class GodMap:
     qp_solver_solution: NextCommands
     added_collision_checks: Dict[Tuple[PrefixName, PrefixName], float]
     closest_point: Collisions
-    collision_matrix: Dict[Tuple[PrefixName, PrefixName], float]
+    # collision_matrix: Dict[Tuple[PrefixName, PrefixName], float]
     time_delay: rospy.Duration
     tracking_start_time: rospy.Time
     result_message: MoveResult

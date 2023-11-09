@@ -324,6 +324,10 @@ class CollisionWorldSynchronizer:
         self.collision_avoidance_configs = defaultdict(CollisionAvoidanceGroupThresholds)
         self._fixed_joints = tuple()
         self.world_version = -1
+        self.collision_matrix = {}
+
+    def clear_collision_matrix(self):
+        self.collision_matrix = {}
 
     @property
     def fixed_joints(self) -> Tuple[PrefixName]:
@@ -840,7 +844,7 @@ class CollisionWorldSynchronizer:
         if collision_check_distances is None:
             collision_check_distances = self.create_collision_check_distances()
         collision_goals = self.verify_collision_entries(collision_goals)
-        self.collision_matrix = {}
+        collision_matrix = {}
         for collision_entry in collision_goals:
             if collision_entry.group1 == collision_entry.ALL:
                 group1_links = god_map.world.link_names_with_collisions
@@ -861,16 +865,20 @@ class CollisionWorldSynchronizer:
                         robot_link, env_link = env_link, robot_link
                     collision_matrix_key = (robot_link, env_link)
                     if self.is_allow_collision(collision_entry):
-                        if collision_matrix_key in self.collision_matrix:
-                            del self.collision_matrix[collision_matrix_key]
+                        if collision_matrix_key in collision_matrix:
+                            del collision_matrix[collision_matrix_key]
                     elif self.is_avoid_collision(collision_entry):
                         if black_list_key not in self.self_collision_matrix:
                             if collision_entry.distance == -1:
-                                self.collision_matrix[collision_matrix_key] = collision_check_distances[robot_link]
+                                collision_matrix[collision_matrix_key] = collision_check_distances[robot_link]
                             else:
-                                self.collision_matrix[collision_matrix_key] = collision_entry.distance
+                                collision_matrix[collision_matrix_key] = collision_entry.distance
                     else:
                         raise AttributeError(f'Invalid collision entry type: {collision_entry.type}')
+        return collision_matrix
+
+    def set_collision_matrix(self, collision_matrix):
+        self.collision_matrix = collision_matrix
 
     def verify_collision_entries(self, collision_goals: List[CollisionEntry]) -> List[CollisionEntry]:
         for collision_entry in collision_goals:

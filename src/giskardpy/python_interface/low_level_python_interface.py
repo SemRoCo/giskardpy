@@ -24,7 +24,7 @@ from giskardpy.goals.joint_goals import JointPositionList
 from giskardpy.goals.monitors.cartesian_monitors import PoseReached, PositionReached, OrientationReached, PointingAt, \
     VectorsAligned, DistanceToLine
 from giskardpy.goals.monitors.joint_monitors import JointGoalReached
-from giskardpy.goals.monitors.monitors import LocalMinimumReached
+from giskardpy.goals.monitors.monitors import LocalMinimumReached, TimeAbove
 from giskardpy.goals.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
 from giskardpy.god_map import god_map
 from giskardpy.model.utils import make_world_body_box
@@ -231,6 +231,12 @@ class LowLevelGiskardWrapper:
         if name is None:
             name = 'local min reached'
         self.add_monitor(monitor_type=LocalMinimumReached.__name__, monitor_name=name)
+        return name
+
+    def add_time_above_monitor(self, threshold: float, name: Optional[str] = None):
+        if name is None:
+            name = 'time above'
+        self.add_monitor(monitor_type=TimeAbove.__name__, monitor_name=name, threshold=threshold)
         return name
 
     def add_joint_position_reached_monitor(self,

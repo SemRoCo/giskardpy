@@ -16,6 +16,10 @@ class CollisionChecker(GiskardBehavior):
         super().__init__(name)
         self.lock = Lock()
 
+    def initialise(self):
+        god_map.collision_scene.add_added_checks()
+        super().initialise()
+
     def are_self_collisions_violated(self, collsions: Collisions):
         for key, self_collisions in collsions.self_collisions.items():
             for self_collision in self_collisions[:-1]:  # the last collision is always some default crap

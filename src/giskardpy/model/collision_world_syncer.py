@@ -871,7 +871,6 @@ class CollisionWorldSynchronizer:
                                 self.collision_matrix[collision_matrix_key] = collision_entry.distance
                     else:
                         raise AttributeError(f'Invalid collision entry type: {collision_entry.type}')
-        self.add_added_checks()
 
     def verify_collision_entries(self, collision_goals: List[CollisionEntry]) -> List[CollisionEntry]:
         for collision_entry in collision_goals:

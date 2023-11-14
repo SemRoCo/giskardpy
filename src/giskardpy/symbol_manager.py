@@ -5,7 +5,7 @@ from giskardpy.god_map import god_map
 import numpy as np
 import giskardpy.casadi_wrapper as cas
 from giskardpy.utils.singleton import SingletonMeta
-
+from geometry_msgs.msg import PointStamped
 
 class SymbolManager(metaclass=SingletonMeta):
     symbol_str_to_lambda: Dict[str, Callable[[], float]]
@@ -57,6 +57,10 @@ class SymbolManager(metaclass=SingletonMeta):
                 data = eval(expr)
             except KeyError as e:
                 raise KeyError(f'to_expr only works, when there is already data at the path: {e}')
+        if input_type_hint == PointStamped and output_type_hint == cas.Point3:
+            return cas.Point3((self.get_symbol(expr + '.point.x'),
+                               self.get_symbol(expr + '.point.y'),
+                               self.get_symbol(expr + '.point.z')))
         if output_type_hint == cas.TransMatrix:
             return cas.TransMatrix(
                 [

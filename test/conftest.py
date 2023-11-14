@@ -74,9 +74,10 @@ def zero_pose(resetted_giskard: GiskardTestWrapper) -> GiskardTestWrapper:
         resetted_giskard.allow_all_collisions()
         resetted_giskard.execute()
     else:
-        resetted_giskard.allow_all_collisions()
-        resetted_giskard.set_joint_goal(resetted_giskard.default_pose)
-        resetted_giskard.execute()
+        pass
+        # resetted_giskard.allow_all_collisions()
+        # resetted_giskard.set_joint_goal(resetted_giskard.default_pose)
+        # resetted_giskard.execute()
     return resetted_giskard
 
 

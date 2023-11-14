@@ -484,8 +484,8 @@ class GiskardTestWrapper(GiskardWrapper):
         return result
 
     def plan_and_execute(self, expected_error_code: int = MoveResult.SUCCESS, stop_after: float = None,
-                         wait: bool = True) -> MoveResult:
-        return self.execute(expected_error_code, stop_after, wait)
+                         wait: bool = True, add_local_minimum_reached=True) -> MoveResult:
+        return self.execute(expected_error_code, stop_after, wait, add_local_minimum_reached=add_local_minimum_reached)
 
     def plan(self, expected_error_codes: int = MoveResult.SUCCESS, wait: bool = True,
              add_local_minimum_reached: bool = True) -> MoveResult:

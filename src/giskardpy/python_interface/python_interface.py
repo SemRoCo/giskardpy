@@ -18,15 +18,15 @@ from giskardpy.python_interface.low_level_python_interface import LowLevelGiskar
 
 class GiskardWrapper(LowLevelGiskardWrapper):
     def execute(self, wait: bool = True) -> MoveResult:
-        local_min_reached_monitor_name = self.add_local_minimum_reached_monitor()
-        for goal in self._goals:
-            goal.to_end.append(local_min_reached_monitor_name)
+        # local_min_reached_monitor_name = self.add_local_minimum_reached_monitor()
+        # for goal in self._goals:
+        #     goal.to_end.append(local_min_reached_monitor_name)
         return super().execute(wait)
 
     def projection(self, wait: bool = True) -> MoveResult:
-        local_min_reached_monitor_name = self.add_local_minimum_reached_monitor()
-        for goal in self._goals:
-            goal.to_end.append(local_min_reached_monitor_name)
+        # local_min_reached_monitor_name = self.add_local_minimum_reached_monitor()
+        # for goal in self._goals:
+        #     goal.to_end.append(local_min_reached_monitor_name)
         return super().projection(wait)
 
     # %% predefined goals

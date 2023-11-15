@@ -18,7 +18,8 @@ from typing import Optional, List
 
 class PouringAdaptiveTilt(Goal):
     def __init__(self, root, tip, pouring_pose: PoseStamped, tilt_angle: float, tilt_axis: Vector3Stamped,
-                 use_local_min=False, max_vel=0.3, weight=WEIGHT_COLLISION_AVOIDANCE, name: Optional[str] = None,
+                 use_local_min=False, max_vel=0.3, weight=WEIGHT_COLLISION_AVOIDANCE, pre_tilt=False,
+                 name: Optional[str] = None,
                  to_start: Optional[List[Monitor]] = None,
                  to_hold: Optional[List[Monitor]] = None,
                  to_end: Optional[List[Monitor]] = None):
@@ -44,6 +45,7 @@ class PouringAdaptiveTilt(Goal):
         self.move_y = False
         self.move_y_back = False
         self.stop = False
+        self.stop_counter = 0
 
         root_T_tip = god_map.world.compose_fk_expression(self.root_link, self.tip_link)
         tip_V_tilt_axis = w.Vector3(self.tilt_axis.vector)
@@ -55,8 +57,13 @@ class PouringAdaptiveTilt(Goal):
                                                  reference_velocity=self.max_vel, weight=self.weight)
 
         rot_task = Task(name='preRotation')
+        if pre_tilt:
+            tip_R_tip = w.RotationMatrix().from_axis_angle(tip_V_tilt_axis, self.tilt_angle/2)
+            root_R_tip_desired = w.RotationMatrix(root_T_goal.pose.orientation).dot(tip_R_tip)
+        else:
+            root_R_tip_desired = w.RotationMatrix(root_T_goal.pose.orientation)
         rot_task.add_rotation_goal_constraints(frame_R_current=root_T_tip.to_rotation(),
-                                               frame_R_goal=w.RotationMatrix(root_T_goal.pose.orientation),
+                                               frame_R_goal=root_R_tip_desired,
                                                current_R_frame_eval=god_map.world.compose_fk_evaluated_expression(
                                                    self.tip_link, self.root_link),
                                                reference_velocity=self.max_vel,
@@ -206,8 +213,12 @@ class PouringAdaptiveTilt(Goal):
             self.move_y = False
             self.move_y_back = False
 
-        if 'stop' in action_string.data:
-            self.stop = 1
+        if '{}' in action_string.data:
+            self.stop_counter += 1
+            if self.stop_counter > 10:
+                self.stop = 1
+        else:
+            self.stop_counter = 0
 
     def connect_to_end(self, monitor: Monitor):
         if self.use_local_min:

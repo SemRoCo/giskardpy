@@ -579,19 +579,13 @@ class TestServo:
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute(add_local_minimum_reached=False)
 
-        goal_pose.pose.position.z = 0.5
-
-        zero_pose.set_cart_goal(goal_pose, 'hand_palm_link', 'map', reference_linear_velocity=0.05)
-        zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute()
-
         goal_pose.pose.position.x = 1.9
         goal_pose.pose.position.y = 0.06
-        goal_pose.pose.position.z = 0.65
-        goal_pose.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 0, 1, 0],
-                                                                         [0, -1, 0, 0],
-                                                                         [1, 0, 0, 0],
-                                                                         [0, 0, 0, 1]]))
+        goal_pose.pose.position.z = 0.45
+        # goal_pose.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 0, 1, 0],
+        #                                                                  [0, -1, 0, 0],
+        #                                                                  [1, 0, 0, 0],
+        #                                                                  [0, 0, 0, 1]]))
         tilt_axis = Vector3Stamped()
         tilt_axis.header.frame_id = 'hand_palm_link'
         tilt_axis.vector.z = 1
@@ -601,9 +595,35 @@ class TestServo:
                                   root='map',
                                   tilt_angle=-1.5,
                                   pouring_pose=goal_pose,
-                                  tilt_axis=tilt_axis)
+                                  tilt_axis=tilt_axis,
+                                  pre_tilt=True)
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute(add_local_minimum_reached=False)
+
+        goal_pose.pose.position.x = 1.93
+        goal_pose.pose.position.y = -0.2
+        goal_pose.pose.position.z = 0.3
+
+        zero_pose.set_cart_goal(goal_pose, 'hand_palm_link', 'map')
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute()
+
+        zero_pose.add_motion_goal(goal_type=CloseGripper.__name__,
+                                  goal_name='openGripper',
+                                  as_open=True,
+                                  velocity_threshold=100,
+                                  effort_threshold=1,
+                                  effort=100)
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute(add_local_minimum_reached=False)
+
+        goal_pose.pose.position.x = 1.5
+        goal_pose.pose.position.y = 0
+        goal_pose.pose.position.z = 0.5
+
+        zero_pose.set_cart_goal(goal_pose, 'hand_palm_link', 'map')
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute()
 
     def test_adaptive_tilt(self, zero_pose):
         goal_pose = PoseStamped()
@@ -619,13 +639,14 @@ class TestServo:
         tilt_axis.header.frame_id = 'hand_palm_link'
         tilt_axis.vector.z = 1
         # zero_pose.set_joint_goal({'arm_flex_joint': -0.8}, weight=WEIGHT_BELOW_CA)
-        zero_pose.add_motion_goal('PouringAdaptiveTilt',
+        zero_pose.add_motion_goal(goal_type=PouringAdaptiveTilt.__name__,
+                                  goal_name='pouring',
                                   tip='hand_palm_link',
                                   root='map',
-                                  tilt_angle=1.5,
+                                  tilt_angle=2,
                                   pouring_pose=goal_pose,
                                   tilt_axis=tilt_axis)
         # TODO: investigate different ways to get to a description of the frames from a description of the task
         #       This should mainly concern the tip link, the tilt axis in it and and the direction of the angle
         zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute()
+        zero_pose.execute(add_local_minimum_reached=False)

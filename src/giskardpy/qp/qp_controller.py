@@ -224,6 +224,39 @@ class Weights(ProblemDataPart):
         error_slack_weights = {f'{c.name}/error': c.normalized_weight() for c in self.inequality_constraints}
         return error_slack_weights
 
+    @profile
+    def linear_weights_expression(self):
+        # get position expression from Manipulability goal
+        stacked_exp = None
+        for name in god_map.motion_goal_manager.motion_goals:
+            if 'MaxManipulability' in name:
+                goal = god_map.motion_goal_manager.motion_goals[name]
+                for task in goal.tasks:
+                    if 'manipulability' in task.name:
+                        if stacked_exp is None:
+                            stacked_exp = cas.vstack([x.expression for x in task.eq_constraints.values()])
+                        else:
+                            stacked_exp = cas.vstack(
+                                [x.expression for x in task.eq_constraints.values()] + [stacked_exp])
+
+        if stacked_exp is None:
+            return None, None, None
+
+        J = cas.jacobian(stacked_exp, self.get_free_variable_symbols(Derivatives.position))
+
+        grad_traces = []
+        for symbol in self.get_free_variable_symbols(Derivatives.position):
+            JJt = J.dot(J.T)
+            J_dq = cas.total_derivative(J, [symbol], [1])
+            product = cas.Expression(cas.matrix_inverse(JJt)).dot(J_dq).dot(J.T)
+            trace = cas.trace(product)
+            grad_traces.append(trace)
+
+        return J, grad_traces, self.get_free_variable_symbols(Derivatives.position)
+
+    def get_free_variable_symbols(self, order: Derivatives) -> List[cas.Symbol]:
+        return self._sorter({v.position_name: v.get_symbol(order) for v in self.free_variables})[0]
+
 
 class FreeVariableBounds(ProblemDataPart):
     """
@@ -1089,10 +1122,14 @@ class QPProblemBuilder:
         lbA, ubA = self.inequality_bounds.construct_expression()
         E, E_slack = self.equality_model.construct_expression()
         bE = self.equality_bounds.construct_expression()
+        J, grad_traces, joints = self.weights.linear_weights_expression()
 
         qp_solver = solver_class(weights=weights, g=g, lb=lb, ub=ub,
                                  E=E, E_slack=E_slack, bE=bE,
-                                 A=A, A_slack=A_slack, lbA=lbA, ubA=ubA)
+                                 A=A, A_slack=A_slack, lbA=lbA, ubA=ubA,
+                                 constraint_jacobian=J, grad_traces=grad_traces,
+                                 joints=joints
+                                 )
         # self.goal_reached_checks.compile(qp_solver.free_symbols)
         logging.loginfo('Done compiling controller:')
         logging.loginfo(f'  #free variables: {weights.shape[0]}')

@@ -12,6 +12,7 @@ from giskardpy.configs.qp_controller_config import SupportedQPSolver
 from giskardpy.exceptions import HardConstraintsViolatedException, InfeasibleException, QPSolverException
 from giskardpy.utils import logging
 from giskardpy.utils.decorators import memoize
+from copy import deepcopy
 
 
 def record_solver_call_time(function):
@@ -59,7 +60,8 @@ class QPSolver(ABC):
     @abc.abstractmethod
     def __init__(self, weights: cas.Expression, g: cas.Expression, lb: cas.Expression, ub: cas.Expression,
                  A: cas.Expression, A_slack: cas.Expression, lbA: cas.Expression, ubA: cas.Expression,
-                 E: cas.Expression, E_slack: cas.Expression, bE: cas.Expression):
+                 E: cas.Expression, E_slack: cas.Expression, bE: cas.Expression, constraint_jacobian: cas.Expression,
+                 grad_traces: [cas.Expression], joints: [cas.Expression]):
         pass
 
     @classmethod
@@ -204,7 +206,7 @@ class QPSolver(ABC):
 
     @abc.abstractmethod
     def get_problem_data(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray,
-    np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+                                        np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """
         :return: weights, g, lb, ub, E, bE, A, lbA, ubA, weight_filter, bE_filter, bA_filter
         """
@@ -216,7 +218,8 @@ class QPSWIFTFormatter(QPSolver):
     @profile
     def __init__(self, weights: cas.Expression, g: cas.Expression, lb: cas.Expression, ub: cas.Expression,
                  E: cas.Expression, E_slack: cas.Expression, bE: cas.Expression,
-                 A: cas.Expression, A_slack: cas.Expression, lbA: cas.Expression, ubA: cas.Expression):
+                 A: cas.Expression, A_slack: cas.Expression, lbA: cas.Expression, ubA: cas.Expression,
+                 constraint_jacobian: cas.Expression, grad_traces: [cas.Expression], joints: [cas.Expression]):
         """
         min_x 0.5 x^T H x + g^T x
         s.t.  Ex = b
@@ -279,6 +282,17 @@ class QPSWIFTFormatter(QPSolver):
 
         self.free_symbols_str = [str(x) for x in self.free_symbols]
 
+        self.use_manipulability = False
+        if constraint_jacobian:
+            self.J_s = constraint_jacobian
+            self.J_f = constraint_jacobian.compile(self.free_symbols)
+            self.grad_traces_f = [x.compile(self.free_symbols) for x in grad_traces]
+            self.joints_f = [x.compile(self.free_symbols) for x in joints]
+            self.m_grad_old = None
+            self.joints_old = None
+            self.H_old = None
+            self.use_manipulability = True
+
         if self.compute_nI_I:
             self._nAi_Ai_cache = {}
 
@@ -288,6 +302,16 @@ class QPSWIFTFormatter(QPSolver):
         self.E = self.E_f.fast_call(substitutions)
         self.weights, self.g, self.nlb, self.ub, self.bE, self.nlbA_ubA = self.combined_vector_f.fast_call(
             substitutions)
+
+        if self.use_manipulability:
+            self.J = self.J_f.fast_call(substitutions)
+            det = np.linalg.det(self.J.dot(self.J.T))
+            self.m = np.sqrt(det)
+            self.m_grad = np.array([x.fast_call(substitutions) for x in self.grad_traces_f]) * self.m
+            pred_horizon = 6
+            self.g[:len(self.m_grad) * pred_horizon] = \
+                np.reshape(np.vstack([self.m_grad] * pred_horizon) * -0.5, len(self.m_grad) * pred_horizon)
+            # print('MANIP: ', self.m)
 
     @profile
     def problem_data_to_qp_format(self) \
@@ -423,7 +447,7 @@ class QPSWIFTFormatter(QPSolver):
 
     @profile
     def get_problem_data(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray,
-    np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+                                        np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """
         :return: weights, g, lb, ub, E, bE, A, lbA, ubA, weight_filter, bE_filter, bA_filter
         """

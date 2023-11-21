@@ -12,7 +12,7 @@ from giskardpy.configs.qp_controller_config import SupportedQPSolver
 from giskardpy.exceptions import HardConstraintsViolatedException, InfeasibleException, QPSolverException
 from giskardpy.utils import logging
 from giskardpy.utils.decorators import memoize
-from copy import deepcopy
+from giskardpy.god_map import god_map
 
 
 def record_solver_call_time(function):
@@ -292,6 +292,7 @@ class QPSWIFTFormatter(QPSolver):
             self.joints_old = None
             self.H_old = None
             self.use_manipulability = True
+            self.manip_gain = god_map.manip_gain
 
         if self.compute_nI_I:
             self._nAi_Ai_cache = {}
@@ -308,10 +309,13 @@ class QPSWIFTFormatter(QPSolver):
             det = np.linalg.det(self.J.dot(self.J.T))
             self.m = np.sqrt(det)
             self.m_grad = np.array([x.fast_call(substitutions) for x in self.grad_traces_f]) * self.m
-            pred_horizon = 6
+            pred_horizon = 5
             self.g[:len(self.m_grad) * pred_horizon] = \
-                np.reshape(np.vstack([self.m_grad] * pred_horizon) * -0.5, len(self.m_grad) * pred_horizon)
+                np.reshape(np.vstack([self.m_grad] * pred_horizon) * -self.manip_gain, len(self.m_grad) * pred_horizon)
             # print('MANIP: ', self.m)
+            god_map.m_index[1] = god_map.m_index[0]
+            god_map.m_index[0] = self.m
+
 
     @profile
     def problem_data_to_qp_format(self) \

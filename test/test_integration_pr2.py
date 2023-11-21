@@ -3955,8 +3955,8 @@ class TestManipulability:
     def test_manip1(self, zero_pose: PR2TestWrapper):
         p = PoseStamped()
         p.header.stamp = rospy.get_rostime()
-        p.header.frame_id = zero_pose.r_tip
-        p.pose.position = Point(1, -0.5, 0)
+        p.header.frame_id = 'map'
+        p.pose.position = Point(0.8, -0.3, 1)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.allow_all_collisions()
         zero_pose.set_cart_goal(p, zero_pose.r_tip, 'map')
@@ -3984,4 +3984,4 @@ class TestManipulability:
                                   root_link='torso_lift_link',
                                   tip_link='l_gripper_tool_frame'
                                   )
-        zero_pose.plan_and_execute()
+        zero_pose.execute(add_local_minimum_reached=True)

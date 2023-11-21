@@ -1,5 +1,3 @@
-
-
 from typing import Optional, List
 
 import numpy as np
@@ -22,12 +20,13 @@ from giskardpy.utils.utils import split_pose_stamped
 
 
 class MaxManipulability(Goal):
-    def __init__(self, root_link: str, tip_link: str,
+    def __init__(self, root_link: str, tip_link: str, gain: float = 0.5,
                  name: Optional[str] = None,
                  to_start: Optional[List[Monitor]] = None,
                  to_hold: Optional[List[Monitor]] = None,
                  to_end: Optional[List[Monitor]] = None
                  ):
+        god_map.manip_gain = gain
         self.root_link = god_map.world.search_for_link_name(root_link, None)
         self.tip_link = god_map.world.search_for_link_name(tip_link, None)
         if name is None:
@@ -42,7 +41,16 @@ class MaxManipulability(Goal):
                                         reference_velocity=0.2,
                                         weight=0)
         self.add_task(task)
-        self.connect_monitors_to_all_tasks(to_start=to_start, to_hold=to_hold, to_end=to_end)
+        m = symbol_manager.get_symbol(f'god_map.m_index[0]')
+        old_m = symbol_manager.get_symbol(f'god_map.m_index[1]')
+        god_map.debug_expression_manager.add_debug_expression('mIndex_percentualDifference',
+                                                              1 - cas.min(cas.save_division(old_m, m), 1))
+        percentual_diff = 1 - cas.min(cas.save_division(old_m, m), 1)
+        monitor = Monitor(name=f'manipMonitor{tip_link}', crucial=True)
+        monitor.set_expression(cas.less(percentual_diff, 0.01))
+        task.add_to_end_monitor(monitor)
+        self.add_monitor(monitor)
+
     """
     This goal maximizes the manipulability of the kinematic chain between root_link and tip_link.
     This chain should only include rotational joint and no linear joints i.e. torso lift joints or odometry joints.

@@ -16,6 +16,8 @@ import math
 from typing import Optional, List
 
 
+# Todo: instead of relying on predefined poses model the motion as relationa between the objects
+# Todo: take velocity constraints more into account
 class PouringAdaptiveTilt(Goal):
     def __init__(self, root, tip, pouring_pose: PoseStamped, tilt_angle: float, tilt_axis: Vector3Stamped,
                  use_local_min=False, max_vel=0.3, weight=WEIGHT_COLLISION_AVOIDANCE, pre_tilt=False,
@@ -112,7 +114,7 @@ class PouringAdaptiveTilt(Goal):
         nominal_monitor.set_expression(w.less(nominal_error, 0.1))
         nominal_task.add_to_start_monitor(pos_monitor)
         nominal_task.add_to_end_monitor(nominal_monitor)
-        # self.pos_task.add_to_end_monitor(nominal_monitor)
+        self.pos_task.add_to_end_monitor(nominal_monitor)
         self.add_task(nominal_task)
         god_map.debug_expression_manager.add_debug_expression('error', nominal_error)
 
@@ -150,30 +152,31 @@ class PouringAdaptiveTilt(Goal):
                                               task_expression=exp)
         self.add_task(adaptive_task)
 
-        # adapt_pos_task = Task('adaptPosition')
-        # adapt_pos_task.add_to_start_monitor(nominal_monitor)
-        # is_x = symbol_manager.get_symbol(f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\'].move_x')
-        # is_x_back = symbol_manager.get_symbol(f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\'].move_x_back')
-        # is_y = symbol_manager.get_symbol(f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\'].move_y')
-        # is_y_back = symbol_manager.get_symbol(f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\'].move_y_back')
-        # root_V_adapt = w.Vector3([0.1 * is_x - 0.1 * is_x_back,
-        #                           0.1 * is_y - 0.1 * is_y_back,
-        #                           0
-        #                           ])
-        # root_P_tip_eval = god_map.world.compose_fk_evaluated_expression(self.root_link, self.tip_link).to_position()
-        # adapt_pos_task.add_point_goal_constraints(frame_P_current=root_T_tip.to_position(),
-        #                                           frame_P_goal=root_P_goal + root_V_adapt,
-        #                                           reference_velocity=self.max_vel,
-        #                                           weight=self.weight)
-        # self.add_task(adapt_pos_task)
+        # Todo: make it smooth and nice to look at, tilt back when adapting the position
+        adapt_pos_task = Task('adaptPosition')
+        adapt_pos_task.add_to_start_monitor(nominal_monitor)
+        is_x = symbol_manager.get_symbol(f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\'].move_x')
+        is_x_back = symbol_manager.get_symbol(f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\'].move_x_back')
+        is_y = symbol_manager.get_symbol(f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\'].move_y')
+        is_y_back = symbol_manager.get_symbol(f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\'].move_y_back')
+        root_V_adapt = w.Vector3([0.1 * is_x - 0.1 * is_x_back,
+                                  0.1 * is_y - 0.1 * is_y_back,
+                                  0
+                                  ])
+        root_P_tip_eval = god_map.world.compose_fk_evaluated_expression(self.root_link, self.tip_link).to_position()
+        adapt_pos_task.add_point_goal_constraints(frame_P_current=root_T_tip.to_position(),
+                                                  frame_P_goal=root_P_goal + root_V_adapt,
+                                                  reference_velocity=self.max_vel/3,
+                                                  weight=self.weight)
+        self.add_task(adapt_pos_task)
 
         external_end_monitor = Monitor('isFnished', crucial=True)
         self.add_monitor(external_end_monitor)
         external_end_monitor.set_expression(
             symbol_manager.get_symbol(f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\'].stop'))
         adaptive_task.add_to_end_monitor(external_end_monitor)
-        # adapt_pos_task.add_to_end_monitor(external_end_monitor)
-        self.pos_task.add_to_end_monitor(external_end_monitor)
+        adapt_pos_task.add_to_end_monitor(external_end_monitor)
+        # self.pos_task.add_to_end_monitor(external_end_monitor)
 
     def callback(self, action_string: String):
         self.action_string = action_string.data
@@ -187,22 +190,22 @@ class PouringAdaptiveTilt(Goal):
             self.forward = False
             self.backward = False
 
-        if 'forward' in action_string.data:
+        if 'moveForward' in action_string.data:
             self.move_x = True
             self.move_x_back = False
             self.move_y = False
             self.move_y_back = False
-        elif 'backward' in action_string.data:
+        elif 'moveBackward' in action_string.data:
             self.move_x = False
             self.move_x_back = True
             self.move_y = False
             self.move_y_back = False
-        elif 'left' in action_string.data:
+        elif 'moveLeft' in action_string.data:
             self.move_x = False
             self.move_x_back = False
             self.move_y = True
             self.move_y_back = False
-        elif 'right' in action_string.data:
+        elif 'moveRight' in action_string.data:
             self.move_x = False
             self.move_x_back = False
             self.move_y = False

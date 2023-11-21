@@ -18,6 +18,7 @@ from giskardpy.utils.utils import launch_launchfile
 from utils_for_tests import compare_poses, GiskardTestWrapper
 from giskardpy.goals.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE
 from giskardpy.goals.adaptive_goals import CloseGripper, PouringAdaptiveTilt
+from giskardpy.goals.manipulability_goals import MaxManipulability
 
 
 class HSRTestWrapper(GiskardTestWrapper):
@@ -549,7 +550,26 @@ class TestServo:
         zero_pose.set_joint_goal({'wrist_roll_joint': 0.5})
         zero_pose.plan_and_execute()
 
-    def test_move_hand(self, zero_pose):
+    def test_move_hand_with_manip(self, zero_pose):
+        goal_pose = PoseStamped()
+        goal_pose.header.frame_id = 'map'
+        goal_pose.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 0, 1, 0],
+                                                                         [0, -1, 0, 0],
+                                                                         [1, 0, 0, 0],
+                                                                         [0, 0, 0, 1]]))
+        goal_pose.pose.position.x = 1.4
+        goal_pose.pose.position.y = -0.5
+        goal_pose.pose.position.z = 0.5
+
+        zero_pose.set_cart_goal(goal_pose, 'hand_palm_link', 'map')
+        zero_pose.add_motion_goal(goal_type=MaxManipulability.__name__,
+                                  root_link='arm_lift_link',
+                                  tip_link='hand_palm_link'
+                                  )
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute()
+
+    def test_complete_pouring(self, zero_pose):
         # first start related scripts for BB detection and scene action reasoning
         zero_pose.add_motion_goal(goal_type=CloseGripper.__name__,
                                   goal_name='openGripper',
@@ -629,7 +649,7 @@ class TestServo:
         goal_pose = PoseStamped()
         goal_pose.header.frame_id = 'map'
         goal_pose.pose.position.x = 1.9
-        goal_pose.pose.position.y = 0.15
+        goal_pose.pose.position.y = 0.20
         goal_pose.pose.position.z = 0.65
         goal_pose.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 0, 1, 0],
                                                                          [0, -1, 0, 0],

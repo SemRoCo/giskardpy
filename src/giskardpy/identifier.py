@@ -131,3 +131,6 @@ hardware_config = giskard + ['hardware_config']
 
 # rnd stuff
 timer_collector = ['timer_collector']
+
+JSPublisher = plugins + ['JSPublisher']
+JSPublisher_enabled = JSPublisher + ['enabled']

@@ -212,6 +212,9 @@ class BehaviorTreeConfig:
         'PlotDebugTF': {
             'enabled': False,
         },
+        'JSPublisher': {
+            'enabled': False,
+        },
     }
 
     def set_goal_reached_parameters(self, joint_convergence_threshold=0.01, window_size=21):

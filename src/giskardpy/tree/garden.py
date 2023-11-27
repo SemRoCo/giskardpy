@@ -61,6 +61,7 @@ from giskardpy.tree.behaviors.visualization import VisualizationBehavior
 from giskardpy.tree.behaviors.world_updater import WorldUpdater
 from giskardpy.tree.composites.async_composite import AsyncBehavior
 from giskardpy.tree.composites.better_parallel import ParallelPolicy, Parallel
+from giskardpy.tree.behaviors.publish_joint_states import PublishJointState
 from giskardpy.utils import logging
 from giskardpy.utils.utils import create_path
 from giskardpy.utils.utils import get_all_classes_in_package
@@ -642,6 +643,8 @@ class StandAlone(TreeManager):
         if self.god_map.get_data(identifier.MaxTrajectoryLength_enabled):
             kwargs = self.god_map.get_data(identifier.MaxTrajectoryLength)
             planning_4.add_child(MaxTrajectoryLength('traj length check', **kwargs))
+        if self.god_map.get_data(identifier.JSPublisher_enabled):
+            planning_4.add_child(PublishJointState('publish_joint_state', 'giskard_joint_states'))
         return planning_4
 
     def grow_plan_postprocessing(self):

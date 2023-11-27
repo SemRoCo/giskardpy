@@ -68,6 +68,7 @@ class HSR_StandAlone(HSR_Base):
         self.set_control_mode(ControlModes.stand_alone)
         self.set_default_visualization_marker_color(1, 1, 1, 1)
         self.publish_all_tf()
+        self.publish_js()
         self.configure_VisualizationBehavior(in_planning_loop=True)
         self.configure_CollisionMarker(in_planning_loop=True)
         self.add_fixed_joint(parent_link='map', child_link='odom')

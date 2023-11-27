@@ -187,6 +187,9 @@ class Giskard:
         self.behavior_tree_config.plugin_config['TFPublisher']['mode'] = TfPublishingModes.all
         self.behavior_tree_config.plugin_config['TFPublisher']['include_prefix'] = include_prefix
 
+    def publish_js(self):
+        self.behavior_tree_config.plugin_config['JSPublisher']['enabled'] = True
+
     def _add_joint(self, joint: Tuple[Type, Dict[str, Any]]):
         joints = self._god_map.get_data(identifier.joints_to_add, default=[])
         joints.append(joint)

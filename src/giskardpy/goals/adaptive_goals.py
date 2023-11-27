@@ -16,7 +16,7 @@ import math
 from typing import Optional, List
 
 
-# Todo: instead of relying on predefined poses model the motion as relationa between the objects
+# Todo: instead of relying on predefined poses model the motion as relations between the objects
 # Todo: take velocity constraints more into account
 class PouringAdaptiveTilt(Goal):
     def __init__(self, root, tip, pouring_pose: PoseStamped, tilt_angle: float, tilt_axis: Vector3Stamped,

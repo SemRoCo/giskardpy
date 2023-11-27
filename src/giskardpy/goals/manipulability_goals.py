@@ -40,6 +40,13 @@ class MaxManipulability(Goal):
                                         frame_P_current=root_T_tip.to_position(),
                                         reference_velocity=0.2,
                                         weight=0)
+        # task.add_point_goal_constraints(frame_P_goal=root_P_goal,
+        #                                 frame_P_current=cas.Point3([root_T_tip.to_rotation().to_quaternion().x,
+        #                                                             root_T_tip.to_rotation().to_quaternion().y,
+        #                                                             root_T_tip.to_rotation().to_quaternion().z]),
+        #                                 reference_velocity=0.2,
+        #                                 weight=0,
+        #                                 name='2')
         self.add_task(task)
         m = symbol_manager.get_symbol(f'god_map.m_index[0]')
         old_m = symbol_manager.get_symbol(f'god_map.m_index[1]')

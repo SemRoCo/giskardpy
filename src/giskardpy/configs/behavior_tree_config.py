@@ -115,11 +115,18 @@ class BehaviorTreeConfig(ABC):
         """
         self.tree_manager.add_tf_publisher(include_prefix=include_prefix, tf_topic=tf_topic, mode=mode)
 
+    def add_js_publisher(self, include_prefix: bool = True, js_topic: str = 'giskard_joint_states'):
+        """
+        Publishes joint states for Giskard's internal state.
+        """
+        self.tree_manager.add_js_publisher(include_prefix=include_prefix, js_topic=js_topic)
+
 
 class StandAloneBTConfig(BehaviorTreeConfig):
-    def __init__(self, planning_sleep: Optional[float] = None):
+    def __init__(self, planning_sleep: Optional[float] = None, publish_js=False):
         super().__init__(ControlModes.standalone)
         self.planning_sleep = planning_sleep
+        self.publish_js = publish_js
 
     def setup(self):
         self.add_visualization_marker_publisher(add_to_sync=True, add_to_planning=False, add_to_control_loop=True)
@@ -128,6 +135,8 @@ class StandAloneBTConfig(BehaviorTreeConfig):
         # self.add_debug_marker_publisher()
         if self.planning_sleep is not None:
             self.add_sleeper(self.planning_sleep)
+        if self.publish_js:
+            self.add_js_publisher(include_prefix=False, js_topic='giskard_joint_states')
 
 
 class OpenLoopBTConfig(BehaviorTreeConfig):

@@ -183,7 +183,10 @@ class QPSolver(ABC):
                    A=cas.Expression(),
                    A_slack=cas.Expression(),
                    lbA=cas.Expression(),
-                   ubA=cas.Expression())
+                   ubA=cas.Expression(),
+                   constraint_jacobian=cas.Expression(),
+                   grad_traces=cas.Expression(),
+                   joints=cas.Expression())
         return self
 
     @abc.abstractmethod

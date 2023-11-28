@@ -9,6 +9,7 @@ from scipy import sparse as sp
 from giskardpy.configs.qp_controller_config import SupportedQPSolver
 from giskardpy.exceptions import QPSolverException, InfeasibleException, HardConstraintsViolatedException
 from giskardpy.qp.qp_solver import QPSolver
+from giskardpy.god_map import god_map
 
 import giskardpy.casadi_wrapper as cas
 
@@ -45,7 +46,8 @@ class QPSolverQPalm(QPSolver):
     @profile
     def __init__(self, weights: cas.Expression, g: cas.Expression, lb: cas.Expression, ub: cas.Expression,
                  E: cas.Expression, E_slack: cas.Expression, bE: cas.Expression,
-                 A: cas.Expression, A_slack: cas.Expression, lbA: cas.Expression, ubA: cas.Expression):
+                 A: cas.Expression, A_slack: cas.Expression, lbA: cas.Expression, ubA: cas.Expression,
+                 constraint_jacobian: cas.Expression, grad_traces: [cas.Expression], joints: [cas.Expression]):
         """
         min_x 0.5 x^T H x + g^T x
         s.t.  lb <= Ax <= ub
@@ -84,6 +86,18 @@ class QPSolverQPalm(QPSolver):
 
         self.free_symbols_str = [str(x) for x in free_symbols]
 
+        self.use_manipulability = False
+        if constraint_jacobian:
+            self.J_s = constraint_jacobian
+            self.J_f = constraint_jacobian.compile(free_symbols)
+            self.grad_traces_f = [x.compile(free_symbols) for x in grad_traces]
+            self.joints_f = [x.compile(free_symbols) for x in joints]
+            self.m_grad_old = None
+            self.joints_old = None
+            self.H_old = None
+            self.use_manipulability = True
+            self.manip_gain = god_map.manip_gain
+
         if self.compute_nI_I:
             self._nAi_Ai_cache = {}
 
@@ -93,6 +107,17 @@ class QPSolverQPalm(QPSolver):
         self.ub, _, self.ubA, self.ub_bE_ubA = self.ub_bE_ubA_f.fast_call(substitutions)
         self.g = np.zeros(self.weights.shape)
         self.A = self.A_f.fast_call(substitutions)
+
+        if self.use_manipulability:
+            self.J = self.J_f.fast_call(substitutions)
+            det = np.linalg.det(self.J.dot(self.J.T))
+            self.m = np.sqrt(det)
+            self.m_grad = np.array([x.fast_call(substitutions) for x in self.grad_traces_f]) * self.m
+            pred_horizon = 5
+            self.g[:len(self.m_grad) * pred_horizon] = \
+                np.reshape(np.vstack([self.m_grad] * pred_horizon) * -self.manip_gain, len(self.m_grad) * pred_horizon)
+            god_map.m_index[1] = god_map.m_index[0]
+            god_map.m_index[0] = self.m
 
     @profile
     def update_filters(self):
@@ -122,7 +147,7 @@ class QPSolverQPalm(QPSolver):
     @profile
     def apply_filters(self):
         self.weights = self.weights[self.weight_filter]
-        self.g = np.zeros(*self.weights.shape)
+        # self.g = np.zeros(*self.weights.shape)
         self.lb_bE_lbA = self.lb_bE_lbA[self.b_bE_bA_filter]
         self.ub_bE_ubA = self.ub_bE_ubA[self.b_bE_bA_filter]
         self.A = self.A[:, self.weight_filter][self.bE_bA_filter, :]

@@ -147,7 +147,7 @@ class QPSolverQPalm(QPSolver):
     @profile
     def apply_filters(self):
         self.weights = self.weights[self.weight_filter]
-        # self.g = np.zeros(*self.weights.shape)
+        self.g = self.g[self.weight_filter]
         self.lb_bE_lbA = self.lb_bE_lbA[self.b_bE_bA_filter]
         self.ub_bE_ubA = self.ub_bE_ubA[self.b_bE_bA_filter]
         self.A = self.A[:, self.weight_filter][self.bE_bA_filter, :]

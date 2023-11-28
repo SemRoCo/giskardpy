@@ -878,9 +878,11 @@ class StandAlone(TreeManager):
         node = TFPublisher('publish tf', mode=mode, tf_topic=tf_topic, include_prefix=include_prefix)
         self.insert_node(node, self.sync_name)
 
-    def add_js_publisher(self, include_prefix: bool = False, js_topic: str = 'giskard_joint_states'):
+    def add_js_publisher(self, include_prefix: bool = False, js_topic: str = 'joint_states'):
         node = PublishJointState('publish js', js_topic=js_topic, use_prefix=include_prefix)
         self.insert_node(node, self.closed_loop_control_name)
+        node2 = running_is_success(PublishJointState)('publish js', js_topic=js_topic, use_prefix=include_prefix)
+        self.insert_node(node2, self.sync_name)
 
 
 class OpenLoop(StandAlone):

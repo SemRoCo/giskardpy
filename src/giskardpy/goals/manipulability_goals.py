@@ -32,21 +32,11 @@ class MaxManipulability(Goal):
         if name is None:
             name = f'{self.__class__.__name__}/{self.root_link}/{self.tip_link}'
         super().__init__(name)
-        self.gain = 2
+
         task = Task(name='manipulability')
         root_T_tip = god_map.world.compose_fk_expression(self.root_link, self.tip_link)
-        root_P_goal = cas.Point3([0, 0, 0])
-        task.add_point_goal_constraints(frame_P_goal=root_P_goal,
-                                        frame_P_current=root_T_tip.to_position(),
-                                        reference_velocity=0.2,
-                                        weight=0)
-        # task.add_point_goal_constraints(frame_P_goal=root_P_goal,
-        #                                 frame_P_current=cas.Point3([root_T_tip.to_rotation().to_quaternion().x,
-        #                                                             root_T_tip.to_rotation().to_quaternion().y,
-        #                                                             root_T_tip.to_rotation().to_quaternion().z]),
-        #                                 reference_velocity=0.2,
-        #                                 weight=0,
-        #                                 name='2')
+        task.add_manipulability_constraint_vector(names=['x', 'y', 'z'],
+                                                  task_expressions=root_T_tip.to_position()[:3])
         self.add_task(task)
         m = symbol_manager.get_symbol(f'god_map.m_index[0]')
         old_m = symbol_manager.get_symbol(f'god_map.m_index[1]')
@@ -67,5 +57,5 @@ class MaxManipulability(Goal):
     the jacobian is calculated. The jacobian is then evaluated and used to calculate the manipulability index
     m=sqrt(det(JJ^T)). The index is then multiplied with the gradient of J. Finally, the linear weight is calculated by 
     multiplying this with a negative gain value.
-    Future work makes it possible to set the gain through the motion goal and to monitor the m index.
+    Future work combines translation and rotation, and improves the monitoring to not stop to early during the main motion.
     """

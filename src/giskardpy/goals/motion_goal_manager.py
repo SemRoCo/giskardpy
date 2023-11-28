@@ -63,7 +63,8 @@ class MotionGoalManager:
         """
         god_map.collision_scene.create_collision_matrix(deepcopy(collision_entries))
         if not collision_entries or not god_map.collision_scene.is_allow_all_collision(collision_entries[-1]):
-            self.add_external_collision_avoidance_constraints(soft_threshold_override=god_map.collision_scene.collision_matrix)
+            self.add_external_collision_avoidance_constraints(
+                soft_threshold_override=god_map.collision_scene.collision_matrix)
         if not collision_entries or (not god_map.collision_scene.is_allow_all_collision(collision_entries[-1]) and
                                      not god_map.collision_scene.is_allow_all_self_collision(collision_entries[-1])):
             self.add_self_collision_avoidance_constraints()
@@ -170,20 +171,23 @@ class MotionGoalManager:
         eq_constraints = ImmutableDict()
         neq_constraints = ImmutableDict()
         derivative_constraints = ImmutableDict()
+        manip_constraints = ImmutableDict()
         goals: Dict[str, Goal] = god_map.motion_goal_manager.motion_goals
         for goal_name, goal in list(goals.items()):
             try:
-                new_eq_constraints, new_neq_constraints, new_derivative_constraints, _debug_expressions = goal.get_constraints()
+                new_eq_constraints, new_neq_constraints, new_derivative_constraints, _debug_expressions, new_manip_constraints = goal.get_constraints()
             except Exception as e:
                 raise ConstraintInitalizationException(str(e))
             eq_constraints.update(new_eq_constraints)
             neq_constraints.update(new_neq_constraints)
             derivative_constraints.update(new_derivative_constraints)
+            manip_constraints.update(new_manip_constraints)
             # logging.loginfo(f'{goal_name} added {len(_constraints)+len(_vel_constraints)} constraints.')
         god_map.eq_constraints = eq_constraints
         god_map.neq_constraints = neq_constraints
         god_map.derivative_constraints = derivative_constraints
-        return eq_constraints, neq_constraints, derivative_constraints
+        god_map.manip_constraints = manip_constraints
+        return eq_constraints, neq_constraints, derivative_constraints, manip_constraints
 
     def replace_jsons_with_ros_messages(self, d):
         if isinstance(d, list):

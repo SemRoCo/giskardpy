@@ -79,6 +79,7 @@ from giskardpy.tree.behaviors.time import TimePlugin
 from giskardpy.tree.behaviors.time_real import RosTime
 from giskardpy.tree.behaviors.visualization import VisualizationBehavior
 from giskardpy.tree.behaviors.world_updater import WorldUpdater
+from giskardpy.tree.behaviors.publish_joint_states import PublishJointState
 from giskardpy.tree.composites.async_composite import AsyncBehavior
 from giskardpy.tree.composites.better_parallel import ParallelPolicy, Parallel
 from giskardpy.utils import logging
@@ -358,6 +359,10 @@ class TreeManager(ABC):
     @abc.abstractmethod
     def add_tf_publisher(self, include_prefix: bool = False, tf_topic: str = 'tf',
                          mode: TfPublishingModes = TfPublishingModes.attached_and_world_objects):
+        ...
+
+    @abc.abstractmethod
+    def add_js_publisher(self, include_prefix: bool = False, js_topic: str = 'tf'):
         ...
 
     def setup(self, timeout=30):
@@ -872,6 +877,10 @@ class StandAlone(TreeManager):
                          mode: TfPublishingModes = TfPublishingModes.attached_and_world_objects):
         node = TFPublisher('publish tf', mode=mode, tf_topic=tf_topic, include_prefix=include_prefix)
         self.insert_node(node, self.sync_name)
+
+    def add_js_publisher(self, include_prefix: bool = False, js_topic: str = 'giskard_joint_states'):
+        node = PublishJointState('publish js', js_topic=js_topic, use_prefix=include_prefix)
+        self.insert_node(node, self.closed_loop_control_name)
 
 
 class OpenLoop(StandAlone):

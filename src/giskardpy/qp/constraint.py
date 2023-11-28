@@ -29,7 +29,8 @@ class InequalityConstraint:
         self.expression = expression
         self.quadratic_weight = quadratic_weight
         if control_horizon is None:
-            self.control_horizon = god_map.qp_controller_config.prediction_horizon - (god_map.qp_controller_config.max_derivative - 1)
+            self.control_horizon = god_map.qp_controller_config.prediction_horizon - (
+                    god_map.qp_controller_config.max_derivative - 1)
         else:
             self.control_horizon = control_horizon
         self.control_horizon = max(1, self.control_horizon)
@@ -70,7 +71,8 @@ class EqualityConstraint:
         self.expression = expression
         self.quadratic_weight = quadratic_weight
         if control_horizon is None:
-            self.control_horizon = god_map.qp_controller_config.prediction_horizon - (god_map.qp_controller_config.max_derivative - 1)
+            self.control_horizon = god_map.qp_controller_config.prediction_horizon - (
+                    god_map.qp_controller_config.max_derivative - 1)
         else:
             self.control_horizon = control_horizon
         self.control_horizon = max(1, self.control_horizon)
@@ -115,7 +117,8 @@ class DerivativeInequalityConstraint:
         self.derivative = derivative
         self.expression = expression
         self.quadratic_weight = quadratic_weight
-        self.control_horizon = control_horizon if control_horizon is not None else max(god_map.qp_controller_config.prediction_horizon - 2, 1)
+        self.control_horizon = control_horizon if control_horizon is not None else max(
+            god_map.qp_controller_config.prediction_horizon - 2, 1)
         self.normalization_factor = normalization_factor
         if self.is_iterable(lower_limit):
             self.lower_limit = lower_limit
@@ -155,3 +158,14 @@ class DerivativeInequalityConstraint:
     def normalized_weight(self, t):
         weight_normalized = self.quadratic_weight * (1 / self.normalization_factor) ** 2
         return self.horizon_function(weight_normalized, t)
+
+
+class ManipulabilityConstraint:
+    def __init__(self,
+                 name: str,
+                 expression: cas.Expression):
+        self.name = name
+        self.expression = expression
+
+    def __str__(self):
+        return self.name

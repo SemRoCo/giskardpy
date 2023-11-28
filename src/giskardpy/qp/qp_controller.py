@@ -15,7 +15,8 @@ from giskardpy.exceptions import HardConstraintsViolatedException, QPSolverExcep
     VelocityLimitUnreachableException
 from giskardpy.god_map import god_map
 from giskardpy.my_types import Derivatives
-from giskardpy.qp.constraint import InequalityConstraint, EqualityConstraint, DerivativeInequalityConstraint
+from giskardpy.qp.constraint import InequalityConstraint, EqualityConstraint, DerivativeInequalityConstraint, \
+    ManipulabilityConstraint
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.next_command import NextCommands
 from giskardpy.qp.pos_in_vel_limits import b_profile
@@ -225,22 +226,11 @@ class Weights(ProblemDataPart):
         return error_slack_weights
 
     @profile
-    def linear_weights_expression(self):
-        # get position expression from Manipulability goal
-        stacked_exp = None
-        for name in god_map.motion_goal_manager.motion_goals:
-            if 'MaxManipulability' in name:
-                goal = god_map.motion_goal_manager.motion_goals[name]
-                for task in goal.tasks:
-                    if 'manipulability' in task.name:
-                        if stacked_exp is None:
-                            stacked_exp = cas.vstack([x.expression for x in task.eq_constraints.values()])
-                        else:
-                            stacked_exp = cas.vstack(
-                                [x.expression for x in task.eq_constraints.values()] + [stacked_exp])
-
-        if stacked_exp is None:
+    def linear_weights_expression(self, manip_expressions):
+        if len(manip_expressions) == 0:
             return None, None, None
+
+        stacked_exp = cas.vstack([x.expression for x in manip_expressions])
 
         J = cas.jacobian(stacked_exp, self.get_free_variable_symbols(Derivatives.position))
 
@@ -1016,6 +1006,7 @@ class QPProblemBuilder:
                  equality_constraints: List[EqualityConstraint] = None,
                  inequality_constraints: List[InequalityConstraint] = None,
                  derivative_constraints: List[DerivativeInequalityConstraint] = None,
+                 manipulability_constraints: List[ManipulabilityConstraint] = None,
                  retries_with_relaxed_constraints: int = 0,
                  retry_added_slack: float = 100,
                  retry_weight_factor: float = 100):
@@ -1023,6 +1014,7 @@ class QPProblemBuilder:
         self.equality_constraints = []
         self.inequality_constraints = []
         self.derivative_constraints = []
+        self.manipulability_constraints = []
         self.prediction_horizon = prediction_horizon
         self.retries_with_relaxed_constraints = retries_with_relaxed_constraints
         self.retry_added_slack = retry_added_slack
@@ -1036,6 +1028,8 @@ class QPProblemBuilder:
             self.add_equality_constraints(equality_constraints)
         if derivative_constraints is not None:
             self.add_derivative_constraints(derivative_constraints)
+        if manipulability_constraints is not None:
+            self.add_manipulability_constraints(manipulability_constraints)
 
         if solver_id is not None:
             self.qp_solver_class = available_solvers[solver_id]
@@ -1077,6 +1071,12 @@ class QPProblemBuilder:
         for c in self.equality_constraints:
             c.control_horizon = min(c.control_horizon, self.prediction_horizon)
             self.check_control_horizon(c)
+
+    def add_manipulability_constraints(self, constraints: List[ManipulabilityConstraint]):
+        self.manipulability_constraints.extend(list(sorted(constraints, key=lambda x: x.name)))
+        l = [x.name for x in constraints]
+        duplicates = set([x for x in l if l.count(x) > 1])
+        assert duplicates == set(), f'there are multiple manipulability constraints with the same name: {duplicates}'
 
     def add_derivative_constraints(self, constraints: List[DerivativeInequalityConstraint]):
         self.derivative_constraints.extend(list(sorted(constraints, key=lambda x: x.name)))
@@ -1122,7 +1122,8 @@ class QPProblemBuilder:
         lbA, ubA = self.inequality_bounds.construct_expression()
         E, E_slack = self.equality_model.construct_expression()
         bE = self.equality_bounds.construct_expression()
-        J, grad_traces, joints = self.weights.linear_weights_expression()
+        J, grad_traces, joints = self.weights.linear_weights_expression(
+            manip_expressions=self.manipulability_constraints)
 
         qp_solver = solver_class(weights=weights, g=g, lb=lb, ub=ub,
                                  E=E, E_slack=E_slack, bE=bE,

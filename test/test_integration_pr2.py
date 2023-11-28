@@ -3961,7 +3961,7 @@ class TestManipulability:
         zero_pose.allow_all_collisions()
         zero_pose.set_cart_goal(p, zero_pose.r_tip, 'map')
         zero_pose.add_motion_goal(goal_type=MaxManipulability.__name__,
-                                  root_link='torso_lift_link',
+                                  root_link='base_footprint',
                                   tip_link='r_gripper_tool_frame'
                                   )
         zero_pose.plan_and_execute()

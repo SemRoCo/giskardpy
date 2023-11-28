@@ -20,7 +20,8 @@ from giskardpy import casadi_wrapper as w
 from giskardpy.exceptions import ConstraintInitalizationException, UnknownGroupException
 from giskardpy.model.joints import OneDofJoint
 from giskardpy.my_types import my_string, transformable_message, PrefixName, Derivatives
-from giskardpy.qp.constraint import InequalityConstraint, EqualityConstraint, DerivativeInequalityConstraint
+from giskardpy.qp.constraint import InequalityConstraint, EqualityConstraint, DerivativeInequalityConstraint, \
+    ManipulabilityConstraint
 
 
 class Goal(ABC):
@@ -113,13 +114,15 @@ class Goal(ABC):
 
     @profile
     def get_constraints(self) -> Tuple[Dict[str, EqualityConstraint],
-    Dict[str, InequalityConstraint],
-    Dict[str, DerivativeInequalityConstraint],
-    Dict[str, Union[w.Symbol, float]]]:
+                                       Dict[str, InequalityConstraint],
+                                       Dict[str, DerivativeInequalityConstraint],
+                                       Dict[str, Union[w.Symbol, float]],
+                                       Dict[str, ManipulabilityConstraint]]:
         self._equality_constraints = OrderedDict()
         self._inequality_constraints = OrderedDict()
         self._derivative_constraints = OrderedDict()
         self._debug_expressions = OrderedDict()
+        self._manip_constraints = OrderedDict()
         if not isinstance(self, NonMotionGoal) and not self.tasks:
             raise ConstraintInitalizationException(f'Goal {str(self)} has no tasks.')
         for task in self.tasks:
@@ -135,9 +138,13 @@ class Goal(ABC):
                 name = f'{task.name}/{constraint.name}'
                 constraint.name = name
                 self._derivative_constraints[constraint.name] = constraint
+            for constraint in task.get_manipulability_constraint():
+                name = f'{task.name}/{constraint.name}'
+                constraint.name = name
+                self._manip_constraints[constraint.name] = constraint
 
         return self._equality_constraints, self._inequality_constraints, self._derivative_constraints, \
-            self._debug_expressions
+               self._debug_expressions, self._manip_constraints
 
     def add_constraints_of_goal(self, goal: Goal):
         for task in goal.tasks:

@@ -5,7 +5,8 @@ import giskardpy.casadi_wrapper as cas
 from giskardpy.exceptions import GiskardException, ConstraintInitalizationException
 from giskardpy.goals.monitors.monitors import Monitor
 from giskardpy.my_types import Derivatives
-from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint
+from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint, \
+    ManipulabilityConstraint
 
 WEIGHT_MAX = giskard_msgs.msg.Weights.WEIGHT_MAX
 WEIGHT_ABOVE_CA = giskard_msgs.msg.Weights.WEIGHT_ABOVE_CA
@@ -37,6 +38,7 @@ class Task:
         self.to_start = []
         self.to_hold = []
         self.to_end = []
+        self.manip_constraints = {}
 
     def __str__(self):
         return self.name
@@ -68,8 +70,11 @@ class Task:
     def get_derivative_constraints(self):
         return self._apply_monitors_to_constraints(self.derivative_constraints.values())
 
+    def get_manipulability_constraint(self):
+        return self.manip_constraints.values()
+
     def _apply_monitors_to_constraints(self, constraints: Iterable[Union[EqualityConstraint, InequalityConstraint,
-    DerivativeInequalityConstraint]]):
+                                                                         DerivativeInequalityConstraint]]):
         output_constraints = []
         for constraint in constraints:
             for monitor in self.to_start:
@@ -83,6 +88,26 @@ class Task:
                 constraint.quadratic_weight *= (1 - end_weight)
             output_constraints.append(constraint)
         return output_constraints
+
+    def add_manipulability_constraint(self,
+                                      task_expression: cas.symbol_expr,
+                                      name: str = None):
+        if task_expression.shape != (1, 1):
+            raise GiskardException(f'expression must have shape (1, 1), has {task_expression.shape}')
+        name = name if name else f'{len(self.manip_constraints)}'
+        self.manip_constraints[name] = ManipulabilityConstraint(name=name,
+                                                                expression=task_expression)
+
+    def add_manipulability_constraint_vector(self,
+                                             task_expressions: Union[
+                                                 cas.Expression, cas.Vector3, cas.Point3, List[cas.symbol_expr]],
+                                             names: List[str]):
+        if len(task_expressions) != len(names):
+            raise ConstraintInitalizationException('All parameters must have the same length.')
+        for i in range(len(task_expressions)):
+            name_suffix = names[i] if names else None
+            self.add_manipulability_constraint(name=name_suffix,
+                                               task_expression=task_expressions[i])
 
     def add_equality_constraint(self,
                                 reference_velocity: cas.symbol_expr_float,
@@ -336,7 +361,6 @@ class Task:
                                                    f'{name}/rot/y',
                                                    f'{name}/rot/z'])
 
-
     def add_velocity_constraint(self,
                                 lower_velocity_limit: Union[cas.symbol_expr_float, List[cas.symbol_expr_float]],
                                 upper_velocity_limit: Union[cas.symbol_expr_float, List[cas.symbol_expr_float]],
@@ -368,16 +392,16 @@ class Task:
         if name in self.derivative_constraints:
             raise KeyError(f'a constraint with name \'{name}\' already exists')
         self.derivative_constraints[name] = DerivativeInequalityConstraint(name=name,
-                                                                            derivative=Derivatives.velocity,
-                                                                            expression=task_expression,
-                                                                            lower_limit=lower_velocity_limit,
-                                                                            upper_limit=upper_velocity_limit,
-                                                                            quadratic_weight=weight,
-                                                                            normalization_factor=velocity_limit,
-                                                                            lower_slack_limit=lower_slack_limit,
-                                                                            upper_slack_limit=upper_slack_limit,
-                                                                            control_horizon=control_horizon,
-                                                                            horizon_function=horizon_function)
+                                                                           derivative=Derivatives.velocity,
+                                                                           expression=task_expression,
+                                                                           lower_limit=lower_velocity_limit,
+                                                                           upper_limit=upper_velocity_limit,
+                                                                           quadratic_weight=weight,
+                                                                           normalization_factor=velocity_limit,
+                                                                           lower_slack_limit=lower_slack_limit,
+                                                                           upper_slack_limit=upper_slack_limit,
+                                                                           control_horizon=control_horizon,
+                                                                           horizon_function=horizon_function)
 
     def add_acceleration_constraint(self,
                                     lower_acceleration_limit: Union[cas.symbol_expr_float, List[cas.symbol_expr_float]],
@@ -409,15 +433,15 @@ class Task:
         if name in self.derivative_constraints:
             raise KeyError(f'a constraint with name \'{name}\' already exists')
         self.derivative_constraints[name] = DerivativeInequalityConstraint(name=name,
-                                                                            derivative=Derivatives.acceleration,
-                                                                            expression=task_expression,
-                                                                            lower_limit=lower_acceleration_limit,
-                                                                            upper_limit=upper_acceleration_limit,
-                                                                            quadratic_weight=weight,
-                                                                            normalization_factor=acceleration_limit,
-                                                                            lower_slack_limit=lower_slack_limit,
-                                                                            upper_slack_limit=upper_slack_limit,
-                                                                            horizon_function=horizon_function)
+                                                                           derivative=Derivatives.acceleration,
+                                                                           expression=task_expression,
+                                                                           lower_limit=lower_acceleration_limit,
+                                                                           upper_limit=upper_acceleration_limit,
+                                                                           quadratic_weight=weight,
+                                                                           normalization_factor=acceleration_limit,
+                                                                           lower_slack_limit=lower_slack_limit,
+                                                                           upper_slack_limit=upper_slack_limit,
+                                                                           horizon_function=horizon_function)
 
     def add_jerk_constraint(self,
                             lower_jerk_limit: Union[cas.symbol_expr_float, List[cas.symbol_expr_float]],
@@ -434,16 +458,15 @@ class Task:
         if name in self.derivative_constraints:
             raise KeyError(f'a constraint with name \'{name}\' already exists')
         self.derivative_constraints[name] = DerivativeInequalityConstraint(name=name,
-                                                                            derivative=Derivatives.jerk,
-                                                                            expression=task_expression,
-                                                                            lower_limit=lower_jerk_limit,
-                                                                            upper_limit=upper_jerk_limit,
-                                                                            quadratic_weight=weight,
-                                                                            normalization_factor=acceleration_limit,
-                                                                            lower_slack_limit=lower_slack_limit,
-                                                                            upper_slack_limit=upper_slack_limit,
-                                                                            horizon_function=horizon_function)
-        
+                                                                           derivative=Derivatives.jerk,
+                                                                           expression=task_expression,
+                                                                           lower_limit=lower_jerk_limit,
+                                                                           upper_limit=upper_jerk_limit,
+                                                                           quadratic_weight=weight,
+                                                                           normalization_factor=acceleration_limit,
+                                                                           lower_slack_limit=lower_slack_limit,
+                                                                           upper_slack_limit=upper_slack_limit,
+                                                                           horizon_function=horizon_function)
 
     def add_translational_velocity_limit(self,
                                          frame_P_current: cas.Point3,

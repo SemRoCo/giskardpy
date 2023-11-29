@@ -8,9 +8,9 @@ on:
       - master
 #      - devel
   pull_request:
-    branches:
-      - master
-      - devel
+#    branches:
+#      - master
+#      - devel
   workflow_dispatch:
     inputs:
       logLevel:

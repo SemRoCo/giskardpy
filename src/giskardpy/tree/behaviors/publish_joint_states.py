@@ -21,19 +21,17 @@ class PublishJointState(GiskardBehavior):
         self.include_prefix = include_prefix
         self.cmd_topic = topic_name
         self.cmd_pub = rospy.Publisher(self.cmd_topic, JointState, queue_size=10)
+        self.joint_names = [k for k in god_map.world.joint_names if god_map.world.is_joint_revolute(k) or god_map.world.is_joint_prismatic(k)]
 
     def update(self):
         msg = JointState()
-        js = deepcopy(god_map.world.state)
-        for joint_name in js:
-            if 'localization' in joint_name.long_name:
-                continue
+        for joint_name in self.joint_names:
             if self.include_prefix:
                 msg.name.append(joint_name.long_name)
             else:
                 msg.name.append(joint_name.short_name)
-            position = js[joint_name].position
-            msg.position.append(position)
+            msg.position.append(god_map.world.state[joint_name].position)
+            msg.velocity.append(god_map.world.state[joint_name].velocity)
         msg.header.stamp = rospy.get_rostime()
         self.cmd_pub.publish(msg)
         return Status.SUCCESS

@@ -144,14 +144,24 @@ class BehaviorTreeConfig(ABC):
             god_map.tree.execute_traj.prepare_base_control.add_compile_debug_expressions()
             god_map.tree.execute_traj.base_closed_loop.add_evaluate_debug_expressions(log_traj=False)
 
+    def add_js_publisher(self, topic_name: Optional[str] = None, include_prefix: bool = False):
+        """
+        Publishes joint states for Giskard's internal state.
+        """
+        god_map.tree.control_loop_branch.publish_state.add_joint_state_publisher(include_prefix=include_prefix,
+                                                                                 topic_name=topic_name)
+        god_map.tree.wait_for_goal.publish_state.add_joint_state_publisher(include_prefix=include_prefix,
+                                                                           topic_name=topic_name)
+
 
 class StandAloneBTConfig(BehaviorTreeConfig):
-    def __init__(self, planning_sleep: Optional[float] = None, debug_mode: bool = False):
+    def __init__(self, planning_sleep: Optional[float] = None, debug_mode: bool = False, publish_js=False):
         super().__init__(ControlModes.standalone)
         self.planning_sleep = planning_sleep
         if god_map.is_in_github_workflow():
             debug_mode = False
         self.debug_mode = debug_mode
+        self.publish_js = publish_js
 
     def setup(self):
         self.add_visualization_marker_publisher(add_to_sync=True, add_to_control_loop=True)
@@ -165,6 +175,8 @@ class StandAloneBTConfig(BehaviorTreeConfig):
         # self.add_debug_marker_publisher()
         if self.planning_sleep is not None:
             self.add_sleeper(self.planning_sleep)
+        if self.publish_js:
+            self.add_js_publisher()
 
 
 class OpenLoopBTConfig(BehaviorTreeConfig):

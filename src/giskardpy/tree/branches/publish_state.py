@@ -4,6 +4,7 @@ from py_trees import Sequence
 
 from giskardpy.tree.behaviors.debug_marker_publisher import DebugMarkerPublisher
 from giskardpy.tree.behaviors.publish_debug_expressions import PublishDebugExpressions
+from giskardpy.tree.behaviors.publish_joint_states import PublishJointState
 from giskardpy.tree.behaviors.tf_publisher import TfPublishingModes, TFPublisher
 from giskardpy.tree.behaviors.visualization import VisualizationBehavior
 from giskardpy.utils.decorators import toggle_on, toggle_off
@@ -49,4 +50,8 @@ class PublishState(Sequence):
                                        publish_weights=publish_weights,
                                        publish_g=publish_g,
                                        publish_debug=publish_debug)
+        self.add_child(node)
+
+    def add_joint_state_publisher(self, topic_name: Optional[str] = None, include_prefix: bool = False):
+        node = PublishJointState(include_prefix=include_prefix, topic_name=topic_name)
         self.add_child(node)

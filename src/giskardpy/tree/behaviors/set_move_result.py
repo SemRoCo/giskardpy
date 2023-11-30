@@ -32,10 +32,13 @@ class SetMoveResult(GiskardBehavior):
 
         if isinstance(e, EmptyProblemException) and god_map.is_standalone():
             motion_goals = god_map.motion_goal_manager.motion_goals.values()
-            only_non_motion_goals = np.all([isinstance(x, (NonMotionGoal, CollisionAvoidance)) for x in motion_goals])
-            if only_non_motion_goals:
-                # ignore error
-                move_result = MoveResult()
+            non_motion_goals = len([x for x in motion_goals if isinstance(x, NonMotionGoal)])
+            collision_avoidance = len([x for x in motion_goals if isinstance(x, CollisionAvoidance)])
+            others = len([x for x in motion_goals if not isinstance(x, (NonMotionGoal, CollisionAvoidance))])
+            if others == 0:
+                if non_motion_goals != 0 and collision_avoidance != 0:
+                    # ignore error
+                    move_result = MoveResult()
 
         trajectory = god_map.trajectory
         joints = [god_map.world.joints[joint_name] for joint_name in god_map.world.movable_joint_names]

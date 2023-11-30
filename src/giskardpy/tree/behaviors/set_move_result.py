@@ -2,6 +2,7 @@ import numpy as np
 from py_trees import Status
 
 from giskardpy.exceptions import *
+from giskardpy.goals.collision_avoidance import CollisionAvoidance
 from giskardpy.goals.goal import NonMotionGoal
 from giskardpy.god_map import god_map
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
@@ -31,7 +32,7 @@ class SetMoveResult(GiskardBehavior):
 
         if isinstance(e, EmptyProblemException) and god_map.is_standalone():
             motion_goals = god_map.motion_goal_manager.motion_goals.values()
-            only_non_motion_goals = np.all([isinstance(x, NonMotionGoal) for x in motion_goals])
+            only_non_motion_goals = np.all([isinstance(x, (NonMotionGoal, CollisionAvoidance)) for x in motion_goals])
             if only_non_motion_goals:
                 # ignore error
                 move_result = MoveResult()

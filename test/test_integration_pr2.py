@@ -2658,18 +2658,16 @@ class TestCollisionAvoidanceGoals:
                                 distance_threshold=0.25,
                                 check_self=False)
 
+
     def test_avoid_collision_go_around_corner(self, fake_table_setup: PR2TestWrapper):
-        tip = 'base_footprint'
         r_goal = PoseStamped()
-        r_goal.header.frame_id = tip
-        r_goal.pose.position.x = 1
-        r_goal.pose.orientation.w = 1
-        fake_table_setup.set_cart_goal(goal_pose=r_goal, tip_link=tip, root_link='map')
-        collision_entry = CollisionEntry()
-        collision_entry.type = CollisionEntry.AVOID_COLLISION
-        collision_entry.distance = -1
-        fake_table_setup.add_motion_goal(goal_type=CollisionAvoidance.__name__,
-                                         collision_entries=[collision_entry])
+        r_goal.header.frame_id = 'map'
+        r_goal.pose.position.x = 0.8
+        r_goal.pose.position.y = -0.38
+        r_goal.pose.position.z = 0.84
+        r_goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 2, [0, 1, 0]))
+        fake_table_setup.avoid_all_collisions(0.1)
+        fake_table_setup.set_cart_goal(goal_pose=r_goal, tip_link=fake_table_setup.r_tip, root_link='map')
         fake_table_setup.plan_and_execute()
         fake_table_setup.check_cpi_geq(fake_table_setup.get_l_gripper_links(), 0.05)
         fake_table_setup.check_cpi_leq(['r_gripper_l_finger_tip_link'], 0.04)
@@ -2693,30 +2691,21 @@ class TestCollisionAvoidanceGoals:
                                                                        tip_link=tip_link,
                                                                        goal_pose=pose1)
         end_monitor = fake_table_setup.add_local_minimum_reached_monitor()
-        # simple cartision goal 2m to the front
+        # simple cartisian goal 2m to the front
         fake_table_setup.low_level_interface().set_cart_goal(goal_pose=pose1,
                                                              goal_name='g1',
                                                              root_link=root_link,
                                                              tip_link=tip_link,
                                                              to_end=[monitor2, end_monitor])
-        fake_table_setup.allow_all_collisions()
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.AVOID_COLLISION
         collision_entry.distance = -1
-        # avoid all collision
-        fake_table_setup.add_motion_goal(goal_type=CollisionAvoidance.__name__,
-                                         goal_name='col1',
-                                         collision_entries=[collision_entry],
-                                         to_end=[monitor1])  # when time is reached, stop this avoidance
-        # avoid only self collision
-        fake_table_setup.add_motion_goal(goal_type=CollisionAvoidance.__name__,
-                                         goal_name='col2',
-                                         collision_entries=[CollisionEntry(type=CollisionEntry.ALLOW_COLLISION),
-                                                            CollisionEntry(type=CollisionEntry.AVOID_COLLISION,
-                                                                           group1='pr2',
-                                                                           group2='pr2',
-                                                                           distance=-1)],
-                                         to_start=[monitor1])  # and start this
+
+        fake_table_setup.avoid_all_collisions(to_end=[monitor1])
+
+        fake_table_setup.allow_all_collisions(to_start=[monitor1])
+        fake_table_setup.avoid_collision(group1='pr2', group2='pr2', to_start=[monitor1])
+
         fake_table_setup.execute(add_local_minimum_reached=False)
 
         # fake_table_setup.check_cpi_geq(fake_table_setup.get_l_gripper_links(), 0.05)

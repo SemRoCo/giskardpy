@@ -369,6 +369,9 @@ class CollisionAvoidance(Goal):
         else:
             god_map.collision_scene.set_collision_matrix(self.collision_matrix)
 
+    def _task_sanity_check(self):
+        pass
+
     @profile
     def add_external_collision_avoidance_constraints(self, soft_threshold_override=None):
         configs = god_map.collision_scene.collision_avoidance_configs

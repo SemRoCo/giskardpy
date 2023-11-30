@@ -29,7 +29,7 @@ class MotionGoalManager:
     def parse_motion_goals(self, motion_goals: List[giskard_msgs.MotionGoal]):
         for motion_goal in motion_goals:
             try:
-                logging.loginfo(f'Adding motion goal of type: \'{motion_goal.type}\'')
+                logging.loginfo(f'Adding motion goal of type: \'{motion_goal.type}\' named: \'{motion_goal.name}\'')
                 C = self.allowed_motion_goal_types[motion_goal.type]
             except KeyError:
                 raise UnknownConstraintException(f'unknown constraint {motion_goal.type}.')

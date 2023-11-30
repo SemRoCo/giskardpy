@@ -598,6 +598,11 @@ class GiskardWrapper(LowLevelGiskardWrapper):
                              joint_list=joint_list)
 
     # %% collision avoidance
+    def _add_collision_entries_as_goals(self):
+        if not self._collision_entries:
+            self.avoid_all_collisions()
+        super()._add_collision_entries_as_goals()
+
     def allow_collision(self,
                         group1: str = CollisionEntry.ALL,
                         group2: str = CollisionEntry.ALL,

@@ -2684,7 +2684,7 @@ class TestCollisionAvoidanceGoals:
         root_link = 'map'
         tip_link = 'base_footprint'
         # monitor that reads time
-        monitor1 = fake_table_setup.add_time_above_monitor(threshold=3)
+        monitor1 = fake_table_setup.add_time_above_monitor(threshold=2.5)
 
         monitor2 = fake_table_setup.add_cartesian_pose_reached_monitor(name='pose1',
                                                                        root_link=root_link,

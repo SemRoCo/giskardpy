@@ -2,7 +2,7 @@ from typing import Dict, Optional, List
 
 from geometry_msgs.msg import PoseStamped, PointStamped, QuaternionStamped, Vector3Stamped
 
-from giskard_msgs.msg import MoveResult
+from giskard_msgs.msg import MoveResult, CollisionEntry
 from giskardpy.goals.align_planes import AlignPlanes
 from giskardpy.goals.cartesian_goals import CartesianPose, CartesianPosition, CartesianOrientation, \
     CartesianPoseStraight, CartesianVelocityLimit, CartesianPositionStraight, DiffDriveBaseGoal
@@ -596,3 +596,111 @@ class GiskardWrapper(LowLevelGiskardWrapper):
                              percentage=percentage,
                              weight=weight,
                              joint_list=joint_list)
+
+    # %% collision avoidance
+    def _add_collision_entries_as_goals(self):
+        if not self._collision_entries:
+            self.avoid_all_collisions()
+        super()._add_collision_entries_as_goals()
+
+    def allow_collision(self,
+                        group1: str = CollisionEntry.ALL,
+                        group2: str = CollisionEntry.ALL,
+                        to_start: Optional[List[str]] = None,
+                        to_hold: Optional[List[str]] = None,
+                        to_end: Optional[List[str]] = None):
+        """
+        Tell Giskard to allow collision between group1 and group2. Use CollisionEntry.ALL to allow collision with all
+        groups.
+        :param group1: name of the first group
+        :param group2: name of the second group
+        """
+        collision_entry = CollisionEntry()
+        collision_entry.type = CollisionEntry.ALLOW_COLLISION
+        collision_entry.group1 = str(group1)
+        collision_entry.group2 = str(group2)
+        self._add_collision_avoidance(collisions=[collision_entry],
+                                      to_start=to_start,
+                                      to_hold=to_hold,
+                                      to_end=to_end)
+
+    def avoid_collision(self,
+                        min_distance: Optional[float] = None,
+                        group1: str = CollisionEntry.ALL,
+                        group2: str = CollisionEntry.ALL,
+                        to_start: Optional[List[str]] = None,
+                        to_hold: Optional[List[str]] = None,
+                        to_end: Optional[List[str]] = None):
+        """
+        Tell Giskard to avoid collision between group1 and group2. Use CollisionEntry.ALL to allow collision with all
+        groups.
+        :param min_distance: set this to overwrite the default distances
+        :param group1: name of the first group
+        :param group2: name of the second group
+        """
+        if min_distance is None:
+            min_distance = - 1
+        collision_entry = CollisionEntry()
+        collision_entry.type = CollisionEntry.AVOID_COLLISION
+        collision_entry.distance = min_distance
+        collision_entry.group1 = group1
+        collision_entry.group2 = group2
+        self._add_collision_avoidance(collisions=[collision_entry],
+                                      to_start=to_start,
+                                      to_hold=to_hold,
+                                      to_end=to_end)
+
+    def allow_all_collisions(self,
+                             to_start: Optional[List[str]] = None,
+                             to_hold: Optional[List[str]] = None,
+                             to_end: Optional[List[str]] = None):
+        """
+        Allows all collisions for next goal.
+        """
+        collision_entry = CollisionEntry()
+        collision_entry.type = CollisionEntry.ALLOW_COLLISION
+        self._add_collision_avoidance(collisions=[collision_entry],
+                                      to_start=to_start,
+                                      to_hold=to_hold,
+                                      to_end=to_end)
+
+    def avoid_all_collisions(self,
+                             min_distance: Optional[float] = None,
+                             to_start: Optional[List[str]] = None,
+                             to_hold: Optional[List[str]] = None,
+                             to_end: Optional[List[str]] = None):
+        """
+        Avoids all collisions for next goal.
+        If you don't want to override the distance, don't call this function. Avoid all is the default, if you don't
+        add any collision entries.
+        :param min_distance: set this to overwrite default distances
+        """
+        if min_distance is None:
+            min_distance = -1
+        collision_entry = CollisionEntry()
+        collision_entry.type = CollisionEntry.AVOID_COLLISION
+        collision_entry.distance = min_distance
+        self._add_collision_avoidance(collisions=[collision_entry],
+                                      to_start=to_start,
+                                      to_hold=to_hold,
+                                      to_end=to_end)
+
+    def allow_self_collision(self,
+                             robot_name: Optional[str] = None,
+                             to_start: Optional[List[str]] = None,
+                             to_hold: Optional[List[str]] = None,
+                             to_end: Optional[List[str]] = None):
+        """
+        Allows the collision of the robot with itself for the next goal.
+        :param robot_name: if there are multiple robots, specify which one.
+        """
+        if robot_name is None:
+            robot_name = self.robot_name
+        collision_entry = CollisionEntry()
+        collision_entry.type = CollisionEntry.ALLOW_COLLISION
+        collision_entry.group1 = robot_name
+        collision_entry.group2 = robot_name
+        self._add_collision_avoidance(collisions=[collision_entry],
+                                      to_start=to_start,
+                                      to_hold=to_hold,
+                                      to_end=to_end)

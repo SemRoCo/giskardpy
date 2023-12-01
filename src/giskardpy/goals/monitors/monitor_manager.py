@@ -25,6 +25,10 @@ def flipped_to_one(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     return np.logical_and(np.logical_not(a), np.logical_or(a, b))
 
 
+def monitor_list_to_monitor_name_tuple(monitors: List[Union[str, Monitor]]) -> Tuple[str, ...]:
+    return tuple(sorted(monitor.name if isinstance(monitor, Monitor) else monitor for monitor in monitors))
+
+
 class MonitorManager:
     compiled_monitors: CompiledFunction
     state: np.ndarray
@@ -42,6 +46,7 @@ class MonitorManager:
         self.robot_names = god_map.collision_scene.robot_names
         self.local_minimum_monitor_id = None
         self.substitution_values = {}
+        self.triggers = {}
 
     def compile_monitors(self):
         expressions = []
@@ -105,7 +110,7 @@ class MonitorManager:
         """
         Expression is updated when all monitors are 1 at the same time, but only once.
         """
-        monitor_names = tuple(sorted(monitor.name if isinstance(monitor, Monitor) else monitor for monitor in monitors))
+        monitor_names = monitor_list_to_monitor_name_tuple(monitors)
         old_symbols = []
         new_symbols = []
         for i, symbol in enumerate(expression.free_symbols()):
@@ -116,10 +121,14 @@ class MonitorManager:
         return new_expression
 
     def _register_expression_update_triggers(self):
-        self.triggers = {}
         for monitor_names, values in self.substitution_values.items():
             trigger_filter = tuple([i for i, m in enumerate(self.monitors) if m.name in monitor_names])
             self.triggers[trigger_filter] = lambda: self.update_substitution_values(monitor_names, list(values.keys()))
+
+    def register_monitor_cb(self, monitor_names: Tuple[str, ...], cb: Callable):
+        monitor_names = monitor_list_to_monitor_name_tuple(monitor_names)
+        trigger_filter = tuple([i for i, m in enumerate(self.monitors) if m.name in monitor_names])
+        self.triggers[trigger_filter] = cb
 
     @profile
     def update_substitution_values(self, monitor_names: Tuple[str, ...], keys: Optional[List[str]] = None):
@@ -160,7 +169,7 @@ class MonitorManager:
                 raise UnknownConstraintException(f'unknown monitor type: \'{monitor_msg.type}\'.')
             try:
                 params = json_str_to_kwargs(monitor_msg.parameter_value_pair)
-                monitor: Monitor = C(monitor_msg.name, **params)
+                monitor: Monitor = C(name=monitor_msg.name, **params)
                 self.add_monitor(monitor)
             except Exception as e:
                 traceback.print_exc()

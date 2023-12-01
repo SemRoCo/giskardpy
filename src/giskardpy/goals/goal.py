@@ -51,6 +51,9 @@ class Goal(ABC):
     def __repr__(self) -> str:
         return self.name
 
+    def has_tasks(self) -> bool:
+        return len(self.tasks) > 0
+
     def get_joint_position_symbol(self, joint_name: PrefixName) -> Union[w.Symbol, float]:
         """
         returns a symbol that refers to the given joint
@@ -120,8 +123,7 @@ class Goal(ABC):
         self._inequality_constraints = OrderedDict()
         self._derivative_constraints = OrderedDict()
         self._debug_expressions = OrderedDict()
-        if not isinstance(self, NonMotionGoal) and not self.tasks:
-            raise ConstraintInitalizationException(f'Goal {str(self)} has no tasks.')
+        self._task_sanity_check()
         for task in self.tasks:
             for constraint in task.get_eq_constraints():
                 name = f'{task.name}/{constraint.name}'
@@ -138,6 +140,10 @@ class Goal(ABC):
 
         return self._equality_constraints, self._inequality_constraints, self._derivative_constraints, \
             self._debug_expressions
+
+    def _task_sanity_check(self):
+        if not self.has_tasks():
+            raise ConstraintInitalizationException(f'Goal {str(self)} has no tasks.')
 
     def add_constraints_of_goal(self, goal: Goal):
         for task in goal.tasks:
@@ -167,4 +173,7 @@ class NonMotionGoal(Goal):
     """
 
     def make_constraints(self):
+        pass
+
+    def _task_sanity_check(self):
         pass

@@ -3,6 +3,7 @@ from typing import List, Dict
 import matplotlib.pyplot as plt
 from py_trees import Status
 
+from giskardpy.goals.collision_avoidance import CollisionAvoidance
 from giskardpy.goals.goal import Goal
 from giskardpy.god_map import god_map
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
@@ -22,9 +23,14 @@ class PlotGanttChart(GiskardBehavior):
         start_dates = []
         end_dates = []
         for goal_name, goal in goals.items():
-            for task in goal.tasks:
-                tasks.append(string_shortener(f'{goal_name} - {task.name}',
-                                              max_lines=5, max_line_length=50))
+            for i, task in enumerate(goal.tasks):
+                if isinstance(goal, CollisionAvoidance):
+                    if i > 0:
+                        break
+                    tasks.append(string_shortener(f'{goal_name}', max_lines=5, max_line_length=50))
+                else:
+                    tasks.append(string_shortener(f'{goal_name} - {task.name}',
+                                                  max_lines=5, max_line_length=50))
                 if not task.to_start:
                     start_dates.append([0])
                 else:

@@ -4,6 +4,7 @@ from typing import List, Dict
 import pydot
 from py_trees import Status
 
+from giskardpy.goals.collision_avoidance import CollisionAvoidance
 from giskardpy.goals.goal import Goal
 from giskardpy.goals.monitors.monitors import Monitor
 from giskardpy.goals.tasks.task import Task
@@ -28,13 +29,20 @@ def generate_graph(goals: Dict[str, Goal], monitors: List[Monitor], output_file:
     to_end_only_monitors = set([shorten(monitor.name) for monitor in monitors])
 
     # Add monitor nodes with black border and text (default)
+    monitor_nodes = {}
     for monitor in monitors:
-        graph.add_node(pydot.Node(shorten(monitor.name), shape='ellipse', color='black', fontcolor='black'))
+        monitor_name = shorten(monitor.name)
+        monitor_nodes[monitor_name] = pydot.Node(monitor_name, shape='ellipse', color='black', fontcolor='black')
 
     # Add task nodes with black border and text (default)
     for goal_name, goal in goals.items():
-        for task in goal.tasks:
-            task_name = shorten(f'{goal_name} - {task.name}')
+        for i, task in enumerate(goal.tasks):
+            if isinstance(goal, CollisionAvoidance):
+                task_name = string_shortener(f'{goal_name}', max_lines=5, max_line_length=50)
+                if i > 0:
+                    break
+            else:
+                task_name = shorten(f'{goal_name} - {task.name}')
             graph.add_node(pydot.Node(task_name, shape='box', color='black', fontcolor='black'))
 
             for monitor in task.to_start:
@@ -42,6 +50,9 @@ def generate_graph(goals: Dict[str, Goal], monitors: List[Monitor], output_file:
                 if to_start:
                     graph.add_edge(pydot.Edge(to_start, task_name, color='green'))
                     to_end_only_monitors.discard(to_start)
+                    if to_start in monitor_nodes:
+                        graph.add_node(monitor_nodes[to_start])
+                        del monitor_nodes[to_start]
                 else:
                     add_t0 = True
                     graph.add_edge(pydot.Edge('t_0', task_name, color='green'))
@@ -49,9 +60,15 @@ def generate_graph(goals: Dict[str, Goal], monitors: List[Monitor], output_file:
                 to_hold = shorten(monitor.name)
                 graph.add_edge(pydot.Edge(to_hold, task_name, color='orange'))
                 to_end_only_monitors.discard(to_hold)
+                if to_hold in monitor_nodes:
+                    graph.add_node(monitor_nodes[to_hold])
+                    del monitor_nodes[to_hold]
             for monitor in task.to_end:
                 to_end = shorten(monitor.name)
                 graph.add_edge(pydot.Edge(task_name, to_end, color='red'))
+                if to_end in monitor_nodes:
+                    graph.add_node(monitor_nodes[to_end])
+                    del monitor_nodes[to_end]
 
 
     # Add "t_0" node with red border and black text if needed
@@ -61,8 +78,9 @@ def generate_graph(goals: Dict[str, Goal], monitors: List[Monitor], output_file:
 
     # Update border color for to_end_only_monitors to red
     for monitor_id in to_end_only_monitors:
-        monitor_node = pydot.Node(monitor_id, shape='ellipse', color='red', fontcolor='black')
-        graph.add_node(monitor_node)
+        if monitor_id not in monitor_nodes: # this means they've been added
+            monitor_node = pydot.Node(monitor_id, shape='ellipse', color='red', fontcolor='black')
+            graph.add_node(monitor_node)
 
     # Save or show the graph
     create_path(output_file)

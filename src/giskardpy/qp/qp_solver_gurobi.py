@@ -110,8 +110,8 @@ class QPSolverGurobi(QPSWIFTFormatter):
                 logging.logwarn('warning, suboptimal solution!')
             return np.array(self.qpProblem.X)
         if success in {gurobipy.GRB.INFEASIBLE, gurobipy.GRB.INF_OR_UNBD, gurobipy.GRB.NUMERIC}:
-            raise InfeasibleException(self.STATUS_VALUE_DICT[success], success)
-        raise QPSolverException(self.STATUS_VALUE_DICT[success], success)
+            raise InfeasibleException(self.STATUS_VALUE_DICT[success])
+        raise QPSolverException(self.STATUS_VALUE_DICT[success])
 
     def default_interface_solver_call(self, H, g, lb, ub, E, bE, A, lbA, ubA) -> np.ndarray:
         weights = H.diagonal()

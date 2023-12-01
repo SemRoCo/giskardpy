@@ -20,7 +20,7 @@ from giskard_msgs.srv import UpdateWorldResponse, UpdateWorldRequest
 from giskardpy.configs.behavior_tree_config import StandAloneBTConfig
 from giskardpy.configs.giskard import Giskard
 from giskardpy.configs.iai_robots.pr2 import PR2CollisionAvoidance, PR2StandaloneInterface, WorldWithPR2Config
-from giskardpy.configs.qp_controller_config import SupportedQPSolver
+from giskardpy.configs.qp_controller_config import SupportedQPSolver, QPControllerConfig
 from giskardpy.goals.cartesian_goals import RelativePositionSequence
 from giskardpy.goals.caster import Circle, Wave
 from giskardpy.goals.collision_avoidance import CollisionAvoidanceHint, CollisionAvoidance
@@ -144,7 +144,8 @@ class PR2TestWrapper(GiskardTestWrapper):
             giskard = Giskard(world_config=WorldWithPR2Config(drive_joint_name=drive_joint_name),
                               robot_interface_config=PR2StandaloneInterface(drive_joint_name=drive_joint_name),
                               collision_avoidance_config=PR2CollisionAvoidance(drive_joint_name=drive_joint_name),
-                              behavior_tree_config=StandAloneBTConfig(debug_mode=True))
+                              behavior_tree_config=StandAloneBTConfig(debug_mode=True),
+                              qp_controller_config=QPControllerConfig())
         super().__init__(giskard)
         self.robot = god_map.world.groups[self.robot_name]
 
@@ -2684,7 +2685,7 @@ class TestCollisionAvoidanceGoals:
         root_link = 'map'
         tip_link = 'base_footprint'
         # monitor that reads time
-        monitor1 = fake_table_setup.add_time_above_monitor(threshold=2.5)
+        monitor1 = fake_table_setup.add_time_above_monitor(threshold=1)
 
         monitor2 = fake_table_setup.add_cartesian_pose_reached_monitor(name='pose1',
                                                                        root_link=root_link,

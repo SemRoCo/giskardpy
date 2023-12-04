@@ -40,6 +40,7 @@ from giskardpy.utils.math import compare_points
 from utils_for_tests import compare_poses, publish_marker_vector, \
     GiskardTestWrapper, pr2_urdf
 from giskardpy.goals.manipulability_goals import MaxManipulability
+from giskardpy.configs.qp_controller_config import QPControllerConfig, SupportedQPSolver
 
 # scopes = ['module', 'class', 'function']
 pocky_pose = {'r_elbow_flex_joint': -1.29610152504,
@@ -145,7 +146,8 @@ class PR2TestWrapper(GiskardTestWrapper):
             giskard = Giskard(world_config=WorldWithPR2Config(drive_joint_name=drive_joint_name),
                               robot_interface_config=PR2StandaloneInterface(drive_joint_name=drive_joint_name),
                               collision_avoidance_config=PR2CollisionAvoidance(drive_joint_name=drive_joint_name),
-                              behavior_tree_config=StandAloneBTConfig(debug_mode=True))
+                              behavior_tree_config=StandAloneBTConfig(debug_mode=True),
+                              qp_controller_config=QPControllerConfig(qp_solver=SupportedQPSolver.qpalm))
         super().__init__(giskard)
         self.robot = god_map.world.groups[self.robot_name]
 

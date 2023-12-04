@@ -586,7 +586,7 @@ class TestServo:
                                                                          [0, -1, 0, 0],
                                                                          [1, 0, 0, 0],
                                                                          [0, 0, 0, 1]]))
-        goal_pose.pose.position.x = 1.93
+        goal_pose.pose.position.x = 1.95
         goal_pose.pose.position.y = -0.2
         goal_pose.pose.position.z = 0.3
 
@@ -599,9 +599,9 @@ class TestServo:
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute(add_local_minimum_reached=False)
 
-        goal_pose.pose.position.x = 1.9
-        goal_pose.pose.position.y = 0.06
-        goal_pose.pose.position.z = 0.45
+        goal_pose.pose.position.x = 1.95
+        goal_pose.pose.position.y = -0.4
+        goal_pose.pose.position.z = 0.49
         # goal_pose.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 0, 1, 0],
         #                                                                  [0, -1, 0, 0],
         #                                                                  [1, 0, 0, 0],
@@ -613,7 +613,7 @@ class TestServo:
                                   goal_name='pouring',
                                   tip='hand_palm_link',
                                   root='map',
-                                  tilt_angle=-1.5,
+                                  tilt_angle=1.5,
                                   pouring_pose=goal_pose,
                                   tilt_axis=tilt_axis,
                                   pre_tilt=True)
@@ -637,9 +637,9 @@ class TestServo:
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute(add_local_minimum_reached=False)
 
-        goal_pose.pose.position.x = 1.5
-        goal_pose.pose.position.y = 0
-        goal_pose.pose.position.z = 0.5
+        goal_pose.pose.position.x = 1.4
+        goal_pose.pose.position.y = -0.2
+        goal_pose.pose.position.z = 0.4
 
         zero_pose.set_cart_goal(goal_pose, 'hand_palm_link', 'map')
         zero_pose.allow_all_collisions()

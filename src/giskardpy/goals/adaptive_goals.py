@@ -159,14 +159,14 @@ class PouringAdaptiveTilt(Goal):
         is_x_back = symbol_manager.get_symbol(f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\'].move_x_back')
         is_y = symbol_manager.get_symbol(f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\'].move_y')
         is_y_back = symbol_manager.get_symbol(f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\'].move_y_back')
-        root_V_adapt = w.Vector3([0.1 * is_x - 0.1 * is_x_back,
-                                  0.1 * is_y - 0.1 * is_y_back,
+        root_V_adapt = w.Vector3([0.05 * is_x - 0.05 * is_x_back,
+                                  0.05 * is_y - 0.05 * is_y_back,
                                   0
                                   ])
         root_P_tip_eval = god_map.world.compose_fk_evaluated_expression(self.root_link, self.tip_link).to_position()
         adapt_pos_task.add_point_goal_constraints(frame_P_current=root_T_tip.to_position(),
                                                   frame_P_goal=root_P_goal + root_V_adapt,
-                                                  reference_velocity=self.max_vel/3,
+                                                  reference_velocity=self.max_vel,
                                                   weight=self.weight)
         self.add_task(adapt_pos_task)
 
@@ -190,22 +190,22 @@ class PouringAdaptiveTilt(Goal):
             self.forward = False
             self.backward = False
 
-        if 'moveForward' in action_string.data:
-            self.move_x = True
-            self.move_x_back = False
-            self.move_y = False
-            self.move_y_back = False
-        elif 'moveBackward' in action_string.data:
-            self.move_x = False
-            self.move_x_back = True
-            self.move_y = False
-            self.move_y_back = False
-        elif 'moveLeft' in action_string.data:
-            self.move_x = False
-            self.move_x_back = False
-            self.move_y = True
-            self.move_y_back = False
-        elif 'moveRight' in action_string.data:
+        # if 'moveForward' in action_string.data:
+        #     self.move_x = False
+        #     self.move_x_back = False
+        #     self.move_y = False
+        #     self.move_y_back = False
+        # elif 'moveBackward' in action_string.data:
+        #     self.move_x = False
+        #     self.move_x_back = False
+        #     self.move_y = False
+        #     self.move_y_back = False
+        # elif 'moveLeft' in action_string.data:
+        #     self.move_x = False
+        #     self.move_x_back = False
+        #     self.move_y = False
+        #     self.move_y_back = False
+        if 'moveRight' in action_string.data:
             self.move_x = False
             self.move_x_back = False
             self.move_y = False
@@ -214,7 +214,7 @@ class PouringAdaptiveTilt(Goal):
             self.move_x = False
             self.move_x_back = False
             self.move_y = False
-            self.move_y_back = False
+            # self.move_y_back = False
 
         if '{}' in action_string.data:
             self.stop_counter += 1

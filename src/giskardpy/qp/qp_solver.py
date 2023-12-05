@@ -216,6 +216,31 @@ class QPSolver(ABC):
         :return: weights, g, lb, ub, E, bE, A, lbA, ubA, weight_filter, bE_filter, bA_filter
         """
 
+    def init_manipulability_variables(self, constraint_jacobian, grad_traces, joints):
+        self.use_manipulability = False
+        if constraint_jacobian:
+            self.J_s = constraint_jacobian
+            self.J_f = constraint_jacobian.compile(self.free_symbols)
+            self.grad_traces_f = [x.compile(self.free_symbols) for x in grad_traces]
+            self.joints_f = [x.compile(self.free_symbols) for x in joints]
+            self.m_grad_old = None
+            self.joints_old = None
+            self.H_old = None
+            self.use_manipulability = True
+            self.manip_gain = god_map.manip_gain
+
+    def set_linear_weight_for_manipulability_maximization(self, substitutions):
+        if self.use_manipulability:
+            self.J = self.J_f.fast_call(substitutions)
+            det = np.linalg.det(self.J.dot(self.J.T))
+            self.m = np.sqrt(det)
+            self.m_grad = np.array([x.fast_call(substitutions) for x in self.grad_traces_f]) * self.m
+            pred_horizon = 5
+            self.g[:len(self.m_grad) * pred_horizon] = \
+                np.reshape(np.vstack([self.m_grad] * pred_horizon) * -self.manip_gain, len(self.m_grad) * pred_horizon)
+            god_map.m_index[1] = god_map.m_index[0]
+            god_map.m_index[0] = self.m
+
 
 class QPSWIFTFormatter(QPSolver):
     sparse: bool = True
@@ -287,18 +312,7 @@ class QPSWIFTFormatter(QPSolver):
 
         self.free_symbols_str = [str(x) for x in self.free_symbols]
 
-        self.use_manipulability = False
-        if constraint_jacobian:
-            self.J_s = constraint_jacobian
-            self.J_f = constraint_jacobian.compile(self.free_symbols)
-            self.grad_traces_f = [x.compile(self.free_symbols) for x in grad_traces]
-            self.joints_f = [x.compile(self.free_symbols) for x in joints]
-            self.m_grad_old = None
-            self.joints_old = None
-            self.H_old = None
-            self.use_manipulability = True
-            self.manip_gain = god_map.manip_gain
-            # self.pub = rospy.Publisher('ellipse_m', MarkerArray, queue_size=1)
+        self.init_manipulability_variables(constraint_jacobian, grad_traces, joints)
 
         if self.compute_nI_I:
             self._nAi_Ai_cache = {}
@@ -310,37 +324,7 @@ class QPSWIFTFormatter(QPSolver):
         self.weights, self.g, self.nlb, self.ub, self.bE, self.nlbA_ubA = self.combined_vector_f.fast_call(
             substitutions)
 
-        if self.use_manipulability:
-            self.J = self.J_f.fast_call(substitutions)
-            det = np.linalg.det(self.J.dot(self.J.T))
-            self.m = np.sqrt(det)
-            self.m_grad = np.array([x.fast_call(substitutions) for x in self.grad_traces_f]) * self.m
-            pred_horizon = 5
-            self.g[:len(self.m_grad) * pred_horizon] = \
-                np.reshape(np.vstack([self.m_grad] * pred_horizon) * -self.manip_gain, len(self.m_grad) * pred_horizon)
-            # print('MANIP: ', self.m)
-            god_map.m_index[1] = god_map.m_index[0]
-            god_map.m_index[0] = self.m
-
-            # singular_values = np.linalg.svd(self.J.dot(self.J.T))[1]
-            # marker_array = MarkerArray()
-            # marker = Marker()
-            # marker.header.frame_id = 'map'
-            # marker.type = 2
-            # marker.ns = 'm_ellipse'
-            # marker.id = 1
-            # marker.action = 0
-            # marker.pose.orientation.w = 1
-            # marker.pose.position.x = 2
-            # marker.pose.position.y = 0
-            # marker.pose.position.z = 1
-            # marker.scale.x = np.sqrt(singular_values[0])
-            # marker.scale.y = np.sqrt(singular_values[1])
-            # marker.scale.z = np.sqrt(singular_values[2])
-            # marker.color.g = 1
-            # marker.color.a = 0.5
-            # marker_array.markers.append(marker)
-            # self.pub.publish(marker_array)
+        self.set_linear_weight_for_manipulability_maximization(substitutions)
 
     @profile
     def problem_data_to_qp_format(self) \

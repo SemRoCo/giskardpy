@@ -75,6 +75,7 @@ class QPSolverQPalm(QPSolver):
         free_symbols.update(lbA.free_symbols())
         free_symbols.update(ubA.free_symbols())
         free_symbols = list(free_symbols)
+        self.free_symbols = free_symbols
 
         self.w_lb_bE_lbA_f = cas.StackedCompiledFunction(expressions=[weights, lb, bE, lbA],
                                                          parameters=free_symbols,
@@ -86,17 +87,7 @@ class QPSolverQPalm(QPSolver):
 
         self.free_symbols_str = [str(x) for x in free_symbols]
 
-        self.use_manipulability = False
-        if constraint_jacobian:
-            self.J_s = constraint_jacobian
-            self.J_f = constraint_jacobian.compile(free_symbols)
-            self.grad_traces_f = [x.compile(free_symbols) for x in grad_traces]
-            self.joints_f = [x.compile(free_symbols) for x in joints]
-            self.m_grad_old = None
-            self.joints_old = None
-            self.H_old = None
-            self.use_manipulability = True
-            self.manip_gain = god_map.manip_gain
+        self.init_manipulability_variables(constraint_jacobian, grad_traces, joints)
 
         if self.compute_nI_I:
             self._nAi_Ai_cache = {}
@@ -108,16 +99,7 @@ class QPSolverQPalm(QPSolver):
         self.g = np.zeros(self.weights.shape)
         self.A = self.A_f.fast_call(substitutions)
 
-        if self.use_manipulability:
-            self.J = self.J_f.fast_call(substitutions)
-            det = np.linalg.det(self.J.dot(self.J.T))
-            self.m = np.sqrt(det)
-            self.m_grad = np.array([x.fast_call(substitutions) for x in self.grad_traces_f]) * self.m
-            pred_horizon = 5
-            self.g[:len(self.m_grad) * pred_horizon] = \
-                np.reshape(np.vstack([self.m_grad] * pred_horizon) * -self.manip_gain, len(self.m_grad) * pred_horizon)
-            god_map.m_index[1] = god_map.m_index[0]
-            god_map.m_index[0] = self.m
+        self.set_linear_weight_for_manipulability_maximization(substitutions)
 
     @profile
     def update_filters(self):

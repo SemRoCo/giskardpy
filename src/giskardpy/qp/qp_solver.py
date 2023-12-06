@@ -216,30 +216,23 @@ class QPSolver(ABC):
         :return: weights, g, lb, ub, E, bE, A, lbA, ubA, weight_filter, bE_filter, bA_filter
         """
 
-    def init_manipulability_variables(self, constraint_jacobian, grad_traces, joints):
+    @profile
+    def init_manipulability_variables(self, constraint_jacobian, grad_traces):
         self.use_manipulability = False
         if constraint_jacobian:
-            self.J_s = constraint_jacobian
-            self.J_f = constraint_jacobian.compile(self.free_symbols)
-            self.grad_traces_f = [x.compile(self.free_symbols) for x in grad_traces]
-            self.joints_f = [x.compile(self.free_symbols) for x in joints]
-            self.m_grad_old = None
-            self.joints_old = None
-            self.H_old = None
+            self.JJT_f = constraint_jacobian.dot(constraint_jacobian.T).compile(self.free_symbols)
+            self.pred_horizon = 5
             self.use_manipulability = True
             self.manip_gain = god_map.manip_gain
+            self.det_symbol = cas.Symbol('det')
+            self.m_symbolic = cas.sqrt(self.det_symbol)
+            self.grad_traces_augmented = cas.vstack([cas.vstack(grad_traces)] * self.pred_horizon) * -self.manip_gain
 
-    def set_linear_weight_for_manipulability_maximization(self, substitutions):
+    @profile
+    def calc_det_of_jjt_manipulability(self, substitutions):
         if self.use_manipulability:
-            self.J = self.J_f.fast_call(substitutions)
-            det = np.linalg.det(self.J.dot(self.J.T))
-            self.m = np.sqrt(det)
-            self.m_grad = np.array([x.fast_call(substitutions) for x in self.grad_traces_f]) * self.m
-            pred_horizon = 5
-            self.g[:len(self.m_grad) * pred_horizon] = \
-                np.reshape(np.vstack([self.m_grad] * pred_horizon) * -self.manip_gain, len(self.m_grad) * pred_horizon)
-            god_map.m_index[1] = god_map.m_index[0]
-            god_map.m_index[0] = self.m
+            self.JJT = self.JJT_f.fast_call(substitutions)
+            self.det = np.linalg.det(self.JJT)
 
 
 class QPSWIFTFormatter(QPSolver):
@@ -302,17 +295,29 @@ class QPSWIFTFormatter(QPSolver):
 
         self.E_f = combined_E.compile(parameters=self.free_symbols, sparse=self.sparse)
         self.nA_A_f = nA_A.compile(parameters=self.free_symbols, sparse=self.sparse)
-        self.combined_vector_f = cas.StackedCompiledFunction([weights,
-                                                              g,
-                                                              nlb_without_inf,
-                                                              ub_without_inf,
-                                                              bE,
-                                                              nlbA_ubA],
-                                                             parameters=self.free_symbols)
+
+        self.init_manipulability_variables(constraint_jacobian, grad_traces)
+
+        if self.use_manipulability:
+            self.combined_vector_f = cas.StackedCompiledFunction([weights,
+                                                                  g,
+                                                                  nlb_without_inf,
+                                                                  ub_without_inf,
+                                                                  bE,
+                                                                  nlbA_ubA,
+                                                                  self.grad_traces_augmented * self.m_symbolic,
+                                                                  self.m_symbolic],
+                                                                 parameters=self.free_symbols + [self.det_symbol.s])
+        else:
+            self.combined_vector_f = cas.StackedCompiledFunction([weights,
+                                                                  g,
+                                                                  nlb_without_inf,
+                                                                  ub_without_inf,
+                                                                  bE,
+                                                                  nlbA_ubA],
+                                                                 parameters=self.free_symbols)
 
         self.free_symbols_str = [str(x) for x in self.free_symbols]
-
-        self.init_manipulability_variables(constraint_jacobian, grad_traces, joints)
 
         if self.compute_nI_I:
             self._nAi_Ai_cache = {}
@@ -321,10 +326,16 @@ class QPSWIFTFormatter(QPSolver):
     def evaluate_functions(self, substitutions):
         self.nA_A = self.nA_A_f.fast_call(substitutions)
         self.E = self.E_f.fast_call(substitutions)
-        self.weights, self.g, self.nlb, self.ub, self.bE, self.nlbA_ubA = self.combined_vector_f.fast_call(
-            substitutions)
-
-        self.set_linear_weight_for_manipulability_maximization(substitutions)
+        if self.use_manipulability:
+            self.calc_det_of_jjt_manipulability(substitutions)
+            self.weights, self.g, self.nlb, self.ub, self.bE, self.nlbA_ubA, self.m_grad, m = self.combined_vector_f.fast_call(
+                np.append(substitutions, self.det))
+            self.g[:len(self.m_grad)] = self.m_grad
+            god_map.m_index[1] = god_map.m_index[0]
+            god_map.m_index[0] = m
+        else:
+            self.weights, self.g, self.nlb, self.ub, self.bE, self.nlbA_ubA = self.combined_vector_f.fast_call(
+                substitutions)
 
     @profile
     def problem_data_to_qp_format(self) \

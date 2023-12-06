@@ -87,7 +87,11 @@ class QPSolverQPalm(QPSolver):
 
         self.free_symbols_str = [str(x) for x in free_symbols]
 
-        self.init_manipulability_variables(constraint_jacobian, grad_traces, joints)
+        self.init_manipulability_variables(constraint_jacobian, grad_traces)
+        if self.use_manipulability:
+            self.combined_vector_f = cas.StackedCompiledFunction([self.grad_traces_augmented * self.m_symbolic,
+                                                                  self.m_symbolic],
+                                                                 parameters=self.free_symbols + [self.det_symbol.s])
 
         if self.compute_nI_I:
             self._nAi_Ai_cache = {}
@@ -99,7 +103,13 @@ class QPSolverQPalm(QPSolver):
         self.g = np.zeros(self.weights.shape)
         self.A = self.A_f.fast_call(substitutions)
 
-        self.set_linear_weight_for_manipulability_maximization(substitutions)
+        if self.use_manipulability:
+            self.calc_det_of_jjt_manipulability(substitutions)
+            self.m_grad, m = self.combined_vector_f.fast_call(np.append(substitutions, self.det))
+            self.g[:len(self.m_grad)] = self.m_grad
+            god_map.m_index[1] = god_map.m_index[0]
+            god_map.m_index[0] = m
+
 
     @profile
     def update_filters(self):

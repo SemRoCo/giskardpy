@@ -226,9 +226,9 @@ class Weights(ProblemDataPart):
         return error_slack_weights
 
     @profile
-    def linear_weights_expression(self, manip_expressions):
+    def linear_weights_expression(self, manip_expressions: List[ManipulabilityConstraint]):
         if len(manip_expressions) == 0:
-            return None, None, None
+            return None, None
 
         stacked_exp = cas.vstack([x.expression for x in manip_expressions])
 
@@ -238,11 +238,11 @@ class Weights(ProblemDataPart):
         for symbol in self.get_free_variable_symbols(Derivatives.position):
             JJt = J.dot(J.T)
             J_dq = cas.total_derivative(J, [symbol], [1])
-            product = cas.Expression(cas.matrix_inverse(JJt)).dot(J_dq).dot(J.T)
+            product = cas.matrix_inverse(JJt).dot(J_dq).dot(J.T)
             trace = cas.trace(product)
             grad_traces.append(trace)
 
-        return J, grad_traces, self.get_free_variable_symbols(Derivatives.position)
+        return J, grad_traces
 
     def get_free_variable_symbols(self, order: Derivatives) -> List[cas.Symbol]:
         return self._sorter({v.position_name: v.get_symbol(order) for v in self.free_variables})[0]
@@ -997,6 +997,7 @@ class QPProblemBuilder:
     inequality_bounds: InequalityBounds
     qp_solver: QPSolver
     prediction_horizon: int = None
+    manipulability_indexes: List[float] = [0.0, 0.0]
 
     def __init__(self,
                  sample_period: float,
@@ -1122,14 +1123,13 @@ class QPProblemBuilder:
         lbA, ubA = self.inequality_bounds.construct_expression()
         E, E_slack = self.equality_model.construct_expression()
         bE = self.equality_bounds.construct_expression()
-        J, grad_traces, joints = self.weights.linear_weights_expression(
+        J, grad_traces = self.weights.linear_weights_expression(
             manip_expressions=self.manipulability_constraints)
 
         qp_solver = solver_class(weights=weights, g=g, lb=lb, ub=ub,
                                  E=E, E_slack=E_slack, bE=bE,
                                  A=A, A_slack=A_slack, lbA=lbA, ubA=ubA,
-                                 constraint_jacobian=J, grad_traces=grad_traces,
-                                 joints=joints
+                                 constraint_jacobian=J, grad_traces=grad_traces
                                  )
         # self.goal_reached_checks.compile(qp_solver.free_symbols)
         logging.loginfo('Done compiling controller:')

@@ -91,23 +91,31 @@ class Task:
 
     def add_manipulability_constraint(self,
                                       task_expression: cas.symbol_expr,
+                                      gain: float,
+                                      prediction_horizon: int,
                                       name: str = None):
         if task_expression.shape != (1, 1):
             raise GiskardException(f'expression must have shape (1, 1), has {task_expression.shape}')
         name = name if name else f'{len(self.manip_constraints)}'
         self.manip_constraints[name] = ManipulabilityConstraint(name=name,
-                                                                expression=task_expression)
+                                                                expression=task_expression,
+                                                                gain=gain,
+                                                                prediction_horizon=prediction_horizon)
 
     def add_manipulability_constraint_vector(self,
                                              task_expressions: Union[
                                                  cas.Expression, cas.Vector3, cas.Point3, List[cas.symbol_expr]],
-                                             names: List[str]):
+                                             names: List[str],
+                                             gain: float,
+                                             prediction_horizon: int):
         if len(task_expressions) != len(names):
             raise ConstraintInitalizationException('All parameters must have the same length.')
         for i in range(len(task_expressions)):
             name_suffix = names[i] if names else None
             self.add_manipulability_constraint(name=name_suffix,
-                                               task_expression=task_expressions[i])
+                                               task_expression=task_expressions[i],
+                                               gain=gain,
+                                               prediction_horizon=prediction_horizon)
 
     def add_equality_constraint(self,
                                 reference_velocity: cas.symbol_expr_float,

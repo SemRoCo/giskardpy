@@ -144,7 +144,7 @@ class Goal(ABC):
                 self._manip_constraints[constraint.name] = constraint
 
         return self._equality_constraints, self._inequality_constraints, self._derivative_constraints, \
-               self._debug_expressions, self._manip_constraints
+               self._manip_constraints, self._debug_expressions
 
     def add_constraints_of_goal(self, goal: Goal):
         for task in goal.tasks:

@@ -47,7 +47,7 @@ class QPSolverQPalm(QPSolver):
     def __init__(self, weights: cas.Expression, g: cas.Expression, lb: cas.Expression, ub: cas.Expression,
                  E: cas.Expression, E_slack: cas.Expression, bE: cas.Expression,
                  A: cas.Expression, A_slack: cas.Expression, lbA: cas.Expression, ubA: cas.Expression,
-                 constraint_jacobian: cas.Expression, grad_traces: [cas.Expression], joints: [cas.Expression]):
+                 constraint_jacobian: cas.Expression, grad_traces: [cas.Expression]):
         """
         min_x 0.5 x^T H x + g^T x
         s.t.  lb <= Ax <= ub
@@ -107,8 +107,8 @@ class QPSolverQPalm(QPSolver):
             self.calc_det_of_jjt_manipulability(substitutions)
             self.m_grad, m = self.combined_vector_f.fast_call(np.append(substitutions, self.det))
             self.g[:len(self.m_grad)] = self.m_grad
-            god_map.m_index[1] = god_map.m_index[0]
-            god_map.m_index[0] = m
+            god_map.qp_controller.manipulability_indexes[1] = god_map.qp_controller.manipulability_indexes[0]
+            god_map.qp_controller.manipulability_indexes[0] = m
 
 
     @profile

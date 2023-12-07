@@ -69,8 +69,6 @@ class GodMap:
     ros_visualizer: ROSMsgVisualization
     free_variables: List[FreeVariable]
     controlled_joints: List[Joint]
-    m_index: List[float]
-    manip_gain: float
 
     def is_goal_msg_type_execute(self):
         return self.goal_msg.type in [MoveGoal.EXECUTE, MoveGoal.PLAN_AND_EXECUTE]

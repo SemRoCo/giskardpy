@@ -2150,8 +2150,10 @@ def substitute(expression, old_symbols, new_symbols):
 
 
 def matrix_inverse(a):
-    return ca.inv(a.s)
+    if isinstance(a, TransMatrix):
+        return a.inverse()
+    return Expression(ca.inv(a.s))
 
 
 def gradient(ex, arg):
-    return ca.gradient(ex.s, arg.s)
+    return Expression(ca.gradient(ex.s, arg.s))

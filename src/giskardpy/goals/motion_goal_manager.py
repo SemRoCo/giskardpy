@@ -175,7 +175,7 @@ class MotionGoalManager:
         goals: Dict[str, Goal] = god_map.motion_goal_manager.motion_goals
         for goal_name, goal in list(goals.items()):
             try:
-                new_eq_constraints, new_neq_constraints, new_derivative_constraints, _debug_expressions, new_manip_constraints = goal.get_constraints()
+                new_eq_constraints, new_neq_constraints, new_derivative_constraints, new_manip_constraints,  _debug_expressions = goal.get_constraints()
             except Exception as e:
                 raise ConstraintInitalizationException(str(e))
             eq_constraints.update(new_eq_constraints)

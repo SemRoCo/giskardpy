@@ -163,9 +163,15 @@ class DerivativeInequalityConstraint:
 class ManipulabilityConstraint:
     def __init__(self,
                  name: str,
-                 expression: cas.Expression):
+                 expression: cas.Expression,
+                 gain: float = 1,
+                 prediction_horizon: int = 1):
         self.name = name
         self.expression = expression
+        if gain < 0:
+            raise Exception('Manipulability gain value has to be positive')
+        self.gain = gain
+        self.prediction_horizon = prediction_horizon
 
     def __str__(self):
         return self.name

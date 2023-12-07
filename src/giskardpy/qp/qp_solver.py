@@ -63,7 +63,7 @@ class QPSolver(ABC):
     def __init__(self, weights: cas.Expression, g: cas.Expression, lb: cas.Expression, ub: cas.Expression,
                  A: cas.Expression, A_slack: cas.Expression, lbA: cas.Expression, ubA: cas.Expression,
                  E: cas.Expression, E_slack: cas.Expression, bE: cas.Expression, constraint_jacobian: cas.Expression,
-                 grad_traces: [cas.Expression], joints: [cas.Expression]):
+                 grad_traces: [cas.Expression]):
         pass
 
     @classmethod
@@ -185,8 +185,7 @@ class QPSolver(ABC):
                    lbA=cas.Expression(),
                    ubA=cas.Expression(),
                    constraint_jacobian=cas.Expression(),
-                   grad_traces=cas.Expression(),
-                   joints=cas.Expression())
+                   grad_traces=cas.Expression())
         return self
 
     @abc.abstractmethod
@@ -221,9 +220,9 @@ class QPSolver(ABC):
         self.use_manipulability = False
         if constraint_jacobian:
             self.JJT_f = constraint_jacobian.dot(constraint_jacobian.T).compile(self.free_symbols)
-            self.pred_horizon = 5
+            self.pred_horizon = god_map.manip_constraints[list(god_map.manip_constraints)[0]].prediction_horizon
             self.use_manipulability = True
-            self.manip_gain = god_map.manip_gain
+            self.manip_gain = god_map.manip_constraints[list(god_map.manip_constraints)[0]].gain
             self.det_symbol = cas.Symbol('det')
             self.m_symbolic = cas.sqrt(self.det_symbol)
             self.grad_traces_augmented = cas.vstack([cas.vstack(grad_traces)] * self.pred_horizon) * -self.manip_gain
@@ -242,7 +241,7 @@ class QPSWIFTFormatter(QPSolver):
     def __init__(self, weights: cas.Expression, g: cas.Expression, lb: cas.Expression, ub: cas.Expression,
                  E: cas.Expression, E_slack: cas.Expression, bE: cas.Expression,
                  A: cas.Expression, A_slack: cas.Expression, lbA: cas.Expression, ubA: cas.Expression,
-                 constraint_jacobian: cas.Expression, grad_traces: [cas.Expression], joints: [cas.Expression]):
+                 constraint_jacobian: cas.Expression, grad_traces: [cas.Expression]):
         """
         min_x 0.5 x^T H x + g^T x
         s.t.  Ex = b
@@ -331,8 +330,8 @@ class QPSWIFTFormatter(QPSolver):
             self.weights, self.g, self.nlb, self.ub, self.bE, self.nlbA_ubA, self.m_grad, m = self.combined_vector_f.fast_call(
                 np.append(substitutions, self.det))
             self.g[:len(self.m_grad)] = self.m_grad
-            god_map.m_index[1] = god_map.m_index[0]
-            god_map.m_index[0] = m
+            god_map.qp_controller.manipulability_indexes[1] = god_map.qp_controller.manipulability_indexes[0]
+            god_map.qp_controller.manipulability_indexes[0] = m
         else:
             self.weights, self.g, self.nlb, self.ub, self.bE, self.nlbA_ubA = self.combined_vector_f.fast_call(
                 substitutions)

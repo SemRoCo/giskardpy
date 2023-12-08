@@ -327,9 +327,9 @@ class QPSWIFTFormatter(QPSolver):
         self.E = self.E_f.fast_call(substitutions)
         if self.use_manipulability:
             self.calc_det_of_jjt_manipulability(substitutions)
-            self.weights, self.g, self.nlb, self.ub, self.bE, self.nlbA_ubA, self.m_grad, m = self.combined_vector_f.fast_call(
+            self.weights, self.g, self.nlb, self.ub, self.bE, self.nlbA_ubA, m_grad, m = self.combined_vector_f.fast_call(
                 np.append(substitutions, self.det))
-            self.g[:len(self.m_grad)] = self.m_grad
+            self.g[:len(m_grad)] = m_grad
             god_map.qp_controller.manipulability_indexes[1] = god_map.qp_controller.manipulability_indexes[0]
             god_map.qp_controller.manipulability_indexes[0] = m
         else:

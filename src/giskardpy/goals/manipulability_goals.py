@@ -35,6 +35,11 @@ class MaxManipulability(Goal):
             name = f'{self.__class__.__name__}/{self.root_link}/{self.tip_link}'
         super().__init__(name)
 
+        results = god_map.world.compute_split_chain(self.root_link, self.tip_link, True, False, False, False)
+        for joint in results[2]:
+            if not god_map.world.is_joint_rotational(joint):
+                raise Exception('Non rotational joint in kinematic chain of Maximize Manipulability Goal')
+
         task = Task(name='manipulability')
         root_T_tip = god_map.world.compose_fk_expression(self.root_link, self.tip_link)
         task.add_manipulability_constraint_vector(names=['x', 'y', 'z'],

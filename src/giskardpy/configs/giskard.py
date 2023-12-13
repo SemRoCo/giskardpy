@@ -57,6 +57,7 @@ class Giskard:
             additional_goal_package_paths = set()
         for additional_path in additional_goal_package_paths:
             self.add_goal_package_name(additional_path)
+        god_map.hack = 0
 
     def set_defaults(self):
         god_map.world_config.set_defaults()

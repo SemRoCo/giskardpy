@@ -35,9 +35,13 @@ class MaxManipulability(Goal):
             name = f'{self.__class__.__name__}/{self.root_link}/{self.tip_link}'
         super().__init__(name)
 
-        results = god_map.world.compute_split_chain(self.root_link, self.tip_link, True, False, False, False)
+        results = god_map.world.compute_split_chain(self.root_link, self.tip_link, True, True, False, False)
+        if len(results[0]) > 0 and len(results[1]) > 0 and len(results[2]) > 0:
+            raise Exception('tip link and root link are in different branches of the kinematic chain of Maximize Manipulability Goal')
+        elif len(results[0]) > 0:
+            raise Exception('tip link is below root link in kinematic chain of Maximize Manipulability Goal')
         for joint in results[2]:
-            if not god_map.world.is_joint_rotational(joint):
+            if 'joint' in joint and not god_map.world.is_joint_rotational(joint):
                 raise Exception('Non rotational joint in kinematic chain of Maximize Manipulability Goal')
 
         task = Task(name='manipulability')

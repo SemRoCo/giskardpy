@@ -21,7 +21,7 @@ from typing import Optional, List
 class PouringAdaptiveTilt(Goal):
     def __init__(self, root, tip, pouring_pose: PoseStamped, tilt_angle: float, tilt_axis: Vector3Stamped,
                  use_local_min=False, max_vel=0.3, weight=WEIGHT_COLLISION_AVOIDANCE, pre_tilt=False,
-                 name: Optional[str] = None,
+                 name: Optional[str] = None, with_feedback=True,
                  to_start: Optional[List[Monitor]] = None,
                  to_hold: Optional[List[Monitor]] = None,
                  to_end: Optional[List[Monitor]] = None):
@@ -119,6 +119,8 @@ class PouringAdaptiveTilt(Goal):
         god_map.debug_expression_manager.add_debug_expression('error', nominal_error)
 
         # add the adaptive part of the goal
+        if not with_feedback:
+            return
         adaptive_task = Task(name='adaptTiltFeedback')
         is_forward = symbol_manager.get_symbol(f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\'].forward')
         is_backward = symbol_manager.get_symbol(f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\'].backward')

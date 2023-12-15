@@ -665,7 +665,8 @@ class TestServo:
                                   root='map',
                                   tilt_angle=2,
                                   pouring_pose=goal_pose,
-                                  tilt_axis=tilt_axis)
+                                  tilt_axis=tilt_axis,
+                                  with_feedback=False)
         # TODO: investigate different ways to get to a description of the frames from a description of the task
         #       This should mainly concern the tip link, the tilt axis in it and and the direction of the angle
         zero_pose.allow_all_collisions()

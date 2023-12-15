@@ -3935,22 +3935,6 @@ class TestBenchmark:
                 fake_table_setup.reset_base()
 
 
-# kernprof -lv py.test -s test/test_integration_pr2.py
-# time: [1-9][1-9]*.[1-9]* s
-# import pytest
-# pytest.main(['-s', __file__ + '::TestJointGoals::test_joint_goal'])
-# pytest.main(['-s', __file__ + '::TestConstraints::test_RelativePositionSequence'])
-# pytest.main(['-s', __file__ + '::TestConstraints::test_open_dishwasher_apartment'])
-# pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_bowl_and_cup'])
-# pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_avoid_collision_go_around_corner'])
-# pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_avoid_collision_box_between_boxes'])
-# pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_avoid_self_collision'])
-# pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_avoid_collision_at_kitchen_corner'])
-# pytest.main(['-s', __file__ + '::TestWayPoints::test_waypoints2'])
-# pytest.main(['-s', __file__ + '::TestCartGoals::test_cart_goal_2eef2'])
-# pytest.main(['-s', __file__ + '::TestCartGoals::test_cart_goal_2eef2'])
-# pytest.main(['-s', __file__ + '::TestWorld::test_compute_self_collision_matrix'])
-
 class TestManipulability:
     def test_manip1(self, zero_pose: PR2TestWrapper):
         p = PoseStamped()
@@ -3985,3 +3969,20 @@ class TestManipulability:
                                   tip_link='l_gripper_tool_frame'
                                   )
         zero_pose.execute(add_local_minimum_reached=True)
+
+# kernprof -lv py.test -s test/test_integration_pr2.py
+# time: [1-9][1-9]*.[1-9]* s
+# import pytest
+# pytest.main(['-s', __file__ + '::TestManipulability::test_manip1'])
+# pytest.main(['-s', __file__ + '::TestJointGoals::test_joint_goal'])
+# pytest.main(['-s', __file__ + '::TestConstraints::test_RelativePositionSequence'])
+# pytest.main(['-s', __file__ + '::TestConstraints::test_open_dishwasher_apartment'])
+# pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_bowl_and_cup'])
+# pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_avoid_collision_go_around_corner'])
+# pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_avoid_collision_box_between_boxes'])
+# pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_avoid_self_collision'])
+# pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_avoid_collision_at_kitchen_corner'])
+# pytest.main(['-s', __file__ + '::TestWayPoints::test_waypoints2'])
+# pytest.main(['-s', __file__ + '::TestCartGoals::test_cart_goal_2eef2'])
+# pytest.main(['-s', __file__ + '::TestCartGoals::test_cart_goal_2eef2'])
+# pytest.main(['-s', __file__ + '::TestWorld::test_compute_self_collision_matrix'])

@@ -499,10 +499,20 @@ def kwargs_to_json(kwargs: Dict[str, Any]) -> str:
     for k, v in kwargs.copy().items():
         if v is None:
             del kwargs[k]
-        if isinstance(v, Message):
-            kwargs[k] = convert_ros_message_to_dictionary(v)
+        else:
+            kwargs[k] = thing_to_json(v)
     kwargs = replace_prefix_name_with_str(kwargs)
     return json.dumps(kwargs)
+
+
+def thing_to_json(thing: Any) -> Any:
+    if isinstance(thing, list):
+        return [thing_to_json(x) for x in thing]
+    if isinstance(thing, dict):
+        return {k: thing_to_json(v) for k, v in thing.items()}
+    if isinstance(thing, Message):
+        return convert_ros_message_to_dictionary(thing)
+    return thing
 
 
 def string_shortener(original_str: str, max_lines: int, max_line_length: int) -> str:
@@ -557,6 +567,7 @@ class ImmutableDict(dict):
     """
     A dict that prevent reassignment of keys.
     """
+
     def __setitem__(self, key, value):
         if key in self:
             raise ValueError(f'Key "{key}" already exists. Cannot reassign value.')

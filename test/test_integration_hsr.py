@@ -36,7 +36,7 @@ class HSRTestWrapper(GiskardTestWrapper):
             giskard = Giskard(world_config=WorldWithHSRConfig(),
                               collision_avoidance_config=HSRCollisionAvoidanceConfig(),
                               robot_interface_config=HSRStandaloneInterface(),
-                              behavior_tree_config=StandAloneBTConfig(debug_mode=True),
+                              behavior_tree_config=StandAloneBTConfig(debug_mode=True, publish_js=True),
                               qp_controller_config=QPControllerConfig())
         super().__init__(giskard)
         self.gripper_group = 'gripper'
@@ -350,7 +350,7 @@ class TestCollisionAvoidanceGoals:
 
     def test_self_collision_avoidance_empty(self, zero_pose: HSRTestWrapper):
         zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute(expected_error_code=MoveResult.INVALID_GOAL)
+        zero_pose.plan_and_execute(expected_error_code=MoveResult.EMPTY_PROBLEM)
         current_state = god_map.world.state.to_position_dict()
         current_state = {k.short_name: v for k, v in current_state.items()}
         zero_pose.compare_joint_state(current_state, zero_pose.default_pose)

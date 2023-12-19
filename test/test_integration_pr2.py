@@ -15,15 +15,15 @@ from shape_msgs.msg import SolidPrimitive
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
 import giskardpy.utils.tfwrapper as tf
-from giskard_msgs.msg import MoveResult, WorldBody
+from giskard_msgs.msg import MoveResult, WorldBody, CollisionEntry
 from giskard_msgs.srv import UpdateWorldResponse, UpdateWorldRequest
 from giskardpy.configs.behavior_tree_config import StandAloneBTConfig
 from giskardpy.configs.giskard import Giskard
 from giskardpy.configs.iai_robots.pr2 import PR2CollisionAvoidance, PR2StandaloneInterface, WorldWithPR2Config
-from giskardpy.configs.qp_controller_config import SupportedQPSolver
+from giskardpy.configs.qp_controller_config import SupportedQPSolver, QPControllerConfig
 from giskardpy.goals.cartesian_goals import RelativePositionSequence
 from giskardpy.goals.caster import Circle, Wave
-from giskardpy.goals.collision_avoidance import CollisionAvoidanceHint
+from giskardpy.goals.collision_avoidance import CollisionAvoidanceHint, CollisionAvoidance
 from giskardpy.goals.goals_tests import DebugGoal
 from giskardpy.goals.joint_goals import JointVelocityLimit
 from giskardpy.goals.set_prediction_horizon import SetQPSolver
@@ -145,7 +145,8 @@ class PR2TestWrapper(GiskardTestWrapper):
             giskard = Giskard(world_config=WorldWithPR2Config(drive_joint_name=drive_joint_name),
                               robot_interface_config=PR2StandaloneInterface(drive_joint_name=drive_joint_name),
                               collision_avoidance_config=PR2CollisionAvoidance(drive_joint_name=drive_joint_name),
-                              behavior_tree_config=StandAloneBTConfig(debug_mode=True))
+                              behavior_tree_config=StandAloneBTConfig(debug_mode=True),
+                              qp_controller_config=QPControllerConfig())
         super().__init__(giskard)
         self.robot = god_map.world.groups[self.robot_name]
 
@@ -2659,6 +2660,7 @@ class TestCollisionAvoidanceGoals:
                                 distance_threshold=0.25,
                                 check_self=False)
 
+
     def test_avoid_collision_go_around_corner(self, fake_table_setup: PR2TestWrapper):
         r_goal = PoseStamped()
         r_goal.header.frame_id = 'map'
@@ -2672,6 +2674,45 @@ class TestCollisionAvoidanceGoals:
         fake_table_setup.check_cpi_geq(fake_table_setup.get_l_gripper_links(), 0.05)
         fake_table_setup.check_cpi_leq(['r_gripper_l_finger_tip_link'], 0.04)
         fake_table_setup.check_cpi_leq(['r_gripper_r_finger_tip_link'], 0.04)
+
+    def test_collision_avoidance_sequence(self, fake_table_setup: PR2TestWrapper):
+        fake_table_setup.set_seed_configuration(fake_table_setup.better_pose)
+        fake_table_setup.execute()
+        pose1 = PoseStamped()
+        pose1.header.frame_id = 'map'
+        pose1.pose.position.x = 2
+        pose1.pose.orientation.w = 1
+
+        root_link = 'map'
+        tip_link = 'base_footprint'
+        # monitor that reads time
+        monitor1 = fake_table_setup.add_time_above_monitor(threshold=1)
+
+        monitor2 = fake_table_setup.add_cartesian_pose_reached_monitor(name='pose1',
+                                                                       root_link=root_link,
+                                                                       tip_link=tip_link,
+                                                                       goal_pose=pose1)
+        end_monitor = fake_table_setup.add_local_minimum_reached_monitor()
+        # simple cartisian goal 2m to the front
+        fake_table_setup.low_level_interface().set_cart_goal(goal_pose=pose1,
+                                                             goal_name='g1',
+                                                             root_link=root_link,
+                                                             tip_link=tip_link,
+                                                             to_end=[monitor2, end_monitor])
+        collision_entry = CollisionEntry()
+        collision_entry.type = CollisionEntry.AVOID_COLLISION
+        collision_entry.distance = -1
+
+        fake_table_setup.avoid_all_collisions(to_end=[monitor1])
+
+        fake_table_setup.allow_all_collisions(to_start=[monitor1])
+        fake_table_setup.avoid_collision(group1='pr2', group2='pr2', to_start=[monitor1])
+
+        fake_table_setup.execute(add_local_minimum_reached=False)
+
+        # fake_table_setup.check_cpi_geq(fake_table_setup.get_l_gripper_links(), 0.05)
+        # fake_table_setup.check_cpi_leq(['r_gripper_l_finger_tip_link'], 0.04)
+        # fake_table_setup.check_cpi_leq(['r_gripper_r_finger_tip_link'], 0.04)
 
     def test_allow_collision_drive_into_box(self, box_setup: PR2TestWrapper):
         p = PoseStamped()

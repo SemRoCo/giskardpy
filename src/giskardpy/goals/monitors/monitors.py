@@ -1,4 +1,4 @@
-from typing import Union, List, TypeVar
+from typing import Union, List, TypeVar, Optional
 
 import numpy as np
 

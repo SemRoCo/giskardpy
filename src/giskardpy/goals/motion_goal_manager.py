@@ -24,13 +24,12 @@ class MotionGoalManager:
         self.allowed_motion_goal_types = {}
         for path in goal_package_paths:
             self.allowed_motion_goal_types.update(get_all_classes_in_package(path, Goal))
-        self.robot_names = god_map.collision_scene.robot_names
 
     @profile
     def parse_motion_goals(self, motion_goals: List[giskard_msgs.MotionGoal]):
         for motion_goal in motion_goals:
             try:
-                logging.loginfo(f'Adding motion goal of type: \'{motion_goal.type}\'')
+                logging.loginfo(f'Adding motion goal of type: \'{motion_goal.type}\' named: \'{motion_goal.name}\'')
                 C = self.allowed_motion_goal_types[motion_goal.type]
             except KeyError:
                 raise UnknownConstraintException(f'unknown constraint {motion_goal.type}.')
@@ -195,13 +194,9 @@ class MotionGoalManager:
                 d[i] = self.replace_jsons_with_ros_messages(element)
 
         if isinstance(d, dict):
-
             if 'message_type' in d:
-
                 d = convert_dictionary_to_ros_message(d)
-
             else:
                 for key, value in d.copy().items():
                     d[key] = self.replace_jsons_with_ros_messages(value)
-
         return d

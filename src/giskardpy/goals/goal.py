@@ -127,9 +127,6 @@ class Goal(ABC):
         self._debug_expressions = OrderedDict()
         self._manip_constraints = OrderedDict()
         
-        if not isinstance(self, NonMotionGoal) and not self.tasks:
-            raise ConstraintInitalizationException(f'Goal {str(self)} has no tasks.')
-        
         self._task_sanity_check()
         
         for task in self.tasks:

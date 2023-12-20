@@ -34,7 +34,7 @@ giskard_wrapper.clear_world()
 
 rospy.loginfo('Combining a joint goal for the arm with a Cartesian goal for the base to reset the pr2.')
 # Setting the joint goal
-giskard_wrapper.set_joint_goal(start_joint_state)
+giskard_wrapper.add_joint_position(start_joint_state)
 
 base_goal = PoseStamped()
 base_goal.header.frame_id = 'map'
@@ -42,7 +42,7 @@ base_goal.pose.position = Point(0, 0, 0)
 base_goal.pose.orientation = Quaternion(0, 0, 0, 1)
 # Setting the Cartesian goal.
 # Choosing map as root_link will allow Giskard to drive with the pr2.
-giskard_wrapper.set_cart_goal(root_link='map', tip_link='base_footprint', goal_pose=base_goal)
+giskard_wrapper.add_cartesian_pose(root_link='map', tip_link='base_footprint', goal_pose=base_goal)
 
 # Turn off collision avoidance to make sure that the robot can recover from any state.
 giskard_wrapper.allow_all_collisions()
@@ -53,14 +53,14 @@ r_goal = PoseStamped()
 r_goal.header.frame_id = 'r_gripper_tool_frame'
 r_goal.pose.position = Point(-0.2, -0.2, 0.2)
 r_goal.pose.orientation = Quaternion(0, 0, 0, 1)
-giskard_wrapper.set_cart_goal(root_link='map', tip_link='r_gripper_tool_frame', goal_pose=r_goal)
+giskard_wrapper.add_cartesian_pose(root_link='map', tip_link='r_gripper_tool_frame', goal_pose=r_goal)
 
 rospy.loginfo('Setting a Cartesian goal for the left gripper.')
 l_goal = PoseStamped()
 l_goal.header.frame_id = 'l_gripper_tool_frame'
 l_goal.pose.position = Point(0.2, 0.2, 0.2)
 l_goal.pose.orientation = Quaternion(0, 0, 0, 1)
-giskard_wrapper.set_cart_goal(root_link='map', tip_link='l_gripper_tool_frame', goal_pose=l_goal)
+giskard_wrapper.add_cartesian_pose(root_link='map', tip_link='l_gripper_tool_frame', goal_pose=l_goal)
 
 rospy.loginfo('Executing both Cartesian goals at the same time')
 giskard_wrapper.plan_and_execute()
@@ -75,10 +75,10 @@ p.pose.orientation.w = 1
 
 rospy.loginfo('Setting Cartesian goal.')
 # Choosing base_footprint as root_link will not include the base, therefore not allowing pr2 to drive.
-giskard_wrapper.set_cart_goal(root_link='base_footprint', tip_link='l_gripper_tool_frame', goal_pose=p)
+giskard_wrapper.add_cartesian_pose(root_link='base_footprint', tip_link='l_gripper_tool_frame', goal_pose=p)
 
 rospy.loginfo('Setting joint goal for only the torso.')
-giskard_wrapper.set_joint_goal({'torso_lift_joint': 0.3})
+giskard_wrapper.add_joint_position({'torso_lift_joint': 0.3})
 
 rospy.loginfo('Executing.')
 giskard_wrapper.plan_and_execute()
@@ -134,18 +134,18 @@ box_name = 'muh'
 box_pose = PoseStamped()
 box_pose.header.frame_id = 'r_gripper_tool_frame'
 box_pose.pose.orientation.w = 1
-giskard_wrapper.add_box(name=box_name,
-                        size=(0.2, 0.1, 0.1),
-                        pose=box_pose,
-                        parent_link='map')
+giskard_wrapper.add_box_to_world(name=box_name,
+                                 size=(0.2, 0.1, 0.1),
+                                 pose=box_pose,
+                                 parent_link='map')
 rospy.loginfo('Delete everything but the robot.')
 giskard_wrapper.clear_world()
 
 rospy.loginfo('Spawn a box again')
-giskard_wrapper.add_box(name=box_name,
-                        size=(0.2, 0.1, 0.1),
-                        pose=box_pose,
-                        parent_link='map')
+giskard_wrapper.add_box_to_world(name=box_name,
+                                 size=(0.2, 0.1, 0.1),
+                                 pose=box_pose,
+                                 parent_link='map')
 
 rospy.loginfo('Attach it to the robot')
 giskard_wrapper.update_parent_link_of_group(name=box_name,
@@ -155,18 +155,18 @@ rospy.loginfo('Delete only the box.')
 giskard_wrapper.remove_group(name=box_name)
 
 rospy.loginfo('Attach a box directly to the robot\'s right gripper.')
-giskard_wrapper.add_box(name=box_name,
-                        size=(0.2, 0.1, 0.1),
-                        pose=box_pose,
-                        parent_link='r_gripper_tool_frame')
+giskard_wrapper.add_box_to_world(name=box_name,
+                                 size=(0.2, 0.1, 0.1),
+                                 pose=box_pose,
+                                 parent_link='r_gripper_tool_frame')
 
 rospy.loginfo('Set a Cartesian goal for the box')
 box_goal = PoseStamped()
 box_goal.header.frame_id = box_name
 box_goal.pose.position.x = 0.5
 box_goal.pose.orientation.w = 1
-giskard_wrapper.set_cart_goal(goal_pose=box_goal,
-                              tip_link=box_name,
-                              root_link='map')
+giskard_wrapper.add_cartesian_pose(goal_pose=box_goal,
+                                   tip_link=box_name,
+                                   root_link='map')
 giskard_wrapper.plan_and_execute()
 

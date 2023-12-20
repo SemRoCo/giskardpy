@@ -57,7 +57,7 @@ def ros(request):
 def resetted_giskard(giskard: GiskardTestWrapper) -> GiskardTestWrapper:
     logging.loginfo('resetting giskard')
     giskard.restart_ticking()
-    giskard.clear_cmds()
+    giskard.clear_motion_goals_and_monitors()
     if god_map.is_standalone() and giskard.has_odometry_joint():
         zero = PoseStamped()
         zero.header.frame_id = 'map'
@@ -100,16 +100,16 @@ def kitchen_setup(better_pose: GiskardTestWrapper) -> GiskardTestWrapper:
         kitchen_pose = PoseStamped()
         kitchen_pose.header.frame_id = str(better_pose.default_root)
         kitchen_pose.pose.orientation.w = 1
-        better_pose.add_urdf(name=kitchen_name,
-                             urdf=rospy.get_param('kitchen_description'),
-                             pose=kitchen_pose)
+        better_pose.add_urdf_to_world(name=kitchen_name,
+                                      urdf=rospy.get_param('kitchen_description'),
+                                      pose=kitchen_pose)
     else:
         kitchen_pose = tf.lookup_pose('map', 'iai_kitchen/world')
-        better_pose.add_urdf(name=kitchen_name,
-                             urdf=rospy.get_param('kitchen_description'),
-                             pose=kitchen_pose,
-                             js_topic='/kitchen/joint_states',
-                             set_js_topic='/kitchen/cram_joint_states')
+        better_pose.add_urdf_to_world(name=kitchen_name,
+                                      urdf=rospy.get_param('kitchen_description'),
+                                      pose=kitchen_pose,
+                                      js_topic='/kitchen/joint_states',
+                                      set_js_topic='/kitchen/cram_joint_states')
     js = {}
     for joint_name in god_map.world.groups[kitchen_name].movable_joint_names:
         joint = god_map.world.joints[joint_name]
@@ -129,15 +129,15 @@ def apartment_setup(better_pose: GiskardTestWrapper) -> GiskardTestWrapper:
         kitchen_pose = PoseStamped()
         kitchen_pose.header.frame_id = str(better_pose.default_root)
         kitchen_pose.pose.orientation.w = 1
-        better_pose.add_urdf(name=better_pose.environment_name,
-                             urdf=rospy.get_param('apartment_description'),
-                             pose=kitchen_pose)
+        better_pose.add_urdf_to_world(name=better_pose.environment_name,
+                                      urdf=rospy.get_param('apartment_description'),
+                                      pose=kitchen_pose)
     else:
-        better_pose.add_urdf(name=better_pose.environment_name,
-                             urdf=rospy.get_param('apartment_description'),
-                             pose=tf.lookup_pose('map', 'iai_apartment/apartment_root'),
-                             js_topic='/apartment_joint_states',
-                             set_js_topic='/iai_kitchen/cram_joint_states')
+        better_pose.add_urdf_to_world(name=better_pose.environment_name,
+                                      urdf=rospy.get_param('apartment_description'),
+                                      pose=tf.lookup_pose('map', 'iai_apartment/apartment_root'),
+                                      js_topic='/apartment_joint_states',
+                                      set_js_topic='/iai_kitchen/cram_joint_states')
     js = {}
     for joint_name in god_map.world.groups[better_pose.environment_name].movable_joint_names:
         joint = god_map.world.joints[joint_name]

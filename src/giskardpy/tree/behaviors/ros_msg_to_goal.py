@@ -25,7 +25,6 @@ class ParseActionGoal(GiskardBehavior):
     def update(self):
         loginfo('Parsing goal message.')
         move_goal = god_map.goal_msg
-        self.goal_msg_sanity_check(move_goal)
         god_map.goal_id += 1
         try:
             god_map.monitor_manager.parse_monitors(move_goal.monitors)
@@ -39,10 +38,6 @@ class ParseActionGoal(GiskardBehavior):
         #     god_map.motion_goal_manager.parse_collision_entries(move_goal.collisions)
         loginfo('Done parsing goal message.')
         return Status.SUCCESS
-
-    def goal_msg_sanity_check(self, goal_msg: MoveGoal):
-        if not goal_msg.goals and goal_msg.collisions and god_map.collision_scene.is_allow_all_collision(goal_msg.collisions[-1]):
-            raise InvalidGoalException(f'No goals have been defined in message.')
 
 
 class SetExecutionMode(GiskardBehavior):

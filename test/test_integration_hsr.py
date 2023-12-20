@@ -46,7 +46,7 @@ class HSRTestWrapper(GiskardTestWrapper):
         self.robot = god_map.world.groups[self.robot_name]
 
     def move_base(self, goal_pose):
-        self.set_cart_goal(goal_pose, tip_link='base_footprint', root_link=god_map.world.root_link_name)
+        self.add_cart_goal(goal_pose, tip_link='base_footprint', root_link=god_map.world.root_link_name)
         self.plan_and_execute()
 
     def open_gripper(self):
@@ -100,7 +100,7 @@ def box_setup(zero_pose: HSRTestWrapper) -> HSRTestWrapper:
     p.pose.position.y = 0
     p.pose.position.z = 0.1
     p.pose.orientation.w = 1
-    zero_pose.add_box(name='box', size=(1, 1, 1), pose=p)
+    zero_pose.add_box_to_world(name='box', size=(1, 1, 1), pose=p)
     return zero_pose
 
 
@@ -147,7 +147,7 @@ class TestJointGoals:
         p.header.frame_id = tip
         p.pose.position.z = 0.2
         p.pose.orientation.w = 1
-        zero_pose.set_cart_goal(goal_pose=p, tip_link=tip,
+        zero_pose.add_cart_goal(goal_pose=p, tip_link=tip,
                                 root_link='base_footprint')
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
@@ -172,7 +172,7 @@ class TestJointGoals:
         p.header.frame_id = tip
         p.pose.position.z = 0.15
         p.pose.orientation.w = 1
-        zero_pose.set_cart_goal(goal_pose=p, tip_link=tip,
+        zero_pose.add_cart_goal(goal_pose=p, tip_link=tip,
                                 root_link='base_footprint')
         zero_pose.plan_and_execute()
         np.testing.assert_almost_equal(god_map.world.state[arm_lift_joint].position, 0.3, decimal=2)
@@ -208,11 +208,11 @@ class TestCartGoals:
         pose = PoseStamped()
         pose.header.frame_id = kitchen_setup.default_root
         pose.pose.orientation.w = 1
-        kitchen_setup.add_box(name=box1_name,
-                              size=(1, 1, 1),
-                              pose=pose,
-                              parent_link='hand_palm_link',
-                              parent_link_group='hsrb')
+        kitchen_setup.add_box_to_world(name=box1_name,
+                                       size=(1, 1, 1),
+                                       pose=pose,
+                                       parent_link='hand_palm_link',
+                                       parent_link_group='hsrb')
         god_map.world.save_graph_pdf()
 
     def test_move_base(self, zero_pose: HSRTestWrapper):
@@ -227,7 +227,7 @@ class TestCartGoals:
         base_goal.header.frame_id = 'map'
         base_goal.pose.position.x = 1
         base_goal.pose.orientation = Quaternion(*quaternion_about_axis(pi, [0, 0, 1]))
-        zero_pose.set_cart_goal(goal_pose=base_goal, tip_link='base_footprint', root_link='map')
+        zero_pose.add_cart_goal(goal_pose=base_goal, tip_link='base_footprint', root_link='map')
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
 
@@ -275,7 +275,7 @@ class TestCartGoals:
         r_goal = PoseStamped()
         r_goal.header.frame_id = zero_pose.tip
         r_goal.pose.orientation = Quaternion(*quaternion_about_axis(pi, [0, 0, 1]))
-        zero_pose.set_cart_goal(goal_pose=r_goal, tip_link=zero_pose.tip, root_link='map')
+        zero_pose.add_cart_goal(goal_pose=r_goal, tip_link=zero_pose.tip, root_link='map')
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
 
@@ -360,7 +360,7 @@ class TestCollisionAvoidanceGoals:
         r_goal.header.frame_id = zero_pose.tip
         r_goal.pose.position.z = 0.5
         r_goal.pose.orientation.w = 1
-        zero_pose.set_cart_goal(goal_pose=r_goal, tip_link=zero_pose.tip, root_link='map')
+        zero_pose.add_cart_goal(goal_pose=r_goal, tip_link=zero_pose.tip, root_link='map')
         zero_pose.plan_and_execute()
 
     def test_self_collision_avoidance2(self, zero_pose: HSRTestWrapper):
@@ -381,7 +381,7 @@ class TestCollisionAvoidanceGoals:
         goal_pose.header.frame_id = 'hand_palm_link'
         goal_pose.pose.position.x = 0.5
         goal_pose.pose.orientation.w = 1
-        zero_pose.set_cart_goal(goal_pose=goal_pose, tip_link=zero_pose.tip, root_link='map')
+        zero_pose.add_cart_goal(goal_pose=goal_pose, tip_link=zero_pose.tip, root_link='map')
         zero_pose.plan_and_execute()
 
     def test_attached_collision1(self, box_setup: HSRTestWrapper):
@@ -391,7 +391,7 @@ class TestCollisionAvoidanceGoals:
         box_pose.pose.position = Point(0.85, 0.3, .66)
         box_pose.pose.orientation = Quaternion(0, 0, 0, 1)
 
-        box_setup.add_box(box_name, (0.07, 0.04, 0.1), box_pose)
+        box_setup.add_box_to_world(box_name, (0.07, 0.04, 0.1), box_pose)
         box_setup.open_gripper()
 
         grasp_pose = deepcopy(box_pose)
@@ -400,7 +400,7 @@ class TestCollisionAvoidanceGoals:
                                                                           [0, -1, 0, 0],
                                                                           [1, 0, 0, 0],
                                                                           [0, 0, 0, 1]]))
-        box_setup.set_cart_goal(goal_pose=grasp_pose, tip_link=box_setup.tip, root_link='map')
+        box_setup.add_cart_goal(goal_pose=grasp_pose, tip_link=box_setup.tip, root_link='map')
         box_setup.plan_and_execute()
         box_setup.update_parent_link_of_group(box_name, box_setup.tip)
 
@@ -421,7 +421,7 @@ class TestCollisionAvoidanceGoals:
         p.pose.position.y = 0
         p.pose.position.z = 0.5
         p.pose.orientation.w = 1
-        zero_pose.add_box(name='box', size=(1, 1, 0.01), pose=p)
+        zero_pose.add_box_to_world(name='box', size=(1, 1, 0.01), pose=p)
 
         js = {'arm_flex_joint': 0}
         zero_pose.set_joint_goal(js, add_monitor=False)
@@ -435,10 +435,10 @@ class TestAddObject:
         pose.header.frame_id = zero_pose.default_root
         pose.pose.orientation.w = 1
         pose.pose.position.x = 1
-        zero_pose.add_box(name=box1_name,
-                          size=(1, 1, 1),
-                          pose=pose,
-                          parent_link='hand_palm_link')
+        zero_pose.add_box_to_world(name=box1_name,
+                                   size=(1, 1, 1),
+                                   pose=pose,
+                                   parent_link='hand_palm_link')
 
         zero_pose.set_joint_goal({'arm_flex_joint': -0.7})
         zero_pose.plan_and_execute()

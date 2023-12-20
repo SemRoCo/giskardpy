@@ -81,11 +81,11 @@ class TestTracebot:
         pose.header.frame_id = 'r_gripper_tool_frame'
         pose.pose.position.z = cylinder_height / 5
         pose.pose.orientation.w = 1
-        better_pose.add_cylinder(name=cylinder_name,
-                                 height=cylinder_height,
-                                 radius=0.0225,
-                                 pose=pose,
-                                 parent_link='r_gripper_tool_frame')
+        better_pose.add_cylinder_to_world(name=cylinder_name,
+                                          height=cylinder_height,
+                                          radius=0.0225,
+                                          pose=pose,
+                                          parent_link='r_gripper_tool_frame')
         better_pose.dye_group(cylinder_name, (0, 0, 1, 1))
 
         better_pose.set_json_goal('InsertCylinder',
@@ -106,7 +106,7 @@ class TestCartGoals:
         goal.pose.orientation.w = 1
         # goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 4, [0, 0, 1]))
 
-        zero_pose.set_cart_goal(goal, tip_link=tip, root_link='world')
+        zero_pose.add_cart_goal(goal, tip_link=tip, root_link='world')
         # zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
         # zero_pose.set_translation_goal(goal, 'base_footprint', 'odom')

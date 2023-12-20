@@ -158,7 +158,7 @@ class TestActionServerEvents:
         p.header.frame_id = 'base_footprint'
         p.pose.position = Point(1, 0, 0)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
-        zero_pose.set_cart_goal(goal_pose=p, tip_link='base_footprint', root_link='map')
+        zero_pose.add_cart_goal(goal_pose=p, tip_link='base_footprint', root_link='map')
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute(expected_error_code=MoveResult.PREEMPTED, stop_after=1)
 
@@ -167,7 +167,7 @@ class TestActionServerEvents:
         p.header.frame_id = 'base_footprint'
         p.pose.position = Point(2, 0, 0)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
-        zero_pose.set_cart_goal(goal_pose=p, tip_link='base_footprint', root_link='map')
+        zero_pose.add_cart_goal(goal_pose=p, tip_link='base_footprint', root_link='map')
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute(expected_error_code=MoveResult.PREEMPTED, stop_after=6)
 

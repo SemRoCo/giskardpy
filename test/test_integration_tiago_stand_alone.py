@@ -317,11 +317,11 @@ class TestCollisionAvoidance:
         box_pose.header.frame_id = parent_link
         box_pose.pose.position.x = 0.2
         box_pose.pose.orientation.w = 1
-        better_pose.add_box(box_name,
-                            (0.1, 0.1, 0.1),
-                            pose=box_pose,
-                            parent_link=parent_link,
-                            parent_link_group=better_pose.robot_name)
+        better_pose.add_box_to_world(box_name,
+                                     (0.1, 0.1, 0.1),
+                                     pose=box_pose,
+                                     parent_link=parent_link,
+                                     parent_link_group=better_pose.robot_name)
         better_pose.set_joint_goal(better_pose.default_pose)
         better_pose.plan_and_execute()
 
@@ -344,11 +344,11 @@ class TestCollisionAvoidance:
         cup_pose.pose.position.x = 0.15
         cup_pose.pose.position.y = 0.15
         cup_pose.pose.orientation.w = 1
-        apartment_setup.add_box(name=cup_name,
-                                size=(0.0753, 0.0753, cup_height),
-                                pose=cup_pose,
-                                parent_link=cupboard_floor,
-                                parent_link_group=apartment_name)
+        apartment_setup.add_box_to_world(name=cup_name,
+                                         size=(0.0753, 0.0753, cup_height),
+                                         pose=cup_pose,
+                                         parent_link=cupboard_floor,
+                                         parent_link_group=apartment_name)
 
         # open cupboard
         goal_angle = np.pi / 2
@@ -359,7 +359,7 @@ class TestCollisionAvoidance:
                                                                          [0, -1, 0, 0],
                                                                          [0, 0, -1, 0],
                                                                          [0, 0, 0, 1]]))
-        apartment_setup.set_cart_goal(left_pose,
+        apartment_setup.add_cart_goal(left_pose,
                                       tip_link=l_tcp,
                                       root_link=apartment_setup.default_root,
                                       weight=WEIGHT_ABOVE_CA * 10,
@@ -372,7 +372,7 @@ class TestCollisionAvoidance:
         apartment_setup.plan_and_execute()
 
         apartment_setup.set_diff_drive_tangential_to_point(goal_point=goal_point, weight=WEIGHT_BELOW_CA)
-        apartment_setup.set_cart_goal(left_pose,
+        apartment_setup.add_cart_goal(left_pose,
                                       tip_link=l_tcp,
                                       root_link=apartment_setup.default_root,
                                       add_monitor=False)
@@ -459,17 +459,17 @@ class TestCollisionAvoidance:
         box_pose.pose.position.z = 0.07
         box_pose.pose.position.x = 0.1
         box_pose.pose.orientation.w = 1
-        zero_pose.add_box('box',
-                          size=(0.05, 0.05, 0.05),
-                          pose=box_pose)
+        zero_pose.add_box_to_world('box',
+                                   size=(0.05, 0.05, 0.05),
+                                   pose=box_pose)
         box_pose = PoseStamped()
         box_pose.header.frame_id = 'arm_left_5_link'
         box_pose.pose.position.z = 0.07
         box_pose.pose.position.y = -0.1
         box_pose.pose.orientation.w = 1
-        zero_pose.add_box('box2',
-                          size=(0.05, 0.05, 0.05),
-                          pose=box_pose)
+        zero_pose.add_box_to_world('box2',
+                                   size=(0.05, 0.05, 0.05),
+                                   pose=box_pose)
         zero_pose.plan_and_execute()
 
     def test_load_negative_scale(self, zero_pose: TiagoTestWrapper):
@@ -479,43 +479,43 @@ class TestCollisionAvoidance:
         box_pose.pose.position.x = 0.6
         box_pose.pose.position.z = 0.0
         box_pose.pose.orientation.w = 1
-        zero_pose.add_mesh('meshy',
-                           mesh=mesh_path,
-                           pose=box_pose,
-                           scale=(1, 1, -1),
-                           )
+        zero_pose.add_mesh_to_world('meshy',
+                                    mesh=mesh_path,
+                                    pose=box_pose,
+                                    scale=(1, 1, -1),
+                                    )
         box_pose = PoseStamped()
         box_pose.header.frame_id = 'base_link'
         box_pose.pose.position.x = 0.6
         box_pose.pose.position.z = -0.1
         box_pose.pose.orientation.w = 1
-        zero_pose.add_box('box1',
-                          size=(0.1, 0.1, 0.01),
-                          pose=box_pose,
-                          parent_link='base_link',
-                          parent_link_group=zero_pose.robot_name)
+        zero_pose.add_box_to_world('box1',
+                                   size=(0.1, 0.1, 0.01),
+                                   pose=box_pose,
+                                   parent_link='base_link',
+                                   parent_link_group=zero_pose.robot_name)
         box_pose = PoseStamped()
         box_pose.header.frame_id = 'base_link'
         box_pose.pose.position.x = 0.6
         box_pose.pose.position.y = 0.1
         box_pose.pose.position.z = 0.05
         box_pose.pose.orientation.w = 1
-        zero_pose.add_box('box2',
-                          size=(0.1, 0.01, 0.1),
-                          pose=box_pose,
-                          parent_link='base_link',
-                          parent_link_group=zero_pose.robot_name)
+        zero_pose.add_box_to_world('box2',
+                                   size=(0.1, 0.01, 0.1),
+                                   pose=box_pose,
+                                   parent_link='base_link',
+                                   parent_link_group=zero_pose.robot_name)
         box_pose = PoseStamped()
         box_pose.header.frame_id = 'base_link'
         box_pose.pose.position.x = 0.6
         box_pose.pose.position.y = -0.1
         box_pose.pose.position.z = 0.05
         box_pose.pose.orientation.w = 1
-        zero_pose.add_box('box3',
-                          size=(0.1, 0.01, 0.1),
-                          pose=box_pose,
-                          parent_link='base_link',
-                          parent_link_group=zero_pose.robot_name)
+        zero_pose.add_box_to_world('box3',
+                                   size=(0.1, 0.01, 0.1),
+                                   pose=box_pose,
+                                   parent_link='base_link',
+                                   parent_link_group=zero_pose.robot_name)
         # box_pose = PoseStamped()
         # box_pose.header.frame_id = 'base_link'
         # box_pose.pose.position.x = 0.6
@@ -546,7 +546,7 @@ class TestCollisionAvoidance:
                                                                          [0, -1, 0, 0],
                                                                          [0, 0, -1, 0],
                                                                          [0, 0, 0, 1]]))
-        apartment_setup.set_cart_goal(left_pose,
+        apartment_setup.add_cart_goal(left_pose,
                                       tip_link=tcp,
                                       root_link=god_map.world.root_link_name,
                                       add_monitor=False)

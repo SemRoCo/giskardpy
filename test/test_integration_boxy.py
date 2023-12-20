@@ -84,7 +84,7 @@ class BoxyTestWrapper(GiskardTestWrapper):
         self.plan_and_execute()
 
     def move_base(self, goal_pose):
-        self.set_cart_goal(goal_pose, tip_link='base_footprint', root_link='odom')
+        self.add_cart_goal(goal_pose, tip_link='base_footprint', root_link='odom')
         self.plan_and_execute()
 
     def open_r_gripper(self):
@@ -172,7 +172,7 @@ class TestConstraints:
                                                                       [1, 0, 0, 0],
                                                                       [0, 0, 0, 1]]))
 
-        better_pose.set_cart_goal(r_goal, better_pose.r_tip, 'base_footprint')
+        better_pose.add_cart_goal(r_goal, better_pose.r_tip, 'base_footprint')
         better_pose.plan_and_execute()
 
         current_x = Vector3Stamped()

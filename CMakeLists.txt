@@ -175,6 +175,7 @@ catkin_install_python(PROGRAMS
 	scripts/iai_robots/tiago/tiago_standalone.py
 	scripts/iai_robots/tracy/tracy.py
 	scripts/iai_robots/tracy/tracy_standalone.py
+	scripts/other_robots/armar/armar_standalone.py
 	scripts/examples/giskard_pr2_standalone_example.py
 	scripts/tools/interactive_marker.py
 	scripts/tools/joystick_e_stop.py

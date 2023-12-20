@@ -1,0 +1,20 @@
+<launch>
+
+  <include file="$(find armar_description)/launch/armar6_upload.launch"/>
+
+  <node pkg="giskardpy" type="armar_standalone.py" name="giskard" output="screen"/>
+
+  <node pkg="giskardpy" type="interactive_marker.py" name="giskard_interactive_marker" output="screen">
+    <rosparam param="enable_self_collision">False</rosparam>
+    <rosparam param="interactive_marker_chains">
+      - [odom, armar6/Roboception]
+      - [map, armar6/Platform]
+      - [map, armar6/Hand R Palm]
+      - [map, armar6/Hand L Palm]
+    </rosparam>
+  </node>
+
+  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find giskardpy)/launch/rviz_config/standalone.rviz" />
+
+</launch>
+

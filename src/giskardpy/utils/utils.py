@@ -125,7 +125,7 @@ def to_joint_state_position_dict(msg):
     :rtype: OrderedDict[str, float]
     """
     js = OrderedDict()
-    for i, joint_name in enumerate(msg.name):
+    for joint_name, i in sorted(zip(msg.name, range(len(msg.name))), key=lambda x: x[0]):
         js[joint_name] = msg.position[i]
     return js
 

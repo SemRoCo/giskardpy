@@ -23,9 +23,9 @@ class AlignPlanes(Goal):
                  reference_velocity: float = 0.5,
                  weight: float = WEIGHT_ABOVE_CA,
                  name: Optional[str] = None,
-                 to_start: Optional[List[Monitor]] = None,
-                 to_hold: Optional[List[Monitor]] = None,
-                 to_end: Optional[List[Monitor]] = None,
+                 start_monitors: Optional[List[Monitor]] = None,
+                 hold_monitors: Optional[List[Monitor]] = None,
+                 end_monitors: Optional[List[Monitor]] = None,
                  **kwargs):
         """
         This goal will use the kinematic chain between tip and root to align tip_normal with goal_normal.
@@ -69,4 +69,4 @@ class AlignPlanes(Goal):
                                          reference_velocity=self.reference_velocity,
                                          weight=self.weight)
         self.add_task(task)
-        self.connect_monitors_to_all_tasks(to_start, to_hold, to_end)
+        self.connect_monitors_to_all_tasks(start_monitors, hold_monitors, end_monitors)

@@ -163,12 +163,12 @@ class MonitorManager:
     def parse_monitors(self, monitor_msgs: List[giskard_msgs.Monitor]):
         for monitor_msg in monitor_msgs:
             try:
-                logging.loginfo(f'Adding monitor of type: \'{monitor_msg.type}\'')
-                C = self.allowed_monitor_types[monitor_msg.type]
+                logging.loginfo(f'Adding monitor of type: \'{monitor_msg.monitor_class}\'')
+                C = self.allowed_monitor_types[monitor_msg.monitor_class]
             except KeyError:
-                raise UnknownConstraintException(f'unknown monitor type: \'{monitor_msg.type}\'.')
+                raise UnknownConstraintException(f'unknown monitor type: \'{monitor_msg.monitor_class}\'.')
             try:
-                params = json_str_to_kwargs(monitor_msg.parameter_value_pair)
+                params = json_str_to_kwargs(monitor_msg.kwargs)
                 monitor: Monitor = C(name=monitor_msg.name, **params)
                 self.add_monitor(monitor)
             except Exception as e:

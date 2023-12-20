@@ -277,7 +277,7 @@ class GiskardTestWrapper(GiskardWrapper):
     def set_seed_odometry(self, base_pose, group_name: Optional[str] = None):
         if group_name is None:
             group_name = self.robot_name
-        self.add_motion_goal(goal_type=SetOdometry.__name__,
+        self.add_motion_goal(motion_goal_class=SetOdometry.__name__,
                              group_name=group_name,
                              base_pose=base_pose)
 
@@ -431,11 +431,11 @@ class GiskardTestWrapper(GiskardWrapper):
         # rospy.sleep(0.5)
 
     def set_move_base_goal(self, goal_pose):
-        self.add_motion_goal(goal_type=PR2DiffDriveBaseGoal.__name__,
+        self.add_motion_goal(motion_goal_class=PR2DiffDriveBaseGoal.__name__,
                              goal_pose=goal_pose)
 
     def set_keep_hand_in_workspace(self, tip_link, map_frame=None, base_footprint=None):
-        self.add_motion_goal(goal_type=KeepHandInWorkspace.__name__,
+        self.add_motion_goal(motion_goal_class=KeepHandInWorkspace.__name__,
                              tip_link=tip_link,
                              map_frame=map_frame,
                              base_footprint=base_footprint)
@@ -455,7 +455,7 @@ class GiskardTestWrapper(GiskardWrapper):
         if add_local_minimum_reached:
             local_min_reached_monitor_name = self.add_local_minimum_reached_monitor()
             for goal in self._goals:
-                goal.to_end.append(local_min_reached_monitor_name)
+                goal.end_monitors.append(local_min_reached_monitor_name)
         return self.send_goal(expected_error_code=expected_error_code, stop_after=stop_after, wait=wait)
 
     def projection(self, expected_error_code: int = MoveResult.SUCCESS, wait: bool = True,
@@ -468,7 +468,7 @@ class GiskardTestWrapper(GiskardWrapper):
         if add_local_minimum_reached:
             local_min_reached_monitor_name = self.add_local_minimum_reached_monitor()
             for goal in self._goals:
-                goal.to_end.append(local_min_reached_monitor_name)
+                goal.end_monitors.append(local_min_reached_monitor_name)
         last_js = god_map.world.state.to_position_dict()
         for key, value in list(last_js.items()):
             if key not in god_map.controlled_joints:
@@ -495,7 +495,7 @@ class GiskardTestWrapper(GiskardWrapper):
 
     def send_goal(self,
                   expected_error_code: int = MoveResult.SUCCESS,
-                  goal_type: int = MoveGoal.PLAN_AND_EXECUTE,
+                  goal_type: int = MoveGoal.EXECUTE,
                   goal: Optional[MoveGoal] = None,
                   stop_after: Optional[float] = None,
                   wait: bool = True) -> Optional[MoveResult]:

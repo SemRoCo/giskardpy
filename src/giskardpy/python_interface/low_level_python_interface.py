@@ -1,13 +1,10 @@
-import json
 from collections import defaultdict
 from typing import Dict, Tuple, Optional, Union, List
 
 import rospy
 from actionlib import SimpleActionClient
-from genpy import Message
 from geometry_msgs.msg import PoseStamped, Vector3Stamped, PointStamped, QuaternionStamped
 from rospy import ServiceException
-from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
 from visualization_msgs.msg import MarkerArray
 
@@ -27,8 +24,6 @@ from giskardpy.goals.monitors.cartesian_monitors import PoseReached, PositionRea
     VectorsAligned, DistanceToLine
 from giskardpy.goals.monitors.joint_monitors import JointGoalReached
 from giskardpy.goals.monitors.monitors import LocalMinimumReached, TimeAbove
-from giskardpy.goals.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
-from giskardpy.god_map import god_map
 from giskardpy.model.utils import make_world_body_box
 from giskardpy.my_types import goal_parameter
 from giskardpy.utils.utils import position_dict_to_joint_states, convert_ros_message_to_dictionary, \
@@ -43,16 +38,14 @@ class LowLevelGiskardWrapper:
 
     def __init__(self, node_name: str = 'giskard'):
         giskard_topic = f'{node_name}/command'
-        if giskard_topic is not None:
-            self._client = SimpleActionClient(giskard_topic, MoveAction)
-            self._update_world_srv = rospy.ServiceProxy(f'{node_name}/update_world', UpdateWorld)
-            self._get_group_info_srv = rospy.ServiceProxy(f'{node_name}/get_group_info', GetGroupInfo)
-            self._get_group_names_srv = rospy.ServiceProxy(f'{node_name}/get_group_names', GetGroupNames)
-            self._register_groups_srv = rospy.ServiceProxy(f'{node_name}/register_groups', RegisterGroup)
-            self._marker_pub = rospy.Publisher('visualization_marker_array', MarkerArray, queue_size=10)
-            self.dye_group_srv = rospy.ServiceProxy(f'{node_name}/dye_group', DyeGroup)
-            rospy.wait_for_service(f'{node_name}/update_world')
-            self._client.wait_for_server()
+        self._client = SimpleActionClient(giskard_topic, MoveAction)
+        self._update_world_srv = rospy.ServiceProxy(f'{node_name}/update_world', UpdateWorld)
+        self._get_group_info_srv = rospy.ServiceProxy(f'{node_name}/get_group_info', GetGroupInfo)
+        self._get_group_names_srv = rospy.ServiceProxy(f'{node_name}/get_group_names', GetGroupNames)
+        self._register_groups_srv = rospy.ServiceProxy(f'{node_name}/register_groups', RegisterGroup)
+        self._dye_group_srv = rospy.ServiceProxy(f'{node_name}/dye_group', DyeGroup)
+        rospy.wait_for_service(f'{node_name}/update_world')
+        self._client.wait_for_server()
         self.clear_cmds()
         rospy.sleep(.3)
         self.robot_name = self.get_group_names()[0]
@@ -106,16 +99,16 @@ class LowLevelGiskardWrapper:
         return action_goal
 
     def _add_collision_entries_as_goals(self):
-        for (to_start, to_hold, to_end), collision_entries in self._collision_entries.items():
+        for (start_monitors, hold_monitors, end_monitors), collision_entries in self._collision_entries.items():
             name = 'collision avoidance'
-            if to_start or to_hold or to_end:
-                name += f'{to_start}, {to_hold}, {to_end}'
-            self.add_motion_goal(goal_type=CollisionAvoidance.__name__,
+            if start_monitors or hold_monitors or end_monitors:
+                name += f'{start_monitors}, {hold_monitors}, {end_monitors}'
+            self.add_motion_goal(motion_goal_class=CollisionAvoidance.__name__,
                                  goal_name=name,
                                  collision_entries=collision_entries,
-                                 to_start=list(to_start),
-                                 to_hold=list(to_hold),
-                                 to_end=list(to_end))
+                                 start_monitors=list(start_monitors),
+                                 hold_monitors=list(hold_monitors),
+                                 end_monitors=list(end_monitors))
 
     def interrupt(self):
         """
@@ -138,27 +131,29 @@ class LowLevelGiskardWrapper:
             raise TimeoutError('Timeout while waiting for goal.')
         return self._client.get_result()
 
-    def add_motion_goal(self, goal_type, goal_name: str = '',
-                        to_start: Optional[List[str]] = None,
-                        to_hold: Optional[List[str]] = None,
-                        to_end: Optional[List[str]] = None,
+    def add_motion_goal(self,
+                        motion_goal_class: str,
+                        goal_name: str = '',
+                        start_monitors: Optional[List[str]] = None,
+                        hold_monitors: Optional[List[str]] = None,
+                        end_monitors: Optional[List[str]] = None,
                         **kwargs):
         motion_goal = MotionGoal()
         motion_goal.name = goal_name
-        motion_goal.type = goal_type
-        motion_goal.to_start = to_start or []
-        motion_goal.to_hold = to_hold or []
-        motion_goal.to_end = to_end or []
-        motion_goal.parameter_value_pair = kwargs_to_json(kwargs)
+        motion_goal.motion_goal_class = motion_goal_class
+        motion_goal.start_monitors = start_monitors or []
+        motion_goal.hold_monitors = hold_monitors or []
+        motion_goal.end_monitors = end_monitors or []
+        motion_goal.kwargs = kwargs_to_json(kwargs)
         self._goals.append(motion_goal)
 
     def add_monitor(self, monitor_type: str, monitor_name: str, **kwargs):
         if [x for x in self._monitors if x.name == monitor_name]:
             raise KeyError(f'monitor named {monitor_name} already exists.')
         monitor = giskard_msgs.Monitor()
-        monitor.type = monitor_type
         monitor.name = monitor_name
-        monitor.parameter_value_pair = kwargs_to_json(kwargs)
+        monitor.monitor_class = monitor_type
+        monitor.kwargs = kwargs_to_json(kwargs)
         self._monitors.append(monitor)
 
     def _feedback_cb(self, msg: MoveFeedback):
@@ -170,9 +165,9 @@ class LowLevelGiskardWrapper:
                        group_name: Optional[str] = None,
                        weight: Optional[float] = None,
                        max_velocity: Optional[float] = None,
-                       to_start: List[str] = None,
-                       to_hold: List[str] = None,
-                       to_end: List[str] = None,
+                       start_monitors: List[str] = None,
+                       hold_monitors: List[str] = None,
+                       end_monitors: List[str] = None,
                        **kwargs: goal_parameter):
         """
         Sets joint position goals for all pairs in goal_state
@@ -181,14 +176,14 @@ class LowLevelGiskardWrapper:
         :param weight:
         :param max_velocity: will be applied to all joints
         """
-        self.add_motion_goal(goal_type=JointPositionList.__name__,
+        self.add_motion_goal(motion_goal_class=JointPositionList.__name__,
                              goal_state=goal_state,
                              group_name=group_name,
                              weight=weight,
                              max_velocity=max_velocity,
-                             to_start=to_start,
-                             to_hold=to_hold,
-                             to_end=to_end,
+                             start_monitors=start_monitors,
+                             hold_monitors=hold_monitors,
+                             end_monitors=end_monitors,
                              **kwargs)
 
     def set_cart_goal(self,
@@ -202,9 +197,9 @@ class LowLevelGiskardWrapper:
                       reference_linear_velocity: Optional[float] = None,
                       reference_angular_velocity: Optional[float] = None,
                       weight: Optional[float] = None,
-                      to_start: List[str] = None,
-                      to_hold: List[str] = None,
-                      to_end: List[str] = None,
+                      start_monitors: List[str] = None,
+                      hold_monitors: List[str] = None,
+                      end_monitors: List[str] = None,
                       **kwargs: goal_parameter):
         """
         This goal will use the kinematic chain between root and tip link to move tip link into the goal pose.
@@ -222,7 +217,7 @@ class LowLevelGiskardWrapper:
         :param reference_angular_velocity: rad/s
         :param weight: default WEIGHT_ABOVE_CA
         """
-        self.add_motion_goal(goal_type=CartesianPose.__name__,
+        self.add_motion_goal(motion_goal_class=CartesianPose.__name__,
                              goal_pose=goal_pose,
                              tip_link=tip_link,
                              root_link=root_link,
@@ -233,9 +228,9 @@ class LowLevelGiskardWrapper:
                              reference_linear_velocity=reference_linear_velocity,
                              reference_angular_velocity=reference_angular_velocity,
                              weight=weight,
-                             to_start=to_start,
-                             to_hold=to_hold,
-                             to_end=to_end,
+                             start_monitors=start_monitors,
+                             hold_monitors=hold_monitors,
+                             end_monitors=end_monitors,
                              **kwargs)
 
     # %% predefined monitors
@@ -421,13 +416,13 @@ class LowLevelGiskardWrapper:
     # %% collision avoidance
     def _add_collision_avoidance(self,
                                  collisions: List[CollisionEntry],
-                                 to_start: Optional[List[str]] = None,
-                                 to_hold: Optional[List[str]] = None,
-                                 to_end: Optional[List[str]] = None):
-        to_start = to_start or ()
-        to_hold = to_hold or ()
-        to_end = to_end or ()
-        key = (tuple(to_start), tuple(to_hold), tuple(to_end))
+                                 start_monitors: Optional[List[str]] = None,
+                                 hold_monitors: Optional[List[str]] = None,
+                                 end_monitors: Optional[List[str]] = None):
+        start_monitors = start_monitors or ()
+        hold_monitors = hold_monitors or ()
+        end_monitors = end_monitors or ()
+        key = (tuple(start_monitors), tuple(hold_monitors), tuple(end_monitors))
         self._collision_entries[key].extend(collisions)
 
     # %% world manipulation
@@ -641,7 +636,7 @@ class LowLevelGiskardWrapper:
         req.color.g = rgba[1]
         req.color.b = rgba[2]
         req.color.a = rgba[3]
-        return self.dye_group_srv(req)
+        return self._dye_group_srv(req)
 
     def get_group_names(self) -> List[str]:
         """

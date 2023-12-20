@@ -21,9 +21,9 @@ class DiffDriveTangentialToPoint(Goal):
                  group_name: Optional[str] = None,
                  reference_velocity: float = 0.5, weight: bool = WEIGHT_ABOVE_CA, drive: bool = False,
                  name: Optional[str] = None,
-                 to_start: Optional[List[Monitor]] = None,
-                 to_hold: Optional[List[Monitor]] = None,
-                 to_end: Optional[List[Monitor]] = None
+                 start_monitors: Optional[List[Monitor]] = None,
+                 hold_monitors: Optional[List[Monitor]] = None,
+                 end_monitors: Optional[List[Monitor]] = None
                  ):
         self.tip = god_map.world.search_for_link_name('base_footprint', group_name)
         self.root = god_map.world.root_link_name
@@ -79,9 +79,9 @@ class DiffDriveTangentialToPoint(Goal):
 class PointingDiffDriveEEF(Goal):
     def __init__(self, base_tip, base_root, eef_tip, eef_root, pointing_axis=None, max_velocity=0.3,
                  weight=WEIGHT_ABOVE_CA, name: Optional[str] = None,
-                 to_start: Optional[List[Monitor]] = None,
-                 to_hold: Optional[List[Monitor]] = None,
-                 to_end: Optional[List[Monitor]] = None
+                 start_monitors: Optional[List[Monitor]] = None,
+                 hold_monitors: Optional[List[Monitor]] = None,
+                 end_monitors: Optional[List[Monitor]] = None
                  ):
         self.weight = weight
         self.max_velocity = max_velocity
@@ -130,9 +130,9 @@ class PointingDiffDriveEEF(Goal):
 class KeepHandInWorkspace(Goal):
     def __init__(self, tip_link, base_footprint=None, map_frame=None, pointing_axis=None, max_velocity=0.3,
                  group_name: Optional[str] = None, weight=WEIGHT_ABOVE_CA, name: Optional[str] = None,
-                 to_start: Optional[List[Monitor]] = None,
-                 to_hold: Optional[List[Monitor]] = None,
-                 to_end: Optional[List[Monitor]] = None
+                 start_monitors: Optional[List[Monitor]] = None,
+                 hold_monitors: Optional[List[Monitor]] = None,
+                 end_monitors: Optional[List[Monitor]] = None
                  ):
         if base_footprint is None:
             base_footprint = 'base_footprint'
@@ -180,7 +180,7 @@ class KeepHandInWorkspace(Goal):
                                        task_expression=angle_error,
                                        name='/rot')
         self.add_task(task)
-        self.connect_monitors_to_all_tasks(to_start, to_hold, to_end)
+        self.connect_monitors_to_all_tasks(start_monitors, hold_monitors, end_monitors)
 
 
 class PR2DiffDriveOrient(Goal):

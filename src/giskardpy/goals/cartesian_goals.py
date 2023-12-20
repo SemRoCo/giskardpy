@@ -31,9 +31,9 @@ class CartesianPosition(Goal):
                  weight: float = WEIGHT_ABOVE_CA,
                  relative: bool = False,
                  name: Optional[str] = None,
-                 to_start: Optional[List[Monitor]] = None,
-                 to_hold: Optional[List[Monitor]] = None,
-                 to_end: Optional[List[Monitor]] = None):
+                 start_monitors: Optional[List[Monitor]] = None,
+                 hold_monitors: Optional[List[Monitor]] = None,
+                 end_monitors: Optional[List[Monitor]] = None):
         """
         See CartesianPose.
         """
@@ -47,7 +47,7 @@ class CartesianPosition(Goal):
         self.reference_velocity = reference_velocity
         self.weight = weight
         if relative:
-            root_P_goal = transform_msg_and_turn_to_expr(self.root_link, goal_point, to_start)
+            root_P_goal = transform_msg_and_turn_to_expr(self.root_link, goal_point, start_monitors)
         else:
             root_P_goal = transform_msg_and_turn_to_expr(self.root_link, goal_point)
         r_P_c = god_map.world.compose_fk_expression(self.root_link, self.tip_link).to_position()
@@ -57,7 +57,7 @@ class CartesianPosition(Goal):
                                         reference_velocity=self.reference_velocity,
                                         weight=self.weight)
         self.add_task(task)
-        self.connect_monitors_to_all_tasks(to_start=to_start, to_hold=to_hold, to_end=to_end)
+        self.connect_monitors_to_all_tasks(start_monitors=start_monitors, hold_monitors=hold_monitors, end_monitors=end_monitors)
 
 
 class CartesianOrientation(Goal):
@@ -73,9 +73,9 @@ class CartesianOrientation(Goal):
                  weight: float = WEIGHT_ABOVE_CA,
                  name: Optional[str] = None,
                  relative: bool = False,
-                 to_start: Optional[List[Monitor]] = None,
-                 to_hold: Optional[List[Monitor]] = None,
-                 to_end: Optional[List[Monitor]] = None):
+                 start_monitors: Optional[List[Monitor]] = None,
+                 hold_monitors: Optional[List[Monitor]] = None,
+                 end_monitors: Optional[List[Monitor]] = None):
         """
         See CartesianPose.
         """
@@ -90,7 +90,7 @@ class CartesianOrientation(Goal):
         self.weight = weight
 
         if relative:
-            root_R_goal = transform_msg_and_turn_to_expr(self.root_link, goal_orientation, to_start)
+            root_R_goal = transform_msg_and_turn_to_expr(self.root_link, goal_orientation, start_monitors)
         else:
             root_R_goal = transform_msg_and_turn_to_expr(self.root_link, goal_orientation)
 
@@ -104,7 +104,7 @@ class CartesianOrientation(Goal):
                                            reference_velocity=self.reference_velocity,
                                            weight=self.weight)
         self.add_task(task)
-        self.connect_monitors_to_all_tasks(to_start, to_hold, to_end)
+        self.connect_monitors_to_all_tasks(start_monitors, hold_monitors, end_monitors)
 
 
 class CartesianPositionStraight(Goal):
@@ -117,9 +117,9 @@ class CartesianPositionStraight(Goal):
                  reference_velocity: Optional[float] = None,
                  name: Optional[str] = None,
                  weight: float = WEIGHT_ABOVE_CA,
-                 to_start: Optional[List[Monitor]] = None,
-                 to_hold: Optional[List[Monitor]] = None,
-                 to_end: Optional[List[Monitor]] = None,
+                 start_monitors: Optional[List[Monitor]] = None,
+                 hold_monitors: Optional[List[Monitor]] = None,
+                 end_monitors: Optional[List[Monitor]] = None,
                  ):
         """
         Same as CartesianPosition, but tries to move the tip_link in a straight line to the goal_point.
@@ -172,7 +172,7 @@ class CartesianPositionStraight(Goal):
                                                    'line/z'])
 
         self.add_task(task)
-        self.connect_monitors_to_all_tasks(to_start, to_hold, to_end)
+        self.connect_monitors_to_all_tasks(start_monitors, hold_monitors, end_monitors)
 
 
 class CartesianPose(Goal):
@@ -187,9 +187,9 @@ class CartesianPose(Goal):
                  name: Optional[str] = None,
                  relative: bool = False,
                  weight=WEIGHT_ABOVE_CA,
-                 to_start: Optional[List[Monitor]] = None,
-                 to_hold: Optional[List[Monitor]] = None,
-                 to_end: Optional[List[Monitor]] = None):
+                 start_monitors: Optional[List[Monitor]] = None,
+                 hold_monitors: Optional[List[Monitor]] = None,
+                 end_monitors: Optional[List[Monitor]] = None):
         """
         This goal will use the kinematic chain between root and tip link to move tip link into the goal pose.
         The max velocities enforce a strict limit, but require a lot of additional constraints, thus making the
@@ -230,9 +230,9 @@ class CartesianPose(Goal):
                                                        weight=self.weight,
                                                        name=position_name,
                                                        relative=relative,
-                                                       to_start=to_start,
-                                                       to_hold=to_hold,
-                                                       to_end=to_end))
+                                                       start_monitors=start_monitors,
+                                                       hold_monitors=hold_monitors,
+                                                       end_monitors=end_monitors))
 
         self.add_constraints_of_goal(CartesianOrientation(root_link=root_link,
                                                           tip_link=tip_link,
@@ -243,9 +243,9 @@ class CartesianPose(Goal):
                                                           weight=self.weight,
                                                           name=orientation_name,
                                                           relative=relative,
-                                                          to_start=to_start,
-                                                          to_hold=to_hold,
-                                                          to_end=to_end))
+                                                          start_monitors=start_monitors,
+                                                          hold_monitors=hold_monitors,
+                                                          end_monitors=end_monitors))
 
 
 class DiffDriveBaseGoal(Goal):
@@ -254,9 +254,9 @@ class DiffDriveBaseGoal(Goal):
                  max_angular_velocity: float = 0.5, weight: float = WEIGHT_ABOVE_CA, pointing_axis=None,
                  root_group: Optional[str] = None, tip_group: Optional[str] = None,
                  always_forward: bool = False, name: Optional[str] = None,
-                 to_start: Optional[List[Monitor]] = None,
-                 to_hold: Optional[List[Monitor]] = None,
-                 to_end: Optional[List[Monitor]] = None):
+                 start_monitors: Optional[List[Monitor]] = None,
+                 hold_monitors: Optional[List[Monitor]] = None,
+                 end_monitors: Optional[List[Monitor]] = None):
         """
         Like a CartesianPose, but specifically for differential drives. It will achieve the goal in 3 phases.
         1. orient towards goal.
@@ -378,7 +378,7 @@ class DiffDriveBaseGoal(Goal):
                                      task_expression=map_current_angle,
                                      name='/rot2')
         self.add_task(task)
-        self.connect_monitors_to_all_tasks(to_start, to_hold, to_end)
+        self.connect_monitors_to_all_tasks(start_monitors, hold_monitors, end_monitors)
 
 
 class PR2DiffDriveBaseGoal(Goal):
@@ -386,9 +386,9 @@ class PR2DiffDriveBaseGoal(Goal):
     def __init__(self, goal_pose: PoseStamped, max_linear_velocity: float = 0.1,
                  max_angular_velocity: float = 0.5, weight: float = WEIGHT_ABOVE_CA, pointing_axis=None,
                  root_group: Optional[str] = None, tip_group: Optional[str] = None,
-                 to_start: Optional[List[Monitor]] = None,
-                 to_hold: Optional[List[Monitor]] = None,
-                 to_end: Optional[List[Monitor]] = None
+                 start_monitors: Optional[List[Monitor]] = None,
+                 hold_monitors: Optional[List[Monitor]] = None,
+                 end_monitors: Optional[List[Monitor]] = None
                  ):
         super().__init__()
         self.max_angular_velocity = max_angular_velocity
@@ -446,9 +446,9 @@ class CartesianPoseStraight(Goal):
                  reference_angular_velocity: Optional[float] = None,
                  weight: float = WEIGHT_ABOVE_CA,
                  name: Optional[str] = None,
-                 to_start: Optional[List[Monitor]] = None,
-                 to_hold: Optional[List[Monitor]] = None,
-                 to_end: Optional[List[Monitor]] = None,
+                 start_monitors: Optional[List[Monitor]] = None,
+                 hold_monitors: Optional[List[Monitor]] = None,
+                 end_monitors: Optional[List[Monitor]] = None,
                  ):
         """
         See CartesianPose. In contrast to it, this goal will try to move tip_link in a straight line.
@@ -466,9 +466,9 @@ class CartesianPoseStraight(Goal):
                                                                goal_point=goal_point,
                                                                reference_velocity=reference_linear_velocity,
                                                                weight=weight,
-                                                               to_start=to_start,
-                                                               to_hold=to_hold,
-                                                               to_end=to_end))
+                                                               start_monitors=start_monitors,
+                                                               hold_monitors=hold_monitors,
+                                                               end_monitors=end_monitors))
         self.add_constraints_of_goal(CartesianOrientation(root_link=root_link,
                                                           root_group=root_group,
                                                           tip_link=tip_link,
@@ -476,17 +476,17 @@ class CartesianPoseStraight(Goal):
                                                           goal_orientation=goal_orientation,
                                                           reference_velocity=reference_angular_velocity,
                                                           weight=weight,
-                                                          to_start=to_start,
-                                                          to_hold=to_hold,
-                                                          to_end=to_end))
+                                                          start_monitors=start_monitors,
+                                                          hold_monitors=hold_monitors,
+                                                          end_monitors=end_monitors))
 
 
 class TranslationVelocityLimit(Goal):
     def __init__(self, root_link: str, tip_link: str, root_group: Optional[str] = None, tip_group: Optional[str] = None,
                  weight=WEIGHT_ABOVE_CA, max_velocity=0.1, hard=True, name: Optional[str] = None,
-                 to_start: Optional[List[Monitor]] = None,
-                 to_hold: Optional[List[Monitor]] = None,
-                 to_end: Optional[List[Monitor]] = None,
+                 start_monitors: Optional[List[Monitor]] = None,
+                 hold_monitors: Optional[List[Monitor]] = None,
+                 end_monitors: Optional[List[Monitor]] = None,
                  ):
         """
         See CartesianVelocityLimit
@@ -513,15 +513,15 @@ class TranslationVelocityLimit(Goal):
                                                   weight=self.weight,
                                                   max_violation=0)
         self.add_task(task)
-        self.connect_monitors_to_all_tasks(to_start, to_hold, to_end)
+        self.connect_monitors_to_all_tasks(start_monitors, hold_monitors, end_monitors)
 
 
 class RotationVelocityLimit(Goal):
     def __init__(self, root_link: str, tip_link: str, root_group: Optional[str] = None, tip_group: Optional[str] = None,
                  weight=WEIGHT_ABOVE_CA, max_velocity=0.5, hard=True, name: Optional[str] = None,
-                 to_start: Optional[List[Monitor]] = None,
-                 to_hold: Optional[List[Monitor]] = None,
-                 to_end: Optional[List[Monitor]] = None,
+                 start_monitors: Optional[List[Monitor]] = None,
+                 hold_monitors: Optional[List[Monitor]] = None,
+                 end_monitors: Optional[List[Monitor]] = None,
                  ):
         """
         See CartesianVelocityLimit
@@ -549,7 +549,7 @@ class RotationVelocityLimit(Goal):
                                                weight=self.weight,
                                                max_violation=0)
         self.add_task(task)
-        self.connect_monitors_to_all_tasks(to_start, to_hold, to_end)
+        self.connect_monitors_to_all_tasks(start_monitors, hold_monitors, end_monitors)
 
 
 class CartesianVelocityLimit(Goal):
@@ -563,9 +563,9 @@ class CartesianVelocityLimit(Goal):
                  weight: float = WEIGHT_ABOVE_CA,
                  hard: bool = False,
                  name: Optional[str] = None,
-                 to_start: Optional[List[Monitor]] = None,
-                 to_hold: Optional[List[Monitor]] = None,
-                 to_end: Optional[List[Monitor]] = None,
+                 start_monitors: Optional[List[Monitor]] = None,
+                 hold_monitors: Optional[List[Monitor]] = None,
+                 end_monitors: Optional[List[Monitor]] = None,
                  ):
         """
         This goal will use put a strict limit on the Cartesian velocity. This will require a lot of constraints, thus
@@ -591,9 +591,9 @@ class CartesianVelocityLimit(Goal):
                                                               max_velocity=max_linear_velocity,
                                                               weight=weight,
                                                               hard=hard,
-                                                              to_start=to_start,
-                                                              to_hold=to_hold,
-                                                              to_end=to_end))
+                                                              start_monitors=start_monitors,
+                                                              hold_monitors=hold_monitors,
+                                                              end_monitors=end_monitors))
         self.add_constraints_of_goal(RotationVelocityLimit(root_link=root_link,
                                                            root_group=root_group,
                                                            tip_link=tip_link,
@@ -601,9 +601,9 @@ class CartesianVelocityLimit(Goal):
                                                            max_velocity=max_angular_velocity,
                                                            weight=weight,
                                                            hard=hard,
-                                                           to_start=to_start,
-                                                           to_hold=to_hold,
-                                                           to_end=to_end))
+                                                           start_monitors=start_monitors,
+                                                           hold_monitors=hold_monitors,
+                                                           end_monitors=end_monitors))
 
 
 class RelativePositionSequence(Goal):
@@ -613,9 +613,9 @@ class RelativePositionSequence(Goal):
                  root_link: str,
                  tip_link: str,
                  name: Optional[str] = None,
-                 to_start: Optional[List[Monitor]] = None,
-                 to_hold: Optional[List[Monitor]] = None,
-                 to_end: Optional[List[Monitor]] = None):
+                 start_monitors: Optional[List[Monitor]] = None,
+                 hold_monitors: Optional[List[Monitor]] = None,
+                 end_monitors: Optional[List[Monitor]] = None):
         self.root_link = god_map.world.search_for_link_name(root_link)
         self.tip_link = god_map.world.search_for_link_name(tip_link)
         if name is None:
@@ -650,21 +650,21 @@ class RelativePositionSequence(Goal):
         error2_monitor.set_expression(cas.less(cas.abs(error2), 0.01))
 
         step1 = Task(name='step1')
-        step1.add_to_end_monitor(error1_monitor)
+        step1.add_end_monitors_monitor(error1_monitor)
         step1.add_point_goal_constraints(root_P_current, root_P_goal1,
                                          reference_velocity=self.max_velocity,
                                          weight=self.weight)
         self.add_task(step1)
 
         self.step2 = Task(name='step2')
-        self.step2.add_to_start_monitor(error1_monitor)
-        self.step2.add_to_end_monitor(error2_monitor)
+        self.step2.add_start_monitors_monitor(error1_monitor)
+        self.step2.add_end_monitors_monitor(error2_monitor)
         self.step2.add_point_goal_constraints(root_P_current, root_P_goal2_cached,
                                               reference_velocity=self.max_velocity,
                                               weight=self.weight)
         self.add_task(self.step2)
 
-        self.connect_to_start_to_all_tasks(to_start)
-        self.connect_to_hold_to_all_tasks(to_hold)
-        for monitor in to_end:
-            self.step2.add_to_end_monitor(monitor)
+        self.connect_start_monitors_to_all_tasks(start_monitors)
+        self.connect_hold_monitors_to_all_tasks(hold_monitors)
+        for monitor in end_monitors:
+            self.step2.add_end_monitors_monitor(monitor)

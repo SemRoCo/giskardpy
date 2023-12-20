@@ -26,9 +26,9 @@ class InsertCylinder(Goal):
                  tilt: float = np.pi / 10,
                  get_straight_after: float = 0.02,
                  name: Optional[str] = None,
-                 to_start: Optional[List[Monitor]] = None,
-                 to_hold: Optional[List[Monitor]] = None,
-                 to_end: Optional[List[Monitor]] = None):
+                 start_monitors: Optional[List[Monitor]] = None,
+                 hold_monitors: Optional[List[Monitor]] = None,
+                 end_monitors: Optional[List[Monitor]] = None):
         self.cylinder_name = cylinder_name
         self.get_straight_after = get_straight_after
         self.root = god_map.world.root_link_name
@@ -80,7 +80,7 @@ class InsertCylinder(Goal):
                                              frame_P_goal=root_P_top,
                                              reference_velocity=0.1,
                                              weight=self.weight)
-        reach_top.add_to_end_monitor(top_reached_monitor)
+        reach_top.add_end_monitors_monitor(top_reached_monitor)
         self.add_task(reach_top)
 
         go_to_line = Task(name='straight line')
@@ -89,7 +89,7 @@ class InsertCylinder(Goal):
                                               reference_velocity=0.1,
                                               weight=self.weight,
                                               name='pregrasp')
-        go_to_line.add_to_start_monitor(top_reached_monitor)
+        go_to_line.add_start_monitors_monitor(top_reached_monitor)
         self.add_task(go_to_line)
         # self.add_debug_expr('root_P_goal', root_P_goal)
         # self.add_debug_expr('root_P_tip', root_P_tip)
@@ -102,7 +102,7 @@ class InsertCylinder(Goal):
                                           expr_goal=self.tilt,
                                           reference_velocity=0.1,
                                           weight=self.weight)
-        tilt_task.add_to_end_monitor(bottom_reached_monitor)
+        tilt_task.add_end_monitors_monitor(bottom_reached_monitor)
         root_V_cylinder_z.vis_frame = self.tip
         self.add_task(tilt_task)
         # self.add_debug_expr('root_V_cylinder_z', root_V_cylinder_z)
@@ -114,7 +114,7 @@ class InsertCylinder(Goal):
                                                reference_velocity=0.1,
                                                weight=self.weight,
                                                name='insertion')
-        insert_task.add_to_start_monitor(top_reached_monitor)
+        insert_task.add_start_monitors_monitor(top_reached_monitor)
         self.add_task(insert_task)
         # self.add_debug_expr('root_P_hole', root_P_hole)
         # self.add_debug_expr('weight_insert', weight_insert)
@@ -130,7 +130,7 @@ class InsertCylinder(Goal):
                                                        frame_V_goal=root_V_up,
                                                        reference_velocity=0.1,
                                                        weight=self.weight)
-        tilt_straight_task.add_to_start_monitor(bottom_reached_monitor)
-        tilt_straight_task.add_to_end_monitor(tilt_monitor)
+        tilt_straight_task.add_start_monitors_monitor(bottom_reached_monitor)
+        tilt_straight_task.add_end_monitors_monitor(tilt_monitor)
         self.add_task(tilt_straight_task)
-        self.connect_monitors_to_all_tasks(to_start, to_hold, to_end)
+        self.connect_monitors_to_all_tasks(start_monitors, hold_monitors, end_monitors)

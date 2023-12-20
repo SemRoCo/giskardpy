@@ -8,14 +8,14 @@ class JointPositionTask(Task):
     def __init__(self, joint_current: cas.symbol_expr_float,
                  joint_goal: cas.symbol_expr_float, weight: cas.symbol_expr_float,
                  velocity_limit: cas.symbol_expr_float,
-                 to_start: Optional[Monitor] = None,
-                 to_hold: Optional[Monitor] = None,
-                 to_end: Optional[Monitor] = None):
+                 start_monitors: Optional[Monitor] = None,
+                 hold_monitors: Optional[Monitor] = None,
+                 end_monitors: Optional[Monitor] = None):
         error = joint_goal - joint_current
-        if to_end is None:
-            to_end = Monitor(cas.less(cas.abs(error), 0.1))
+        if end_monitors is None:
+            end_monitors = Monitor(cas.less(cas.abs(error), 0.1))
 
-        super().__init__(None, to_start, to_hold, to_end)
+        super().__init__(None, start_monitors, hold_monitors, end_monitors)
 
         self.add_equality_constraint(reference_velocity=velocity_limit,
                                      equality_bound=error,
@@ -30,11 +30,11 @@ class PositionTask(Task):
                  goal_positions: List[cas.symbol_expr_float],
                  velocity_limits: List[cas.symbol_expr_float],
                  weight: cas.symbol_expr_float,
-                 to_start: Optional[Monitor] = None,
-                 to_hold: Optional[Monitor] = None,
-                 to_end: Optional[Monitor] = None):
+                 start_monitors: Optional[Monitor] = None,
+                 hold_monitors: Optional[Monitor] = None,
+                 end_monitors: Optional[Monitor] = None):
 
-        super().__init__(None, to_start, to_hold, to_end)
+        super().__init__(None, start_monitors, hold_monitors, end_monitors)
         for i in range(len(names)):
             name = names[i]
             current = current_positions[i]

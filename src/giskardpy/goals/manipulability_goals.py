@@ -25,9 +25,9 @@ class MaxManipulability(Goal):
                  optimize_rotational_dofs=False,
                  monitor_threshold: float = 0.01,
                  prediction_horizon: int = 5,
-                 to_start: Optional[List[Monitor]] = None,
-                 to_hold: Optional[List[Monitor]] = None,
-                 to_end: Optional[List[Monitor]] = None
+                 start_monitors: Optional[List[Monitor]] = None,
+                 hold_monitors: Optional[List[Monitor]] = None,
+                 end_monitors: Optional[List[Monitor]] = None
                  ):
         self.root_link = god_map.world.search_for_link_name(root_link, None)
         self.tip_link = god_map.world.search_for_link_name(tip_link, None)
@@ -63,7 +63,7 @@ class MaxManipulability(Goal):
         percentual_diff = 1 - cas.min(cas.save_division(old_m, m), 1)
         monitor = Monitor(name=f'manipMonitor{tip_link}', crucial=True)
         monitor.set_expression(cas.less(percentual_diff, monitor_threshold))
-        task.add_to_end_monitor(monitor)
+        task.add_end_monitors_monitor(monitor)
         self.add_monitor(monitor)
 
     """

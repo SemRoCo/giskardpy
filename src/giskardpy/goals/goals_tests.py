@@ -12,9 +12,9 @@ from giskardpy.symbol_manager import symbol_manager
 class DebugGoal(NonMotionGoal):
     def __init__(self,
                  name: Optional[str] = None,
-                 to_start: Optional[List[Monitor]] = None,
-                 to_hold: Optional[List[Monitor]] = None,
-                 to_end: Optional[List[Monitor]] = None):
+                 start_monitors: Optional[List[Monitor]] = None,
+                 hold_monitors: Optional[List[Monitor]] = None,
+                 end_monitors: Optional[List[Monitor]] = None):
         if name is None:
             name = self.__class__.__name__
         super().__init__(name=name)

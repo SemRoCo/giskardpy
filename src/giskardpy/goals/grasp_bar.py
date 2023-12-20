@@ -27,9 +27,9 @@ class GraspBar(Goal):
                  reference_angular_velocity: float = 0.5,
                  weight: float = WEIGHT_ABOVE_CA,
                  name: Optional[str] = None,
-                 to_start: Optional[List[Monitor]] = None,
-                 to_hold: Optional[List[Monitor]] = None,
-                 to_end: Optional[List[Monitor]] = None
+                 start_monitors: Optional[List[Monitor]] = None,
+                 hold_monitors: Optional[List[Monitor]] = None,
+                 end_monitors: Optional[List[Monitor]] = None
                  ):
         """
         Like a CartesianPose but with more freedom.

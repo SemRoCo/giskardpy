@@ -31,14 +31,14 @@ class PlotGanttChart(GiskardBehavior):
                 else:
                     tasks.append(string_shortener(f'{goal_name} - {task.name}',
                                                   max_lines=5, max_line_length=50))
-                if not task.to_start:
+                if not task.start_monitors:
                     start_dates.append([0])
                 else:
-                    start_dates.append([x.state_flip_times[0] if x.state_flip_times else None for x in task.to_start])
-                if not task.to_end:
+                    start_dates.append([x.state_flip_times[0] if x.state_flip_times else None for x in task.start_monitors])
+                if not task.end_monitors:
                     end_dates.append([god_map.time])
                 else:
-                    end_dates.append([x.state_flip_times[-1] if x.state_flip_times else None for x in task.to_end])
+                    end_dates.append([x.state_flip_times[-1] if x.state_flip_times else None for x in task.end_monitors])
 
         plt.figure(figsize=(10, 5))
 

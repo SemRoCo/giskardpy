@@ -71,7 +71,7 @@ class GodMap:
     controlled_joints: List[Joint]
 
     def is_goal_msg_type_execute(self):
-        return self.goal_msg.type in [MoveGoal.EXECUTE, MoveGoal.PLAN_AND_EXECUTE]
+        return self.goal_msg.type in [MoveGoal.EXECUTE]
 
     def is_goal_msg_type_projection(self):
         return MoveGoal.PROJECTION == self.goal_msg.type

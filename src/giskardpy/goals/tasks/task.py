@@ -22,9 +22,9 @@ class Task:
     eq_constraints: Dict[str, EqualityConstraint]
     neq_constraints: Dict[str, InequalityConstraint]
     derivative_constraints: Dict[str, DerivativeInequalityConstraint]
-    to_start: List[Monitor]
-    to_hold: List[Monitor]
-    to_end: List[Monitor]
+    start_monitors: List[Monitor]
+    hold_monitors: List[Monitor]
+    end_monitors: List[Monitor]
     name: Optional[str]
 
     def __init__(self, name: Optional[str] = None):
@@ -35,31 +35,31 @@ class Task:
         self.eq_constraints = {}
         self.neq_constraints = {}
         self.derivative_constraints = {}
-        self.to_start = []
-        self.to_hold = []
-        self.to_end = []
+        self.start_monitors = []
+        self.hold_monitors = []
+        self.end_monitors = []
         self.manip_constraints = {}
 
     def __str__(self):
         return self.name
 
-    def add_to_start_monitor(self, monitor: Monitor):
-        if [m for m in self.to_start if m.name == monitor.name]:
+    def add_start_monitors_monitor(self, monitor: Monitor):
+        if [m for m in self.start_monitors if m.name == monitor.name]:
             raise AttributeError(f'Monitor with name {monitor.name} '
-                                 f'already registered for to_start of task {self.name}')
-        self.to_start.append(monitor)
+                                 f'already registered for start_monitors of task {self.name}')
+        self.start_monitors.append(monitor)
 
-    def add_to_hold_monitor(self, monitor: Monitor):
-        if [m for m in self.to_hold if m.name == monitor.name]:
+    def add_hold_monitors_monitor(self, monitor: Monitor):
+        if [m for m in self.hold_monitors if m.name == monitor.name]:
             raise AttributeError(f'Monitor with name {monitor.name} '
-                                 f'already registered for to_hold of task {self.name}')
-        self.to_hold.append(monitor)
+                                 f'already registered for hold_monitors of task {self.name}')
+        self.hold_monitors.append(monitor)
 
-    def add_to_end_monitor(self, monitor: Monitor):
-        if [m for m in self.to_end if m.name == monitor.name]:
+    def add_end_monitors_monitor(self, monitor: Monitor):
+        if [m for m in self.end_monitors if m.name == monitor.name]:
             raise AttributeError(f'Monitor with name {monitor.name} '
-                                 f'already registered for to_end of task {self.name}')
-        self.to_end.append(monitor)
+                                 f'already registered for end_monitors of task {self.name}')
+        self.end_monitors.append(monitor)
 
     def get_eq_constraints(self):
         return self._apply_monitors_to_constraints(self.eq_constraints.values())
@@ -77,13 +77,13 @@ class Task:
                                                                          DerivativeInequalityConstraint]]):
         output_constraints = []
         for constraint in constraints:
-            for monitor in self.to_start:
+            for monitor in self.start_monitors:
                 constraint.quadratic_weight *= monitor.get_state_expression()
-            for monitor in self.to_hold:
+            for monitor in self.hold_monitors:
                 constraint.quadratic_weight *= monitor.get_state_expression()
-            if self.to_end:
+            if self.end_monitors:
                 end_weight = 1
-                for monitor in self.to_end:
+                for monitor in self.end_monitors:
                     end_weight *= monitor.get_state_expression()
                 constraint.quadratic_weight *= (1 - end_weight)
             output_constraints.append(constraint)

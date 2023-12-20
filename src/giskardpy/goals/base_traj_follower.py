@@ -31,9 +31,9 @@ class BaseTrajFollower(Goal):
                  joint_name: my_string,
                  track_only_velocity: bool = False,
                  weight: float = WEIGHT_ABOVE_CA,
-                 to_start: Optional[List[Monitor]] = None,
-                 to_hold: Optional[List[Monitor]] = None,
-                 to_end: Optional[List[Monitor]] = None):
+                 start_monitors: Optional[List[Monitor]] = None,
+                 hold_monitors: Optional[List[Monitor]] = None,
+                 end_monitors: Optional[List[Monitor]] = None):
         self.weight = weight
         self.joint_name = joint_name
         super().__init__(name=f'{self.__class__.__name__}/{self.joint_name}')
@@ -47,7 +47,7 @@ class BaseTrajFollower(Goal):
         self.trajectory_length = len(trajectory.items())
         self.add_trans_constraints()
         self.add_rot_constraints()
-        self.connect_monitors_to_all_tasks(to_start, to_hold, to_end)
+        self.connect_monitors_to_all_tasks(start_monitors, hold_monitors, end_monitors)
 
     @profile
     def x_symbol(self, t: int, free_variable_name: PrefixName, derivative: Derivatives = Derivatives.position) \

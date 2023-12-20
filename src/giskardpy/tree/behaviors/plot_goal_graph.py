@@ -26,7 +26,7 @@ def generate_graph(goals: Dict[str, Goal], monitors: List[Monitor], output_file:
 
     # Flags to track special cases
     add_t0 = False
-    to_end_only_monitors = set([shorten(monitor.name) for monitor in monitors])
+    end_monitors_only_monitors = set([shorten(monitor.name) for monitor in monitors])
 
     # Add monitor nodes with black border and text (default)
     monitor_nodes = {}
@@ -45,30 +45,30 @@ def generate_graph(goals: Dict[str, Goal], monitors: List[Monitor], output_file:
                 task_name = shorten(f'{goal_name} - {task.name}')
             graph.add_node(pydot.Node(task_name, shape='box', color='black', fontcolor='black'))
 
-            for monitor in task.to_start:
-                to_start = shorten(monitor.name)
-                if to_start:
-                    graph.add_edge(pydot.Edge(to_start, task_name, color='green'))
-                    to_end_only_monitors.discard(to_start)
-                    if to_start in monitor_nodes:
-                        graph.add_node(monitor_nodes[to_start])
-                        del monitor_nodes[to_start]
+            for monitor in task.start_monitors:
+                start_monitors = shorten(monitor.name)
+                if start_monitors:
+                    graph.add_edge(pydot.Edge(start_monitors, task_name, color='green'))
+                    end_monitors_only_monitors.discard(start_monitors)
+                    if start_monitors in monitor_nodes:
+                        graph.add_node(monitor_nodes[start_monitors])
+                        del monitor_nodes[start_monitors]
                 else:
                     add_t0 = True
                     graph.add_edge(pydot.Edge('t_0', task_name, color='green'))
-            for monitor in task.to_hold:
-                to_hold = shorten(monitor.name)
-                graph.add_edge(pydot.Edge(to_hold, task_name, color='orange'))
-                to_end_only_monitors.discard(to_hold)
-                if to_hold in monitor_nodes:
-                    graph.add_node(monitor_nodes[to_hold])
-                    del monitor_nodes[to_hold]
-            for monitor in task.to_end:
-                to_end = shorten(monitor.name)
-                graph.add_edge(pydot.Edge(task_name, to_end, color='red'))
-                if to_end in monitor_nodes:
-                    graph.add_node(monitor_nodes[to_end])
-                    del monitor_nodes[to_end]
+            for monitor in task.hold_monitors:
+                hold_monitors = shorten(monitor.name)
+                graph.add_edge(pydot.Edge(hold_monitors, task_name, color='orange'))
+                end_monitors_only_monitors.discard(hold_monitors)
+                if hold_monitors in monitor_nodes:
+                    graph.add_node(monitor_nodes[hold_monitors])
+                    del monitor_nodes[hold_monitors]
+            for monitor in task.end_monitors:
+                end_monitors = shorten(monitor.name)
+                graph.add_edge(pydot.Edge(task_name, end_monitors, color='red'))
+                if end_monitors in monitor_nodes:
+                    graph.add_node(monitor_nodes[end_monitors])
+                    del monitor_nodes[end_monitors]
 
 
     # Add "t_0" node with red border and black text if needed
@@ -76,8 +76,8 @@ def generate_graph(goals: Dict[str, Goal], monitors: List[Monitor], output_file:
         t0_node = pydot.Node('t_0', shape='ellipse', color='red', fontcolor='black')
         graph.add_node(t0_node)
 
-    # Update border color for to_end_only_monitors to red
-    for monitor_id in to_end_only_monitors:
+    # Update border color for end_monitors_only_monitors to red
+    for monitor_id in end_monitors_only_monitors:
         if monitor_id not in monitor_nodes: # this means they've been added
             monitor_node = pydot.Node(monitor_id, shape='ellipse', color='red', fontcolor='black')
             graph.add_node(monitor_node)

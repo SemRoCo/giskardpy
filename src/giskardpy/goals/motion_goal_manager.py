@@ -1,7 +1,7 @@
 import traceback
 from collections import defaultdict
 from copy import deepcopy
-from typing import List, Dict, Tuple
+from typing import List, Dict
 
 from giskardpy.exceptions import UnknownConstraintException, GiskardException, ConstraintInitalizationException, \
     DuplicateNameException
@@ -9,9 +9,8 @@ from giskardpy.goals.collision_avoidance import ExternalCollisionAvoidance, Self
 from giskardpy.goals.goal import Goal
 import giskard_msgs.msg as giskard_msgs
 from giskardpy.god_map import god_map
-from giskardpy.my_types import PrefixName
 from giskardpy.utils import logging
-from giskardpy.utils.utils import get_all_classes_in_package, json_to_kwargs, convert_dictionary_to_ros_message, \
+from giskardpy.utils.utils import get_all_classes_in_package, convert_dictionary_to_ros_message, \
     json_str_to_kwargs, ImmutableDict
 
 
@@ -29,18 +28,18 @@ class MotionGoalManager:
     def parse_motion_goals(self, motion_goals: List[giskard_msgs.MotionGoal]):
         for motion_goal in motion_goals:
             try:
-                logging.loginfo(f'Adding motion goal of type: \'{motion_goal.type}\' named: \'{motion_goal.name}\'')
-                C = self.allowed_motion_goal_types[motion_goal.type]
+                logging.loginfo(f'Adding motion goal of type: \'{motion_goal.motion_goal_class}\' named: \'{motion_goal.name}\'')
+                C = self.allowed_motion_goal_types[motion_goal.motion_goal_class]
             except KeyError:
-                raise UnknownConstraintException(f'unknown constraint {motion_goal.type}.')
+                raise UnknownConstraintException(f'unknown constraint {motion_goal.motion_goal_class}.')
             try:
-                params = json_str_to_kwargs(motion_goal.parameter_value_pair)
+                params = json_str_to_kwargs(motion_goal.kwargs)
                 if motion_goal.name == '':
                     motion_goal.name = None
-                to_start = [god_map.monitor_manager.get_monitor(monitor_name) for monitor_name in motion_goal.to_start]
-                to_hold = [god_map.monitor_manager.get_monitor(monitor_name) for monitor_name in motion_goal.to_hold]
-                to_end = [god_map.monitor_manager.get_monitor(monitor_name) for monitor_name in motion_goal.to_end]
-                c: Goal = C(name=motion_goal.name, to_start=to_start, to_hold=to_hold, to_end=to_end, **params)
+                start_monitors = [god_map.monitor_manager.get_monitor(monitor_name) for monitor_name in motion_goal.start_monitors]
+                hold_monitors = [god_map.monitor_manager.get_monitor(monitor_name) for monitor_name in motion_goal.hold_monitors]
+                end_monitors = [god_map.monitor_manager.get_monitor(monitor_name) for monitor_name in motion_goal.end_monitors]
+                c: Goal = C(name=motion_goal.name, start_monitors=start_monitors, hold_monitors=hold_monitors, end_monitors=end_monitors, **params)
                 self.add_motion_goal(c)
             except Exception as e:
                 traceback.print_exc()

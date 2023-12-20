@@ -24,9 +24,9 @@ class RealTimePointing(Pointing):
                  pointing_axis: Vector3Stamped = None,
                  max_velocity: float = 0.3,
                  weight: float = WEIGHT_BELOW_CA,
-                 to_start: Optional[List[Monitor]] = None,
-                 to_hold: Optional[List[Monitor]] = None,
-                 to_end: Optional[List[Monitor]] = None
+                 start_monitors: Optional[List[Monitor]] = None,
+                 hold_monitors: Optional[List[Monitor]] = None,
+                 end_monitors: Optional[List[Monitor]] = None
                  ):
         initial_goal = PointStamped()
         initial_goal.header.frame_id = 'base_footprint'

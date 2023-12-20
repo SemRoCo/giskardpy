@@ -10,9 +10,9 @@ from giskardpy.utils import logging
 
 class SetPredictionHorizon(NonMotionGoal):
     def __init__(self, prediction_horizon: int, name: Optional[str] = None,
-                 to_start: Optional[List[Monitor]] = None,
-                 to_hold: Optional[List[Monitor]] = None,
-                 to_end: Optional[List[Monitor]] = None):
+                 start_monitors: Optional[List[Monitor]] = None,
+                 hold_monitors: Optional[List[Monitor]] = None,
+                 end_monitors: Optional[List[Monitor]] = None):
         """
         Will overwrite the prediction horizon for a single goal.
         Setting it to 1 will turn of acceleration and jerk limits.
@@ -31,9 +31,9 @@ class SetPredictionHorizon(NonMotionGoal):
 class SetQPSolver(NonMotionGoal):
 
     def __init__(self, qp_solver_id: Union[SupportedQPSolver, int], name: Optional[str] = None,
-                 to_start: Optional[List[Monitor]] = None,
-                 to_hold: Optional[List[Monitor]] = None,
-                 to_end: Optional[List[Monitor]] = None):
+                 start_monitors: Optional[List[Monitor]] = None,
+                 hold_monitors: Optional[List[Monitor]] = None,
+                 end_monitors: Optional[List[Monitor]] = None):
         if name is None:
             name = self.__class__.__name__
         super().__init__(name=name)
@@ -42,9 +42,9 @@ class SetQPSolver(NonMotionGoal):
 
 
 class SetMaxTrajLength(NonMotionGoal):
-    def __init__(self, new_length: int, name: Optional[str] = None, to_start: Optional[List[Monitor]] = None,
-                 to_hold: Optional[List[Monitor]] = None,
-                 to_end: Optional[List[Monitor]] = None):
+    def __init__(self, new_length: int, name: Optional[str] = None, start_monitors: Optional[List[Monitor]] = None,
+                 hold_monitors: Optional[List[Monitor]] = None,
+                 end_monitors: Optional[List[Monitor]] = None):
         """
         Overwrites Giskard trajectory length limit for planning.
         If the trajectory is longer than new_length, Giskard will preempt the goal.
@@ -58,9 +58,9 @@ class SetMaxTrajLength(NonMotionGoal):
 
 
 class EnableVelocityTrajectoryTracking(NonMotionGoal):
-    def __init__(self, enabled: bool = True, name: Optional[str] = None, to_start: Optional[List[Monitor]] = None,
-                 to_hold: Optional[List[Monitor]] = None,
-                 to_end: Optional[List[Monitor]] = None):
+    def __init__(self, enabled: bool = True, name: Optional[str] = None, start_monitors: Optional[List[Monitor]] = None,
+                 hold_monitors: Optional[List[Monitor]] = None,
+                 end_monitors: Optional[List[Monitor]] = None):
         """
         A hack for the PR2. This goal decides whether the velocity part of the trajectory message is filled,
         when they are send to the robot.

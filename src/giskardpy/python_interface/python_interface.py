@@ -20,13 +20,13 @@ class GiskardWrapper(LowLevelGiskardWrapper):
     def execute(self, wait: bool = True) -> MoveResult:
         local_min_reached_monitor_name = self.add_local_minimum_reached_monitor()
         for goal in self._goals:
-            goal.to_end.append(local_min_reached_monitor_name)
+            goal.end_monitors.append(local_min_reached_monitor_name)
         return super().execute(wait)
 
     def projection(self, wait: bool = True) -> MoveResult:
         local_min_reached_monitor_name = self.add_local_minimum_reached_monitor()
         for goal in self._goals:
-            goal.to_end.append(local_min_reached_monitor_name)
+            goal.end_monitors.append(local_min_reached_monitor_name)
         return super().projection(wait)
 
     # %% predefined goals
@@ -47,14 +47,14 @@ class GiskardWrapper(LowLevelGiskardWrapper):
         if add_monitor:
             monitor_name = self.add_joint_position_reached_monitor(goal_state=goal_state,
                                                                    crucial=True)
-            to_end_monitors = [monitor_name]
+            end_monitors_monitors = [monitor_name]
         else:
-            to_end_monitors = []
+            end_monitors_monitors = []
         super().set_joint_goal(goal_state=goal_state,
                                group_name=group_name,
                                weight=weight,
                                max_velocity=max_velocity,
-                               to_end=to_end_monitors,
+                               end_monitors=end_monitors_monitors,
                                **kwargs)
 
     def set_cart_goal(self,
@@ -92,9 +92,9 @@ class GiskardWrapper(LowLevelGiskardWrapper):
                                                                    tip_link=tip_link,
                                                                    tip_group=tip_group,
                                                                    goal_pose=goal_pose)
-            to_end_monitors = [monitor_name]
+            end_monitors_monitors = [monitor_name]
         else:
-            to_end_monitors = []
+            end_monitors_monitors = []
         super().set_cart_goal(goal_pose=goal_pose,
                               tip_link=tip_link,
                               root_link=root_link,
@@ -105,7 +105,7 @@ class GiskardWrapper(LowLevelGiskardWrapper):
                               reference_linear_velocity=reference_linear_velocity,
                               reference_angular_velocity=reference_angular_velocity,
                               weight=weight,
-                              to_end=to_end_monitors,
+                              end_monitors=end_monitors_monitors,
                               **kwargs)
 
     def set_diff_drive_base_goal(self,
@@ -142,11 +142,11 @@ class GiskardWrapper(LowLevelGiskardWrapper):
                                                     tip_group=tip_group,
                                                     position_threshold=0.02,
                                                     goal_pose=goal_pose)
-            to_end_monitors = [monitor_name]
+            end_monitors_monitors = [monitor_name]
         else:
-            to_end_monitors = []
-        self.add_motion_goal(goal_type=DiffDriveBaseGoal.__name__,
-                             to_end=to_end_monitors,
+            end_monitors_monitors = []
+        self.add_motion_goal(motion_goal_class=DiffDriveBaseGoal.__name__,
+                             end_monitors=end_monitors_monitors,
                              goal_pose=goal_pose,
                              tip_link=tip_link,
                              root_link=root_link,
@@ -193,11 +193,11 @@ class GiskardWrapper(LowLevelGiskardWrapper):
                                                     tip_link=tip_link,
                                                     tip_group=tip_group,
                                                     goal_pose=goal_pose)
-            to_end_monitors = [monitor_name]
+            end_monitors_monitors = [monitor_name]
         else:
-            to_end_monitors = []
-        self.add_motion_goal(goal_type=CartesianPoseStraight.__name__,
-                             to_end=to_end_monitors,
+            end_monitors_monitors = []
+        self.add_motion_goal(motion_goal_class=CartesianPoseStraight.__name__,
+                             end_monitors=end_monitors_monitors,
                              goal_pose=goal_pose,
                              tip_link=tip_link,
                              tip_group=tip_group,
@@ -236,11 +236,11 @@ class GiskardWrapper(LowLevelGiskardWrapper):
                                                         tip_link=tip_link,
                                                         tip_group=tip_group,
                                                         goal_point=goal_point)
-            to_end_monitors = [monitor_name]
+            end_monitors_monitors = [monitor_name]
         else:
-            to_end_monitors = []
-        self.add_motion_goal(goal_type=CartesianPosition.__name__,
-                             to_end=to_end_monitors,
+            end_monitors_monitors = []
+        self.add_motion_goal(motion_goal_class=CartesianPosition.__name__,
+                             end_monitors=end_monitors_monitors,
                              goal_point=goal_point,
                              tip_link=tip_link,
                              root_link=root_link,
@@ -251,7 +251,7 @@ class GiskardWrapper(LowLevelGiskardWrapper):
                              **kwargs)
 
     def set_seed_configuration(self, seed_configuration, group_name: Optional[str] = None):
-        self.add_motion_goal(goal_type=SetSeedConfiguration.__name__,
+        self.add_motion_goal(motion_goal_class=SetSeedConfiguration.__name__,
                              seed_configuration=seed_configuration,
                              group_name=group_name)
 
@@ -276,11 +276,11 @@ class GiskardWrapper(LowLevelGiskardWrapper):
                                                         tip_link=tip_link,
                                                         tip_group=tip_group,
                                                         goal_point=goal_point)
-            to_end_monitors = [monitor_name]
+            end_monitors_monitors = [monitor_name]
         else:
-            to_end_monitors = []
-        self.add_motion_goal(goal_type=CartesianPositionStraight.__name__,
-                             to_end=to_end_monitors,
+            end_monitors_monitors = []
+        self.add_motion_goal(motion_goal_class=CartesianPositionStraight.__name__,
+                             end_monitors=end_monitors_monitors,
                              goal_point=goal_point,
                              tip_link=tip_link,
                              root_link=root_link,
@@ -319,11 +319,11 @@ class GiskardWrapper(LowLevelGiskardWrapper):
                                                            tip_link=tip_link,
                                                            tip_group=tip_group,
                                                            goal_orientation=goal_orientation)
-            to_end_monitors = [monitor_name]
+            end_monitors_monitors = [monitor_name]
         else:
-            to_end_monitors = []
-        self.add_motion_goal(goal_type=CartesianOrientation.__name__,
-                             to_end=to_end_monitors,
+            end_monitors_monitors = []
+        self.add_motion_goal(motion_goal_class=CartesianOrientation.__name__,
+                             end_monitors=end_monitors_monitors,
                              goal_orientation=goal_orientation,
                              tip_link=tip_link,
                              root_link=root_link,
@@ -364,11 +364,11 @@ class GiskardWrapper(LowLevelGiskardWrapper):
                                              tip_normal=tip_normal,
                                              root_group=root_group,
                                              tip_group=tip_group)
-            to_end_monitors = [monitor_name]
+            end_monitors_monitors = [monitor_name]
         else:
-            to_end_monitors = []
-        self.add_motion_goal(goal_type=AlignPlanes.__name__,
-                             to_end=to_end_monitors,
+            end_monitors_monitors = []
+        self.add_motion_goal(motion_goal_class=AlignPlanes.__name__,
+                             end_monitors=end_monitors_monitors,
                              tip_link=tip_link,
                              tip_group=tip_group,
                              tip_normal=tip_normal,
@@ -385,7 +385,7 @@ class GiskardWrapper(LowLevelGiskardWrapper):
         Setting it to 1 will turn of acceleration and jerk limits.
         :param prediction_horizon: size of the prediction horizon, a number that should be 1 or above 5.
         """
-        self.add_motion_goal(goal_type=SetPredictionHorizon.__name__,
+        self.add_motion_goal(motion_goal_class=SetPredictionHorizon.__name__,
                              prediction_horizon=prediction_horizon,
                              **kwargs)
 
@@ -395,7 +395,7 @@ class GiskardWrapper(LowLevelGiskardWrapper):
         If the trajectory is longer than new_length, Giskard will prempt the goal.
         :param new_length: in seconds
         """
-        self.add_motion_goal(goal_type=SetMaxTrajLength.__name__,
+        self.add_motion_goal(motion_goal_class=SetMaxTrajLength.__name__,
                              new_length=new_length,
                              **kwargs)
 
@@ -421,7 +421,7 @@ class GiskardWrapper(LowLevelGiskardWrapper):
         :param weight: default WEIGHT_ABOVE_CA
         :param hard: Turn this into a hard constraint. This make create unsolvable optimization problems
         """
-        self.add_motion_goal(goal_type=CartesianVelocityLimit.__name__,
+        self.add_motion_goal(motion_goal_class=CartesianVelocityLimit.__name__,
                              root_link=root_link,
                              root_group=root_group,
                              tip_link=tip_link,
@@ -462,7 +462,7 @@ class GiskardWrapper(LowLevelGiskardWrapper):
         :param reference_angular_velocity: rad/s
         :param weight:
         """
-        to_end_monitors = []
+        end_monitors_monitors = []
         if add_monitor:
             monitor_name = self.add_distance_to_line_monitor(root_link=root_link,
                                                              tip_link=tip_link,
@@ -471,16 +471,16 @@ class GiskardWrapper(LowLevelGiskardWrapper):
                                                              line_length=bar_length,
                                                              root_group=root_group,
                                                              tip_group=tip_group)
-            to_end_monitors.append(monitor_name)
+            end_monitors_monitors.append(monitor_name)
             monitor_name = self.add_vectors_aligned_monitor(root_link=root_link,
                                                             tip_link=tip_link,
                                                             goal_normal=bar_axis,
                                                             tip_normal=tip_grasp_axis,
                                                             root_group=root_group,
                                                             tip_group=tip_group)
-            to_end_monitors.append(monitor_name)
-        self.add_motion_goal(goal_type=GraspBar.__name__,
-                             to_end=to_end_monitors,
+            end_monitors_monitors.append(monitor_name)
+        self.add_motion_goal(motion_goal_class=GraspBar.__name__,
+                             end_monitors=end_monitors_monitors,
                              root_link=root_link,
                              tip_link=tip_link,
                              tip_grasp_axis=tip_grasp_axis,
@@ -514,7 +514,7 @@ class GiskardWrapper(LowLevelGiskardWrapper):
         :param goal_joint_state: goal state for the container. default is maximum joint state.
         :param weight:
         """
-        self.add_motion_goal(goal_type=Open.__name__,
+        self.add_motion_goal(motion_goal_class=Open.__name__,
                              tip_link=tip_link,
                              environment_link=environment_link,
                              tip_group=tip_group,
@@ -532,7 +532,7 @@ class GiskardWrapper(LowLevelGiskardWrapper):
         """
         Same as Open, but will use minimum value as default for goal_joint_state
         """
-        self.add_motion_goal(goal_type=Close.__name__,
+        self.add_motion_goal(motion_goal_class=Close.__name__,
                              tip_link=tip_link,
                              environment_link=environment_link,
                              tip_group=tip_group,
@@ -569,11 +569,11 @@ class GiskardWrapper(LowLevelGiskardWrapper):
                                                         root_link=root_link,
                                                         tip_group=tip_group,
                                                         root_group=root_group)
-            to_end_monitors = [monitor_name]
+            end_monitors_monitors = [monitor_name]
         else:
-            to_end_monitors = []
-        self.add_motion_goal(goal_type=Pointing.__name__,
-                             to_end=to_end_monitors,
+            end_monitors_monitors = []
+        self.add_motion_goal(motion_goal_class=Pointing.__name__,
+                             end_monitors=end_monitors_monitors,
                              tip_link=tip_link,
                              tip_group=tip_group,
                              goal_point=goal_point,
@@ -592,7 +592,7 @@ class GiskardWrapper(LowLevelGiskardWrapper):
         This goal will push joints away from their position limits. For example if percentage is 15 and the joint
         limits are 0-100, it will push it into the 15-85 range.
         """
-        self.add_motion_goal(goal_type=AvoidJointLimits.__name__,
+        self.add_motion_goal(motion_goal_class=AvoidJointLimits.__name__,
                              percentage=percentage,
                              weight=weight,
                              joint_list=joint_list)
@@ -606,9 +606,9 @@ class GiskardWrapper(LowLevelGiskardWrapper):
     def allow_collision(self,
                         group1: str = CollisionEntry.ALL,
                         group2: str = CollisionEntry.ALL,
-                        to_start: Optional[List[str]] = None,
-                        to_hold: Optional[List[str]] = None,
-                        to_end: Optional[List[str]] = None):
+                        start_monitors: Optional[List[str]] = None,
+                        hold_monitors: Optional[List[str]] = None,
+                        end_monitors: Optional[List[str]] = None):
         """
         Tell Giskard to allow collision between group1 and group2. Use CollisionEntry.ALL to allow collision with all
         groups.
@@ -620,17 +620,17 @@ class GiskardWrapper(LowLevelGiskardWrapper):
         collision_entry.group1 = str(group1)
         collision_entry.group2 = str(group2)
         self._add_collision_avoidance(collisions=[collision_entry],
-                                      to_start=to_start,
-                                      to_hold=to_hold,
-                                      to_end=to_end)
+                                      start_monitors=start_monitors,
+                                      hold_monitors=hold_monitors,
+                                      end_monitors=end_monitors)
 
     def avoid_collision(self,
                         min_distance: Optional[float] = None,
                         group1: str = CollisionEntry.ALL,
                         group2: str = CollisionEntry.ALL,
-                        to_start: Optional[List[str]] = None,
-                        to_hold: Optional[List[str]] = None,
-                        to_end: Optional[List[str]] = None):
+                        start_monitors: Optional[List[str]] = None,
+                        hold_monitors: Optional[List[str]] = None,
+                        end_monitors: Optional[List[str]] = None):
         """
         Tell Giskard to avoid collision between group1 and group2. Use CollisionEntry.ALL to allow collision with all
         groups.
@@ -646,29 +646,29 @@ class GiskardWrapper(LowLevelGiskardWrapper):
         collision_entry.group1 = group1
         collision_entry.group2 = group2
         self._add_collision_avoidance(collisions=[collision_entry],
-                                      to_start=to_start,
-                                      to_hold=to_hold,
-                                      to_end=to_end)
+                                      start_monitors=start_monitors,
+                                      hold_monitors=hold_monitors,
+                                      end_monitors=end_monitors)
 
     def allow_all_collisions(self,
-                             to_start: Optional[List[str]] = None,
-                             to_hold: Optional[List[str]] = None,
-                             to_end: Optional[List[str]] = None):
+                             start_monitors: Optional[List[str]] = None,
+                             hold_monitors: Optional[List[str]] = None,
+                             end_monitors: Optional[List[str]] = None):
         """
         Allows all collisions for next goal.
         """
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.ALLOW_COLLISION
         self._add_collision_avoidance(collisions=[collision_entry],
-                                      to_start=to_start,
-                                      to_hold=to_hold,
-                                      to_end=to_end)
+                                      start_monitors=start_monitors,
+                                      hold_monitors=hold_monitors,
+                                      end_monitors=end_monitors)
 
     def avoid_all_collisions(self,
                              min_distance: Optional[float] = None,
-                             to_start: Optional[List[str]] = None,
-                             to_hold: Optional[List[str]] = None,
-                             to_end: Optional[List[str]] = None):
+                             start_monitors: Optional[List[str]] = None,
+                             hold_monitors: Optional[List[str]] = None,
+                             end_monitors: Optional[List[str]] = None):
         """
         Avoids all collisions for next goal.
         If you don't want to override the distance, don't call this function. Avoid all is the default, if you don't
@@ -681,15 +681,15 @@ class GiskardWrapper(LowLevelGiskardWrapper):
         collision_entry.type = CollisionEntry.AVOID_COLLISION
         collision_entry.distance = min_distance
         self._add_collision_avoidance(collisions=[collision_entry],
-                                      to_start=to_start,
-                                      to_hold=to_hold,
-                                      to_end=to_end)
+                                      start_monitors=start_monitors,
+                                      hold_monitors=hold_monitors,
+                                      end_monitors=end_monitors)
 
     def allow_self_collision(self,
                              robot_name: Optional[str] = None,
-                             to_start: Optional[List[str]] = None,
-                             to_hold: Optional[List[str]] = None,
-                             to_end: Optional[List[str]] = None):
+                             start_monitors: Optional[List[str]] = None,
+                             hold_monitors: Optional[List[str]] = None,
+                             end_monitors: Optional[List[str]] = None):
         """
         Allows the collision of the robot with itself for the next goal.
         :param robot_name: if there are multiple robots, specify which one.
@@ -701,6 +701,6 @@ class GiskardWrapper(LowLevelGiskardWrapper):
         collision_entry.group1 = robot_name
         collision_entry.group2 = robot_name
         self._add_collision_avoidance(collisions=[collision_entry],
-                                      to_start=to_start,
-                                      to_hold=to_hold,
-                                      to_end=to_end)
+                                      start_monitors=start_monitors,
+                                      hold_monitors=hold_monitors,
+                                      end_monitors=end_monitors)

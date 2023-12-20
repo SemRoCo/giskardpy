@@ -592,7 +592,7 @@ class TestManipulability:
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.allow_all_collisions()
         zero_pose.set_cart_goal(p, zero_pose.r_tip, 'map')
-        zero_pose.add_motion_goal(goal_type=MaxManipulability.__name__,
+        zero_pose.add_motion_goal(motion_goal_class=MaxManipulability.__name__,
                                   root_link='torso_lift_link',
                                   tip_link='r_gripper_tool_frame'
                                   )

@@ -24,9 +24,9 @@ class ExternalCollisionAvoidance(Goal):
                  soft_thresholds: Optional[Dict[my_string, float]] = None,
                  idx: int = 0,
                  num_repeller: int = 1,
-                 to_start: Optional[List[Monitor]] = None,
-                 to_hold: Optional[List[Monitor]] = None,
-                 to_end: Optional[List[Monitor]] = None
+                 start_monitors: Optional[List[Monitor]] = None,
+                 hold_monitors: Optional[List[Monitor]] = None,
+                 end_monitors: Optional[List[Monitor]] = None
                  ):
         """
         Don't use me
@@ -96,7 +96,7 @@ class ExternalCollisionAvoidance(Goal):
         distance_monitor.set_expression(cas.less(actual_distance, 50))
         self.add_monitor(distance_monitor)
         task = Task('stay away')
-        task.add_to_hold_monitor(distance_monitor)
+        task.add_hold_monitors_monitor(distance_monitor)
         task.add_inequality_constraint(reference_velocity=self.max_velocity,
                                        lower_error=lower_limit,
                                        upper_error=float('inf'),
@@ -105,7 +105,7 @@ class ExternalCollisionAvoidance(Goal):
                                        lower_slack_limit=-float('inf'),
                                        upper_slack_limit=upper_slack)
         self.add_task(task)
-        self.connect_monitors_to_all_tasks(to_start, to_hold, to_end)
+        self.connect_monitors_to_all_tasks(start_monitors, hold_monitors, end_monitors)
 
     def map_V_n_symbol(self):
         expr = f'god_map.closest_point.get_external_collisions(\'{self.link_name}\')[{self.idx}].map_V_n'
@@ -144,9 +144,9 @@ class SelfCollisionAvoidance(Goal):
                  idx: float = 0,
                  num_repeller: int = 1,
                  name_prefix: Optional[str] = None,
-                 to_start: Optional[List[Monitor]] = None,
-                 to_hold: Optional[List[Monitor]] = None,
-                 to_end: Optional[List[Monitor]] = None):
+                 start_monitors: Optional[List[Monitor]] = None,
+                 hold_monitors: Optional[List[Monitor]] = None,
+                 end_monitors: Optional[List[Monitor]] = None):
         self.link_a = link_a
         self.link_b = link_b
         self.max_velocity = max_velocity
@@ -208,7 +208,7 @@ class SelfCollisionAvoidance(Goal):
         god_map.debug_expression_manager.add_debug_expression(f'distance {str(self)}', actual_distance)
         self.add_monitor(distance_monitor)
         task = Task('stay away')
-        task.add_to_hold_monitor(distance_monitor)
+        task.add_hold_monitors_monitor(distance_monitor)
         task.add_inequality_constraint(reference_velocity=self.max_velocity,
                                        lower_error=lower_limit,
                                        upper_error=float('inf'),
@@ -217,7 +217,7 @@ class SelfCollisionAvoidance(Goal):
                                        lower_slack_limit=-float('inf'),
                                        upper_slack_limit=upper_slack)
         self.add_task(task)
-        self.connect_monitors_to_all_tasks(to_start, to_hold, to_end)
+        self.connect_monitors_to_all_tasks(start_monitors, hold_monitors, end_monitors)
 
     def get_contact_normal_in_b(self):
         expr = f'god_map.closest_point.get_self_collisions(\'{self.link_a}\', \'{self.link_b}\')[{self.idx}].new_b_V_n'
@@ -245,9 +245,9 @@ class CollisionAvoidanceHint(Goal):
     def __init__(self, tip_link, avoidance_hint, object_link_name, object_group=None, max_linear_velocity=0.1,
                  root_link=None, max_threshold=0.05, spring_threshold=None, weight=WEIGHT_ABOVE_CA,
                  name: Optional[str] = None,
-                 to_start: Optional[List[Monitor]] = None,
-                 to_hold: Optional[List[Monitor]] = None,
-                 to_end: Optional[List[Monitor]] = None
+                 start_monitors: Optional[List[Monitor]] = None,
+                 hold_monitors: Optional[List[Monitor]] = None,
+                 end_monitors: Optional[List[Monitor]] = None
                  ):
         """
         This goal pushes the link_name in the direction of avoidance_hint, if it is closer than spring_threshold
@@ -324,7 +324,7 @@ class CollisionAvoidanceHint(Goal):
                                      weight=weight,
                                      task_expression=expr)
         self.add_task(task)
-        self.connect_monitors_to_all_tasks(to_start, to_hold, to_end)
+        self.connect_monitors_to_all_tasks(start_monitors, hold_monitors, end_monitors)
 
     def get_actual_distance(self):
         expr = f'god_map.closest_point.get_external_collisions_long_key(\'{self.key[0]}\', \'{self.key[1]}\').contact_distance'
@@ -345,15 +345,15 @@ class CollisionAvoidance(Goal):
     def __init__(self,
                  collision_entries: List[CollisionEntry],
                  name: Optional[str] = None,
-                 to_start: Optional[List[Monitor]] = None,
-                 to_hold: Optional[List[Monitor]] = None,
-                 to_end: Optional[List[Monitor]] = None):
+                 start_monitors: Optional[List[Monitor]] = None,
+                 hold_monitors: Optional[List[Monitor]] = None,
+                 end_monitors: Optional[List[Monitor]] = None):
         if name is None:
             name = self.__class__.__name__
         super().__init__(name)
-        self.to_start = to_start
-        self.to_hold = to_hold
-        self.to_end = to_end
+        self.start_monitors = start_monitors
+        self.hold_monitors = hold_monitors
+        self.end_monitors = end_monitors
         self.collision_matrix = god_map.collision_scene.create_collision_matrix(deepcopy(collision_entries))
         if not collision_entries or not god_map.collision_scene.is_allow_all_collision(collision_entries[-1]):
             self.add_external_collision_avoidance_constraints(
@@ -361,11 +361,11 @@ class CollisionAvoidance(Goal):
         if not collision_entries or (not god_map.collision_scene.is_allow_all_collision(collision_entries[-1]) and
                                      not god_map.collision_scene.is_allow_all_self_collision(collision_entries[-1])):
             self.add_self_collision_avoidance_constraints()
-        if to_start:
+        if start_monitors:
             def cb():
                 god_map.collision_scene.set_collision_matrix(self.collision_matrix)
                 god_map.collision_scene.reset_cache()
-            god_map.monitor_manager.register_monitor_cb(to_start, cb)
+            god_map.monitor_manager.register_monitor_cb(start_monitors, cb)
         else:
             god_map.collision_scene.set_collision_matrix(self.collision_matrix)
 
@@ -401,9 +401,9 @@ class CollisionAvoidance(Goal):
                                                                             soft_thresholds=soft_threshold,
                                                                             idx=i,
                                                                             num_repeller=number_of_repeller,
-                                                                            to_start=self.to_start,
-                                                                            to_hold=self.to_hold,
-                                                                            to_end=self.to_end))
+                                                                            start_monitors=self.start_monitors,
+                                                                            hold_monitors=self.hold_monitors,
+                                                                            end_monitors=self.end_monitors))
                     num_constrains += 1
         logging.loginfo(f'Adding {num_constrains} external collision avoidance constraints.')
 
@@ -469,8 +469,8 @@ class CollisionAvoidance(Goal):
                                                                     soft_threshold=soft_threshold,
                                                                     idx=i,
                                                                     num_repeller=number_of_repeller,
-                                                                    to_start=self.to_start,
-                                                                    to_hold=self.to_hold,
-                                                                    to_end=self.to_end))
+                                                                    start_monitors=self.start_monitors,
+                                                                    hold_monitors=self.hold_monitors,
+                                                                    end_monitors=self.end_monitors))
                 num_constr += 1
         logging.loginfo(f'Adding {num_constr} self collision avoidance constraints.')

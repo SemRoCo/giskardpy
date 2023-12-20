@@ -20,9 +20,9 @@ class Open(Goal):
                  max_velocity: float = 100,
                  weight: float = WEIGHT_ABOVE_CA,
                  name: Optional[str] = None,
-                 to_start: Optional[List[Monitor]] = None,
-                 to_hold: Optional[List[Monitor]] = None,
-                 to_end: Optional[List[Monitor]] = None
+                 start_monitors: Optional[List[Monitor]] = None,
+                 hold_monitors: Optional[List[Monitor]] = None,
+                 end_monitors: Optional[List[Monitor]] = None
                  ):
         """
         Open a container in an environment.
@@ -58,17 +58,17 @@ class Open(Goal):
                                                    tip_group=tip_group,
                                                    goal_pose=self.handle_T_tip,
                                                    weight=self.weight,
-                                                   to_start=to_start,
-                                                   to_hold=to_hold,
-                                                   to_end=to_end))
+                                                   start_monitors=start_monitors,
+                                                   hold_monitors=hold_monitors,
+                                                   end_monitors=end_monitors))
         goal_state = {self.joint_name.short_name: goal_joint_state}
         self.add_constraints_of_goal(JointPositionList(goal_state=goal_state,
                                                        group_name=self.joint_group.name,
                                                        max_velocity=max_velocity,
                                                        weight=WEIGHT_BELOW_CA,
-                                                       to_start=to_start,
-                                                       to_hold=to_hold,
-                                                       to_end=to_end))
+                                                       start_monitors=start_monitors,
+                                                       hold_monitors=hold_monitors,
+                                                       end_monitors=end_monitors))
 
 
 class Close(Goal):
@@ -80,9 +80,9 @@ class Close(Goal):
                  goal_joint_state: Optional[float] = None,
                  weight: float = WEIGHT_ABOVE_CA,
                  name: Optional[str] = None,
-                 to_start: Optional[List[Monitor]] = None,
-                 to_hold: Optional[List[Monitor]] = None,
-                 to_end: Optional[List[Monitor]] = None
+                 start_monitors: Optional[List[Monitor]] = None,
+                 hold_monitors: Optional[List[Monitor]] = None,
+                 end_monitors: Optional[List[Monitor]] = None
                  ):
         """
         Same as Open, but will use minimum value as default for goal_joint_state
@@ -105,6 +105,6 @@ class Close(Goal):
                                           environment_group=environment_group,
                                           goal_joint_state=goal_joint_state,
                                           weight=weight,
-                                          to_start=to_start,
-                                          to_hold=to_hold,
-                                          to_end=to_end))
+                                          start_monitors=start_monitors,
+                                          hold_monitors=hold_monitors,
+                                          end_monitors=end_monitors))

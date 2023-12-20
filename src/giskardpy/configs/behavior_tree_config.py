@@ -153,12 +153,6 @@ class BehaviorTreeConfig(ABC):
         god_map.tree.wait_for_goal.publish_state.add_joint_state_publisher(include_prefix=include_prefix,
                                                                            topic_name=topic_name)
 
-    def add_js_publisher(self, include_prefix: bool = True, js_topic: str = 'joint_states'):
-        """
-        Publishes joint states for Giskard's internal state.
-        """
-        self.tree_manager.add_js_publisher(include_prefix=include_prefix, js_topic=js_topic)
-
 
 class StandAloneBTConfig(BehaviorTreeConfig):
     def __init__(self, planning_sleep: Optional[float] = None, debug_mode: bool = False, publish_js=False):

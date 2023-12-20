@@ -54,7 +54,6 @@ class LowLevelGiskardWrapper:
             rospy.wait_for_service(f'{node_name}/update_world')
             self._client.wait_for_server()
         self.clear_cmds()
-        self._object_js_topics = {}
         rospy.sleep(.3)
         self.robot_name = self.get_group_names()[0]
 
@@ -440,8 +439,6 @@ class LowLevelGiskardWrapper:
         req.operation = UpdateWorldRequest.REMOVE_ALL
         req.timeout = timeout
         result: UpdateWorldResponse = self._update_world_srv.call(req)
-        if result.error_codes == UpdateWorldResponse.SUCCESS:
-            self._object_js_topics = {}
         return result
 
     def remove_group(self,
@@ -458,9 +455,6 @@ class LowLevelGiskardWrapper:
         req.timeout = timeout
         req.body = world_body
         result: UpdateWorldResponse = self._update_world_srv.call(req)
-        if result.error_codes == UpdateWorldResponse.SUCCESS:
-            if name in self._object_js_topics:
-                del self._object_js_topics[name]
         return result
 
     def add_box(self,
@@ -610,7 +604,6 @@ class LowLevelGiskardWrapper:
                  parent_link: str = '',
                  parent_link_group: str = '',
                  js_topic: Optional[str] = '',
-                 set_js_topic: Optional[str] = '',
                  timeout: float = 2) -> UpdateWorldResponse:
         """
         Adds a urdf to the world.
@@ -620,14 +613,10 @@ class LowLevelGiskardWrapper:
         :param parent_link: to which link the urdf will be attached
         :param parent_link_group: if parent_link is not unique, search here for matches.
         :param js_topic: Giskard will listen on that topic for joint states and update the urdf accordingly
-        :param set_js_topic: A topic that the python wrapper will use to set the urdf joint state.
-                                Only works if there is, e.g., a joint_state_publisher that listens to it.
         :param timeout: how long to wait if Giskard is busy.
         :return: response message
         """
         js_topic = str(js_topic)
-        if set_js_topic == '':
-            set_js_topic = js_topic
         urdf_body = WorldBody()
         urdf_body.type = WorldBody.URDF_BODY
         urdf_body.urdf = str(urdf)
@@ -640,10 +629,6 @@ class LowLevelGiskardWrapper:
         req.pose = pose
         req.parent_link = parent_link
         req.parent_link_group = parent_link_group
-        if set_js_topic:
-            # FIXME publisher has to be removed, when object gets deleted
-            # FIXME there could be sync error, if objects get added/removed by something else
-            self._object_js_topics[name] = rospy.Publisher(set_js_topic, JointState, queue_size=10)
         return self._update_world_srv.call(req)
 
     def dye_group(self, group_name: str, rgba: Tuple[float, float, float, float]) -> DyeGroupResponse:

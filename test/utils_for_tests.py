@@ -540,7 +540,7 @@ class GiskardTestWrapper(GiskardWrapper):
     def sync_world_with_trajectory(self):
         t = god_map.trajectory
         whole_last_joint_state = t.get_last().to_position_dict()
-        for group_name in self._object_js_topics:
+        for group_name in self.env_joint_state_pubs:
             group_joints = self.get_group_info(group_name).joint_state.name
             group_last_joint_state = {str(k): v for k, v in whole_last_joint_state.items() if k in group_joints}
             self.set_env_state(group_last_joint_state, group_name)
@@ -811,7 +811,6 @@ class GiskardTestWrapper(GiskardWrapper):
                                     parent_link=parent_link,
                                     parent_link_group=parent_link_group,
                                     js_topic=js_topic,
-                                    set_js_topic=set_js_topic,
                                     timeout=timeout)
         self.wait_heartbeats()
         self.check_add_object_result(response=response,

@@ -997,7 +997,7 @@ class QPProblemBuilder:
     inequality_bounds: InequalityBounds
     qp_solver: QPSolver
     prediction_horizon: int = None
-    manipulability_indexes: List[float] = [0.0, 0.0]
+    manipulability_indexes: np.ndarray = np.array([0.0, 0.0])
 
     def __init__(self,
                  sample_period: float,

@@ -39,6 +39,7 @@ from giskardpy.utils.utils import launch_launchfile, suppress_stderr, resolve_ro
 from giskardpy.utils.math import compare_points
 from utils_for_tests import compare_poses, publish_marker_vector, \
     GiskardTestWrapper, pr2_urdf
+from giskardpy.goals.manipulability_goals import MaxManipulability
 
 # scopes = ['module', 'class', 'function']
 pocky_pose = {'r_elbow_flex_joint': -1.29610152504,
@@ -3974,9 +3975,46 @@ class TestBenchmark:
                 fake_table_setup.allow_all_collisions()
                 fake_table_setup.reset_base()
 
+
+class TestManipulability:
+    def test_manip1(self, zero_pose: PR2TestWrapper):
+        p = PoseStamped()
+        p.header.stamp = rospy.get_rostime()
+        p.header.frame_id = 'map'
+        p.pose.position = Point(0.8, -0.3, 1)
+        p.pose.orientation = Quaternion(0, 0, 0, 1)
+        zero_pose.allow_all_collisions()
+        zero_pose.set_cart_goal(p, zero_pose.r_tip, 'map')
+        zero_pose.add_motion_goal(goal_type=MaxManipulability.__name__,
+                                  root_link='torso_lift_link',
+                                  tip_link='r_gripper_tool_frame'
+                                  )
+        zero_pose.plan_and_execute()
+
+    def test_manip2(self, zero_pose: PR2TestWrapper):
+        p = PoseStamped()
+        p.header.stamp = rospy.get_rostime()
+        p.header.frame_id = zero_pose.r_tip
+        p.pose.position = Point(1, -0.5, 0)
+        p.pose.orientation = Quaternion(0, 0, 0, 1)
+        zero_pose.allow_all_collisions()
+        zero_pose.set_cart_goal(p, zero_pose.r_tip, 'map')
+        zero_pose.add_motion_goal(goal_type=MaxManipulability.__name__,
+                                  root_link='torso_lift_link',
+                                  tip_link='r_gripper_tool_frame'
+                                  )
+        p.pose.position = Point(1, 0.1, 0)
+        zero_pose.set_cart_goal(p, zero_pose.l_tip, 'map')
+        zero_pose.add_motion_goal(goal_type=MaxManipulability.__name__,
+                                  root_link='torso_lift_link',
+                                  tip_link='l_gripper_tool_frame'
+                                  )
+        zero_pose.execute(add_local_minimum_reached=True)
+
 # kernprof -lv py.test -s test/test_integration_pr2.py
 # time: [1-9][1-9]*.[1-9]* s
 # import pytest
+# pytest.main(['-s', __file__ + '::TestManipulability::test_manip1'])
 # pytest.main(['-s', __file__ + '::TestJointGoals::test_joint_goal'])
 # pytest.main(['-s', __file__ + '::TestConstraints::test_RelativePositionSequence'])
 # pytest.main(['-s', __file__ + '::TestConstraints::test_open_dishwasher_apartment'])

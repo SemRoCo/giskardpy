@@ -9,6 +9,7 @@ from scipy import sparse as sp
 from giskardpy.configs.qp_controller_config import SupportedQPSolver
 from giskardpy.exceptions import QPSolverException, InfeasibleException, HardConstraintsViolatedException
 from giskardpy.qp.qp_solver import QPSolver
+from giskardpy.god_map import god_map
 
 import giskardpy.casadi_wrapper as cas
 
@@ -45,7 +46,8 @@ class QPSolverQPalm(QPSolver):
     @profile
     def __init__(self, weights: cas.Expression, g: cas.Expression, lb: cas.Expression, ub: cas.Expression,
                  E: cas.Expression, E_slack: cas.Expression, bE: cas.Expression,
-                 A: cas.Expression, A_slack: cas.Expression, lbA: cas.Expression, ubA: cas.Expression):
+                 A: cas.Expression, A_slack: cas.Expression, lbA: cas.Expression, ubA: cas.Expression,
+                 constraint_jacobian: cas.Expression, grad_traces: [cas.Expression]):
         """
         min_x 0.5 x^T H x + g^T x
         s.t.  lb <= Ax <= ub
@@ -73,13 +75,33 @@ class QPSolverQPalm(QPSolver):
         free_symbols.update(lbA.free_symbols())
         free_symbols.update(ubA.free_symbols())
         free_symbols = list(free_symbols)
+        self.free_symbols = free_symbols
 
-        self.w_lb_bE_lbA_f = cas.StackedCompiledFunction(expressions=[weights, lb, bE, lbA],
-                                                         parameters=free_symbols,
-                                                         additional_views=[slice(weights.shape[0], None)])
-        self.ub_bE_ubA_f = cas.StackedCompiledFunction(expressions=[ub, bE, ubA],
-                                                       parameters=free_symbols,
-                                                       additional_views=[slice(0, None)])
+        len_lb_be_lba_end = weights.shape[0] + lb.shape[0] + bE.shape[0] + lbA.shape[0]
+        len_ub_be_uba_end = len_lb_be_lba_end + ub.shape[0] + bE.shape[0] + ubA.shape[0]
+
+        self.init_manipulability_variables(constraint_jacobian, grad_traces)
+        if self.use_manipulability:
+            self.combined_vector_f = cas.StackedCompiledFunction(expressions=[weights,
+                                                                              lb,
+                                                                              bE,
+                                                                              lbA,
+                                                                              ub,
+                                                                              bE,
+                                                                              ubA,
+                                                                              self.grad_traces_augmented * self.m_symbolic,
+                                                                              self.m_symbolic],
+                                                                 parameters=free_symbols + [self.det_symbol.s],
+                                                                 additional_views=[
+                                                                     slice(weights.shape[0], len_lb_be_lba_end),
+                                                                     slice(len_lb_be_lba_end, len_ub_be_uba_end)])
+        else:
+            self.combined_vector_f = cas.StackedCompiledFunction(expressions=[weights, lb, bE, lbA, ub, bE, ubA],
+                                                                 parameters=free_symbols,
+                                                                 additional_views=[
+                                                                     slice(weights.shape[0], len_lb_be_lba_end),
+                                                                     slice(len_lb_be_lba_end, len_ub_be_uba_end)])
+
         self.A_f = combined_A.compile(parameters=free_symbols, sparse=self.sparse)
 
         self.free_symbols_str = [str(x) for x in free_symbols]
@@ -89,9 +111,19 @@ class QPSolverQPalm(QPSolver):
 
     @profile
     def evaluate_functions(self, substitutions: np.ndarray):
-        self.weights, self.lb, self.bE, self.lbA, self.lb_bE_lbA = self.w_lb_bE_lbA_f.fast_call(substitutions)
-        self.ub, _, self.ubA, self.ub_bE_ubA = self.ub_bE_ubA_f.fast_call(substitutions)
-        self.g = np.zeros(self.weights.shape)
+        if self.use_manipulability:
+            self.calc_det_of_jjt_manipulability(substitutions)
+            self.weights, self.lb, self.bE, self.lbA, self.ub, _, self.ubA, m_grad, m, self.lb_bE_lbA, self.ub_bE_ubA = self.combined_vector_f.fast_call(
+                np.append(substitutions, self.det))
+            self.g = np.zeros(self.weights.shape)
+            self.g[:len(m_grad)] = m_grad
+            god_map.qp_controller.manipulability_indexes[1] = god_map.qp_controller.manipulability_indexes[0]
+            god_map.qp_controller.manipulability_indexes[0] = m
+        else:
+            self.weights, self.lb, self.bE, self.lbA, self.ub, _, self.ubA, self.lb_bE_lbA, self.ub_bE_ubA = self.combined_vector_f.fast_call(
+                substitutions)
+            self.g = np.zeros(self.weights.shape)
+
         self.A = self.A_f.fast_call(substitutions)
 
     @profile
@@ -122,7 +154,7 @@ class QPSolverQPalm(QPSolver):
     @profile
     def apply_filters(self):
         self.weights = self.weights[self.weight_filter]
-        self.g = np.zeros(*self.weights.shape)
+        self.g = self.g[self.weight_filter]
         self.lb_bE_lbA = self.lb_bE_lbA[self.b_bE_bA_filter]
         self.ub_bE_ubA = self.ub_bE_ubA[self.b_bE_bA_filter]
         self.A = self.A[:, self.weight_filter][self.bE_bA_filter, :]

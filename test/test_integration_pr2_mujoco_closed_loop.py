@@ -20,6 +20,7 @@ from giskardpy.data_types import JointStates
 from giskardpy.goals.goal import WEIGHT_BELOW_CA
 from giskardpy.god_map import god_map
 from test_integration_pr2 import PR2TestWrapper, TestJointGoals, pocky_pose
+from giskardpy.goals.manipulability_goals import MaxManipulability
 
 
 class PR2TestWrapperMujoco(PR2TestWrapper):
@@ -66,8 +67,8 @@ class PR2TestWrapperMujoco(PR2TestWrapper):
         p = PoseStamped()
         p.header.frame_id = tf.get_tf_root()
         p.pose.orientation.w = 1
-        self.set_localization(p)
-        self.wait_heartbeats()
+        # self.set_localization(p)
+        # self.wait_heartbeats()
 
     def set_localization(self, map_T_odom: PoseStamped):
         pass
@@ -77,7 +78,7 @@ class PR2TestWrapperMujoco(PR2TestWrapper):
         self.move_base(goal_pose)
 
     def reset(self):
-        self.mujoco_reset()
+        # self.mujoco_reset()
         super().reset()
 
 
@@ -567,6 +568,7 @@ class TestActionServerEvents:
         zero_pose.cmd_seq = []
         zero_pose.plan_and_execute(expected_error_code=MoveResult.INVALID_GOAL)
 
+
 # kernprof -lv py.test -s test/test_integration_pr2.py
 # time: [1-9][1-9]*.[1-9]* s
 # import pytest
@@ -579,3 +581,19 @@ class TestActionServerEvents:
 # pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_avoid_collision_at_kitchen_corner'])
 # pytest.main(['-s', __file__ + '::TestWayPoints::test_waypoints2'])
 # pytest.main(['-s', __file__ + '::TestCartGoals::test_keep_position3'])
+
+
+class TestManipulability:
+    def test_manip1(self, zero_pose: PR2TestWrapper):
+        p = PoseStamped()
+        p.header.stamp = rospy.get_rostime()
+        p.header.frame_id = 'map'
+        p.pose.position = Point(0.8, -0.3, 1)
+        p.pose.orientation = Quaternion(0, 0, 0, 1)
+        zero_pose.allow_all_collisions()
+        zero_pose.set_cart_goal(p, zero_pose.r_tip, 'map')
+        zero_pose.add_motion_goal(goal_type=MaxManipulability.__name__,
+                                  root_link='torso_lift_link',
+                                  tip_link='r_gripper_tool_frame'
+                                  )
+        zero_pose.plan_and_execute()

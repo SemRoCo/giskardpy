@@ -20,7 +20,8 @@ from giskardpy import casadi_wrapper as w
 from giskardpy.exceptions import ConstraintInitalizationException, UnknownGroupException
 from giskardpy.model.joints import OneDofJoint
 from giskardpy.my_types import my_string, transformable_message, PrefixName, Derivatives
-from giskardpy.qp.constraint import InequalityConstraint, EqualityConstraint, DerivativeInequalityConstraint
+from giskardpy.qp.constraint import InequalityConstraint, EqualityConstraint, DerivativeInequalityConstraint, \
+    ManipulabilityConstraint
 
 
 class Goal(ABC):
@@ -116,14 +117,18 @@ class Goal(ABC):
 
     @profile
     def get_constraints(self) -> Tuple[Dict[str, EqualityConstraint],
-    Dict[str, InequalityConstraint],
-    Dict[str, DerivativeInequalityConstraint],
-    Dict[str, Union[w.Symbol, float]]]:
+                                       Dict[str, InequalityConstraint],
+                                       Dict[str, DerivativeInequalityConstraint],
+                                       Dict[str, Union[w.Symbol, float]],
+                                       Dict[str, ManipulabilityConstraint]]:
         self._equality_constraints = OrderedDict()
         self._inequality_constraints = OrderedDict()
         self._derivative_constraints = OrderedDict()
         self._debug_expressions = OrderedDict()
+        self._manip_constraints = OrderedDict()
+        
         self._task_sanity_check()
+        
         for task in self.tasks:
             for constraint in task.get_eq_constraints():
                 name = f'{task.name}/{constraint.name}'
@@ -137,9 +142,13 @@ class Goal(ABC):
                 name = f'{task.name}/{constraint.name}'
                 constraint.name = name
                 self._derivative_constraints[constraint.name] = constraint
+            for constraint in task.get_manipulability_constraint():
+                name = f'{task.name}/{constraint.name}'
+                constraint.name = name
+                self._manip_constraints[constraint.name] = constraint
 
         return self._equality_constraints, self._inequality_constraints, self._derivative_constraints, \
-            self._debug_expressions
+               self._manip_constraints, self._debug_expressions
 
     def _task_sanity_check(self):
         if not self.has_tasks():

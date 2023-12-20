@@ -2147,3 +2147,13 @@ def substitute(expression, old_symbols, new_symbols):
     new_symbols = Expression([_to_sx(s) for s in new_symbols]).s
     sx = ca.substitute(sx, old_symbols, new_symbols)
     return type(expression)(sx)
+
+
+def matrix_inverse(a):
+    if isinstance(a, TransMatrix):
+        return a.inverse()
+    return Expression(ca.inv(a.s))
+
+
+def gradient(ex, arg):
+    return Expression(ca.gradient(ex.s, arg.s))

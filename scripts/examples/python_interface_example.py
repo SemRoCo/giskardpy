@@ -111,10 +111,10 @@ pointing_axis = Vector3Stamped()
 pointing_axis.header.frame_id = tip
 pointing_axis.vector.x = 1
 
-giskard_wrapper.set_pointing_goal(tip_link=tip,
-                                  root_link=root,
-                                  goal_point=goal_point,
-                                  pointing_axis=pointing_axis)
+giskard_wrapper.add_pointing(tip_link=tip,
+                             root_link=root,
+                             goal_point=goal_point,
+                             pointing_axis=pointing_axis)
 
 rospy.loginfo('Combining it with a goal that makes the right hand point at the left hand.')
 tip = 'r_gripper_tool_frame'
@@ -122,10 +122,10 @@ root = 'torso_lift_link'
 pointing_axis = Vector3Stamped()
 pointing_axis.header.frame_id = tip
 pointing_axis.vector.x = 1
-giskard_wrapper.set_pointing_goal(tip_link='r_gripper_tool_frame',
-                                  root_link=root,
-                                  goal_point=goal_point,
-                                  pointing_axis=pointing_axis)
+giskard_wrapper.add_pointing(tip_link='r_gripper_tool_frame',
+                             root_link=root,
+                             goal_point=goal_point,
+                             pointing_axis=pointing_axis)
 rospy.loginfo('Execute')
 giskard_wrapper.plan_and_execute()
 

@@ -137,16 +137,16 @@ class GiskardWrapper(LowLevelGiskardWrapper):
             end_monitors_monitors = [monitor_name]
         else:
             end_monitors_monitors = []
-        self.motion_goals.set_diff_drive_base_goal(end_monitors=end_monitors_monitors,
-                                                   goal_pose=goal_pose,
-                                                   tip_link=tip_link,
-                                                   root_link=root_link,
-                                                   root_group=root_group,
-                                                   tip_group=tip_group,
-                                                   reference_linear_velocity=reference_linear_velocity,
-                                                   reference_angular_velocity=reference_angular_velocity,
-                                                   weight=weight,
-                                                   **kwargs)
+        self.motion_goals.add_diff_drive_base(end_monitors=end_monitors_monitors,
+                                              goal_pose=goal_pose,
+                                              tip_link=tip_link,
+                                              root_link=root_link,
+                                              root_group=root_group,
+                                              tip_group=tip_group,
+                                              reference_linear_velocity=reference_linear_velocity,
+                                              reference_angular_velocity=reference_angular_velocity,
+                                              weight=weight,
+                                              **kwargs)
 
     def set_straight_cart_goal(self,
                                goal_pose: PoseStamped,
@@ -187,16 +187,16 @@ class GiskardWrapper(LowLevelGiskardWrapper):
             end_monitors_monitors = [monitor_name]
         else:
             end_monitors_monitors = []
-        self.motion_goals.set_straight_cart_goal(end_monitors=end_monitors_monitors,
-                                                 goal_pose=goal_pose,
-                                                 tip_link=tip_link,
-                                                 tip_group=tip_group,
-                                                 root_link=root_link,
-                                                 root_group=root_group,
-                                                 weight=weight,
-                                                 reference_linear_velocity=reference_linear_velocity,
-                                                 reference_angular_velocity=reference_angular_velocity,
-                                                 **kwargs)
+        self.motion_goals.add_cartesian_pose_straight(end_monitors=end_monitors_monitors,
+                                                      goal_pose=goal_pose,
+                                                      tip_link=tip_link,
+                                                      tip_group=tip_group,
+                                                      root_link=root_link,
+                                                      root_group=root_group,
+                                                      weight=weight,
+                                                      reference_linear_velocity=reference_linear_velocity,
+                                                      reference_angular_velocity=reference_angular_velocity,
+                                                      **kwargs)
 
     def set_translation_goal(self,
                              goal_point: PointStamped,
@@ -309,15 +309,15 @@ class GiskardWrapper(LowLevelGiskardWrapper):
             end_monitors_monitors = [monitor_name]
         else:
             end_monitors_monitors = []
-        self.motion_goals.set_rotation_goal(end_monitors=end_monitors_monitors,
-                                            goal_orientation=goal_orientation,
-                                            tip_link=tip_link,
-                                            root_link=root_link,
-                                            tip_group=tip_group,
-                                            root_group=root_group,
-                                            reference_velocity=reference_velocity,
-                                            weight=weight,
-                                            **kwargs)
+        self.motion_goals.add_cartesian_orientation(end_monitors=end_monitors_monitors,
+                                                    goal_orientation=goal_orientation,
+                                                    tip_link=tip_link,
+                                                    root_link=root_link,
+                                                    tip_group=tip_group,
+                                                    root_group=root_group,
+                                                    reference_velocity=reference_velocity,
+                                                    weight=weight,
+                                                    **kwargs)
 
     def set_align_planes_goal(self,
                               goal_normal: Vector3Stamped,
@@ -404,15 +404,15 @@ class GiskardWrapper(LowLevelGiskardWrapper):
         :param weight: default WEIGHT_ABOVE_CA
         :param hard: Turn this into a hard constraint. This make create unsolvable optimization problems
         """
-        self.motion_goals.set_limit_cartesian_velocity_goal(root_link=root_link,
-                                                            root_group=root_group,
-                                                            tip_link=tip_link,
-                                                            tip_group=tip_group,
-                                                            weight=weight,
-                                                            max_linear_velocity=max_linear_velocity,
-                                                            max_angular_velocity=max_angular_velocity,
-                                                            hard=hard,
-                                                            **kwargs)
+        self.motion_goals.add_limit_cartesian_velocity(root_link=root_link,
+                                                       root_group=root_group,
+                                                       tip_link=tip_link,
+                                                       tip_group=tip_group,
+                                                       weight=weight,
+                                                       max_linear_velocity=max_linear_velocity,
+                                                       max_angular_velocity=max_angular_velocity,
+                                                       hard=hard,
+                                                       **kwargs)
 
     def set_grasp_bar_goal(self,
                            bar_center: PointStamped,
@@ -461,19 +461,19 @@ class GiskardWrapper(LowLevelGiskardWrapper):
                                                              root_group=root_group,
                                                              tip_group=tip_group)
             end_monitors_monitors.append(monitor_name)
-        self.motion_goals.set_grasp_bar_goal(end_monitors=end_monitors_monitors,
-                                             root_link=root_link,
-                                             tip_link=tip_link,
-                                             tip_grasp_axis=tip_grasp_axis,
-                                             bar_center=bar_center,
-                                             bar_axis=bar_axis,
-                                             bar_length=bar_length,
-                                             root_group=root_group,
-                                             tip_group=tip_group,
-                                             reference_linear_velocity=reference_linear_velocity,
-                                             reference_angular_velocity=reference_angular_velocity,
-                                             weight=weight,
-                                             **kwargs)
+        self.motion_goals.add_grasp_bar(end_monitors=end_monitors_monitors,
+                                        root_link=root_link,
+                                        tip_link=tip_link,
+                                        tip_grasp_axis=tip_grasp_axis,
+                                        bar_center=bar_center,
+                                        bar_axis=bar_axis,
+                                        bar_length=bar_length,
+                                        root_group=root_group,
+                                        tip_group=tip_group,
+                                        reference_linear_velocity=reference_linear_velocity,
+                                        reference_angular_velocity=reference_angular_velocity,
+                                        weight=weight,
+                                        **kwargs)
 
     def set_open_container_goal(self,
                                 tip_link: str,
@@ -494,12 +494,12 @@ class GiskardWrapper(LowLevelGiskardWrapper):
         :param goal_joint_state: goal state for the container. default is maximum joint state.
         :param weight:
         """
-        self.motion_goals.set_open_container_goal(tip_link=tip_link,
-                                                  environment_link=environment_link,
-                                                  tip_group=tip_group,
-                                                  environment_group=environment_group,
-                                                  goal_joint_state=goal_joint_state,
-                                                  weight=weight)
+        self.motion_goals.add_open_container(tip_link=tip_link,
+                                             environment_link=environment_link,
+                                             tip_group=tip_group,
+                                             environment_group=environment_group,
+                                             goal_joint_state=goal_joint_state,
+                                             weight=weight)
 
     def set_close_container_goal(self,
                                  tip_link: str,
@@ -550,16 +550,16 @@ class GiskardWrapper(LowLevelGiskardWrapper):
             end_monitors_monitors = [monitor_name]
         else:
             end_monitors_monitors = []
-        self.motion_goals.set_pointing_goal(end_monitors=end_monitors_monitors,
-                                            tip_link=tip_link,
-                                            tip_group=tip_group,
-                                            goal_point=goal_point,
-                                            root_link=root_link,
-                                            root_group=root_group,
-                                            pointing_axis=pointing_axis,
-                                            max_velocity=max_velocity,
-                                            weight=weight,
-                                            **kwargs)
+        self.motion_goals.add_pointing(end_monitors=end_monitors_monitors,
+                                       tip_link=tip_link,
+                                       tip_group=tip_group,
+                                       goal_point=goal_point,
+                                       root_link=root_link,
+                                       root_group=root_group,
+                                       pointing_axis=pointing_axis,
+                                       max_velocity=max_velocity,
+                                       weight=weight,
+                                       **kwargs)
 
     def set_avoid_joint_limits_goal(self,
                                     percentage: int = 15,

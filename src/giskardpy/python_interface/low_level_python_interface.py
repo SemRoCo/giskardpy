@@ -496,16 +496,16 @@ class MotionGoalWrapper:
                              hold_monitors=hold_monitors,
                              end_monitors=end_monitors)
 
-    def set_open_container_goal(self,
-                                tip_link: str,
-                                environment_link: str,
-                                tip_group: Optional[str] = None,
-                                environment_group: Optional[str] = None,
-                                goal_joint_state: Optional[float] = None,
-                                weight: Optional[float] = None,
-                                start_monitors: List[str] = None,
-                                hold_monitors: List[str] = None,
-                                end_monitors: List[str] = None):
+    def add_open_container(self,
+                           tip_link: str,
+                           environment_link: str,
+                           tip_group: Optional[str] = None,
+                           environment_group: Optional[str] = None,
+                           goal_joint_state: Optional[float] = None,
+                           weight: Optional[float] = None,
+                           start_monitors: List[str] = None,
+                           hold_monitors: List[str] = None,
+                           end_monitors: List[str] = None):
         """
         Open a container in an environment.
         Only works with the environment was added as urdf.
@@ -529,19 +529,19 @@ class MotionGoalWrapper:
                              hold_monitors=hold_monitors,
                              end_monitors=end_monitors)
 
-    def set_diff_drive_base_goal(self,
-                                 goal_pose: PoseStamped,
-                                 tip_link: str,
-                                 root_link: str,
-                                 tip_group: Optional[str] = None,
-                                 root_group: Optional[str] = None,
-                                 reference_linear_velocity: Optional[float] = None,
-                                 reference_angular_velocity: Optional[float] = None,
-                                 weight: Optional[float] = None,
-                                 start_monitors: List[str] = None,
-                                 hold_monitors: List[str] = None,
-                                 end_monitors: List[str] = None,
-                                 **kwargs: goal_parameter):
+    def add_diff_drive_base(self,
+                            goal_pose: PoseStamped,
+                            tip_link: str,
+                            root_link: str,
+                            tip_group: Optional[str] = None,
+                            root_group: Optional[str] = None,
+                            reference_linear_velocity: Optional[float] = None,
+                            reference_angular_velocity: Optional[float] = None,
+                            weight: Optional[float] = None,
+                            start_monitors: List[str] = None,
+                            hold_monitors: List[str] = None,
+                            end_monitors: List[str] = None,
+                            **kwargs: goal_parameter):
         """
         This goal will use the kinematic chain between root and tip link to move tip link into the goal pose.
         The max velocities enforce a strict limit, but require a lot of additional constraints, thus making the
@@ -570,22 +570,22 @@ class MotionGoalWrapper:
                              end_monitors=end_monitors,
                              **kwargs)
 
-    def set_grasp_bar_goal(self,
-                           bar_center: PointStamped,
-                           bar_axis: Vector3Stamped,
-                           bar_length: float,
-                           tip_link: str,
-                           tip_grasp_axis: Vector3Stamped,
-                           root_link: str,
-                           tip_group: Optional[str] = None,
-                           root_group: Optional[str] = None,
-                           reference_linear_velocity: Optional[float] = None,
-                           reference_angular_velocity: Optional[float] = None,
-                           weight: Optional[float] = None,
-                           start_monitors: List[str] = None,
-                           hold_monitors: List[str] = None,
-                           end_monitors: List[str] = None,
-                           **kwargs: goal_parameter):
+    def add_grasp_bar(self,
+                      bar_center: PointStamped,
+                      bar_axis: Vector3Stamped,
+                      bar_length: float,
+                      tip_link: str,
+                      tip_grasp_axis: Vector3Stamped,
+                      root_link: str,
+                      tip_group: Optional[str] = None,
+                      root_group: Optional[str] = None,
+                      reference_linear_velocity: Optional[float] = None,
+                      reference_angular_velocity: Optional[float] = None,
+                      weight: Optional[float] = None,
+                      start_monitors: List[str] = None,
+                      hold_monitors: List[str] = None,
+                      end_monitors: List[str] = None,
+                      **kwargs: goal_parameter):
         """
         Like a CartesianPose but with more freedom.
         tip_link is allowed to be at any point along bar_axis, that is without bar_center +/- bar_length.
@@ -619,19 +619,19 @@ class MotionGoalWrapper:
                              end_monitors=end_monitors,
                              **kwargs)
 
-    def set_limit_cartesian_velocity_goal(self,
-                                          tip_link: str,
-                                          root_link: str,
-                                          tip_group: Optional[str] = None,
-                                          root_group: Optional[str] = None,
-                                          max_linear_velocity: float = 0.1,
-                                          max_angular_velocity: float = 0.5,
-                                          weight: Optional[float] = None,
-                                          hard: bool = False,
-                                          start_monitors: List[str] = None,
-                                          hold_monitors: List[str] = None,
-                                          end_monitors: List[str] = None,
-                                          **kwargs: goal_parameter):
+    def add_limit_cartesian_velocity(self,
+                                     tip_link: str,
+                                     root_link: str,
+                                     tip_group: Optional[str] = None,
+                                     root_group: Optional[str] = None,
+                                     max_linear_velocity: float = 0.1,
+                                     max_angular_velocity: float = 0.5,
+                                     weight: Optional[float] = None,
+                                     hard: bool = False,
+                                     start_monitors: List[str] = None,
+                                     hold_monitors: List[str] = None,
+                                     end_monitors: List[str] = None,
+                                     **kwargs: goal_parameter):
         """
         This goal will use put a strict limit on the Cartesian velocity. This will require a lot of constraints, thus
         slowing down the system noticeably.
@@ -668,19 +668,19 @@ class MotionGoalWrapper:
                              new_length=new_length,
                              **kwargs)
 
-    def set_pointing_goal(self,
-                          goal_point: PointStamped,
-                          tip_link: str,
-                          pointing_axis: Vector3Stamped,
-                          root_link: str,
-                          tip_group: Optional[str] = None,
-                          root_group: Optional[str] = None,
-                          max_velocity: float = 0.3,
-                          weight: Optional[float] = None,
-                          start_monitors: List[str] = None,
-                          hold_monitors: List[str] = None,
-                          end_monitors: List[str] = None,
-                          **kwargs: goal_parameter):
+    def add_pointing(self,
+                     goal_point: PointStamped,
+                     tip_link: str,
+                     pointing_axis: Vector3Stamped,
+                     root_link: str,
+                     tip_group: Optional[str] = None,
+                     root_group: Optional[str] = None,
+                     max_velocity: float = 0.3,
+                     weight: Optional[float] = None,
+                     start_monitors: List[str] = None,
+                     hold_monitors: List[str] = None,
+                     end_monitors: List[str] = None,
+                     **kwargs: goal_parameter):
         """
         Will orient pointing_axis at goal_point.
         :param tip_link: tip link of the kinematic chain.
@@ -716,18 +716,18 @@ class MotionGoalWrapper:
                              prediction_horizon=prediction_horizon,
                              **kwargs)
 
-    def set_rotation_goal(self,
-                          goal_orientation: QuaternionStamped,
-                          tip_link: str,
-                          root_link: str,
-                          tip_group: Optional[str] = None,
-                          root_group: Optional[str] = None,
-                          reference_velocity: Optional[float] = None,
-                          weight: Optional[float] = None,
-                          start_monitors: List[str] = None,
-                          hold_monitors: List[str] = None,
-                          end_monitors: List[str] = None,
-                          **kwargs: goal_parameter):
+    def add_cartesian_orientation(self,
+                                  goal_orientation: QuaternionStamped,
+                                  tip_link: str,
+                                  root_link: str,
+                                  tip_group: Optional[str] = None,
+                                  root_group: Optional[str] = None,
+                                  reference_velocity: Optional[float] = None,
+                                  weight: Optional[float] = None,
+                                  start_monitors: List[str] = None,
+                                  hold_monitors: List[str] = None,
+                                  end_monitors: List[str] = None,
+                                  **kwargs: goal_parameter):
         """
         Will use kinematic chain between root_link and tip_link to move tip_link to goal_orientation.
         :param goal_orientation:
@@ -762,19 +762,19 @@ class MotionGoalWrapper:
                              group_name=group_name,
                              base_pose=base_pose)
 
-    def set_straight_cart_goal(self,
-                               goal_pose: PoseStamped,
-                               tip_link: str,
-                               root_link: str,
-                               tip_group: Optional[str] = None,
-                               root_group: Optional[str] = None,
-                               reference_linear_velocity: Optional[float] = None,
-                               reference_angular_velocity: Optional[float] = None,
-                               weight: Optional[float] = None,
-                               start_monitors: List[str] = None,
-                               hold_monitors: List[str] = None,
-                               end_monitors: List[str] = None,
-                               **kwargs: goal_parameter):
+    def add_cartesian_pose_straight(self,
+                                    goal_pose: PoseStamped,
+                                    tip_link: str,
+                                    root_link: str,
+                                    tip_group: Optional[str] = None,
+                                    root_group: Optional[str] = None,
+                                    reference_linear_velocity: Optional[float] = None,
+                                    reference_angular_velocity: Optional[float] = None,
+                                    weight: Optional[float] = None,
+                                    start_monitors: List[str] = None,
+                                    hold_monitors: List[str] = None,
+                                    end_monitors: List[str] = None,
+                                    **kwargs: goal_parameter):
         """
         This goal will use the kinematic chain between root and tip link to move tip link into the goal pose.
         The max velocities enforce a strict limit, but require a lot of additional constraints, thus making the

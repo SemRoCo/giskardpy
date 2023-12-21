@@ -616,7 +616,7 @@ class GiskardTestWrapper(OldGiskardWrapper):
         if expected_response == UpdateWorldResponse.SUCCESS:
             old_link_names = god_map.world.groups[name].link_names_as_set
             old_joint_names = god_map.world.groups[name].joint_names
-        r = super(GiskardTestWrapper, self).world.remove_group(name, timeout=timeout)
+        r = self.world.remove_group(name, timeout=timeout)
         assert r.error_codes == expected_response, \
             f'Got: \'{update_world_error_code(r.error_codes)}\', ' \
             f'expected: \'{update_world_error_code(expected_response)}.\''

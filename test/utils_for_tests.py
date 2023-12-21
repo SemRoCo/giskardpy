@@ -35,7 +35,7 @@ from giskardpy.model.collision_world_syncer import Collisions, Collision
 from giskardpy.my_types import PrefixName, Derivatives
 from giskardpy.exceptions import UnknownGroupException
 from giskardpy.model.joints import OneDofJoint, OmniDrive, DiffDrive
-from giskardpy.python_interface.python_interface import GiskardWrapper
+from giskardpy.python_interface.old_python_interface import OldGiskardWrapper
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.qp_controller import available_solvers
 from giskardpy.utils import logging, utils
@@ -217,7 +217,7 @@ def pykdl_frame_to_numpy(pykdl_frame):
                      [0, 0, 0, 1]])
 
 
-class GiskardTestWrapper(GiskardWrapper):
+class GiskardTestWrapper(OldGiskardWrapper):
     default_pose = {}
     better_pose = {}
     odom_root = 'odom'
@@ -462,7 +462,7 @@ class GiskardTestWrapper(GiskardWrapper):
         """
         if add_local_minimum_reached:
             local_min_reached_monitor_name = self.monitors.add_local_minimum_reached()
-            for goal in self._goals:
+            for goal in self.motion_goals._goals:
                 goal.end_monitors.append(local_min_reached_monitor_name)
         last_js = god_map.world.state.to_position_dict()
         for key, value in list(last_js.items()):

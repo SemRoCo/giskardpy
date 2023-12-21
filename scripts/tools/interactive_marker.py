@@ -15,7 +15,7 @@ from visualization_msgs.msg._InteractiveMarkerControl import InteractiveMarkerCo
 from visualization_msgs.msg._InteractiveMarkerFeedback import InteractiveMarkerFeedback
 from visualization_msgs.msg._Marker import Marker
 
-from giskardpy.python_interface.python_interface import GiskardWrapper
+from giskardpy.python_interface.old_python_interface import OldGiskardWrapper
 from giskardpy.utils import logging
 from giskardpy.utils.math import qv_mult
 
@@ -36,7 +36,7 @@ class IMServer(object):
         :type suffix: str
         """
         self.enable_self_collision = rospy.get_param('~enable_self_collision', True)
-        self.giskard = GiskardWrapper()
+        self.giskard = OldGiskardWrapper()
         self.robot_name = self.giskard.robot_name
         if len(root_tips) > 0:
             self.roots, self.tips = zip(*root_tips)
@@ -167,7 +167,7 @@ class IMServer(object):
             :param tip_link:
             :type tip_link: str
             :param giskard:
-            :type giskard: GiskardWrapper
+            :type giskard: OldGiskardWrapper
             :param enable_self_collision:
             :type enable_self_collision: bool
             """

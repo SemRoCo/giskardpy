@@ -34,7 +34,7 @@ from giskardpy.model.utils import make_world_body_box, hacky_urdf_parser_fix
 from giskardpy.model.world import WorldTree
 from giskardpy.my_types import PrefixName
 from giskardpy.goals.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE
-from giskardpy.python_interface.python_interface import GiskardWrapper
+from giskardpy.python_interface.old_python_interface import OldGiskardWrapper
 from giskardpy.utils.utils import launch_launchfile, suppress_stderr, resolve_ros_iris
 from giskardpy.utils.math import compare_points
 from utils_for_tests import compare_poses, publish_marker_vector, \
@@ -151,7 +151,7 @@ class PR2TestWrapper(GiskardTestWrapper):
         self.robot = god_map.world.groups[self.robot_name]
 
     def low_level_interface(self):
-        return super(GiskardWrapper, self)
+        return super(OldGiskardWrapper, self)
 
     def teleport_base(self, goal_pose, group_name: Optional[str] = None):
         self.set_seed_odometry(base_pose=goal_pose, group_name=group_name)

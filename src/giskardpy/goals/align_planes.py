@@ -54,9 +54,9 @@ class AlignPlanes(Goal):
 
         if name is None:
             name = f'{self.__class__.__name__}/{self.root}/{self.tip}' \
-                   f'_X:{self.tip_V_tip_normal.vector.x}' \
-                   f'_Y:{self.tip_V_tip_normal.vector.y}' \
-                   f'_Z:{self.tip_V_tip_normal.vector.z}'
+                   f'_X:{self.tip_V_tip_normal.vector.x:.3f}' \
+                   f'_Y:{self.tip_V_tip_normal.vector.y:.3f}' \
+                   f'_Z:{self.tip_V_tip_normal.vector.z:.3f}'
         super().__init__(name)
 
         task = Task('align planes')

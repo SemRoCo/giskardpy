@@ -17,9 +17,9 @@ from giskardpy.utils.utils import create_path, string_shortener
 
 def generate_graph(goals: Dict[str, Goal], monitors: List[Monitor], output_file: str = 'graph.png'):
     def shorten(string: str) -> str:
-        return string_shortener(original_str=string,
+        return '"' + string_shortener(original_str=string,
                                 max_lines=4,
-                                max_line_length=25)
+                                max_line_length=25) + '"'
 
     # Initialize graph
     graph = pydot.Dot(graph_type='digraph')

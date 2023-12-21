@@ -46,6 +46,8 @@ class CartesianPosition(Goal):
             reference_velocity = self.default_reference_velocity
         self.reference_velocity = reference_velocity
         self.weight = weight
+        if start_monitors:
+            relative = True
         if relative:
             root_P_goal = transform_msg_and_turn_to_expr(self.root_link, goal_point, start_monitors)
         else:

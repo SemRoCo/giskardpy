@@ -205,7 +205,6 @@ class SelfCollisionAvoidance(Goal):
                                    cas.min(number_of_self_collisions, self.num_repeller))
         distance_monitor = Monitor(f'collision distance {self.name}', crucial=False)
         distance_monitor.set_expression(cas.less(actual_distance, 50))
-        god_map.debug_expression_manager.add_debug_expression(f'distance {str(self)}', actual_distance)
         self.add_monitor(distance_monitor)
         task = Task('stay away')
         task.add_hold_monitors_monitor(distance_monitor)

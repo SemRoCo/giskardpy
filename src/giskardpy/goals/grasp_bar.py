@@ -96,3 +96,4 @@ class GraspBar(Goal):
                                         reference_velocity=self.reference_linear_velocity,
                                         weight=self.weight)
         self.add_task(task)
+        self.connect_monitors_to_all_tasks(start_monitors, hold_monitors, end_monitors)

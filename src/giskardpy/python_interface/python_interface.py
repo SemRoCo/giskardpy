@@ -1191,7 +1191,9 @@ class MonitorWrapper:
                             threshold: float = 0.01,
                             crucial: bool = True) -> str:
         if name is None:
-            name = f'{root_link}/{tip_link} {goal_normal}/{tip_normal} vectors aligned'
+            name = f'{root_link}/{tip_link} vectors aligned'
+            while name in self._monitors:
+                name += 'I'
         self.add_monitor(monitor_type=VectorsAligned.__name__,
                          monitor_name=name,
                          root_link=root_link,

@@ -421,6 +421,167 @@ class TestJointGoals:
 class TestConstraints:
     # TODO write buggy constraints that test sanity checks
 
+    def test_bowl_and_cup_sequence(self, kitchen_setup: PR2TestWrapper):
+        # %% setup
+        bowl_name = 'bowl'
+        cup_name = 'cup'
+        percentage = 50
+        drawer_handle = 'sink_area_left_middle_drawer_handle'
+        drawer_joint = 'sink_area_left_middle_drawer_main_joint'
+        # spawn cup
+        cup_pose = PoseStamped()
+        cup_pose.header.frame_id = 'iai_kitchen/sink_area_left_middle_drawer_main'
+        cup_pose.header.stamp = rospy.get_rostime() + rospy.Duration(0.5)
+        cup_pose.pose.position = Point(0.1, 0.2, -.05)
+        cup_pose.pose.orientation = Quaternion(0, 0, 0, 1)
+
+        kitchen_setup.add_cylinder_to_world(name=cup_name, height=0.07, radius=0.04, pose=cup_pose,
+                                            parent_link='sink_area_left_middle_drawer_main')
+
+        # spawn bowl
+        bowl_pose = PoseStamped()
+        bowl_pose.header.frame_id = 'iai_kitchen/sink_area_left_middle_drawer_main'
+        bowl_pose.pose.position = Point(0.1, -0.2, -.05)
+        bowl_pose.pose.orientation = Quaternion(0, 0, 0, 1)
+
+        kitchen_setup.add_cylinder_to_world(name=bowl_name, height=0.05, radius=0.07, pose=bowl_pose,
+                                            parent_link='sink_area_left_middle_drawer_main')
+
+        # %% phase 1: grasp drawer handle
+        bar_axis = Vector3Stamped()
+        bar_axis.header.frame_id = drawer_handle
+        bar_axis.vector.y = 1
+
+        bar_center = PointStamped()
+        bar_center.header.frame_id = drawer_handle
+
+        tip_grasp_axis = Vector3Stamped()
+        tip_grasp_axis.header.frame_id = kitchen_setup.l_tip
+        tip_grasp_axis.vector.z = 1
+
+        phase1 = kitchen_setup.monitors.add_distance_to_line(name='phase 1',
+                                                             root_link=kitchen_setup.default_root,
+                                                             tip_link=kitchen_setup.l_tip,
+                                                             center_point=bar_center,
+                                                             line_axis=bar_axis,
+                                                             line_length=0.4)
+        kitchen_setup.motion_goals.add_grasp_bar(bar_center=bar_center,
+                                                 bar_axis=bar_axis,
+                                                 bar_length=0.4,
+                                                 tip_link=kitchen_setup.l_tip,
+                                                 tip_grasp_axis=tip_grasp_axis,
+                                                 root_link=kitchen_setup.default_root,
+                                                 end_monitors=[phase1])
+        x_gripper = Vector3Stamped()
+        x_gripper.header.frame_id = kitchen_setup.l_tip
+        x_gripper.vector.x = 1
+
+        x_goal = Vector3Stamped()
+        x_goal.header.frame_id = drawer_handle
+        x_goal.vector.x = -1
+
+        kitchen_setup.motion_goals.add_align_planes(tip_link=kitchen_setup.l_tip,
+                                                    tip_normal=x_gripper,
+                                                    root_link=kitchen_setup.default_root,
+                                                    goal_normal=x_goal,
+                                                    end_monitors=[phase1])
+        # kitchen_setup.allow_all_collisions()
+        # kitchen_setup.plan_and_execute()
+
+        # %% phase 2 open drawer
+        phase2 = kitchen_setup.monitors.add_local_minimum_reached('phase 2')
+        kitchen_setup.motion_goals.add_open_container(tip_link=kitchen_setup.l_tip,
+                                                      environment_link=drawer_handle,
+                                                      start_monitors=[phase1],
+                                                      end_monitors=[phase2])
+        kitchen_setup.execute(add_local_minimum_reached=False)
+
+        # kitchen_setup.set_env_state({drawer_joint: 0.48})
+        #
+        # kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
+        # base_pose = PoseStamped()
+        # base_pose.header.frame_id = 'map'
+        # base_pose.pose.position.y = 1
+        # base_pose.pose.position.x = .1
+        # base_pose.pose.orientation.w = 1
+        # kitchen_setup.move_base(base_pose)
+        #
+        # # grasp bowl
+        # l_goal = deepcopy(bowl_pose)
+        # l_goal.header.frame_id = 'iai_kitchen/sink_area_left_middle_drawer_main'
+        # l_goal.pose.position.z += .2
+        # l_goal.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 1, 0, 0],
+        #                                                               [0, 0, -1, 0],
+        #                                                               [-1, 0, 0, 0],
+        #                                                               [0, 0, 0, 1]]))
+        # kitchen_setup.add_cart_goal(goal_pose=l_goal,
+        #                             tip_link=kitchen_setup.l_tip,
+        #                             root_link=kitchen_setup.default_root)
+        # kitchen_setup.allow_collision(kitchen_setup.l_gripper_group, bowl_name)
+        #
+        # # grasp cup
+        # r_goal = deepcopy(cup_pose)
+        # r_goal.header.frame_id = 'iai_kitchen/sink_area_left_middle_drawer_main'
+        # r_goal.pose.position.z += .2
+        # r_goal.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 1, 0, 0],
+        #                                                               [0, 0, -1, 0],
+        #                                                               [-1, 0, 0, 0],
+        #                                                               [0, 0, 0, 1]]))
+        # kitchen_setup.set_avoid_joint_limits_goal(percentage=percentage)
+        # kitchen_setup.add_cart_goal(goal_pose=r_goal,
+        #                             tip_link=kitchen_setup.r_tip,
+        #                             root_link=kitchen_setup.default_root)
+        # kitchen_setup.plan_and_execute()
+        #
+        # l_goal.pose.position.z -= .2
+        # r_goal.pose.position.z -= .2
+        # kitchen_setup.add_cart_goal(goal_pose=l_goal,
+        #                             tip_link=kitchen_setup.l_tip,
+        #                             root_link=kitchen_setup.default_root)
+        # kitchen_setup.add_cart_goal(goal_pose=r_goal,
+        #                             tip_link=kitchen_setup.r_tip,
+        #                             root_link=kitchen_setup.default_root)
+        # kitchen_setup.set_avoid_joint_limits_goal(percentage=percentage)
+        # kitchen_setup.avoid_all_collisions(0.05)
+        # kitchen_setup.allow_collision(group1=kitchen_setup.robot_name, group2=bowl_name)
+        # kitchen_setup.allow_collision(group1=kitchen_setup.robot_name, group2=cup_name)
+        # kitchen_setup.plan_and_execute()
+        #
+        # kitchen_setup.update_parent_link_of_group(name=bowl_name, parent_link=kitchen_setup.l_tip)
+        # kitchen_setup.update_parent_link_of_group(name=cup_name, parent_link=kitchen_setup.r_tip)
+        #
+        # kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
+        # kitchen_setup.plan_and_execute()
+        # base_goal = PoseStamped()
+        # base_goal.header.frame_id = 'base_footprint'
+        # base_goal.pose.position.x = -.1
+        # base_goal.pose.orientation = Quaternion(*quaternion_about_axis(pi, [0, 0, 1]))
+        # kitchen_setup.move_base(base_goal)
+        #
+        # # place bowl and cup
+        # bowl_goal = PoseStamped()
+        # bowl_goal.header.frame_id = 'kitchen_island_surface'
+        # bowl_goal.pose.position = Point(.2, 0, .05)
+        # bowl_goal.pose.orientation = Quaternion(0, 0, 0, 1)
+        #
+        # cup_goal = PoseStamped()
+        # cup_goal.header.frame_id = 'kitchen_island_surface'
+        # cup_goal.pose.position = Point(.15, 0.25, .07)
+        # cup_goal.pose.orientation = Quaternion(0, 0, 0, 1)
+        #
+        # kitchen_setup.add_cart_goal(goal_pose=bowl_goal, tip_link=bowl_name, root_link=kitchen_setup.default_root)
+        # kitchen_setup.add_cart_goal(goal_pose=cup_goal, tip_link=cup_name, root_link=kitchen_setup.default_root)
+        # kitchen_setup.set_avoid_joint_limits_goal(percentage=percentage)
+        # kitchen_setup.avoid_all_collisions(0.05)
+        # kitchen_setup.plan_and_execute()
+        #
+        # kitchen_setup.detach_group(name=bowl_name)
+        # kitchen_setup.detach_group(name=cup_name)
+        # kitchen_setup.allow_collision(group1=kitchen_setup.robot_name, group2=cup_name)
+        # kitchen_setup.allow_collision(group1=kitchen_setup.robot_name, group2=bowl_name)
+        # kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
+        # kitchen_setup.plan_and_execute()
+
     def test_add_debug_expr(self, zero_pose: PR2TestWrapper):
         zero_pose.motion_goals.add_motion_goal(motion_goal_class=DebugGoal.__name__)
         zero_pose.set_joint_goal(zero_pose.better_pose)

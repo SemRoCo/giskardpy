@@ -599,7 +599,7 @@ class GiskardTestWrapper(GiskardWrapper):
         assert new_group_name in self.world.get_group_names()
 
     def clear_world(self, timeout: float = TimeOut) -> UpdateWorldResponse:
-        respone = self.world.clear_world(timeout=timeout)
+        respone = self.world.clear(timeout=timeout)
         self.default_env_name = None
         assert respone.error_codes == UpdateWorldResponse.SUCCESS
         assert len(god_map.world.groups) == 1
@@ -689,12 +689,12 @@ class GiskardTestWrapper(GiskardWrapper):
                          parent_link_group: str = '',
                          timeout: float = TimeOut,
                          expected_error_code: int = UpdateWorldResponse.SUCCESS) -> UpdateWorldResponse:
-        response = self.world.add_box_to_world(name=name,
-                                                  size=size,
-                                                  pose=pose,
-                                                  parent_link=parent_link,
-                                                  parent_link_group=parent_link_group,
-                                                  timeout=timeout)
+        response = self.world.add_box(name=name,
+                                      size=size,
+                                      pose=pose,
+                                      parent_link=parent_link,
+                                      parent_link_group=parent_link_group,
+                                      timeout=timeout)
         self.check_add_object_result(response=response,
                                      name=name,
                                      size=size,
@@ -723,12 +723,12 @@ class GiskardTestWrapper(GiskardWrapper):
                             parent_link_group: str = '',
                             timeout: float = TimeOut,
                             expected_error_code=UpdateWorldResponse.SUCCESS) -> UpdateWorldResponse:
-        response = self.world.add_sphere_to_world(name=name,
-                                                     radius=radius,
-                                                     pose=pose,
-                                                     parent_link=parent_link,
-                                                     parent_link_group=parent_link_group,
-                                                     timeout=timeout)
+        response = self.world.add_sphere(name=name,
+                                         radius=radius,
+                                         pose=pose,
+                                         parent_link=parent_link,
+                                         parent_link_group=parent_link_group,
+                                         timeout=timeout)
         self.check_add_object_result(response=response,
                                      name=name,
                                      size=None,
@@ -747,13 +747,13 @@ class GiskardTestWrapper(GiskardWrapper):
                               parent_link_group: str = '',
                               timeout: float = TimeOut,
                               expected_error_code=UpdateWorldResponse.SUCCESS) -> UpdateWorldResponse:
-        response = self.world.add_cylinder_to_world(name=name,
-                                                       height=height,
-                                                       radius=radius,
-                                                       pose=pose,
-                                                       parent_link=parent_link,
-                                                       parent_link_group=parent_link_group,
-                                                       timeout=timeout)
+        response = self.world.add_cylinder(name=name,
+                                           height=height,
+                                           radius=radius,
+                                           pose=pose,
+                                           parent_link=parent_link,
+                                           parent_link_group=parent_link_group,
+                                           timeout=timeout)
         self.check_add_object_result(response=response,
                                      name=name,
                                      size=None,
@@ -772,13 +772,13 @@ class GiskardTestWrapper(GiskardWrapper):
                           scale: Tuple[float, float, float] = (1, 1, 1),
                           timeout: float = TimeOut,
                           expected_error_code=UpdateWorldResponse.SUCCESS) -> UpdateWorldResponse:
-        response = self.world.add_mesh_to_world(name=name,
-                                                   mesh=mesh,
-                                                   pose=pose,
-                                                   parent_link=parent_link,
-                                                   parent_link_group=parent_link_group,
-                                                   scale=scale,
-                                                   timeout=timeout)
+        response = self.world.add_mesh(name=name,
+                                       mesh=mesh,
+                                       pose=pose,
+                                       parent_link=parent_link,
+                                       parent_link_group=parent_link_group,
+                                       scale=scale,
+                                       timeout=timeout)
         pose = utils.make_pose_from_parts(pose=pose, frame_id=pose.header.frame_id,
                                           position=pose.pose.position, orientation=pose.pose.orientation)
         self.check_add_object_result(response=response,
@@ -800,13 +800,13 @@ class GiskardTestWrapper(GiskardWrapper):
                           set_js_topic: Optional[str] = '',
                           timeout: float = TimeOut,
                           expected_error_code=UpdateWorldResponse.SUCCESS) -> UpdateWorldResponse:
-        response = self.world.add_urdf_to_world(name=name,
-                                                   urdf=urdf,
-                                                   pose=pose,
-                                                   parent_link=parent_link,
-                                                   parent_link_group=parent_link_group,
-                                                   js_topic=js_topic,
-                                                   timeout=timeout)
+        response = self.world.add_urdf(name=name,
+                                       urdf=urdf,
+                                       pose=pose,
+                                       parent_link=parent_link,
+                                       parent_link_group=parent_link_group,
+                                       js_topic=js_topic,
+                                       timeout=timeout)
         self.wait_heartbeats()
         self.check_add_object_result(response=response,
                                      name=name,

@@ -44,7 +44,7 @@ class WorldWrapper:
         rospy.wait_for_service(f'{node_name}/update_world')
         self.robot_name = self.get_group_names()[0]
 
-    def clear_world(self, timeout: float = 2) -> UpdateWorldResponse:
+    def clear(self, timeout: float = 2) -> UpdateWorldResponse:
         """
         Resets the world to what it was when Giskard was launched.
         """
@@ -70,13 +70,13 @@ class WorldWrapper:
         result: UpdateWorldResponse = self._update_world_srv.call(req)
         return result
 
-    def add_box_to_world(self,
-                         name: str,
-                         size: Tuple[float, float, float],
-                         pose: PoseStamped,
-                         parent_link: str = '',
-                         parent_link_group: str = '',
-                         timeout: float = 2) -> UpdateWorldResponse:
+    def add_box(self,
+                name: str,
+                size: Tuple[float, float, float],
+                pose: PoseStamped,
+                parent_link: str = '',
+                parent_link_group: str = '',
+                timeout: float = 2) -> UpdateWorldResponse:
         """
         Adds a new box to the world tree and attaches it to parent_link.
         If parent_link_group and parent_link are empty, the box will be attached to the world root link, e.g., map.
@@ -98,13 +98,13 @@ class WorldWrapper:
         req.pose = pose
         return self._update_world_srv.call(req)
 
-    def add_sphere_to_world(self,
-                            name: str,
-                            radius: float,
-                            pose: PoseStamped,
-                            parent_link: str = '',
-                            parent_link_group: str = '',
-                            timeout: float = 2) -> UpdateWorldResponse:
+    def add_sphere(self,
+                   name: str,
+                   radius: float,
+                   pose: PoseStamped,
+                   parent_link: str = '',
+                   parent_link_group: str = '',
+                   timeout: float = 2) -> UpdateWorldResponse:
         """
         See add_box.
         """
@@ -122,14 +122,14 @@ class WorldWrapper:
         req.parent_link_group = parent_link_group
         return self._update_world_srv.call(req)
 
-    def add_mesh_to_world(self,
-                          name: str,
-                          mesh: str,
-                          pose: PoseStamped,
-                          parent_link: str = '',
-                          parent_link_group: str = '',
-                          scale: Tuple[float, float, float] = (1, 1, 1),
-                          timeout: float = 2) -> UpdateWorldResponse:
+    def add_mesh(self,
+                 name: str,
+                 mesh: str,
+                 pose: PoseStamped,
+                 parent_link: str = '',
+                 parent_link_group: str = '',
+                 scale: Tuple[float, float, float] = (1, 1, 1),
+                 timeout: float = 2) -> UpdateWorldResponse:
         """
         See add_box.
         :param mesh: path to the mesh location, can be ros package path, e.g.,
@@ -151,14 +151,14 @@ class WorldWrapper:
         req.parent_link_group = parent_link_group
         return self._update_world_srv.call(req)
 
-    def add_cylinder_to_world(self,
-                              name: str,
-                              height: float,
-                              radius: float,
-                              pose: PoseStamped,
-                              parent_link: str = '',
-                              parent_link_group: str = '',
-                              timeout: float = 2) -> UpdateWorldResponse:
+    def add_cylinder(self,
+                     name: str,
+                     height: float,
+                     radius: float,
+                     pose: PoseStamped,
+                     parent_link: str = '',
+                     parent_link_group: str = '',
+                     timeout: float = 2) -> UpdateWorldResponse:
         """
         See add_box.
         """
@@ -210,14 +210,14 @@ class WorldWrapper:
         req.operation = req.UPDATE_PARENT_LINK
         return self._update_world_srv.call(req)
 
-    def add_urdf_to_world(self,
-                          name: str,
-                          urdf: str,
-                          pose: PoseStamped,
-                          parent_link: str = '',
-                          parent_link_group: str = '',
-                          js_topic: Optional[str] = '',
-                          timeout: float = 2) -> UpdateWorldResponse:
+    def add_urdf(self,
+                 name: str,
+                 urdf: str,
+                 pose: PoseStamped,
+                 parent_link: str = '',
+                 parent_link_group: str = '',
+                 js_topic: Optional[str] = '',
+                 timeout: float = 2) -> UpdateWorldResponse:
         """
         Adds a urdf to the world.
         :param name: name the group containing the urdf will have.
@@ -322,9 +322,16 @@ class MotionGoalWrapper:
     _goals: List[MotionGoal]
     _collision_entries: Dict[Tuple[Tuple[str, ...], Tuple[str, ...], Tuple[str, ...]], List[CollisionEntry]]
 
-    def __init__(self, node_name: str):
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
         self._goals = []
-        self._collision_entries = {}
+        self._collision_entries = defaultdict(list)
+
+    def get_goals(self):
+        self._add_collision_entries_as_goals()
+        return self._goals
 
     def add_motion_goal(self,
                         motion_goal_class: str,
@@ -341,6 +348,108 @@ class MotionGoalWrapper:
         motion_goal.end_monitors = end_monitors or []
         motion_goal.kwargs = kwargs_to_json(kwargs)
         self._goals.append(motion_goal)
+
+    def allow_collision(self,
+                        group1: str = CollisionEntry.ALL,
+                        group2: str = CollisionEntry.ALL,
+                        start_monitors: Optional[List[str]] = None,
+                        hold_monitors: Optional[List[str]] = None,
+                        end_monitors: Optional[List[str]] = None):
+        """
+        Tell Giskard to allow collision between group1 and group2. Use CollisionEntry.ALL to allow collision with all
+        groups.
+        :param group1: name of the first group
+        :param group2: name of the second group
+        """
+        collision_entry = CollisionEntry()
+        collision_entry.type = CollisionEntry.ALLOW_COLLISION
+        collision_entry.group1 = str(group1)
+        collision_entry.group2 = str(group2)
+        self._add_collision_avoidance(collisions=[collision_entry],
+                                      start_monitors=start_monitors,
+                                      hold_monitors=hold_monitors,
+                                      end_monitors=end_monitors)
+
+    def avoid_collision(self,
+                        min_distance: Optional[float] = None,
+                        group1: str = CollisionEntry.ALL,
+                        group2: str = CollisionEntry.ALL,
+                        start_monitors: Optional[List[str]] = None,
+                        hold_monitors: Optional[List[str]] = None,
+                        end_monitors: Optional[List[str]] = None):
+        """
+        Tell Giskard to avoid collision between group1 and group2. Use CollisionEntry.ALL to allow collision with all
+        groups.
+        :param min_distance: set this to overwrite the default distances
+        :param group1: name of the first group
+        :param group2: name of the second group
+        """
+        if min_distance is None:
+            min_distance = - 1
+        collision_entry = CollisionEntry()
+        collision_entry.type = CollisionEntry.AVOID_COLLISION
+        collision_entry.distance = min_distance
+        collision_entry.group1 = group1
+        collision_entry.group2 = group2
+        self._add_collision_avoidance(collisions=[collision_entry],
+                                      start_monitors=start_monitors,
+                                      hold_monitors=hold_monitors,
+                                      end_monitors=end_monitors)
+
+    def allow_all_collisions(self,
+                             start_monitors: Optional[List[str]] = None,
+                             hold_monitors: Optional[List[str]] = None,
+                             end_monitors: Optional[List[str]] = None):
+        """
+        Allows all collisions for next goal.
+        """
+        collision_entry = CollisionEntry()
+        collision_entry.type = CollisionEntry.ALLOW_COLLISION
+        self._add_collision_avoidance(collisions=[collision_entry],
+                                      start_monitors=start_monitors,
+                                      hold_monitors=hold_monitors,
+                                      end_monitors=end_monitors)
+
+    def avoid_all_collisions(self,
+                             min_distance: Optional[float] = None,
+                             start_monitors: Optional[List[str]] = None,
+                             hold_monitors: Optional[List[str]] = None,
+                             end_monitors: Optional[List[str]] = None):
+        """
+        Avoids all collisions for next goal.
+        If you don't want to override the distance, don't call this function. Avoid all is the default, if you don't
+        add any collision entries.
+        :param min_distance: set this to overwrite default distances
+        """
+        if min_distance is None:
+            min_distance = -1
+        collision_entry = CollisionEntry()
+        collision_entry.type = CollisionEntry.AVOID_COLLISION
+        collision_entry.distance = min_distance
+        self._add_collision_avoidance(collisions=[collision_entry],
+                                      start_monitors=start_monitors,
+                                      hold_monitors=hold_monitors,
+                                      end_monitors=end_monitors)
+
+    def allow_self_collision(self,
+                             robot_name: Optional[str] = None,
+                             start_monitors: Optional[List[str]] = None,
+                             hold_monitors: Optional[List[str]] = None,
+                             end_monitors: Optional[List[str]] = None):
+        """
+        Allows the collision of the robot with itself for the next goal.
+        :param robot_name: if there are multiple robots, specify which one.
+        """
+        if robot_name is None:
+            robot_name = self.robot_name
+        collision_entry = CollisionEntry()
+        collision_entry.type = CollisionEntry.ALLOW_COLLISION
+        collision_entry.group1 = robot_name
+        collision_entry.group2 = robot_name
+        self._add_collision_avoidance(collisions=[collision_entry],
+                                      start_monitors=start_monitors,
+                                      hold_monitors=hold_monitors,
+                                      end_monitors=end_monitors)
 
     def add_joint_position(self,
                            goal_state: Dict[str, float],
@@ -414,6 +523,29 @@ class MotionGoalWrapper:
                              hold_monitors=hold_monitors,
                              end_monitors=end_monitors,
                              **kwargs)
+
+    def _add_collision_avoidance(self,
+                                 collisions: List[CollisionEntry],
+                                 start_monitors: Optional[List[str]] = None,
+                                 hold_monitors: Optional[List[str]] = None,
+                                 end_monitors: Optional[List[str]] = None):
+        start_monitors = start_monitors or ()
+        hold_monitors = hold_monitors or ()
+        end_monitors = end_monitors or ()
+        key = (tuple(start_monitors), tuple(hold_monitors), tuple(end_monitors))
+        self._collision_entries[key].extend(collisions)
+
+    def _add_collision_entries_as_goals(self):
+        for (start_monitors, hold_monitors, end_monitors), collision_entries in self._collision_entries.items():
+            name = 'collision avoidance'
+            if start_monitors or hold_monitors or end_monitors:
+                name += f'{start_monitors}, {hold_monitors}, {end_monitors}'
+            self.add_motion_goal(motion_goal_class=CollisionAvoidance.__name__,
+                                 goal_name=name,
+                                 collision_entries=collision_entries,
+                                 start_monitors=list(start_monitors),
+                                 hold_monitors=list(hold_monitors),
+                                 end_monitors=list(end_monitors))
 
     def add_align_planes(self,
                          goal_normal: Vector3Stamped,
@@ -806,18 +938,18 @@ class MotionGoalWrapper:
                              end_monitors=end_monitors,
                              **kwargs)
 
-    def set_translation_goal(self,
-                             goal_point: PointStamped,
-                             tip_link: str,
-                             root_link: str,
-                             tip_group: Optional[str] = None,
-                             root_group: Optional[str] = None,
-                             reference_velocity: Optional[float] = 0.2,
-                             weight: Optional[float] = None,
-                             start_monitors: List[str] = None,
-                             hold_monitors: List[str] = None,
-                             end_monitors: List[str] = None,
-                             **kwargs: goal_parameter):
+    def add_cartesian_position(self,
+                               goal_point: PointStamped,
+                               tip_link: str,
+                               root_link: str,
+                               tip_group: Optional[str] = None,
+                               root_group: Optional[str] = None,
+                               reference_velocity: Optional[float] = 0.2,
+                               weight: Optional[float] = None,
+                               start_monitors: List[str] = None,
+                               hold_monitors: List[str] = None,
+                               end_monitors: List[str] = None,
+                               **kwargs: goal_parameter):
         """
         Will use kinematic chain between root_link and tip_link to move tip_link to goal_point.
         :param goal_point:
@@ -841,18 +973,18 @@ class MotionGoalWrapper:
                              end_monitors=end_monitors,
                              **kwargs)
 
-    def set_straight_translation_goal(self,
-                                      goal_point: PointStamped,
-                                      tip_link: str,
-                                      root_link: str,
-                                      tip_group: Optional[str] = None,
-                                      root_group: Optional[str] = None,
-                                      reference_velocity: float = None,
-                                      weight: Optional[float] = None,
-                                      start_monitors: List[str] = None,
-                                      hold_monitors: List[str] = None,
-                                      end_monitors: List[str] = None,
-                                      **kwargs: goal_parameter):
+    def add_cartesian_position_straight(self,
+                                        goal_point: PointStamped,
+                                        tip_link: str,
+                                        root_link: str,
+                                        tip_group: Optional[str] = None,
+                                        root_group: Optional[str] = None,
+                                        reference_velocity: float = None,
+                                        weight: Optional[float] = None,
+                                        start_monitors: List[str] = None,
+                                        hold_monitors: List[str] = None,
+                                        end_monitors: List[str] = None,
+                                        **kwargs: goal_parameter):
         """
         Same as set_translation_goal, but will try to move in a straight line.
         """
@@ -873,7 +1005,13 @@ class MotionGoalWrapper:
 class MonitorWrapper:
     _monitors: List[Monitor]
 
-    def __init__(self, node_name: str):
+    def __init__(self):
+        self.reset()
+
+    def get_monitors(self):
+        return self._monitors
+
+    def reset(self):
         self._monitors = []
 
     def add_monitor(self, monitor_type: str, monitor_name: str, **kwargs):
@@ -1070,8 +1208,8 @@ class LowLevelGiskardWrapper:
 
     def __init__(self, node_name: str = 'giskard'):
         self.world = WorldWrapper(node_name)
-        self.motion_goals = MotionGoalWrapper(node_name)
-        self.monitors = MonitorWrapper(node_name)
+        self.motion_goals = MotionGoalWrapper()
+        self.monitors = MonitorWrapper()
         self.clear_motion_goals_and_monitors()
         giskard_topic = f'{node_name}/command'
         self._client = SimpleActionClient(giskard_topic, MoveAction)
@@ -1083,14 +1221,12 @@ class LowLevelGiskardWrapper:
     def robot_name(self):
         return self.world.robot_name
 
-    # %% action server communication
     def clear_motion_goals_and_monitors(self):
         """
         Removes all move commands from the current goal, collision entries are left untouched.
         """
-        self.motion_goals._goals = []
-        self.motion_goals._collision_entries = defaultdict(list)
-        self.monitors._monitors = []
+        self.motion_goals.reset()
+        self.monitors.reset()
 
     def execute(self, wait: bool = True) -> MoveResult:
         """
@@ -1125,23 +1261,10 @@ class LowLevelGiskardWrapper:
 
     def _create_action_goal(self) -> MoveGoal:
         action_goal = MoveGoal()
-        action_goal.monitors = self.monitors._monitors
-        action_goal.goals = self.motion_goals._goals
-        self._add_collision_entries_as_goals()
+        action_goal.monitors = self.monitors.get_monitors()
+        action_goal.goals = self.motion_goals.get_goals()
         self.clear_motion_goals_and_monitors()
         return action_goal
-
-    def _add_collision_entries_as_goals(self):
-        for (start_monitors, hold_monitors, end_monitors), collision_entries in self.motion_goals._collision_entries.items():
-            name = 'collision avoidance'
-            if start_monitors or hold_monitors or end_monitors:
-                name += f'{start_monitors}, {hold_monitors}, {end_monitors}'
-            self.motion_goals.add_motion_goal(motion_goal_class=CollisionAvoidance.__name__,
-                                              goal_name=name,
-                                              collision_entries=collision_entries,
-                                              start_monitors=list(start_monitors),
-                                              hold_monitors=list(hold_monitors),
-                                              end_monitors=list(end_monitors))
 
     def interrupt(self):
         """
@@ -1166,15 +1289,3 @@ class LowLevelGiskardWrapper:
 
     def _feedback_cb(self, msg: MoveFeedback):
         self.last_feedback = msg
-
-    # %% collision avoidance
-    def _add_collision_avoidance(self,
-                                 collisions: List[CollisionEntry],
-                                 start_monitors: Optional[List[str]] = None,
-                                 hold_monitors: Optional[List[str]] = None,
-                                 end_monitors: Optional[List[str]] = None):
-        start_monitors = start_monitors or ()
-        hold_monitors = hold_monitors or ()
-        end_monitors = end_monitors or ()
-        key = (tuple(start_monitors), tuple(hold_monitors), tuple(end_monitors))
-        self.motion_goals._collision_entries[key].extend(collisions)

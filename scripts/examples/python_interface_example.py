@@ -30,7 +30,7 @@ rospy.loginfo('Instantiating Giskard wrapper.')
 giskard_wrapper = GiskardWrapper()
 
 # Remove everything but the robot.
-giskard_wrapper.clear_world()
+giskard_wrapper.clear()
 
 rospy.loginfo('Combining a joint goal for the arm with a Cartesian goal for the base to reset the pr2.')
 # Setting the joint goal
@@ -134,18 +134,18 @@ box_name = 'muh'
 box_pose = PoseStamped()
 box_pose.header.frame_id = 'r_gripper_tool_frame'
 box_pose.pose.orientation.w = 1
-giskard_wrapper.add_box_to_world(name=box_name,
-                                 size=(0.2, 0.1, 0.1),
-                                 pose=box_pose,
-                                 parent_link='map')
+giskard_wrapper.add_box(name=box_name,
+                        size=(0.2, 0.1, 0.1),
+                        pose=box_pose,
+                        parent_link='map')
 rospy.loginfo('Delete everything but the robot.')
-giskard_wrapper.clear_world()
+giskard_wrapper.clear()
 
 rospy.loginfo('Spawn a box again')
-giskard_wrapper.add_box_to_world(name=box_name,
-                                 size=(0.2, 0.1, 0.1),
-                                 pose=box_pose,
-                                 parent_link='map')
+giskard_wrapper.add_box(name=box_name,
+                        size=(0.2, 0.1, 0.1),
+                        pose=box_pose,
+                        parent_link='map')
 
 rospy.loginfo('Attach it to the robot')
 giskard_wrapper.update_parent_link_of_group(name=box_name,
@@ -155,10 +155,10 @@ rospy.loginfo('Delete only the box.')
 giskard_wrapper.remove_group(name=box_name)
 
 rospy.loginfo('Attach a box directly to the robot\'s right gripper.')
-giskard_wrapper.add_box_to_world(name=box_name,
-                                 size=(0.2, 0.1, 0.1),
-                                 pose=box_pose,
-                                 parent_link='r_gripper_tool_frame')
+giskard_wrapper.add_box(name=box_name,
+                        size=(0.2, 0.1, 0.1),
+                        pose=box_pose,
+                        parent_link='r_gripper_tool_frame')
 
 rospy.loginfo('Set a Cartesian goal for the box')
 box_goal = PoseStamped()

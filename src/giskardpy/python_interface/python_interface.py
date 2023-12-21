@@ -1,8 +1,9 @@
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, Tuple
 
 from geometry_msgs.msg import PoseStamped, PointStamped, QuaternionStamped, Vector3Stamped
 
-from giskard_msgs.msg import MoveResult, CollisionEntry
+from giskard_msgs.msg import MoveResult, CollisionEntry, MoveGoal
+from giskard_msgs.srv import UpdateWorldResponse, DyeGroupResponse, GetGroupInfoResponse, RegisterGroupResponse
 from giskardpy.goals.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
 from giskardpy.my_types import goal_parameter
 from giskardpy.python_interface.low_level_python_interface import LowLevelGiskardWrapper
@@ -20,6 +21,15 @@ class GiskardWrapper(LowLevelGiskardWrapper):
         for goal in self.motion_goals._goals:
             goal.end_monitors.append(local_min_reached_monitor_name)
         return super().projection(wait)
+
+    def _create_action_goal(self) -> MoveGoal:
+        if not self.motion_goals._collision_entries:
+            self.motion_goals.avoid_all_collisions()
+        action_goal = MoveGoal()
+        action_goal.monitors = self.monitors.get_monitors()
+        action_goal.goals = self.motion_goals.get_goals()
+        self.clear_motion_goals_and_monitors()
+        return action_goal
 
     # %% predefined goals
     def set_joint_goal(self,
@@ -43,11 +53,11 @@ class GiskardWrapper(LowLevelGiskardWrapper):
         else:
             end_monitors_monitors = []
         self.motion_goals.add_joint_position(goal_state=goal_state,
-                                         group_name=group_name,
-                                         weight=weight,
-                                         max_velocity=max_velocity,
-                                         end_monitors=end_monitors_monitors,
-                                         **kwargs)
+                                             group_name=group_name,
+                                             weight=weight,
+                                             max_velocity=max_velocity,
+                                             end_monitors=end_monitors_monitors,
+                                             **kwargs)
 
     def add_cart_goal(self,
                       goal_pose: PoseStamped,
@@ -229,15 +239,15 @@ class GiskardWrapper(LowLevelGiskardWrapper):
             end_monitors_monitors = [monitor_name]
         else:
             end_monitors_monitors = []
-        self.motion_goals.set_translation_goal(end_monitors=end_monitors_monitors,
-                                               goal_point=goal_point,
-                                               tip_link=tip_link,
-                                               root_link=root_link,
-                                               tip_group=tip_group,
-                                               root_group=root_group,
-                                               reference_velocity=reference_velocity,
-                                               weight=weight,
-                                               **kwargs)
+        self.motion_goals.add_cartesian_position(end_monitors=end_monitors_monitors,
+                                                 goal_point=goal_point,
+                                                 tip_link=tip_link,
+                                                 root_link=root_link,
+                                                 tip_group=tip_group,
+                                                 root_group=root_group,
+                                                 reference_velocity=reference_velocity,
+                                                 weight=weight,
+                                                 **kwargs)
 
     def set_seed_configuration(self, seed_configuration, group_name: Optional[str] = None):
         self.motion_goals.set_seed_configuration(seed_configuration=seed_configuration,
@@ -267,15 +277,15 @@ class GiskardWrapper(LowLevelGiskardWrapper):
             end_monitors_monitors = [monitor_name]
         else:
             end_monitors_monitors = []
-        self.motion_goals.set_straight_translation_goal(end_monitors=end_monitors_monitors,
-                                                        goal_point=goal_point,
-                                                        tip_link=tip_link,
-                                                        root_link=root_link,
-                                                        tip_group=tip_group,
-                                                        root_group=root_group,
-                                                        reference_velocity=reference_velocity,
-                                                        weight=weight,
-                                                        **kwargs)
+        self.motion_goals.add_cartesian_position_straight(end_monitors=end_monitors_monitors,
+                                                          goal_point=goal_point,
+                                                          tip_link=tip_link,
+                                                          root_link=root_link,
+                                                          tip_group=tip_group,
+                                                          root_group=root_group,
+                                                          reference_velocity=reference_velocity,
+                                                          weight=weight,
+                                                          **kwargs)
 
     def set_rotation_goal(self,
                           goal_orientation: QuaternionStamped,
@@ -574,11 +584,6 @@ class GiskardWrapper(LowLevelGiskardWrapper):
                                                  joint_list=joint_list)
 
     # %% collision avoidance
-    def _add_collision_entries_as_goals(self):
-        if not self.motion_goals._collision_entries:
-            self.avoid_all_collisions()
-        super()._add_collision_entries_as_goals()
-
     def allow_collision(self,
                         group1: str = CollisionEntry.ALL,
                         group2: str = CollisionEntry.ALL,
@@ -591,14 +596,11 @@ class GiskardWrapper(LowLevelGiskardWrapper):
         :param group1: name of the first group
         :param group2: name of the second group
         """
-        collision_entry = CollisionEntry()
-        collision_entry.type = CollisionEntry.ALLOW_COLLISION
-        collision_entry.group1 = str(group1)
-        collision_entry.group2 = str(group2)
-        self._add_collision_avoidance(collisions=[collision_entry],
-                                      start_monitors=start_monitors,
-                                      hold_monitors=hold_monitors,
-                                      end_monitors=end_monitors)
+        self.motion_goals.allow_collision(group1=group1,
+                                          group2=group2,
+                                          start_monitors=start_monitors,
+                                          hold_monitors=hold_monitors,
+                                          end_monitors=end_monitors)
 
     def avoid_collision(self,
                         min_distance: Optional[float] = None,
@@ -614,17 +616,12 @@ class GiskardWrapper(LowLevelGiskardWrapper):
         :param group1: name of the first group
         :param group2: name of the second group
         """
-        if min_distance is None:
-            min_distance = - 1
-        collision_entry = CollisionEntry()
-        collision_entry.type = CollisionEntry.AVOID_COLLISION
-        collision_entry.distance = min_distance
-        collision_entry.group1 = group1
-        collision_entry.group2 = group2
-        self._add_collision_avoidance(collisions=[collision_entry],
-                                      start_monitors=start_monitors,
-                                      hold_monitors=hold_monitors,
-                                      end_monitors=end_monitors)
+        self.motion_goals.avoid_collision(min_distance=min_distance,
+                                          group1=group1,
+                                          group2=group2,
+                                          start_monitors=start_monitors,
+                                          hold_monitors=hold_monitors,
+                                          end_monitors=end_monitors)
 
     def allow_all_collisions(self,
                              start_monitors: Optional[List[str]] = None,
@@ -633,12 +630,9 @@ class GiskardWrapper(LowLevelGiskardWrapper):
         """
         Allows all collisions for next goal.
         """
-        collision_entry = CollisionEntry()
-        collision_entry.type = CollisionEntry.ALLOW_COLLISION
-        self._add_collision_avoidance(collisions=[collision_entry],
-                                      start_monitors=start_monitors,
-                                      hold_monitors=hold_monitors,
-                                      end_monitors=end_monitors)
+        self.motion_goals.allow_all_collisions(start_monitors=start_monitors,
+                                               hold_monitors=hold_monitors,
+                                               end_monitors=end_monitors)
 
     def avoid_all_collisions(self,
                              min_distance: Optional[float] = None,
@@ -651,15 +645,10 @@ class GiskardWrapper(LowLevelGiskardWrapper):
         add any collision entries.
         :param min_distance: set this to overwrite default distances
         """
-        if min_distance is None:
-            min_distance = -1
-        collision_entry = CollisionEntry()
-        collision_entry.type = CollisionEntry.AVOID_COLLISION
-        collision_entry.distance = min_distance
-        self._add_collision_avoidance(collisions=[collision_entry],
-                                      start_monitors=start_monitors,
-                                      hold_monitors=hold_monitors,
-                                      end_monitors=end_monitors)
+        self.motion_goals.avoid_all_collisions(min_distance=min_distance,
+                                               start_monitors=start_monitors,
+                                               hold_monitors=hold_monitors,
+                                               end_monitors=end_monitors)
 
     def allow_self_collision(self,
                              robot_name: Optional[str] = None,
@@ -670,13 +659,194 @@ class GiskardWrapper(LowLevelGiskardWrapper):
         Allows the collision of the robot with itself for the next goal.
         :param robot_name: if there are multiple robots, specify which one.
         """
-        if robot_name is None:
-            robot_name = self.robot_name
-        collision_entry = CollisionEntry()
-        collision_entry.type = CollisionEntry.ALLOW_COLLISION
-        collision_entry.group1 = robot_name
-        collision_entry.group2 = robot_name
-        self._add_collision_avoidance(collisions=[collision_entry],
-                                      start_monitors=start_monitors,
-                                      hold_monitors=hold_monitors,
-                                      end_monitors=end_monitors)
+        self.motion_goals.allow_self_collision(robot_name=robot_name,
+                                               start_monitors=start_monitors,
+                                               hold_monitors=hold_monitors,
+                                               end_monitors=end_monitors)
+
+    def add_box(self,
+                name: str,
+                size: Tuple[float, float, float],
+                pose: PoseStamped,
+                parent_link: str = '',
+                parent_link_group: str = '',
+                timeout: float = 2) -> UpdateWorldResponse:
+        """
+        Adds a new box to the world tree and attaches it to parent_link.
+        If parent_link_group and parent_link are empty, the box will be attached to the world root link, e.g., map.
+        :param name: How the new group will be called
+        :param size: X, Y and Z dimensions of the box, respectively
+        :param pose: Where the root link of the new object will be positioned
+        :param parent_link: Name of the link, the object will get attached to
+        :param parent_link_group: Name of the group in which Giskard will search for parent_link
+        :param timeout: Can wait this many seconds, in case Giskard is busy
+        :return: Response message of the service call
+        """
+        return self.world.add_box(name=name,
+                                  size=size,
+                                  pose=pose,
+                                  parent_link=parent_link,
+                                  parent_link_group=parent_link_group,
+                                  timeout=timeout)
+
+    def add_sphere(self,
+                   name: str,
+                   radius: float,
+                   pose: PoseStamped,
+                   parent_link: str = '',
+                   parent_link_group: str = '',
+                   timeout: float = 2) -> UpdateWorldResponse:
+        """
+        See add_box.
+        """
+        return self.world.add_sphere(name=name,
+                                     radius=radius,
+                                     pose=pose,
+                                     parent_link=parent_link,
+                                     parent_link_group=parent_link_group,
+                                     timeout=timeout)
+
+    def add_mesh(self,
+                 name: str,
+                 mesh: str,
+                 pose: PoseStamped,
+                 parent_link: str = '',
+                 parent_link_group: str = '',
+                 scale: Tuple[float, float, float] = (1, 1, 1),
+                 timeout: float = 2) -> UpdateWorldResponse:
+        """
+        See add_box.
+        :param mesh: path to the mesh location, can be ros package path, e.g.,
+                        package://giskardpy/test/urdfs/meshes/bowl_21.obj
+        """
+        return self.world.add_mesh(name=name,
+                                   mesh=mesh,
+                                   scale=scale,
+                                   pose=pose,
+                                   parent_link=parent_link,
+                                   parent_link_group=parent_link_group,
+                                   timeout=timeout)
+
+    def add_cylinder(self,
+                     name: str,
+                     height: float,
+                     radius: float,
+                     pose: PoseStamped,
+                     parent_link: str = '',
+                     parent_link_group: str = '',
+                     timeout: float = 2) -> UpdateWorldResponse:
+        """
+        See add_box.
+        """
+        return self.world.add_cylinder(name=name,
+                                       height=height,
+                                       radius=radius,
+                                       pose=pose,
+                                       parent_link=parent_link,
+                                       parent_link_group=parent_link_group,
+                                       timeout=timeout)
+
+    def update_parent_link_of_group(self,
+                                    name: str,
+                                    parent_link: str,
+                                    parent_link_group: Optional[str] = '',
+                                    timeout: float = 2) -> UpdateWorldResponse:
+        """
+        Removes the joint connecting the root link of a group and attaches it to a parent_link.
+        The object will not move relative to the world's root link in this process.
+        :param name: name of the group
+        :param parent_link: name of the new parent link
+        :param parent_link_group: if parent_link is not unique, search in this group for matches.
+        :param timeout: how long to wait in case Giskard is busy processing a goal.
+        :return: result message
+        """
+        return self.world.update_parent_link_of_group(name=name,
+                                                      parent_link=parent_link,
+                                                      parent_link_group=parent_link_group,
+                                                      timeout=timeout)
+
+    def detach_group(self, object_name: str, timeout: float = 2):
+        """
+        A wrapper for update_parent_link_of_group which set parent_link to the root link of the world.
+        """
+        return self.world.detach_group(oname=object_name, timeout=timeout)
+
+    def add_urdf(self,
+                 name: str,
+                 urdf: str,
+                 pose: PoseStamped,
+                 parent_link: str = '',
+                 parent_link_group: str = '',
+                 js_topic: Optional[str] = '',
+                 timeout: float = 2) -> UpdateWorldResponse:
+        """
+        Adds a urdf to the world.
+        :param name: name the group containing the urdf will have.
+        :param urdf: urdf as string, no path!
+        :param pose: pose of the root link of the new object
+        :param parent_link: to which link the urdf will be attached
+        :param parent_link_group: if parent_link is not unique, search here for matches.
+        :param js_topic: Giskard will listen on that topic for joint states and update the urdf accordingly
+        :param timeout: how long to wait if Giskard is busy.
+        :return: response message
+        """
+        return self.world.add_urdf(name=name,
+                                   urdf=urdf,
+                                   pose=pose,
+                                   js_topic=js_topic,
+                                   parent_link=parent_link,
+                                   parent_link_group=parent_link_group,
+                                   timeout=timeout)
+
+    def dye_group(self, group_name: str, rgba: Tuple[float, float, float, float]) -> DyeGroupResponse:
+        """
+        Change the color of the ghost for this particular group.
+        """
+        return self.world.dye_group(group_name=group_name, rgba=rgba)
+
+    def get_group_names(self) -> List[str]:
+        """
+        Returns the names of every group in the world.
+        """
+        return self.world.get_group_names()
+
+    def get_group_info(self, group_name: str) -> GetGroupInfoResponse:
+        """
+        Returns the joint state, joint state topic and pose of a group.
+        """
+        return self.world.get_group_info(group_name=group_name)
+
+    def get_controlled_joints(self, group_name: str) -> List[str]:
+        """
+        Returns all joints of a group that are flagged as controlled.
+        """
+        return self.world.get_controlled_joints(group_name=group_name)
+
+    def update_group_pose(self, group_name: str, new_pose: PoseStamped, timeout: float = 2) -> UpdateWorldResponse:
+        """
+        Overwrites the pose specified in the joint that connects the two groups.
+        :param group_name: Name of the group that will move
+        :param new_pose: New pose of the group
+        :param timeout: How long to wait if Giskard is busy
+        :return: Giskard's reply
+        """
+        return self.world.update_group_pose(group_name=group_name, new_pose=new_pose, timeout=timeout)
+
+    def register_group(self, new_group_name: str, root_link_name: str,
+                       root_link_group_name: str) -> RegisterGroupResponse:
+        """
+        Register a new group for reference in collision checking. All child links of root_link_name will belong to it.
+        :param new_group_name: Name of the new group.
+        :param root_link_name: root link of the new group
+        :param root_link_group_name: Name of the group root_link_name belongs to
+        :return: RegisterGroupResponse
+        """
+        return self.register_group(new_group_name=new_group_name,
+                                   root_link_name=root_link_name,
+                                   root_link_group_name=root_link_group_name)
+
+    def clear_world(self, timeout: float = 2) -> UpdateWorldResponse:
+        """
+        Resets the world to what it was when Giskard was launched.
+        """
+        return self.world.clear(timeout=timeout)

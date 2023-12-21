@@ -31,7 +31,6 @@ class HSRTestWrapper(GiskardTestWrapper):
 
     def __init__(self, giskard=None):
         self.tip = 'hand_gripper_tool_frame'
-        self.robot_name = 'hsr'
         if giskard is None:
             giskard = Giskard(world_config=WorldWithHSRConfig(),
                               collision_avoidance_config=HSRCollisionAvoidanceConfig(),

@@ -322,7 +322,8 @@ class MotionGoalWrapper:
     _goals: List[MotionGoal]
     _collision_entries: Dict[Tuple[Tuple[str, ...], Tuple[str, ...], Tuple[str, ...]], List[CollisionEntry]]
 
-    def __init__(self):
+    def __init__(self, robot_name: str):
+        self.robot_name = robot_name
         self.reset()
 
     def reset(self):
@@ -1005,7 +1006,8 @@ class MotionGoalWrapper:
 class MonitorWrapper:
     _monitors: List[Monitor]
 
-    def __init__(self):
+    def __init__(self, robot_name: str):
+        self._robot_name = robot_name
         self.reset()
 
     def get_monitors(self):
@@ -1208,8 +1210,8 @@ class LowLevelGiskardWrapper:
 
     def __init__(self, node_name: str = 'giskard'):
         self.world = WorldWrapper(node_name)
-        self.motion_goals = MotionGoalWrapper()
-        self.monitors = MonitorWrapper()
+        self.monitors = MonitorWrapper(self.robot_name)
+        self.motion_goals = MotionGoalWrapper(self.robot_name)
         self.clear_motion_goals_and_monitors()
         giskard_topic = f'{node_name}/command'
         self._client = SimpleActionClient(giskard_topic, MoveAction)

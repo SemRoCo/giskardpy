@@ -6,12 +6,13 @@ import numpy as np
 import giskardpy.casadi_wrapper as cas
 from giskardpy.casadi_wrapper import CompiledFunction
 from giskardpy.exceptions import GiskardException, UnknownConstraintException, ConstraintInitalizationException
+from giskardpy.goals.monitors.monitor_callback import MonitorCallback
 from giskardpy.goals.monitors.monitors import Monitor
 import giskard_msgs.msg as giskard_msgs
 from giskardpy.god_map import god_map
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils import logging
-from giskardpy.utils.utils import json_to_kwargs, get_all_classes_in_package, json_str_to_kwargs
+from giskardpy.utils.utils import get_all_classes_in_package, json_str_to_kwargs
 from giskardpy.goals.monitors.monitors import LocalMinimumReached
 
 
@@ -120,15 +121,15 @@ class MonitorManager:
         self.update_substitution_values(monitor_names, [str(s) for s in old_symbols])
         return new_expression
 
+    def register_monitor_cb(self, event: MonitorCallback):
+        monitor_names = monitor_list_to_monitor_name_tuple(event.trigger_monitors)
+        trigger_filter = tuple([i for i, m in enumerate(self.monitors) if m.name in monitor_names])
+        self.triggers[trigger_filter] = event
+
     def _register_expression_update_triggers(self):
         for monitor_names, values in self.substitution_values.items():
             trigger_filter = tuple([i for i, m in enumerate(self.monitors) if m.name in monitor_names])
             self.triggers[trigger_filter] = lambda: self.update_substitution_values(monitor_names, list(values.keys()))
-
-    def register_monitor_cb(self, monitor_names: Tuple[str, ...], cb: Callable):
-        monitor_names = monitor_list_to_monitor_name_tuple(monitor_names)
-        trigger_filter = tuple([i for i, m in enumerate(self.monitors) if m.name in monitor_names])
-        self.triggers[trigger_filter] = cb
 
     @profile
     def update_substitution_values(self, monitor_names: Tuple[str, ...], keys: Optional[List[str]] = None):

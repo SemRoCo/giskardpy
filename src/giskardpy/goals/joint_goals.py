@@ -5,12 +5,13 @@ from typing import Dict, Optional, List
 from geometry_msgs.msg import PoseStamped
 
 from giskardpy import casadi_wrapper as cas
+from giskardpy.goals.monitors.monitor_callback import UpdateParentLinkOfGroup
 from giskardpy.goals.monitors.monitors import Monitor
 from giskardpy.god_map import god_map
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.exceptions import ConstraintException, ConstraintInitalizationException
 from giskardpy.goals.goal import Goal, NonMotionGoal
-from giskardpy.goals.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE, Task
+from giskardpy.goals.tasks.task import WEIGHT_BELOW_CA, Task
 from giskardpy.model.joints import OmniDrive, DiffDrive, OmniDrivePR22, OneDofJoint
 from giskardpy.my_types import PrefixName, Derivatives
 from giskardpy.utils.expression_definition_utils import transform_msg
@@ -371,4 +372,6 @@ class JointPositionList(Goal):
                                          task_expression=current)
 
         self.add_task(task)
+        event = UpdateParentLinkOfGroup(trigger_monitors=end_monitors, group_name='', new_parent_link='')
+        god_map.monitor_manager.register_monitor_cb(event)
         self.connect_monitors_to_all_tasks(start_monitors, hold_monitors, end_monitors)

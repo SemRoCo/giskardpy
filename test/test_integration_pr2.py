@@ -421,6 +421,13 @@ class TestJointGoals:
 class TestConstraints:
     # TODO write buggy constraints that test sanity checks
 
+    def test_print_event(self, zero_pose: PR2TestWrapper):
+        monitor_name = zero_pose.monitors.add_joint_position(zero_pose.better_pose, name='goal')
+        zero_pose.motion_goals.add_joint_position(zero_pose.better_pose)
+        zero_pose.callbacks.add_print_callback(start_monitors=[monitor_name],
+                                               message='=====================done=====================')
+        zero_pose.execute()
+
     def test_bowl_and_cup_sequence(self, kitchen_setup: PR2TestWrapper):
         # %% setup
         bowl_name = 'bowl'

@@ -372,6 +372,4 @@ class JointPositionList(Goal):
                                          task_expression=current)
 
         self.add_task(task)
-        event = UpdateParentLinkOfGroup(trigger_monitors=end_monitors, group_name='', new_parent_link='')
-        god_map.monitor_manager.register_monitor_cb(event)
         self.connect_monitors_to_all_tasks(start_monitors, hold_monitors, end_monitors)

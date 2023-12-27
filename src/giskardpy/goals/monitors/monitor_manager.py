@@ -44,6 +44,8 @@ class MonitorManager:
         self.monitors = []
         self.allowed_monitor_types = {}
         self.allowed_monitor_types.update(get_all_classes_in_package('giskardpy.goals.monitors', Monitor))
+        self.allowed_callback_types = {}
+        self.allowed_callback_types.update(get_all_classes_in_package('giskardpy.goals.monitors', MonitorCallback))
         self.robot_names = god_map.collision_scene.robot_names
         self.local_minimum_monitor_id = None
         self.substitution_values = {}
@@ -121,10 +123,10 @@ class MonitorManager:
         self.update_substitution_values(monitor_names, [str(s) for s in old_symbols])
         return new_expression
 
-    def register_monitor_cb(self, event: MonitorCallback):
-        monitor_names = monitor_list_to_monitor_name_tuple(event.trigger_monitors)
+    def register_monitor_cb(self, callback: MonitorCallback):
+        monitor_names = monitor_list_to_monitor_name_tuple(callback.start_monitors)
         trigger_filter = tuple([i for i, m in enumerate(self.monitors) if m.name in monitor_names])
-        self.triggers[trigger_filter] = event
+        self.triggers[trigger_filter] = callback
 
     def _register_expression_update_triggers(self):
         for monitor_names, values in self.substitution_values.items():
@@ -174,7 +176,28 @@ class MonitorManager:
                 self.add_monitor(monitor)
             except Exception as e:
                 traceback.print_exc()
-                error_msg = f'Initialization of \'{C.__name__}\' constraint failed: \n {e} \n'
+                error_msg = f'Initialization of \'{C.__name__}\' monitor failed: \n {e} \n'
+                if not isinstance(e, GiskardException):
+                    raise ConstraintInitalizationException(error_msg)
+                raise e
+
+    @profile
+    def parse_monitor_callbacks(self, callback_msgs: List[giskard_msgs.Callback]):
+        for callback_msg in callback_msgs:
+            try:
+                logging.loginfo(f'Adding Monitor Callback of type: \'{callback_msg.callback_class}\'')
+                C = self.allowed_callback_types[callback_msg.callback_class]
+            except KeyError:
+                raise UnknownConstraintException(f'unknown monitor callback type: \'{callback_msg.callback_class}\'.')
+            try:
+                kwargs = json_str_to_kwargs(callback_msg.kwargs)
+                callback: MonitorCallback = C(name=callback_msg.name,
+                                              start_monitors=callback_msg.start_monitors,
+                                              **kwargs)
+                self.register_monitor_cb(callback)
+            except Exception as e:
+                traceback.print_exc()
+                error_msg = f'Initialization of \'{C.__name__}\' monitor callback failed: \n {e} \n'
                 if not isinstance(e, GiskardException):
                     raise ConstraintInitalizationException(error_msg)
                 raise e

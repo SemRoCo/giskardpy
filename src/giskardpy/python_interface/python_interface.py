@@ -8,7 +8,7 @@ from rospy import ServiceException
 from shape_msgs.msg import SolidPrimitive
 
 from giskard_msgs.msg import MoveAction, MoveGoal, WorldBody, CollisionEntry, MoveResult, MoveFeedback, MotionGoal, \
-    Monitor
+    Monitor, Callback
 import giskard_msgs.msg as giskard_msgs
 from giskard_msgs.srv import DyeGroupRequest, DyeGroup, GetGroupInfoRequest, DyeGroupResponse
 from giskard_msgs.srv import GetGroupNamesResponse, GetGroupInfoResponse, RegisterGroupRequest
@@ -25,6 +25,7 @@ from giskardpy.goals.joint_goals import JointPositionList, AvoidJointLimits, Set
 from giskardpy.goals.monitors.cartesian_monitors import PoseReached, PositionReached, OrientationReached, PointingAt, \
     VectorsAligned, DistanceToLine
 from giskardpy.goals.monitors.joint_monitors import JointGoalReached
+from giskardpy.goals.monitors.monitor_callback import Print
 from giskardpy.goals.monitors.monitors import LocalMinimumReached, TimeAbove
 from giskardpy.goals.open_close import Close, Open
 from giskardpy.goals.pointing import Pointing
@@ -1003,6 +1004,36 @@ class MotionGoalWrapper:
                              **kwargs)
 
 
+class MonitorCallbackWrapper:
+    _callbacks: List[Callback]
+
+    def __init__(self, robot_name: str):
+        self._robot_name = robot_name
+        self.reset()
+
+    def get_monitor_callbacks(self):
+        return self._callbacks
+
+    def reset(self):
+        self._callbacks = []
+
+    def add_monitor_callback(self, callback_class: str, callback_name: str, start_monitors: List[str], **kwargs):
+        if [x for x in self._callbacks if x.name == callback_name]:
+            raise KeyError(f'monitor named {callback_name} already exists.')
+        callback = giskard_msgs.Callback()
+        callback.name = callback_name
+        callback.callback_class = callback_class
+        callback.start_monitors = start_monitors
+        callback.kwargs = kwargs_to_json(kwargs)
+        self._callbacks.append(callback)
+
+    def add_print_callback(self, start_monitors: List[str], message: str):
+        self.add_monitor_callback(callback_class=Print.__name__,
+                                  callback_name='print',
+                                  start_monitors=start_monitors,
+                                  message=message)
+
+
 class MonitorWrapper:
     _monitors: List[Monitor]
 
@@ -1213,6 +1244,7 @@ class GiskardWrapper:
     def __init__(self, node_name: str = 'giskard'):
         self.world = WorldWrapper(node_name)
         self.monitors = MonitorWrapper(self.robot_name)
+        self.callbacks = MonitorCallbackWrapper(self.robot_name)
         self.motion_goals = MotionGoalWrapper(self.robot_name)
         self.clear_motion_goals_and_monitors()
         giskard_topic = f'{node_name}/command'
@@ -1231,6 +1263,7 @@ class GiskardWrapper:
         """
         self.motion_goals.reset()
         self.monitors.reset()
+        self.callbacks.reset()
 
     def execute(self, wait: bool = True) -> MoveResult:
         """
@@ -1267,6 +1300,7 @@ class GiskardWrapper:
         action_goal = MoveGoal()
         action_goal.monitors = self.monitors.get_monitors()
         action_goal.goals = self.motion_goals.get_goals()
+        action_goal.callback = self.callbacks.get_monitor_callbacks()
         self.clear_motion_goals_and_monitors()
         return action_goal
 

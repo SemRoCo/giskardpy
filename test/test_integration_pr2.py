@@ -426,6 +426,46 @@ class TestPayloadMonitor:
                                      message='=====================done=====================')
         zero_pose.execute()
 
+    def test_collision_avoidance_sequence(self, fake_table_setup: PR2TestWrapper):
+        fake_table_setup.set_seed_configuration(fake_table_setup.better_pose)
+        fake_table_setup.execute()
+        pose1 = PoseStamped()
+        pose1.header.frame_id = 'map'
+        pose1.pose.position.x = 2
+        pose1.pose.orientation.w = 1
+
+        root_link = 'map'
+        tip_link = 'base_footprint'
+        # monitor that reads time
+        monitor1 = fake_table_setup.monitors.add_time_above(threshold=1)
+
+        monitor2 = fake_table_setup.monitors.add_cartesian_pose(name='pose1',
+                                                                root_link=root_link,
+                                                                tip_link=tip_link,
+                                                                goal_pose=pose1)
+        end_monitor = fake_table_setup.monitors.add_local_minimum_reached()
+        # simple cartisian goal 2m to the front
+        fake_table_setup.motion_goals.add_cartesian_pose(goal_pose=pose1,
+                                                         goal_name='g1',
+                                                         root_link=root_link,
+                                                         tip_link=tip_link,
+                                                         end_monitors=[monitor2, end_monitor])
+        collision_entry = CollisionEntry()
+        collision_entry.type = CollisionEntry.AVOID_COLLISION
+        collision_entry.distance = -1
+
+        fake_table_setup.avoid_all_collisions(end_monitors=[monitor1])
+
+        fake_table_setup.allow_all_collisions(start_monitors=[monitor1])
+        fake_table_setup.avoid_collision(group1='pr2', group2='pr2', start_monitors=[monitor1])
+        fake_table_setup.monitors.add_end_motion(start_monitors=[end_monitor])
+
+        fake_table_setup.execute(add_local_minimum_reached=False)
+
+        # fake_table_setup.check_cpi_geq(fake_table_setup.get_l_gripper_links(), 0.05)
+        # fake_table_setup.check_cpi_leq(['r_gripper_l_finger_tip_link'], 0.04)
+        # fake_table_setup.check_cpi_leq(['r_gripper_r_finger_tip_link'], 0.04)
+
 
 class TestConstraints:
     # TODO write buggy constraints that test sanity checks
@@ -2843,45 +2883,6 @@ class TestCollisionAvoidanceGoals:
         fake_table_setup.check_cpi_geq(fake_table_setup.get_l_gripper_links(), 0.05)
         fake_table_setup.check_cpi_leq(['r_gripper_l_finger_tip_link'], 0.04)
         fake_table_setup.check_cpi_leq(['r_gripper_r_finger_tip_link'], 0.04)
-
-    def test_collision_avoidance_sequence(self, fake_table_setup: PR2TestWrapper):
-        fake_table_setup.set_seed_configuration(fake_table_setup.better_pose)
-        fake_table_setup.execute()
-        pose1 = PoseStamped()
-        pose1.header.frame_id = 'map'
-        pose1.pose.position.x = 2
-        pose1.pose.orientation.w = 1
-
-        root_link = 'map'
-        tip_link = 'base_footprint'
-        # monitor that reads time
-        monitor1 = fake_table_setup.monitors.add_time_above(threshold=1)
-
-        monitor2 = fake_table_setup.monitors.add_cartesian_pose(name='pose1',
-                                                                root_link=root_link,
-                                                                tip_link=tip_link,
-                                                                goal_pose=pose1)
-        end_monitor = fake_table_setup.monitors.add_local_minimum_reached()
-        # simple cartisian goal 2m to the front
-        fake_table_setup.motion_goals.add_cartesian_pose(goal_pose=pose1,
-                                                         goal_name='g1',
-                                                         root_link=root_link,
-                                                         tip_link=tip_link,
-                                                         end_monitors=[monitor2, end_monitor])
-        collision_entry = CollisionEntry()
-        collision_entry.type = CollisionEntry.AVOID_COLLISION
-        collision_entry.distance = -1
-
-        fake_table_setup.avoid_all_collisions(end_monitors=[monitor1])
-
-        fake_table_setup.allow_all_collisions(start_monitors=[monitor1])
-        fake_table_setup.avoid_collision(group1='pr2', group2='pr2', start_monitors=[monitor1])
-
-        fake_table_setup.execute(add_local_minimum_reached=False)
-
-        # fake_table_setup.check_cpi_geq(fake_table_setup.get_l_gripper_links(), 0.05)
-        # fake_table_setup.check_cpi_leq(['r_gripper_l_finger_tip_link'], 0.04)
-        # fake_table_setup.check_cpi_leq(['r_gripper_r_finger_tip_link'], 0.04)
 
     def test_allow_collision_drive_into_box(self, box_setup: PR2TestWrapper):
         p = PoseStamped()

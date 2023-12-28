@@ -36,9 +36,9 @@ class MotionGoalManager:
                 params = json_str_to_kwargs(motion_goal.kwargs)
                 if motion_goal.name == '':
                     motion_goal.name = None
-                start_monitors = [god_map.monitor_manager.get_monitor(monitor_name) for monitor_name in motion_goal.start_monitors]
-                hold_monitors = [god_map.monitor_manager.get_monitor(monitor_name) for monitor_name in motion_goal.hold_monitors]
-                end_monitors = [god_map.monitor_manager.get_monitor(monitor_name) for monitor_name in motion_goal.end_monitors]
+                start_monitors = god_map.monitor_manager.search_for_monitors(motion_goal.start_monitors)
+                hold_monitors = god_map.monitor_manager.search_for_monitors(motion_goal.hold_monitors)
+                end_monitors = god_map.monitor_manager.search_for_monitors(motion_goal.end_monitors)
                 c: Goal = C(name=motion_goal.name, start_monitors=start_monitors, hold_monitors=hold_monitors, end_monitors=end_monitors, **params)
                 self.add_motion_goal(c)
             except Exception as e:

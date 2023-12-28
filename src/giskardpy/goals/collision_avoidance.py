@@ -5,8 +5,8 @@ import giskardpy.casadi_wrapper as cas
 import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import CollisionEntry
 from giskardpy.goals.goal import Goal
-from giskardpy.goals.monitors.monitor_callback import CollisionMatrixUpdater
 from giskardpy.goals.monitors.monitors import ExpressionMonitor
+from giskardpy.goals.monitors.payload_monitors import CollisionMatrixUpdater
 from giskardpy.goals.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE, Task
 from giskardpy.god_map import god_map
 from giskardpy.my_types import my_string
@@ -362,9 +362,10 @@ class CollisionAvoidance(Goal):
                                      not god_map.collision_scene.is_allow_all_self_collision(collision_entries[-1])):
             self.add_self_collision_avoidance_constraints()
         if start_monitors:
-            cb = CollisionMatrixUpdater(trigger_monitors=start_monitors,
+            payload_monitor = CollisionMatrixUpdater(name='update collision matrix',
+                                        start_monitors=start_monitors,
                                         new_collision_matrix=self.collision_matrix)
-            god_map.monitor_manager.register_monitor_cb(cb)
+            god_map.monitor_manager.add_payload_monitor(payload_monitor)
         else:
             god_map.collision_scene.set_collision_matrix(self.collision_matrix)
 

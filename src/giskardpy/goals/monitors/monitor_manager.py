@@ -181,6 +181,9 @@ class MonitorManager:
         self.state = next_state
         self.trigger_update_triggers(self.state)
 
+    def search_for_monitors(self, monitor_names: List[str]) -> List[Monitor]:
+        return [self.get_monitor(monitor_name) for monitor_name in monitor_names]
+
     @profile
     def parse_monitors(self, monitor_msgs: List[giskard_msgs.Monitor]):
         for monitor_msg in monitor_msgs:
@@ -190,8 +193,11 @@ class MonitorManager:
             except KeyError:
                 raise UnknownConstraintException(f'unknown monitor type: \'{monitor_msg.monitor_class}\'.')
             try:
-                params = json_str_to_kwargs(monitor_msg.kwargs)
-                monitor = C(name=monitor_msg.name, **params)
+                kwargs = json_str_to_kwargs(monitor_msg.kwargs)
+                start_monitors = god_map.monitor_manager.search_for_monitors(monitor_msg.start_monitors)
+                monitor = C(name=monitor_msg.name,
+                            start_monitors=start_monitors,
+                            **kwargs)
                 if isinstance(monitor, ExpressionMonitor):
                     self.add_expression_monitor(monitor)
                 elif isinstance(monitor, PayloadMonitor):

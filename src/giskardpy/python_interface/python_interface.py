@@ -1048,12 +1048,13 @@ class MonitorWrapper:
     def reset(self):
         self._monitors = []
 
-    def add_monitor(self, monitor_class: str, monitor_name: str, **kwargs):
+    def add_monitor(self, monitor_class: str, monitor_name: str, start_monitors: Optional[List[str]] = None, **kwargs):
         if [x for x in self._monitors if x.name == monitor_name]:
             raise KeyError(f'monitor named {monitor_name} already exists.')
         monitor = giskard_msgs.Monitor()
         monitor.name = monitor_name
         monitor.monitor_class = monitor_class
+        monitor.start_monitors = start_monitors or []
         monitor.kwargs = kwargs_to_json(kwargs)
         self._monitors.append(monitor)
 

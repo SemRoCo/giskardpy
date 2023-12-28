@@ -3,7 +3,7 @@ from typing import List, Dict, Optional
 from geometry_msgs.msg import PointStamped, QuaternionStamped, PoseStamped, Vector3Stamped
 
 import giskardpy.casadi_wrapper as cas
-from giskardpy.goals.monitors.monitors import ExpressionMonitor
+from giskardpy.goals.monitors.monitors import ExpressionMonitor, Monitor
 from giskardpy.god_map import god_map
 from giskardpy.my_types import Derivatives
 import giskardpy.utils.tfwrapper as tf
@@ -21,8 +21,9 @@ class PoseReached(ExpressionMonitor):
                  orientation_threshold: float = 0.01,
                  update_pose_on: Optional[List[str]] = None,
                  crucial: bool = True,
-                 stay_one: bool = True):
-        super().__init__(name, crucial=crucial, stay_one=stay_one)
+                 stay_one: bool = True,
+                 start_monitors: Optional[List[Monitor]] = None):
+        super().__init__(name, crucial=crucial, stay_one=stay_one, start_monitors=start_monitors)
         root_link = god_map.world.search_for_link_name(root_link, root_group)
         tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
         if update_pose_on is None:

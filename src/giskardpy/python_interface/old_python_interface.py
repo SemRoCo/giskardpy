@@ -28,7 +28,6 @@ class OldGiskardWrapper(GiskardWrapper):
         action_goal = MoveGoal()
         action_goal.monitors = self.monitors.get_monitors()
         action_goal.goals = self.motion_goals.get_goals()
-        action_goal.callback = self.callbacks.get_monitor_callbacks()
         self.clear_motion_goals_and_monitors()
         return action_goal
 

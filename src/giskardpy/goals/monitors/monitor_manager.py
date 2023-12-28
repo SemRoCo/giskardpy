@@ -6,7 +6,6 @@ import numpy as np
 import giskardpy.casadi_wrapper as cas
 from giskardpy.casadi_wrapper import CompiledFunction
 from giskardpy.exceptions import GiskardException, UnknownConstraintException, ConstraintInitalizationException
-from giskardpy.goals.monitors.monitor_callback import MonitorCallback
 from giskardpy.goals.monitors.monitors import ExpressionMonitor, Monitor
 import giskard_msgs.msg as giskard_msgs
 from giskardpy.goals.monitors.payload_monitors import PayloadMonitor, EndMotion
@@ -14,7 +13,6 @@ from giskardpy.god_map import god_map
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils import logging
 from giskardpy.utils.utils import get_all_classes_in_package, json_str_to_kwargs
-from giskardpy.goals.monitors.monitors import LocalMinimumReached
 
 
 def flipped_to_one(a: np.ndarray, b: np.ndarray) -> np.ndarray:
@@ -47,9 +45,6 @@ class MonitorManager:
         self.allowed_monitor_types = {}
         self.allowed_monitor_types.update(get_all_classes_in_package('giskardpy.goals.monitors',
                                                                      Monitor))
-        self.allowed_callback_types = {}
-        self.allowed_callback_types.update(get_all_classes_in_package('giskardpy.goals.monitors',
-                                                                      MonitorCallback))
         self.substitution_values = {}
         self.triggers = {}
 
@@ -134,11 +129,6 @@ class MonitorManager:
         self.update_substitution_values(monitor_names, [str(s) for s in old_symbols])
         return new_expression
 
-    def register_monitor_cb(self, callback: MonitorCallback):
-        monitor_names = monitor_list_to_monitor_name_tuple(callback.start_monitors)
-        trigger_filter = tuple([i for i, m in enumerate(self.expression_monitors) if m.name in monitor_names])
-        self.triggers[trigger_filter] = callback
-
     def to_state_filter(self, monitor_names: List[str]) -> np.ndarray:
         monitor_names = monitor_list_to_monitor_name_tuple(monitor_names)
         return np.array([monitor.id for monitor in self.monitors if monitor.name in monitor_names])
@@ -205,27 +195,6 @@ class MonitorManager:
             except Exception as e:
                 traceback.print_exc()
                 error_msg = f'Initialization of \'{C.__name__}\' monitor failed: \n {e} \n'
-                if not isinstance(e, GiskardException):
-                    raise ConstraintInitalizationException(error_msg)
-                raise e
-
-    @profile
-    def parse_monitor_callbacks(self, callback_msgs: List[giskard_msgs.Callback]):
-        for callback_msg in callback_msgs:
-            try:
-                logging.loginfo(f'Adding Monitor Callback of type: \'{callback_msg.callback_class}\'')
-                C = self.allowed_callback_types[callback_msg.callback_class]
-            except KeyError:
-                raise UnknownConstraintException(f'unknown monitor callback type: \'{callback_msg.callback_class}\'.')
-            try:
-                kwargs = json_str_to_kwargs(callback_msg.kwargs)
-                callback: MonitorCallback = C(name=callback_msg.name,
-                                              start_monitors=callback_msg.start_monitors,
-                                              **kwargs)
-                self.register_monitor_cb(callback)
-            except Exception as e:
-                traceback.print_exc()
-                error_msg = f'Initialization of \'{C.__name__}\' monitor callback failed: \n {e} \n'
                 if not isinstance(e, GiskardException):
                     raise ConstraintInitalizationException(error_msg)
                 raise e

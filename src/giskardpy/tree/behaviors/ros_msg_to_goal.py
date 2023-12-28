@@ -28,7 +28,6 @@ class ParseActionGoal(GiskardBehavior):
         god_map.goal_id += 1
         try:
             god_map.monitor_manager.parse_monitors(move_goal.monitors)
-            god_map.monitor_manager.parse_monitor_callbacks(move_goal.callback)
             god_map.motion_goal_manager.parse_motion_goals(move_goal.goals)
         except AttributeError:
             traceback.print_exc()

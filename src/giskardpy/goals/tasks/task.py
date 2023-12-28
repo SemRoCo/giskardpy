@@ -3,7 +3,7 @@ from typing import Optional, List, Union, Dict, Callable, Iterable
 import giskard_msgs.msg
 import giskardpy.casadi_wrapper as cas
 from giskardpy.exceptions import GiskardException, ConstraintInitalizationException
-from giskardpy.goals.monitors.monitors import Monitor
+from giskardpy.goals.monitors.monitors import ExpressionMonitor
 from giskardpy.my_types import Derivatives
 from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint, \
     ManipulabilityConstraint
@@ -22,9 +22,9 @@ class Task:
     eq_constraints: Dict[str, EqualityConstraint]
     neq_constraints: Dict[str, InequalityConstraint]
     derivative_constraints: Dict[str, DerivativeInequalityConstraint]
-    start_monitors: List[Monitor]
-    hold_monitors: List[Monitor]
-    end_monitors: List[Monitor]
+    start_monitors: List[ExpressionMonitor]
+    hold_monitors: List[ExpressionMonitor]
+    end_monitors: List[ExpressionMonitor]
     name: Optional[str]
 
     def __init__(self, name: Optional[str] = None):
@@ -43,19 +43,19 @@ class Task:
     def __str__(self):
         return self.name
 
-    def add_start_monitors_monitor(self, monitor: Monitor):
+    def add_start_monitors_monitor(self, monitor: ExpressionMonitor):
         if [m for m in self.start_monitors if m.name == monitor.name]:
             raise AttributeError(f'Monitor with name {monitor.name} '
                                  f'already registered for start_monitors of task {self.name}')
         self.start_monitors.append(monitor)
 
-    def add_hold_monitors_monitor(self, monitor: Monitor):
+    def add_hold_monitors_monitor(self, monitor: ExpressionMonitor):
         if [m for m in self.hold_monitors if m.name == monitor.name]:
             raise AttributeError(f'Monitor with name {monitor.name} '
                                  f'already registered for hold_monitors of task {self.name}')
         self.hold_monitors.append(monitor)
 
-    def add_end_monitors_monitor(self, monitor: Monitor):
+    def add_end_monitors_monitor(self, monitor: ExpressionMonitor):
         if [m for m in self.end_monitors if m.name == monitor.name]:
             raise AttributeError(f'Monitor with name {monitor.name} '
                                  f'already registered for end_monitors of task {self.name}')

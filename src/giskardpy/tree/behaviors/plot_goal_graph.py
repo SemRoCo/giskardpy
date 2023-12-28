@@ -6,7 +6,7 @@ from py_trees import Status
 
 from giskardpy.goals.collision_avoidance import CollisionAvoidance
 from giskardpy.goals.goal import Goal
-from giskardpy.goals.monitors.monitors import Monitor
+from giskardpy.goals.monitors.monitors import ExpressionMonitor
 from giskardpy.goals.tasks.task import Task
 from giskardpy.god_map import god_map
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
@@ -15,7 +15,7 @@ from giskardpy.utils.decorators import record_time, catch_and_raise_to_blackboar
 from giskardpy.utils.utils import create_path, string_shortener
 
 
-def generate_graph(goals: Dict[str, Goal], monitors: List[Monitor], output_file: str = 'graph.png'):
+def generate_graph(goals: Dict[str, Goal], monitors: List[ExpressionMonitor], output_file: str = 'graph.png'):
     def shorten(string: str) -> str:
         return '"' + string_shortener(original_str=string,
                                 max_lines=4,

@@ -7,7 +7,7 @@ from typing import Optional, Tuple, Dict, List, Union, Callable, TYPE_CHECKING, 
 
 from geometry_msgs.msg import PoseStamped, PointStamped, QuaternionStamped, Vector3Stamped
 
-from giskardpy.goals.monitors.monitors import Monitor
+from giskardpy.goals.monitors.monitors import ExpressionMonitor
 from giskardpy.goals.tasks.task import Task, WEIGHT_BELOW_CA
 from giskardpy.god_map import god_map
 from giskardpy.symbol_manager import symbol_manager
@@ -31,9 +31,9 @@ class Goal(ABC):
     @abc.abstractmethod
     def __init__(self,
                  name: str,
-                 start_monitors: Optional[List[Monitor]] = None,
-                 hold_monitors: Optional[List[Monitor]] = None,
-                 end_monitors: Optional[List[Monitor]] = None):
+                 start_monitors: Optional[List[ExpressionMonitor]] = None,
+                 hold_monitors: Optional[List[ExpressionMonitor]] = None,
+                 end_monitors: Optional[List[ExpressionMonitor]] = None):
         """
         This is where you specify goal parameters and save them as self attributes.
         """
@@ -66,22 +66,22 @@ class Goal(ABC):
             return joint.get_symbol(Derivatives.position)
         raise TypeError(f'get_joint_position_symbol is only supported for OneDofJoint, not {type(joint)}')
 
-    def connect_start_monitors_to_all_tasks(self, monitors: List[Monitor]):
+    def connect_start_monitors_to_all_tasks(self, monitors: List[ExpressionMonitor]):
         for monitor in monitors:
             for task in self.tasks:
                 task.add_start_monitors_monitor(monitor)
 
-    def connect_hold_monitors_to_all_tasks(self, monitors: List[Monitor]):
+    def connect_hold_monitors_to_all_tasks(self, monitors: List[ExpressionMonitor]):
         for monitor in monitors:
             for task in self.tasks:
                 task.add_hold_monitors_monitor(monitor)
 
-    def connect_end_monitors_to_all_tasks(self, monitors: List[Monitor]):
+    def connect_end_monitors_to_all_tasks(self, monitors: List[ExpressionMonitor]):
         for monitor in monitors:
             for task in self.tasks:
                 task.add_end_monitors_monitor(monitor)
 
-    def connect_monitors_to_all_tasks(self, start_monitors: List[Monitor], hold_monitors: List[Monitor], end_monitors: List[Monitor]):
+    def connect_monitors_to_all_tasks(self, start_monitors: List[ExpressionMonitor], hold_monitors: List[ExpressionMonitor], end_monitors: List[ExpressionMonitor]):
         self.connect_start_monitors_to_all_tasks(start_monitors)
         self.connect_hold_monitors_to_all_tasks(hold_monitors)
         self.connect_end_monitors_to_all_tasks(end_monitors)
@@ -172,8 +172,8 @@ class Goal(ABC):
         for task in tasks:
             self.add_task(task)
 
-    def add_monitor(self, monitor: Monitor):
-        god_map.monitor_manager.add_monitor(monitor)
+    def add_monitor(self, monitor: ExpressionMonitor):
+        god_map.monitor_manager.add_expression_monitor(monitor)
 
 
 class NonMotionGoal(Goal):

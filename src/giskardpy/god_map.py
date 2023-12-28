@@ -23,7 +23,6 @@ if TYPE_CHECKING:
     from giskardpy.goals.motion_goal_manager import MotionGoalManager
     from giskardpy.debug_expression_manager import DebugExpressionManager
     from giskardpy.goals.monitors.monitor_manager import MonitorManager
-    from giskardpy.goals.monitors.monitors import Monitor
     from giskardpy.configs.collision_avoidance_config import CollisionAvoidanceConfig
     from giskardpy.configs.world_config import WorldConfig
     from giskardpy.tree.control_modes import ControlModes

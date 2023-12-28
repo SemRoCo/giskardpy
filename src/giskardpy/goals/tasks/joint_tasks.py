@@ -1,6 +1,6 @@
 from typing import Optional, List
 import giskardpy.casadi_wrapper as cas
-from giskardpy.goals.monitors.monitors import Monitor
+from giskardpy.goals.monitors.monitors import ExpressionMonitor
 from giskardpy.goals.tasks.task import Task
 
 
@@ -8,12 +8,12 @@ class JointPositionTask(Task):
     def __init__(self, joint_current: cas.symbol_expr_float,
                  joint_goal: cas.symbol_expr_float, weight: cas.symbol_expr_float,
                  velocity_limit: cas.symbol_expr_float,
-                 start_monitors: Optional[Monitor] = None,
-                 hold_monitors: Optional[Monitor] = None,
-                 end_monitors: Optional[Monitor] = None):
+                 start_monitors: Optional[ExpressionMonitor] = None,
+                 hold_monitors: Optional[ExpressionMonitor] = None,
+                 end_monitors: Optional[ExpressionMonitor] = None):
         error = joint_goal - joint_current
         if end_monitors is None:
-            end_monitors = Monitor(cas.less(cas.abs(error), 0.1))
+            end_monitors = ExpressionMonitor(cas.less(cas.abs(error), 0.1))
 
         super().__init__(None, start_monitors, hold_monitors, end_monitors)
 
@@ -30,9 +30,9 @@ class PositionTask(Task):
                  goal_positions: List[cas.symbol_expr_float],
                  velocity_limits: List[cas.symbol_expr_float],
                  weight: cas.symbol_expr_float,
-                 start_monitors: Optional[Monitor] = None,
-                 hold_monitors: Optional[Monitor] = None,
-                 end_monitors: Optional[Monitor] = None):
+                 start_monitors: Optional[ExpressionMonitor] = None,
+                 hold_monitors: Optional[ExpressionMonitor] = None,
+                 end_monitors: Optional[ExpressionMonitor] = None):
 
         super().__init__(None, start_monitors, hold_monitors, end_monitors)
         for i in range(len(names)):

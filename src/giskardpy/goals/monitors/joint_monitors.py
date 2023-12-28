@@ -1,12 +1,12 @@
 from typing import List, Dict
 
 import giskardpy.casadi_wrapper as cas
-from giskardpy.goals.monitors.monitors import Monitor
+from giskardpy.goals.monitors.monitors import ExpressionMonitor
 from giskardpy.god_map import god_map
 from giskardpy.my_types import Derivatives
 
 
-class JointGoalReached(Monitor):
+class JointGoalReached(ExpressionMonitor):
     def __init__(self,
                  name: str,
                  goal_state: Dict[str, float],

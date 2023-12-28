@@ -3,14 +3,14 @@ from typing import List, Dict, Optional
 from geometry_msgs.msg import PointStamped, QuaternionStamped, PoseStamped, Vector3Stamped
 
 import giskardpy.casadi_wrapper as cas
-from giskardpy.goals.monitors.monitors import Monitor
+from giskardpy.goals.monitors.monitors import ExpressionMonitor
 from giskardpy.god_map import god_map
 from giskardpy.my_types import Derivatives
 import giskardpy.utils.tfwrapper as tf
 from giskardpy.utils.expression_definition_utils import transform_msg
 
 
-class PoseReached(Monitor):
+class PoseReached(ExpressionMonitor):
     def __init__(self,
                  name: str,
                  root_link: str, tip_link: str,
@@ -52,7 +52,7 @@ class PoseReached(Monitor):
         self.set_expression(cas.logic_and(position_reached, orientation_reached))
 
 
-class PositionReached(Monitor):
+class PositionReached(ExpressionMonitor):
     def __init__(self,
                  name: str,
                  root_link: str, tip_link: str,
@@ -72,7 +72,7 @@ class PositionReached(Monitor):
         self.set_expression(cas.less(distance_to_goal, threshold))
 
 
-class OrientationReached(Monitor):
+class OrientationReached(ExpressionMonitor):
     def __init__(self,
                  name: str,
                  root_link: str,
@@ -93,7 +93,7 @@ class OrientationReached(Monitor):
         self.set_expression(cas.less(cas.abs(rotation_error), threshold))
 
 
-class PointingAt(Monitor):
+class PointingAt(ExpressionMonitor):
     def __init__(self,
                  name: str,
                  tip_link: str,
@@ -128,7 +128,7 @@ class PointingAt(Monitor):
         god_map.debug_expression_manager.add_debug_expression('pointing', root_V_pointing_axis)
 
 
-class VectorsAligned(Monitor):
+class VectorsAligned(ExpressionMonitor):
     def __init__(self,
                  name: str,
                  root_link: str,
@@ -159,7 +159,7 @@ class VectorsAligned(Monitor):
         self.set_expression(expr)
 
 
-class DistanceToLine(Monitor):
+class DistanceToLine(ExpressionMonitor):
     def __init__(self,
                  name: str,
                  root_link: str,

@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+from functools import cached_property
 from typing import Union, List, TypeVar, Optional
 
 import numpy as np
@@ -13,6 +16,19 @@ import giskardpy.utils.tfwrapper as tf
 
 
 class Monitor:
+    name: str
+    start_monitors: List[Monitor]
+
+    def __init__(self, name: str, start_monitors: List[Monitor]):
+        self.name = name
+        self.start_monitors = start_monitors
+
+    @cached_property
+    def state_filter(self) -> np.ndarray:
+        return god_map.monitor_manager.to_state_filter(self.start_monitors)
+
+
+class ExpressionMonitor(Monitor):
     id: int
     expression: cas.Expression
     state_flip_times: List[float]
@@ -27,6 +43,7 @@ class Monitor:
         self.substitution_keys = []
         self.expression = None
         self.state_flip_times = []
+        super().__init__(name, [])
 
     def set_id(self, id_: int):
         self.id = id_
@@ -48,7 +65,7 @@ class Monitor:
         pass
 
 
-class LocalMinimumReached(Monitor):
+class LocalMinimumReached(ExpressionMonitor):
     def __init__(self, name: str = 'local minimum reached', min_cut_off: float = 0.01, max_cut_off: float = 0.06,
                  joint_convergence_threshold: float = 0.01, windows_size: int = 1):
         super().__init__(name=name, crucial=True, stay_one=False)
@@ -77,7 +94,7 @@ class LocalMinimumReached(Monitor):
         self.expression = cas.logic_all(cas.Expression(condition_list))
 
 
-class TimeAbove(Monitor):
+class TimeAbove(ExpressionMonitor):
     def __init__(self, *, threshold: float, name: str = 'time above'):
         super().__init__(name=name, crucial=True, stay_one=False)
         traj_length_in_sec = symbol_manager.time

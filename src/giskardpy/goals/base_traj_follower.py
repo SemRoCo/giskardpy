@@ -14,7 +14,7 @@ from visualization_msgs.msg import MarkerArray, Marker
 from giskardpy import casadi_wrapper as w
 from giskardpy.exceptions import GiskardException, ConstraintInitalizationException
 from giskardpy.goals.goal import Goal
-from giskardpy.goals.monitors.monitors import Monitor
+from giskardpy.goals.monitors.monitors import ExpressionMonitor
 from giskardpy.goals.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE, Task
 from giskardpy.god_map import god_map
 from giskardpy.model.joints import OmniDrive, OmniDrivePR22
@@ -31,9 +31,9 @@ class BaseTrajFollower(Goal):
                  joint_name: my_string,
                  track_only_velocity: bool = False,
                  weight: float = WEIGHT_ABOVE_CA,
-                 start_monitors: Optional[List[Monitor]] = None,
-                 hold_monitors: Optional[List[Monitor]] = None,
-                 end_monitors: Optional[List[Monitor]] = None):
+                 start_monitors: Optional[List[ExpressionMonitor]] = None,
+                 hold_monitors: Optional[List[ExpressionMonitor]] = None,
+                 end_monitors: Optional[List[ExpressionMonitor]] = None):
         self.weight = weight
         self.joint_name = joint_name
         super().__init__(name=f'{self.__class__.__name__}/{self.joint_name}')

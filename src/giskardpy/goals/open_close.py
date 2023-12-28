@@ -4,7 +4,7 @@ from typing import Optional, List
 
 from giskardpy.goals.cartesian_goals import CartesianPose, CartesianPosition, CartesianOrientation
 from giskardpy.goals.goal import Goal
-from giskardpy.goals.monitors.monitors import Monitor
+from giskardpy.goals.monitors.monitors import ExpressionMonitor
 from giskardpy.goals.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE, Task
 from giskardpy.goals.joint_goals import JointPositionList
 from giskardpy.god_map import god_map
@@ -20,9 +20,9 @@ class Open(Goal):
                  max_velocity: float = 100,
                  weight: float = WEIGHT_ABOVE_CA,
                  name: Optional[str] = None,
-                 start_monitors: Optional[List[Monitor]] = None,
-                 hold_monitors: Optional[List[Monitor]] = None,
-                 end_monitors: Optional[List[Monitor]] = None
+                 start_monitors: Optional[List[ExpressionMonitor]] = None,
+                 hold_monitors: Optional[List[ExpressionMonitor]] = None,
+                 end_monitors: Optional[List[ExpressionMonitor]] = None
                  ):
         """
         Open a container in an environment.
@@ -110,9 +110,9 @@ class Close(Goal):
                  goal_joint_state: Optional[float] = None,
                  weight: float = WEIGHT_ABOVE_CA,
                  name: Optional[str] = None,
-                 start_monitors: Optional[List[Monitor]] = None,
-                 hold_monitors: Optional[List[Monitor]] = None,
-                 end_monitors: Optional[List[Monitor]] = None
+                 start_monitors: Optional[List[ExpressionMonitor]] = None,
+                 hold_monitors: Optional[List[ExpressionMonitor]] = None,
+                 end_monitors: Optional[List[ExpressionMonitor]] = None
                  ):
         """
         Same as Open, but will use minimum value as default for goal_joint_state

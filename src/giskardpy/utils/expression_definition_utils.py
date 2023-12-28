@@ -10,7 +10,7 @@ import giskardpy.utils.tfwrapper as tf
 import giskardpy.casadi_wrapper as cas
 
 if TYPE_CHECKING:
-    from giskardpy.goals.monitors.monitors import Monitor
+    from giskardpy.goals.monitors.monitors import ExpressionMonitor
 
 
 @overload
@@ -51,25 +51,25 @@ def transform_msg(target_frame, msg, tf_timeout=1):
 @overload
 def transform_msg_and_turn_to_expr(root_link: PrefixName,
                                    msg: Union[PoseStamped],
-                                   monitors: Optional[List[Union[str, Monitor]]] = None) -> cas.TransMatrix: ...
+                                   monitors: Optional[List[Union[str, ExpressionMonitor]]] = None) -> cas.TransMatrix: ...
 
 
 @overload
 def transform_msg_and_turn_to_expr(root_link: PrefixName,
                                    msg: Union[PointStamped],
-                                   monitors: Optional[List[Union[str, Monitor]]] = None) -> cas.Point3: ...
+                                   monitors: Optional[List[Union[str, ExpressionMonitor]]] = None) -> cas.Point3: ...
 
 
 @overload
 def transform_msg_and_turn_to_expr(root_link: PrefixName,
                                    msg: Union[Vector3Stamped],
-                                   monitors: Optional[List[Union[str, Monitor]]] = None) -> cas.Vector3: ...
+                                   monitors: Optional[List[Union[str, ExpressionMonitor]]] = None) -> cas.Vector3: ...
 
 
 @overload
 def transform_msg_and_turn_to_expr(root_link: PrefixName,
                                    msg: Union[QuaternionStamped],
-                                   monitors: Optional[List[Union[str, Monitor]]] = None) -> cas.RotationMatrix: ...
+                                   monitors: Optional[List[Union[str, ExpressionMonitor]]] = None) -> cas.RotationMatrix: ...
 
 
 def transform_msg_and_turn_to_expr(root_link, msg, update_on_monitors=None):

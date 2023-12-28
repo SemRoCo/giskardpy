@@ -27,6 +27,7 @@ from giskardpy.goals.monitors.cartesian_monitors import PoseReached, PositionRea
 from giskardpy.goals.monitors.joint_monitors import JointGoalReached
 from giskardpy.goals.monitors.monitor_callback import Print
 from giskardpy.goals.monitors.monitors import LocalMinimumReached, TimeAbove
+from giskardpy.goals.monitors.payload_monitors import EndMotion
 from giskardpy.goals.open_close import Close, Open
 from giskardpy.goals.pointing import Pointing
 from giskardpy.goals.set_prediction_horizon import SetMaxTrajLength, SetPredictionHorizon
@@ -1047,25 +1048,25 @@ class MonitorWrapper:
     def reset(self):
         self._monitors = []
 
-    def add_monitor(self, monitor_type: str, monitor_name: str, **kwargs):
+    def add_monitor(self, monitor_class: str, monitor_name: str, **kwargs):
         if [x for x in self._monitors if x.name == monitor_name]:
             raise KeyError(f'monitor named {monitor_name} already exists.')
         monitor = giskard_msgs.Monitor()
         monitor.name = monitor_name
-        monitor.monitor_class = monitor_type
+        monitor.monitor_class = monitor_class
         monitor.kwargs = kwargs_to_json(kwargs)
         self._monitors.append(monitor)
 
     def add_local_minimum_reached(self, name: Optional[str] = None):
         if name is None:
             name = 'local min reached'
-        self.add_monitor(monitor_type=LocalMinimumReached.__name__, monitor_name=name)
+        self.add_monitor(monitor_class=LocalMinimumReached.__name__, monitor_name=name)
         return name
 
     def add_time_above(self, threshold: float, name: Optional[str] = None):
         if name is None:
             name = 'time above'
-        self.add_monitor(monitor_type=TimeAbove.__name__, monitor_name=name, threshold=threshold)
+        self.add_monitor(monitor_class=TimeAbove.__name__, monitor_name=name, threshold=threshold)
         return name
 
     def add_joint_position(self,
@@ -1076,7 +1077,7 @@ class MonitorWrapper:
                            stay_one: bool = True) -> str:
         if name is None:
             name = f'joint position reached {list(goal_state.keys())}'
-        self.add_monitor(monitor_type=JointGoalReached.__name__,
+        self.add_monitor(monitor_class=JointGoalReached.__name__,
                          monitor_name=name,
                          goal_state=goal_state,
                          threshold=threshold,
@@ -1098,7 +1099,7 @@ class MonitorWrapper:
                            stay_one: bool = True):
         if name is None:
             name = f'{root_link}/{tip_link} pose reached'
-        self.add_monitor(monitor_type=PoseReached.__name__,
+        self.add_monitor(monitor_class=PoseReached.__name__,
                          monitor_name=name,
                          root_link=root_link,
                          tip_link=tip_link,
@@ -1125,7 +1126,7 @@ class MonitorWrapper:
                                stay_one: bool = True) -> str:
         if name is None:
             name = f'{root_link}/{tip_link} position reached'
-        self.add_monitor(monitor_type=PositionReached.__name__,
+        self.add_monitor(monitor_class=PositionReached.__name__,
                          monitor_name=name,
                          root_link=root_link,
                          tip_link=tip_link,
@@ -1152,7 +1153,7 @@ class MonitorWrapper:
                              crucial: bool = True):
         if name is None:
             name = f'{root_link}/{tip_link} distance to line'
-        self.add_monitor(monitor_type=DistanceToLine.__name__,
+        self.add_monitor(monitor_class=DistanceToLine.__name__,
                          monitor_name=name,
                          center_point=center_point,
                          line_axis=line_axis,
@@ -1175,7 +1176,7 @@ class MonitorWrapper:
                                   threshold: float = 0.01,
                                   crucial: bool = True,
                                   stay_one: bool = True):
-        self.add_monitor(monitor_type=OrientationReached.__name__,
+        self.add_monitor(monitor_class=OrientationReached.__name__,
                          monitor_name=name,
                          root_link=root_link,
                          tip_link=tip_link,
@@ -1198,7 +1199,7 @@ class MonitorWrapper:
                         crucial: bool = True) -> str:
         if name is None:
             name = f'{root_link}/{tip_link} pointing at'
-        self.add_monitor(monitor_type=PointingAt.__name__,
+        self.add_monitor(monitor_class=PointingAt.__name__,
                          monitor_name=name,
                          tip_link=tip_link,
                          goal_point=goal_point,
@@ -1225,7 +1226,7 @@ class MonitorWrapper:
             name = f'{root_link}/{tip_link} vectors aligned'
             while name in self._monitors:
                 name += 'I'
-        self.add_monitor(monitor_type=VectorsAligned.__name__,
+        self.add_monitor(monitor_class=VectorsAligned.__name__,
                          monitor_name=name,
                          root_link=root_link,
                          tip_link=tip_link,
@@ -1236,6 +1237,11 @@ class MonitorWrapper:
                          threshold=threshold,
                          crucial=crucial)
         return name
+
+    def add_end_motion(self, start_monitors: List[str], name: Optional[str] = 'end_motion') -> None:
+        self.add_monitor(monitor_class=EndMotion.__name__,
+                         monitor_name=name,
+                         start_monitors=start_monitors)
 
 
 class GiskardWrapper:

@@ -6,7 +6,7 @@ import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import CollisionEntry
 from giskardpy.goals.goal import Goal
 from giskardpy.goals.monitors.monitor_callback import CollisionMatrixUpdater
-from giskardpy.goals.monitors.monitors import Monitor
+from giskardpy.goals.monitors.monitors import ExpressionMonitor
 from giskardpy.goals.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE, Task
 from giskardpy.god_map import god_map
 from giskardpy.my_types import my_string
@@ -25,9 +25,9 @@ class ExternalCollisionAvoidance(Goal):
                  soft_thresholds: Optional[Dict[my_string, float]] = None,
                  idx: int = 0,
                  num_repeller: int = 1,
-                 start_monitors: Optional[List[Monitor]] = None,
-                 hold_monitors: Optional[List[Monitor]] = None,
-                 end_monitors: Optional[List[Monitor]] = None
+                 start_monitors: Optional[List[ExpressionMonitor]] = None,
+                 hold_monitors: Optional[List[ExpressionMonitor]] = None,
+                 end_monitors: Optional[List[ExpressionMonitor]] = None
                  ):
         """
         Don't use me
@@ -93,7 +93,7 @@ class ExternalCollisionAvoidance(Goal):
 
         weight = cas.save_division(WEIGHT_COLLISION_AVOIDANCE,  # divide by number of active repeller per link
                                    cas.min(number_of_external_collisions, self.num_repeller))
-        distance_monitor = Monitor(f'collision distance {self.name}', crucial=False)
+        distance_monitor = ExpressionMonitor(f'collision distance {self.name}', crucial=False)
         distance_monitor.set_expression(cas.less(actual_distance, 50))
         self.add_monitor(distance_monitor)
         task = Task('stay away')
@@ -145,9 +145,9 @@ class SelfCollisionAvoidance(Goal):
                  idx: float = 0,
                  num_repeller: int = 1,
                  name_prefix: Optional[str] = None,
-                 start_monitors: Optional[List[Monitor]] = None,
-                 hold_monitors: Optional[List[Monitor]] = None,
-                 end_monitors: Optional[List[Monitor]] = None):
+                 start_monitors: Optional[List[ExpressionMonitor]] = None,
+                 hold_monitors: Optional[List[ExpressionMonitor]] = None,
+                 end_monitors: Optional[List[ExpressionMonitor]] = None):
         self.link_a = link_a
         self.link_b = link_b
         self.max_velocity = max_velocity
@@ -204,7 +204,7 @@ class SelfCollisionAvoidance(Goal):
 
         weight = cas.save_division(WEIGHT_COLLISION_AVOIDANCE,  # divide by number of active repeller per link
                                    cas.min(number_of_self_collisions, self.num_repeller))
-        distance_monitor = Monitor(f'collision distance {self.name}', crucial=False)
+        distance_monitor = ExpressionMonitor(f'collision distance {self.name}', crucial=False)
         distance_monitor.set_expression(cas.less(actual_distance, 50))
         self.add_monitor(distance_monitor)
         task = Task('stay away')
@@ -245,9 +245,9 @@ class CollisionAvoidanceHint(Goal):
     def __init__(self, tip_link, avoidance_hint, object_link_name, object_group=None, max_linear_velocity=0.1,
                  root_link=None, max_threshold=0.05, spring_threshold=None, weight=WEIGHT_ABOVE_CA,
                  name: Optional[str] = None,
-                 start_monitors: Optional[List[Monitor]] = None,
-                 hold_monitors: Optional[List[Monitor]] = None,
-                 end_monitors: Optional[List[Monitor]] = None
+                 start_monitors: Optional[List[ExpressionMonitor]] = None,
+                 hold_monitors: Optional[List[ExpressionMonitor]] = None,
+                 end_monitors: Optional[List[ExpressionMonitor]] = None
                  ):
         """
         This goal pushes the link_name in the direction of avoidance_hint, if it is closer than spring_threshold
@@ -345,9 +345,9 @@ class CollisionAvoidance(Goal):
     def __init__(self,
                  collision_entries: List[CollisionEntry],
                  name: Optional[str] = None,
-                 start_monitors: Optional[List[Monitor]] = None,
-                 hold_monitors: Optional[List[Monitor]] = None,
-                 end_monitors: Optional[List[Monitor]] = None):
+                 start_monitors: Optional[List[ExpressionMonitor]] = None,
+                 hold_monitors: Optional[List[ExpressionMonitor]] = None,
+                 end_monitors: Optional[List[ExpressionMonitor]] = None):
         if name is None:
             name = self.__class__.__name__
         super().__init__(name)

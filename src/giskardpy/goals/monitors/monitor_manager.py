@@ -109,9 +109,8 @@ class MonitorManager:
         self.payload_monitors.append(monitor)
         monitor.set_id(len(self.monitors) - 1)
 
-    def get_state_dict(self, only_crucial: bool = False) -> Dict[str, bool]:
-        return {monitor.name: bool(self.state[i]) for i, monitor in enumerate(self.expression_monitors)
-                if not only_crucial or monitor.crucial}
+    def get_state_dict(self) -> Dict[str, bool]:
+        return {monitor.name: bool(self.state[i]) for i, monitor in enumerate(self.expression_monitors)}
 
     def register_expression_updater(self, expression: cas.PreservedCasType,
                                     monitors: Tuple[Union[str, ExpressionMonitor], ...]) \

@@ -47,8 +47,7 @@ class OldGiskardWrapper(GiskardWrapper):
         :param max_velocity: will be applied to all joints
         """
         if add_monitor:
-            monitor_name = self.monitors.add_joint_position(goal_state=goal_state,
-                                                            crucial=True)
+            monitor_name = self.monitors.add_joint_position(goal_state=goal_state)
             end_monitors_monitors = [monitor_name]
         else:
             end_monitors_monitors = []

@@ -34,12 +34,11 @@ class ExpressionMonitor(Monitor):
     state_flip_times: List[float]
     name: str
 
-    def __init__(self, name: str, *, crucial: bool, stay_one: bool = False,
+    def __init__(self, name: str, *, stay_one: bool = False,
                  start_monitors: Optional[List[Monitor]] = None):
         self.id = -1
         self.name = name
         self.stay_one = stay_one
-        self.crucial = crucial
         self.substitution_values = []
         self.substitution_keys = []
         self.expression = None
@@ -75,7 +74,7 @@ class LocalMinimumReached(ExpressionMonitor):
                  joint_convergence_threshold: float = 0.01,
                  windows_size: int = 1,
                  start_monitors: Optional[List[Monitor]] = None):
-        super().__init__(name=name, crucial=True, stay_one=False, start_monitors=start_monitors)
+        super().__init__(name=name, stay_one=False, start_monitors=start_monitors)
         self.joint_convergence_threshold = joint_convergence_threshold
         self.min_cut_off = min_cut_off
         self.max_cut_off = max_cut_off
@@ -105,7 +104,6 @@ class TimeAbove(ExpressionMonitor):
     def __init__(self, *, threshold: float, name: str = 'time above',
                  start_monitors: Optional[List[Monitor]] = None):
         super().__init__(name=name,
-                         crucial=True,
                          stay_one=False,
                          start_monitors=start_monitors)
         traj_length_in_sec = symbol_manager.time

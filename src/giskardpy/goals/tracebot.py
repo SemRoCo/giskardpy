@@ -64,14 +64,14 @@ class InsertCylinder(Goal):
         root_P_top = root_P_hole + root_V_up * self.pre_grasp_height
         distance_to_top = cas.euclidean_distance(root_P_tip, root_P_top)
         top_reached = cas.less(distance_to_top, 0.01)
-        top_reached_monitor = ExpressionMonitor(name='top reached', crucial=False, stay_one=True)
+        top_reached_monitor = ExpressionMonitor(name='top reached', stay_one=True)
         self.add_monitor(top_reached_monitor)
         top_reached_monitor.set_expression(top_reached)
 
         distance_to_line, root_P_on_line = cas.distance_point_to_line_segment(root_P_tip, root_P_hole, root_P_top)
         distance_to_hole = cas.norm(root_P_hole - root_P_tip)
         bottom_reached = cas.less(distance_to_hole, 0.01)
-        bottom_reached_monitor = ExpressionMonitor('bottom reached', crucial=True, stay_one=True)
+        bottom_reached_monitor = ExpressionMonitor('bottom reached', stay_one=True)
         bottom_reached_monitor.set_expression(bottom_reached)
         self.add_monitor(bottom_reached_monitor)
 
@@ -121,7 +121,7 @@ class InsertCylinder(Goal):
         #
         # # tilt straight
         tilt_error = cas.angle_between_vector(root_V_cylinder_z, root_V_up)
-        tilt_monitor = ExpressionMonitor(name='straight', crucial=True)
+        tilt_monitor = ExpressionMonitor(name='straight')
         tilt_monitor.set_expression(cas.less(tilt_error, 0.01))
         self.add_monitor(tilt_monitor)
 

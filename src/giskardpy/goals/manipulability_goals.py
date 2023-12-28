@@ -61,7 +61,7 @@ class MaxManipulability(Goal):
         god_map.debug_expression_manager.add_debug_expression('mIndex_percentualDifference',
                                                               1 - cas.min(cas.save_division(old_m, m), 1))
         percentual_diff = 1 - cas.min(cas.save_division(old_m, m), 1)
-        monitor = ExpressionMonitor(name=f'manipMonitor{tip_link}', crucial=True)
+        monitor = ExpressionMonitor(name=f'manipMonitor{tip_link}')
         monitor.set_expression(cas.less(percentual_diff, monitor_threshold))
         task.add_end_monitors_monitor(monitor)
         self.add_monitor(monitor)

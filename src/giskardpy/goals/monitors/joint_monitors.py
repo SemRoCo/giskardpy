@@ -11,7 +11,6 @@ class JointGoalReached(ExpressionMonitor):
                  name: str,
                  goal_state: Dict[str, float],
                  threshold: float,
-                 crucial: bool,
                  stay_one: bool = True):
         comparison_list = []
         for joint_name, goal in goal_state.items():
@@ -24,7 +23,7 @@ class JointGoalReached(ExpressionMonitor):
             # god_map.debug_expression_manager.add_debug_expression(str(joint_name), cas.min(cas.abs(error), 0.01))
             comparison_list.append(cas.less(cas.abs(error), threshold))
         expression = cas.logic_all(cas.Expression(comparison_list))
-        super().__init__(name, crucial=crucial, stay_one=stay_one)
+        super().__init__(name, stay_one=stay_one)
         self.set_expression(expression)
         god_map.debug_expression_manager.add_debug_expression(f'joints reached', self.expression)
 

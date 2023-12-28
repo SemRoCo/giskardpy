@@ -1043,7 +1043,6 @@ class MonitorWrapper:
                            goal_state: Dict[str, float],
                            name: Optional[str] = None,
                            threshold: float = 0.01,
-                           crucial: bool = True,
                            stay_one: bool = True) -> str:
         if name is None:
             name = f'joint position reached {list(goal_state.keys())}'
@@ -1051,7 +1050,6 @@ class MonitorWrapper:
                          monitor_name=name,
                          goal_state=goal_state,
                          threshold=threshold,
-                         crucial=crucial,
                          stay_one=stay_one)
         return name
 
@@ -1065,7 +1063,6 @@ class MonitorWrapper:
                            position_threshold: float = 0.01,
                            orientation_threshold: float = 0.01,
                            update_pose_on: Optional[List[str]] = None,
-                           crucial: bool = True,
                            stay_one: bool = True):
         if name is None:
             name = f'{root_link}/{tip_link} pose reached'
@@ -1079,7 +1076,6 @@ class MonitorWrapper:
                          position_threshold=position_threshold,
                          orientation_threshold=orientation_threshold,
                          update_pose_on=update_pose_on,
-                         crucial=crucial,
                          stay_one=stay_one)
         return name
 
@@ -1092,7 +1088,6 @@ class MonitorWrapper:
                                root_group: Optional[str] = None,
                                tip_group: Optional[str] = None,
                                threshold: float = 0.01,
-                               crucial: bool = True,
                                stay_one: bool = True) -> str:
         if name is None:
             name = f'{root_link}/{tip_link} position reached'
@@ -1104,7 +1099,6 @@ class MonitorWrapper:
                          root_group=root_group,
                          tip_group=tip_group,
                          threshold=threshold,
-                         crucial=crucial,
                          stay_one=stay_one)
 
         return name
@@ -1119,8 +1113,7 @@ class MonitorWrapper:
                              name: Optional[str] = None,
                              root_group: Optional[str] = None,
                              tip_group: Optional[str] = None,
-                             threshold: float = 0.01,
-                             crucial: bool = True):
+                             threshold: float = 0.01):
         if name is None:
             name = f'{root_link}/{tip_link} distance to line'
         self.add_monitor(monitor_class=DistanceToLine.__name__,
@@ -1132,8 +1125,7 @@ class MonitorWrapper:
                          tip_link=tip_link,
                          root_group=root_group,
                          tip_group=tip_group,
-                         threshold=threshold,
-                         crucial=crucial)
+                         threshold=threshold)
         return name
 
     def add_cartesian_orientation(self,
@@ -1144,7 +1136,6 @@ class MonitorWrapper:
                                   root_group: Optional[str] = None,
                                   tip_group: Optional[str] = None,
                                   threshold: float = 0.01,
-                                  crucial: bool = True,
                                   stay_one: bool = True):
         self.add_monitor(monitor_class=OrientationReached.__name__,
                          monitor_name=name,
@@ -1154,7 +1145,6 @@ class MonitorWrapper:
                          root_group=root_group,
                          tip_group=tip_group,
                          threshold=threshold,
-                         crucial=crucial,
                          stay_one=stay_one)
 
     def add_pointing_at(self,

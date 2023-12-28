@@ -1,6 +1,7 @@
 from py_trees import Sequence
 
 from giskardpy.tree.behaviors.append_zero_velocity import SetZeroVelocity
+from giskardpy.tree.behaviors.delete_monitors_behaviors import DeleteMonitors
 from giskardpy.tree.behaviors.goal_cleanup import GoalCleanUp
 from giskardpy.tree.behaviors.log_trajectory import LogTrajPlugin
 from giskardpy.tree.behaviors.plot_debug_expressions import PlotDebugExpressions
@@ -20,6 +21,7 @@ class CleanupControlLoop(Sequence):
         self.add_child(SetZeroVelocity('set zero vel 1'))
         self.add_child(LogTrajPlugin('log post processing'))
         self.add_child(GoalCleanUp('clean up goals'))
+        self.add_child(DeleteMonitors())
         self.reset_world_state = ResetWorldState()
         self.remove_reset_world_state()
 

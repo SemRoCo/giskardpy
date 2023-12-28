@@ -27,7 +27,7 @@ from giskardpy.goals.monitors.cartesian_monitors import PoseReached, PositionRea
 from giskardpy.goals.monitors.joint_monitors import JointGoalReached
 from giskardpy.goals.monitors.monitor_callback import Print
 from giskardpy.goals.monitors.monitors import LocalMinimumReached, TimeAbove
-from giskardpy.goals.monitors.payload_monitors import EndMotion
+from giskardpy.goals.monitors.payload_monitors import EndMotion, Print
 from giskardpy.goals.open_close import Close, Open
 from giskardpy.goals.pointing import Pointing
 from giskardpy.goals.set_prediction_horizon import SetMaxTrajLength, SetPredictionHorizon
@@ -1195,8 +1195,7 @@ class MonitorWrapper:
                         name: Optional[str] = None,
                         tip_group: Optional[str] = None,
                         root_group: Optional[str] = None,
-                        threshold: float = 0.01,
-                        crucial: bool = True) -> str:
+                        threshold: float = 0.01) -> str:
         if name is None:
             name = f'{root_link}/{tip_link} pointing at'
         self.add_monitor(monitor_class=PointingAt.__name__,
@@ -1207,8 +1206,7 @@ class MonitorWrapper:
                          tip_group=tip_group,
                          root_group=root_group,
                          pointing_axis=pointing_axis,
-                         threshold=threshold,
-                         crucial=crucial)
+                         threshold=threshold)
         return name
 
     def add_vectors_aligned(self,
@@ -1220,8 +1218,7 @@ class MonitorWrapper:
                             name: Optional[str] = None,
                             root_group: Optional[str] = None,
                             tip_group: Optional[str] = None,
-                            threshold: float = 0.01,
-                            crucial: bool = True) -> str:
+                            threshold: float = 0.01) -> str:
         if name is None:
             name = f'{root_link}/{tip_link} vectors aligned'
             while name in self._monitors:
@@ -1234,14 +1231,26 @@ class MonitorWrapper:
                          tip_normal=tip_normal,
                          root_group=root_group,
                          tip_group=tip_group,
-                         threshold=threshold,
-                         crucial=crucial)
+                         threshold=threshold)
         return name
 
-    def add_end_motion(self, start_monitors: List[str], name: Optional[str] = 'end_motion') -> None:
+    def add_end_motion(self, start_monitors: List[str], name: Optional[str] = 'end_motion') -> str:
         self.add_monitor(monitor_class=EndMotion.__name__,
                          monitor_name=name,
                          start_monitors=start_monitors)
+        return name
+
+    def add_print(self,
+                  message: str,
+                  start_monitors: List[str],
+                  name: Optional[str] = None) -> str:
+        if name is None:
+            name = f'print {message}'
+        self.add_monitor(monitor_class=Print.__name__,
+                         monitor_name=name,
+                         message=message,
+                         start_monitors=start_monitors)
+        return name
 
 
 class GiskardWrapper:

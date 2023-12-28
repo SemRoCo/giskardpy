@@ -17,9 +17,9 @@ import giskardpy.utils.tfwrapper as tf
 
 class Monitor:
     name: str
-    start_monitors: List[Monitor]
+    start_monitors: List[str]
 
-    def __init__(self, name: str, start_monitors: List[Monitor]):
+    def __init__(self, name: str, start_monitors: List[str]):
         self.name = name
         self.start_monitors = start_monitors
 

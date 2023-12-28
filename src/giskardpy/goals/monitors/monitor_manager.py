@@ -75,9 +75,6 @@ class MonitorManager:
                 return monitor
         raise KeyError(f'No monitor of name {name} found.')
 
-    def is_local_minimum_reached(self) -> bool:
-        return bool(np.any(self.state[self.end_motion_ids]))
-
     @profile
     def update_expr_monitor_state(self, new_state) -> np.ndarray:  # Assuming new_state is a NumPy array with only 1 and 0
         new_state = new_state.astype(int)

@@ -7,7 +7,7 @@ import numpy as np
 
 import giskardpy.casadi_wrapper as cas
 from giskardpy.casadi_wrapper import PreservedCasType
-from giskardpy.exceptions import UnknownGroupException
+from giskardpy.exceptions import UnknownGroupException, GiskardException
 from giskardpy.god_map import god_map
 from giskardpy.my_types import Derivatives, my_string, transformable_message
 from giskardpy.qp.free_variable import FreeVariable
@@ -16,20 +16,26 @@ import giskardpy.utils.tfwrapper as tf
 
 
 class Monitor:
+    id: int
     name: str
     start_monitors: List[Monitor]
 
     def __init__(self, name: str, start_monitors: List[Monitor]):
         self.name = name
         self.start_monitors = start_monitors
+        self.id = -1
 
     @cached_property
     def state_filter(self) -> np.ndarray:
         return god_map.monitor_manager.to_state_filter(self.start_monitors)
 
+    def get_state_expression(self):
+        if self.id == -1:
+            raise GiskardException(f'Id of {self.name} is not set.')
+        return symbol_manager.get_symbol(f'god_map.monitor_manager.state[{self.id}]')
+
 
 class ExpressionMonitor(Monitor):
-    id: int
     expression: cas.Expression
     state_flip_times: List[float]
     name: str
@@ -57,9 +63,6 @@ class ExpressionMonitor(Monitor):
 
     def get_expression(self):
         return self.expression
-
-    def get_state_expression(self):
-        return symbol_manager.get_symbol(f'god_map.monitor_manager.state[{self.id}]')
 
     def compile(self):
         # use this if you need to do stuff, after the qp controller has been initialized

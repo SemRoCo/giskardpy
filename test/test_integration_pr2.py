@@ -419,56 +419,48 @@ class TestJointGoals:
 
 
 class TestPayloadMonitor:
-    def test_print_event(self, zero_pose: PR2TestWrapper):
-        monitor_name = zero_pose.monitors.add_joint_position(zero_pose.better_pose, name='goal')
-        zero_pose.motion_goals.add_joint_position(zero_pose.better_pose)
-        zero_pose.monitors.add_print(start_monitors=[monitor_name],
-                                     message='=====================done=====================')
-        zero_pose.execute()
-
-    def test_collision_avoidance_sequence(self, fake_table_setup: PR2TestWrapper):
-        fake_table_setup.set_seed_configuration(fake_table_setup.better_pose)
-        fake_table_setup.execute()
+    def test_cart_goal_sequence(self, zero_pose: PR2TestWrapper):
         pose1 = PoseStamped()
         pose1.header.frame_id = 'map'
-        pose1.pose.position.x = 2
+        pose1.pose.position.x = 1
         pose1.pose.orientation.w = 1
+
+        pose2 = PoseStamped()
+        pose2.header.frame_id = 'base_footprint'
+        pose2.pose.position.y = 1
+        pose2.pose.orientation.w = 1
 
         root_link = 'map'
         tip_link = 'base_footprint'
-        # monitor that reads time
-        monitor1 = fake_table_setup.monitors.add_time_above(threshold=1)
 
-        monitor2 = fake_table_setup.monitors.add_cartesian_pose(name='pose1',
-                                                                root_link=root_link,
-                                                                tip_link=tip_link,
-                                                                goal_pose=pose1)
-        end_monitor = fake_table_setup.monitors.add_local_minimum_reached()
-        # simple cartisian goal 2m to the front
-        fake_table_setup.motion_goals.add_cartesian_pose(goal_pose=pose1,
-                                                         goal_name='g1',
+        monitor1 = zero_pose.monitors.add_cartesian_pose(name='pose1',
                                                          root_link=root_link,
                                                          tip_link=tip_link,
-                                                         end_monitors=[monitor2, end_monitor])
-        collision_entry = CollisionEntry()
-        collision_entry.type = CollisionEntry.AVOID_COLLISION
-        collision_entry.distance = -1
+                                                         goal_pose=pose1)
 
-        fake_table_setup.avoid_all_collisions(end_monitors=[monitor1])
+        monitor2 = zero_pose.monitors.add_cartesian_pose(name='pose2',
+                                                         root_link=root_link,
+                                                         tip_link=tip_link,
+                                                         goal_pose=pose2,
+                                                         update_pose_on=[monitor1])
+        end_monitor = zero_pose.monitors.add_local_minimum_reached()
 
-        fake_table_setup.allow_all_collisions(start_monitors=[monitor1])
-        fake_table_setup.avoid_collision(group1='pr2', group2='pr2', start_monitors=[monitor1])
-        fake_table_setup.monitors.add_end_motion(start_monitors=[end_monitor])
+        zero_pose.motion_goals.add_cartesian_pose(goal_pose=pose1,
+                                                  goal_name='g1',
+                                                  root_link=root_link,
+                                                  tip_link=tip_link,
+                                                  end_monitors=[monitor1])
+        zero_pose.motion_goals.add_cartesian_pose(goal_pose=pose2,
+                                                  goal_name='g2',
+                                                  root_link=root_link,
+                                                  tip_link=tip_link,
+                                                  relative=True,
+                                                  start_monitors=[monitor1],
+                                                  end_monitors=[monitor2, end_monitor])
+        zero_pose.allow_all_collisions()
+        zero_pose.monitors.add_end_motion(start_monitors=[end_monitor])
+        zero_pose.execute(add_local_minimum_reached=False)
 
-        fake_table_setup.execute(add_local_minimum_reached=False)
-
-        # fake_table_setup.check_cpi_geq(fake_table_setup.get_l_gripper_links(), 0.05)
-        # fake_table_setup.check_cpi_leq(['r_gripper_l_finger_tip_link'], 0.04)
-        # fake_table_setup.check_cpi_leq(['r_gripper_r_finger_tip_link'], 0.04)
-
-
-class TestConstraints:
-    # TODO write buggy constraints that test sanity checks
     def test_bowl_and_cup_sequence(self, kitchen_setup: PR2TestWrapper):
         # %% setup
         bowl_name = 'bowl'
@@ -630,6 +622,84 @@ class TestConstraints:
         # kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
         # kitchen_setup.plan_and_execute()
 
+    def test_sleep(self, zero_pose: PR2TestWrapper):
+        sleep1 = zero_pose.monitors.add_sleep(2, name='sleep1')
+        print1 = zero_pose.monitors.add_print(message=f'{sleep1} done', start_monitors=[sleep1])
+        sleep2 = zero_pose.monitors.add_sleep(3, name='sleep2', start_monitors=[print1])
+        joint_monitor = zero_pose.monitors.add_joint_position(zero_pose.better_pose)
+        local_min = zero_pose.monitors.add_local_minimum_reached()
+        end = zero_pose.monitors.add_end_motion(start_monitors=[local_min, sleep2, joint_monitor])
+
+        zero_pose.motion_goals.add_joint_position(zero_pose.better_pose, start_monitors=[sleep2])
+        zero_pose.execute(add_local_minimum_reached=False)
+        assert god_map.trajectory.length_in_seconds > 6
+
+    def test_RelativePositionSequence(self, zero_pose: PR2TestWrapper):
+        goal1 = PointStamped()
+        goal1.header.frame_id = 'base_footprint'
+        goal1.point.x = 1
+
+        goal2 = PointStamped()
+        goal2.header.frame_id = 'base_footprint'
+        goal2.point.y = 1
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class=RelativePositionSequence.__name__,
+                                               goal1=goal1,
+                                               goal2=goal2,
+                                               root_link='map',
+                                               tip_link='base_footprint')
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute()
+
+    def test_print_event(self, zero_pose: PR2TestWrapper):
+        monitor_name = zero_pose.monitors.add_joint_position(zero_pose.better_pose, name='goal')
+        zero_pose.motion_goals.add_joint_position(zero_pose.better_pose)
+        zero_pose.monitors.add_print(start_monitors=[monitor_name],
+                                     message='=====================done=====================')
+        zero_pose.execute()
+
+    def test_collision_avoidance_sequence(self, fake_table_setup: PR2TestWrapper):
+        fake_table_setup.set_seed_configuration(fake_table_setup.better_pose)
+        fake_table_setup.execute()
+        pose1 = PoseStamped()
+        pose1.header.frame_id = 'map'
+        pose1.pose.position.x = 2
+        pose1.pose.orientation.w = 1
+
+        root_link = 'map'
+        tip_link = 'base_footprint'
+        # monitor that reads time
+        monitor1 = fake_table_setup.monitors.add_time_above(threshold=1)
+
+        monitor2 = fake_table_setup.monitors.add_cartesian_pose(name='pose1',
+                                                                root_link=root_link,
+                                                                tip_link=tip_link,
+                                                                goal_pose=pose1)
+        end_monitor = fake_table_setup.monitors.add_local_minimum_reached()
+        # simple cartisian goal 2m to the front
+        fake_table_setup.motion_goals.add_cartesian_pose(goal_pose=pose1,
+                                                         goal_name='g1',
+                                                         root_link=root_link,
+                                                         tip_link=tip_link,
+                                                         end_monitors=[monitor2, end_monitor])
+        collision_entry = CollisionEntry()
+        collision_entry.type = CollisionEntry.AVOID_COLLISION
+        collision_entry.distance = -1
+
+        fake_table_setup.avoid_all_collisions(end_monitors=[monitor1])
+
+        fake_table_setup.allow_all_collisions(start_monitors=[monitor1])
+        fake_table_setup.avoid_collision(group1='pr2', group2='pr2', start_monitors=[monitor1])
+        fake_table_setup.monitors.add_end_motion(start_monitors=[end_monitor])
+
+        fake_table_setup.execute(add_local_minimum_reached=False)
+
+        # fake_table_setup.check_cpi_geq(fake_table_setup.get_l_gripper_links(), 0.05)
+        # fake_table_setup.check_cpi_leq(['r_gripper_l_finger_tip_link'], 0.04)
+        # fake_table_setup.check_cpi_leq(['r_gripper_r_finger_tip_link'], 0.04)
+
+
+class TestConstraints:
+    # TODO write buggy constraints that test sanity checks
     def test_add_debug_expr(self, zero_pose: PR2TestWrapper):
         zero_pose.motion_goals.add_motion_goal(motion_goal_class=DebugGoal.__name__)
         zero_pose.set_joint_goal(zero_pose.better_pose)
@@ -853,22 +923,6 @@ class TestConstraints:
         goal_position_p.header.frame_id = 'base_link'
         zero_pose.set_straight_cart_goal(goal_pose=goal_position_p, tip_link=zero_pose.l_tip,
                                          root_link=zero_pose.default_root)
-        zero_pose.plan_and_execute()
-
-    def test_RelativePositionSequence(self, zero_pose: PR2TestWrapper):
-        goal1 = PointStamped()
-        goal1.header.frame_id = 'base_footprint'
-        goal1.point.x = 1
-
-        goal2 = PointStamped()
-        goal2.header.frame_id = 'base_footprint'
-        goal2.point.y = 1
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class=RelativePositionSequence.__name__,
-                                               goal1=goal1,
-                                               goal2=goal2,
-                                               root_link='map',
-                                               tip_link='base_footprint')
-        zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
 
     def test_CartesianPoseStraight2(self, better_pose: PR2TestWrapper):
@@ -1229,47 +1283,6 @@ class TestConstraints:
                                                   goal_state=pocky_pose,
                                                   start_monitors=[joint_monitor1],
                                                   end_monitors=[end_monitor, joint_monitor2])
-        zero_pose.allow_all_collisions()
-        zero_pose.execute(add_local_minimum_reached=False)
-
-    def test_cart_goal_sequence(self, zero_pose: PR2TestWrapper):
-        pose1 = PoseStamped()
-        pose1.header.frame_id = 'map'
-        pose1.pose.position.x = 1
-        pose1.pose.orientation.w = 1
-
-        pose2 = PoseStamped()
-        pose2.header.frame_id = 'base_footprint'
-        pose2.pose.position.y = 1
-        pose2.pose.orientation.w = 1
-
-        root_link = 'map'
-        tip_link = 'base_footprint'
-
-        monitor1 = zero_pose.monitors.add_cartesian_pose(name='pose1',
-                                                         root_link=root_link,
-                                                         tip_link=tip_link,
-                                                         goal_pose=pose1)
-
-        monitor2 = zero_pose.monitors.add_cartesian_pose(name='pose2',
-                                                         root_link=root_link,
-                                                         tip_link=tip_link,
-                                                         goal_pose=pose2,
-                                                         update_pose_on=[monitor1])
-        end_monitor = zero_pose.monitors.add_local_minimum_reached()
-
-        zero_pose.motion_goals.add_cartesian_pose(goal_pose=pose1,
-                                                  goal_name='g1',
-                                                  root_link=root_link,
-                                                  tip_link=tip_link,
-                                                  end_monitors=[monitor1])
-        zero_pose.motion_goals.add_cartesian_pose(goal_pose=pose2,
-                                                  goal_name='g2',
-                                                  root_link=root_link,
-                                                  tip_link=tip_link,
-                                                  relative=True,
-                                                  start_monitors=[monitor1],
-                                                  end_monitors=[monitor2, end_monitor])
         zero_pose.allow_all_collisions()
         zero_pose.execute(add_local_minimum_reached=False)
 

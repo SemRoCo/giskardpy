@@ -1,4 +1,5 @@
 import traceback
+from collections import OrderedDict
 from typing import List, Tuple, Dict, Optional, Callable, Union
 
 import numpy as np
@@ -26,7 +27,7 @@ def flipped_to_one(a: np.ndarray, b: np.ndarray) -> np.ndarray:
 
 
 def monitor_list_to_monitor_name_tuple(monitors: List[Union[str, ExpressionMonitor]]) -> Tuple[str, ...]:
-    return tuple(sorted(monitor.name if isinstance(monitor, ExpressionMonitor) else monitor for monitor in monitors))
+    return tuple(sorted(monitor.name if isinstance(monitor, Monitor) else monitor for monitor in monitors))
 
 
 class MonitorManager:
@@ -70,7 +71,7 @@ class MonitorManager:
         self._register_expression_update_triggers()
 
     def get_monitor(self, name: str) -> ExpressionMonitor:
-        for monitor in self.expression_monitors:
+        for monitor in self.monitors:
             if monitor.name == name:
                 return monitor
         raise KeyError(f'No monitor of name {name} found.')
@@ -99,6 +100,9 @@ class MonitorManager:
             raise GiskardException(f'Monitor named {monitor.name} already exists.')
         self.expression_monitors.append(monitor)
         monitor.set_id(len(self.expression_monitors) - 1)
+        # increase all payload monitor ids because expression monitors always come first
+        for payload_monitor in self.payload_monitors:
+            payload_monitor.set_id(payload_monitor.id + 1)
 
     def add_payload_monitor(self, monitor: PayloadMonitor):
         if [x for x in self.monitors if x.name == monitor.name]:
@@ -107,7 +111,7 @@ class MonitorManager:
         monitor.set_id(len(self.monitors) - 1)
 
     def get_state_dict(self) -> Dict[str, bool]:
-        return {monitor.name: bool(self.state[i]) for i, monitor in enumerate(self.expression_monitors)}
+        return OrderedDict((monitor.name, bool(self.state[i])) for i, monitor in enumerate(self.monitors))
 
     def register_expression_updater(self, expression: cas.PreservedCasType,
                                     monitors: Tuple[Union[str, ExpressionMonitor], ...]) \

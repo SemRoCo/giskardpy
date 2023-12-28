@@ -3,6 +3,7 @@ from abc import ABC
 from typing import Union, List, TypeVar, Optional, Dict, Tuple
 
 import numpy as np
+import rospy
 
 import giskardpy.casadi_wrapper as cas
 from giskardpy.casadi_wrapper import PreservedCasType
@@ -20,12 +21,14 @@ class PayloadMonitor(Monitor, ABC):
     id: int
     name: str
     state: bool
+    run_call_in_thread: bool
 
-    def __init__(self, name: str, start_monitors: List[Monitor]):
+    def __init__(self, name: str, start_monitors: List[Monitor], run_call_in_thread: bool):
         self.id = -1
         self.name = name
         self.state_flip_times = []
         self.state = False
+        self.run_call_in_thread = run_call_in_thread
         super().__init__(name=name, start_monitors=start_monitors)
 
     def get_state(self) -> bool:
@@ -41,7 +44,7 @@ class PayloadMonitor(Monitor, ABC):
 
 class EndMotion(PayloadMonitor):
     def __init__(self, name: str, start_monitors: List[Monitor]):
-        super().__init__(name, start_monitors)
+        super().__init__(name, start_monitors, run_call_in_thread=False)
 
     def __call__(self):
         self.state = True
@@ -53,10 +56,20 @@ class EndMotion(PayloadMonitor):
 class Print(PayloadMonitor):
     def __init__(self, name: str, start_monitors: List[Monitor], message: str):
         self.message = message
-        super().__init__(name, start_monitors)
+        super().__init__(name, start_monitors, run_call_in_thread=False)
 
     def __call__(self):
         logging.loginfo(self.message)
+        self.state = True
+
+
+class Sleep(PayloadMonitor):
+    def __init__(self, name: str, start_monitors: List[Monitor], seconds: float):
+        self.seconds = seconds
+        super().__init__(name, start_monitors, run_call_in_thread=True)
+
+    def __call__(self):
+        rospy.sleep(self.seconds)
         self.state = True
 
 
@@ -64,7 +77,7 @@ class CollisionMatrixUpdater(PayloadMonitor):
     collision_matrix: Dict[Tuple[str, str], float]
 
     def __init__(self, name: str, start_monitors: List[Monitor], new_collision_matrix: Dict[Tuple[str, str], float]):
-        super().__init__(name, start_monitors)
+        super().__init__(name, start_monitors, run_call_in_thread=False)
         self.collision_matrix = new_collision_matrix
 
     def __call__(self):

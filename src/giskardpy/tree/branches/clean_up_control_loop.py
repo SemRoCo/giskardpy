@@ -26,7 +26,8 @@ class CleanupControlLoop(Sequence):
         self.remove_reset_world_state()
 
     def add_plot_trajectory(self, normalize_position: bool = False, wait: bool = False):
-        self.add_child(PlotTrajectory('plot trajectory', wait=wait, normalize_position=normalize_position))
+        self.insert_child(PlotTrajectory('plot trajectory', wait=wait, normalize_position=normalize_position),
+                          index=-1)
 
     def add_plot_debug_trajectory(self, normalize_position: bool = False, wait: bool = False):
         self.add_child(PlotDebugExpressions('plot debug trajectory', wait=wait, normalize_position=normalize_position))

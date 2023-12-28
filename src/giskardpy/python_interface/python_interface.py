@@ -26,7 +26,7 @@ from giskardpy.goals.monitors.cartesian_monitors import PoseReached, PositionRea
     VectorsAligned, DistanceToLine
 from giskardpy.goals.monitors.joint_monitors import JointGoalReached
 from giskardpy.goals.monitors.monitors import LocalMinimumReached, TimeAbove
-from giskardpy.goals.monitors.payload_monitors import EndMotion, Print
+from giskardpy.goals.monitors.payload_monitors import EndMotion, Print, Sleep
 from giskardpy.goals.open_close import Close, Open
 from giskardpy.goals.pointing import Pointing
 from giskardpy.goals.set_prediction_horizon import SetMaxTrajLength, SetPredictionHorizon
@@ -1209,6 +1209,18 @@ class MonitorWrapper:
         self.add_monitor(monitor_class=Print.__name__,
                          monitor_name=name,
                          message=message,
+                         start_monitors=start_monitors)
+        return name
+
+    def add_sleep(self,
+                  seconds: float,
+                  start_monitors: Optional[List[str]] = None,
+                  name: Optional[str] = None) -> str:
+        if name is None:
+            name = f'sleep {seconds:.3f}s'
+        self.add_monitor(monitor_class=Sleep.__name__,
+                         monitor_name=name,
+                         seconds=seconds,
                          start_monitors=start_monitors)
         return name
 

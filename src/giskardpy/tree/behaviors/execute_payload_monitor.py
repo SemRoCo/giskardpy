@@ -1,24 +1,34 @@
-import numpy as np
+from threading import Thread
+
 from py_trees import Status
 
 from giskardpy.goals.monitors.payload_monitors import PayloadMonitor
-from giskardpy.god_map import god_map
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.decorators import record_time
 
 
 class ExecutePayloadMonitor(GiskardBehavior):
     monitor: PayloadMonitor
+    started: bool
 
     @profile
     def __init__(self, monitor: PayloadMonitor):
         super().__init__('execute\npayload')
         self.monitor = monitor
+        self.started = False
 
     @record_time
     @profile
     def update(self):
-        self.monitor()
+        if self.monitor.run_call_in_thread:
+            if not self.started:
+                self.payload_thread = Thread(target=self.monitor)
+                self.payload_thread.start()
+                self.started = True
+            if self.payload_thread.is_alive():
+                return Status.RUNNING
+        else:
+            self.monitor()
         if self.monitor.get_state():
             return Status.SUCCESS
         return Status.FAILURE

@@ -2,16 +2,24 @@ import traceback
 from py_trees import Status
 
 from giskard_msgs.msg import MoveGoal
-from giskardpy.exceptions import InvalidGoalException, GiskardException
+from giskardpy.exceptions import InvalidGoalException, GiskardException, ConstraintInitalizationException
 from giskardpy.goals.base_traj_follower import BaseTrajFollower
 from giskardpy.goals.monitors.monitors import TimeAbove
+from giskardpy.goals.monitors.payload_monitors import EndMotion
 from giskardpy.god_map import god_map
 from giskardpy.model.joints import OmniDrive, DiffDrive
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
+from giskardpy.utils import logging
 from giskardpy.utils.logging import loginfo
 from giskardpy.utils.decorators import catch_and_raise_to_blackboard, record_time
 from giskardpy.utils.utils import get_ros_msgs_constant_name_by_value
 
+
+def end_motion_in_move_goal(move_goal: MoveGoal) -> bool:
+    for monitor in move_goal.monitors:
+        if monitor.monitor_class == EndMotion.__name__:
+            return True
+    return False
 
 class ParseActionGoal(GiskardBehavior):
     @record_time
@@ -26,6 +34,7 @@ class ParseActionGoal(GiskardBehavior):
         loginfo('Parsing goal message.')
         move_goal = god_map.goal_msg
         god_map.goal_id += 1
+        self.sanity_check(move_goal)
         try:
             god_map.monitor_manager.parse_monitors(move_goal.monitors)
             god_map.motion_goal_manager.parse_motion_goals(move_goal.goals)
@@ -39,6 +48,9 @@ class ParseActionGoal(GiskardBehavior):
         loginfo('Done parsing goal message.')
         return Status.SUCCESS
 
+    def sanity_check(self, move_goal: MoveGoal):
+        if not end_motion_in_move_goal(move_goal):
+            logging.logwarn(f'No {EndMotion.__name__} monitor.')
 
 class SetExecutionMode(GiskardBehavior):
     @record_time

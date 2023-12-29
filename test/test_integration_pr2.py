@@ -419,6 +419,24 @@ class TestJointGoals:
 
 
 class TestPayloadMonitor:
+    def test_joint_sequence(self, zero_pose: PR2TestWrapper):
+        joint_monitor1 = zero_pose.monitors.add_joint_position(zero_pose.better_pose,
+                                                               name='joint_monitor1')
+        joint_monitor2 = zero_pose.monitors.add_joint_position(pocky_pose,
+                                                               name='joint_monitor2')
+        end_monitor = zero_pose.monitors.add_local_minimum_reached()
+
+        zero_pose.motion_goals.add_joint_position(goal_name='g1',
+                                                  goal_state=zero_pose.better_pose,
+                                                  end_monitors=[joint_monitor1])
+        zero_pose.motion_goals.add_joint_position(goal_name='g2',
+                                                  goal_state=pocky_pose,
+                                                  start_monitors=[joint_monitor1],
+                                                  end_monitors=[end_monitor, joint_monitor2])
+        zero_pose.allow_all_collisions()
+        zero_pose.monitors.add_end_motion(start_monitors=[end_monitor])
+        zero_pose.execute(add_local_minimum_reached=False)
+
     def test_cart_goal_sequence(self, zero_pose: PR2TestWrapper):
         pose1 = PoseStamped()
         pose1.header.frame_id = 'map'
@@ -1268,23 +1286,6 @@ class TestConstraints:
                                         goal_normal=y_goal)
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
-
-    def test_joint_sequence(self, zero_pose: PR2TestWrapper):
-        joint_monitor1 = zero_pose.monitors.add_joint_position(zero_pose.better_pose,
-                                                               name='joint_monitor1')
-        joint_monitor2 = zero_pose.monitors.add_joint_position(pocky_pose,
-                                                               name='joint_monitor2')
-        end_monitor = zero_pose.monitors.add_local_minimum_reached()
-
-        zero_pose.motion_goals.add_joint_position(goal_name='g1',
-                                                  goal_state=zero_pose.better_pose,
-                                                  end_monitors=[joint_monitor1])
-        zero_pose.motion_goals.add_joint_position(goal_name='g2',
-                                                  goal_state=pocky_pose,
-                                                  start_monitors=[joint_monitor1],
-                                                  end_monitors=[end_monitor, joint_monitor2])
-        zero_pose.allow_all_collisions()
-        zero_pose.execute(add_local_minimum_reached=False)
 
     def test_wrong_constraint_type(self, zero_pose: PR2TestWrapper):
         goal_state = {'r_elbow_flex_joint': -1.0}
@@ -2622,7 +2623,7 @@ class TestSelfCollisionAvoidance:
         p.pose.position.x = 0.2
         p.pose.orientation.w = 1
         zero_pose.add_cart_goal(goal_pose=p, tip_link=zero_pose.r_tip, root_link='base_footprint')
-        zero_pose.send_goal()
+        zero_pose.execute()
         zero_pose.check_cpi_geq(zero_pose.get_r_gripper_links(), 0.048)
 
     def test_avoid_self_collision_specific_link(self, zero_pose: PR2TestWrapper):

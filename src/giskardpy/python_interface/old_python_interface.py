@@ -14,12 +14,14 @@ class OldGiskardWrapper(GiskardWrapper):
         local_min_reached_monitor_name = self.monitors.add_local_minimum_reached()
         for goal in self.motion_goals._goals:
             goal.end_monitors.append(local_min_reached_monitor_name)
+        self.monitors.add_end_motion(start_monitors=[local_min_reached_monitor_name])
         return super().execute(wait)
 
     def projection(self, wait: bool = True) -> MoveResult:
         local_min_reached_monitor_name = self.monitors.add_local_minimum_reached()
         for goal in self.motion_goals._goals:
             goal.end_monitors.append(local_min_reached_monitor_name)
+        self.monitors.add_end_motion(start_monitors=[local_min_reached_monitor_name])
         return super().projection(wait)
 
     def _create_action_goal(self) -> MoveGoal:

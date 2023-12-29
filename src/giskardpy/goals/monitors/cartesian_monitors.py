@@ -60,8 +60,9 @@ class PositionReached(ExpressionMonitor):
                  root_group: Optional[str] = None,
                  tip_group: Optional[str] = None,
                  threshold: float = 0.01,
-                 stay_one: bool = True):
-        super().__init__(name, stay_one=stay_one)
+                 stay_one: bool = True,
+                 start_monitors: Optional[List[Monitor]] = None):
+        super().__init__(name, stay_one=stay_one, start_monitors=start_monitors)
         root_link = god_map.world.search_for_link_name(root_link, root_group)
         tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
         goal_point = transform_msg(root_link, goal_point)
@@ -80,8 +81,9 @@ class OrientationReached(ExpressionMonitor):
                  root_group: Optional[str] = None,
                  tip_group: Optional[str] = None,
                  threshold: float = 0.01,
-                 stay_one: bool = True):
-        super().__init__(name, stay_one=stay_one)
+                 stay_one: bool = True,
+                 start_monitors: Optional[List[Monitor]] = None):
+        super().__init__(name, stay_one=stay_one, start_monitors=start_monitors)
         root_link = god_map.world.search_for_link_name(root_link, root_group)
         tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
         goal_orientation = transform_msg(root_link, goal_orientation)
@@ -101,8 +103,9 @@ class PointingAt(ExpressionMonitor):
                  root_group: Optional[str] = None,
                  pointing_axis: Vector3Stamped = None,
                  threshold: float = 0.01,
-                 stay_one: bool = True):
-        super().__init__(name, stay_one=stay_one)
+                 stay_one: bool = True,
+                 start_monitors: Optional[List[Monitor]] = None):
+        super().__init__(name, stay_one=stay_one, start_monitors=start_monitors)
         self.root = god_map.world.search_for_link_name(root_link, root_group)
         self.tip = god_map.world.search_for_link_name(tip_link, tip_group)
         self.root_P_goal_point = transform_msg(self.root, goal_point)
@@ -135,8 +138,9 @@ class VectorsAligned(ExpressionMonitor):
                  root_group: Optional[str] = None,
                  tip_group: Optional[str] = None,
                  threshold: float = 0.01,
-                 stay_one: bool = True):
-        super().__init__(name, stay_one=stay_one)
+                 stay_one: bool = True,
+                 start_monitors: Optional[List[Monitor]] = None):
+        super().__init__(name, stay_one=stay_one, start_monitors=start_monitors)
         self.root = god_map.world.search_for_link_name(root_link, root_group)
         self.tip = god_map.world.search_for_link_name(tip_link, tip_group)
 
@@ -166,8 +170,9 @@ class DistanceToLine(ExpressionMonitor):
                  root_group: Optional[str] = None,
                  tip_group: Optional[str] = None,
                  threshold: float = 0.01,
-                 stay_one: bool = True):
-        super().__init__(name, stay_one=stay_one)
+                 stay_one: bool = True,
+                 start_monitors: Optional[List[Monitor]] = None):
+        super().__init__(name, stay_one=stay_one, start_monitors=start_monitors)
         self.root = god_map.world.search_for_link_name(root_link, root_group)
         self.tip = god_map.world.search_for_link_name(tip_link, tip_group)
 

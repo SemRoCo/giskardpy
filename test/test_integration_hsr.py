@@ -282,6 +282,7 @@ class TestCartGoals:
 class TestConstraints:
 
     def test_open_fridge(self, kitchen_setup: HSRTestWrapper):
+        #fixme: end pose is off
         handle_frame_id = 'iai_kitchen/iai_fridge_door_handle'
         handle_name = 'iai_fridge_door_handle'
         kitchen_setup.open_gripper()

@@ -465,6 +465,7 @@ class GiskardTestWrapper(OldGiskardWrapper):
             local_min_reached_monitor_name = self.monitors.add_local_minimum_reached()
             for goal in self.motion_goals._goals:
                 goal.end_monitors.append(local_min_reached_monitor_name)
+            self.monitors.add_end_motion(start_monitors=[local_min_reached_monitor_name])
         last_js = god_map.world.state.to_position_dict()
         for key, value in list(last_js.items()):
             if key not in god_map.controlled_joints:

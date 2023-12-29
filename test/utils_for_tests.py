@@ -449,6 +449,8 @@ class GiskardTestWrapper(OldGiskardWrapper):
                 wait: bool = True, add_local_minimum_reached: bool = True) -> MoveResult:
         if add_local_minimum_reached:
             local_min_reached_monitor_name = self.monitors.add_local_minimum_reached()
+            for goal in self.motion_goals._goals:
+                goal.end_monitors.append(local_min_reached_monitor_name)
             self.monitors.add_end_motion(start_monitors=[local_min_reached_monitor_name])
         return self.send_goal(expected_error_code=expected_error_code, stop_after=stop_after, wait=wait)
 

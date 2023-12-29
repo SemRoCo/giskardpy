@@ -7,6 +7,7 @@ from giskardpy.goals.monitors.monitors import ExpressionMonitor
 from giskardpy.my_types import Derivatives
 from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint, \
     ManipulabilityConstraint
+from giskardpy.utils.utils import string_shortener
 
 WEIGHT_MAX = giskard_msgs.msg.Weights.WEIGHT_MAX
 WEIGHT_ABOVE_CA = giskard_msgs.msg.Weights.WEIGHT_ABOVE_CA
@@ -43,6 +44,14 @@ class Task:
     def __str__(self):
         return self.name
 
+    def formatted_name(self, quoted: bool = False) -> str:
+        formatted_name = string_shortener(original_str=self.name,
+                                          max_lines=4,
+                                          max_line_length=25)
+        if quoted:
+            return '"' + formatted_name + '"'
+        return formatted_name
+
     def add_start_monitors_monitor(self, monitor: ExpressionMonitor):
         if [m for m in self.start_monitors if m.name == monitor.name]:
             raise AttributeError(f'Monitor with name {monitor.name} '
@@ -74,7 +83,7 @@ class Task:
         return self.manip_constraints.values()
 
     def _apply_monitors_to_constraints(self, constraints: Iterable[Union[EqualityConstraint, InequalityConstraint,
-                                                                         DerivativeInequalityConstraint]]):
+    DerivativeInequalityConstraint]]):
         output_constraints = []
         for constraint in constraints:
             for monitor in self.start_monitors:

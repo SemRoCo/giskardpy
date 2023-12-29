@@ -7,10 +7,11 @@ from typing import Optional, Tuple, Dict, List, Union, Callable, TYPE_CHECKING, 
 
 from geometry_msgs.msg import PoseStamped, PointStamped, QuaternionStamped, Vector3Stamped
 
-from giskardpy.goals.monitors.monitors import ExpressionMonitor
+from giskardpy.goals.monitors.monitors import ExpressionMonitor, Monitor
 from giskardpy.goals.tasks.task import Task, WEIGHT_BELOW_CA
 from giskardpy.god_map import god_map
 from giskardpy.symbol_manager import symbol_manager
+from giskardpy.utils.utils import string_shortener
 
 if TYPE_CHECKING:
     from giskardpy.tree.control_modes import ControlModes
@@ -31,14 +32,22 @@ class Goal(ABC):
     @abc.abstractmethod
     def __init__(self,
                  name: str,
-                 start_monitors: Optional[List[ExpressionMonitor]] = None,
-                 hold_monitors: Optional[List[ExpressionMonitor]] = None,
-                 end_monitors: Optional[List[ExpressionMonitor]] = None):
+                 start_monitors: Optional[List[Monitor]] = None,
+                 hold_monitors: Optional[List[Monitor]] = None,
+                 end_monitors: Optional[List[Monitor]] = None):
         """
         This is where you specify goal parameters and save them as self attributes.
         """
         self.tasks = []
         self.name = name
+
+    def formatted_name(self, quoted: bool = False) -> str:
+        formatted_name = string_shortener(original_str=self.name,
+                                          max_lines=4,
+                                          max_line_length=25)
+        if quoted:
+            return '"' + formatted_name + '"'
+        return formatted_name
 
     def clean_up(self):
         pass
@@ -81,7 +90,8 @@ class Goal(ABC):
             for task in self.tasks:
                 task.add_end_monitors_monitor(monitor)
 
-    def connect_monitors_to_all_tasks(self, start_monitors: List[ExpressionMonitor], hold_monitors: List[ExpressionMonitor], end_monitors: List[ExpressionMonitor]):
+    def connect_monitors_to_all_tasks(self, start_monitors: List[ExpressionMonitor],
+                                      hold_monitors: List[ExpressionMonitor], end_monitors: List[ExpressionMonitor]):
         self.connect_start_monitors_to_all_tasks(start_monitors)
         self.connect_hold_monitors_to_all_tasks(hold_monitors)
         self.connect_end_monitors_to_all_tasks(end_monitors)
@@ -117,18 +127,18 @@ class Goal(ABC):
 
     @profile
     def get_constraints(self) -> Tuple[Dict[str, EqualityConstraint],
-                                       Dict[str, InequalityConstraint],
-                                       Dict[str, DerivativeInequalityConstraint],
-                                       Dict[str, Union[w.Symbol, float]],
-                                       Dict[str, ManipulabilityConstraint]]:
+    Dict[str, InequalityConstraint],
+    Dict[str, DerivativeInequalityConstraint],
+    Dict[str, Union[w.Symbol, float]],
+    Dict[str, ManipulabilityConstraint]]:
         self._equality_constraints = OrderedDict()
         self._inequality_constraints = OrderedDict()
         self._derivative_constraints = OrderedDict()
         self._debug_expressions = OrderedDict()
         self._manip_constraints = OrderedDict()
-        
+
         self._task_sanity_check()
-        
+
         for task in self.tasks:
             for constraint in task.get_eq_constraints():
                 name = f'{task.name}/{constraint.name}'
@@ -148,7 +158,7 @@ class Goal(ABC):
                 self._manip_constraints[constraint.name] = constraint
 
         return self._equality_constraints, self._inequality_constraints, self._derivative_constraints, \
-               self._manip_constraints, self._debug_expressions
+            self._manip_constraints, self._debug_expressions
 
     def _task_sanity_check(self):
         if not self.has_tasks():

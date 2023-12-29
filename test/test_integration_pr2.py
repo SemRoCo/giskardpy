@@ -629,7 +629,7 @@ class TestPayloadMonitor:
         joint_monitor = zero_pose.monitors.add_joint_position(zero_pose.better_pose)
         local_min = zero_pose.monitors.add_local_minimum_reached()
         end = zero_pose.monitors.add_end_motion(start_monitors=[local_min, sleep2, joint_monitor])
-
+        zero_pose.motion_goals.allow_all_collisions()
         zero_pose.motion_goals.add_joint_position(zero_pose.better_pose, start_monitors=[sleep2])
         zero_pose.execute(add_local_minimum_reached=False)
         assert god_map.trajectory.length_in_seconds > 6

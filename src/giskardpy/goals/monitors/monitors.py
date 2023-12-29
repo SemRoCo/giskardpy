@@ -13,6 +13,7 @@ from giskardpy.my_types import Derivatives, my_string, transformable_message
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.symbol_manager import symbol_manager
 import giskardpy.utils.tfwrapper as tf
+from giskardpy.utils.utils import string_shortener
 
 
 class Monitor:
@@ -20,9 +21,9 @@ class Monitor:
     name: str
     start_monitors: List[Monitor]
 
-    def __init__(self, name: str, start_monitors: List[Monitor]):
+    def __init__(self, name: str, start_monitors: Optional[List[Monitor]] = None):
         self.name = name
-        self.start_monitors = start_monitors
+        self.start_monitors = start_monitors or []
         self.id = -1
 
     @cached_property
@@ -33,6 +34,14 @@ class Monitor:
         if self.id == -1:
             raise GiskardException(f'Id of {self.name} is not set.')
         return symbol_manager.get_symbol(f'god_map.monitor_manager.state[{self.id}]')
+
+    def formatted_name(self, quoted: bool = False) -> str:
+        formatted_name = string_shortener(original_str=self.name,
+                                          max_lines=4,
+                                          max_line_length=25)
+        if quoted:
+            return '"' + formatted_name + '"'
+        return formatted_name
 
 
 class ExpressionMonitor(Monitor):

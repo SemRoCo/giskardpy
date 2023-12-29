@@ -8,6 +8,7 @@ from giskardpy.goals.monitors.monitors import ExpressionMonitor
 from giskardpy.goals.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE, Task
 from giskardpy.goals.joint_goals import JointPositionList
 from giskardpy.god_map import god_map
+import giskardpy.casadi_wrapper as cas
 
 
 class Open(Goal):
@@ -62,7 +63,7 @@ class Open(Goal):
         #                                            hold_monitors=hold_monitors,
         #                                            end_monitors=end_monitors))
 
-        handle_T_tip = god_map.world.compose_fk_expression(self.handle_link, self.tip_link)
+        handle_T_tip = cas.TransMatrix(god_map.world.compute_fk_pose(self.handle_link, self.tip_link))
         if start_monitors:
             handle_T_tip = god_map.monitor_manager.register_expression_updater(handle_T_tip,
                                                                                tuple(start_monitors))

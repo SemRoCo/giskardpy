@@ -15,6 +15,7 @@ from giskardpy.configs.qp_controller_config import QPControllerConfig
 from giskardpy.god_map import god_map
 from giskardpy.utils.utils import launch_launchfile
 from utils_for_tests import compare_poses, GiskardTestWrapper
+import giskardpy.utils.tfwrapper as tf
 
 
 class HSRTestWrapper(GiskardTestWrapper):
@@ -282,7 +283,6 @@ class TestCartGoals:
 class TestConstraints:
 
     def test_open_fridge(self, kitchen_setup: HSRTestWrapper):
-        #fixme: end pose is off
         handle_frame_id = 'iai_kitchen/iai_fridge_door_handle'
         handle_name = 'iai_fridge_door_handle'
         kitchen_setup.open_gripper()
@@ -322,7 +322,8 @@ class TestConstraints:
                                             root_link='map')
         kitchen_setup.allow_all_collisions()
         # kitchen_setup.add_json_goal('AvoidJointLimits', percentage=10)
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
+        current_pose = god_map.world.compute_fk_pose(root='map', tip=kitchen_setup.tip)
 
         kitchen_setup.set_open_container_goal(tip_link=kitchen_setup.tip,
                                               environment_link=handle_name,
@@ -330,15 +331,22 @@ class TestConstraints:
         # kitchen_setup.set_json_goal('AvoidJointLimits', percentage=40)
         kitchen_setup.allow_all_collisions()
         # kitchen_setup.add_json_goal('AvoidJointLimits')
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
         kitchen_setup.set_env_state({'iai_fridge_door_joint': 1.5})
+
+        pose_reached = kitchen_setup.monitors.add_cartesian_pose('map',
+                                                                 tip_link=kitchen_setup.tip,
+                                                                 goal_pose=current_pose)
+        kitchen_setup.monitors.add_end_motion(start_monitors=[pose_reached])
 
         kitchen_setup.set_open_container_goal(tip_link=kitchen_setup.tip,
                                               environment_link=handle_name,
                                               goal_joint_state=0)
         kitchen_setup.allow_all_collisions()
         # kitchen_setup.set_json_goal('AvoidJointLimits', percentage=40)
-        kitchen_setup.plan_and_execute()
+
+        kitchen_setup.execute(add_local_minimum_reached=False)
+
         kitchen_setup.set_env_state({'iai_fridge_door_joint': 0})
 
         kitchen_setup.set_joint_goal(kitchen_setup.better_pose)

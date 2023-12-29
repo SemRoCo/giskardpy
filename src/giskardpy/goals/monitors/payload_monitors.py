@@ -7,7 +7,7 @@ import rospy
 
 import giskardpy.casadi_wrapper as cas
 from giskardpy.casadi_wrapper import PreservedCasType
-from giskardpy.exceptions import UnknownGroupException
+from giskardpy.exceptions import UnknownGroupException, PlanningException, GiskardException
 from giskardpy.goals.monitors.monitors import ExpressionMonitor, Monitor
 from giskardpy.god_map import god_map
 from giskardpy.my_types import Derivatives, my_string, transformable_message
@@ -15,6 +15,7 @@ from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.symbol_manager import symbol_manager
 import giskardpy.utils.tfwrapper as tf
 from giskardpy.utils import logging
+from giskardpy.utils.decorators import catch_and_raise_to_blackboard
 
 
 class PayloadMonitor(Monitor, ABC):
@@ -51,6 +52,36 @@ class EndMotion(PayloadMonitor):
 
     def get_state(self) -> bool:
         return self.state
+
+
+class CancelMotion(PayloadMonitor):
+    def __init__(self, name: str, start_monitors: List[Monitor], error_message: str):
+        super().__init__(name, start_monitors, run_call_in_thread=False)
+        self.error_message = error_message
+
+    def __call__(self):
+        raise PlanningException(self.error_message)
+
+    def get_state(self) -> bool:
+        return self.state
+
+
+class SetMaxTrajectoryLength(CancelMotion):
+    new_length: float
+
+    def __init__(self, name: str, new_length: Optional[float] = None, start_monitors: Optional[List[Monitor]] = None):
+        if start_monitors:
+            raise GiskardException(f'Cannot set start_monitors for {SetMaxTrajectoryLength.__name__}')
+        if new_length is None:
+            self.new_length = god_map.qp_controller_config.max_trajectory_length
+        else:
+            self.new_length = new_length
+        error_message = f'Trajectory longer than {new_length}'
+        super().__init__(name, start_monitors=[], error_message=error_message)
+
+    def __call__(self):
+        if god_map.time > self.new_length:
+            return super().__call__()
 
 
 class Print(PayloadMonitor):

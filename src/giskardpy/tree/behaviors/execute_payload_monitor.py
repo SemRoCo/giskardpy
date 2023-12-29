@@ -4,7 +4,7 @@ from py_trees import Status
 
 from giskardpy.goals.monitors.payload_monitors import PayloadMonitor
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
-from giskardpy.utils.decorators import record_time
+from giskardpy.utils.decorators import record_time, catch_and_raise_to_blackboard
 
 
 class ExecutePayloadMonitor(GiskardBehavior):
@@ -17,6 +17,7 @@ class ExecutePayloadMonitor(GiskardBehavior):
         self.monitor = monitor
         self.started = False
 
+    @catch_and_raise_to_blackboard
     @record_time
     @profile
     def update(self):
@@ -31,4 +32,4 @@ class ExecutePayloadMonitor(GiskardBehavior):
             self.monitor()
         if self.monitor.get_state():
             return Status.SUCCESS
-        return Status.FAILURE
+        return Status.RUNNING

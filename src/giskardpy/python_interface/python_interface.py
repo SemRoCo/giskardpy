@@ -26,7 +26,7 @@ from giskardpy.goals.monitors.cartesian_monitors import PoseReached, PositionRea
     VectorsAligned, DistanceToLine
 from giskardpy.goals.monitors.joint_monitors import JointGoalReached
 from giskardpy.goals.monitors.monitors import LocalMinimumReached, TimeAbove
-from giskardpy.goals.monitors.payload_monitors import EndMotion, Print, Sleep
+from giskardpy.goals.monitors.payload_monitors import EndMotion, Print, Sleep, CancelMotion, SetMaxTrajectoryLength
 from giskardpy.goals.open_close import Close, Open
 from giskardpy.goals.pointing import Pointing
 from giskardpy.goals.set_prediction_horizon import SetMaxTrajLength, SetPredictionHorizon
@@ -1200,6 +1200,22 @@ class MonitorWrapper:
         self.add_monitor(monitor_class=EndMotion.__name__,
                          monitor_name=name,
                          start_monitors=start_monitors)
+        return name
+
+    def add_cancel_motion(self, start_monitors: List[str], error_message: str,
+                          name: Optional[str] = 'cancel_motion') -> str:
+        self.add_monitor(monitor_class=CancelMotion.__name__,
+                         monitor_name=name,
+                         start_monitors=start_monitors,
+                         error_message=error_message)
+        return name
+
+    def add_max_trajectory_length(self, max_trajectory_length: Optional[float] = None):
+        name = SetMaxTrajectoryLength.__name__
+        self.add_monitor(monitor_name=name,
+                         monitor_class=SetMaxTrajectoryLength.__name__,
+                         new_length=max_trajectory_length,
+                         start_monitors=[])
         return name
 
     def add_print(self,

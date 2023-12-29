@@ -452,6 +452,9 @@ class GiskardTestWrapper(OldGiskardWrapper):
             for goal in self.motion_goals._goals:
                 goal.end_monitors.append(local_min_reached_monitor_name)
             self.monitors.add_end_motion(start_monitors=[local_min_reached_monitor_name])
+            if not self.max_trajectory_length_set:
+                self.monitors.add_max_trajectory_length()
+            self.max_trajectory_length_set = False
         return self.send_goal(expected_error_code=expected_error_code, stop_after=stop_after, wait=wait)
 
     def projection(self, expected_error_code: int = MoveResult.SUCCESS, wait: bool = True,
@@ -466,6 +469,9 @@ class GiskardTestWrapper(OldGiskardWrapper):
             for goal in self.motion_goals._goals:
                 goal.end_monitors.append(local_min_reached_monitor_name)
             self.monitors.add_end_motion(start_monitors=[local_min_reached_monitor_name])
+            if not self.max_trajectory_length_set:
+                self.monitors.add_max_trajectory_length()
+            self.max_trajectory_length_set = False
         last_js = god_map.world.state.to_position_dict()
         for key, value in list(last_js.items()):
             if key not in god_map.controlled_joints:

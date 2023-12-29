@@ -45,7 +45,7 @@ class Monitor:
 
 
 class ExpressionMonitor(Monitor):
-    expression: cas.Expression
+    _expression: cas.Expression
     state_flip_times: List[float]
     name: str
 
@@ -56,7 +56,7 @@ class ExpressionMonitor(Monitor):
         self.stay_one = stay_one
         self.substitution_values = []
         self.substitution_keys = []
-        self.expression = None
+        self._expression = None
         self.state_flip_times = []
         self.start_monitors = start_monitors
         super().__init__(name, start_monitors=start_monitors)
@@ -65,13 +65,16 @@ class ExpressionMonitor(Monitor):
         self.id = id_
 
     def set_expression(self, expression: cas.symbol_expr):
-        self.expression = expression
+        self._expression = expression
+        for monitor in self.start_monitors:
+            monitor_state = monitor.get_state_expression()
+            self._expression = cas.logic_and(self._expression, monitor_state)
 
     def notify_flipped(self, time: float):
         self.state_flip_times.append(time)
 
     def get_expression(self):
-        return self.expression
+        return self._expression
 
     def compile(self):
         # use this if you need to do stuff, after the qp controller has been initialized
@@ -109,7 +112,7 @@ class LocalMinimumReached(ExpressionMonitor):
                     joint_vel_symbol = symbol_manager.get_symbol(expr)
                 condition_list.append(cas.less(cas.abs(joint_vel_symbol), velocity_limit))
 
-        self.expression = cas.logic_all(cas.Expression(condition_list))
+        self.set_expression(cas.logic_all(cas.Expression(condition_list)))
 
 
 class TimeAbove(ExpressionMonitor):

@@ -1027,10 +1027,12 @@ class MonitorWrapper:
         monitor.kwargs = kwargs_to_json(kwargs)
         self._monitors.append(monitor)
 
-    def add_local_minimum_reached(self, name: Optional[str] = None):
+    def add_local_minimum_reached(self, name: Optional[str] = None, start_monitors: Optional[List[str]] = None):
         if name is None:
             name = 'local min reached'
-        self.add_monitor(monitor_class=LocalMinimumReached.__name__, monitor_name=name)
+        self.add_monitor(monitor_class=LocalMinimumReached.__name__,
+                         monitor_name=name,
+                         start_monitors=start_monitors)
         return name
 
     def add_time_above(self, threshold: float, name: Optional[str] = None):

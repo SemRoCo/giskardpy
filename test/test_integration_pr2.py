@@ -419,6 +419,16 @@ class TestJointGoals:
 
 
 class TestPayloadMonitor:
+    def test_start_of_expression_monitor(self, zero_pose: PR2TestWrapper):
+        time_above = zero_pose.monitors.add_time_above(threshold=5)
+        local_min = zero_pose.monitors.add_local_minimum_reached(start_monitors=[time_above])
+        end_monitor = zero_pose.monitors.add_end_motion(start_monitors=[local_min])
+
+        zero_pose.motion_goals.add_joint_position(goal_state=zero_pose.default_pose)
+        zero_pose.allow_all_collisions()
+        zero_pose.execute(add_local_minimum_reached=False)
+        assert god_map.trajectory.length_in_seconds > 4
+
     def test_joint_sequence(self, zero_pose: PR2TestWrapper):
         joint_monitor1 = zero_pose.monitors.add_joint_position(zero_pose.better_pose,
                                                                name='joint_monitor1')

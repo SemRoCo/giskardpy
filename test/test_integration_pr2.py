@@ -2708,8 +2708,8 @@ class TestSelfCollisionAvoidance:
         p.pose.orientation.w = 1
         zero_pose.add_cart_goal(p, zero_pose.l_tip, 'base_footprint')
         zero_pose.allow_all_collisions()
-        zero_pose.send_goal()
-        zero_pose.send_goal(expected_error_code=MoveResult.SELF_COLLISION_VIOLATED)
+        zero_pose.execute()
+        zero_pose.execute(expected_error_code=MoveResult.SELF_COLLISION_VIOLATED)
 
 
 class TestCollisionAvoidanceGoals:

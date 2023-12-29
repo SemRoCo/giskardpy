@@ -26,5 +26,5 @@ class JointGoalReached(ExpressionMonitor):
         expression = cas.logic_all(cas.Expression(comparison_list))
         super().__init__(name, stay_one=stay_one, start_monitors=start_monitors)
         self.set_expression(expression)
-        god_map.debug_expression_manager.add_debug_expression(f'joints reached', self.expression)
+        god_map.debug_expression_manager.add_debug_expression(f'joints reached', self.get_expression())
 

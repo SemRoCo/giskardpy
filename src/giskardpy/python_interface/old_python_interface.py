@@ -10,26 +10,12 @@ from giskardpy.python_interface.python_interface import GiskardWrapper
 
 
 class OldGiskardWrapper(GiskardWrapper):
-    max_trajectory_length_set: bool = False
-
     def execute(self, wait: bool = True) -> MoveResult:
-        local_min_reached_monitor_name = self.monitors.add_local_minimum_reached()
-        for goal in self.motion_goals._goals:
-            goal.end_monitors.append(local_min_reached_monitor_name)
-        self.monitors.add_end_motion(start_monitors=[local_min_reached_monitor_name])
-        if not self.max_trajectory_length_set:
-            self.monitors.add_max_trajectory_length()
-        self.max_trajectory_length_set = False
+        self.add_default_end_motion_conditions()
         return super().execute(wait)
 
     def projection(self, wait: bool = True) -> MoveResult:
-        local_min_reached_monitor_name = self.monitors.add_local_minimum_reached()
-        for goal in self.motion_goals._goals:
-            goal.end_monitors.append(local_min_reached_monitor_name)
-        self.monitors.add_end_motion(start_monitors=[local_min_reached_monitor_name])
-        if not self.max_trajectory_length_set:
-            self.monitors.add_max_trajectory_length()
-        self.max_trajectory_length_set = False
+        self.add_default_end_motion_conditions()
         return super().projection(wait)
 
     def _create_action_goal(self) -> MoveGoal:
@@ -398,7 +384,6 @@ class OldGiskardWrapper(GiskardWrapper):
         If the trajectory is longer than new_length, Giskard will prempt the goal.
         :param new_length: in seconds
         """
-        self.max_trajectory_length_set = True
         self.monitors.add_max_trajectory_length(max_trajectory_length=new_length,
                                                 **kwargs)
 

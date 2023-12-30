@@ -6,6 +6,7 @@ import numpy as np
 import rospy
 
 import giskardpy.casadi_wrapper as cas
+from giskard_msgs.msg import MoveResult
 from giskardpy.casadi_wrapper import PreservedCasType
 from giskardpy.exceptions import UnknownGroupException, PlanningException, GiskardException
 from giskardpy.goals.monitors.monitors import ExpressionMonitor, Monitor
@@ -55,12 +56,17 @@ class EndMotion(PayloadMonitor):
 
 
 class CancelMotion(PayloadMonitor):
-    def __init__(self, name: str, start_monitors: List[Monitor], error_message: str):
+    def __init__(self,
+                 name: str,
+                 start_monitors: List[Monitor],
+                 error_message: str,
+                 error_code: int = MoveResult.ERROR):
         super().__init__(name, start_monitors, run_call_in_thread=False)
         self.error_message = error_message
+        self.error_code = error_code
 
     def __call__(self):
-        raise PlanningException(self.error_message)
+        raise GiskardException.from_error_code(error_code=self.error_code, error_message=self.error_message)
 
     def get_state(self) -> bool:
         return self.state
@@ -76,7 +82,7 @@ class SetMaxTrajectoryLength(CancelMotion):
             self.new_length = god_map.qp_controller_config.max_trajectory_length
         else:
             self.new_length = new_length
-        error_message = f'Trajectory longer than {new_length}'
+        error_message = f'Trajectory longer than {self.new_length}'
         super().__init__(name, start_monitors=[], error_message=error_message)
 
     def __call__(self):

@@ -9,7 +9,7 @@ from giskardpy.casadi_wrapper import CompiledFunction
 from giskardpy.exceptions import GiskardException, UnknownConstraintException, ConstraintInitalizationException
 from giskardpy.goals.monitors.monitors import ExpressionMonitor, Monitor
 import giskard_msgs.msg as giskard_msgs
-from giskardpy.goals.monitors.payload_monitors import PayloadMonitor, EndMotion
+from giskardpy.goals.monitors.payload_monitors import PayloadMonitor, EndMotion, CancelMotion
 from giskardpy.god_map import god_map
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils import logging
@@ -60,7 +60,7 @@ class MonitorManager:
         self.switches_state = np.zeros_like(self.stay_one_filter)
 
     def compile_payload_monitors(self):
-        self.end_motion_ids = np.array([isinstance(monitor, EndMotion) for monitor in self.monitors])
+        self.payload_monitors = sorted(self.payload_monitors, key=lambda x: isinstance(x, CancelMotion))
         for monitor in self.payload_monitors:
             god_map.tree.control_loop_branch.check_monitors.add_monitor(monitor)
 

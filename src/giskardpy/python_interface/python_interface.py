@@ -1006,13 +1006,18 @@ class MotionGoalWrapper:
 
 class MonitorWrapper:
     _monitors: List[Monitor]
+    max_trajectory_length_set: bool
 
     def __init__(self, robot_name: str):
         self._robot_name = robot_name
+        self.max_trajectory_length_set = False
         self.reset()
 
-    def get_monitors(self):
+    def get_monitors(self) -> List[Monitor]:
         return self._monitors
+
+    def get_monitor_names(self) -> List[str]:
+        return [monitor.name for monitor in self._monitors]
 
     def reset(self):
         self._monitors = []
@@ -1202,12 +1207,13 @@ class MonitorWrapper:
                          start_monitors=start_monitors)
         return name
 
-    def add_cancel_motion(self, start_monitors: List[str], error_message: str,
+    def add_cancel_motion(self, start_monitors: List[str], error_message: str, error_code: int = MoveResult.ERROR,
                           name: Optional[str] = 'cancel_motion') -> str:
         self.add_monitor(monitor_class=CancelMotion.__name__,
                          monitor_name=name,
                          start_monitors=start_monitors,
-                         error_message=error_message)
+                         error_message=error_message,
+                         error_code=error_code)
         return name
 
     def add_max_trajectory_length(self, max_trajectory_length: Optional[float] = None):
@@ -1216,6 +1222,7 @@ class MonitorWrapper:
                          monitor_class=SetMaxTrajectoryLength.__name__,
                          new_length=max_trajectory_length,
                          start_monitors=[])
+        self.max_trajectory_length_set = True
         return name
 
     def add_print(self,
@@ -1256,6 +1263,18 @@ class GiskardWrapper:
         self._client.wait_for_server()
         self.clear_motion_goals_and_monitors()
         rospy.sleep(.3)
+
+    def add_default_end_motion_conditions(self):
+        local_min_reached_monitor_name = self.monitors.add_local_minimum_reached()
+        for goal in self.motion_goals._goals:
+            goal.end_monitors.append(local_min_reached_monitor_name)
+        self.monitors.add_end_motion(start_monitors=self.monitors.get_monitor_names())
+        self.monitors.add_cancel_motion(start_monitors=[local_min_reached_monitor_name],
+                                        error_message=f'local minimum reached',
+                                        error_code=MoveResult.LOCAL_MINIMUM)
+        if not self.monitors. max_trajectory_length_set:
+            self.monitors.add_max_trajectory_length()
+        self.monitors.max_trajectory_length_set = False
 
     @property
     def robot_name(self):

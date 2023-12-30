@@ -83,7 +83,7 @@ class SetMaxTrajectoryLength(CancelMotion):
         else:
             self.new_length = new_length
         error_message = f'Trajectory longer than {self.new_length}'
-        super().__init__(name, start_monitors=[], error_message=error_message)
+        super().__init__(name, start_monitors=[], error_message=error_message, error_code=MoveResult.CONTROL_ERROR)
 
     def __call__(self):
         if god_map.time > self.new_length:

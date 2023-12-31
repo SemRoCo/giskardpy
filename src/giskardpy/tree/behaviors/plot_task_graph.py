@@ -44,10 +44,11 @@ def create_graph(goals: List[Goal], all_monitors: List[Monitor], output_file: st
 
     # Process monitors and their start_monitors
     for monitor in all_monitors:
-        monitor_node = add_or_get_node(monitor)
-        for sub_monitor in monitor.start_monitors:
-            sub_monitor_node = add_or_get_node(sub_monitor)
-            graph.add_edge(pydot.Edge(sub_monitor_node, monitor_node, color='green'))
+        if monitor.start_monitors:
+            monitor_node = add_or_get_node(monitor)
+            for sub_monitor in monitor.start_monitors:
+                sub_monitor_node = add_or_get_node(sub_monitor)
+                graph.add_edge(pydot.Edge(sub_monitor_node, monitor_node, color='green'))
 
     # Process goals and their connections
     for goal in goals:

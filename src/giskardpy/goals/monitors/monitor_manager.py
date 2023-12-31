@@ -49,6 +49,7 @@ class MonitorManager:
         self.substitution_values = {}
         self.triggers = {}
 
+    @profile
     def compile_expression_monitors(self):
         expressions = []
         for monitor in self.expression_monitors:
@@ -59,17 +60,20 @@ class MonitorManager:
         self.stay_one_filter = np.array([x.stay_one for x in self.expression_monitors], dtype=bool)
         self.switches_state = np.zeros_like(self.stay_one_filter)
 
+    @profile
     def compile_payload_monitors(self):
         self.payload_monitors = sorted(self.payload_monitors, key=lambda x: isinstance(x, CancelMotion))
         for monitor in self.payload_monitors:
             god_map.tree.control_loop_branch.check_monitors.add_monitor(monitor)
 
+    @profile
     def compile_monitors(self):
         self.state = np.zeros(len(self.monitors))
         self.compile_expression_monitors()
         self.compile_payload_monitors()
         self._register_expression_update_triggers()
 
+    @profile
     def get_monitor(self, name: str) -> ExpressionMonitor:
         for monitor in self.monitors:
             if monitor.name == name:
@@ -95,6 +99,7 @@ class MonitorManager:
     def monitors(self):
         return self.expression_monitors + self.payload_monitors
 
+    @profile
     def add_expression_monitor(self, monitor: ExpressionMonitor):
         if [x for x in self.monitors if x.name == monitor.name]:
             raise GiskardException(f'Monitor named {monitor.name} already exists.')
@@ -104,6 +109,7 @@ class MonitorManager:
         for payload_monitor in self.payload_monitors:
             payload_monitor.set_id(payload_monitor.id + 1)
 
+    @profile
     def add_payload_monitor(self, monitor: PayloadMonitor):
         if [x for x in self.monitors if x.name == monitor.name]:
             raise GiskardException(f'Monitor named {monitor.name} already exists.')
@@ -113,6 +119,7 @@ class MonitorManager:
     def get_state_dict(self) -> Dict[str, bool]:
         return OrderedDict((monitor.name, bool(self.state[i])) for i, monitor in enumerate(self.monitors))
 
+    @profile
     def register_expression_updater(self, expression: cas.PreservedCasType,
                                     monitors: Tuple[Union[str, ExpressionMonitor], ...]) \
             -> cas.PreservedCasType:
@@ -129,10 +136,12 @@ class MonitorManager:
         self.update_substitution_values(monitor_names, [str(s) for s in old_symbols])
         return new_expression
 
+    @profile
     def to_state_filter(self, monitor_names: List[str]) -> np.ndarray:
         monitor_names = monitor_list_to_monitor_name_tuple(monitor_names)
         return np.array([monitor.id for monitor in self.monitors if monitor.name in monitor_names])
 
+    @profile
     def _register_expression_update_triggers(self):
         for monitor_names, values in self.substitution_values.items():
             trigger_filter = tuple([i for i, m in enumerate(self.expression_monitors) if m.name in monitor_names])
@@ -171,6 +180,7 @@ class MonitorManager:
         self.state = next_state
         self.trigger_update_triggers(self.state)
 
+    @profile
     def search_for_monitors(self, monitor_names: List[str]) -> List[Monitor]:
         return [self.get_monitor(monitor_name) for monitor_name in monitor_names]
 

@@ -65,6 +65,7 @@ class CancelMotion(PayloadMonitor):
         self.error_message = error_message
         self.error_code = error_code
 
+    @profile
     def __call__(self):
         raise GiskardException.from_error_code(error_code=self.error_code, error_message=self.error_message)
 
@@ -85,6 +86,7 @@ class SetMaxTrajectoryLength(CancelMotion):
         error_message = f'Trajectory longer than {self.new_length}'
         super().__init__(name, start_monitors=[], error_message=error_message, error_code=MoveResult.CONTROL_ERROR)
 
+    @profile
     def __call__(self):
         if god_map.time > self.new_length:
             return super().__call__()
@@ -117,6 +119,7 @@ class CollisionMatrixUpdater(PayloadMonitor):
         super().__init__(name, start_monitors, run_call_in_thread=False)
         self.collision_matrix = new_collision_matrix
 
+    @profile
     def __call__(self):
         god_map.collision_scene.set_collision_matrix(self.collision_matrix)
         god_map.collision_scene.reset_cache()

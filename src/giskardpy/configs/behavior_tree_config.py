@@ -155,17 +155,23 @@ class BehaviorTreeConfig(ABC):
 
 
 class StandAloneBTConfig(BehaviorTreeConfig):
-    def __init__(self, planning_sleep: Optional[float] = None, debug_mode: bool = False, publish_js=False):
+    def __init__(self,
+                 planning_sleep: Optional[float] = None,
+                 debug_mode: bool = False,
+                 publish_js: bool = False,
+                 publish_tf: bool = False):
         super().__init__(ControlModes.standalone)
         self.planning_sleep = planning_sleep
         if god_map.is_in_github_workflow():
             debug_mode = False
         self.debug_mode = debug_mode
         self.publish_js = publish_js
+        self.publish_tf = publish_tf
 
     def setup(self):
         self.add_visualization_marker_publisher(add_to_sync=True, add_to_control_loop=True)
-        self.add_tf_publisher(include_prefix=True, mode=TfPublishingModes.all)
+        if self.publish_tf:
+            self.add_tf_publisher(include_prefix=True, mode=TfPublishingModes.all)
         if self.debug_mode:
             self.add_trajectory_plotter(wait=True)
             self.add_debug_trajectory_plotter(wait=True)

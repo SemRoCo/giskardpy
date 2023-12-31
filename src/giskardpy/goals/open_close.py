@@ -63,10 +63,13 @@ class Open(Goal):
         #                                            hold_monitors=hold_monitors,
         #                                            end_monitors=end_monitors))
 
-        handle_T_tip = cas.TransMatrix(god_map.world.compute_fk_pose(self.handle_link, self.tip_link))
         if start_monitors:
+            handle_T_tip = god_map.world.compose_fk_expression(self.handle_link, self.tip_link)
             handle_T_tip = god_map.monitor_manager.register_expression_updater(handle_T_tip,
                                                                                tuple(start_monitors))
+        else:
+            handle_T_tip = cas.TransMatrix(god_map.world.compute_fk_pose(self.handle_link, self.tip_link))
+
         # %% position
         r_P_c = god_map.world.compose_fk_expression(self.handle_link, self.tip_link).to_position()
         task = Task(name='position')

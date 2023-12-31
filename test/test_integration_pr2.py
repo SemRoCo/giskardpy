@@ -557,24 +557,47 @@ class TestPayloadMonitor:
         # kitchen_setup.plan_and_execute()
 
         # %% phase 2 open drawer
-        phase2 = kitchen_setup.monitors.add_local_minimum_reached('phase 2')
+        phase2 = kitchen_setup.monitors.add_local_minimum_reached('phase 2',
+                                                                  start_monitors=[phase1])
         kitchen_setup.motion_goals.add_open_container(tip_link=kitchen_setup.l_tip,
                                                       environment_link=drawer_handle,
                                                       start_monitors=[phase1],
                                                       end_monitors=[phase2])
-        kitchen_setup.monitors.add_end_motion(start_monitors=[phase2])
+
+        # %% phase 3 pre grasp
+
+        base_pose = PoseStamped()
+        base_pose.header.frame_id = 'map'
+        base_pose.pose.position.y = 1
+        base_pose.pose.position.x = .1
+        base_pose.pose.orientation.w = 1
+        joint_position_reached = kitchen_setup.monitors.add_joint_position(kitchen_setup.better_pose,
+                                                                           name='phase 3 joint goal',
+                                                                           start_monitors=[phase2])
+        base_pose_reached = kitchen_setup.monitors.add_cartesian_pose(root_link=kitchen_setup.default_root,
+                                                                      tip_link='base_footprint',
+                                                                      goal_pose=base_pose,
+                                                                      start_monitors=[phase2],
+                                                                      name='phase 3 base goal')
+        kitchen_setup.motion_goals.add_joint_position(kitchen_setup.better_pose,
+                                                      start_monitors=[phase2],
+                                                      end_monitors=[joint_position_reached])
+        kitchen_setup.motion_goals.add_cartesian_pose(root_link=kitchen_setup.default_root,
+                                                      tip_link='base_footprint',
+                                                      goal_pose=base_pose,
+                                                      start_monitors=[phase2],
+                                                      end_monitors=[base_pose_reached])
+
+        phase3 = kitchen_setup.monitors.add_local_minimum_reached('phase3 done',
+                                                                  start_monitors=[
+                                                                      joint_position_reached,
+                                                                      base_pose_reached
+                                                                  ])
+        kitchen_setup.monitors.add_end_motion(start_monitors=[phase3])
+        kitchen_setup.monitors.add_max_trajectory_length(30)
+        kitchen_setup.allow_all_collisions()
         kitchen_setup.execute(add_local_minimum_reached=False)
 
-        # kitchen_setup.set_env_state({drawer_joint: 0.48})
-        #
-        # kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
-        # base_pose = PoseStamped()
-        # base_pose.header.frame_id = 'map'
-        # base_pose.pose.position.y = 1
-        # base_pose.pose.position.x = .1
-        # base_pose.pose.orientation.w = 1
-        # kitchen_setup.move_base(base_pose)
-        #
         # # grasp bowl
         # l_goal = deepcopy(bowl_pose)
         # l_goal.header.frame_id = 'iai_kitchen/sink_area_left_middle_drawer_main'

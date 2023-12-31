@@ -1040,16 +1040,23 @@ class MonitorWrapper:
                          start_monitors=start_monitors)
         return name
 
-    def add_time_above(self, threshold: float, name: Optional[str] = None):
+    def add_time_above(self,
+                       threshold: float,
+                       name: Optional[str] = None,
+                       start_monitors: List[str] = None):
         if name is None:
             name = 'time above'
-        self.add_monitor(monitor_class=TimeAbove.__name__, monitor_name=name, threshold=threshold)
+        self.add_monitor(monitor_class=TimeAbove.__name__,
+                         monitor_name=name,
+                         start_monitors=start_monitors,
+                         threshold=threshold)
         return name
 
     def add_joint_position(self,
                            goal_state: Dict[str, float],
                            name: Optional[str] = None,
                            threshold: float = 0.01,
+                           start_monitors: List[str] = None,
                            stay_one: bool = True) -> str:
         if name is None:
             name = f'joint position reached {list(goal_state.keys())}'
@@ -1057,6 +1064,7 @@ class MonitorWrapper:
                          monitor_name=name,
                          goal_state=goal_state,
                          threshold=threshold,
+                         start_monitors=start_monitors,
                          stay_one=stay_one)
         return name
 
@@ -1070,6 +1078,7 @@ class MonitorWrapper:
                            position_threshold: float = 0.01,
                            orientation_threshold: float = 0.01,
                            update_pose_on: Optional[List[str]] = None,
+                           start_monitors: List[str] = None,
                            stay_one: bool = True):
         if name is None:
             name = f'{root_link}/{tip_link} pose reached'
@@ -1080,6 +1089,7 @@ class MonitorWrapper:
                          goal_pose=goal_pose,
                          root_group=root_group,
                          tip_group=tip_group,
+                         start_monitors=start_monitors,
                          position_threshold=position_threshold,
                          orientation_threshold=orientation_threshold,
                          update_pose_on=update_pose_on,
@@ -1095,6 +1105,7 @@ class MonitorWrapper:
                                root_group: Optional[str] = None,
                                tip_group: Optional[str] = None,
                                threshold: float = 0.01,
+                               start_monitors: List[str] = None,
                                stay_one: bool = True) -> str:
         if name is None:
             name = f'{root_link}/{tip_link} position reached'
@@ -1104,6 +1115,7 @@ class MonitorWrapper:
                          tip_link=tip_link,
                          goal_point=goal_point,
                          root_group=root_group,
+                         start_monitors=start_monitors,
                          tip_group=tip_group,
                          threshold=threshold,
                          stay_one=stay_one)
@@ -1120,6 +1132,8 @@ class MonitorWrapper:
                              name: Optional[str] = None,
                              root_group: Optional[str] = None,
                              tip_group: Optional[str] = None,
+                             stay_one: bool = True,
+                             start_monitors: List[str] = None,
                              threshold: float = 0.01):
         if name is None:
             name = f'{root_link}/{tip_link} distance to line'
@@ -1130,7 +1144,9 @@ class MonitorWrapper:
                          line_length=line_length,
                          root_link=root_link,
                          tip_link=tip_link,
+                         start_monitors=start_monitors,
                          root_group=root_group,
+                         stay_one=stay_one,
                          tip_group=tip_group,
                          threshold=threshold)
         return name
@@ -1143,6 +1159,7 @@ class MonitorWrapper:
                                   root_group: Optional[str] = None,
                                   tip_group: Optional[str] = None,
                                   threshold: float = 0.01,
+                                  start_monitors: List[str] = None,
                                   stay_one: bool = True):
         self.add_monitor(monitor_class=OrientationReached.__name__,
                          monitor_name=name,
@@ -1151,6 +1168,7 @@ class MonitorWrapper:
                          goal_orientation=goal_orientation,
                          root_group=root_group,
                          tip_group=tip_group,
+                         start_monitors=start_monitors,
                          threshold=threshold,
                          stay_one=stay_one)
 
@@ -1161,6 +1179,7 @@ class MonitorWrapper:
                         root_link: str,
                         name: Optional[str] = None,
                         tip_group: Optional[str] = None,
+                        start_monitors: List[str] = None,
                         root_group: Optional[str] = None,
                         threshold: float = 0.01) -> str:
         if name is None:
@@ -1171,6 +1190,7 @@ class MonitorWrapper:
                          goal_point=goal_point,
                          root_link=root_link,
                          tip_group=tip_group,
+                         start_monitors=start_monitors,
                          root_group=root_group,
                          pointing_axis=pointing_axis,
                          threshold=threshold)
@@ -1183,6 +1203,7 @@ class MonitorWrapper:
                             goal_normal: Vector3Stamped,
                             tip_normal: Vector3Stamped,
                             name: Optional[str] = None,
+                            start_monitors: List[str] = None,
                             root_group: Optional[str] = None,
                             tip_group: Optional[str] = None,
                             threshold: float = 0.01) -> str:
@@ -1196,6 +1217,7 @@ class MonitorWrapper:
                          tip_link=tip_link,
                          goal_normal=goal_normal,
                          tip_normal=tip_normal,
+                         start_monitors=start_monitors,
                          root_group=root_group,
                          tip_group=tip_group,
                          threshold=threshold)

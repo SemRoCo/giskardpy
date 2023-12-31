@@ -5,6 +5,7 @@ from py_trees import Status
 
 from giskardpy.goals.collision_avoidance import CollisionAvoidance
 from giskardpy.goals.goal import Goal
+from giskardpy.goals.monitors.monitors import Monitor
 from giskardpy.god_map import god_map
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
@@ -18,31 +19,35 @@ class PlotGanttChart(GiskardBehavior):
     def __init__(self, name: str = 'plot gantt chart'):
         super().__init__(name)
 
-    def plot_gantt_chart(self, goals: Dict[str, Goal], file_name: str):
+    def plot_gantt_chart(self, goals: Dict[str, Goal], monitors: List[Monitor], file_name: str):
         tasks = []
         start_dates = []
         end_dates = []
+        monitors = [monitor for monitor in monitors if monitor.plot]
+
         for goal_name, goal in goals.items():
             for i, task in enumerate(goal.tasks):
                 if isinstance(goal, CollisionAvoidance):
-                    if i > 0:
-                        break
-                    tasks.append(string_shortener(f'{goal_name}', max_lines=5, max_line_length=50))
+                    continue
+                    # if i > 0:
+                    #     break
+                    # tasks.append(string_shortener(f'{goal_name}', max_lines=5, max_line_length=50))
                 else:
-                    tasks.append(string_shortener(f'{goal_name} - {task.name}',
-                                                  max_lines=5, max_line_length=50))
+                    tasks.append(task.name)
                 if not task.start_monitors:
                     start_dates.append([0])
                 else:
-                    start_dates.append([x.state_flip_times[0] if x.state_flip_times else None for x in task.start_monitors])
+                    start_dates.append(
+                        [x.state_flip_times[0] if x.state_flip_times else None for x in task.start_monitors])
                 if not task.end_monitors:
                     end_dates.append([god_map.time])
                 else:
-                    end_dates.append([x.state_flip_times[-1] if x.state_flip_times else None for x in task.end_monitors])
+                    end_dates.append(
+                        [x.state_flip_times[-1] if x.state_flip_times else None for x in task.end_monitors])
 
-        plt.figure(figsize=(10, 5))
+        plt.figure(figsize=(god_map.time + 10, int(len(monitors) + len(tasks)) * 0.5))
 
-        for i, (task, start_date, end_date) in enumerate(zip(tasks, start_dates, end_dates)):
+        for i, (task, start_date, end_date) in enumerate(reversed(list(zip(tasks, start_dates, end_dates)))):
             if None in start_date:
                 start_date = god_map.time
             else:
@@ -54,19 +59,26 @@ class PlotGanttChart(GiskardBehavior):
             plt.barh(task, end_date - start_date, height=0.8, left=start_date,
                      color=(133 / 255, 232 / 255, 133 / 255))
 
-        for monitor in god_map.monitor_manager.monitors:
+        for monitor in reversed(monitors):
+            monitor.state_flip_times.append(god_map.time)
+            start_date = 0
             state = False
-            for flip_event in monitor.state_flip_times:
-                monitor_name = string_shortener(monitor.name,
-                                                max_lines=2, max_line_length=50)
-                text = f'{monitor_name}\n{state} -> {not state}'
+            for end_date in monitor.state_flip_times:
+                if state:
+                    plt.barh(monitor.formatted_name(), end_date - start_date, height=0.8, left=start_date,
+                             color='green')
+                else:
+                    plt.barh(monitor.formatted_name(), end_date - start_date, height=0.8, left=start_date,
+                             color='white')
+                start_date = end_date
                 state = not state
-                plt.axvline(x=flip_event, color='k', linestyle='--')
-                plt.text(flip_event, (len(tasks) - 1) / 2, text, color='k', rotation='vertical', va='center')
 
+        plt.gca().yaxis.tick_right()
+        plt.subplots_adjust(left=0.01, right=0.75)
         plt.xlabel('Time [s]')
         plt.ylabel('Tasks')
         plt.tight_layout()
+        plt.grid()
         create_path(file_name)
         plt.savefig(file_name)
         logging.loginfo(f'Saved gantt chart to {file_name}.')
@@ -76,5 +88,5 @@ class PlotGanttChart(GiskardBehavior):
     def update(self):
         goals = god_map.motion_goal_manager.motion_goals
         file_name = god_map.giskard.tmp_folder + f'gantt_charts/goal_{god_map.goal_id}.png'
-        self.plot_gantt_chart(goals, file_name)
+        self.plot_gantt_chart(goals, god_map.monitor_manager.monitors, file_name)
         return Status.SUCCESS

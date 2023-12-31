@@ -3,6 +3,7 @@ from threading import Thread
 from py_trees import Status
 
 from giskardpy.goals.monitors.payload_monitors import PayloadMonitor
+from giskardpy.god_map import god_map
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.decorators import record_time, catch_and_raise_to_blackboard
 
@@ -31,5 +32,6 @@ class ExecutePayloadMonitor(GiskardBehavior):
         else:
             self.monitor()
         if self.monitor.get_state():
+            self.monitor.state_flip_times.append(god_map.time)
             return Status.SUCCESS
         return Status.RUNNING

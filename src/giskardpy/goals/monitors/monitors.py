@@ -20,11 +20,15 @@ class Monitor:
     id: int
     name: str
     start_monitors: List[Monitor]
+    plot: bool
+    state_flip_times: List[float]
 
-    def __init__(self, name: str, start_monitors: Optional[List[Monitor]] = None):
+    def __init__(self, name: str, start_monitors: Optional[List[Monitor]] = None, plot: bool = True):
         self.name = name
         self.start_monitors = start_monitors or []
         self.id = -1
+        self.plot = plot
+        self.state_flip_times = []
 
     @cached_property
     def state_filter(self) -> np.ndarray:
@@ -46,20 +50,20 @@ class Monitor:
 
 class ExpressionMonitor(Monitor):
     _expression: cas.Expression
-    state_flip_times: List[float]
     name: str
+    stay_one: bool
 
     def __init__(self, name: str, *, stay_one: bool = False,
-                 start_monitors: Optional[List[Monitor]] = None):
+                 start_monitors: Optional[List[Monitor]] = None,
+                 plot: bool = True):
         self.id = -1
         self.name = name
         self.stay_one = stay_one
         self.substitution_values = []
         self.substitution_keys = []
         self._expression = None
-        self.state_flip_times = []
         self.start_monitors = start_monitors
-        super().__init__(name, start_monitors=start_monitors)
+        super().__init__(name, start_monitors=start_monitors, plot=plot)
 
     def set_id(self, id_: int):
         self.id = id_
@@ -89,7 +93,7 @@ class LocalMinimumReached(ExpressionMonitor):
                  joint_convergence_threshold: float = 0.01,
                  windows_size: int = 1,
                  start_monitors: Optional[List[Monitor]] = None):
-        super().__init__(name=name, stay_one=False, start_monitors=start_monitors)
+        super().__init__(name=name, stay_one=True, start_monitors=start_monitors)
         self.joint_convergence_threshold = joint_convergence_threshold
         self.min_cut_off = min_cut_off
         self.max_cut_off = max_cut_off

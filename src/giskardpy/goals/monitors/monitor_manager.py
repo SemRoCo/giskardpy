@@ -81,14 +81,15 @@ class MonitorManager:
         raise KeyError(f'No monitor of name {name} found.')
 
     @profile
-    def update_expr_monitor_state(self, new_state) -> np.ndarray:  # Assuming new_state is a NumPy array with only 1 and 0
+    def update_expr_monitor_state(self, new_state: np.ndarray, last_state: np.ndarray) -> np.ndarray:
+        # Assuming new_state is a NumPy array with only 1 and 0
         new_state = new_state.astype(int)
         filtered_switches = self.switches_state[self.stay_one_filter]
         filtered_new_state = new_state[self.stay_one_filter]
         # new_flips = flipped_to_one(filtered_switches, filtered_new_state)
         self.switches_state[self.stay_one_filter] = filtered_switches | filtered_new_state
         next_state = self.switches_state | new_state
-        any_flips = np.logical_xor(new_state, next_state)
+        any_flips = np.logical_xor(last_state, next_state)
         if np.any(any_flips):
             for i, state in enumerate(any_flips):
                 if state:
@@ -145,7 +146,14 @@ class MonitorManager:
     def _register_expression_update_triggers(self):
         for monitor_names, values in self.substitution_values.items():
             trigger_filter = tuple([i for i, m in enumerate(self.expression_monitors) if m.name in monitor_names])
-            self.triggers[trigger_filter] = lambda: self.update_substitution_values(monitor_names, list(values.keys()))
+            class Callback:
+                def __init__(self, monitor_names, values):
+                    self.monitor_names = monitor_names
+                    self.keys = list(values.keys())
+
+                def __call__(self):
+                    return god_map.monitor_manager.update_substitution_values(self.monitor_names, self.keys)
+            self.triggers[trigger_filter] = Callback(monitor_names, values)
 
     @profile
     def update_substitution_values(self, monitor_names: Tuple[str, ...], keys: Optional[List[str]] = None):
@@ -173,7 +181,7 @@ class MonitorManager:
         next_state = np.zeros_like(self.state)
         num_expr_monitors = len(self.expression_monitors)
         expr_monitor_state = self.compiled_monitors.fast_call(args)
-        expr_monitor_state = self.update_expr_monitor_state(expr_monitor_state)
+        expr_monitor_state = self.update_expr_monitor_state(expr_monitor_state, self.state[:num_expr_monitors])
         next_state[:num_expr_monitors] = expr_monitor_state
         for i in range(num_expr_monitors, len(self.monitors)):
             next_state[i] = self.payload_monitors[i-num_expr_monitors].get_state()

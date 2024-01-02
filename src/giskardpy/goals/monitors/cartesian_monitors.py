@@ -19,13 +19,12 @@ class PoseReached(ExpressionMonitor):
                  tip_group: Optional[str] = None,
                  position_threshold: float = 0.01,
                  orientation_threshold: float = 0.01,
-                 update_pose_on: Optional[List[str]] = None,
                  stay_one: bool = True,
                  start_monitors: Optional[List[Monitor]] = None):
         super().__init__(name, stay_one=stay_one, start_monitors=start_monitors)
         root_link = god_map.world.search_for_link_name(root_link, root_group)
         tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
-        if update_pose_on is None:
+        if start_monitors is None:
             goal_pose = transform_msg(root_link, goal_pose)
             root_T_goal = cas.TransMatrix(goal_pose)
         else:
@@ -33,7 +32,7 @@ class PoseReached(ExpressionMonitor):
             goal_frame_id_T_goal = transform_msg(goal_frame_id, goal_pose)
             root_T_goal_frame_id = god_map.world.compose_fk_expression(root_link, goal_frame_id)
             root_T_goal_frame_id = god_map.monitor_manager.register_expression_updater(root_T_goal_frame_id,
-                                                                                       tuple(update_pose_on))
+                                                                                       tuple(start_monitors))
             goal_frame_id_T_goal = cas.TransMatrix(goal_frame_id_T_goal)
             root_T_goal = root_T_goal_frame_id.dot(goal_frame_id_T_goal)
 

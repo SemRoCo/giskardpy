@@ -70,6 +70,8 @@ class ExpressionMonitor(Monitor):
 
     def set_expression(self, expression: cas.symbol_expr):
         self._expression = expression
+
+    def apply_start_monitors_to_expression(self):
         for monitor in self.start_monitors:
             monitor_state = monitor.get_state_expression()
             self._expression = cas.logic_and(self._expression, monitor_state)
@@ -82,7 +84,7 @@ class ExpressionMonitor(Monitor):
 
     def compile(self):
         # use this if you need to do stuff, after the qp controller has been initialized
-        pass
+        self.apply_start_monitors_to_expression()
 
 
 class LocalMinimumReached(ExpressionMonitor):
@@ -117,6 +119,7 @@ class LocalMinimumReached(ExpressionMonitor):
                 condition_list.append(cas.less(cas.abs(joint_vel_symbol), velocity_limit))
 
         self.set_expression(cas.logic_all(cas.Expression(condition_list)))
+        self.apply_start_monitors_to_expression()
 
 
 class TimeAbove(ExpressionMonitor):

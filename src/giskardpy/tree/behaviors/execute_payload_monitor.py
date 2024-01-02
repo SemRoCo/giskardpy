@@ -26,6 +26,7 @@ class ExecutePayloadMonitor(GiskardBehavior):
             if not self.started:
                 self.payload_thread = Thread(target=self.monitor)
                 self.payload_thread.start()
+                self.monitor.state_flip_times.append(god_map.time)
                 self.started = True
             if self.payload_thread.is_alive():
                 return Status.RUNNING

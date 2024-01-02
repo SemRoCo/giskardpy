@@ -26,7 +26,8 @@ from giskardpy.goals.monitors.cartesian_monitors import PoseReached, PositionRea
     VectorsAligned, DistanceToLine
 from giskardpy.goals.monitors.joint_monitors import JointGoalReached
 from giskardpy.goals.monitors.monitors import LocalMinimumReached, TimeAbove
-from giskardpy.goals.monitors.payload_monitors import EndMotion, Print, Sleep, CancelMotion, SetMaxTrajectoryLength
+from giskardpy.goals.monitors.payload_monitors import EndMotion, Print, Sleep, CancelMotion, SetMaxTrajectoryLength, \
+    UpdateParentLinkOfGroup
 from giskardpy.goals.open_close import Close, Open
 from giskardpy.goals.pointing import Pointing
 from giskardpy.goals.set_prediction_horizon import SetMaxTrajLength, SetPredictionHorizon
@@ -337,13 +338,13 @@ class MotionGoalWrapper:
 
     def add_motion_goal(self,
                         motion_goal_class: str,
-                        goal_name: str = '',
+                        name: str = '',
                         start_monitors: Optional[List[str]] = None,
                         hold_monitors: Optional[List[str]] = None,
                         end_monitors: Optional[List[str]] = None,
                         **kwargs):
         motion_goal = MotionGoal()
-        motion_goal.name = goal_name
+        motion_goal.name = name
         motion_goal.motion_goal_class = motion_goal_class
         motion_goal.start_monitors = start_monitors or []
         motion_goal.hold_monitors = hold_monitors or []
@@ -543,7 +544,7 @@ class MotionGoalWrapper:
             if start_monitors or hold_monitors or end_monitors:
                 name += f'{start_monitors}, {hold_monitors}, {end_monitors}'
             self.add_motion_goal(motion_goal_class=CollisionAvoidance.__name__,
-                                 goal_name=name,
+                                 name=name,
                                  collision_entries=collision_entries,
                                  start_monitors=list(start_monitors),
                                  hold_monitors=list(hold_monitors),
@@ -1227,6 +1228,20 @@ class MonitorWrapper:
         self.add_monitor(monitor_class=EndMotion.__name__,
                          monitor_name=name,
                          start_monitors=start_monitors)
+        return name
+
+    def update_parent_link_of_group(self,
+                                    start_monitors: List[str],
+                                    group_name: str,
+                                    parent_link: str,
+                                    parent_link_group: Optional[str] = '',
+                                    name: Optional[str] = 'move group') -> str:
+        self.add_monitor(monitor_class=UpdateParentLinkOfGroup.__name__,
+                         monitor_name=name,
+                         start_monitors=start_monitors,
+                         group_name=group_name,
+                         parent_link=parent_link,
+                         parent_link_group=parent_link_group)
         return name
 
     def add_cancel_motion(self, start_monitors: List[str], error_message: str, error_code: int = MoveResult.ERROR,

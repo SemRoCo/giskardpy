@@ -112,6 +112,25 @@ class Sleep(PayloadMonitor):
         self.state = True
 
 
+class UpdateParentLinkOfGroup(PayloadMonitor):
+    # FIXME multithreading issue
+    def __init__(self,
+                 name: str,
+                 start_monitors: List[Monitor],
+                 group_name: str,
+                 parent_link: str,
+                 parent_link_group: Optional[str] = ''):
+        self.group_name = group_name
+        self.new_parent_link = god_map.world.search_for_link_name(parent_link, parent_link_group)
+        super().__init__(name, start_monitors, run_call_in_thread=True)
+
+    def __call__(self):
+        god_map.world.move_group(group_name=self.group_name,
+                                 new_parent_link_name=self.new_parent_link)
+        rospy.sleep(2)
+        self.state = True
+
+
 class CollisionMatrixUpdater(PayloadMonitor):
     collision_matrix: Dict[Tuple[str, str], float]
 

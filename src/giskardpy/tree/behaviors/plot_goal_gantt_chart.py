@@ -6,6 +6,7 @@ from py_trees import Status
 from giskardpy.goals.collision_avoidance import CollisionAvoidance
 from giskardpy.goals.goal import Goal
 from giskardpy.goals.monitors.monitors import Monitor
+from giskardpy.goals.monitors.payload_monitors import PayloadMonitor
 from giskardpy.god_map import god_map
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
@@ -20,6 +21,8 @@ class PlotGanttChart(GiskardBehavior):
         super().__init__(name)
 
     def plot_gantt_chart(self, goals: Dict[str, Goal], monitors: List[Monitor], file_name: str):
+        light_green = (133 / 255, 232 / 255, 133 / 255)
+        gray = (128 / 255, 128 / 255, 128 / 255)
         tasks = []
         start_dates = []
         end_dates = []
@@ -56,20 +59,27 @@ class PlotGanttChart(GiskardBehavior):
                 end_date = god_map.time
             else:
                 end_date = max(end_date)
-            plt.barh(task, end_date - start_date, height=0.8, left=start_date,
-                     color=(133 / 255, 232 / 255, 133 / 255))
+            plt.barh(task[:50], end_date - start_date, height=0.8, left=start_date,
+                     color=light_green)
 
+        # monitor_state: Dict[str, bool] = {monitor.name: False for monitor in monitors}
+        # todo indicate when all start monitors are active
         for monitor in reversed(monitors):
+            if isinstance(monitor, PayloadMonitor) and monitor.run_call_in_thread:
+                colors = ['white', light_green, 'green']
+            else:
+                colors = ['white', 'green']
             monitor.state_flip_times.append(god_map.time)
             start_date = 0
             state = False
-            for end_date in monitor.state_flip_times:
+            for i, end_date in enumerate(monitor.state_flip_times):
+
                 if state:
-                    plt.barh(monitor.formatted_name(), end_date - start_date, height=0.8, left=start_date,
-                             color='green')
+                    plt.barh(monitor.formatted_name()[:50], end_date - start_date, height=0.8, left=start_date,
+                             color=colors[i % len(colors)])
                 else:
-                    plt.barh(monitor.formatted_name(), end_date - start_date, height=0.8, left=start_date,
-                             color='white')
+                    plt.barh(monitor.formatted_name()[:50], end_date - start_date, height=0.8, left=start_date,
+                             color=colors[i % len(colors)])
                 start_date = end_date
                 state = not state
 
@@ -87,6 +97,6 @@ class PlotGanttChart(GiskardBehavior):
     @profile
     def update(self):
         goals = god_map.motion_goal_manager.motion_goals
-        file_name = god_map.giskard.tmp_folder + f'gantt_charts/goal_{god_map.goal_id}.png'
+        file_name = god_map.giskard.tmp_folder + f'gantt_charts/goal_{god_map.goal_id}.pdf'
         self.plot_gantt_chart(goals, god_map.monitor_manager.monitors, file_name)
         return Status.SUCCESS

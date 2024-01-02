@@ -1342,9 +1342,10 @@ class WorldTree(WorldTreeInterface):
                 root_T_tip = np.dot(root_T_map, map_T_tip)
                 return root_T_tip
 
-        self._fk_computer = ExpressionCompanion(self)
-        self.travel_branch(self.root_link_name, self._fk_computer)
-        self._fk_computer.compile_fks()
+        new_fks = ExpressionCompanion(self)
+        self.travel_branch(self.root_link_name, new_fks)
+        new_fks.compile_fks()
+        self._fk_computer = new_fks
 
     @profile
     def _recompute_fks(self):

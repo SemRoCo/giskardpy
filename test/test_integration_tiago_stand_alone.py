@@ -298,7 +298,7 @@ class TestCartGoals:
                                                                          [0, -1, 0, 0],
                                                                          [0, 0, 1, 0],
                                                                          [0, 0, 0, 1]]))
-        base_pose = tf.transform_pose(apartment_setup.default_root, base_pose)
+        base_pose = god_map.world.transform_pose(apartment_setup.default_root, base_pose)
         base_pose.pose.position.z = 0
         # apartment_setup.allow_all_collisions()
         apartment_setup.move_base(base_pose)

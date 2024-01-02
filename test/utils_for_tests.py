@@ -911,7 +911,10 @@ class GiskardTestWrapper(OldGiskardWrapper):
 
     def reset_base(self):
         p = PoseStamped()
-        p.header.frame_id = tf.get_tf_root()
+        try:
+            p.header.frame_id = tf.get_tf_root()
+        except AssertionError as e:
+            p.header.frame_id = god_map.world.root_link_name
         p.pose.orientation.w = 1
         self.set_localization(p)
         self.wait_heartbeats()

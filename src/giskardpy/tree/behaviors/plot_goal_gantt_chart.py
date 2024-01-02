@@ -96,7 +96,10 @@ class PlotGanttChart(GiskardBehavior):
     @record_time
     @profile
     def update(self):
-        goals = god_map.motion_goal_manager.motion_goals
-        file_name = god_map.giskard.tmp_folder + f'gantt_charts/goal_{god_map.goal_id}.pdf'
-        self.plot_gantt_chart(goals, god_map.monitor_manager.monitors, file_name)
+        try:
+            goals = god_map.motion_goal_manager.motion_goals
+            file_name = god_map.giskard.tmp_folder + f'gantt_charts/goal_{god_map.goal_id}.pdf'
+            self.plot_gantt_chart(goals, god_map.monitor_manager.monitors, file_name)
+        except Exception as e:
+            logging.logwarn(f'Failed to create goal gantt chart: {e}.')
         return Status.SUCCESS

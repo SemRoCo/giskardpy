@@ -1,5 +1,6 @@
 import abc
 from abc import ABC
+from threading import Lock
 from typing import Union, List, TypeVar, Optional, Dict, Tuple
 
 import numpy as np
@@ -42,6 +43,22 @@ class PayloadMonitor(Monitor, ABC):
     @abc.abstractmethod
     def __call__(self):
         pass
+
+
+class WorldUpdatePayloadMonitor(PayloadMonitor):
+    world_lock = Lock()
+
+    def __init__(self, name: str, start_monitors: List[Monitor]):
+        super().__init__(name=name, start_monitors=start_monitors, run_call_in_thread=True)
+
+    @abc.abstractmethod
+    def apply_world_update(self):
+        pass
+
+    def __call__(self):
+        with WorldUpdatePayloadMonitor.world_lock:
+            self.apply_world_update()
+        self.state = True
 
 
 class EndMotion(PayloadMonitor):
@@ -112,8 +129,7 @@ class Sleep(PayloadMonitor):
         self.state = True
 
 
-class UpdateParentLinkOfGroup(PayloadMonitor):
-    # FIXME multithreading issue
+class UpdateParentLinkOfGroup(WorldUpdatePayloadMonitor):
     def __init__(self,
                  name: str,
                  start_monitors: List[Monitor],
@@ -122,13 +138,11 @@ class UpdateParentLinkOfGroup(PayloadMonitor):
                  parent_link_group: Optional[str] = ''):
         self.group_name = group_name
         self.new_parent_link = god_map.world.search_for_link_name(parent_link, parent_link_group)
-        super().__init__(name, start_monitors, run_call_in_thread=True)
+        super().__init__(name, start_monitors)
 
-    def __call__(self):
+    def apply_world_update(self):
         god_map.world.move_group(group_name=self.group_name,
                                  new_parent_link_name=self.new_parent_link)
-        rospy.sleep(2)
-        self.state = True
 
 
 class CollisionMatrixUpdater(PayloadMonitor):

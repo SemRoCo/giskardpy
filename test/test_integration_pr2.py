@@ -693,7 +693,7 @@ class TestPayloadMonitor:
                                                       start_monitors=[r_pre_grasp_pose],
                                                       end_monitors=[attach_cup])
 
-        kitchen_setup.monitors.update_parent_link_of_group(start_monitors=[attach_bowl, r_grasp_pose],
+        kitchen_setup.monitors.update_parent_link_of_group(start_monitors=[r_grasp_pose],
                                                            name=attach_cup,
                                                            group_name=cup_name,
                                                            parent_link=kitchen_setup.r_tip)

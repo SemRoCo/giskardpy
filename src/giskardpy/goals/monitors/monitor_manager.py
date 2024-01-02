@@ -127,6 +127,8 @@ class MonitorManager:
         """
         Expression is updated when all monitors are 1 at the same time, but only once.
         """
+        if not monitors:
+            raise ValueError('monitors is empty.')
         monitor_names = monitor_list_to_monitor_name_tuple(monitors)
         old_symbols = []
         new_symbols = []

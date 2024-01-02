@@ -1187,7 +1187,7 @@ class TestConstraints:
         kitchen_setup.teleport_base(base_goal)
 
         tip = 'head_mount_kinect_rgb_link'
-        goal_point = tf.lookup_point('map', 'iai_kitchen/iai_fridge_door_handle')
+        goal_point = god_map.world.compute_fk_point(root='map', tip='iai_kitchen/iai_fridge_door_handle')
         goal_point.header.stamp = rospy.Time()
         pointing_axis = Vector3Stamped()
         pointing_axis.header.frame_id = tip

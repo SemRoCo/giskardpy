@@ -24,7 +24,7 @@ class PoseReached(ExpressionMonitor):
         super().__init__(name, stay_one=stay_one, start_monitors=start_monitors)
         root_link = god_map.world.search_for_link_name(root_link, root_group)
         tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
-        if start_monitors is None:
+        if not start_monitors:
             goal_pose = transform_msg(root_link, goal_pose)
             root_T_goal = cas.TransMatrix(goal_pose)
         else:

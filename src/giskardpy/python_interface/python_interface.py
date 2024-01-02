@@ -459,6 +459,7 @@ class MotionGoalWrapper:
                            group_name: Optional[str] = None,
                            weight: Optional[float] = None,
                            max_velocity: Optional[float] = None,
+                           name: str = '',
                            start_monitors: List[str] = None,
                            hold_monitors: List[str] = None,
                            end_monitors: List[str] = None,
@@ -471,6 +472,7 @@ class MotionGoalWrapper:
         :param max_velocity: will be applied to all joints
         """
         self.add_motion_goal(motion_goal_class=JointPositionList.__name__,
+                             name=name,
                              goal_state=goal_state,
                              group_name=group_name,
                              weight=weight,
@@ -592,6 +594,7 @@ class MotionGoalWrapper:
                                percentage: int = 15,
                                joint_list: Optional[List[str]] = None,
                                weight: Optional[float] = None,
+                               name: str = '',
                                start_monitors: List[str] = None,
                                hold_monitors: List[str] = None,
                                end_monitors: List[str] = None):
@@ -602,6 +605,7 @@ class MotionGoalWrapper:
         self.add_motion_goal(motion_goal_class=AvoidJointLimits.__name__,
                              percentage=percentage,
                              weight=weight,
+                             name=name,
                              joint_list=joint_list,
                              start_monitors=start_monitors,
                              hold_monitors=hold_monitors,

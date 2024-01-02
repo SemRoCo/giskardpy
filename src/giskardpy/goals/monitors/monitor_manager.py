@@ -78,7 +78,7 @@ class MonitorManager:
         for monitor in self.monitors:
             if monitor.name == name:
                 return monitor
-        raise KeyError(f'No monitor of name {name} found.')
+        raise KeyError(f'No monitor of name \'{name}\' found.')
 
     @profile
     def update_expr_monitor_state(self, new_state: np.ndarray, last_state: np.ndarray) -> np.ndarray:

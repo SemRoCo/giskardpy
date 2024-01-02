@@ -91,6 +91,8 @@ class CartesianOrientation(Goal):
         self.reference_velocity = reference_velocity
         self.weight = weight
 
+        if start_monitors:
+            relative = True
         if relative:
             root_R_goal = transform_msg_and_turn_to_expr(self.root_link, goal_orientation, start_monitors)
         else:

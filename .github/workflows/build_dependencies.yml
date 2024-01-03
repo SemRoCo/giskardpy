@@ -87,6 +87,7 @@ jobs:
         name: install pip requirements
         run: |
           sudo apt install libeigen3-dev
+          python3 -m pip install --upgrade pip
           pip3 install -r requirements.txt
       - if: ${{ steps.pip-load.outputs.cache-hit != 'true' }}
         name: cache pip

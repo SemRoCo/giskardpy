@@ -1,44 +1,100 @@
 from __future__ import annotations
 
+import builtins
 from copy import copy
-from typing import Union
-
+from typing import Union, List
+import math
 import casadi as ca  # type: ignore
 import numpy as np
 import geometry_msgs.msg as geometry_msgs
 import rospy
-
-from giskardpy.my_types import PrefixName
+from scipy import sparse as sp
+from giskardpy.my_types import PrefixName, Derivatives
 from giskardpy.utils import logging
+
+builtin_max = builtins.max
+builtin_min = builtins.min
+builtin_abs = builtins.abs
 
 _EPS = np.finfo(float).eps * 4.0
 pi = ca.pi
 
 
+class StackedCompiledFunction:
+    def __init__(self, expressions, parameters=None, additional_views=None):
+        combined_expression = vstack(expressions)
+        self.compiled_f = combined_expression.compile(parameters=parameters)
+        slices = []
+        start = 0
+        for expression in expressions[:-1]:
+            end = start + expression.shape[0]
+            slices.append(end)
+            start = end
+        self.split_out_view = np.split(self.compiled_f.out, slices)
+        if additional_views is not None:
+            for expression_slice in additional_views:
+                self.split_out_view.append(self.compiled_f.out[expression_slice])
+
+    @profile
+    def fast_call(self, filtered_args):
+        self.compiled_f.fast_call(filtered_args)
+        return self.split_out_view
+
+
 class CompiledFunction:
-    def __init__(self, str_params, fast_f, shape):
-        self.str_params = str_params
-        self.fast_f = fast_f
-        self.shape = shape
-        self.buf, self.f_eval = fast_f.buffer()
-        self.out = np.zeros(self.shape, order='F')
-        self.buf.set_res(0, memoryview(self.out))  # type: ignore
-        if len(str_params) == 0:
+    def __init__(self, expression, parameters=None, sparse=False):
+        self.sparse = sparse
+        if len(expression) == 0:
+            self.sparse = False
+        if parameters is None:
+            parameters = expression.free_symbols()
+
+        self.str_params = [str(x) for x in parameters]
+        if len(parameters) > 0:
+            parameters = [Expression(parameters).s]
+
+        if self.sparse:
+            expression.s = ca.sparsify(expression.s)
+            try:
+                self.compiled_f = ca.Function('f', parameters, [expression.s])
+            except Exception:
+                self.compiled_f = ca.Function('f', parameters, expression.s)
+            self.buf, self.f_eval = self.compiled_f.buffer()
+            self.csc_indices, self.csc_indptr = expression.s.sparsity().get_ccs()
+            self.out = sp.csc_matrix((np.zeros(expression.s.nnz()), self.csc_indptr, self.csc_indices))
+            self.buf.set_res(0, memoryview(self.out.data))
+        else:
+            try:
+                self.compiled_f = ca.Function('f', parameters, [ca.densify(expression.s)])
+            except Exception:
+                self.compiled_f = ca.Function('f', parameters, ca.densify(expression.s))
+            self.buf, self.f_eval = self.compiled_f.buffer()
+            if expression.shape[1] == 1:
+                shape = expression.shape[0]
+            else:
+                shape = expression.shape
+            self.out = np.zeros(shape, order='F')
+            self.buf.set_res(0, memoryview(self.out))
+        if len(self.str_params) == 0:
             self.f_eval()
-            self.__call__ = lambda **kwargs: self.out
-            self.call2 = lambda filtered_args: self.out
+            if self.sparse:
+                result = self.out.toarray()
+            else:
+                result = self.out
+            self.__call__ = lambda **kwargs: result
+            self.fast_call = lambda filtered_args: result
 
     def __call__(self, **kwargs):
         filtered_args = [kwargs[k] for k in self.str_params]
-        return self.call2(filtered_args)
+        filtered_args = np.array(filtered_args, dtype=float)
+        return self.fast_call(filtered_args)
 
-    def call2(self, filtered_args):
+    @profile
+    def fast_call(self, filtered_args):
         """
         :param filtered_args: parameter values in the same order as in self.str_params
         """
-
-        filtered_args = np.array(filtered_args, dtype=float)
-        self.buf.set_arg(0, memoryview(filtered_args))  # type: ignore
+        self.buf.set_arg(0, memoryview(filtered_args))
         self.f_eval()
         return self.out
 
@@ -64,6 +120,8 @@ class Symbol_:
         return self.s.__hash__()
 
     def __getitem__(self, item):
+        if isinstance(item, np.ndarray) and item.dtype == bool:
+            item = (np.where(item)[0], slice(None, None))
         return Expression(self.s[item])
 
     def __setitem__(self, key, value):
@@ -84,22 +142,15 @@ class Symbol_:
         return free_symbols(self.s)
 
     def evaluate(self):
-        if self.s.shape[0] * self.s.shape[1] <= 1:
+        if self.shape[0] == self.shape[1] == 0:
+            return np.eye(0)
+        elif self.s.shape[0] * self.s.shape[1] <= 1:
             return float(ca.evalf(self.s))
         else:
             return np.array(ca.evalf(self.s))
 
-    def compile(self, parameters=None):
-        if parameters is None:
-            parameters = self.free_symbols()
-        str_params = [str(x) for x in parameters]
-        if len(parameters) > 0:
-            parameters = [Expression(parameters).s]
-        try:
-            f = ca.Function('f', parameters, [ca.densify(self.s)])
-        except Exception:
-            f = ca.Function('f', parameters, ca.densify(self.s))
-        return CompiledFunction(str_params, f, self.shape)
+    def compile(self, parameters=None, sparse=False):
+        return CompiledFunction(self, parameters, sparse)
 
 
 class Symbol(Symbol_):
@@ -178,6 +229,24 @@ class Symbol(Symbol_):
             return Expression(self.s.__rtruediv__(other))
         raise _operation_type_error(other, '/', self)
 
+    def __floordiv__(self, other):
+        return floor(self / other)
+
+    def __mod__(self, other):
+        return fmod(self, other)
+
+    def __divmod__(self, other):
+        return self // other, self % other
+
+    def __rfloordiv__(self, other):
+        return floor(other / self)
+
+    def __rmod__(self, other):
+        return fmod(other, self)
+
+    def __rdivmod__(self, other):
+        return other // self, other % self
+
     def __lt__(self, other):
         if isinstance(other, Symbol_):
             other = other.s
@@ -247,7 +316,7 @@ class Expression(Symbol_):
         else:
             x = len(data)
             if x == 0:
-                self.s = ca.SX([])
+                self.s = ca.SX()
                 return
             if isinstance(data[0], list) or isinstance(data[0], tuple) or isinstance(data[0], np.ndarray):
                 y = len(data[0])
@@ -315,6 +384,45 @@ class Expression(Symbol_):
             return Expression(self.s.__rtruediv__(other))
         raise _operation_type_error(other, '/', self)
 
+    def __floordiv__(self, other):
+        return floor(self / other)
+
+    def __mod__(self, other):
+        return fmod(self, other)
+
+    def __divmod__(self, other):
+        return self // other, self % other
+
+    def __rfloordiv__(self, other):
+        return floor(other / self)
+
+    def __rmod__(self, other):
+        return fmod(other, self)
+
+    def __rdivmod__(self, other):
+        return other // self, other % self
+
+    def __abs__(self):
+        return abs(self)
+
+    def __floor__(self):
+        return floor(self)
+
+    def __ceil__(self):
+        return ceil(self)
+
+    def __ge__(self, other):
+        return greater_equal(self, other)
+
+    def __gt__(self, other):
+        return greater(self, other)
+
+    def __le__(self, other):
+        return less_equal(self, other)
+
+    def __lt__(self, other):
+        return less(self, other)
+
     def __mul__(self, other):
         if isinstance(other, (int, float)):
             return Expression(self.s.__mul__(other))
@@ -370,6 +478,9 @@ class Expression(Symbol_):
     @property
     def T(self):
         return Expression(self.s.T)
+
+    def reshape(self, new_shape):
+        return Expression(self.s.reshape(new_shape))
 
 
 class TransMatrix(Symbol_):
@@ -649,15 +760,15 @@ class RotationMatrix(Symbol_):
             pass
         s = ca.SX.eye(4)
 
-        s[0,0] = ca.cos(yaw) * ca.cos(pitch)
-        s[0,1] = (ca.cos(yaw) * ca.sin(pitch) * ca.sin(roll)) - (ca.sin(yaw) * ca.cos(roll))
-        s[0,2] = (ca.sin(yaw) * ca.sin(roll)) + (ca.cos(yaw) * ca.sin(pitch) * ca.cos(roll))
-        s[1,0] = ca.sin(yaw) * ca.cos(pitch)
-        s[1,1] = (ca.cos(yaw) * ca.cos(roll)) + (ca.sin(yaw) * ca.sin(pitch) * ca.sin(roll))
-        s[1,2] = (ca.sin(yaw) * ca.sin(pitch) * ca.cos(roll)) - (ca.cos(yaw) * ca.sin(roll))
-        s[2,0] = -ca.sin(pitch)
-        s[2,1] = ca.cos(pitch) * ca.sin(roll)
-        s[2,2] = ca.cos(pitch) * ca.cos(roll)
+        s[0, 0] = ca.cos(yaw) * ca.cos(pitch)
+        s[0, 1] = (ca.cos(yaw) * ca.sin(pitch) * ca.sin(roll)) - (ca.sin(yaw) * ca.cos(roll))
+        s[0, 2] = (ca.sin(yaw) * ca.sin(roll)) + (ca.cos(yaw) * ca.sin(pitch) * ca.cos(roll))
+        s[1, 0] = ca.sin(yaw) * ca.cos(pitch)
+        s[1, 1] = (ca.cos(yaw) * ca.cos(roll)) + (ca.sin(yaw) * ca.sin(pitch) * ca.sin(roll))
+        s[1, 2] = (ca.sin(yaw) * ca.sin(pitch) * ca.cos(roll)) - (ca.cos(yaw) * ca.sin(roll))
+        s[2, 0] = -ca.sin(pitch)
+        s[2, 1] = ca.cos(pitch) * ca.sin(roll)
+        s[2, 2] = ca.cos(pitch) * ca.cos(roll)
         return cls(s, sanity_check=False)
 
     def inverse(self):
@@ -1236,23 +1347,32 @@ def diag(args):
 
 
 @profile
-def jacobian(expressions, symbols, order=1):
+def jacobian(expressions, symbols):
     expressions = Expression(expressions)
-    if order == 1:
-        return Expression(ca.jacobian(expressions.s, Expression(symbols).s))
-    elif order == 2:
-        j = jacobian(expressions, symbols, order=1)
-        for i, symbol in enumerate(symbols):
-            j[:, i] = jacobian(j[:, i], [symbol])
-        return j
-    else:
-        raise NotImplementedError('jacobian only supports order 1 and 2')
+    return Expression(ca.jacobian(expressions.s, Expression(symbols).s))
+
+
+def jacobian_dot(expressions, symbols, symbols_dot):
+    Jd = jacobian(expressions, symbols)
+    for i in range(Jd.shape[0]):
+        for j in range(Jd.shape[1]):
+            Jd[i, j] = total_derivative(Jd[i, j], symbols, symbols_dot)
+    return Jd
+
+
+def jacobian_ddot(expressions, symbols, symbols_dot, symbols_ddot):
+    symbols_ddot = Expression(symbols_ddot)
+    Jdd = jacobian(expressions, symbols)
+    for i in range(Jdd.shape[0]):
+        for j in range(Jdd.shape[1]):
+            Jdd[i, j] = total_derivative2(Jdd[i, j], symbols, symbols_dot, symbols_ddot)
+    return Jdd
 
 
 def equivalent(expression1, expression2):
     expression1 = Expression(expression1).s
     expression2 = Expression(expression2).s
-    return ca.is_equal(ca.simplify(expression1), ca.simplify(expression2), 1)
+    return ca.is_equal(ca.simplify(expression1), ca.simplify(expression2), 5)
 
 
 def free_symbols(expression):
@@ -1293,8 +1413,12 @@ def compile_and_execute(f, params):
     expr = f(*symbol_params)
     assert isinstance(expr, Symbol_)
     fast_f = expr.compile(symbol_params2)
-    input_ = np.concatenate(input_).T[0]
-    result = fast_f.call2(input_)
+    input_ = np.array(np.concatenate(input_).T[0], dtype=float)
+    result = fast_f.fast_call(input_)
+    if len(result.shape) == 1:
+        if result.shape[0] == 1:
+            return result[0]
+        return result
     if result.shape[0] * result.shape[1] == 1:
         return result[0][0]
     elif result.shape[1] == 1:
@@ -1341,8 +1465,13 @@ def limit(x, lower_limit, upper_limit):
 
 def if_else(condition, if_result, else_result):
     condition = Expression(condition).s
+    if isinstance(if_result, float):
+        if_result = Expression(if_result)
+    if isinstance(else_result, float):
+        else_result = Expression(else_result)
     if isinstance(if_result, (Point3, Vector3, TransMatrix, RotationMatrix, Quaternion)):
-        assert type(if_result) == type(else_result)
+        assert type(if_result) == type(else_result), \
+            f'if_else: result types are not equal {type(if_result)} != {type(else_result)}'
     return_type = type(if_result)
     if return_type in (int, float):
         return_type = Expression
@@ -1385,7 +1514,10 @@ def less(x, y):
     return Expression(ca.lt(x, y))
 
 
-def greater(x, y):
+def greater(x, y, decimal_places=None):
+    if decimal_places is not None:
+        x = round_up(x, decimal_places)
+        y = round_up(y, decimal_places)
     if isinstance(x, Symbol_):
         x = x.s
     if isinstance(y, Symbol_):
@@ -1401,12 +1533,24 @@ def logic_and(*args):
         return Expression(ca.logic_and(args[0].s, logic_and(*args[1:]).s))
 
 
+def logic_any(args):
+    return Expression(ca.logic_any(args.s))
+
+
+def logic_all(args):
+    return Expression(ca.logic_all(args.s))
+
+
 def logic_or(*args):
     assert len(args) >= 2, 'and must be called with at least 2 arguments'
     if len(args) == 2:
-        return ca.logic_or(args[0], args[1])
+        return Expression(ca.logic_or(args[0].s, args[1].s))
     else:
-        return ca.logic_or(args[0], logic_and(*args[1:]))
+        return Expression(ca.logic_or(args[0].s, logic_or(*args[1:]).s))
+
+
+def logic_not(expr):
+    return Expression(ca.logic_not(expr.s))
 
 
 def if_greater(a, b, if_result, else_result):
@@ -1489,7 +1633,7 @@ def if_less_eq_cases(a, b_result_cases, else_result):
     """
     a = _to_sx(a)
     result = _to_sx(else_result)
-    for i in reversed(range(len(b_result_cases) - 1)):
+    for i in reversed(range(len(b_result_cases))):
         b = _to_sx(b_result_cases[i][0])
         b_result = _to_sx(b_result_cases[i][1])
         result = ca.if_else(ca.le(a, b), b_result, result)
@@ -1562,11 +1706,29 @@ def trace(matrix):
 
 
 def vstack(list_of_matrices):
+    if len(list_of_matrices) == 0:
+        return Expression()
     return Expression(ca.vertcat(*[x.s for x in list_of_matrices]))
 
 
 def hstack(list_of_matrices):
+    if len(list_of_matrices) == 0:
+        return Expression()
     return Expression(ca.horzcat(*[x.s for x in list_of_matrices]))
+
+
+def diag_stack(list_of_matrices):
+    num_rows = int(math.fsum(e.shape[0] for e in list_of_matrices))
+    num_columns = int(math.fsum(e.shape[1] for e in list_of_matrices))
+    combined_matrix = zeros(num_rows, num_columns)
+    row_counter = 0
+    column_counter = 0
+    for matrix in list_of_matrices:
+        combined_matrix[row_counter:row_counter + matrix.shape[0],
+        column_counter:column_counter + matrix.shape[1]] = matrix
+        row_counter += matrix.shape[0]
+        column_counter += matrix.shape[1]
+    return combined_matrix
 
 
 def normalize_axis_angle(axis, angle):
@@ -1601,6 +1763,10 @@ def fmod(a, b):
     a = Expression(a).s
     b = Expression(b).s
     return Expression(ca.fmod(a, b))
+
+
+def euclidean_division(nominator, denominator):
+    pass
 
 
 def normalize_angle_positive(angle):
@@ -1752,18 +1918,18 @@ def sum_column(matrix):
     return Expression(ca.sum2(matrix))
 
 
-def distance_point_to_line_segment(point, line_start, line_end):
+def distance_point_to_line_segment(frame_P_current, frame_P_line_start, frame_P_line_end):
     """
-    :param point: current position of an object (i. e.) gripper tip
-    :param line_start: start of the approached line
-    :param line_end: end of the approached line
+    :param frame_P_current: current position of an object (i. e.) gripper tip
+    :param frame_P_line_start: start of the approached line
+    :param frame_P_line_end: end of the approached line
     :return: distance to line, the nearest point on the line
     """
-    point = Point3(point)
-    line_start = Point3(line_start)
-    line_end = Point3(line_end)
-    line_vec = line_end - line_start
-    pnt_vec = point - line_start
+    frame_P_current = Point3(frame_P_current)
+    frame_P_line_start = Point3(frame_P_line_start)
+    frame_P_line_end = Point3(frame_P_line_end)
+    line_vec = frame_P_line_end - frame_P_line_start
+    pnt_vec = frame_P_current - frame_P_line_start
     line_len = norm(line_vec)
     line_unitvec = line_vec / line_len
     pnt_vec_scaled = pnt_vec / line_len
@@ -1771,7 +1937,7 @@ def distance_point_to_line_segment(point, line_start, line_end):
     t = limit(t, lower_limit=0.0, upper_limit=1.0)
     nearest = line_vec * t
     dist = norm(nearest - pnt_vec)
-    nearest = nearest + line_start
+    nearest = nearest + frame_P_line_start
     return dist, Point3(nearest)
 
 
@@ -1818,29 +1984,46 @@ def to_str(expression):
     """
     Turns expression into a more or less readable string.
     """
-    s = str(expression)
-    parts = s.split(', ')
-    result = parts[-1]
-    for x in reversed(parts[:-1]):
-        equal_position = len(x.split('=')[0])
-        index = x[:equal_position]
-        sub = x[equal_position+1:]
-        if index not in result:
-            raise Exception('fuck')
-        result = result.replace(index, sub)
-    return result
+    result_list = np.zeros(expression.shape).tolist()
+    for x_index in range(expression.shape[0]):
+        for y_index in range(expression.shape[1]):
+            s = str(expression[x_index, y_index])
+            parts = s.split(', ')
+            result = parts[-1]
+            for x in reversed(parts[:-1]):
+                equal_position = len(x.split('=')[0])
+                index = x[:equal_position]
+                sub = x[equal_position + 1:]
+                if index not in result:
+                    raise Exception('fuck')
+                result = result.replace(index, sub)
+            result_list[x_index][y_index] = result
+    return result_list
 
 
 def total_derivative(expr,
                      symbols,
                      symbols_dot):
-    expr_jacobian = jacobian(expr, symbols)
-    last_velocities = Expression(symbols_dot)
-    velocity = dot(expr_jacobian, last_velocities)
-    if velocity.shape[0] * velocity.shape[0] == 1:
-        return velocity[0]
-    else:
-        return velocity
+    symbols = Expression(symbols)
+    symbols_dot = Expression(symbols_dot)
+    return Expression(ca.jtimes(expr.s, symbols.s, symbols_dot.s))
+
+
+def total_derivative2(expr, symbols, symbols_dot, symbols_ddot):
+    symbols = Expression(symbols)
+    symbols_dot = Expression(symbols_dot)
+    symbols_ddot = Expression(symbols_ddot)
+    v = []
+    for i in range(len(symbols)):
+        for j in range(len(symbols)):
+            if i == j:
+                v.append(symbols_ddot[i].s)
+            else:
+                v.append(symbols_dot[i].s * symbols_dot[j].s)
+    v = Expression(v)
+    H = Expression(ca.hessian(expr.s, symbols.s)[0])
+    H = H.reshape((1, len(H) ** 2))
+    return H.dot(v)
 
 
 def quaternion_multiply(q1, q2):
@@ -1889,3 +2072,50 @@ def atan2(x, y):
     x = Expression(x).s
     y = Expression(y).s
     return Expression(ca.atan2(x, y))
+
+
+def solve_for(expression, target_value, start_value=0.0001, max_tries=10000, eps=1e-10, max_step=50):
+    f_dx = jacobian(expression, expression.free_symbols()).compile()
+    f = expression.compile()
+    x = start_value
+    for tries in range(max_tries):
+        err = f.fast_call(np.array([x]))[0] - target_value
+        if builtin_abs(err) < eps:
+            return x
+        slope = f_dx.fast_call(np.array([x]))[0]
+        if slope == 0:
+            if start_value > 0:
+                slope = -0.001
+            else:
+                slope = 0.001
+        x -= builtin_max(builtin_min(err / slope, max_step), -max_step)
+    raise ValueError('no solution found')
+
+
+def gauss(n):
+    return (n ** 2 + n) / 2
+
+
+def r_gauss(integral):
+    return sqrt(2 * integral + (1 / 4)) - 1 / 2
+
+
+def one_step_change(current_acceleration, jerk_limit, dt):
+    return current_acceleration * dt + jerk_limit * dt ** 2
+
+
+def desired_velocity(current_position, goal_position, dt, ph):
+    e = goal_position - current_position
+    a = e / (gauss(ph) * dt)
+    # a = e / ((gauss(ph-1) + ph - 1)*dt)
+    return a * ph
+    # return a * (ph-2)
+
+
+def vel_integral(vel_limit, jerk_limit, dt, ph):
+    def f(vc, ac, jl, t, dt, ph):
+        return vc + (t) * ac * dt + gauss(t) * jl * dt ** 2
+
+    half1 = math.floor(ph / 2)
+    x = f(0, 0, jerk_limit, half1, dt, ph)
+    return x

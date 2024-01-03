@@ -6,7 +6,11 @@ import pytest
 from geometry_msgs.msg import PoseStamped, Quaternion, Vector3Stamped, PointStamped
 from tf.transformations import quaternion_from_matrix
 
-from giskardpy.configs.boxy import Boxy_StandAlone
+from giskardpy.configs.behavior_tree_config import StandAloneBTConfig
+from giskardpy.configs.iai_robots.boxy import BoxyCollisionAvoidanceConfig, BoxyStandaloneInterfaceConfig
+from giskardpy.configs.iai_robots.donbot import WorldWithBoxyBaseConfig
+from giskardpy.configs.giskard import Giskard
+from giskardpy.configs.qp_controller_config import QPControllerConfig
 from giskardpy.utils.utils import launch_launchfile
 from utils_for_tests import GiskardTestWrapper
 
@@ -60,15 +64,19 @@ class BoxyTestWrapper(GiskardTestWrapper):
         'right_arm_6_joint': 0.01,
     }
 
-    def __init__(self, config=None):
-        if config is None:
-            config = Boxy_StandAlone
+    def __init__(self, giskard=None):
+        if giskard is None:
+            giskard = Giskard(world_config=WorldWithBoxyBaseConfig(),
+                              collision_avoidance_config=BoxyCollisionAvoidanceConfig(),
+                              robot_interface_config=BoxyStandaloneInterfaceConfig(),
+                              behavior_tree_config=StandAloneBTConfig(),
+                              qp_controller_config=QPControllerConfig())
         self.camera_tip = 'camera_link'
         self.r_tip = 'right_gripper_tool_frame'
         self.l_tip = 'left_gripper_tool_frame'
         self.robot_name = 'boxy'
         self.r_gripper_group = 'r_gripper'
-        super().__init__(config)
+        super().__init__(giskard)
 
     def teleport_base(self, goal_pose, group_name: Optional[str] = None):
         self.set_seed_odometry(base_pose=goal_pose, group_name=group_name)

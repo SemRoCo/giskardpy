@@ -2,9 +2,7 @@
 
   <include file="$(find iai_boxy_description)/launch/upload_boxy.launch"/>
 
-  <node pkg="giskardpy" type="giskard.py" name="giskard" output="screen">
-    <param name="config" value="Boxy_StandAlone"/>
-  </node>
+  <node pkg="giskardpy" type="boxy_standalone.py" name="giskard" output="screen"/>
 
   <node pkg="giskardpy" type="interactive_marker.py" name="giskard_interactive_marker" output="screen">
     <rosparam param="enable_self_collision">False</rosparam>
@@ -18,6 +16,8 @@
       - [boxy_description/left_gripper_base_link, boxy_description/left_gripper_finger_left_link]
    </rosparam>
   </node>
+
+  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find giskardpy)/launch/rviz_config/standalone.rviz" />
 
 </launch>
 

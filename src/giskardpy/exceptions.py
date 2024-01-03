@@ -4,7 +4,12 @@ from typing import Optional
 class DontPrintStackTrace:
     pass
 
+
 class GiskardException(Exception):
+    pass
+
+
+class SetupException(GiskardException):
     pass
 
 
@@ -18,6 +23,10 @@ class QPSolverException(GiskardException):
 
 
 class InfeasibleException(QPSolverException):
+    pass
+
+
+class VelocityLimitUnreachableException(QPSolverException):
     pass
 
 
@@ -104,6 +113,7 @@ class UnreachableException(PlanningException):
 class SelfCollisionViolatedException(PlanningException):
     pass
 
+
 # errors during execution
 # int64 EXECUTION_ERROR # if no execution code fits
 # int64 PREEMPTED # goal got canceled via action server interface
@@ -147,6 +157,12 @@ class ExecutionSucceededPrematurely(ExecutionException):
     pass
 
 
-# -----------------------------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+class BehaviorTreeException(GiskardException):
+    pass
+
+
+# ----------------------------------------------------------------------------------------------------------------------
 class ImplementationException(GiskardException):
     pass

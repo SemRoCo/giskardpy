@@ -4,6 +4,8 @@ from geometry_msgs.msg import PoseStamped, Quaternion
 from tf.transformations import quaternion_about_axis
 
 import giskardpy.utils.tfwrapper as tf
+from giskardpy import identifier
+from giskardpy.god_map import GodMap
 from giskardpy.model.joints import OneDofJoint
 from giskardpy.utils import logging
 from giskardpy.utils.utils import launch_launchfile
@@ -23,6 +25,10 @@ def ros(request):
     tf.init(60)
 
     def kill_ros():
+        try:
+            GodMap().get_data(identifier.tree_manager).render()
+        except KeyError as e:
+            logging.logerr(f'Failed to render behavior tree.')
         logging.loginfo('shutdown ros')
         rospy.signal_shutdown('die')
         try:
@@ -51,7 +57,7 @@ def ros(request):
 @pytest.fixture()
 def resetted_giskard(giskard: GiskardTestWrapper) -> GiskardTestWrapper:
     logging.loginfo('resetting giskard')
-    giskard.resuscitate()
+    giskard.restart_ticking()
     if giskard.is_standalone() and giskard.has_odometry_joint():
         zero = PoseStamped()
         zero.header.frame_id = 'map'
@@ -106,7 +112,10 @@ def kitchen_setup(better_pose: GiskardTestWrapper) -> GiskardTestWrapper:
     for joint_name in better_pose.world.groups[better_pose.kitchen_name].movable_joint_names:
         joint = better_pose.world.joints[joint_name]
         if isinstance(joint, OneDofJoint):
-            js[str(joint.free_variable.name)] = 0.0
+            if better_pose.is_standalone():
+                js[str(joint.free_variable.name)] = 0.0
+            else:
+                js[str(joint.free_variable.name.short_name)] = 0.0
     better_pose.set_kitchen_js(js)
     return better_pose
 

@@ -4,14 +4,16 @@ from giskard_msgs.msg import MoveResult
 from giskardpy import identifier
 from giskardpy.tree.behaviors.action_server import ActionServerBehavior
 from giskardpy.utils import logging
+from giskardpy.utils.decorators import record_time
 
 
 class SendResult(ActionServerBehavior):
+    @record_time
     @profile
     def update(self):
-        skip_failures = self.get_god_map().get_data(identifier.skip_failures)
+        skip_failures = self.god_map.get_data(identifier.skip_failures)
         Blackboard().set('exception', None)  # FIXME move this to reset?
-        result = self.get_god_map().get_data(identifier.result_message)
+        result = self.god_map.get_data(identifier.result_message)
 
         if result.error_codes[-1] == MoveResult.PREEMPTED:
             logging.logerr('Goal preempted')

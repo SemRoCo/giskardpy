@@ -1,7 +1,5 @@
-
 import numpy as np
 from casadi import casadi
-from qpsolvers import solve_qp
 
 from giskardpy.qp.qp_solver import QPSolver
 
@@ -32,8 +30,8 @@ class QPSolverCasadi(QPSolver):
             'a': a.sparsity(),
         }
         solver = casadi.conic('S', 'qpoases', qp, verbose=False)
-        result = solver(h=h,a=a,g=g,lba=lba,uba=uba,lbx=lbx,ubx=ubx)['x']
-        result = np.array(result)[:,0]
+        result = solver(h=h, a=a, g=g, lba=lba, uba=uba, lbx=lbx, ubx=ubx)['x']
+        result = np.array(result)[:, 0]
         return result
 
     # @profile

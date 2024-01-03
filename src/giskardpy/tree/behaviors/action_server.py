@@ -6,6 +6,7 @@ from py_trees import Blackboard
 from giskard_msgs.msg._MoveGoal import MoveGoal
 from giskard_msgs.msg._MoveResult import MoveResult
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
+from giskardpy.utils.decorators import record_time
 
 ERROR_CODE_TO_NAME = {getattr(MoveResult, x): x for x in dir(MoveResult) if x.isupper()}
 
@@ -15,6 +16,7 @@ class ActionServerHandler(object):
     Interface to action server which is more useful for behaviors.
     """
 
+    @record_time
     def __init__(self, action_name, action_type):
         self.goal_queue = Queue(1)
         self.result_queue = Queue(1)
@@ -73,7 +75,8 @@ class ActionServerHandler(object):
 class ActionServerBehavior(GiskardBehavior):
     as_handler: ActionServerHandler
 
-    def __init__(self, name, as_name, action_type=None):
+    @record_time
+    def __init__(self, name: str, as_name: str, action_type=None):
         self.as_name = as_name
         self.action_type = action_type
         self.as_handler = Blackboard().get(self.as_name)
@@ -82,8 +85,5 @@ class ActionServerBehavior(GiskardBehavior):
             Blackboard().set(self.as_name, self.as_handler)
         super().__init__(name)
 
-    def get_as(self):
-        """
-        :rtype: ActionServerHandler
-        """
+    def get_as(self) -> ActionServerHandler:
         return self.as_handler

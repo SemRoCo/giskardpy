@@ -1,5 +1,5 @@
 from __future__ import division
-
+import hashlib
 # I only do this, because otherwise test/test_integration_pr2.py::TestWorldManipulation::test_unsupported_options
 # fails on github actions
 import urdf_parser_py.urdf as up
@@ -10,27 +10,19 @@ import json
 import os
 import pkgutil
 import sys
-import traceback
 from collections import OrderedDict
 from contextlib import contextmanager
-from copy import deepcopy
-from functools import wraps
-from itertools import product
-from multiprocessing import Lock
-from time import time
-from typing import Type, Optional, Dict
+from functools import cached_property
+from typing import Type, Optional, Dict, Any
 
-import matplotlib.colors as mcolors
 import numpy as np
-import pylab as plt
 import roslaunch
 import rospkg
 import rospy
-import trimesh
 from genpy import Message
 from geometry_msgs.msg import PointStamped, Point, Vector3Stamped, Vector3, Pose, PoseStamped, QuaternionStamped, \
     Quaternion
-from py_trees import Status, Blackboard
+from py_trees import Blackboard
 from rospy_message_converter.message_converter import \
     convert_ros_message_to_dictionary as original_convert_ros_message_to_dictionary, \
     convert_dictionary_to_ros_message as original_convert_dictionary_to_ros_message
@@ -38,11 +30,9 @@ from sensor_msgs.msg import JointState
 from visualization_msgs.msg import Marker, MarkerArray
 
 from giskardpy import identifier
-from giskardpy.exceptions import DontPrintStackTrace
 from giskardpy.god_map import GodMap
 from giskardpy.my_types import PrefixName
 from giskardpy.utils import logging
-from giskardpy.utils.time_collector import TimeCollector
 
 
 @contextmanager
@@ -135,7 +125,7 @@ def to_joint_state_position_dict(msg):
     :rtype: OrderedDict[str, float]
     """
     js = OrderedDict()
-    for i, joint_name in enumerate(msg.name):
+    for joint_name, i in sorted(zip(msg.name, range(len(msg.name))), key=lambda x: x[0]):
         js[joint_name] = msg.position[i]
     return js
 
@@ -233,132 +223,29 @@ def cm_to_inch(cm):
     return cm * 0.393701
 
 
-plot_lock = Lock()
+def get_file_hash(file_path: str, algorithm: str = "sha256") -> Optional[str]:
+    try:
+        hash_func = hashlib.new(algorithm)
+        with open(file_path, 'rb') as f:
+            while chunk := f.read(4096):
+                hash_func.update(chunk)
+        return hash_func.hexdigest()
+    except Exception as e:
+        print(f"Error occurred while hashing: {e}")
+        return None
 
 
-@profile
-def plot_trajectory(tj, controlled_joints, path_to_data_folder, sample_period, order=3, velocity_threshold=0.0,
-                    cm_per_second=0.2, normalize_position=False, tick_stride=1.0, file_name='trajectory.pdf', history=5,
-                    height_per_derivative=3.5, print_last_tick=False, legend=True, hspace=1, diff_after=2,
-                    y_limits=None):
+def clear_cached_properties(instance: Any):
     """
-    :type tj: Trajectory
-    :param controlled_joints: only joints in this list will be added to the plot
-    :type controlled_joints: list
-    :param velocity_threshold: only joints that exceed this velocity threshold will be added to the plot. Use a negative number if you want to include every joint
-    :param cm_per_second: determines how much the x axis is scaled with the length(time) of the trajectory
-    :param normalize_position: centers the joint positions around 0 on the y axis
-    :param tick_stride: the distance between ticks in the plot. if tick_stride <= 0 pyplot determines the ticks automatically
+    Clears the cache of all cached_property attributes of an instance.
+
+    Args:
+        instance: The instance for which to clear all cached_property caches.
     """
-    cm_per_second = cm_to_inch(cm_per_second)
-    height_per_derivative = cm_to_inch(height_per_derivative)
-    hspace = cm_to_inch(hspace)
-    with plot_lock:
-        def ceil(val, base=0.0, stride=1.0):
-            base = base % stride
-            return np.ceil((float)(val - base) / stride) * stride + base
-
-        def floor(val, base=0.0, stride=1.0):
-            base = base % stride
-            return np.floor((float)(val - base) / stride) * stride + base
-
-        order = max(order, 2)
-        if len(tj._points) <= 0:
-            return
-        colors = list(mcolors.TABLEAU_COLORS.keys())
-        colors.append('k')
-
-        titles = ['position', 'velocity', 'acceleration', 'jerk', 'snap', 'crackle', 'pop']
-        line_styles = ['-', '--', '-.', ':']
-        fmts = list(product(line_styles, colors))
-        data = [[] for i in range(order)]
-        times = []
-        names = list(sorted([i for i in tj._points[0.0].keys() if i in controlled_joints]))
-        if diff_after > 3:
-            tj.delete_last()
-        for time, point in tj.items():
-            for i in range(order):
-                if i == 0:
-                    data[0].append([point[joint_name].position for joint_name in names])
-                elif i == 1:
-                    data[1].append([point[joint_name].velocity for joint_name in names])
-                elif i < diff_after and i == 2:
-                    data[2].append([point[joint_name].acceleration for joint_name in names])
-                elif i < diff_after and i == 3:
-                    data[3].append([point[joint_name].jerk for joint_name in names])
-            times.append(time)
-
-        for i in range(0, order):
-            if i < diff_after:
-                data[i] = np.array(data[i])
-            else:
-                data[i] = np.diff(data[i - 1], axis=0, prepend=0) / sample_period
-        if (normalize_position):
-            data[0] = data[0] - (data[0].max(0) + data[0].min(0)) / 2
-        times = np.array(times) * sample_period
-
-        f, axs = plt.subplots(order, sharex=True, gridspec_kw={'hspace': hspace})
-        f.set_size_inches(w=(times[-1] - times[0]) * cm_per_second, h=order * height_per_derivative)
-
-        plt.xlim(times[0], times[-1])
-
-        if tick_stride > 0:
-            first = ceil(times[0], stride=tick_stride)
-            last = floor(times[-1], stride=tick_stride)
-            ticks = np.arange(first, last, tick_stride)
-            ticks = np.insert(ticks, 0, times[0])
-            ticks = np.append(ticks, last)
-            if print_last_tick:
-                ticks = np.append(ticks, times[-1])
-            for i in range(order):
-                axs[i].set_title(titles[i])
-                axs[i].xaxis.set_ticks(ticks)
-                if y_limits is not None:
-                    axs[i].set_ylim(y_limits)
-        else:
-            for i in range(order):
-                axs[i].set_title(titles[i])
-                if y_limits is not None:
-                    axs[i].set_ylim(y_limits)
-        color_counter = 0
-        for i in range(len(controlled_joints)):
-            if velocity_threshold is None or any(abs(data[1][:, i]) > velocity_threshold):
-                for j in range(order):
-                    try:
-                        axs[j].plot(times, data[j][:, i], color=fmts[color_counter][1],
-                                    linestyle=fmts[color_counter][0],
-                                    label=names[i])
-                    except KeyError:
-                        logging.logwarn('Not enough colors to plot all joints, skipping {}.'.format(names[i]))
-                    except Exception as e:
-                        pass
-                color_counter += 1
-
-        if legend:
-            axs[0].legend(bbox_to_anchor=(1.01, 1), loc='upper left')
-
-        axs[-1].set_xlabel('time [s]')
-        for i in range(order):
-            axs[i].grid()
-
-        file_name = path_to_data_folder + file_name
-        last_file_name = file_name.replace('.pdf', f'{history}.pdf')
-
-        if os.path.isfile(file_name):
-            if os.path.isfile(last_file_name):
-                os.remove(last_file_name)
-            for i in np.arange(history, 0, -1):
-                if i == 1:
-                    previous_file_name = file_name
-                else:
-                    previous_file_name = file_name.replace('.pdf', f'{i - 1}.pdf')
-                current_file_name = file_name.replace('.pdf', f'{i}.pdf')
-                try:
-                    os.rename(previous_file_name, current_file_name)
-                except FileNotFoundError:
-                    pass
-        plt.savefig(file_name, bbox_inches="tight")
-        logging.loginfo(f'saved {file_name}')
+    for attr in dir(instance):
+        if isinstance(getattr(type(instance), attr, None), cached_property):
+            if attr in instance.__dict__:
+                del instance.__dict__[attr]
 
 
 def resolve_ros_iris_in_urdf(input_urdf):
@@ -442,81 +329,6 @@ def fix_obj(file_name):
             f.write(fixed_obj)
 
 
-def convert_to_decomposed_obj_and_save_in_tmp(file_name: str, log_path='/tmp/giskardpy/vhacd.log'):
-    first_group_name = list(GodMap().get_data(identifier.world).groups.keys())[0]
-    resolved_old_path = resolve_ros_iris(file_name)
-    short_file_name = file_name.split('/')[-1][:-3]
-    decomposed_obj_file_name = f'{first_group_name}/{short_file_name}obj'
-    new_path = to_tmp_path(decomposed_obj_file_name)
-    if not os.path.exists(new_path):
-        mesh = trimesh.load(resolved_old_path, force='mesh')
-        obj_str = trimesh.exchange.obj.export_obj(mesh)
-        write_to_tmp(decomposed_obj_file_name, obj_str)
-        logging.loginfo(f'converting {file_name} to obj and saved in {new_path}')
-        # if not trimesh.convex.is_convex(mesh):
-        #     pybullet.vhacd(new_path, new_path, log_path)
-
-    return new_path
-
-
-def memoize(function):
-    memo = function.memo = {}
-
-    @wraps(function)
-    def wrapper(*args, **kwargs):
-        # key = cPickle.dumps((args, kwargs))
-        # key = pickle.dumps((args, sorted(kwargs.items()), -1))
-        key = (args, frozenset(kwargs.items()))
-        try:
-            return memo[key]
-        except KeyError:
-            rv = function(*args, **kwargs)
-            memo[key] = rv
-            return rv
-
-    return wrapper
-
-
-def record_time(function):
-    return function
-    god_map = GodMap()
-    time_collector: TimeCollector = god_map.get_data(identifier.timer_collector, default=TimeCollector())
-    if function.__name__ == 'solve':
-        @wraps(function)
-        def wrapper(self, weights, g, A, lb, ub, lbA, ubA):
-            qp_solver = self.solver_id
-            start_time = time()
-            result = function(self, weights, g, A, lb, ub, lbA, ubA)
-            time_delta = time() - start_time
-            time_collector.add_qp_solve_time(str(qp_solver), A.shape[1], A.shape[0], time_delta)
-            return result
-
-        return wrapper
-
-
-def clear_memo(f):
-    if hasattr(f, 'memo'):
-        f.memo.clear()
-
-
-def copy_memoize(function):
-    memo = function.memo = {}
-
-    @wraps(function)
-    def wrapper(*args, **kwargs):
-        # key = cPickle.dumps((args, kwargs))
-        # key = pickle.dumps((args, sorted(kwargs.items()), -1))
-        key = (args, frozenset(kwargs.items()))
-        try:
-            return deepcopy(memo[key])
-        except KeyError:
-            rv = function(*args, **kwargs)
-            memo[key] = rv
-            return rv
-
-    return wrapper
-
-
 def launch_launchfile(file_name: str):
     launch_file = resolve_ros_iris(file_name)
     uuid = roslaunch.rlutil.get_or_generate_uuid(None, False)
@@ -536,7 +348,7 @@ def raise_to_blackboard(exception):
 
 def has_blackboard_exception():
     return hasattr(Blackboard(), blackboard_exception_name) \
-           and getattr(Blackboard(), blackboard_exception_name) is not None
+        and getattr(Blackboard(), blackboard_exception_name) is not None
 
 
 def get_blackboard_exception():
@@ -545,23 +357,6 @@ def get_blackboard_exception():
 
 def clear_blackboard_exception():
     raise_to_blackboard(None)
-
-
-def catch_and_raise_to_blackboard(function):
-    @wraps(function)
-    def wrapper(*args, **kwargs):
-        if has_blackboard_exception():
-            return Status.FAILURE
-        try:
-            r = function(*args, **kwargs)
-        except Exception as e:
-            if not isinstance(e, DontPrintStackTrace):
-                traceback.print_exc()
-            raise_to_blackboard(e)
-            return Status.FAILURE
-        return r
-
-    return wrapper
 
 
 def make_pose_from_parts(pose, frame_id, position, orientation):
@@ -573,15 +368,32 @@ def make_pose_from_parts(pose, frame_id, position, orientation):
         pose.pose.orientation = Quaternion(*(orientation if orientation is not None else [0, 0, 0, 1]))
     return pose
 
+def convert_ros_message_to_dictionary(message) -> dict:
 
-def convert_ros_message_to_dictionary(message: Message) -> dict:
-    type_str_parts = str(type(message)).split('.')
-    part1 = type_str_parts[0].split('\'')[1]
-    part2 = type_str_parts[-1].split('\'')[0]
-    message_type = f'{part1}/{part2}'
-    d = {'message_type': message_type,
-         'message': original_convert_ros_message_to_dictionary(message)}
-    return d
+    if isinstance(message, list):
+        for i, element in enumerate(message):
+            message[i] = convert_ros_message_to_dictionary(element)
+    elif isinstance(message, dict):
+        for k, v in message.copy().items():
+            message[k] = convert_ros_message_to_dictionary(v)
+
+    elif isinstance(message, tuple):
+        list_values = list(message)
+        for i, element in enumerate(list_values):
+            list_values[i] = convert_ros_message_to_dictionary(element)
+        message = tuple(list_values)
+
+    elif isinstance(message, Message):
+
+        type_str_parts = str(type(message)).split('.')
+        part1 = type_str_parts[0].split('\'')[1]
+        part2 = type_str_parts[-1].split('\'')[0]
+        message_type = f'{part1}/{part2}'
+        d = {'message_type': message_type,
+             'message': original_convert_ros_message_to_dictionary(message)}
+        return d
+
+    return message
 
 
 def replace_prefix_name_with_str(d: dict) -> dict:

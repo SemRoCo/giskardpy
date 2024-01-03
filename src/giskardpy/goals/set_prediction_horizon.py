@@ -1,5 +1,9 @@
+from typing import Union
+
 from giskardpy import identifier
+from giskardpy.configs.qp_controller_config import SupportedQPSolver
 from giskardpy.goals.goal import Goal, NonMotionGoal
+from giskardpy.tree.behaviors.max_trajectory_length import MaxTrajectoryLength
 from giskardpy.utils import logging
 
 
@@ -14,10 +18,21 @@ class SetPredictionHorizon(Goal):
         self.new_prediction_horizon = prediction_horizon
 
     def make_constraints(self):
-        self.prediction_horizon = self.new_prediction_horizon
-        if 5 > self.prediction_horizon > 1:
-            logging.logwarn('Prediction horizon should be 1 or greater equal 5.')
-        self.god_map.set_data(identifier.prediction_horizon, self.prediction_horizon)
+        pass
+        if self.new_prediction_horizon < 7:
+            logging.logwarn('Prediction horizon must be >= 7.')
+        self.god_map.set_data(identifier.prediction_horizon, self.new_prediction_horizon)
+
+    def __str__(self) -> str:
+        return str(self.__class__.__name__)
+
+
+class SetQPSolver(NonMotionGoal):
+
+    def __init__(self, qp_solver_id: Union[SupportedQPSolver, int]):
+        super().__init__()
+        qp_solver_id = SupportedQPSolver(qp_solver_id)
+        self.god_map.set_data(identifier.qp_solver_name, qp_solver_id)
 
     def __str__(self) -> str:
         return str(self.__class__.__name__)
@@ -28,11 +43,21 @@ class SetMaxTrajLength(NonMotionGoal):
                  new_length: int):
         """
         Overwrites Giskard trajectory length limit for planning.
-        If the trajectory is longer than new_length, Giskard will prempt the goal.
+        If the trajectory is longer than new_length, Giskard will preempt the goal.
         :param new_length: in seconds
         """
         super().__init__()
-        self.god_map.set_data(identifier.MaxTrajectoryLength + ['length'], new_length)
+        assert new_length > 0
+        self.god_map.set_data(identifier.max_trajectory_length, new_length)
+
+    def __str__(self) -> str:
+        return super().__str__()
+
+
+class EndlessMode(NonMotionGoal):
+    def __init__(self):
+        super().__init__()
+        self.god_map.set_data(identifier.endless_mode, True)
 
     def __str__(self) -> str:
         return super().__str__()

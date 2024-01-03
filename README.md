@@ -45,18 +45,13 @@ If it doesn't work, make sure that your ```$PYTHONPATH``` includes something lik
 
 #### Alternative QP solvers
 Giskard supports multiple QP solvers and will automatically use the fasted installed solver.
-The default is `qpalm`, as it is the easiest to install.
 
-You may want to install `qpSWIFT` manually. 
-It is faster than `qpalm` up until ~600 constraints after which `qpalm` becomes faster.
-For reference, using the default setup, the PR2 usually requires 300-500 constraints for most goals.
-To install `qpSWIFT`, follow the instructions on their github page: https://github.com/qpSWIFT/qpSWIFT.
-
-Giskard also supports two additional solvers, which are slower than `qpalm`, sorted by how fast they are for Giskard's usecase:
-- `Gurobi`: A commercial solver, slower than `qpalm`, but the difference decreases with rising number of constraints: 
+- `qpalm`: Default solver, because it is the easiest to install and still reasonably fast.
+- `qpSWIFT`: Fastest open source solver in most cases. Install instructions: https://github.com/qpSWIFT/qpSWIFT.
+- `gurobi`: Commercial solver. Slightly slower than `qpSWIFT` on most robots. Outperforms `qpSWFIT` on systems with a lot of dof and/or a large prediction horizon.
   - ```sudo pip3 install gurobipy```
   - You can apply for a free academic license or buy one here: https://www.gurobi.com/academia/academic-program-and-licenses/
-- `qpOASES`: Fine up until ~100 constraints, afterwards it because extremely slow: https://github.com/SemRoCo/qpOASES/tree/noetic
+  - If you have vpn access to or are in the local network of the IAI of the University of Bremen, follow these instructions: https://ai.uni-bremen.de/wiki/intern/adm/gurobi
 
 [//]: # (- `Clarabel.rs`: `sudo pip3 install clarabel` &#40;https://github.com/oxfordcontrol/Clarabel.rs&#41;)
 

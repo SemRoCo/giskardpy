@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import numpy as np
 import rospy
@@ -12,6 +12,7 @@ from visualization_msgs.msg import Marker, MarkerArray
 import giskardpy.casadi_wrapper as w
 import giskardpy.identifier as identifier
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
+from giskardpy.utils.decorators import record_time
 from giskardpy.utils.tfwrapper import normalize_quaternion_msg, np_to_kdl, point_to_kdl, kdl_to_point, \
     quaternion_to_kdl, transform_to_kdl, kdl_to_transform_stamped
 
@@ -27,11 +28,16 @@ class DebugMarkerPublisher(GiskardBehavior):
               ColorRGBA(1, 1, 1, 1)]  # white
 
     @profile
-    def __init__(self, name, tf_topic='/tf'):
+    def __init__(self, name, tf_topic='/tf', map_frame: Optional[str] = None):
         super().__init__(name)
+        if map_frame is None:
+            self.map_frame = str(self.world.root_link_name)
+        else:
+            self.map_frame = map_frame
         self.tf_pub = rospy.Publisher(tf_topic, TFMessage, queue_size=10)
         self.marker_pub = rospy.Publisher('~visualization_marker_array', MarkerArray, queue_size=10)
 
+    @record_time
     def setup(self, timeout):
         self.clear_markers()
 
@@ -60,7 +66,7 @@ class DebugMarkerPublisher(GiskardBehavior):
                 map_V_x_offset = np.dot(map_T_d, d_V_x_offset)
                 mx = Marker()
                 mx.action = mx.ADD
-                mx.header.frame_id = 'map'
+                mx.header.frame_id = self.map_frame
                 mx.ns = f'debug{name}'
                 mx.id = 0
                 mx.type = mx.CYLINDER
@@ -80,7 +86,7 @@ class DebugMarkerPublisher(GiskardBehavior):
                 map_V_y_offset = np.dot(map_T_d, d_V_y_offset)
                 my = Marker()
                 my.action = my.ADD
-                my.header.frame_id = 'map'
+                my.header.frame_id = self.map_frame
                 my.ns = f'debug{name}'
                 my.id = 1
                 my.type = my.CYLINDER
@@ -100,7 +106,7 @@ class DebugMarkerPublisher(GiskardBehavior):
                 map_V_z_offset = np.dot(map_T_d, d_V_z_offset)
                 mz = Marker()
                 mz.action = mz.ADD
-                mz.header.frame_id = 'map'
+                mz.header.frame_id = self.map_frame
                 mz.ns = f'debug{name}'
                 mz.id = 2
                 mz.type = mz.CYLINDER
@@ -118,7 +124,7 @@ class DebugMarkerPublisher(GiskardBehavior):
                 m.action = m.ADD
                 m.ns = f'debug/{name}'
                 m.id = 0
-                m.header.frame_id = 'map'
+                m.header.frame_id = self.map_frame
                 m.pose.orientation.w = 1
                 if isinstance(expr, w.Vector3):
                     ref_V_d = value
@@ -127,11 +133,11 @@ class DebugMarkerPublisher(GiskardBehavior):
                     else:
                         map_T_vis = np.eye(4)
                     map_V_d = np.dot(map_T_ref, ref_V_d)
-                    map_P_vis = map_T_vis[:4, 3:]
+                    map_P_vis = map_T_vis[:4, 3:].T[0]
                     map_P_p1 = map_P_vis
                     map_P_p2 = map_P_vis + map_V_d
-                    m.points.append(Point(map_P_p1[0][0], map_P_p1[1][0], map_P_p1[2][0]))
-                    m.points.append(Point(map_P_p2[0][0], map_P_p2[1][0], map_P_p2[2][0]))
+                    m.points.append(Point(map_P_p1[0], map_P_p1[1], map_P_p1[2]))
+                    m.points.append(Point(map_P_p2[0], map_P_p2[1], map_P_p2[2]))
                     m.type = m.ARROW
                     m.color = self.colors[color_counter]
                     m.scale.x = width / 2
@@ -141,9 +147,9 @@ class DebugMarkerPublisher(GiskardBehavior):
                 elif isinstance(expr, w.Point3):
                     ref_P_d = value
                     map_P_d = np.dot(map_T_ref, ref_P_d)
-                    m.pose.position.x = map_P_d[0][0]
-                    m.pose.position.y = map_P_d[1][0]
-                    m.pose.position.z = map_P_d[2][0]
+                    m.pose.position.x = map_P_d[0]
+                    m.pose.position.y = map_P_d[1]
+                    m.pose.position.z = map_P_d[2]
                     m.pose.orientation.w = 1
                     m.type = m.SPHERE
                     m.color = self.colors[color_counter]
@@ -161,9 +167,10 @@ class DebugMarkerPublisher(GiskardBehavior):
         msg.markers.append(marker)
         self.marker_pub.publish(msg)
 
+    @record_time
     @profile
     def update(self):
-        with self.get_god_map() as god_map:
+        with self.god_map as god_map:
             self.debugs = self.god_map.unsafe_get_data(identifier.debug_expressions)
             if len(self.debugs) > 0:
                 self.debugs_evaluated = self.god_map.unsafe_get_data(identifier.debug_expressions_evaluated)

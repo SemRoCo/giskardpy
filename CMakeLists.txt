@@ -161,18 +161,28 @@ include_directories(
 # )
 
 catkin_install_python(PROGRAMS 
-	scripts/giskard.py
-	scripts/interactive_marker.py
-	scripts/joystick_e_stop.py
-	scripts/clear_world.py
-	scripts/joint_goal_publisher.py
-	scripts/move_base_simple_goal.py
-	scripts/print_joint_state.py
-	scripts/fake_servers.py
-	scripts/move_base_simple_goal_diff_drive.py
-	scripts/base_joint_state_publisher.py
-	scripts/giskard_pr2_standalone_example.py
-	scripts/python_interface_example.py
+	scripts/tools/clear_world.py
+	scripts/tools/collision_matrix_tool.py
+	scripts/iai_robots/boxy/boxy_standalone.py
+	scripts/iai_robots/donbot/donbot.py
+	scripts/iai_robots/donbot/donbot_standalone.py
+	scripts/iai_robots/hsr/hsr_standalone.py
+	scripts/iai_robots/hsr/iai_hsr.py
+	scripts/iai_robots/hsr/iai_hsr_real_time.py
+	scripts/iai_robots/pr2/iai_pr2.py
+	scripts/iai_robots/pr2/pr2_mujoco.py
+	scripts/iai_robots/pr2/pr2_standalone.py
+	scripts/iai_robots/tiago/tiago_standalone.py
+	scripts/iai_robots/tracy/tracy.py
+	scripts/iai_robots/tracy/tracy_standalone.py
+	scripts/other_robots/armar/armar_standalone.py
+	scripts/examples/giskard_pr2_standalone_example.py
+	scripts/tools/interactive_marker.py
+	scripts/tools/joystick_e_stop.py
+	scripts/tools/move_base_simple_goal.py
+	scripts/tools/move_base_simple_goal_diff_drive.py
+	scripts/tools/print_joint_state.py
+	scripts/examples/python_interface_example.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 ## Mark executables and/or libraries for installation

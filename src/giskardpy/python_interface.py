@@ -395,6 +395,7 @@ class GiskardWrapper:
                                 tip_group: Optional[str] = None,
                                 environment_group: Optional[str] = None,
                                 goal_joint_state: Optional[float] = None,
+                                max_velocity: float = 100,
                                 weight=WEIGHT_ABOVE_CA, ):
         """
         Open a container in an environment.
@@ -414,6 +415,7 @@ class GiskardWrapper:
                            tip_group=tip_group,
                            environment_group=environment_group,
                            goal_joint_state=goal_joint_state,
+                           max_velocity=max_velocity,
                            weight=weight)
 
     def set_close_container_goal(self,
@@ -480,7 +482,7 @@ class GiskardWrapper:
         for k, v in kwargs.copy().items():
             if v is None:
                 del kwargs[k]
-            if isinstance(v, Message):
+            else:
                 kwargs[k] = convert_ros_message_to_dictionary(v)
         kwargs = replace_prefix_name_with_str(kwargs)
         constraint.parameter_value_pair = json.dumps(kwargs)

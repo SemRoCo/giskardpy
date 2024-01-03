@@ -1,0 +1,17 @@
+<launch>
+
+    <include file="$(find iai_tracy_description)/launch/upload.launch"/>
+
+    <node pkg="giskardpy" type="tracy_standalone.py" name="giskard" output="screen"/>
+
+    <node pkg="giskardpy" type="interactive_marker.py" name="giskard_interactive_marker" output="screen">
+        <rosparam param="enable_self_collision">False</rosparam>
+        <rosparam param="interactive_marker_chains">
+            - [tracy/world, tracy/l_gripper_tool_frame]
+            - [tracy/world, tracy/r_gripper_tool_frame]
+        </rosparam>
+    </node>
+
+    <node name="rviz" pkg="rviz" type="rviz" args="-d $(find giskardpy)/launch/rviz_config/standalone_tracy.rviz"/>
+
+</launch>

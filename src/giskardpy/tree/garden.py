@@ -1,7 +1,16 @@
-from collections import defaultdict
-from time import time
-from typing import Type, TypeVar, Union
+from __future__ import annotations
 
+from enum import Enum
+from typing import Type, TypeVar, Union, Dict, List, Optional, Any
+
+import inspect
+import abc
+from abc import ABC
+from collections import defaultdict
+from copy import copy
+from time import time
+
+import numpy as np
 import py_trees
 import pydot
 import rospy
@@ -13,29 +22,37 @@ from sortedcontainers import SortedList
 import giskardpy
 from giskard_msgs.msg import MoveAction, MoveFeedback
 from giskardpy import identifier
-from giskardpy.configs.data_types import CollisionCheckerLib, HardwareConfig
+from giskardpy.configs.collision_avoidance_config import CollisionCheckerLib
+from giskardpy.exceptions import DuplicateNameException, BehaviorTreeException
 from giskardpy.god_map import GodMap
+from giskardpy.my_types import PrefixName, Derivatives
 from giskardpy.tree.behaviors.debug_marker_publisher import DebugMarkerPublisher
 from giskardpy.tree.behaviors.append_zero_velocity import SetZeroVelocity
 from giskardpy.tree.behaviors.cleanup import CleanUp, CleanUpPlanning, CleanUpBaseController
 from giskardpy.tree.behaviors.collision_checker import CollisionChecker
-from giskardpy.tree.behaviors.collision_marker import CollisionMarker
 from giskardpy.tree.behaviors.collision_scene_updater import CollisionSceneUpdater
 from giskardpy.tree.behaviors.commands_remaining import CommandsRemaining
 from giskardpy.tree.behaviors.evaluate_debug_expressions import EvaluateDebugExpressions
 from giskardpy.tree.behaviors.exception_to_execute import ExceptionToExecute
 from giskardpy.tree.behaviors.goal_canceled import GoalCanceled
+from giskardpy.tree.behaviors.goal_cleanup import GoalCleanUp
+from giskardpy.tree.behaviors.goal_done import GoalDone
 from giskardpy.tree.behaviors.goal_reached import GoalReached
 from giskardpy.tree.behaviors.goal_received import GoalReceived
 from giskardpy.tree.behaviors.init_qp_controller import InitQPController
 from giskardpy.tree.behaviors.instantaneous_controller import ControllerPlugin
 from giskardpy.tree.behaviors.instantaneous_controller_base import ControllerPluginBase
+from giskardpy.tree.behaviors.joint_group_pos_controller_publisher import JointGroupPosController
+from giskardpy.tree.behaviors.joint_group_vel_controller_publisher import JointGroupVelController
+from giskardpy.tree.behaviors.joint_pos_controller_publisher import JointPosController
+from giskardpy.tree.behaviors.joint_vel_controller_publisher import JointVelController
 from giskardpy.tree.behaviors.kinematic_sim import KinSimPlugin
 from giskardpy.tree.behaviors.log_debug_expressions import LogDebugExpressionsPlugin
 from giskardpy.tree.behaviors.log_trajectory import LogTrajPlugin
 from giskardpy.tree.behaviors.loop_detector import LoopDetector
 from giskardpy.tree.behaviors.max_trajectory_length import MaxTrajectoryLength
 from giskardpy.tree.behaviors.new_trajectory import NewTrajectory
+from giskardpy.tree.behaviors.notify_state_change import NotifyStateChange
 from giskardpy.tree.behaviors.plot_debug_expressions import PlotDebugExpressions
 from giskardpy.tree.behaviors.plot_trajectory import PlotTrajectory
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
@@ -47,18 +64,22 @@ from giskardpy.tree.behaviors.ros_msg_to_goal import RosMsgToGoal
 from giskardpy.tree.behaviors.send_result import SendResult
 from giskardpy.tree.behaviors.send_trajectory import SendFollowJointTrajectory
 from giskardpy.tree.behaviors.send_trajectory_omni_drive_realtime import SendTrajectoryToCmdVel
+from giskardpy.tree.behaviors.send_trajectory_omni_drive_realtime2 import SendCmdVel
 from giskardpy.tree.behaviors.set_cmd import SetCmd
 from giskardpy.tree.behaviors.set_error_code import SetErrorCode
 from giskardpy.tree.behaviors.set_tracking_start_time import SetTrackingStartTime
 from giskardpy.tree.behaviors.setup_base_traj_constraints import SetDriveGoals
+from giskardpy.tree.behaviors.sleep import Sleep
 from giskardpy.tree.behaviors.sync_configuration import SyncConfiguration
-from giskardpy.tree.behaviors.sync_odometry import SyncOdometry
+from giskardpy.tree.behaviors.sync_configuration2 import SyncConfiguration2
+from giskardpy.tree.behaviors.sync_odometry import SyncOdometry, SyncOdometryNoLock
 from giskardpy.tree.behaviors.sync_tf_frames import SyncTfFrames
-from giskardpy.tree.behaviors.tf_publisher import TFPublisher
+from giskardpy.tree.behaviors.tf_publisher import TFPublisher, TfPublishingModes
 from giskardpy.tree.behaviors.time import TimePlugin
 from giskardpy.tree.behaviors.time_real import RosTime
 from giskardpy.tree.behaviors.visualization import VisualizationBehavior
 from giskardpy.tree.behaviors.world_updater import WorldUpdater
+from giskardpy.tree.behaviors.publish_joint_states import PublishJointState
 from giskardpy.tree.composites.async_composite import AsyncBehavior
 from giskardpy.tree.composites.better_parallel import ParallelPolicy, Parallel
 from giskardpy.utils import logging
@@ -100,13 +121,28 @@ def anything_is_failure(cls: T) -> T:
     return running_is_failure(success_is_failure(cls))
 
 
+def behavior_is_instance_of(obj: Any, type_: Type) -> bool:
+    return isinstance(obj, type_) or hasattr(obj, 'original') and isinstance(obj.original, type_)
+
+
+class ControlModes(Enum):
+    none = -1
+    open_loop = 1
+    close_loop = 2
+    standalone = 3
+
+
 class ManagerNode:
-    def __init__(self, node, parent, position: int):
+    node: GiskardBehavior
+    parent: ManagerNode
+    position: int
+    disabled_children: SortedList[ManagerNode]
+    enabled_children: SortedList[ManagerNode]
+
+    def __init__(self, node: GiskardBehavior, parent: ManagerNode, position: int):
         """
         :param node: the behavior that is represented by this ManagerNode
-        :type node: ManagerNode
         :param parent: the parent of the behavior that is represented by this ManagerNode
-        :type parent: ManagerNode
         :param position: the position of the node in the list of children of the parent
         """
         self.node = node
@@ -124,62 +160,50 @@ class ManagerNode:
     def __eq__(self, other):
         return self.node == other.node and self.parent == other.parent
 
-    def disable_child(self, manager_node):
+    def __str__(self):
+        return self.node.name
+
+    def __repr__(self):
+        return str(self)
+
+    def disable_child(self, manager_node: ManagerNode):
         """
         marks the given manager node as disabled in the internal tree representation and removes it to the behavior tree
-        :param manager_node:
-        :type manager_node: ManagerNode
-        :return:
         """
         self.enabled_children.remove(manager_node)
         self.disabled_children.add(manager_node)
-        if isinstance(self.node, AsyncBehavior):
-            self.node.remove_child(manager_node.node.name)
-        else:
-            self.node.remove_child(manager_node.node)
+        self.node.remove_child(manager_node.node)
 
-    def enable_child(self, manager_node):
+    def enable_child(self, manager_node: ManagerNode):
         """
         marks the given manager node as enabled in the internal tree representation and adds it to the behavior tree
-        :param manager_node:
-        :type manager_node: TreeManager.ManagerNode
-        :return:
         """
-        self.disabled_children.remove(manager_node)
-        self.enabled_children.add(manager_node)
-        if isinstance(self.node, AsyncBehavior):
-            self.node.add_child(manager_node.node)
-        else:
+        self.disabled_children.discard(manager_node)
+        if manager_node not in self.enabled_children:
+            self.enabled_children.add(manager_node)
             idx = self.enabled_children.index(manager_node)
             self.node.insert_child(manager_node.node, idx)
 
-    def add_child(self, manager_node):
+    def add_child(self, manager_node: ManagerNode):
         """
         adds the given manager node to the internal tree map and the corresponding behavior to the behavior tree
-        :param manager_node:
-        :type manager_node: TreeManager.ManagerNode
-        :return:
         """
-        if isinstance(self.node, AsyncBehavior):
-            self.enabled_children.add(manager_node)
-            self.node.add_child(manager_node.node)
+        if manager_node.position < 0:
+            manager_node.position = 0
+            if self.enabled_children:
+                manager_node.position = max(manager_node.position, self.enabled_children[-1].position + 1)
+            if self.disabled_children:
+                manager_node.position = max(manager_node.position, self.disabled_children[-1].position + 1)
+            idx = manager_node.position
         else:
-            if manager_node.position < 0:
-                manager_node.position = 0
-                if self.enabled_children:
-                    manager_node.position = max(manager_node.position, self.enabled_children[-1].position + 1)
-                if self.disabled_children:
-                    manager_node.position = max(manager_node.position, self.disabled_children[-1].position + 1)
-                idx = manager_node.position
-            else:
-                idx = self.disabled_children.bisect_left(manager_node)
-                for c in self.disabled_children.islice(start=idx):
-                    c.position += 1
-                idx = self.enabled_children.bisect_left(manager_node)
-                for c in self.enabled_children.islice(start=idx):
-                    c.position += 1
-            self.node.insert_child(manager_node.node, idx)
-            self.enabled_children.add(manager_node)
+            idx = self.disabled_children.bisect_left(manager_node)
+            for c in self.disabled_children.islice(start=idx):
+                c.position += 1
+            idx = self.enabled_children.bisect_left(manager_node)
+            for c in self.enabled_children.islice(start=idx):
+                c.position += 1
+        self.node.insert_child(manager_node.node, idx)
+        self.enabled_children.add(manager_node)
 
     def remove_child(self, manager_node):
         """
@@ -188,29 +212,19 @@ class ManagerNode:
         :type manager_node: TreeManager.ManagerNode
         :return:
         """
-        if isinstance(self.node, AsyncBehavior):
-            if manager_node in self.enabled_children:
-                self.enabled_children.remove(manager_node)
-                self.node.remove_child(manager_node.node.name)
-            elif manager_node in self.disabled_children:
-                self.disabled_children.remove(manager_node)
-            else:
-                raise RuntimeError(
-                    'could not remove node from parent. this probably means that the tree is inconsistent')
+        if manager_node in self.enabled_children:
+            self.enabled_children.remove(manager_node)
+            self.node.remove_child(manager_node.node)
+        elif manager_node in self.disabled_children:
+            self.disabled_children.remove(manager_node)
         else:
-            if manager_node in self.enabled_children:
-                self.enabled_children.remove(manager_node)
-                self.node.remove_child(manager_node.node)
-            elif manager_node in self.disabled_children:
-                self.disabled_children.remove(manager_node)
-            else:
-                raise RuntimeError('could not remove node. this probably means that the tree is inconsistent')
-            idx = self.disabled_children.bisect_right(manager_node)
-            for c in self.disabled_children.islice(start=idx):
-                c.position -= 1
-            idx = self.enabled_children.bisect_right(manager_node)
-            for c in self.enabled_children.islice(start=idx):
-                c.position -= 1
+            raise RuntimeError('could not remove node. this probably means that the tree is inconsistent')
+        idx = self.disabled_children.bisect_right(manager_node)
+        for c in self.disabled_children.islice(start=idx):
+            c.position -= 1
+        idx = self.enabled_children.bisect_right(manager_node)
+        for c in self.enabled_children.islice(start=idx):
+            c.position -= 1
 
 
 def search_for(lines, function_name):
@@ -226,24 +240,11 @@ def search_for(lines, function_name):
     return result
 
 
-def extract_data_from_profile(path):
-    data = defaultdict(lambda: defaultdict(lambda: 'n/a'))
-    with open(path, 'r') as f:
-        profile = f.read()
-    lines = profile.split('\n')
-    keywords = ['__init__', 'setup', 'initialise', 'update']
-    for function_name in keywords:
-        new_data = search_for(lines, function_name)
-        for file_name, function_data in new_data.items():
-            data[file_name].update(function_data)
-    for file_name, function_data in data.items():
-        for function_name in keywords:
-            data[file_name][function_name]
-    return data
-
-
-class TreeManager:
+class TreeManager(ABC):
     god_map = GodMap()
+    tree_nodes: Dict[str, ManagerNode]
+    tick_rate: float = 0.05
+    control_mode = ControlModes.none
 
     @profile
     def __init__(self, tree=None):
@@ -256,18 +257,15 @@ class TreeManager:
         else:
             self.tree = tree
         self.tree_nodes = {}
-        self.god_map.get_data(identifier.world).reset_cache()
-        self.god_map.get_data(identifier.collision_scene).reset_collision_blacklist()
+        # self.god_map.get_data(identifier.world).reset_cache()
+        # self.god_map.get_data(identifier.collision_scene).reset_collision_blacklist()
 
         self.__init_map(self.tree.root, None, 0)
-        # self.render(profile=extract_data_from_profile(resolve_ros_iris('package://giskardpy/profile2.txt')))
-        self.render()
-        # self.render(profile=extract_data_from_profile(resolve_ros_iris('package://giskardpy/test_open_cabinet_left2.txt')))
+        # self.render()
 
     def live(self):
-        sleeper = rospy.Rate(1 / self.god_map.get_data(identifier.tree_tick_rate))
+        sleeper = rospy.Rate(1 / self.tick_rate)
         logging.loginfo('giskard is ready')
-        t = time()
         while not rospy.is_shutdown():
             try:
                 self.tick()
@@ -278,6 +276,94 @@ class TreeManager:
 
     def tick(self):
         self.tree.tick()
+
+    @abc.abstractmethod
+    def add_visualization_marker_behavior(self,
+                                          add_to_sync: Optional[bool] = None,
+                                          add_to_planning: Optional[bool] = None,
+                                          add_to_control_loop: Optional[bool] = None,
+                                          use_decomposed_meshes: bool = True):
+        ...
+
+    @abc.abstractmethod
+    def add_sleeper(self, time: float):
+        ...
+
+    @abc.abstractmethod
+    def configure_max_trajectory_length(self, enabled: bool, length: float):
+        ...
+
+    @abc.abstractmethod
+    def sync_joint_state_topic(self, group_name: str, topic_name: str):
+        ...
+
+    @abc.abstractmethod
+    def sync_odometry_topic(self, topic_name: str, joint_name: PrefixName):
+        ...
+
+    @abc.abstractmethod
+    def add_follow_joint_traj_action_server(self, namespace: str, state_topic: str, group_name: str,
+                                            fill_velocity_values: bool, path_tolerance: Dict[Derivatives, float] = None):
+        ...
+
+    @abc.abstractmethod
+    def add_joint_velocity_controllers(self, namespaces: List[str]):
+        ...
+
+    @abc.abstractmethod
+    def add_joint_velocity_group_controllers(self, namespaces: str):
+        ...
+
+    @abc.abstractmethod
+    def add_cmd_vel_publisher(self, joint_name: PrefixName):
+        ...
+
+    @abc.abstractmethod
+    def add_base_traj_action_server(self, cmd_vel_topic: str, track_only_velocity: bool = False,
+                                    joint_name: PrefixName = None):
+        ...
+
+    @abc.abstractmethod
+    def base_tracking_enabled(self) -> bool:
+        ...
+
+    @abc.abstractmethod
+    def add_evaluate_debug_expressions(self):
+        ...
+
+    @abc.abstractmethod
+    def sync_6dof_joint_with_tf_frame(self, joint_name: PrefixName, tf_parent_frame: str, tf_child_frame: str):
+        ...
+
+    @abc.abstractmethod
+    def add_plot_trajectory(self, normalize_position: bool = False, wait: bool = False):
+        ...
+
+    @abc.abstractmethod
+    def add_plot_debug_trajectory(self, normalize_position: bool = False, wait: bool = False):
+        ...
+
+    @abc.abstractmethod
+    def add_qp_data_publisher(self, publish_lb: bool = False, publish_ub: bool = False,
+                              publish_lbA: bool = False, publish_ubA: bool = False,
+                              publish_bE: bool = False, publish_Ax: bool = False,
+                              publish_Ex: bool = False, publish_xdot: bool = False,
+                              publish_weights: bool = False, publish_g: bool = False,
+                              publish_debug: bool = False, *args, **kwargs):
+        ...
+
+    @abc.abstractmethod
+    def add_debug_marker_publisher(self):
+        ...
+
+    @abc.abstractmethod
+    def add_tf_publisher(self, include_prefix: bool = False, tf_topic: str = 'tf',
+                         mode: TfPublishingModes = TfPublishingModes.attached_and_world_objects):
+        ...
+
+    @abc.abstractmethod
+    def add_js_publisher(self, include_prefix: bool = False, js_topic: str = 'tf'):
+        ...
 
     def setup(self, timeout=30):
         self.tree.setup(timeout)
@@ -307,12 +393,14 @@ class TreeManager:
         manager_node = ManagerNode(node=node, parent=parent, position=idx)
         if parent is not None:
             parent.enabled_children.add(manager_node)
-        if isinstance(node, AsyncBehavior):
-            children = node._children
-            for child_name in children:
-                child_node = ManagerNode(node=children[child_name], parent=manager_node, position=0)
-                self.tree_nodes[child_name] = child_node
-                manager_node.enabled_children.add(child_node)
+        # if isinstance(node, AsyncBehavior) or hasattr(node, 'original') and isinstance(node.original, AsyncBehavior):
+        #     children = node._children
+        #     for idx, child_name in enumerate(children):
+        #         child_node = ManagerNode(node=children[child_name], parent=manager_node, position=idx)
+        #         self.tree_nodes[child_name] = child_node
+        #         manager_node.enabled_children.add(child_node)
+        if node.name in self.tree_nodes:
+            raise KeyError(f'node named {node.name} already exists')
         self.tree_nodes[node.name] = manager_node
         for idx, child in enumerate(node.children):
             self.__init_map(child, manager_node, idx)
@@ -330,12 +418,10 @@ class TreeManager:
             logging.logwarn('cannot disable root node')
             return False
 
-    def enable_node(self, node_name):
+    def enable_node(self, node_name: str):
         """
         enables the node with the given name
         :param node_name: the name of the node
-        :type node_name: str
-        :return:
         """
         t = self.tree_nodes[node_name]
         if t.parent is not None:
@@ -343,18 +429,19 @@ class TreeManager:
         else:
             logging.loginfo('root node')
 
-    def insert_node(self, node, parent_name, position=-1):
+    def insert_node(self, node: GiskardBehavior, parent_name: str, position: int = -1):
         """
         inserts a node into the behavior tree.
         :param node: the node that will be inserted
-        :type node: py_trees.behaviour.Behaviour
         :param parent_name: the name of the parent node where the node will be inserted
-        :type parent_name: str
         :param position: the node will be inserted as the nth child with n = len([x for x in children if x.position < position])
-        :type position: int
-        :return:
         """
-        if node.name in self.tree_nodes:
+        for i in range(100):
+            if node.name in self.tree_nodes:
+                node.name += '*'
+            else:
+                break
+        else:
             raise ValueError(f'Node named {node.name} already exists.')
         parent = self.tree_nodes[parent_name]
         tree_node = ManagerNode(node=node, parent=parent, position=position)
@@ -384,13 +471,35 @@ class TreeManager:
         """
         return self.tree_nodes[node_name].node
 
-    def render(self, profile=None):
+    GiskardBehavior_ = TypeVar('GiskardBehavior_', bound=GiskardBehavior)
+
+    def get_nodes_of_type(self, node_type: Type[GiskardBehavior_]) -> List[GiskardBehavior_]:
+        return [node.node for node in self.tree_nodes.values() if behavior_is_instance_of(node.node, node_type)]
+
+    def insert_node_behind_every_node_of_type(self, node_type: Type[GiskardBehavior],
+                                              node_to_be_added: GiskardBehavior):
+        nodes = self.get_nodes_of_type(node_type)
+        for idx, node in enumerate(nodes):
+            node_copy = copy(node_to_be_added)
+            manager_node = self.tree_nodes[node.name]
+            parent = manager_node.parent.node
+            self.insert_node(node_copy, parent.name, self.tree_nodes[node.name].position + 1)
+
+    def insert_node_behind_node_of_type(self, parent_node_name: str, node_type: Type[GiskardBehavior],
+                                        node_to_be_added: GiskardBehavior):
+        parent_node = self.tree_nodes[parent_node_name]
+        for child_node in parent_node.enabled_children:
+            if isinstance(child_node.node, node_type):
+                self.insert_node(node_to_be_added, parent_node_name, child_node.position + 1)
+                break
+
+    def render(self):
         path = self.god_map.get_data(identifier.tmp_folder) + 'tree'
         create_path(path)
-        render_dot_tree(self.tree.root, name=path, profile=profile)
+        render_dot_tree(self.tree.root, name=path)
 
 
-def render_dot_tree(root, visibility_level=common.VisibilityLevel.DETAIL, name=None, profile=None):
+def render_dot_tree(root, visibility_level=common.VisibilityLevel.DETAIL, name=None):
     """
     Render the dot tree to .dot, .svg, .png. files in the current
     working directory. These will be named with the root behaviour name.
@@ -422,7 +531,7 @@ def render_dot_tree(root, visibility_level=common.VisibilityLevel.DETAIL, name=N
         A good practice is to provide a command line argument for optional rendering of a program so users
         can quickly visualise what tree the program will execute.
     """
-    graph = generate_pydot_graph(root, visibility_level, profile)
+    graph = generate_pydot_graph(root, visibility_level)
     filename_wo_extension = root.name.lower().replace(" ", "_") if name is None else name
     logging.loginfo("Writing %s.dot/svg/png" % filename_wo_extension)
     # graph.write(filename_wo_extension + '.dot')
@@ -430,7 +539,7 @@ def render_dot_tree(root, visibility_level=common.VisibilityLevel.DETAIL, name=N
     # graph.write_svg(filename_wo_extension + '.svg')
 
 
-def generate_pydot_graph(root, visibility_level, profile=None):
+def generate_pydot_graph(root, visibility_level):
     """
     Generate the pydot graph - this is usually the first step in
     rendering the tree to file. See also :py:func:`render_dot_tree`.
@@ -471,66 +580,85 @@ def generate_pydot_graph(root, visibility_level, profile=None):
         return attributes
 
     fontsize = 11
+    fontname = 'Courier'
     graph = pydot.Dot(graph_type='digraph')
-    graph.set_name(root.name.lower().replace(" ", "_"))
+    graph.set_name(root.name.lower().replace(' ', '_'))
     # fonts: helvetica, times-bold, arial (times-roman is the default, but this helps some viewers, like kgraphviewer)
     graph.set_graph_defaults(fontname='times-roman')
     graph.set_node_defaults(fontname='times-roman')
     graph.set_edge_defaults(fontname='times-roman')
     (node_shape, node_colour, node_font_colour) = get_node_attributes(root, visibility_level)
     node_root = pydot.Node(root.name, shape=node_shape, style="filled", fillcolor=node_colour, fontsize=fontsize,
-                           fontcolor=node_font_colour)
+                           fontcolor=node_font_colour, fontname=fontname)
     graph.add_node(node_root)
     names = [root.name]
 
-    def add_edges(root, root_dot_name, visibility_level, profile):
+    def add_edges(root, root_dot_name, visibility_level):
         if visibility_level < root.blackbox_level:
-            if isinstance(root, AsyncBehavior) \
-                    or (hasattr(root, 'original') and isinstance(root.original, AsyncBehavior)):
-                children = []
-                names2 = []
-                for name, child in root.get_children().items():
-                    children.append(child)
-                    names2.append(name)
-            else:
-                children = root.children
-                names2 = [c.name for c in children]
+            # if isinstance(root, AsyncBehavior) \
+            #         or (hasattr(root, 'original') and isinstance(root.original, AsyncBehavior)):
+            #     children = []
+            #     names2 = []
+            #     for name, child in root.get_children().items():
+            #         children.append(child)
+            #         names2.append(name)
+            # else:
+            children = root.children
+            names2 = [c.name for c in children]
             for name, c in zip(names2, children):
                 (node_shape, node_colour, node_font_colour) = get_node_attributes(c, visibility_level)
                 proposed_dot_name = name
                 if hasattr(c, 'original'):
                     proposed_dot_name += f'\n{type(c).__name__}'
                 color = 'black'
-                if (isinstance(c, GiskardBehavior) or (hasattr(c, 'original')
-                                                       and isinstance(c.original, GiskardBehavior))) \
-                        and not isinstance(c, AsyncBehavior) and profile is not None:
-                    if hasattr(c, 'original'):
-                        file_name = str(c.original.__class__).split('.')[-2]
+                if hasattr(c, 'original'):
+                    original_c = c.original
+                else:
+                    original_c = c
+                if isinstance(original_c, GiskardBehavior) and not isinstance(original_c, AsyncBehavior):
+                    function_names = ['__init__', 'setup', 'initialise', 'update']
+                    function_name_padding = 20
+                    entry_name_padding = 8
+                    number_padding = function_name_padding - entry_name_padding
+                    if hasattr(original_c, '__times'):
+                        time_dict = original_c.__times
                     else:
-                        file_name = str(c.__class__).split('.')[-2]
-                    if file_name in profile:
-                        max_time = max(profile[file_name].values(), key=lambda x: 0 if x == 'n/a' else x)
-                        if max_time > 1:
-                            color = 'red'
-                        proposed_dot_name += '\n' + '\n'.join(
-                            [f'{k}= {v}' for k, v in sorted(profile[file_name].items())])
+                        time_dict = {}
+                    for function_name in function_names:
+                        if function_name in time_dict:
+                            times = time_dict[function_name]
+                            average_time = np.average(times)
+                            total_time = np.sum(times)
+                            if total_time > 1:
+                                color = 'red'
+                            proposed_dot_name += f'\n{function_name.ljust(function_name_padding, "-")}' \
+                                                 f'\n{"  avg".ljust(entry_name_padding)}{f"={average_time:.3}".ljust(number_padding)}' \
+                                                 f'\n{"  sum".ljust(entry_name_padding)}{f"={total_time:.3}".ljust(number_padding)}'
+                        else:
+                            proposed_dot_name += f'\n{function_name.ljust(function_name_padding, "-")}'
 
                 while proposed_dot_name in names:
                     proposed_dot_name = proposed_dot_name + "*"
                 names.append(proposed_dot_name)
                 node = pydot.Node(proposed_dot_name, shape=node_shape, style="filled", fillcolor=node_colour,
-                                  fontsize=fontsize, fontcolor=node_font_colour, color=color)
+                                  fontsize=fontsize, fontcolor=node_font_colour, color=color, fontname=fontname)
                 graph.add_node(node)
                 edge = pydot.Edge(root_dot_name, proposed_dot_name)
                 graph.add_edge(edge)
                 if (hasattr(c, 'children') and c.children != []) or (hasattr(c, '_children') and c._children != []):
-                    add_edges(c, proposed_dot_name, visibility_level, profile)
+                    add_edges(c, proposed_dot_name, visibility_level)
 
-    add_edges(root, root.name, visibility_level, profile)
+    add_edges(root, root.name, visibility_level)
     return graph
 
 
 class StandAlone(TreeManager):
+    sync_name: str = 'Synchronize'
+    closed_loop_control_name: str = 'closed loop control'
+    plan_postprocessing_name: str = 'plan postprocessing'
+    planning2_name: str = 'planning II'
+    control_mode = ControlModes.standalone
+
     def grow_giskard(self):
         root = Sequence('Giskard')
         root.add_child(self.grow_wait_for_goal())
@@ -538,6 +666,7 @@ class StandAlone(TreeManager):
         root.add_child(NewTrajectory('NewTrajectory'))
         root.add_child(self.grow_process_goal())
         root.add_child(SendResult('send result', self.action_server_name, MoveAction))
+        root.add_child(GoalCleanUp('clean up goals'))
         return root
 
     def grow_wait_for_goal(self):
@@ -549,20 +678,15 @@ class StandAlone(TreeManager):
         return wait_for_goal
 
     def grow_Synchronize(self):
-        sync = Sequence('Synchronize')
+        sync = Sequence(self.sync_name)
         sync.add_child(WorldUpdater('update world'))
-        sync.add_child(SyncTfFrames('sync tf frames',
-                                    **self.god_map.unsafe_get_data(identifier.SyncTfFrames)))
-        if self.god_map.get_data(identifier.TFPublisher_enabled):
-            sync.add_child(TFPublisher('publish tf', **self.god_map.get_data(identifier.TFPublisher)))
+        sync.add_child(SyncTfFrames('sync tf frames1'))
         sync.add_child(CollisionSceneUpdater('update collision scene'))
-        if self.god_map.get_data(identifier.enable_VisualizationBehavior):
-            sync.add_child(running_is_success(VisualizationBehavior)('visualize collision scene'))
         return sync
 
     def grow_process_goal(self):
         process_move_goal = failure_is_success(Selector)('Process goal')
-        process_move_goal.add_child(success_is_failure(PublishFeedback)('publish feedback',
+        process_move_goal.add_child(success_is_failure(PublishFeedback)('publish feedback2',
                                                                         self.action_server_name,
                                                                         MoveFeedback.PLANNING))
         process_move_goal.add_child(self.grow_process_move_commands())
@@ -574,7 +698,7 @@ class StandAlone(TreeManager):
         process_move_cmd = success_is_failure(Sequence)('Process move commands')
         process_move_cmd.add_child(SetCmd('set move cmd', self.action_server_name))
         process_move_cmd.add_child(self.grow_planning())
-        process_move_cmd.add_child(SetErrorCode('set error code', 'Planning'))
+        process_move_cmd.add_child(SetErrorCode('set error code1', 'Planning'))
         return process_move_cmd
 
     def grow_planning(self):
@@ -589,18 +713,11 @@ class StandAlone(TreeManager):
         return planning
 
     def grow_planning2(self):
-        planning_2 = failure_is_success(Selector)('planning II')
-        planning_2.add_child(GoalCanceled('goal canceled', self.action_server_name))
-        planning_2.add_child(success_is_failure(PublishFeedback)('publish feedback',
+        planning_2 = failure_is_success(Selector)(self.planning2_name)
+        planning_2.add_child(GoalCanceled('goal canceled2', self.action_server_name))
+        planning_2.add_child(success_is_failure(PublishFeedback)('publish feedback1',
                                                                  self.action_server_name,
                                                                  MoveFeedback.PLANNING))
-        if self.god_map.get_data(identifier.enable_VisualizationBehavior) \
-                and not self.god_map.get_data(identifier.VisualizationBehavior_in_planning_loop):
-            planning_2.add_child(running_is_failure(VisualizationBehavior)('visualization'))
-        if self.god_map.get_data(identifier.enable_CPIMarker) \
-                and self.god_map.get_data(identifier.collision_checker) is not None \
-                and not self.god_map.get_data(identifier.CPIMarker_in_planning_loop):
-            planning_2.add_child(running_is_failure(CollisionMarker)('cpi marker'))
         # planning_2.add_child(success_is_failure(StartTimer)('start runtime timer'))
         planning_2.add_child(self.grow_planning3())
         return planning_2
@@ -613,60 +730,217 @@ class StandAlone(TreeManager):
         return planning_3
 
     def grow_closed_loop_control(self):
-        planning_4 = failure_is_success(AsyncBehavior)('closed loop control')
-        if self.god_map.get_data(identifier.enable_VisualizationBehavior) \
-                and self.god_map.get_data(identifier.VisualizationBehavior_in_planning_loop):
-            planning_4.add_child(VisualizationBehavior('visualization'))
+        planning_4 = failure_is_success(AsyncBehavior)(self.closed_loop_control_name)
         if self.god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none:
             planning_4.add_child(CollisionChecker('collision checker'))
-            if self.god_map.get_data(identifier.enable_CPIMarker) \
-                    and self.god_map.get_data(identifier.CPIMarker_in_planning_loop):
-                planning_4.add_child(CollisionMarker('cpi marker'))
         planning_4.add_child(ControllerPlugin('controller'))
-        if self.god_map.get_data(identifier.debug_expr_needed):
-            planning_4.add_child(EvaluateDebugExpressions('evaluate debug expressions'))
         planning_4.add_child(KinSimPlugin('kin sim'))
-        planning_4.add_child(LogTrajPlugin('log'))
-        if self.god_map.get_data(identifier.PlotDebugTrajectory_enabled):
-            planning_4.add_child(LogDebugExpressionsPlugin('log lba'))
-        if self.god_map.get_data(identifier.PlotDebugTF_enabled):
-            planning_4.add_child(DebugMarkerPublisher('debug marker publisher'))
-        if self.god_map.unsafe_get_data(identifier.PublishDebugExpressions)['enabled']:
-            planning_4.add_child(PublishDebugExpressions('PublishDebugExpressions',
-                                                         **self.god_map.unsafe_get_data(
-                                                             identifier.PublishDebugExpressions)))
+        planning_4.add_child(LogTrajPlugin('log closed loop control'))
         # planning_4.add_child(WiggleCancel('wiggle'))
         planning_4.add_child(LoopDetector('loop detector'))
         planning_4.add_child(GoalReached('goal reached'))
-        planning_4.add_child(TimePlugin())
-        if self.god_map.get_data(identifier.MaxTrajectoryLength_enabled):
-            kwargs = self.god_map.get_data(identifier.MaxTrajectoryLength)
-            planning_4.add_child(MaxTrajectoryLength('traj length check', **kwargs))
+        planning_4.add_child(TimePlugin('increase time closed loop'))
+        planning_4.add_child(MaxTrajectoryLength('traj length check'))
         return planning_4
 
     def grow_plan_postprocessing(self):
-        plan_postprocessing = Sequence('plan postprocessing')
-        plan_postprocessing.add_child(running_is_success(TimePlugin)())
-        plan_postprocessing.add_child(SetZeroVelocity())
-        plan_postprocessing.add_child(running_is_success(LogTrajPlugin)('log'))
-        if self.god_map.get_data(identifier.enable_VisualizationBehavior) \
-                and not self.god_map.get_data(identifier.VisualizationBehavior_in_planning_loop):
-            plan_postprocessing.add_child(
-                anything_is_success(VisualizationBehavior)('visualization', ensure_publish=True))
-        if self.god_map.get_data(identifier.enable_CPIMarker) \
-                and self.god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none \
-                and not self.god_map.get_data(identifier.CPIMarker_in_planning_loop):
-            plan_postprocessing.add_child(anything_is_success(CollisionMarker)('collision marker'))
-        if self.god_map.get_data(identifier.PlotTrajectory_enabled):
-            kwargs = self.god_map.get_data(identifier.PlotTrajectory)
-            plan_postprocessing.add_child(PlotTrajectory('plot trajectory', **kwargs))
-        if self.god_map.get_data(identifier.PlotDebugTrajectory_enabled):
-            kwargs = self.god_map.get_data(identifier.PlotDebugTrajectory)
-            plan_postprocessing.add_child(PlotDebugExpressions('plot debug expressions', **kwargs))
+        plan_postprocessing = Sequence(self.plan_postprocessing_name)
+        plan_postprocessing.add_child(running_is_success(TimePlugin)('increase time plan post processing'))
+        plan_postprocessing.add_child(SetZeroVelocity('set zero vel 1'))
+        plan_postprocessing.add_child(running_is_success(LogTrajPlugin)('log post processing'))
         return plan_postprocessing
+
+    def add_sleeper(self, time: float):
+        sleep_node = success_is_running(Sleep)('sleeper', time)
+        self.insert_node_behind_node_of_type(self.closed_loop_control_name, ControllerPlugin, sleep_node)
+
+    def add_visualization_marker_behavior(self,
+                                          add_to_sync: Optional[bool] = None,
+                                          add_to_planning: Optional[bool] = None,
+                                          add_to_control_loop: Optional[bool] = None,
+                                          use_decomposed_meshes: bool = True):
+        if add_to_sync is not None and add_to_sync:
+            self.insert_node(VisualizationBehavior('visualization',
+                                                   use_decomposed_meshes=use_decomposed_meshes), self.sync_name)
+        if add_to_planning is not None and add_to_planning:
+            self.insert_node(success_is_failure(VisualizationBehavior)('visualization',
+                                                                       use_decomposed_meshes=use_decomposed_meshes),
+                             self.planning2_name, 2)
+            self.insert_node(anything_is_success(VisualizationBehavior)('visualization',
+                                                                        use_decomposed_meshes=use_decomposed_meshes),
+                             self.plan_postprocessing_name)
+        if add_to_control_loop is not None and add_to_control_loop:
+            self.insert_node(success_is_running(VisualizationBehavior)('visualization',
+                                                                       use_decomposed_meshes=use_decomposed_meshes),
+                             self.closed_loop_control_name)
+
+    def configure_max_trajectory_length(self, enabled: bool, length: float):
+        nodes = self.get_nodes_of_type(MaxTrajectoryLength)
+        for node in nodes:
+            if enabled:
+                self.enable_node(node.name)
+            else:
+                self.disable_node(node.name)
+            node.length = length
+
+    def add_joint_velocity_group_controllers(self, namespaces: List[str]):
+        # todo new abstract decorator that uses this as default implementation
+        current_function_name = inspect.currentframe().f_code.co_name
+        NotImplementedError(f'stand alone mode doesn\'t support {current_function_name}.')
+
+    def add_follow_joint_traj_action_server(self, namespace: str, state_topic: str, group_name: str,
+                                            fill_velocity_values: bool, path_tolerance: Dict[Derivatives, float] = None):
+        # todo new abstract decorator that uses this as default implementation
+        current_function_name = inspect.currentframe().f_code.co_name
+        NotImplementedError(f'stand alone mode doesn\'t support {current_function_name}.')
+
+    def add_joint_velocity_controllers(self, namespaces: List[str]):
+        # todo new abstract decorator that uses this as default implementation
+        current_function_name = inspect.currentframe().f_code.co_name
+        NotImplementedError(f'stand alone mode doesn\'t support {current_function_name}.')
+
+    def add_cmd_vel_publisher(self, joint_name: PrefixName):
+        current_function_name = inspect.currentframe().f_code.co_name
+        NotImplementedError(f'stand alone mode doesn\'t support {current_function_name}.')
+
+    def add_base_traj_action_server(self, cmd_vel_topic: str, track_only_velocity: bool = False,
+                                    joint_name: PrefixName = None):
+        current_function_name = inspect.currentframe().f_code.co_name
+        NotImplementedError(f'stand alone mode doesn\'t support {current_function_name}.')
+
+    def base_tracking_enabled(self) -> bool:
+        return False
+
+    def add_evaluate_debug_expressions(self):
+        nodes = self.get_nodes_of_type(EvaluateDebugExpressions)
+        if len(nodes) == 0:
+            self.insert_node_behind_every_node_of_type(ControllerPlugin,
+                                                       EvaluateDebugExpressions('evaluate debug expressions'))
+
+    def add_plot_trajectory(self, normalize_position: bool = False, wait: bool = False):
+        if len(self.get_nodes_of_type(PlotTrajectory)) > 0:
+            raise BehaviorTreeException(f'add_plot_trajectory is not allowed to be called twice')
+        behavior = PlotTrajectory('plot trajectory', wait=wait, normalize_position=normalize_position)
+        self.insert_node(behavior, self.plan_postprocessing_name)
+
+    def add_plot_debug_trajectory(self, normalize_position: bool = False, wait: bool = False):
+        if len(self.get_nodes_of_type(PlotDebugExpressions)) > 0:
+            raise BehaviorTreeException(f'add_plot_debug_trajectory is not allowed to be called twice')
+        self.add_evaluate_debug_expressions()
+        for node in self.get_nodes_of_type(EvaluateDebugExpressions):
+            manager_node = self.tree_nodes[node.name]
+            parent_node = self.tree_nodes[node.name].parent
+            if parent_node.node.name == self.closed_loop_control_name:
+                self.insert_node(LogDebugExpressionsPlugin('log lba'), self.closed_loop_control_name,
+                                 manager_node.position + 1)
+        behavior = PlotDebugExpressions('plot debug trajectory', wait=wait, normalize_position=normalize_position)
+        self.insert_node(behavior, self.plan_postprocessing_name)
+
+    def sync_6dof_joint_with_tf_frame(self, joint_name: PrefixName, tf_parent_frame: str, tf_child_frame: str):
+        tf_sync_nodes = self.get_nodes_of_type(SyncTfFrames)
+        for node in tf_sync_nodes:
+            node.sync_6dof_joint_with_tf_frame(joint_name, tf_parent_frame, tf_child_frame)
+
+    def sync_joint_state_topic(self, group_name: str, topic_name: str):
+        behavior = SyncConfiguration(group_name=group_name, joint_state_topic=topic_name)
+        self.insert_node(behavior, self.sync_name, 2)
+
+    def sync_odometry_topic(self, topic_name: str, joint_name: PrefixName):
+        behavior = SyncOdometry(topic_name, joint_name)
+        self.insert_node(behavior, self.sync_name, 2)
+
+    def add_qp_data_publisher(self, publish_lb: bool = False, publish_ub: bool = False, publish_lbA: bool = False,
+                              publish_ubA: bool = False, publish_bE: bool = False, publish_Ax: bool = False,
+                              publish_Ex: bool = False, publish_xdot: bool = False, publish_weights: bool = False,
+                              publish_g: bool = False, publish_debug: bool = False, *args, **kwargs):
+        self.add_evaluate_debug_expressions()
+        node = PublishDebugExpressions('qp data publisher',
+                                       publish_lb=publish_lb,
+                                       publish_ub=publish_ub,
+                                       publish_lbA=publish_lbA,
+                                       publish_ubA=publish_ubA,
+                                       publish_bE=publish_bE,
+                                       publish_Ax=publish_Ax,
+                                       publish_Ex=publish_Ex,
+                                       publish_xdot=publish_xdot,
+                                       publish_weights=publish_weights,
+                                       publish_g=publish_g,
+                                       publish_debug=publish_debug)
+        self.insert_node_behind_node_of_type(self.closed_loop_control_name, EvaluateDebugExpressions, node)
+
+    def add_debug_marker_publisher(self):
+        self.add_evaluate_debug_expressions()
+        node = DebugMarkerPublisher('debug marker_publisher')
+        self.insert_node_behind_every_node_of_type(EvaluateDebugExpressions, node)
+
+    def add_tf_publisher(self, include_prefix: bool = False, tf_topic: str = 'tf',
+                         mode: TfPublishingModes = TfPublishingModes.attached_and_world_objects):
+        node = TFPublisher('publish tf', mode=mode, tf_topic=tf_topic, include_prefix=include_prefix)
+        self.insert_node(node, self.sync_name)
+
+    def add_js_publisher(self, include_prefix: bool = False, js_topic: str = 'joint_states'):
+        node = PublishJointState('publish js', js_topic=js_topic, use_prefix=include_prefix)
+        self.insert_node(node, self.closed_loop_control_name)
+        node2 = running_is_success(PublishJointState)('publish js', js_topic=js_topic, use_prefix=include_prefix)
+        self.insert_node(node2, self.sync_name)
 
 
 class OpenLoop(StandAlone):
+    move_robots_name = 'move robots'
+    execution_name = 'execution'
+    base_closed_loop_control_name = 'base sequence'
+    control_mode = ControlModes.open_loop
+
+    def add_follow_joint_traj_action_server(self, namespace: str, state_topic: str, group_name: str,
+                                            fill_velocity_values: bool, path_tolerance: Dict[Derivatives, float] = None):
+        behavior = SendFollowJointTrajectory(action_namespace=namespace, state_topic=state_topic, group_name=group_name,
+                                             fill_velocity_values=fill_velocity_values, path_tolerance=path_tolerance)
+        self.insert_node(behavior, self.move_robots_name)
+
+    def add_base_traj_action_server(self, cmd_vel_topic: str, track_only_velocity: bool = False,
+                                    joint_name: PrefixName = None):
+        # todo handle if this is called twice
+        self.insert_node_behind_node_of_type(self.execution_name, SetTrackingStartTime,
+                                             CleanUpBaseController('CleanUpBaseController', clear_markers=False))
+        self.insert_node_behind_node_of_type(self.execution_name, SetTrackingStartTime,
+                                             InitQPController('InitQPController for base'))
+        self.insert_node_behind_node_of_type(self.execution_name, SetTrackingStartTime,
+                                             SetDriveGoals('SetupBaseTrajConstraints'))
+
+        real_time_tracking = AsyncBehavior(self.base_closed_loop_control_name)
+        self.insert_node(real_time_tracking, self.move_robots_name)
+        sync_tf_nodes = self.get_nodes_of_type(SyncTfFrames)
+        for node in sync_tf_nodes:
+            self.insert_node(success_is_running(SyncTfFrames)(node.name + '*', node.joint_map),
+                             self.base_closed_loop_control_name)
+        odom_nodes = self.get_nodes_of_type(SyncOdometry)
+        for node in odom_nodes:
+            new_node = success_is_running(SyncOdometry)(odometry_topic=node.odometry_topic,
+                                                        joint_name=node.joint_name,
+                                                        name_suffix='*')
+            self.insert_node(new_node, self.base_closed_loop_control_name)
+        self.insert_node(RosTime('time'), self.base_closed_loop_control_name)
+        self.insert_node(ControllerPlugin('base controller'), self.base_closed_loop_control_name)
+        self.insert_node(RealKinSimPlugin('base kin sim'), self.base_closed_loop_control_name)
+        # todo debugging
+        # if self.god_map.get_data(identifier.PlotDebugTF_enabled):
+        #     real_time_tracking.add_child(DebugMarkerPublisher('debug marker publisher'))
+        # if self.god_map.unsafe_get_data(identifier.PublishDebugExpressions)['enabled_base']:
+        #     real_time_tracking.add_child(PublishDebugExpressions('PublishDebugExpressions',
+        #                                                          **self.god_map.unsafe_get_data(
+        #                                                              identifier.PublishDebugExpressions)))
+        # if self.god_map.unsafe_get_data(identifier.PlotDebugTF)['enabled_base']:
+        #     real_time_tracking.add_child(DebugMarkerPublisher('debug marker publisher',
+        #                                                       **self.god_map.unsafe_get_data(
+        #                                                           identifier.PlotDebugTF)))
+
+        self.insert_node(SendTrajectoryToCmdVel(cmd_vel_topic=cmd_vel_topic,
+                                                track_only_velocity=track_only_velocity,
+                                                joint_name=joint_name), self.base_closed_loop_control_name)
+
+    def base_tracking_enabled(self) -> bool:
+        return len(self.get_nodes_of_type(SendTrajectoryToCmdVel)) > 0
+
     def grow_giskard(self):
         root = Sequence('Giskard')
         root.add_child(self.grow_wait_for_goal())
@@ -680,29 +954,25 @@ class OpenLoop(StandAlone):
     def grow_Synchronize(self):
         sync = Sequence('Synchronize')
         sync.add_child(WorldUpdater('update world'))
-        sync.add_child(SyncTfFrames('sync tf frames',
-                                    **self.god_map.unsafe_get_data(identifier.SyncTfFrames)))
-        hardware_config: HardwareConfig = self.god_map.get_data(identifier.hardware_config)
-        for kwargs in hardware_config.joint_state_topics_kwargs:
-            sync.add_child(running_is_success(SyncConfiguration)(**kwargs))
-        for odometry_kwargs in hardware_config.odometry_node_kwargs:
-            sync.add_child(running_is_success(SyncOdometry)(**odometry_kwargs))
-        if self.god_map.get_data(identifier.TFPublisher_enabled):
-            sync.add_child(TFPublisher('publish tf', **self.god_map.get_data(identifier.TFPublisher)))
+        sync.add_child(SyncTfFrames('sync tf frames3'))
+        # hardware_config: HardwareConfig = self.god_map.get_data(identifier.hardware_config)
+        # for kwargs in hardware_config.joint_state_topics_kwargs:
+        #     sync.add_child(running_is_success(SyncConfiguration)(**kwargs))
+        # for odometry_kwargs in hardware_config.odometry_node_kwargs:
+        #     sync.add_child(running_is_success(SyncOdometry)(**odometry_kwargs))
+        # if self.god_map.get_data(identifier.TFPublisher_enabled):
+        #     sync.add_child(TFPublisher('publish tf', **self.god_map.get_data(identifier.TFPublisher)))
         sync.add_child(CollisionSceneUpdater('update collision scene'))
         sync.add_child(running_is_success(VisualizationBehavior)('visualize collision scene'))
         return sync
 
     def grow_execution(self):
-        execution = failure_is_success(Sequence)('execution')
+        execution = failure_is_success(Sequence)(self.execution_name)
         execution.add_child(IF('execute?', identifier.execute))
-        if self.add_real_time_tracking:
-            execution.add_child(CleanUpBaseController('CleanUpBaseController'))
-            execution.add_child(SetDriveGoals('SetupBaseTrajConstraints'))
-            execution.add_child(InitQPController('InitQPController for base'))
         execution.add_child(SetTrackingStartTime('start start time'))
         execution.add_child(self.grow_monitor_execution())
-        execution.add_child(SetZeroVelocity())
+        execution.add_child(SetZeroVelocity('set zero vel 2'))
+        execution.add_child(GoalCleanUp('clean up goals'))
         return execution
 
     def grow_monitor_execution(self):
@@ -713,98 +983,101 @@ class OpenLoop(StandAlone):
                                                                         MoveFeedback.EXECUTION))
         monitor_execution.add_child(self.grow_execution_cancelled())
         monitor_execution.add_child(self.grow_move_robots())
-        monitor_execution.add_child(SetErrorCode('set error code', 'Execution'))
+        monitor_execution.add_child(SetErrorCode('set error code2', 'Execution'))
         return monitor_execution
 
     def grow_execution_cancelled(self):
         execute_canceled = Sequence('execute canceled')
-        execute_canceled.add_child(GoalCanceled('goal canceled', self.action_server_name))
-        execute_canceled.add_child(SetErrorCode('set error code', 'Execution'))
+        execute_canceled.add_child(GoalCanceled('goal canceled1', self.action_server_name))
+        execute_canceled.add_child(SetErrorCode('set error code3', 'Execution'))
         return execute_canceled
 
-    @property
-    def add_real_time_tracking(self):
-        drive_interfaces = self.config.hardware_config.send_trajectory_to_cmd_vel_kwargs
-        return len(drive_interfaces) > 0
-
     def grow_move_robots(self):
-        execution_action_server = Parallel('move robots',
+        execution_action_server = Parallel(self.move_robots_name,
                                            policy=ParallelPolicy.SuccessOnAll(synchronise=True))
-        hardware_config: HardwareConfig = self.god_map.get_data(identifier.hardware_config)
-        for follow_joint_trajectory_config in hardware_config.follow_joint_trajectory_interfaces_kwargs:
-            execution_action_server.add_child(SendFollowJointTrajectory(**follow_joint_trajectory_config))
-        if self.add_real_time_tracking:
-            for drive_interface in hardware_config.send_trajectory_to_cmd_vel_kwargs:
-                real_time_tracking = AsyncBehavior('base sequence')
-                real_time_tracking.add_child(success_is_running(SyncTfFrames)('sync tf frames',
-                                                                              **self.god_map.unsafe_get_data(
-                                                                                  identifier.SyncTfFrames)))
-                for odometry_kwargs in hardware_config.odometry_node_kwargs:
-                    real_time_tracking.add_child(SyncOdometry(**odometry_kwargs))
-                real_time_tracking.add_child(RosTime('time'))
-                real_time_tracking.add_child(ControllerPluginBase('base controller'))
-                real_time_tracking.add_child(RealKinSimPlugin('kin sim'))
-                if self.god_map.unsafe_get_data(identifier.PublishDebugExpressions)['enabled_base']:
-                    real_time_tracking.add_child(PublishDebugExpressions('PublishDebugExpressions',
-                                                                         **self.god_map.unsafe_get_data(
-                                                                             identifier.PublishDebugExpressions)))
-                real_time_tracking.add_child(SendTrajectoryToCmdVel(**drive_interface))
-                execution_action_server.add_child(real_time_tracking)
         return execution_action_server
+
+    def add_qp_data_publisher(self, publish_lb: bool = False, publish_ub: bool = False, publish_lbA: bool = False,
+                              publish_ubA: bool = False, publish_bE: bool = False, publish_Ax: bool = False,
+                              publish_Ex: bool = False, publish_xdot: bool = False, publish_weights: bool = False,
+                              publish_g: bool = False, publish_debug: bool = False, add_to_base: bool = False,
+                              *args, **kwargs):
+        self.add_evaluate_debug_expressions()
+        node = PublishDebugExpressions('qp data publisher',
+                                       publish_lb=publish_lb,
+                                       publish_ub=publish_ub,
+                                       publish_lbA=publish_lbA,
+                                       publish_ubA=publish_ubA,
+                                       publish_bE=publish_bE,
+                                       publish_Ax=publish_Ax,
+                                       publish_Ex=publish_Ex,
+                                       publish_xdot=publish_xdot,
+                                       publish_weights=publish_weights,
+                                       publish_g=publish_g,
+                                       publish_debug=publish_debug)
+        if not add_to_base:
+            self.insert_node_behind_node_of_type(self.closed_loop_control_name, EvaluateDebugExpressions, node)
+        else:
+            self.insert_node_behind_node_of_type(self.base_closed_loop_control_name, EvaluateDebugExpressions, node)
 
 
 class ClosedLoop(OpenLoop):
+    control_mode = ControlModes.close_loop
+
+    def add_joint_velocity_controllers(self, namespaces: List[str]):
+        behavior = JointVelController(namespaces=namespaces)
+        self.insert_node_behind_node_of_type(self.closed_loop_control_name, RealKinSimPlugin, behavior)
+
+    def add_joint_velocity_group_controllers(self, namespace: str):
+        behavior = JointGroupVelController(namespace)
+        self.insert_node_behind_node_of_type(self.closed_loop_control_name, RealKinSimPlugin, behavior)
+
+    def add_base_traj_action_server(self, cmd_vel_topic: str, track_only_velocity: bool = False,
+                                    joint_name: PrefixName = None):
+        behavior = SendCmdVel(cmd_vel_topic, joint_name=joint_name)
+        self.insert_node_behind_node_of_type(self.closed_loop_control_name, RealKinSimPlugin, behavior)
+
+    def grow_planning3(self):
+        planning_3 = Sequence('planning III')
+        # planning_3.add_child(PrintText('asdf'))
+        planning_3.add_child(SetTrackingStartTime('start time', offset=0.0))
+        planning_3.add_child(self.grow_closed_loop_control())
+        # planning_3.add_child(self.grow_plan_postprocessing())
+        return planning_3
 
     def grow_giskard(self):
         root = Sequence('Giskard')
         root.add_child(self.grow_wait_for_goal())
-        root.add_child(CleanUp('cleanup'))
+        root.add_child(CleanUpPlanning('CleanUpPlanning'))
+        root.add_child(NewTrajectory('NewTrajectory'))
         root.add_child(self.grow_process_goal())
         root.add_child(SendResult('send result', self.action_server_name, MoveAction))
         return root
 
-    # def grow_sync_branch(self):
-    #     sync = Sequence('Synchronize')
-    #     sync.add_child(WorldUpdater('update world'))
-    #     sync.add_child(running_is_success(SyncConfiguration)('update robot configuration', RobotName))
-    #     sync.add_child(SyncLocalization('update robot localization', RobotName))
-    #     sync.add_child(TFPublisher('publish tf', **self.god_map.get_data(identifier.TFPublisher)))
-    #     sync.add_child(CollisionSceneUpdater('update collision scene'))
-    #     sync.add_child(running_is_success(VisualizationBehavior)('visualize collision scene'))
-    #     return sync
+    def sync_joint_state_topic(self, group_name: str, topic_name: str):
+        super().sync_joint_state_topic(group_name, topic_name)
+        behavior = success_is_running(SyncConfiguration2)(group_name=group_name, joint_state_topic=topic_name)
+        self.insert_node(behavior, self.closed_loop_control_name, 0)
 
-    def grow_planning3(self):
-        planning_3 = Sequence('planning III', sleep=0)
-        planning_3.add_child(self.grow_closed_loop_control())
-        return planning_3
+    def sync_odometry_topic(self, topic_name: str, joint_name: PrefixName):
+        super().sync_odometry_topic(topic_name, joint_name)
+        behavior = success_is_running(SyncOdometryNoLock)(topic_name, joint_name)
+        self.insert_node(behavior, self.closed_loop_control_name, 0)
 
     def grow_closed_loop_control(self):
-        planning_4 = AsyncBehavior('planning IIII')
-        action_servers = self.god_map.get_data(identifier.robot_interface)
-        behaviors = get_all_classes_in_package(giskardpy.tree.behaviors)
-        for i, (execution_action_server_name, params) in enumerate(action_servers.items()):
-            C = behaviors[params['plugin']]
-            del params['plugin']
-            planning_4.add_child(C(execution_action_server_name, **params))
-        #planning_4.add_child(SyncConfiguration2('update robot configuration',
-        #                                         self.god_map.unsafe_get_data(identifier.robot_group_name)))
-        planning_4.add_child(LogTrajPlugin('log'))
-        if self.god_map.get_data(identifier.collision_checker) is not None:
+        planning_4 = failure_is_success(AsyncBehavior)(self.closed_loop_control_name)
+        planning_4.add_child(success_is_running(SyncTfFrames)('sync tf frames close loop'))
+        planning_4.add_child(success_is_running(NotifyStateChange)())
+        if self.god_map.get_data(identifier.collision_checker) != CollisionCheckerLib.none:
             planning_4.add_child(CollisionChecker('collision checker'))
         planning_4.add_child(ControllerPlugin('controller'))
-        planning_4.add_child(KinSimPlugin('kin sim'))
-
-        if self.god_map.get_data(identifier.PlotDebugTrajectory_enabled):
-            planning_4.add_child(LogDebugExpressionsPlugin('log lba'))
-        # planning_4.add_plugin(WiggleCancel('wiggle'))
-        # planning_4.add_plugin(LoopDetector('loop detector'))
-        planning_4.add_child(GoalReached('goal reached'))
-        planning_4.add_child(TimePlugin('time'))
-        if self.god_map.get_data(identifier.MaxTrajectoryLength_enabled):
-            kwargs = self.god_map.get_data(identifier.MaxTrajectoryLength)
-            planning_4.add_child(MaxTrajectoryLength('traj length check', **kwargs))
+        planning_4.add_child(RosTime())
+        planning_4.add_child(RealKinSimPlugin('kin sim'))
+        # planning_4.add_child(LoopDetector('loop detector'))
+        planning_4.add_child(GoalReached('goal reached', real_time=True))
+        planning_4.add_child(MaxTrajectoryLength('traj length check', real_time=True))
+        planning_4.add_child(GoalDone('goal done check'))
         return planning_4
-
 
 # def sanity_check(god_map):
 #     check_velocity_limits_reachable(god_map)

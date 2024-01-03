@@ -1,48 +1,46 @@
 from collections import defaultdict
+from typing import Dict, Tuple, DefaultDict, List, Set, Optional, Iterable
 
 import betterpybullet as bpb
+import numpy as np
 from betterpybullet import ClosestPair
 from betterpybullet import ContactPoint
-from geometry_msgs.msg import PoseStamped, Quaternion
+from geometry_msgs.msg import PoseStamped, Quaternion, Pose
 from sortedcontainers import SortedDict
 
+from giskardpy import identifier
+from giskardpy.configs.collision_avoidance_config import CollisionCheckerLib
 from giskardpy.model.bpb_wrapper import create_cube_shape, create_object, create_sphere_shape, create_cylinder_shape, \
-    load_convex_mesh_shape
+    load_convex_mesh_shape, create_shape_from_link, to_giskard_collision
 from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer, Collision, Collisions
 from giskardpy.model.links import BoxGeometry, SphereGeometry, CylinderGeometry, MeshGeometry, Link
+from giskardpy.my_types import PrefixName
 from giskardpy.utils import logging
+from giskardpy.utils.tfwrapper import np_to_pose
 
 
 class BetterPyBulletSyncer(CollisionWorldSynchronizer):
-    def __init__(self, world):
-        self.kw = bpb.KineverseWorld()
-        self.object_name_to_id = defaultdict(list)
-        self.query = None
-        super().__init__(world)
+    collision_checker_id = CollisionCheckerLib.bpb
 
+    def __init__(self,):
+        self.kw = bpb.KineverseWorld()
+        self.object_name_to_id: Dict[PrefixName, bpb.CollisionObject] = {}
+        self.query: Optional[DefaultDict[PrefixName, Set[Tuple[bpb.CollisionObject, float]]]] = None
+        super().__init__()
+
+    @classmethod
+    def empty(cls):
+        self = super().empty()
+        self.god_map.set_data(identifier.collision_checker, CollisionCheckerLib.bpb)
+        return self
 
     @profile
     def add_object(self, link: Link):
         if not link.has_collisions():
-            return False
-        for collision_id, geometry in enumerate(link.collisions):
-            if isinstance(geometry, BoxGeometry):
-                shape = create_cube_shape([geometry.depth, geometry.width, geometry.height])
-            elif isinstance(geometry, SphereGeometry):
-                shape = create_sphere_shape(geometry.radius * 2)
-            elif isinstance(geometry, CylinderGeometry):
-                shape = create_cylinder_shape(geometry.radius * 2, geometry.height)
-            elif isinstance(geometry, MeshGeometry):
-                shape = load_convex_mesh_shape(geometry.file_name, scale=geometry.scale)
-                geometry.file_name = 'file://' + shape.file_path
-            else:
-                raise NotImplementedError()
-            map_T_o = bpb.Transform()
-            map_T_o.origin = bpb.Vector3(0, 0, 0)
-            map_T_o.rotation = bpb.Quaternion(0, 0, 0, 1)
-            o = create_object(link.name, shape, map_T_o, collision_id)
-            self.kw.add_collision_object(o)
-            self.object_name_to_id[link.name].append(o)
+            return
+        o = create_shape_from_link(link)
+        self.kw.add_collision_object(o)
+        self.object_name_to_id[link.name] = o
 
     def reset_cache(self):
         self.query = None
@@ -53,67 +51,48 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
                 pass
 
     @profile
-    def cut_off_distances_to_query(self, cut_off_distances, buffer=0.05):
+    def cut_off_distances_to_query(self, cut_off_distances: Dict[Tuple[PrefixName, PrefixName], float],
+                                   buffer: float = 0.05) -> DefaultDict[PrefixName, Set[Tuple[bpb.CollisionObject, float]]]:
         if self.query is None:
-            self.query = defaultdict(set)
-            for (link_a, link_b), dist in cut_off_distances.items():
-                for collision_object_a in self.object_name_to_id[link_a]:
-                    for collision_object_b in self.object_name_to_id[link_b]:
-                        self.query[collision_object_a].add((collision_object_b, dist+buffer))
+            self.query = {(self.object_name_to_id[a], self.object_name_to_id[b]): v + buffer for (a, b), v in cut_off_distances.items()}
         return self.query
 
     @profile
-    def check_collisions(self, cut_off_distances, collision_list_sizes):
+    def check_collisions(self, cut_off_distances: Dict[Tuple[PrefixName, PrefixName], float],
+                         collision_list_sizes: int, buffer: float = 0.05) -> Collisions:
         """
-        :param cut_off_distances: (robot_link, body_b, link_b) -> cut off distance. Contacts between objects not in this
-                                    dict or further away than the cut off distance will be ignored.
-        :type cut_off_distances: dict
-        :param self_collision_d: distances grater than this value will be ignored
-        :type self_collision_d: float
-        :type enable_self_collision: bool
-        :return: (robot_link, body_b, link_b) -> Collision
-        :rtype: Collisions
+        :param cut_off_distances: (link_a, link_b) -> max distance. Contacts between objects not in this
+                                    dict or further away than the cutoff distance will be ignored.
+        :param collision_list_sizes: max number of collisions
         """
 
-        query = self.cut_off_distances_to_query(cut_off_distances)
-        result = self.kw.get_closest_filtered_POD_batch(query)
-
+        query = self.cut_off_distances_to_query(cut_off_distances, buffer=buffer)
+        result: List[bpb.Collision] = self.kw.get_closest_filtered_map_batch(query)
         return self.bpb_result_to_collisions(result, collision_list_sizes)
 
     @profile
-    def bpb_result_to_list(self, result):
-        result_list = []
-        for obj_a, contacts in result.items():
-            if not contacts:
-                continue
-            map_T_a = obj_a.np_transform
-            link_a = obj_a.name
-            for contact in contacts:  # type: ClosestPair
-                map_T_b = contact.obj_b.np_transform
-                link_b = contact.obj_b.name
-                for p in contact.points:  # type: ContactPoint
-                    map_P_a = map_T_a.dot(p.point_a.reshape(4))
-                    map_P_b = map_T_b.dot(p.point_b.reshape(4))
-                    c = Collision(link_a=link_a,
-                                  link_b=link_b,
-                                  contact_distance=p.distance,
-                                  map_V_n=p.normal_world_b.reshape(4),
-                                  map_P_pa=map_P_a,
-                                  map_P_pb=map_P_b)
-                    result_list.append(c)
-        return result_list
-
-    def bpb_result_to_dict(self, result):
-        result_dict = {}
-        for c in self.bpb_result_to_list(result):
-            result_dict[c.link_a, c.link_b] = c
-        return SortedDict({k: v for k, v in sorted(result_dict.items())})
+    def find_colliding_combinations(self, link_combinations: Iterable[Tuple[PrefixName, PrefixName]],
+                                    distance: float,
+                                    update_query: bool) -> Set[Tuple[PrefixName, PrefixName, float]]:
+        if update_query:
+            self.query = None
+            cut_off_distance = {link_combination: distance for link_combination in link_combinations}
+        else:
+            cut_off_distance = {}
+        self.sync()
+        collisions = self.check_collisions(cut_off_distance, 15, buffer=0.0)
+        colliding_combinations = {(c.original_link_a, c.original_link_b, c.contact_distance) for c in collisions.all_collisions
+                                  if c.contact_distance <= distance}
+        return colliding_combinations
 
     @profile
-    def bpb_result_to_collisions(self, result, collision_list_size):
+    def bpb_result_to_collisions(self, result: List[bpb.Collision],
+                                 collision_list_size: int) -> Collisions:
         collisions = Collisions(collision_list_size)
-        for c in self.bpb_result_to_list(result):
-            collisions.add(c)
+
+        for collision in result:
+            giskard_collision = to_giskard_collision(collision)
+            collisions.add(giskard_collision)
         return collisions
 
     def check_collision(self, link_a, link_b, distance):
@@ -133,29 +112,25 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
 
     @profile
     def sync(self):
+        super().sync()
         if self.has_world_changed():
+            self.sync_links_with_world()
             self.reset_cache()
             logging.logdebug('hard sync')
             for o in self.kw.collision_objects:
                 self.kw.remove_collision_object(o)
-            self.object_name_to_id = defaultdict(list)
+            self.object_name_to_id = {}
+            self.objects_in_order = []
 
-            for link_name in self.world.link_names_with_collisions:
+            for link_name in sorted(self.world.link_names_with_collisions):
                 link = self.world.links[link_name]
                 self.add_object(link)
-            self.objects_in_order = [x for link_name in self.world._fk_computer.collision_link_order for x in self.object_name_to_id[link_name]]
-            # self.objects_in_order = [self.object_name_to_id[link_name] for link_name in self.world.link_names_with_collisions]
-            bpb.batch_set_transforms(self.objects_in_order, self.world.compute_all_fks_matrix())
-            # self.update_collision_blacklist()
-        bpb.batch_set_transforms(self.objects_in_order, self.world.compute_all_fks_matrix())
+                self.objects_in_order.append(self.object_name_to_id[link_name])
+            bpb.batch_set_transforms(self.objects_in_order, self.world.compute_all_collision_fks())
+        else:
+            bpb.batch_set_transforms(self.objects_in_order, self.world.compute_all_collision_fks())
 
     @profile
-    def get_pose(self, link_name, collision_id=0):
-        collision_object = self.object_name_to_id[link_name][collision_id]
-        map_T_link = PoseStamped()
-        map_T_link.header.frame_id = self.world.root_link_name
-        map_T_link.pose.position.x = collision_object.transform.origin.x
-        map_T_link.pose.position.y = collision_object.transform.origin.y
-        map_T_link.pose.position.z = collision_object.transform.origin.z
-        map_T_link.pose.orientation = Quaternion(*collision_object.transform.rotation)
-        return map_T_link
+    def get_map_T_geometry(self, link_name: PrefixName, collision_id: int = 0) -> Pose:
+        collision_object = self.object_name_to_id[link_name]
+        return collision_object.compound_transform(collision_id)

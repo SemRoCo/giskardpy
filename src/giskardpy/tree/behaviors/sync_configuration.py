@@ -9,10 +9,12 @@ from sensor_msgs.msg import JointState
 from giskardpy.data_types import JointStates
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
+from giskardpy.utils.decorators import record_time
 
 
 class SyncConfiguration(GiskardBehavior):
 
+    @record_time
     @profile
     def __init__(self, group_name: str, joint_state_topic: str = 'joint_states'):
         self.joint_state_topic = joint_state_topic
@@ -23,6 +25,7 @@ class SyncConfiguration(GiskardBehavior):
         self.group_name = group_name
         self.lock = Queue(maxsize=1)
 
+    @record_time
     @profile
     def setup(self, timeout=0.0):
         msg = None
@@ -42,6 +45,7 @@ class SyncConfiguration(GiskardBehavior):
             pass
         self.lock.put(data)
 
+    @record_time
     @profile
     def update(self):
         try:
@@ -53,9 +57,9 @@ class SyncConfiguration(GiskardBehavior):
         except Empty:
             pass
 
-        self.get_world().state.update(self.mjs)
+        self.world.state.update(self.mjs)
         self.world.notify_state_change()
-        return Status.RUNNING
+        return Status.SUCCESS
 
     def __str__(self):
         return f'{super().__str__()} ({self.joint_state_topic})'

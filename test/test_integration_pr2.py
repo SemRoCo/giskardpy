@@ -826,8 +826,9 @@ class TestPayloadMonitor:
 
     def test_hold_monitors(self, zero_pose: PR2TestWrapper):
         sleep = zero_pose.monitors.add_sleep(0.5)
-        alternator1 = zero_pose.monitors.add_alternator(start_monitors=[sleep], mod=4)
-        alternator2 = zero_pose.monitors.add_alternator(start_monitors=[alternator1], mod=3)
+        # alternator3 = zero_pose.monitors.add_alternator(start_monitors=[], mod=3)
+        alternator2 = zero_pose.monitors.add_alternator(start_monitors=[sleep], mod=2)
+        alternator4 = zero_pose.monitors.add_alternator(start_monitors=[alternator2], mod=4)
 
         base_goal = PoseStamped()
         base_goal.header.frame_id = 'map'
@@ -841,7 +842,7 @@ class TestPayloadMonitor:
         zero_pose.motion_goals.add_cartesian_pose(goal_pose=base_goal,
                                                   tip_link='base_footprint',
                                                   root_link='map',
-                                                  hold_monitors=[alternator2],
+                                                  hold_monitors=[alternator4],
                                                   end_monitors=[goal_reached])
         local_min = zero_pose.monitors.add_local_minimum_reached(start_monitors=[goal_reached])
 

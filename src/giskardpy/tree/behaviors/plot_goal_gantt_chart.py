@@ -57,7 +57,7 @@ class PlotGanttChart(GiskardBehavior):
                 thing = things[thing_id]
                 start_time, last_status = state[thing.name]
                 if status != last_status:
-                    plt.barh(thing.formatted_name()[:50], end_time - start_time, height=bar_height, left=start_time,
+                    plt.barh(thing.name[:50], end_time - start_time, height=bar_height, left=start_time,
                              color=color_map[last_status])
                     state[thing.name] = (end_time, status)
 

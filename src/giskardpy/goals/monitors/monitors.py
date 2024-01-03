@@ -47,6 +47,9 @@ class Monitor:
             return '"' + formatted_name + '"'
         return formatted_name
 
+    def __repr__(self) -> str:
+        return self.name
+
 
 class ExpressionMonitor(Monitor):
     _expression: cas.Expression

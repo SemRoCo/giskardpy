@@ -790,7 +790,7 @@ class TestPayloadMonitor:
                                                       end_monitors=[final_pose_monitor, phase7])
 
         kitchen_setup.monitors.add_end_motion(start_monitors=[phase7])
-        kitchen_setup.monitors.add_max_trajectory_length(60)
+        kitchen_setup.monitors.add_max_trajectory_length(120)
         kitchen_setup.avoid_all_collisions()
         kitchen_setup.allow_collision(group1=kitchen_setup.l_gripper_group,
                                       group2=bowl_name)
@@ -799,16 +799,25 @@ class TestPayloadMonitor:
         kitchen_setup.execute(add_local_minimum_reached=False)
 
     def test_sleep(self, zero_pose: PR2TestWrapper):
-        sleep1 = zero_pose.monitors.add_sleep(2, name='sleep1')
+        sleep1 = zero_pose.monitors.add_sleep(1, name='sleep1')
         print1 = zero_pose.monitors.add_print(message=f'{sleep1} done', start_monitors=[sleep1])
-        sleep2 = zero_pose.monitors.add_sleep(3, name='sleep2', start_monitors=[print1])
-        local_min = zero_pose.monitors.add_local_minimum_reached()
+        sleep2 = zero_pose.monitors.add_sleep(2, name='sleep2', start_monitors=[print1])
         zero_pose.motion_goals.allow_all_collisions()
 
-        right_monitor = zero_pose.monitors.add_joint_position(zero_pose.better_pose_right)
-        left_monitor = zero_pose.monitors.add_joint_position(zero_pose.better_pose_left)
-        zero_pose.motion_goals.add_joint_position(zero_pose.better_pose_right, start_monitors=[sleep2])
-        zero_pose.motion_goals.add_joint_position(zero_pose.better_pose_left)
+        right_monitor = zero_pose.monitors.add_joint_position(zero_pose.better_pose_right,
+                                                              name='right pose reached',
+                                                              start_monitors=[sleep1])
+        left_monitor = zero_pose.monitors.add_joint_position(zero_pose.better_pose_left,
+                                                             name='left pose reached',
+                                                             start_monitors=[sleep1])
+        zero_pose.motion_goals.add_joint_position(zero_pose.better_pose_right,
+                                                  name='right pose',
+                                                  start_monitors=[sleep2],
+                                                  end_monitors=[right_monitor])
+        zero_pose.motion_goals.add_joint_position(zero_pose.better_pose_left,
+                                                  name='left pose',
+                                                  end_monitors=[left_monitor])
+        local_min = zero_pose.monitors.add_local_minimum_reached(start_monitors=[right_monitor, left_monitor])
 
         end = zero_pose.monitors.add_end_motion(start_monitors=[local_min, sleep2, right_monitor, left_monitor])
         zero_pose.execute(add_local_minimum_reached=False)

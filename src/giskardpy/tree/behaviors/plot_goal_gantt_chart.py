@@ -1,7 +1,9 @@
-from typing import List, Dict
+from typing import List, Dict, Tuple
 
 import matplotlib.pyplot as plt
+import numpy as np
 from py_trees import Status
+from sortedcontainers import SortedDict
 
 from giskardpy.goals.collision_avoidance import CollisionAvoidance
 from giskardpy.goals.goal import Goal
@@ -26,6 +28,7 @@ class PlotGanttChart(GiskardBehavior):
         tasks = []
         start_dates = []
         end_dates = []
+        bar_height = 0.8
         monitors = [monitor for monitor in monitors if monitor.plot]
 
         for goal_name, goal in goals.items():
@@ -48,7 +51,7 @@ class PlotGanttChart(GiskardBehavior):
                     end_dates.append(
                         [x.state_flip_times[-1] if x.state_flip_times else None for x in task.end_monitors])
 
-        plt.figure(figsize=(god_map.time + 10, int(len(monitors) + len(tasks)) * 0.5))
+        plt.figure(figsize=(god_map.time * 0.25 + 5, int(len(monitors) + len(tasks)) * 0.3))
 
         for i, (task, start_date, end_date) in enumerate(reversed(list(zip(tasks, start_dates, end_dates)))):
             if None in start_date:
@@ -59,39 +62,68 @@ class PlotGanttChart(GiskardBehavior):
                 end_date = god_map.time
             else:
                 end_date = max(end_date)
-            plt.barh(task[:50], end_date - start_date, height=0.8, left=start_date,
+            plt.barh(task[:50], end_date - start_date, height=bar_height, left=start_date,
                      color=light_green)
 
-        # monitor_state: Dict[str, bool] = {monitor.name: False for monitor in monitors}
-        # todo indicate when all start monitors are active
+        monitors = self.add_running_to_monitors(monitors)
         for monitor in reversed(monitors):
-            if isinstance(monitor, PayloadMonitor) and monitor.run_call_in_thread:
-                colors = ['white', light_green, 'green']
+            if (isinstance(monitor, PayloadMonitor) and monitor.run_call_in_thread
+                    or not isinstance(monitor, PayloadMonitor) and monitor.start_monitors):
+                colors = ['white', gray, 'green']
             else:
                 colors = ['white', 'green']
-            monitor.state_flip_times.append(god_map.time)
             start_date = 0
             state = False
             for i, end_date in enumerate(monitor.state_flip_times):
-
-                if state:
-                    plt.barh(monitor.formatted_name()[:50], end_date - start_date, height=0.8, left=start_date,
-                             color=colors[i % len(colors)])
-                else:
-                    plt.barh(monitor.formatted_name()[:50], end_date - start_date, height=0.8, left=start_date,
-                             color=colors[i % len(colors)])
+                plt.barh(monitor.formatted_name()[:50], end_date - start_date, height=bar_height, left=start_date,
+                         color=colors[i % len(colors)])
                 start_date = end_date
-                state = not state
 
         plt.gca().yaxis.tick_right()
         plt.subplots_adjust(left=0.01, right=0.75)
         plt.xlabel('Time [s]')
         plt.ylabel('Tasks')
+        plt.xlim(0, god_map.time)
+        plt.ylim(-1, len(monitors) + len(tasks))
         plt.tight_layout()
         plt.grid()
         create_path(file_name)
         plt.savefig(file_name)
         logging.loginfo(f'Saved gantt chart to {file_name}.')
+
+    def add_running_to_monitors(self, monitors: List[Monitor]) -> List[Monitor]:
+        monitor_time_line: Dict[float, List[Tuple[Monitor, Status]]] = SortedDict()
+        for monitor in monitors:
+            monitor.state_flip_times.append(god_map.time)
+            state_counter = 0
+            if isinstance(monitor, PayloadMonitor) and monitor.run_call_in_thread:
+                states = [Status.FAILURE, Status.RUNNING, Status.SUCCESS]
+            else:
+                states = [Status.FAILURE, Status.SUCCESS]
+            for time in monitor.state_flip_times:
+                if time not in monitor_time_line:
+                    monitor_time_line[time] = []
+                state_counter += 1
+                state_counter = state_counter % len(states)
+                state = states[state_counter]
+                monitor_time_line[time].append((monitor, state))
+        total_state: Dict[str, Status] = {monitor.name: Status.FAILURE for monitor in monitors}
+        for time in monitor_time_line:
+            for (monitor, state) in monitor_time_line[time]:
+                total_state[monitor.name] = state
+            for monitor in monitors:
+                start_monitor_names = [m.name for m in monitor.start_monitors]
+                active = np.all(
+                    [status == Status.SUCCESS for m, status in total_state.items() if m in start_monitor_names])
+                if (not isinstance(monitor, PayloadMonitor)
+                        and monitor.start_monitors
+                        and total_state[monitor.name] == Status.FAILURE
+                        and active):
+                    monitor.state_flip_times.append(time)
+                    monitor.state_flip_times = list(sorted(monitor.state_flip_times))
+                    total_state[monitor.name] = Status.RUNNING
+
+        return monitors
 
     @record_time
     @profile

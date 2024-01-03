@@ -569,8 +569,6 @@ class TestPayloadMonitor:
                                                     root_link=kitchen_setup.default_root,
                                                     goal_normal=x_goal,
                                                     end_monitors=[phase1])
-        # kitchen_setup.allow_all_collisions()
-        # kitchen_setup.plan_and_execute()
 
         # %% phase 2 open drawer
         phase2 = kitchen_setup.monitors.add_local_minimum_reached('phase 2',
@@ -647,7 +645,6 @@ class TestPayloadMonitor:
                                                       name=l_grasp_pose,
                                                       start_monitors=[l_pre_grasp_pose],
                                                       end_monitors=[attach_bowl])
-        # kitchen_setup.allow_collision(kitchen_setup.l_gripper_group, bowl_name) TODO
         kitchen_setup.monitors.update_parent_link_of_group(start_monitors=[l_grasp_pose],
                                                            name=attach_bowl,
                                                            group_name=bowl_name,
@@ -772,7 +769,6 @@ class TestPayloadMonitor:
                                                           name='avoid_joint_limits_while_placing',
                                                           start_monitors=[phase5],
                                                           end_monitors=[cup_placed, bowl_placed])
-        # kitchen_setup.avoid_all_collisions(0.05)
         bowl_detached = kitchen_setup.monitors.update_parent_link_of_group(start_monitors=[bowl_placed],
                                                                            name='detach_bowl',
                                                                            group_name=bowl_name,
@@ -781,8 +777,6 @@ class TestPayloadMonitor:
                                                                           name='detach_cup',
                                                                           group_name=cup_name,
                                                                           parent_link='map')
-        # kitchen_setup.allow_collision(group1=kitchen_setup.robot_name, group2=cup_name)
-        # kitchen_setup.allow_collision(group1=kitchen_setup.robot_name, group2=bowl_name)
 
         # %% phase7 final pose
         final_pose_monitor = kitchen_setup.monitors.add_joint_position(goal_state=kitchen_setup.better_pose,
@@ -797,7 +791,11 @@ class TestPayloadMonitor:
 
         kitchen_setup.monitors.add_end_motion(start_monitors=[phase7])
         kitchen_setup.monitors.add_max_trajectory_length(60)
-        kitchen_setup.allow_all_collisions()
+        kitchen_setup.avoid_all_collisions()
+        kitchen_setup.allow_collision(group1=kitchen_setup.l_gripper_group,
+                                      group2=bowl_name)
+        kitchen_setup.allow_collision(group1=kitchen_setup.r_gripper_group,
+                                      group2=cup_name)
         kitchen_setup.execute(add_local_minimum_reached=False)
 
     def test_sleep(self, zero_pose: PR2TestWrapper):
@@ -4367,6 +4365,7 @@ class TestManipulability:
 # pytest.main(['-s', __file__ + '::TestConstraints::test_RelativePositionSequence'])
 # pytest.main(['-s', __file__ + '::TestConstraints::test_open_dishwasher_apartment'])
 # pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_bowl_and_cup'])
+# pytest.main(['-s', __file__ + '::TestPayloadMonitor::test_bowl_and_cup_sequence'])
 # pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_avoid_collision_go_around_corner'])
 # pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_avoid_collision_box_between_boxes'])
 # pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_avoid_self_collision'])

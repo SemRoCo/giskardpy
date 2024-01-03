@@ -33,7 +33,7 @@ class CleanupControlLoop(Sequence):
         self.add_child(PlotDebugExpressions('plot debug trajectory', wait=wait, normalize_position=normalize_position))
 
     def add_plot_gantt_chart(self):
-        self.add_child(PlotGanttChart())
+        self.insert_child(PlotGanttChart(), 0)
 
     @toggle_on('has_reset_world_state')
     def add_reset_world_state(self):

@@ -84,6 +84,7 @@ class CancelMotion(PayloadMonitor):
 
     @profile
     def __call__(self):
+        self.state = True
         raise GiskardException.from_error_code(error_code=self.error_code, error_message=self.error_message)
 
     def get_state(self) -> bool:

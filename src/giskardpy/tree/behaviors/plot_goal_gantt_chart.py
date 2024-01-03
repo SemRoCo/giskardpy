@@ -24,18 +24,19 @@ class PlotGanttChart(GiskardBehavior):
         super().__init__(name)
 
     def plot_gantt_chart(self, goals: List[Goal], monitors: List[Monitor], file_name: str):
-        monitors = [monitor for monitor in monitors if monitor.plot]
+        monitor_plot_filter = np.array([monitor.plot for monitor in god_map.monitor_manager.monitors])
         tasks = [task for g in goals for task in g.tasks]
+        task_plot_filter = np.array([not isinstance(g, CollisionAvoidance) for g in goals for _ in g.tasks])
 
         monitor_history, task_history = self.get_new_history()
-        num_monitors = len(monitor_history[0][1])
-        num_tasks = len(task_history[0][1])
+        num_monitors = monitor_plot_filter.tolist().count(True)
+        num_tasks = task_plot_filter.tolist().count(True)
         num_bars = num_monitors + num_tasks
 
         plt.figure(figsize=(god_map.time * 0.25 + 5, num_bars * 0.3))
 
-        self.plot_history(task_history, tasks)
-        self.plot_history(monitor_history, monitors)
+        self.plot_history(task_history, tasks, task_plot_filter)
+        self.plot_history(monitor_history, monitors, monitor_plot_filter)
 
         plt.gca().yaxis.tick_right()
         plt.subplots_adjust(left=0.01, right=0.75)
@@ -49,11 +50,14 @@ class PlotGanttChart(GiskardBehavior):
         plt.savefig(file_name)
         logging.loginfo(f'Saved gantt chart to {file_name}.')
 
-    def plot_history(self, history: List[Tuple[float, List[Optional[Status]]]], things, bar_height: float = 0.8):
+    def plot_history(self, history: List[Tuple[float, List[Optional[Status]]]], things, filter: np.ndarray,
+                     bar_height: float = 0.8):
         color_map = {Status.FAILURE: 'white', Status.RUNNING: 'gray', Status.SUCCESS: 'green'}
         state: Dict[str, Tuple[float, Status]] = {t.name: (0, Status.FAILURE) for t in things}
         for end_time, history_state in history:
             for thing_id, status in enumerate(history_state):
+                if not filter[thing_id]:
+                    continue
                 thing = things[thing_id]
                 start_time, last_status = state[thing.name]
                 if status != last_status:
@@ -121,8 +125,9 @@ class PlotGanttChart(GiskardBehavior):
             return Status.SUCCESS
         try:
             goals = list(god_map.motion_goal_manager.motion_goals.values())
+            monitors = god_map.monitor_manager.monitors
             file_name = god_map.giskard.tmp_folder + f'gantt_charts/goal_{god_map.goal_id}.pdf'
-            self.plot_gantt_chart(goals, god_map.monitor_manager.monitors, file_name)
+            self.plot_gantt_chart(goals, monitors, file_name)
         except Exception as e:
             logging.logwarn(f'Failed to create goal gantt chart: {e}.')
             traceback.print_exc()

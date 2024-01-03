@@ -184,15 +184,21 @@ class MonitorManager:
     def evaluate_monitors(self):
         args = symbol_manager.resolve_symbols(self.compiled_monitors.str_params)
         next_state = np.zeros_like(self.state)
+
         num_expr_monitors = len(self.expression_monitors)
         expr_monitor_state = self.compiled_monitors.fast_call(args)
         expr_monitor_state = self.update_expr_monitor_state(expr_monitor_state, self.state[:num_expr_monitors])
         next_state[:num_expr_monitors] = expr_monitor_state
-        for i in range(num_expr_monitors, len(self.monitors)):
-            next_state[i] = self.payload_monitors[i-num_expr_monitors].get_state()
+        next_state[num_expr_monitors:] = self.evaluate_payload_monitors()
         self.state = next_state
         self.trigger_update_triggers(self.state)
         self.state_history.append((god_map.time, self.state))
+
+    def evaluate_payload_monitors(self) -> np.ndarray:
+        next_state = np.zeros(len(self.payload_monitors))
+        for i in range(len(self.payload_monitors)):
+            next_state[i] = self.payload_monitors[i].get_state()
+        return next_state
 
     @profile
     def search_for_monitors(self, monitor_names: List[str]) -> List[Monitor]:

@@ -25,7 +25,7 @@ from giskardpy.goals.joint_goals import JointPositionList, AvoidJointLimits, Set
 from giskardpy.goals.monitors.cartesian_monitors import PoseReached, PositionReached, OrientationReached, PointingAt, \
     VectorsAligned, DistanceToLine
 from giskardpy.goals.monitors.joint_monitors import JointGoalReached
-from giskardpy.goals.monitors.monitors import LocalMinimumReached, TimeAbove
+from giskardpy.goals.monitors.monitors import LocalMinimumReached, TimeAbove, Alternator
 from giskardpy.goals.monitors.payload_monitors import EndMotion, Print, Sleep, CancelMotion, SetMaxTrajectoryLength, \
     UpdateParentLinkOfGroup
 from giskardpy.goals.open_close import Close, Open
@@ -1288,6 +1288,18 @@ class MonitorWrapper:
                          start_monitors=start_monitors)
         return name
 
+    def add_alternator(self,
+                       start_monitors: Optional[List[str]] = None,
+                       name: Optional[str] = None,
+                       mod: int = 2) -> str:
+        if name is None:
+            name = Alternator.__name__ + f' % {mod}'
+        self.add_monitor(monitor_class=Alternator.__name__,
+                         monitor_name=name,
+                         start_monitors=start_monitors,
+                         mod=mod)
+        return name
+
 
 class GiskardWrapper:
     last_feedback: MoveFeedback = None
@@ -1311,7 +1323,7 @@ class GiskardWrapper:
         self.monitors.add_cancel_motion(start_monitors=[local_min_reached_monitor_name],
                                         error_message=f'local minimum reached',
                                         error_code=MoveResult.LOCAL_MINIMUM)
-        if not self.monitors. max_trajectory_length_set:
+        if not self.monitors.max_trajectory_length_set:
             self.monitors.add_max_trajectory_length()
         self.monitors.max_trajectory_length_set = False
 

@@ -39,6 +39,7 @@ class MonitorManager:
     payload_monitors: List[PayloadMonitor]
     substitution_values: Dict[Tuple[str, ...], Dict[str, float]]
     triggers: Dict[Tuple[int, ...], Callable]
+    state_history: List[Tuple[float, np.ndarray]]
 
     def __init__(self):
         self.expression_monitors = []
@@ -48,6 +49,7 @@ class MonitorManager:
                                                                      Monitor))
         self.substitution_values = {}
         self.triggers = {}
+        self.state_history = []
 
     @profile
     def compile_expression_monitors(self):
@@ -68,6 +70,7 @@ class MonitorManager:
 
     @profile
     def compile_monitors(self):
+        self.state_history = []
         self.state = np.zeros(len(self.monitors))
         self.compile_expression_monitors()
         self.compile_payload_monitors()
@@ -189,6 +192,7 @@ class MonitorManager:
             next_state[i] = self.payload_monitors[i-num_expr_monitors].get_state()
         self.state = next_state
         self.trigger_update_triggers(self.state)
+        self.state_history.append((god_map.time, self.state))
 
     @profile
     def search_for_monitors(self, monitor_names: List[str]) -> List[Monitor]:

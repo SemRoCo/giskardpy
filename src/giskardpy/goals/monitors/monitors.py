@@ -137,3 +137,14 @@ class TimeAbove(ExpressionMonitor):
         condition = cas.greater(traj_length_in_sec, threshold)
         # god_map.debug_expression_manager.add_debug_expression('time', traj_length_in_sec)
         self.set_expression(condition)
+
+
+class Alternator(ExpressionMonitor):
+
+    def __init__(self, name: str, *, stay_one: bool = False, start_monitors: Optional[List[Monitor]] = None,
+                 mod: int = 2,
+                 plot: bool = True):
+        super().__init__(name, stay_one=stay_one, start_monitors=start_monitors, plot=plot)
+        time = symbol_manager.time
+        expr = cas.equal(cas.fmod(cas.floor(time), mod), 0)
+        self.set_expression(expr)

@@ -783,7 +783,8 @@ class TestPayloadMonitor:
                                                                        name='final pose',
                                                                        start_monitors=[bowl_detached, cup_detached])
         phase7 = kitchen_setup.monitors.add_local_minimum_reached(name='phase7',
-                                                                  start_monitors=[final_pose_monitor, bowl_detached, cup_detached])
+                                                                  start_monitors=[final_pose_monitor, bowl_detached,
+                                                                                  cup_detached])
         kitchen_setup.motion_goals.add_joint_position(goal_state=kitchen_setup.better_pose,
                                                       name=final_pose_monitor,
                                                       start_monitors=[phase6, bowl_detached, cup_detached],
@@ -822,6 +823,31 @@ class TestPayloadMonitor:
         end = zero_pose.monitors.add_end_motion(start_monitors=[local_min, sleep2, right_monitor, left_monitor])
         zero_pose.execute(add_local_minimum_reached=False)
         assert god_map.trajectory.length_in_seconds > 6
+
+    def test_hold_monitors(self, zero_pose: PR2TestWrapper):
+        sleep = zero_pose.monitors.add_sleep(0.5)
+        alternator1 = zero_pose.monitors.add_alternator(start_monitors=[sleep], mod=4)
+        alternator2 = zero_pose.monitors.add_alternator(start_monitors=[alternator1], mod=3)
+
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = 'map'
+        base_goal.pose.position.x = 0.5
+        base_goal.pose.orientation.w = 1
+        goal_reached = zero_pose.monitors.add_cartesian_pose(goal_pose=base_goal,
+                                                             tip_link='base_footprint',
+                                                             root_link='map',
+                                                             name='goal reached')
+
+        zero_pose.motion_goals.add_cartesian_pose(goal_pose=base_goal,
+                                                  tip_link='base_footprint',
+                                                  root_link='map',
+                                                  hold_monitors=[alternator2],
+                                                  end_monitors=[goal_reached])
+        local_min = zero_pose.monitors.add_local_minimum_reached(start_monitors=[goal_reached])
+
+        end = zero_pose.monitors.add_end_motion(start_monitors=[local_min])
+        zero_pose.motion_goals.allow_all_collisions()
+        zero_pose.execute(add_local_minimum_reached=False)
 
     def test_RelativePositionSequence(self, zero_pose: PR2TestWrapper):
         goal1 = PointStamped()

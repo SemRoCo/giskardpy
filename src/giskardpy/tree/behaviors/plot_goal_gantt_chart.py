@@ -1,4 +1,5 @@
-from typing import List, Dict, Tuple
+import traceback
+from typing import List, Dict, Tuple, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -22,116 +23,108 @@ class PlotGanttChart(GiskardBehavior):
     def __init__(self, name: str = 'plot gantt chart'):
         super().__init__(name)
 
-    def plot_gantt_chart(self, goals: Dict[str, Goal], monitors: List[Monitor], file_name: str):
-        light_green = (133 / 255, 232 / 255, 133 / 255)
-        gray = (128 / 255, 128 / 255, 128 / 255)
-        tasks = []
-        start_dates = []
-        end_dates = []
-        bar_height = 0.8
+    def plot_gantt_chart(self, goals: List[Goal], monitors: List[Monitor], file_name: str):
         monitors = [monitor for monitor in monitors if monitor.plot]
+        tasks = [task for g in goals for task in g.tasks]
 
-        for goal_name, goal in goals.items():
-            for i, task in enumerate(goal.tasks):
-                if isinstance(goal, CollisionAvoidance):
-                    continue
-                    # if i > 0:
-                    #     break
-                    # tasks.append(string_shortener(f'{goal_name}', max_lines=5, max_line_length=50))
-                else:
-                    tasks.append(task.name)
-                if not task.start_monitors:
-                    start_dates.append([0])
-                else:
-                    start_dates.append(
-                        [x.state_flip_times[0] if x.state_flip_times else None for x in task.start_monitors])
-                if not task.end_monitors:
-                    end_dates.append([god_map.time])
-                else:
-                    end_dates.append(
-                        [x.state_flip_times[-1] if x.state_flip_times else None for x in task.end_monitors])
+        monitor_history, task_history = self.get_new_history()
+        num_monitors = len(monitor_history[0][1])
+        num_tasks = len(task_history[0][1])
+        num_bars = num_monitors + num_tasks
 
-        plt.figure(figsize=(god_map.time * 0.25 + 5, int(len(monitors) + len(tasks)) * 0.3))
+        plt.figure(figsize=(god_map.time * 0.25 + 5, num_bars * 0.3))
 
-        for i, (task, start_date, end_date) in enumerate(reversed(list(zip(tasks, start_dates, end_dates)))):
-            if None in start_date:
-                start_date = god_map.time
-            else:
-                start_date = max(start_date)
-            if None in end_date:
-                end_date = god_map.time
-            else:
-                end_date = max(end_date)
-            plt.barh(task[:50], end_date - start_date, height=bar_height, left=start_date,
-                     color=light_green)
-
-        monitors = self.add_running_to_monitors(monitors)
-        for monitor in reversed(monitors):
-            if (isinstance(monitor, PayloadMonitor) and monitor.run_call_in_thread
-                    or not isinstance(monitor, PayloadMonitor) and monitor.start_monitors):
-                colors = ['white', gray, 'green']
-            else:
-                colors = ['white', 'green']
-            start_date = 0
-            state = False
-            for i, end_date in enumerate(monitor.state_flip_times):
-                plt.barh(monitor.formatted_name()[:50], end_date - start_date, height=bar_height, left=start_date,
-                         color=colors[i % len(colors)])
-                start_date = end_date
+        self.plot_history(task_history, tasks)
+        self.plot_history(monitor_history, monitors)
 
         plt.gca().yaxis.tick_right()
         plt.subplots_adjust(left=0.01, right=0.75)
         plt.xlabel('Time [s]')
         plt.ylabel('Tasks')
-        plt.xlim(0, god_map.time)
-        plt.ylim(-1, len(monitors) + len(tasks))
+        plt.xlim(0, monitor_history[-1][0])
+        plt.ylim(-1, num_bars)
         plt.tight_layout()
         plt.grid()
         create_path(file_name)
         plt.savefig(file_name)
         logging.loginfo(f'Saved gantt chart to {file_name}.')
 
-    def add_running_to_monitors(self, monitors: List[Monitor]) -> List[Monitor]:
-        monitor_time_line: Dict[float, List[Tuple[Monitor, Status]]] = SortedDict()
-        for monitor in monitors:
-            monitor.state_flip_times.append(god_map.time)
-            state_counter = 0
-            if isinstance(monitor, PayloadMonitor) and monitor.run_call_in_thread:
-                states = [Status.FAILURE, Status.RUNNING, Status.SUCCESS]
-            else:
-                states = [Status.FAILURE, Status.SUCCESS]
-            for time in monitor.state_flip_times:
-                if time not in monitor_time_line:
-                    monitor_time_line[time] = []
-                state_counter += 1
-                state_counter = state_counter % len(states)
-                state = states[state_counter]
-                monitor_time_line[time].append((monitor, state))
-        total_state: Dict[str, Status] = {monitor.name: Status.FAILURE for monitor in monitors}
-        for time in monitor_time_line:
-            for (monitor, state) in monitor_time_line[time]:
-                total_state[monitor.name] = state
-            for monitor in monitors:
-                start_monitor_names = [m.name for m in monitor.start_monitors]
-                active = np.all(
-                    [status == Status.SUCCESS for m, status in total_state.items() if m in start_monitor_names])
-                if (not isinstance(monitor, PayloadMonitor)
-                        and monitor.start_monitors
-                        and total_state[monitor.name] == Status.FAILURE
-                        and active):
-                    monitor.state_flip_times.append(time)
-                    monitor.state_flip_times = list(sorted(monitor.state_flip_times))
-                    total_state[monitor.name] = Status.RUNNING
+    def plot_history(self, history: List[Tuple[float, List[Optional[Status]]]], things, bar_height: float = 0.8):
+        color_map = {Status.FAILURE: 'white', Status.RUNNING: 'gray', Status.SUCCESS: 'green'}
+        state: Dict[str, Tuple[float, Status]] = {t.name: (0, Status.FAILURE) for t in things}
+        for end_time, history_state in history:
+            for thing_id, status in enumerate(history_state):
+                thing = things[thing_id]
+                start_time, last_status = state[thing.name]
+                if status != last_status:
+                    plt.barh(thing.formatted_name()[:50], end_time - start_time, height=bar_height, left=start_time,
+                             color=color_map[last_status])
+                    state[thing.name] = (end_time, status)
 
-        return monitors
+    def get_new_history(self) \
+            -> Tuple[List[Tuple[float, List[Optional[Status]]]], List[Tuple[float, List[Optional[Status]]]]]:
+        # because the monitor state doesn't get updated after the final end motion becomes true
+        god_map.monitor_manager.evaluate_monitors()
+        monitor_history: List[Tuple[float, List[Optional[Status]]]] = []
+        task_history: List[Tuple[float, List[Optional[Status]]]] = []
+        for time_id, (time, state) in enumerate(god_map.monitor_manager.state_history):
+            next_monitor_state = [Status.SUCCESS if x else Status.FAILURE for x in state]
+            next_task_state = []
+            if time_id >= 1:
+                for monitor_id, monitor in enumerate(god_map.monitor_manager.monitors):
+                    monitor_state = state[monitor_id]
+                    if not monitor.start_monitors:
+                        if isinstance(monitor, PayloadMonitor) and not monitor_state:
+                            next_monitor_state[monitor_id] = Status.RUNNING
+                        continue
+                    prev_state = god_map.monitor_manager.state_history[time_id-1][1]
+                    active = np.all(prev_state[monitor.state_filter])
+                    if not monitor_state and active:
+                        next_monitor_state[monitor_id] = Status.RUNNING
+
+            for goal_id, goal in enumerate(god_map.motion_goal_manager.motion_goals.values()):
+                for task_id, task in enumerate(goal.tasks):
+                    if task.start_monitors:
+                        started = np.all(state[god_map.monitor_manager.to_state_filter(task.start_monitors)])
+                    else:
+                        started = True
+                    if task.hold_monitors:
+                        held = np.all(state[god_map.monitor_manager.to_state_filter(task.hold_monitors)])
+                    else:
+                        held = False
+                    if task.end_monitors:
+                        ended = np.all(state[god_map.monitor_manager.to_state_filter(task.end_monitors)])
+                    else:
+                        ended = False
+                    task_state = Status.FAILURE
+                    if not ended:
+                        if started:
+                            if held:
+                                task_state = Status.RUNNING
+                            else:
+                                task_state = Status.SUCCESS
+                    next_task_state.append(task_state)
+
+            monitor_history.append((time, next_monitor_state))
+            task_history.append((time, next_task_state))
+        # add Nones to make sure all bars gets "ended"
+        new_end_time = god_map.time + god_map.qp_controller_config.sample_period
+        monitor_history.append((new_end_time, [None] * len(monitor_history[0][1])))
+        task_history.append((new_end_time, [None] * len(task_history[0][1])))
+
+        return monitor_history, task_history
 
     @record_time
     @profile
     def update(self):
+        if not god_map.monitor_manager.state_history:
+            return Status.SUCCESS
         try:
-            goals = god_map.motion_goal_manager.motion_goals
+            goals = list(god_map.motion_goal_manager.motion_goals.values())
             file_name = god_map.giskard.tmp_folder + f'gantt_charts/goal_{god_map.goal_id}.pdf'
             self.plot_gantt_chart(goals, god_map.monitor_manager.monitors, file_name)
         except Exception as e:
             logging.logwarn(f'Failed to create goal gantt chart: {e}.')
+            traceback.print_exc()
+
         return Status.SUCCESS

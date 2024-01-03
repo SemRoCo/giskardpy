@@ -452,10 +452,10 @@ class TestPayloadMonitor:
                                                                name='joint_monitor2')
         end_monitor = zero_pose.monitors.add_local_minimum_reached()
 
-        zero_pose.motion_goals.add_joint_position(goal_name='g1',
+        zero_pose.motion_goals.add_joint_position(name='g1',
                                                   goal_state=zero_pose.better_pose,
                                                   end_monitors=[joint_monitor1])
-        zero_pose.motion_goals.add_joint_position(goal_name='g2',
+        zero_pose.motion_goals.add_joint_position(name='g2',
                                                   goal_state=pocky_pose,
                                                   start_monitors=[joint_monitor1],
                                                   end_monitors=[end_monitor, joint_monitor2])
@@ -486,16 +486,16 @@ class TestPayloadMonitor:
                                                          root_link=root_link,
                                                          tip_link=tip_link,
                                                          goal_pose=pose2,
-                                                         update_pose_on=[monitor1])
+                                                         start_monitors=[monitor1])
         end_monitor = zero_pose.monitors.add_local_minimum_reached()
 
         zero_pose.motion_goals.add_cartesian_pose(goal_pose=pose1,
-                                                  goal_name='g1',
+                                                  name='g1',
                                                   root_link=root_link,
                                                   tip_link=tip_link,
                                                   end_monitors=[monitor1])
         zero_pose.motion_goals.add_cartesian_pose(goal_pose=pose2,
-                                                  goal_name='g2',
+                                                  name='g2',
                                                   root_link=root_link,
                                                   tip_link=tip_link,
                                                   relative=True,

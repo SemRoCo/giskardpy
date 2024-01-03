@@ -1082,8 +1082,7 @@ class MonitorWrapper:
                            tip_group: Optional[str] = None,
                            position_threshold: float = 0.01,
                            orientation_threshold: float = 0.01,
-                           update_pose_on: Optional[List[str]] = None,
-                           start_monitors: List[str] = None,
+                           start_monitors: Optional[List[str]] = None,
                            stay_one: bool = True):
         if name is None:
             name = f'{root_link}/{tip_link} pose reached'
@@ -1097,7 +1096,6 @@ class MonitorWrapper:
                          start_monitors=start_monitors,
                          position_threshold=position_threshold,
                          orientation_threshold=orientation_threshold,
-                         update_pose_on=update_pose_on,
                          stay_one=stay_one)
         return name
 

@@ -7,7 +7,7 @@ from py_trees import Status
 from giskardpy.goals.collision_avoidance import CollisionAvoidance
 from giskardpy.goals.goal import Goal
 from giskardpy.goals.monitors.monitors import ExpressionMonitor, Monitor
-from giskardpy.goals.monitors.payload_monitors import EndMotion
+from giskardpy.goals.monitors.payload_monitors import EndMotion, CancelMotion
 from giskardpy.goals.tasks.task import Task
 from giskardpy.god_map import god_map
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
@@ -25,8 +25,11 @@ def create_graph(goals: List[Goal], all_monitors: List[Monitor], output_file: st
         if not nodes:
             if isinstance(thing, Monitor):
                 if isinstance(thing, EndMotion):
-                    shape = 'box'
+                    shape = 'octagon'
                     color = 'red'
+                elif isinstance(thing, CancelMotion):
+                    shape = 'octagon'
+                    color = 'orange'
                 elif isinstance(thing, ExpressionMonitor):
                     shape = 'box'
                     color = 'black'
@@ -44,7 +47,7 @@ def create_graph(goals: List[Goal], all_monitors: List[Monitor], output_file: st
 
     # Process monitors and their start_monitors
     for monitor in all_monitors:
-        if monitor.start_monitors:
+        if monitor.plot:
             monitor_node = add_or_get_node(monitor)
             for sub_monitor in monitor.start_monitors:
                 sub_monitor_node = add_or_get_node(sub_monitor)

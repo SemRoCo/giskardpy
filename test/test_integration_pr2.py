@@ -821,6 +821,7 @@ class TestPayloadMonitor:
         local_min = zero_pose.monitors.add_local_minimum_reached(start_monitors=[right_monitor, left_monitor])
 
         end = zero_pose.monitors.add_end_motion(start_monitors=[local_min, sleep2, right_monitor, left_monitor])
+        zero_pose.monitors.add_max_trajectory_length(120)
         zero_pose.execute(add_local_minimum_reached=False)
         assert god_map.trajectory.length_in_seconds > 6
 

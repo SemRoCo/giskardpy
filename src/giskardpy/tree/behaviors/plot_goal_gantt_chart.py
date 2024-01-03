@@ -9,7 +9,7 @@ from sortedcontainers import SortedDict
 from giskardpy.goals.collision_avoidance import CollisionAvoidance
 from giskardpy.goals.goal import Goal
 from giskardpy.goals.monitors.monitors import Monitor
-from giskardpy.goals.monitors.payload_monitors import PayloadMonitor
+from giskardpy.goals.monitors.payload_monitors import PayloadMonitor, EndMotion, CancelMotion
 from giskardpy.god_map import god_map
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
@@ -36,6 +36,7 @@ class PlotGanttChart(GiskardBehavior):
         plt.figure(figsize=(god_map.time * 0.25 + 5, num_bars * 0.3))
 
         self.plot_history(task_history, tasks, task_plot_filter)
+        plt.axhline(y=num_tasks-0.5, color='black', linestyle='--')
         self.plot_history(monitor_history, monitors, monitor_plot_filter)
 
         plt.gca().yaxis.tick_right()
@@ -63,6 +64,8 @@ class PlotGanttChart(GiskardBehavior):
                 if status != last_status:
                     plt.barh(thing.name[:50], end_time - start_time, height=bar_height, left=start_time,
                              color=color_map[last_status])
+                    if isinstance(thing, (EndMotion, CancelMotion)) and status == Status.SUCCESS:
+                        plt.barh(thing.name[:50], end_time, height=bar_height/2, color='blue')
                     state[thing.name] = (end_time, status)
 
     def get_new_history(self) \

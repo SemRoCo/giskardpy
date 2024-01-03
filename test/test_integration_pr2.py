@@ -505,301 +505,314 @@ class TestPayloadMonitor:
         zero_pose.monitors.add_end_motion(start_monitors=[end_monitor])
         zero_pose.execute(add_local_minimum_reached=False)
 
-    # def test_bowl_and_cup_sequence(self, kitchen_setup: PR2TestWrapper):
-    #     # %% setup
-    #     bowl_name = 'bowl'
-    #     cup_name = 'cup'
-    #     percentage = 50
-    #     drawer_handle = 'sink_area_left_middle_drawer_handle'
-    #     drawer_joint = 'sink_area_left_middle_drawer_main_joint'
-    #     # spawn cup
-    #     cup_pose = PoseStamped()
-    #     cup_pose.header.frame_id = 'iai_kitchen/sink_area_left_middle_drawer_main'
-    #     cup_pose.header.stamp = rospy.get_rostime() + rospy.Duration(0.5)
-    #     cup_pose.pose.position = Point(0.1, 0.2, -.05)
-    #     cup_pose.pose.orientation = Quaternion(0, 0, 0, 1)
-    #
-    #     kitchen_setup.add_cylinder_to_world(name=cup_name, height=0.07, radius=0.04, pose=cup_pose,
-    #                                         parent_link='sink_area_left_middle_drawer_main')
-    #
-    #     # spawn bowl
-    #     bowl_pose = PoseStamped()
-    #     bowl_pose.header.frame_id = 'iai_kitchen/sink_area_left_middle_drawer_main'
-    #     bowl_pose.pose.position = Point(0.1, -0.2, -.05)
-    #     bowl_pose.pose.orientation = Quaternion(0, 0, 0, 1)
-    #
-    #     kitchen_setup.add_cylinder_to_world(name=bowl_name, height=0.05, radius=0.07, pose=bowl_pose,
-    #                                         parent_link='sink_area_left_middle_drawer_main')
-    #
-    #     # %% phase 1: grasp drawer handle
-    #     bar_axis = Vector3Stamped()
-    #     bar_axis.header.frame_id = drawer_handle
-    #     bar_axis.vector.y = 1
-    #
-    #     bar_center = PointStamped()
-    #     bar_center.header.frame_id = drawer_handle
-    #
-    #     tip_grasp_axis = Vector3Stamped()
-    #     tip_grasp_axis.header.frame_id = kitchen_setup.l_tip
-    #     tip_grasp_axis.vector.z = 1
-    #
-    #     phase1 = kitchen_setup.monitors.add_distance_to_line(name='phase 1',
-    #                                                          root_link=kitchen_setup.default_root,
-    #                                                          tip_link=kitchen_setup.l_tip,
-    #                                                          center_point=bar_center,
-    #                                                          line_axis=bar_axis,
-    #                                                          line_length=0.4)
-    #     kitchen_setup.motion_goals.add_grasp_bar(bar_center=bar_center,
-    #                                              bar_axis=bar_axis,
-    #                                              bar_length=0.4,
-    #                                              tip_link=kitchen_setup.l_tip,
-    #                                              tip_grasp_axis=tip_grasp_axis,
-    #                                              root_link=kitchen_setup.default_root,
-    #                                              end_monitors=[phase1])
-    #     x_gripper = Vector3Stamped()
-    #     x_gripper.header.frame_id = kitchen_setup.l_tip
-    #     x_gripper.vector.x = 1
-    #
-    #     x_goal = Vector3Stamped()
-    #     x_goal.header.frame_id = drawer_handle
-    #     x_goal.vector.x = -1
-    #
-    #     kitchen_setup.motion_goals.add_align_planes(tip_link=kitchen_setup.l_tip,
-    #                                                 tip_normal=x_gripper,
-    #                                                 root_link=kitchen_setup.default_root,
-    #                                                 goal_normal=x_goal,
-    #                                                 end_monitors=[phase1])
-    #     # kitchen_setup.allow_all_collisions()
-    #     # kitchen_setup.plan_and_execute()
-    #
-    #     # %% phase 2 open drawer
-    #     phase2 = kitchen_setup.monitors.add_local_minimum_reached('phase 2',
-    #                                                               start_monitors=[phase1])
-    #     kitchen_setup.motion_goals.add_open_container(tip_link=kitchen_setup.l_tip,
-    #                                                   environment_link=drawer_handle,
-    #                                                   start_monitors=[phase1],
-    #                                                   end_monitors=[phase2])
-    #
-    #     # %% phase 3 pre grasp
-    #
-    #     base_pose = PoseStamped()
-    #     base_pose.header.frame_id = 'map'
-    #     base_pose.pose.position.y = 1
-    #     base_pose.pose.position.x = .1
-    #     base_pose.pose.orientation.w = 1
-    #     joint_position_reached = kitchen_setup.monitors.add_joint_position(kitchen_setup.better_pose,
-    #                                                                        name='phase 3 joint goal',
-    #                                                                        start_monitors=[phase2])
-    #     base_pose_reached = kitchen_setup.monitors.add_cartesian_pose(root_link=kitchen_setup.default_root,
-    #                                                                   tip_link='base_footprint',
-    #                                                                   goal_pose=base_pose,
-    #                                                                   start_monitors=[phase2],
-    #                                                                   name='phase 3 base goal')
-    #     kitchen_setup.motion_goals.add_joint_position(kitchen_setup.better_pose,
-    #                                                   start_monitors=[phase2],
-    #                                                   end_monitors=[joint_position_reached])
-    #     kitchen_setup.motion_goals.add_cartesian_pose(root_link=kitchen_setup.default_root,
-    #                                                   tip_link='base_footprint',
-    #                                                   goal_pose=base_pose,
-    #                                                   start_monitors=[phase2],
-    #                                                   end_monitors=[base_pose_reached])
-    #
-    #     phase3 = kitchen_setup.monitors.add_local_minimum_reached('phase3 done',
-    #                                                               start_monitors=[
-    #                                                                   joint_position_reached,
-    #                                                                   base_pose_reached
-    #                                                               ])
-    #
-    #     # %% phase 4 grasping
-    #     attach_cup = 'attach_cup'
-    #     attach_bowl = 'attach_bowl'
-    #     l_post_grasp = 'l_post_grasp'
-    #     r_post_grasp = 'r_post_grasp'
-    #     # %% grasp bowl
-    #     l_goal = deepcopy(bowl_pose)
-    #     l_goal.header.frame_id = 'iai_kitchen/sink_area_left_middle_drawer_main'
-    #     l_goal.pose.position.z += .2
-    #     l_goal.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 1, 0, 0],
-    #                                                                   [0, 0, -1, 0],
-    #                                                                   [-1, 0, 0, 0],
-    #                                                                   [0, 0, 0, 1]]))
-    #     l_pre_grasp_pose = kitchen_setup.monitors.add_cartesian_pose(root_link=kitchen_setup.default_root,
-    #                                                                  tip_link=kitchen_setup.l_tip,
-    #                                                                  goal_pose=l_goal,
-    #                                                                  name='l_pre_grasp_pose',
-    #                                                                  start_monitors=[phase3])
-    #     kitchen_setup.motion_goals.add_cartesian_pose(goal_pose=l_goal,
-    #                                                   tip_link=kitchen_setup.l_tip,
-    #                                                   root_link=kitchen_setup.default_root,
-    #                                                   name=l_pre_grasp_pose,
-    #                                                   start_monitors=[phase3],
-    #                                                   end_monitors=[l_pre_grasp_pose])
-    #     l_grasp_goal = deepcopy(l_goal)
-    #     l_grasp_goal.pose.position.z -= .2
-    #     l_grasp_pose = kitchen_setup.monitors.add_cartesian_pose(root_link=kitchen_setup.default_root,
-    #                                                              tip_link=kitchen_setup.l_tip,
-    #                                                              goal_pose=l_grasp_goal,
-    #                                                              name='l_grasp_pose',
-    #                                                              start_monitors=[l_pre_grasp_pose])
-    #     kitchen_setup.motion_goals.add_cartesian_pose(goal_pose=l_grasp_goal,
-    #                                                   tip_link=kitchen_setup.l_tip,
-    #                                                   root_link=kitchen_setup.default_root,
-    #                                                   name=l_grasp_pose,
-    #                                                   start_monitors=[l_pre_grasp_pose],
-    #                                                   end_monitors=[attach_bowl])
-    #     # kitchen_setup.allow_collision(kitchen_setup.l_gripper_group, bowl_name) TODO
-    #     kitchen_setup.monitors.update_parent_link_of_group(start_monitors=[l_grasp_pose],
-    #                                                        name=attach_bowl,
-    #                                                        group_name=bowl_name,
-    #                                                        parent_link=kitchen_setup.l_tip)
-    #     kitchen_setup.monitors.add_joint_position(goal_state=kitchen_setup.better_pose_left,
-    #                                               name=l_post_grasp,
-    #                                               start_monitors=[attach_bowl])
-    #     kitchen_setup.motion_goals.add_joint_position(goal_state=kitchen_setup.better_pose_left,
-    #                                                   name=l_post_grasp,
-    #                                                   start_monitors=[attach_bowl],
-    #                                                   end_monitors=[l_post_grasp, r_post_grasp])
-    #
-    #     # %% grasp cup
-    #     r_goal = deepcopy(cup_pose)
-    #     r_goal.header.frame_id = 'iai_kitchen/sink_area_left_middle_drawer_main'
-    #     r_goal.pose.position.z += .2
-    #     r_goal.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 1, 0, 0],
-    #                                                                   [0, 0, -1, 0],
-    #                                                                   [-1, 0, 0, 0],
-    #                                                                   [0, 0, 0, 1]]))
-    #     r_pre_grasp_pose = kitchen_setup.monitors.add_cartesian_pose(root_link=kitchen_setup.default_root,
-    #                                                                  tip_link=kitchen_setup.r_tip,
-    #                                                                  goal_pose=r_goal,
-    #                                                                  name='r_pre_grasp_pose',
-    #                                                                  start_monitors=[phase3])
-    #     kitchen_setup.motion_goals.add_cartesian_pose(goal_pose=r_goal,
-    #                                                   tip_link=kitchen_setup.r_tip,
-    #                                                   root_link=kitchen_setup.default_root,
-    #                                                   name=r_pre_grasp_pose,
-    #                                                   start_monitors=[phase3],
-    #                                                   end_monitors=[r_pre_grasp_pose])
-    #     r_goal = deepcopy(r_goal)
-    #     r_goal.pose.position.z -= .2
-    #     r_grasp_pose = kitchen_setup.monitors.add_cartesian_pose(root_link=kitchen_setup.default_root,
-    #                                                              tip_link=kitchen_setup.r_tip,
-    #                                                              goal_pose=r_goal,
-    #                                                              name='r_grasp_pose',
-    #                                                              start_monitors=[r_pre_grasp_pose])
-    #     kitchen_setup.motion_goals.add_cartesian_pose(goal_pose=r_goal,
-    #                                                   name=r_grasp_pose,
-    #                                                   tip_link=kitchen_setup.r_tip,
-    #                                                   root_link=kitchen_setup.default_root,
-    #                                                   start_monitors=[r_pre_grasp_pose],
-    #                                                   end_monitors=[attach_cup])
-    #
-    #     kitchen_setup.monitors.update_parent_link_of_group(start_monitors=[r_grasp_pose],
-    #                                                        name=attach_cup,
-    #                                                        group_name=cup_name,
-    #                                                        parent_link=kitchen_setup.r_tip)
-    #
-    #     kitchen_setup.monitors.add_joint_position(goal_state=kitchen_setup.better_pose_right,
-    #                                               name=r_post_grasp,
-    #                                               start_monitors=[attach_cup])
-    #     kitchen_setup.motion_goals.add_joint_position(goal_state=kitchen_setup.better_pose_right,
-    #                                                   name=r_post_grasp,
-    #                                                   start_monitors=[attach_cup],
-    #                                                   end_monitors=[l_post_grasp, r_post_grasp])
-    #
-    #     kitchen_setup.motion_goals.add_avoid_joint_limits(percentage=percentage,
-    #                                                       start_monitors=[phase3],
-    #                                                       end_monitors=[attach_bowl, attach_cup])
-    #     phase4 = kitchen_setup.monitors.add_local_minimum_reached(name='phase4',
-    #                                                               start_monitors=[l_post_grasp, r_post_grasp])
-    #
-    #     # %% phase 5 rotate
-    #     phase5 = kitchen_setup.monitors.add_local_minimum_reached(name='phase5',
-    #                                                               start_monitors=[phase4])
-    #
-    #     base_goal = PoseStamped()
-    #     base_goal.header.frame_id = 'base_footprint'
-    #     base_goal.pose.position.x = -.1
-    #     base_goal.pose.orientation = Quaternion(*quaternion_about_axis(pi, [0, 0, 1]))
-    #     kitchen_setup.motion_goals.add_cartesian_pose(goal_pose=base_goal,
-    #                                                   tip_link='base_footprint',
-    #                                                   name='rotate_to_island',
-    #                                                   root_link=kitchen_setup.default_root,
-    #                                                   start_monitors=[phase4],
-    #                                                   end_monitors=[phase5])
-    #
-    #     # %% phase 6 place bowl and cup
-    #     phase6 = kitchen_setup.monitors.add_local_minimum_reached(name='phase6',
-    #                                                               start_monitors=[phase5])
-    #     bowl_goal = PoseStamped()
-    #     bowl_goal.header.frame_id = 'kitchen_island_surface'
-    #     bowl_goal.pose.position = Point(.2, 0, .05)
-    #     bowl_goal.pose.orientation = Quaternion(0, 0, 0, 1)
-    #
-    #     cup_goal = PoseStamped()
-    #     cup_goal.header.frame_id = 'kitchen_island_surface'
-    #     cup_goal.pose.position = Point(.15, 0.25, .07)
-    #     cup_goal.pose.orientation = Quaternion(0, 0, 0, 1)
-    #
-    #     bowl_placed = kitchen_setup.monitors.add_cartesian_pose(root_link=kitchen_setup.default_root,
-    #                                                             tip_link=bowl_name,
-    #                                                             goal_pose=bowl_goal,
-    #                                                             name='bowl_placed',
-    #                                                             start_monitors=[phase5])
-    #     kitchen_setup.motion_goals.add_cartesian_pose(goal_pose=bowl_goal,
-    #                                                   tip_link=bowl_name,
-    #                                                   root_link=kitchen_setup.default_root,
-    #                                                   name='place_bowl',
-    #                                                   start_monitors=[phase5],
-    #                                                   end_monitors=[bowl_placed, phase6])
-    #     cup_placed = kitchen_setup.monitors.add_cartesian_pose(root_link=kitchen_setup.default_root,
-    #                                                            tip_link=cup_name,
-    #                                                            goal_pose=cup_goal,
-    #                                                            name='cup_placed',
-    #                                                            start_monitors=[phase5])
-    #     kitchen_setup.motion_goals.add_cartesian_pose(goal_pose=cup_goal,
-    #                                                   tip_link=cup_name,
-    #                                                   root_link=kitchen_setup.default_root,
-    #                                                   name='place_cup',
-    #                                                   start_monitors=[phase5],
-    #                                                   end_monitors=[cup_placed, phase6])
-    #     kitchen_setup.motion_goals.add_avoid_joint_limits(percentage=percentage,
-    #                                                       name='avoid_joint_limits_while_placing',
-    #                                                       start_monitors=[phase5],
-    #                                                       end_monitors=[cup_placed, bowl_placed])
-    #     # kitchen_setup.avoid_all_collisions(0.05)
-    #     bowl_detached = kitchen_setup.monitors.update_parent_link_of_group(start_monitors=[bowl_placed],
-    #                                                                        name='detach_bowl',
-    #                                                                        group_name=bowl_name,
-    #                                                                        parent_link='map')
-    #     cup_detached = kitchen_setup.monitors.update_parent_link_of_group(start_monitors=[cup_placed],
-    #                                                                       name='detach_cup',
-    #                                                                       group_name=cup_name,
-    #                                                                       parent_link='map')
-    #     # kitchen_setup.allow_collision(group1=kitchen_setup.robot_name, group2=cup_name)
-    #     # kitchen_setup.allow_collision(group1=kitchen_setup.robot_name, group2=bowl_name)
-    #
-    #     # %% phase7 final pose
-    #     phase7 = kitchen_setup.monitors.add_local_minimum_reached(name='phase7',
-    #                                                               start_monitors=[bowl_detached, cup_detached])
-    #     kitchen_setup.motion_goals.add_joint_position(goal_state=kitchen_setup.better_pose,
-    #                                                   name='final pose',
-    #                                                   start_monitors=[phase6, bowl_detached, cup_detached],
-    #                                                   end_monitors=[phase7])
-    #
-    #     kitchen_setup.monitors.add_end_motion(start_monitors=[phase7])
-    #     kitchen_setup.monitors.add_max_trajectory_length(60)
-    #     kitchen_setup.allow_all_collisions()
-    #     kitchen_setup.execute(add_local_minimum_reached=False)
+    def test_bowl_and_cup_sequence(self, kitchen_setup: PR2TestWrapper):
+        # %% setup
+        bowl_name = 'bowl'
+        cup_name = 'cup'
+        percentage = 50
+        drawer_handle = 'sink_area_left_middle_drawer_handle'
+        drawer_joint = 'sink_area_left_middle_drawer_main_joint'
+        # spawn cup
+        cup_pose = PoseStamped()
+        cup_pose.header.frame_id = 'iai_kitchen/sink_area_left_middle_drawer_main'
+        cup_pose.header.stamp = rospy.get_rostime() + rospy.Duration(0.5)
+        cup_pose.pose.position = Point(0.1, 0.2, -.05)
+        cup_pose.pose.orientation = Quaternion(0, 0, 0, 1)
+
+        kitchen_setup.add_cylinder_to_world(name=cup_name, height=0.07, radius=0.04, pose=cup_pose,
+                                            parent_link='sink_area_left_middle_drawer_main')
+
+        # spawn bowl
+        bowl_pose = PoseStamped()
+        bowl_pose.header.frame_id = 'iai_kitchen/sink_area_left_middle_drawer_main'
+        bowl_pose.pose.position = Point(0.1, -0.2, -.05)
+        bowl_pose.pose.orientation = Quaternion(0, 0, 0, 1)
+
+        kitchen_setup.add_cylinder_to_world(name=bowl_name, height=0.05, radius=0.07, pose=bowl_pose,
+                                            parent_link='sink_area_left_middle_drawer_main')
+
+        # %% phase 1: grasp drawer handle
+        bar_axis = Vector3Stamped()
+        bar_axis.header.frame_id = drawer_handle
+        bar_axis.vector.y = 1
+
+        bar_center = PointStamped()
+        bar_center.header.frame_id = drawer_handle
+
+        tip_grasp_axis = Vector3Stamped()
+        tip_grasp_axis.header.frame_id = kitchen_setup.l_tip
+        tip_grasp_axis.vector.z = 1
+
+        phase1 = kitchen_setup.monitors.add_distance_to_line(name='phase 1',
+                                                             root_link=kitchen_setup.default_root,
+                                                             tip_link=kitchen_setup.l_tip,
+                                                             center_point=bar_center,
+                                                             line_axis=bar_axis,
+                                                             line_length=0.4)
+        kitchen_setup.motion_goals.add_grasp_bar(bar_center=bar_center,
+                                                 bar_axis=bar_axis,
+                                                 bar_length=0.4,
+                                                 tip_link=kitchen_setup.l_tip,
+                                                 tip_grasp_axis=tip_grasp_axis,
+                                                 root_link=kitchen_setup.default_root,
+                                                 end_monitors=[phase1])
+        x_gripper = Vector3Stamped()
+        x_gripper.header.frame_id = kitchen_setup.l_tip
+        x_gripper.vector.x = 1
+
+        x_goal = Vector3Stamped()
+        x_goal.header.frame_id = drawer_handle
+        x_goal.vector.x = -1
+
+        kitchen_setup.motion_goals.add_align_planes(tip_link=kitchen_setup.l_tip,
+                                                    tip_normal=x_gripper,
+                                                    root_link=kitchen_setup.default_root,
+                                                    goal_normal=x_goal,
+                                                    end_monitors=[phase1])
+        # kitchen_setup.allow_all_collisions()
+        # kitchen_setup.plan_and_execute()
+
+        # %% phase 2 open drawer
+        phase2 = kitchen_setup.monitors.add_local_minimum_reached('phase 2',
+                                                                  start_monitors=[phase1])
+        kitchen_setup.motion_goals.add_open_container(tip_link=kitchen_setup.l_tip,
+                                                      environment_link=drawer_handle,
+                                                      start_monitors=[phase1],
+                                                      end_monitors=[phase2])
+
+        # %% phase 3 pre grasp
+
+        base_pose = PoseStamped()
+        base_pose.header.frame_id = 'map'
+        base_pose.pose.position.y = 1
+        base_pose.pose.position.x = .1
+        base_pose.pose.orientation.w = 1
+        joint_position_reached = kitchen_setup.monitors.add_joint_position(kitchen_setup.better_pose,
+                                                                           name='phase 3 joint goal',
+                                                                           start_monitors=[phase2])
+        base_pose_reached = kitchen_setup.monitors.add_cartesian_pose(root_link=kitchen_setup.default_root,
+                                                                      tip_link='base_footprint',
+                                                                      goal_pose=base_pose,
+                                                                      start_monitors=[phase2],
+                                                                      name='phase 3 base goal')
+        kitchen_setup.motion_goals.add_joint_position(kitchen_setup.better_pose,
+                                                      start_monitors=[phase2],
+                                                      end_monitors=[joint_position_reached])
+        kitchen_setup.motion_goals.add_cartesian_pose(root_link=kitchen_setup.default_root,
+                                                      tip_link='base_footprint',
+                                                      goal_pose=base_pose,
+                                                      start_monitors=[phase2],
+                                                      end_monitors=[base_pose_reached])
+
+        phase3 = kitchen_setup.monitors.add_local_minimum_reached('phase3 done',
+                                                                  start_monitors=[
+                                                                      joint_position_reached,
+                                                                      base_pose_reached
+                                                                  ])
+
+        # %% phase 4 grasping
+        attach_cup = 'attach_cup'
+        attach_bowl = 'attach_bowl'
+        l_post_grasp = 'l_post_grasp'
+        r_post_grasp = 'r_post_grasp'
+        # %% grasp bowl
+        l_goal = deepcopy(bowl_pose)
+        l_goal.header.frame_id = 'iai_kitchen/sink_area_left_middle_drawer_main'
+        l_goal.pose.position.z += .2
+        l_goal.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 1, 0, 0],
+                                                                      [0, 0, -1, 0],
+                                                                      [-1, 0, 0, 0],
+                                                                      [0, 0, 0, 1]]))
+        l_pre_grasp_pose = kitchen_setup.monitors.add_cartesian_pose(root_link=kitchen_setup.default_root,
+                                                                     tip_link=kitchen_setup.l_tip,
+                                                                     goal_pose=l_goal,
+                                                                     name='l_pre_grasp_pose',
+                                                                     start_monitors=[phase3])
+        kitchen_setup.motion_goals.add_cartesian_pose(goal_pose=l_goal,
+                                                      tip_link=kitchen_setup.l_tip,
+                                                      root_link=kitchen_setup.default_root,
+                                                      name=l_pre_grasp_pose,
+                                                      start_monitors=[phase3],
+                                                      end_monitors=[l_pre_grasp_pose])
+        l_grasp_goal = deepcopy(l_goal)
+        l_grasp_goal.pose.position.z -= .2
+        l_grasp_pose = kitchen_setup.monitors.add_cartesian_pose(root_link=kitchen_setup.default_root,
+                                                                 tip_link=kitchen_setup.l_tip,
+                                                                 goal_pose=l_grasp_goal,
+                                                                 name='l_grasp_pose',
+                                                                 start_monitors=[l_pre_grasp_pose])
+        kitchen_setup.motion_goals.add_cartesian_pose(goal_pose=l_grasp_goal,
+                                                      tip_link=kitchen_setup.l_tip,
+                                                      root_link=kitchen_setup.default_root,
+                                                      name=l_grasp_pose,
+                                                      start_monitors=[l_pre_grasp_pose],
+                                                      end_monitors=[attach_bowl])
+        # kitchen_setup.allow_collision(kitchen_setup.l_gripper_group, bowl_name) TODO
+        kitchen_setup.monitors.update_parent_link_of_group(start_monitors=[l_grasp_pose],
+                                                           name=attach_bowl,
+                                                           group_name=bowl_name,
+                                                           parent_link=kitchen_setup.l_tip)
+        kitchen_setup.monitors.add_joint_position(goal_state=kitchen_setup.better_pose_left,
+                                                  name=l_post_grasp,
+                                                  start_monitors=[attach_bowl])
+        kitchen_setup.motion_goals.add_joint_position(goal_state=kitchen_setup.better_pose_left,
+                                                      name=l_post_grasp,
+                                                      start_monitors=[attach_bowl],
+                                                      end_monitors=[l_post_grasp, r_post_grasp])
+
+        # %% grasp cup
+        r_goal = deepcopy(cup_pose)
+        r_goal.header.frame_id = 'iai_kitchen/sink_area_left_middle_drawer_main'
+        r_goal.pose.position.z += .2
+        r_goal.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 1, 0, 0],
+                                                                      [0, 0, -1, 0],
+                                                                      [-1, 0, 0, 0],
+                                                                      [0, 0, 0, 1]]))
+        r_pre_grasp_pose = kitchen_setup.monitors.add_cartesian_pose(root_link=kitchen_setup.default_root,
+                                                                     tip_link=kitchen_setup.r_tip,
+                                                                     goal_pose=r_goal,
+                                                                     name='r_pre_grasp_pose',
+                                                                     start_monitors=[phase3])
+        kitchen_setup.motion_goals.add_cartesian_pose(goal_pose=r_goal,
+                                                      tip_link=kitchen_setup.r_tip,
+                                                      root_link=kitchen_setup.default_root,
+                                                      name=r_pre_grasp_pose,
+                                                      start_monitors=[phase3],
+                                                      end_monitors=[r_pre_grasp_pose])
+        r_goal = deepcopy(r_goal)
+        r_goal.pose.position.z -= .2
+        r_grasp_pose = kitchen_setup.monitors.add_cartesian_pose(root_link=kitchen_setup.default_root,
+                                                                 tip_link=kitchen_setup.r_tip,
+                                                                 goal_pose=r_goal,
+                                                                 name='r_grasp_pose',
+                                                                 start_monitors=[r_pre_grasp_pose])
+        kitchen_setup.motion_goals.add_cartesian_pose(goal_pose=r_goal,
+                                                      name=r_grasp_pose,
+                                                      tip_link=kitchen_setup.r_tip,
+                                                      root_link=kitchen_setup.default_root,
+                                                      start_monitors=[r_pre_grasp_pose],
+                                                      end_monitors=[attach_cup])
+
+        kitchen_setup.monitors.update_parent_link_of_group(start_monitors=[r_grasp_pose],
+                                                           name=attach_cup,
+                                                           group_name=cup_name,
+                                                           parent_link=kitchen_setup.r_tip)
+
+        kitchen_setup.monitors.add_joint_position(goal_state=kitchen_setup.better_pose_right,
+                                                  name=r_post_grasp,
+                                                  start_monitors=[attach_cup])
+        kitchen_setup.motion_goals.add_joint_position(goal_state=kitchen_setup.better_pose_right,
+                                                      name=r_post_grasp,
+                                                      start_monitors=[attach_cup],
+                                                      end_monitors=[l_post_grasp, r_post_grasp])
+
+        kitchen_setup.motion_goals.add_avoid_joint_limits(percentage=percentage,
+                                                          start_monitors=[phase3],
+                                                          end_monitors=[attach_bowl, attach_cup])
+        phase4 = kitchen_setup.monitors.add_local_minimum_reached(name='phase4',
+                                                                  start_monitors=[l_post_grasp, r_post_grasp])
+
+        # %% phase 5 rotate
+        phase5 = kitchen_setup.monitors.add_local_minimum_reached(name='phase5',
+                                                                  start_monitors=[phase4])
+
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = 'base_footprint'
+        base_goal.pose.position.x = -.1
+        base_goal.pose.orientation = Quaternion(*quaternion_about_axis(pi, [0, 0, 1]))
+        kitchen_setup.motion_goals.add_cartesian_pose(goal_pose=base_goal,
+                                                      tip_link='base_footprint',
+                                                      name='rotate_to_island',
+                                                      root_link=kitchen_setup.default_root,
+                                                      start_monitors=[phase4],
+                                                      end_monitors=[phase5])
+
+        # %% phase 6 place bowl and cup
+        phase6 = kitchen_setup.monitors.add_local_minimum_reached(name='phase6',
+                                                                  start_monitors=[phase5])
+        bowl_goal = PoseStamped()
+        bowl_goal.header.frame_id = 'kitchen_island_surface'
+        bowl_goal.pose.position = Point(.2, 0, .05)
+        bowl_goal.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 1, 0, 0],
+                                                                         [0, 0, -1, 0],
+                                                                         [-1, 0, 0, 0],
+                                                                         [0, 0, 0, 1]]))
+
+        cup_goal = PoseStamped()
+        cup_goal.header.frame_id = 'kitchen_island_surface'
+        cup_goal.pose.position = Point(.15, 0.25, .07)
+        cup_goal.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 1, 0, 0],
+                                                                        [0, 0, -1, 0],
+                                                                        [-1, 0, 0, 0],
+                                                                        [0, 0, 0, 1]]))
+
+        bowl_placed = kitchen_setup.monitors.add_cartesian_pose(root_link=kitchen_setup.default_root,
+                                                                tip_link=kitchen_setup.l_tip,
+                                                                goal_pose=bowl_goal,
+                                                                name='bowl_placed',
+                                                                start_monitors=[phase5])
+        kitchen_setup.motion_goals.add_cartesian_pose(goal_pose=bowl_goal,
+                                                      tip_link=kitchen_setup.l_tip,
+                                                      root_link=kitchen_setup.default_root,
+                                                      name='place_bowl',
+                                                      start_monitors=[phase5],
+                                                      end_monitors=[bowl_placed, phase6])
+        cup_placed = kitchen_setup.monitors.add_cartesian_pose(root_link=kitchen_setup.default_root,
+                                                               tip_link=kitchen_setup.r_tip,
+                                                               goal_pose=cup_goal,
+                                                               name='cup_placed',
+                                                               start_monitors=[phase5])
+        kitchen_setup.motion_goals.add_cartesian_pose(goal_pose=cup_goal,
+                                                      tip_link=kitchen_setup.r_tip,
+                                                      root_link=kitchen_setup.default_root,
+                                                      name='place_cup',
+                                                      start_monitors=[phase5],
+                                                      end_monitors=[cup_placed, phase6])
+        kitchen_setup.motion_goals.add_avoid_joint_limits(percentage=percentage,
+                                                          name='avoid_joint_limits_while_placing',
+                                                          start_monitors=[phase5],
+                                                          end_monitors=[cup_placed, bowl_placed])
+        # kitchen_setup.avoid_all_collisions(0.05)
+        bowl_detached = kitchen_setup.monitors.update_parent_link_of_group(start_monitors=[bowl_placed],
+                                                                           name='detach_bowl',
+                                                                           group_name=bowl_name,
+                                                                           parent_link='map')
+        cup_detached = kitchen_setup.monitors.update_parent_link_of_group(start_monitors=[cup_placed],
+                                                                          name='detach_cup',
+                                                                          group_name=cup_name,
+                                                                          parent_link='map')
+        # kitchen_setup.allow_collision(group1=kitchen_setup.robot_name, group2=cup_name)
+        # kitchen_setup.allow_collision(group1=kitchen_setup.robot_name, group2=bowl_name)
+
+        # %% phase7 final pose
+        final_pose_monitor = kitchen_setup.monitors.add_joint_position(goal_state=kitchen_setup.better_pose,
+                                                                       name='final pose',
+                                                                       start_monitors=[bowl_detached, cup_detached])
+        phase7 = kitchen_setup.monitors.add_local_minimum_reached(name='phase7',
+                                                                  start_monitors=[final_pose_monitor, bowl_detached, cup_detached])
+        kitchen_setup.motion_goals.add_joint_position(goal_state=kitchen_setup.better_pose,
+                                                      name=final_pose_monitor,
+                                                      start_monitors=[phase6, bowl_detached, cup_detached],
+                                                      end_monitors=[final_pose_monitor, phase7])
+
+        kitchen_setup.monitors.add_end_motion(start_monitors=[phase7])
+        kitchen_setup.monitors.add_max_trajectory_length(60)
+        kitchen_setup.allow_all_collisions()
+        kitchen_setup.execute(add_local_minimum_reached=False)
 
     def test_sleep(self, zero_pose: PR2TestWrapper):
         sleep1 = zero_pose.monitors.add_sleep(2, name='sleep1')
         print1 = zero_pose.monitors.add_print(message=f'{sleep1} done', start_monitors=[sleep1])
         sleep2 = zero_pose.monitors.add_sleep(3, name='sleep2', start_monitors=[print1])
-        joint_monitor = zero_pose.monitors.add_joint_position(zero_pose.better_pose)
         local_min = zero_pose.monitors.add_local_minimum_reached()
-        end = zero_pose.monitors.add_end_motion(start_monitors=[local_min, sleep2, joint_monitor])
         zero_pose.motion_goals.allow_all_collisions()
-        zero_pose.motion_goals.add_joint_position(zero_pose.better_pose, start_monitors=[sleep2])
+
+        right_monitor = zero_pose.monitors.add_joint_position(zero_pose.better_pose_right)
+        left_monitor = zero_pose.monitors.add_joint_position(zero_pose.better_pose_left)
+        zero_pose.motion_goals.add_joint_position(zero_pose.better_pose_right, start_monitors=[sleep2])
+        zero_pose.motion_goals.add_joint_position(zero_pose.better_pose_left)
+
+        end = zero_pose.monitors.add_end_motion(start_monitors=[local_min, sleep2, right_monitor, left_monitor])
         zero_pose.execute(add_local_minimum_reached=False)
         assert god_map.trajectory.length_in_seconds > 6
 

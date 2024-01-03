@@ -143,6 +143,7 @@ class UpdateParentLinkOfGroup(WorldUpdatePayloadMonitor):
     def apply_world_update(self):
         god_map.world.move_group(group_name=self.group_name,
                                  new_parent_link_name=self.new_parent_link)
+        rospy.sleep(2)
 
 
 class CollisionMatrixUpdater(PayloadMonitor):

@@ -84,19 +84,13 @@ class MonitorManager:
         raise KeyError(f'No monitor of name \'{name}\' found.')
 
     @profile
-    def update_expr_monitor_state(self, new_state: np.ndarray, last_state: np.ndarray) -> np.ndarray:
+    def update_expr_monitor_state(self, new_state: np.ndarray) -> np.ndarray:
         # Assuming new_state is a NumPy array with only 1 and 0
         new_state = new_state.astype(int)
         filtered_switches = self.switches_state[self.stay_one_filter]
         filtered_new_state = new_state[self.stay_one_filter]
-        # new_flips = flipped_to_one(filtered_switches, filtered_new_state)
         self.switches_state[self.stay_one_filter] = filtered_switches | filtered_new_state
         next_state = self.switches_state | new_state
-        any_flips = np.logical_xor(last_state, next_state)
-        if np.any(any_flips):
-            for i, state in enumerate(any_flips):
-                if state:
-                    self.expression_monitors[i].notify_flipped(god_map.time)
         return next_state
 
     @property
@@ -187,7 +181,7 @@ class MonitorManager:
 
         num_expr_monitors = len(self.expression_monitors)
         expr_monitor_state = self.compiled_monitors.fast_call(args)
-        expr_monitor_state = self.update_expr_monitor_state(expr_monitor_state, self.state[:num_expr_monitors])
+        expr_monitor_state = self.update_expr_monitor_state(expr_monitor_state)
         next_state[:num_expr_monitors] = expr_monitor_state
         next_state[num_expr_monitors:] = self.evaluate_payload_monitors()
         self.state = next_state

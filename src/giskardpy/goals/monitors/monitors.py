@@ -21,14 +21,12 @@ class Monitor:
     name: str
     start_monitors: List[Monitor]
     plot: bool
-    state_flip_times: List[float]
 
     def __init__(self, name: str, start_monitors: Optional[List[Monitor]] = None, plot: bool = True):
         self.name = name
         self.start_monitors = start_monitors or []
         self.id = -1
         self.plot = plot
-        self.state_flip_times = []
 
     @cached_property
     def state_filter(self) -> np.ndarray:
@@ -78,9 +76,6 @@ class ExpressionMonitor(Monitor):
         for monitor in self.start_monitors:
             monitor_state = monitor.get_state_expression()
             self._expression = cas.logic_and(self._expression, monitor_state)
-
-    def notify_flipped(self, time: float):
-        self.state_flip_times.append(time)
 
     def get_expression(self):
         return self._expression

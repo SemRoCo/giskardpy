@@ -29,7 +29,6 @@ class PayloadMonitor(Monitor, ABC):
     def __init__(self, name: str, start_monitors: List[Monitor], run_call_in_thread: bool):
         self.id = -1
         self.name = name
-        self.state_flip_times = []
         self.state = False
         self.run_call_in_thread = run_call_in_thread
         super().__init__(name=name, start_monitors=start_monitors)

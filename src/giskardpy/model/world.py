@@ -735,7 +735,7 @@ class WorldTree(WorldTreeInterface):
                 ancestry[group_name] = ancestors[0]
         return ancestry
 
-    def _get_group_name_containing_link(self, link_name: Union[PrefixName, str]) -> str:
+    def get_group_name_containing_link(self, link_name: Union[PrefixName, str]) -> str:
         groups = self.get_group_names_containing_link(link_name)
         ret = self._get_group_from_groups(groups)
         if ret is None:

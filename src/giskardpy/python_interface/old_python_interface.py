@@ -139,13 +139,13 @@ class OldGiskardWrapper(GiskardWrapper):
         """
         if add_monitor:
             monitor_name = f'{root_link}/{tip_link} pose reached'
-            self.monitors.add_cartesian_pose(name=monitor_name,
-                                             root_link=root_link,
-                                             root_group=root_group,
-                                             tip_link=tip_link,
-                                             tip_group=tip_group,
-                                             position_threshold=0.02,
-                                             goal_pose=goal_pose)
+            monitor_name = self.monitors.add_cartesian_pose(name=monitor_name,
+                                                            root_link=root_link,
+                                                            root_group=root_group,
+                                                            tip_link=tip_link,
+                                                            tip_group=tip_group,
+                                                            position_threshold=0.02,
+                                                            goal_pose=goal_pose)
             end_monitors_monitors = [monitor_name]
         else:
             end_monitors_monitors = []
@@ -190,12 +190,12 @@ class OldGiskardWrapper(GiskardWrapper):
         """
         if add_monitor:
             monitor_name = f'{root_link}/{tip_link} pose reached'
-            self.monitors.add_cartesian_pose(name=monitor_name,
-                                             root_link=root_link,
-                                             root_group=root_group,
-                                             tip_link=tip_link,
-                                             tip_group=tip_group,
-                                             goal_pose=goal_pose)
+            monitor_name = self.monitors.add_cartesian_pose(name=monitor_name,
+                                                            root_link=root_link,
+                                                            root_group=root_group,
+                                                            tip_link=tip_link,
+                                                            tip_group=tip_group,
+                                                            goal_pose=goal_pose)
             end_monitors_monitors = [monitor_name]
         else:
             end_monitors_monitors = []
@@ -232,12 +232,12 @@ class OldGiskardWrapper(GiskardWrapper):
         """
         if add_monitor:
             monitor_name = f'{root_link}/{tip_link} position reached'
-            self.monitors.add_cartesian_position(name=monitor_name,
-                                                 root_link=root_link,
-                                                 root_group=root_group,
-                                                 tip_link=tip_link,
-                                                 tip_group=tip_group,
-                                                 goal_point=goal_point)
+            monitor_name = self.monitors.add_cartesian_position(name=monitor_name,
+                                                                root_link=root_link,
+                                                                root_group=root_group,
+                                                                tip_link=tip_link,
+                                                                tip_group=tip_group,
+                                                                goal_point=goal_point)
             end_monitors_monitors = [monitor_name]
         else:
             end_monitors_monitors = []
@@ -270,12 +270,12 @@ class OldGiskardWrapper(GiskardWrapper):
         """
         if add_monitor:
             monitor_name = f'{root_link}/{tip_link} position reached'
-            self.monitors.add_cartesian_position(name=monitor_name,
-                                                 root_link=root_link,
-                                                 root_group=root_group,
-                                                 tip_link=tip_link,
-                                                 tip_group=tip_group,
-                                                 goal_point=goal_point)
+            monitor_name = self.monitors.add_cartesian_position(name=monitor_name,
+                                                                root_link=root_link,
+                                                                root_group=root_group,
+                                                                tip_link=tip_link,
+                                                                tip_group=tip_group,
+                                                                goal_point=goal_point)
             end_monitors_monitors = [monitor_name]
         else:
             end_monitors_monitors = []
@@ -312,12 +312,12 @@ class OldGiskardWrapper(GiskardWrapper):
         """
         if add_monitor:
             monitor_name = f'{root_link}/{tip_link} orientation reached'
-            self.monitors.add_cartesian_orientation(name=monitor_name,
-                                                    root_link=root_link,
-                                                    root_group=root_group,
-                                                    tip_link=tip_link,
-                                                    tip_group=tip_group,
-                                                    goal_orientation=goal_orientation)
+            monitor_name = self.monitors.add_cartesian_orientation(name=monitor_name,
+                                                                   root_link=root_link,
+                                                                   root_group=root_group,
+                                                                   tip_link=tip_link,
+                                                                   tip_group=tip_group,
+                                                                   goal_orientation=goal_orientation)
             end_monitors_monitors = [monitor_name]
         else:
             end_monitors_monitors = []
@@ -355,13 +355,13 @@ class OldGiskardWrapper(GiskardWrapper):
         """
         if add_monitor:
             monitor_name = f'{root_link}/{tip_link} vectors aligned {len(self.monitors._monitors)}'
-            self.monitors.add_vectors_aligned(name=monitor_name,
-                                              root_link=root_link,
-                                              tip_link=tip_link,
-                                              goal_normal=goal_normal,
-                                              tip_normal=tip_normal,
-                                              root_group=root_group,
-                                              tip_group=tip_group)
+            monitor_name = self.monitors.add_vectors_aligned(name=monitor_name,
+                                                             root_link=root_link,
+                                                             tip_link=tip_link,
+                                                             goal_normal=goal_normal,
+                                                             tip_normal=tip_normal,
+                                                             root_group=root_group,
+                                                             tip_group=tip_group)
             end_monitors_monitors = [monitor_name]
         else:
             end_monitors_monitors = []

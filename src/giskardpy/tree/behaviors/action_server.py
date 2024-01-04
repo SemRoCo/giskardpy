@@ -3,8 +3,8 @@ from queue import Queue, Empty
 import actionlib
 from py_trees import Blackboard
 
-from giskard_msgs.msg._MoveGoal import MoveGoal
-from giskard_msgs.msg._MoveResult import MoveResult
+from giskard_msgs.msg import MoveGoal
+from giskard_msgs.msg import MoveResult
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.decorators import record_time
 

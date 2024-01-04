@@ -78,7 +78,7 @@ class MotionGoalManager:
                 robot_name = god_map.world.get_group_of_joint(joint_name).name
             except KeyError:
                 child_link = god_map.world.joints[joint_name].child_link_name
-                robot_name = god_map.world._get_group_name_containing_link(child_link)
+                robot_name = god_map.world.get_group_name_containing_link(child_link)
             child_links = god_map.world.get_directly_controlled_child_links_with_collisions(joint_name, fixed_joints)
             if child_links:
                 number_of_repeller = configs[robot_name].external_collision_avoidance[joint_name].number_of_repeller
@@ -147,8 +147,8 @@ class MotionGoalManager:
                                          config[link_b].soft_threshold)
                     number_of_repeller = min(config[link_a].number_of_repeller,
                                              config[link_b].number_of_repeller)
-                groups_a = god_map.world._get_group_name_containing_link(link_a)
-                groups_b = god_map.world._get_group_name_containing_link(link_b)
+                groups_a = god_map.world.get_group_name_containing_link(link_a)
+                groups_b = god_map.world.get_group_name_containing_link(link_b)
                 if groups_b == groups_a:
                     robot_name = groups_a
                 else:

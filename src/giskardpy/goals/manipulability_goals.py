@@ -1,22 +1,11 @@
 from typing import Optional, List
 
-import numpy as np
-from geometry_msgs.msg import PointStamped, PoseStamped, QuaternionStamped
-from geometry_msgs.msg import Vector3Stamped
-from tf.transformations import rotation_from_matrix
-
 from giskardpy import casadi_wrapper as cas
 from giskardpy.goals.goal import Goal
-from giskardpy.goals.monitors.monitors import Monitor
-from giskardpy.goals.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE, Task
+from giskardpy.monitors.monitors import ExpressionMonitor
+from giskardpy.tasks.task import Task
 from giskardpy.god_map import god_map
-from giskardpy.model.joints import DiffDrive, OmniDrivePR22
-from giskardpy.my_types import Derivatives
 from giskardpy.symbol_manager import symbol_manager
-from giskardpy.utils import logging
-from giskardpy.utils.expression_definition_utils import transform_msg_and_turn_to_expr, transform_msg
-from giskardpy.utils.tfwrapper import normalize
-from giskardpy.utils.utils import split_pose_stamped
 
 
 class MaxManipulability(Goal):
@@ -25,9 +14,9 @@ class MaxManipulability(Goal):
                  optimize_rotational_dofs=False,
                  monitor_threshold: float = 0.01,
                  prediction_horizon: int = 5,
-                 start_monitors: Optional[List[Monitor]] = None,
-                 hold_monitors: Optional[List[Monitor]] = None,
-                 end_monitors: Optional[List[Monitor]] = None
+                 start_monitors: Optional[List[ExpressionMonitor]] = None,
+                 hold_monitors: Optional[List[ExpressionMonitor]] = None,
+                 end_monitors: Optional[List[ExpressionMonitor]] = None
                  ):
         self.root_link = god_map.world.search_for_link_name(root_link, None)
         self.tip_link = god_map.world.search_for_link_name(tip_link, None)
@@ -61,7 +50,7 @@ class MaxManipulability(Goal):
         god_map.debug_expression_manager.add_debug_expression('mIndex_percentualDifference',
                                                               1 - cas.min(cas.save_division(old_m, m), 1))
         percentual_diff = 1 - cas.min(cas.save_division(old_m, m), 1)
-        monitor = Monitor(name=f'manipMonitor{tip_link}', crucial=True)
+        monitor = ExpressionMonitor(name=f'manipMonitor{tip_link}')
         monitor.set_expression(cas.less(percentual_diff, monitor_threshold))
         task.add_end_monitors_monitor(monitor)
         self.add_monitor(monitor)

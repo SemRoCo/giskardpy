@@ -1,6 +1,7 @@
 from py_trees import Sequence
 
 from giskardpy.tree.behaviors.append_zero_velocity import SetZeroVelocity
+from giskardpy.tree.behaviors.delete_monitors_behaviors import DeleteMonitors
 from giskardpy.tree.behaviors.goal_cleanup import GoalCleanUp
 from giskardpy.tree.behaviors.log_trajectory import LogTrajPlugin
 from giskardpy.tree.behaviors.plot_debug_expressions import PlotDebugExpressions
@@ -20,17 +21,19 @@ class CleanupControlLoop(Sequence):
         self.add_child(SetZeroVelocity('set zero vel 1'))
         self.add_child(LogTrajPlugin('log post processing'))
         self.add_child(GoalCleanUp('clean up goals'))
+        self.add_child(DeleteMonitors())
         self.reset_world_state = ResetWorldState()
         self.remove_reset_world_state()
 
     def add_plot_trajectory(self, normalize_position: bool = False, wait: bool = False):
-        self.add_child(PlotTrajectory('plot trajectory', wait=wait, normalize_position=normalize_position))
+        self.insert_child(PlotTrajectory('plot trajectory', wait=wait, normalize_position=normalize_position),
+                          index=-1)
 
     def add_plot_debug_trajectory(self, normalize_position: bool = False, wait: bool = False):
         self.add_child(PlotDebugExpressions('plot debug trajectory', wait=wait, normalize_position=normalize_position))
 
     def add_plot_gantt_chart(self):
-        self.add_child(PlotGanttChart())
+        self.insert_child(PlotGanttChart(), 0)
 
     @toggle_on('has_reset_world_state')
     def add_reset_world_state(self):

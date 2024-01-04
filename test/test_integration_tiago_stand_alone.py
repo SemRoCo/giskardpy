@@ -12,8 +12,7 @@ from giskardpy.configs.giskard import Giskard
 from giskardpy.configs.qp_controller_config import QPControllerConfig
 from giskardpy.configs.iai_robots.tiago import TiagoStandaloneInterface, TiagoCollisionAvoidanceConfig
 from giskardpy.configs.world_config import WorldWithDiffDriveRobot
-from giskardpy.goals.goal import WEIGHT_BELOW_CA
-from giskardpy.goals.tasks.task import WEIGHT_ABOVE_CA
+from giskardpy.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
 from giskardpy.god_map import god_map
 from giskardpy.my_types import PrefixName
 from giskardpy.utils.utils import launch_launchfile
@@ -298,7 +297,7 @@ class TestCartGoals:
                                                                          [0, -1, 0, 0],
                                                                          [0, 0, 1, 0],
                                                                          [0, 0, 0, 1]]))
-        base_pose = tf.transform_pose(apartment_setup.default_root, base_pose)
+        base_pose = god_map.world.transform_pose(apartment_setup.default_root, base_pose)
         base_pose.pose.position.z = 0
         # apartment_setup.allow_all_collisions()
         apartment_setup.move_base(base_pose)
@@ -359,7 +358,7 @@ class TestCollisionAvoidance:
                                                                          [0, -1, 0, 0],
                                                                          [0, 0, -1, 0],
                                                                          [0, 0, 0, 1]]))
-        apartment_setup.add_cart_goal(left_pose,
+        apartment_setup.set_cart_goal(left_pose,
                                       tip_link=l_tcp,
                                       root_link=apartment_setup.default_root,
                                       weight=WEIGHT_ABOVE_CA * 10,
@@ -372,7 +371,7 @@ class TestCollisionAvoidance:
         apartment_setup.plan_and_execute()
 
         apartment_setup.set_diff_drive_tangential_to_point(goal_point=goal_point, weight=WEIGHT_BELOW_CA)
-        apartment_setup.add_cart_goal(left_pose,
+        apartment_setup.set_cart_goal(left_pose,
                                       tip_link=l_tcp,
                                       root_link=apartment_setup.default_root,
                                       add_monitor=False)
@@ -546,7 +545,7 @@ class TestCollisionAvoidance:
                                                                          [0, -1, 0, 0],
                                                                          [0, 0, -1, 0],
                                                                          [0, 0, 0, 1]]))
-        apartment_setup.add_cart_goal(left_pose,
+        apartment_setup.set_cart_goal(left_pose,
                                       tip_link=tcp,
                                       root_link=god_map.world.root_link_name,
                                       add_monitor=False)

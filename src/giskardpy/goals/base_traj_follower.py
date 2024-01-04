@@ -1,27 +1,24 @@
 from __future__ import division
 
-from copy import deepcopy
-from typing import Optional, List, Tuple
+from typing import Optional, List
 
 import numpy as np
 # import matplotlib.pyplot as plt
-from scipy.interpolate import UnivariateSpline
 import rospy
-from geometry_msgs.msg import PointStamped, Vector3Stamped, Vector3, Point
+from geometry_msgs.msg import PointStamped, Vector3, Point
 from sensor_msgs.msg import LaserScan
 from visualization_msgs.msg import MarkerArray, Marker
 
 from giskardpy import casadi_wrapper as w
 from giskardpy.exceptions import GiskardException, ConstraintInitalizationException
 from giskardpy.goals.goal import Goal
-from giskardpy.goals.monitors.monitors import Monitor
-from giskardpy.goals.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE, Task
+from giskardpy.monitors.monitors import ExpressionMonitor
+from giskardpy.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE, Task
 from giskardpy.god_map import god_map
 from giskardpy.model.joints import OmniDrive, OmniDrivePR22
 from giskardpy.my_types import my_string, Derivatives, PrefixName
 from giskardpy.utils import logging
 from giskardpy.utils.decorators import memoize_with_counter, clear_memo
-from giskardpy.utils.tfwrapper import point_to_np
 from giskardpy.utils.utils import raise_to_blackboard
 from giskardpy.symbol_manager import symbol_manager
 
@@ -31,9 +28,9 @@ class BaseTrajFollower(Goal):
                  joint_name: my_string,
                  track_only_velocity: bool = False,
                  weight: float = WEIGHT_ABOVE_CA,
-                 start_monitors: Optional[List[Monitor]] = None,
-                 hold_monitors: Optional[List[Monitor]] = None,
-                 end_monitors: Optional[List[Monitor]] = None):
+                 start_monitors: Optional[List[ExpressionMonitor]] = None,
+                 hold_monitors: Optional[List[ExpressionMonitor]] = None,
+                 end_monitors: Optional[List[ExpressionMonitor]] = None):
         self.weight = weight
         self.joint_name = joint_name
         super().__init__(name=f'{self.__class__.__name__}/{self.joint_name}')

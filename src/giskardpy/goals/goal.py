@@ -3,23 +3,16 @@ from __future__ import annotations
 import abc
 from abc import ABC
 from collections import OrderedDict
-from typing import Optional, Tuple, Dict, List, Union, Callable, TYPE_CHECKING, overload
+from typing import Optional, Tuple, Dict, List, Union
 
-from geometry_msgs.msg import PoseStamped, PointStamped, QuaternionStamped, Vector3Stamped
-
-from giskardpy.goals.monitors.monitors import Monitor
-from giskardpy.goals.tasks.task import Task, WEIGHT_BELOW_CA
+from giskardpy.monitors.monitors import ExpressionMonitor, Monitor
 from giskardpy.god_map import god_map
-from giskardpy.symbol_manager import symbol_manager
-
-if TYPE_CHECKING:
-    from giskardpy.tree.control_modes import ControlModes
-
-import giskardpy.utils.tfwrapper as tf
+from giskardpy.tasks.task import Task
+from giskardpy.utils.utils import string_shortener
 from giskardpy import casadi_wrapper as w
-from giskardpy.exceptions import ConstraintInitalizationException, UnknownGroupException
+from giskardpy.exceptions import ConstraintInitalizationException
 from giskardpy.model.joints import OneDofJoint
-from giskardpy.my_types import my_string, transformable_message, PrefixName, Derivatives
+from giskardpy.my_types import PrefixName, Derivatives
 from giskardpy.qp.constraint import InequalityConstraint, EqualityConstraint, DerivativeInequalityConstraint, \
     ManipulabilityConstraint
 
@@ -39,6 +32,14 @@ class Goal(ABC):
         """
         self.tasks = []
         self.name = name
+
+    def formatted_name(self, quoted: bool = False) -> str:
+        formatted_name = string_shortener(original_str=self.name,
+                                          max_lines=4,
+                                          max_line_length=25)
+        if quoted:
+            return '"' + formatted_name + '"'
+        return formatted_name
 
     def clean_up(self):
         pass
@@ -66,22 +67,23 @@ class Goal(ABC):
             return joint.get_symbol(Derivatives.position)
         raise TypeError(f'get_joint_position_symbol is only supported for OneDofJoint, not {type(joint)}')
 
-    def connect_start_monitors_to_all_tasks(self, monitors: List[Monitor]):
+    def connect_start_monitors_to_all_tasks(self, monitors: List[ExpressionMonitor]):
         for monitor in monitors:
             for task in self.tasks:
                 task.add_start_monitors_monitor(monitor)
 
-    def connect_hold_monitors_to_all_tasks(self, monitors: List[Monitor]):
+    def connect_hold_monitors_to_all_tasks(self, monitors: List[ExpressionMonitor]):
         for monitor in monitors:
             for task in self.tasks:
                 task.add_hold_monitors_monitor(monitor)
 
-    def connect_end_monitors_to_all_tasks(self, monitors: List[Monitor]):
+    def connect_end_monitors_to_all_tasks(self, monitors: List[ExpressionMonitor]):
         for monitor in monitors:
             for task in self.tasks:
                 task.add_end_monitors_monitor(monitor)
 
-    def connect_monitors_to_all_tasks(self, start_monitors: List[Monitor], hold_monitors: List[Monitor], end_monitors: List[Monitor]):
+    def connect_monitors_to_all_tasks(self, start_monitors: List[ExpressionMonitor],
+                                      hold_monitors: List[ExpressionMonitor], end_monitors: List[ExpressionMonitor]):
         self.connect_start_monitors_to_all_tasks(start_monitors)
         self.connect_hold_monitors_to_all_tasks(hold_monitors)
         self.connect_end_monitors_to_all_tasks(end_monitors)
@@ -117,18 +119,18 @@ class Goal(ABC):
 
     @profile
     def get_constraints(self) -> Tuple[Dict[str, EqualityConstraint],
-                                       Dict[str, InequalityConstraint],
-                                       Dict[str, DerivativeInequalityConstraint],
-                                       Dict[str, Union[w.Symbol, float]],
-                                       Dict[str, ManipulabilityConstraint]]:
+    Dict[str, InequalityConstraint],
+    Dict[str, DerivativeInequalityConstraint],
+    Dict[str, Union[w.Symbol, float]],
+    Dict[str, ManipulabilityConstraint]]:
         self._equality_constraints = OrderedDict()
         self._inequality_constraints = OrderedDict()
         self._derivative_constraints = OrderedDict()
         self._debug_expressions = OrderedDict()
         self._manip_constraints = OrderedDict()
-        
+
         self._task_sanity_check()
-        
+
         for task in self.tasks:
             for constraint in task.get_eq_constraints():
                 name = f'{task.name}/{constraint.name}'
@@ -148,7 +150,7 @@ class Goal(ABC):
                 self._manip_constraints[constraint.name] = constraint
 
         return self._equality_constraints, self._inequality_constraints, self._derivative_constraints, \
-               self._manip_constraints, self._debug_expressions
+            self._manip_constraints, self._debug_expressions
 
     def _task_sanity_check(self):
         if not self.has_tasks():
@@ -172,8 +174,8 @@ class Goal(ABC):
         for task in tasks:
             self.add_task(task)
 
-    def add_monitor(self, monitor: Monitor):
-        god_map.monitor_manager.add_monitor(monitor)
+    def add_monitor(self, monitor: ExpressionMonitor):
+        god_map.monitor_manager.add_expression_monitor(monitor)
 
 
 class NonMotionGoal(Goal):

@@ -3,7 +3,7 @@ from __future__ import annotations
 import rospy
 
 from giskard_msgs.msg import MoveGoal, MoveResult
-from typing import TYPE_CHECKING, List, Dict, Set, Tuple
+from typing import TYPE_CHECKING, List, Dict, Tuple
 import os
 
 if TYPE_CHECKING:
@@ -18,15 +18,12 @@ if TYPE_CHECKING:
     from giskardpy.qp.qp_controller import QPProblemBuilder
     from giskardpy.configs.qp_controller_config import QPControllerConfig
     from giskardpy.my_types import Derivatives, PrefixName
-    from giskardpy.goals.goal import Goal
     from giskardpy.configs.giskard import Giskard
     from giskardpy.goals.motion_goal_manager import MotionGoalManager
     from giskardpy.debug_expression_manager import DebugExpressionManager
-    from giskardpy.goals.monitors.monitor_manager import MonitorManager
-    from giskardpy.goals.monitors.monitors import Monitor
+    from giskardpy.monitors.monitor_manager import MonitorManager
     from giskardpy.configs.collision_avoidance_config import CollisionAvoidanceConfig
     from giskardpy.configs.world_config import WorldConfig
-    from giskardpy.tree.control_modes import ControlModes
     from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer, CollisionCheckerLib, \
         CollisionAvoidanceGroupThresholds, Collisions
     from giskardpy.model.world import WorldTree

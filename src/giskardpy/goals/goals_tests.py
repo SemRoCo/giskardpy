@@ -3,8 +3,8 @@ from typing import Optional, List
 import numpy as np
 from geometry_msgs.msg import QuaternionStamped, PointStamped, PoseStamped, Vector3Stamped
 import giskardpy.casadi_wrapper as w
-from giskardpy.goals.goal import Goal, NonMotionGoal
-from giskardpy.goals.monitors.monitors import Monitor
+from giskardpy.goals.goal import NonMotionGoal
+from giskardpy.monitors.monitors import ExpressionMonitor
 from giskardpy.god_map import god_map
 from giskardpy.symbol_manager import symbol_manager
 
@@ -12,9 +12,9 @@ from giskardpy.symbol_manager import symbol_manager
 class DebugGoal(NonMotionGoal):
     def __init__(self,
                  name: Optional[str] = None,
-                 start_monitors: Optional[List[Monitor]] = None,
-                 hold_monitors: Optional[List[Monitor]] = None,
-                 end_monitors: Optional[List[Monitor]] = None):
+                 start_monitors: Optional[List[ExpressionMonitor]] = None,
+                 hold_monitors: Optional[List[ExpressionMonitor]] = None,
+                 end_monitors: Optional[List[ExpressionMonitor]] = None):
         if name is None:
             name = self.__class__.__name__
         super().__init__(name=name)

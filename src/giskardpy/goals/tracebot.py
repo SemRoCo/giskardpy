@@ -5,13 +5,11 @@ from typing import Optional, List
 import numpy as np
 from geometry_msgs.msg import Vector3Stamped, PointStamped
 
-import giskardpy.utils.tfwrapper as tf
 from giskardpy import casadi_wrapper as cas
 from giskardpy.goals.goal import Goal
-from giskardpy.goals.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE
-from giskardpy.goals.monitors.monitors import Monitor
-from giskardpy.goals.tasks.joint_tasks import PositionTask
-from giskardpy.goals.tasks.task import Task
+from giskardpy.tasks.task import WEIGHT_ABOVE_CA
+from giskardpy.monitors.monitors import ExpressionMonitor
+from giskardpy.tasks.task import Task
 from giskardpy.god_map import god_map
 from giskardpy.utils.expression_definition_utils import transform_msg
 
@@ -26,9 +24,9 @@ class InsertCylinder(Goal):
                  tilt: float = np.pi / 10,
                  get_straight_after: float = 0.02,
                  name: Optional[str] = None,
-                 start_monitors: Optional[List[Monitor]] = None,
-                 hold_monitors: Optional[List[Monitor]] = None,
-                 end_monitors: Optional[List[Monitor]] = None):
+                 start_monitors: Optional[List[ExpressionMonitor]] = None,
+                 hold_monitors: Optional[List[ExpressionMonitor]] = None,
+                 end_monitors: Optional[List[ExpressionMonitor]] = None):
         self.cylinder_name = cylinder_name
         self.get_straight_after = get_straight_after
         self.root = god_map.world.root_link_name
@@ -64,14 +62,14 @@ class InsertCylinder(Goal):
         root_P_top = root_P_hole + root_V_up * self.pre_grasp_height
         distance_to_top = cas.euclidean_distance(root_P_tip, root_P_top)
         top_reached = cas.less(distance_to_top, 0.01)
-        top_reached_monitor = Monitor(name='top reached', crucial=False, stay_one=True)
+        top_reached_monitor = ExpressionMonitor(name='top reached', stay_one=True)
         self.add_monitor(top_reached_monitor)
         top_reached_monitor.set_expression(top_reached)
 
         distance_to_line, root_P_on_line = cas.distance_point_to_line_segment(root_P_tip, root_P_hole, root_P_top)
         distance_to_hole = cas.norm(root_P_hole - root_P_tip)
         bottom_reached = cas.less(distance_to_hole, 0.01)
-        bottom_reached_monitor = Monitor('bottom reached', crucial=True, stay_one=True)
+        bottom_reached_monitor = ExpressionMonitor('bottom reached', stay_one=True)
         bottom_reached_monitor.set_expression(bottom_reached)
         self.add_monitor(bottom_reached_monitor)
 
@@ -121,7 +119,7 @@ class InsertCylinder(Goal):
         #
         # # tilt straight
         tilt_error = cas.angle_between_vector(root_V_cylinder_z, root_V_up)
-        tilt_monitor = Monitor(name='straight', crucial=True)
+        tilt_monitor = ExpressionMonitor(name='straight')
         tilt_monitor.set_expression(cas.less(tilt_error, 0.01))
         self.add_monitor(tilt_monitor)
 

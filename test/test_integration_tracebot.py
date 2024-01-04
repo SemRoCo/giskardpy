@@ -106,7 +106,7 @@ class TestCartGoals:
         goal.pose.orientation.w = 1
         # goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 4, [0, 0, 1]))
 
-        zero_pose.add_cart_goal(goal, tip_link=tip, root_link='world')
+        zero_pose.set_cart_goal(goal, tip_link=tip, root_link='world')
         # zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
         # zero_pose.set_translation_goal(goal, 'base_footprint', 'odom')

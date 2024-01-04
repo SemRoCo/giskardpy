@@ -829,7 +829,8 @@ class CollisionWorldSynchronizer:
         return max_distances
 
     def create_collision_matrix(self, collision_goals: List[CollisionEntry],
-                                collision_check_distances: Optional[Dict[PrefixName, float]] = None):
+                                collision_check_distances: Optional[Dict[PrefixName, float]] = None) \
+            -> Dict[Tuple[str, str], float]:
         """
         :param collision_goals: list of CollisionEntry
         :return: dict mapping (link_a, link_b) -> collision checking distance

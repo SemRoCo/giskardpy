@@ -7,12 +7,13 @@ import giskardpy.casadi_wrapper as cas
 from giskardpy.data_types import JointStates
 from giskardpy.god_map import god_map
 from giskardpy.model.trajectory import Trajectory
+from giskardpy.my_types import PrefixName
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils import logging
 
 
 class DebugExpressionManager:
-    debug_expressions: Dict[str, cas.Expression]
+    debug_expressions: Dict[PrefixName, cas.Expression]
     compiled_debug_expressions: Dict[str, cas.CompiledFunction]
     evaluated_debug_expressions: Dict[str, np.ndarray]
     _debug_trajectory: Trajectory
@@ -22,7 +23,7 @@ class DebugExpressionManager:
         self._debug_trajectory = Trajectory()
 
     def add_debug_expression(self, name: str, expression: cas.Expression):
-        self.debug_expressions[name] = expression
+        self.debug_expressions[PrefixName(name, prefix='')] = expression
 
     @property
     def debug_trajectory(self):
@@ -75,7 +76,7 @@ class DebugExpressionManager:
                     self.evaluated_expr_to_js(name, last_mjs, js, value)
             self._debug_trajectory.set(control_cycle_counter, js)
 
-    def evaluated_expr_to_js(self, name, last_js, next_js, value):
+    def evaluated_expr_to_js(self, name, last_js, next_js: JointStates, value):
         if last_js is not None:
             velocity = value - last_js[name].position
         else:

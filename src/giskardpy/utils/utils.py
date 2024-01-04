@@ -523,6 +523,8 @@ def string_shortener(original_str: str, max_lines: int, max_line_length: int) ->
     for _ in range(max_lines):
         end = start + max_line_length
         lines.append(original_str[start:end])
+        if end >= len(original_str):
+            break
         start = end
 
     result = '\n'.join(lines)

@@ -29,7 +29,7 @@ from giskardpy.configs.qp_controller_config import SupportedQPSolver
 from giskardpy.data_types import KeyDefaultDict
 from giskardpy.goals.cartesian_goals import PR2DiffDriveBaseGoal
 from giskardpy.goals.diff_drive_goals import DiffDriveTangentialToPoint, KeepHandInWorkspace
-from giskardpy.goals.tasks.task import WEIGHT_ABOVE_CA
+from giskardpy.tasks.task import WEIGHT_ABOVE_CA
 from giskardpy.god_map import god_map
 from giskardpy.model.collision_world_syncer import Collisions, Collision
 from giskardpy.my_types import PrefixName, Derivatives
@@ -448,9 +448,7 @@ class GiskardTestWrapper(OldGiskardWrapper):
     def execute(self, expected_error_code: int = MoveResult.SUCCESS, stop_after: float = None,
                 wait: bool = True, add_local_minimum_reached: bool = True) -> MoveResult:
         if add_local_minimum_reached:
-            local_min_reached_monitor_name = self.monitors.add_local_minimum_reached()
-            for goal in self.motion_goals._goals:
-                goal.end_monitors.append(local_min_reached_monitor_name)
+            self.add_default_end_motion_conditions()
         return self.send_goal(expected_error_code=expected_error_code, stop_after=stop_after, wait=wait)
 
     def projection(self, expected_error_code: int = MoveResult.SUCCESS, wait: bool = True,
@@ -461,9 +459,7 @@ class GiskardTestWrapper(OldGiskardWrapper):
         :return: result from Giskard
         """
         if add_local_minimum_reached:
-            local_min_reached_monitor_name = self.monitors.add_local_minimum_reached()
-            for goal in self.motion_goals._goals:
-                goal.end_monitors.append(local_min_reached_monitor_name)
+            self.add_default_end_motion_conditions()
         last_js = god_map.world.state.to_position_dict()
         for key, value in list(last_js.items()):
             if key not in god_map.controlled_joints:
@@ -915,7 +911,10 @@ class GiskardTestWrapper(OldGiskardWrapper):
 
     def reset_base(self):
         p = PoseStamped()
-        p.header.frame_id = tf.get_tf_root()
+        try:
+            p.header.frame_id = tf.get_tf_root()
+        except AssertionError as e:
+            p.header.frame_id = god_map.world.root_link_name
         p.pose.orientation.w = 1
         self.set_localization(p)
         self.wait_heartbeats()

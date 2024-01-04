@@ -7,8 +7,8 @@ from geometry_msgs.msg import Vector3Stamped, PointStamped
 import giskardpy.utils.tfwrapper as tf
 from giskardpy import casadi_wrapper as w
 from giskardpy.goals.goal import Goal
-from giskardpy.goals.monitors.monitors import Monitor
-from giskardpy.goals.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE, Task
+from giskardpy.monitors.monitors import ExpressionMonitor
+from giskardpy.tasks.task import WEIGHT_BELOW_CA, Task
 from giskardpy.god_map import god_map
 from giskardpy.utils.expression_definition_utils import transform_msg
 from giskardpy.utils.logging import logwarn
@@ -25,9 +25,9 @@ class Pointing(Goal):
                  max_velocity: float = 0.3,
                  weight: float = WEIGHT_BELOW_CA,
                  name: Optional[str] = None,
-                 start_monitors: Optional[List[Monitor]] = None,
-                 hold_monitors: Optional[List[Monitor]] = None,
-                 end_monitors: Optional[List[Monitor]] = None):
+                 start_monitors: Optional[List[ExpressionMonitor]] = None,
+                 hold_monitors: Optional[List[ExpressionMonitor]] = None,
+                 end_monitors: Optional[List[ExpressionMonitor]] = None):
         """
         Will orient pointing_axis at goal_point.
         :param tip_link: tip link of the kinematic chain.

@@ -22,10 +22,12 @@ from giskardpy.goals.cartesian_goals import CartesianPose, DiffDriveBaseGoal, Ca
 from giskardpy.goals.collision_avoidance import CollisionAvoidance
 from giskardpy.goals.grasp_bar import GraspBar
 from giskardpy.goals.joint_goals import JointPositionList, AvoidJointLimits, SetSeedConfiguration, SetOdometry
-from giskardpy.goals.monitors.cartesian_monitors import PoseReached, PositionReached, OrientationReached, PointingAt, \
+from giskardpy.monitors.cartesian_monitors import PoseReached, PositionReached, OrientationReached, PointingAt, \
     VectorsAligned, DistanceToLine
-from giskardpy.goals.monitors.joint_monitors import JointGoalReached
-from giskardpy.goals.monitors.monitors import LocalMinimumReached, TimeAbove
+from giskardpy.monitors.joint_monitors import JointGoalReached
+from giskardpy.monitors.monitors import LocalMinimumReached, TimeAbove, Alternator
+from giskardpy.monitors.payload_monitors import EndMotion, Print, Sleep, CancelMotion, SetMaxTrajectoryLength, \
+    UpdateParentLinkOfGroup, PayloadAlternator
 from giskardpy.goals.open_close import Close, Open
 from giskardpy.goals.pointing import Pointing
 from giskardpy.goals.set_prediction_horizon import SetMaxTrajLength, SetPredictionHorizon
@@ -327,6 +329,9 @@ class MotionGoalWrapper:
         self.reset()
 
     def reset(self):
+        """
+        Clears all goals.
+        """
         self._goals = []
         self._collision_entries = defaultdict(list)
 
@@ -336,13 +341,23 @@ class MotionGoalWrapper:
 
     def add_motion_goal(self,
                         motion_goal_class: str,
-                        goal_name: str = '',
+                        name: str = '',
                         start_monitors: Optional[List[str]] = None,
                         hold_monitors: Optional[List[str]] = None,
                         end_monitors: Optional[List[str]] = None,
                         **kwargs):
+        """
+        Generic function to add a motion goal.
+        :param motion_goal_class: Name of a class defined in
+        :param name:
+        :param start_monitors:
+        :param hold_monitors:
+        :param end_monitors:
+        :param kwargs:
+        :return:
+        """
         motion_goal = MotionGoal()
-        motion_goal.name = goal_name
+        motion_goal.name = name
         motion_goal.motion_goal_class = motion_goal_class
         motion_goal.start_monitors = start_monitors or []
         motion_goal.hold_monitors = hold_monitors or []
@@ -457,6 +472,7 @@ class MotionGoalWrapper:
                            group_name: Optional[str] = None,
                            weight: Optional[float] = None,
                            max_velocity: Optional[float] = None,
+                           name: str = '',
                            start_monitors: List[str] = None,
                            hold_monitors: List[str] = None,
                            end_monitors: List[str] = None,
@@ -469,6 +485,7 @@ class MotionGoalWrapper:
         :param max_velocity: will be applied to all joints
         """
         self.add_motion_goal(motion_goal_class=JointPositionList.__name__,
+                             name=name,
                              goal_state=goal_state,
                              group_name=group_name,
                              weight=weight,
@@ -542,7 +559,7 @@ class MotionGoalWrapper:
             if start_monitors or hold_monitors or end_monitors:
                 name += f'{start_monitors}, {hold_monitors}, {end_monitors}'
             self.add_motion_goal(motion_goal_class=CollisionAvoidance.__name__,
-                                 goal_name=name,
+                                 name=name,
                                  collision_entries=collision_entries,
                                  start_monitors=list(start_monitors),
                                  hold_monitors=list(hold_monitors),
@@ -590,6 +607,7 @@ class MotionGoalWrapper:
                                percentage: int = 15,
                                joint_list: Optional[List[str]] = None,
                                weight: Optional[float] = None,
+                               name: str = '',
                                start_monitors: List[str] = None,
                                hold_monitors: List[str] = None,
                                end_monitors: List[str] = None):
@@ -600,6 +618,7 @@ class MotionGoalWrapper:
         self.add_motion_goal(motion_goal_class=AvoidJointLimits.__name__,
                              percentage=percentage,
                              weight=weight,
+                             name=name,
                              joint_list=joint_list,
                              start_monitors=start_monitors,
                              hold_monitors=hold_monitors,
@@ -1005,51 +1024,65 @@ class MotionGoalWrapper:
 
 class MonitorWrapper:
     _monitors: List[Monitor]
+    max_trajectory_length_set: bool
 
     def __init__(self, robot_name: str):
         self._robot_name = robot_name
+        self.max_trajectory_length_set = False
         self.reset()
 
-    def get_monitors(self):
+    def get_monitors(self) -> List[Monitor]:
         return self._monitors
+
+    def get_monitor_names(self) -> List[str]:
+        return [monitor.name for monitor in self._monitors]
 
     def reset(self):
         self._monitors = []
 
-    def add_monitor(self, monitor_type: str, monitor_name: str, **kwargs):
+    def add_monitor(self, monitor_class: str, monitor_name: str, start_monitors: Optional[List[str]] = None, **kwargs):
         if [x for x in self._monitors if x.name == monitor_name]:
             raise KeyError(f'monitor named {monitor_name} already exists.')
         monitor = giskard_msgs.Monitor()
         monitor.name = monitor_name
-        monitor.monitor_class = monitor_type
+        monitor.monitor_class = monitor_class
+        monitor.start_monitors = start_monitors or []
         monitor.kwargs = kwargs_to_json(kwargs)
         self._monitors.append(monitor)
 
-    def add_local_minimum_reached(self, name: Optional[str] = None):
+    def add_local_minimum_reached(self, name: Optional[str] = None, start_monitors: Optional[List[str]] = None):
         if name is None:
             name = 'local min reached'
-        self.add_monitor(monitor_type=LocalMinimumReached.__name__, monitor_name=name)
+        self.add_monitor(monitor_class=LocalMinimumReached.__name__,
+                         monitor_name=name,
+                         start_monitors=start_monitors)
         return name
 
-    def add_time_above(self, threshold: float, name: Optional[str] = None):
+    def add_time_above(self,
+                       threshold: float,
+                       name: Optional[str] = None,
+                       start_monitors: List[str] = None):
         if name is None:
             name = 'time above'
-        self.add_monitor(monitor_type=TimeAbove.__name__, monitor_name=name, threshold=threshold)
+        self.add_monitor(monitor_class=TimeAbove.__name__,
+                         monitor_name=name,
+                         start_monitors=start_monitors,
+                         threshold=threshold)
         return name
 
     def add_joint_position(self,
                            goal_state: Dict[str, float],
                            name: Optional[str] = None,
                            threshold: float = 0.01,
-                           crucial: bool = True,
+                           start_monitors: List[str] = None,
                            stay_one: bool = True) -> str:
         if name is None:
             name = f'joint position reached {list(goal_state.keys())}'
-        self.add_monitor(monitor_type=JointGoalReached.__name__,
+        self.add_monitor(monitor_class=JointGoalReached.__name__,
                          monitor_name=name,
                          goal_state=goal_state,
                          threshold=threshold,
-                         crucial=crucial,
+                         start_monitors=start_monitors,
                          stay_one=stay_one)
         return name
 
@@ -1062,22 +1095,20 @@ class MonitorWrapper:
                            tip_group: Optional[str] = None,
                            position_threshold: float = 0.01,
                            orientation_threshold: float = 0.01,
-                           update_pose_on: Optional[List[str]] = None,
-                           crucial: bool = True,
+                           start_monitors: Optional[List[str]] = None,
                            stay_one: bool = True):
         if name is None:
             name = f'{root_link}/{tip_link} pose reached'
-        self.add_monitor(monitor_type=PoseReached.__name__,
+        self.add_monitor(monitor_class=PoseReached.__name__,
                          monitor_name=name,
                          root_link=root_link,
                          tip_link=tip_link,
                          goal_pose=goal_pose,
                          root_group=root_group,
                          tip_group=tip_group,
+                         start_monitors=start_monitors,
                          position_threshold=position_threshold,
                          orientation_threshold=orientation_threshold,
-                         update_pose_on=update_pose_on,
-                         crucial=crucial,
                          stay_one=stay_one)
         return name
 
@@ -1090,19 +1121,19 @@ class MonitorWrapper:
                                root_group: Optional[str] = None,
                                tip_group: Optional[str] = None,
                                threshold: float = 0.01,
-                               crucial: bool = True,
+                               start_monitors: List[str] = None,
                                stay_one: bool = True) -> str:
         if name is None:
             name = f'{root_link}/{tip_link} position reached'
-        self.add_monitor(monitor_type=PositionReached.__name__,
+        self.add_monitor(monitor_class=PositionReached.__name__,
                          monitor_name=name,
                          root_link=root_link,
                          tip_link=tip_link,
                          goal_point=goal_point,
                          root_group=root_group,
+                         start_monitors=start_monitors,
                          tip_group=tip_group,
                          threshold=threshold,
-                         crucial=crucial,
                          stay_one=stay_one)
 
         return name
@@ -1117,21 +1148,23 @@ class MonitorWrapper:
                              name: Optional[str] = None,
                              root_group: Optional[str] = None,
                              tip_group: Optional[str] = None,
-                             threshold: float = 0.01,
-                             crucial: bool = True):
+                             stay_one: bool = True,
+                             start_monitors: List[str] = None,
+                             threshold: float = 0.01):
         if name is None:
             name = f'{root_link}/{tip_link} distance to line'
-        self.add_monitor(monitor_type=DistanceToLine.__name__,
+        self.add_monitor(monitor_class=DistanceToLine.__name__,
                          monitor_name=name,
                          center_point=center_point,
                          line_axis=line_axis,
                          line_length=line_length,
                          root_link=root_link,
                          tip_link=tip_link,
+                         start_monitors=start_monitors,
                          root_group=root_group,
+                         stay_one=stay_one,
                          tip_group=tip_group,
-                         threshold=threshold,
-                         crucial=crucial)
+                         threshold=threshold)
         return name
 
     def add_cartesian_orientation(self,
@@ -1142,17 +1175,17 @@ class MonitorWrapper:
                                   root_group: Optional[str] = None,
                                   tip_group: Optional[str] = None,
                                   threshold: float = 0.01,
-                                  crucial: bool = True,
+                                  start_monitors: List[str] = None,
                                   stay_one: bool = True):
-        self.add_monitor(monitor_type=OrientationReached.__name__,
+        self.add_monitor(monitor_class=OrientationReached.__name__,
                          monitor_name=name,
                          root_link=root_link,
                          tip_link=tip_link,
                          goal_orientation=goal_orientation,
                          root_group=root_group,
                          tip_group=tip_group,
+                         start_monitors=start_monitors,
                          threshold=threshold,
-                         crucial=crucial,
                          stay_one=stay_one)
 
     def add_pointing_at(self,
@@ -1162,21 +1195,21 @@ class MonitorWrapper:
                         root_link: str,
                         name: Optional[str] = None,
                         tip_group: Optional[str] = None,
+                        start_monitors: List[str] = None,
                         root_group: Optional[str] = None,
-                        threshold: float = 0.01,
-                        crucial: bool = True) -> str:
+                        threshold: float = 0.01) -> str:
         if name is None:
             name = f'{root_link}/{tip_link} pointing at'
-        self.add_monitor(monitor_type=PointingAt.__name__,
+        self.add_monitor(monitor_class=PointingAt.__name__,
                          monitor_name=name,
                          tip_link=tip_link,
                          goal_point=goal_point,
                          root_link=root_link,
                          tip_group=tip_group,
+                         start_monitors=start_monitors,
                          root_group=root_group,
                          pointing_axis=pointing_axis,
-                         threshold=threshold,
-                         crucial=crucial)
+                         threshold=threshold)
         return name
 
     def add_vectors_aligned(self,
@@ -1186,22 +1219,110 @@ class MonitorWrapper:
                             goal_normal: Vector3Stamped,
                             tip_normal: Vector3Stamped,
                             name: Optional[str] = None,
+                            start_monitors: List[str] = None,
                             root_group: Optional[str] = None,
                             tip_group: Optional[str] = None,
-                            threshold: float = 0.01,
-                            crucial: bool = True) -> str:
+                            threshold: float = 0.01) -> str:
         if name is None:
-            name = f'{root_link}/{tip_link} {goal_normal}/{tip_normal} vectors aligned'
-        self.add_monitor(monitor_type=VectorsAligned.__name__,
+            name = f'{root_link}/{tip_link} vectors aligned'
+            while name in self._monitors:
+                name += 'I'
+        self.add_monitor(monitor_class=VectorsAligned.__name__,
                          monitor_name=name,
                          root_link=root_link,
                          tip_link=tip_link,
                          goal_normal=goal_normal,
                          tip_normal=tip_normal,
+                         start_monitors=start_monitors,
                          root_group=root_group,
                          tip_group=tip_group,
-                         threshold=threshold,
-                         crucial=crucial)
+                         threshold=threshold)
+        return name
+
+    def add_end_motion(self, start_monitors: List[str], name: Optional[str] = 'end_motion') -> str:
+        self.add_monitor(monitor_class=EndMotion.__name__,
+                         monitor_name=name,
+                         start_monitors=start_monitors)
+        return name
+
+    def update_parent_link_of_group(self,
+                                    start_monitors: List[str],
+                                    group_name: str,
+                                    parent_link: str,
+                                    parent_link_group: Optional[str] = '',
+                                    name: Optional[str] = 'move group') -> str:
+        self.add_monitor(monitor_class=UpdateParentLinkOfGroup.__name__,
+                         monitor_name=name,
+                         start_monitors=start_monitors,
+                         group_name=group_name,
+                         parent_link=parent_link,
+                         parent_link_group=parent_link_group)
+        return name
+
+    def add_cancel_motion(self, start_monitors: List[str], error_message: str, error_code: int = MoveResult.ERROR,
+                          name: Optional[str] = 'cancel_motion') -> str:
+        self.add_monitor(monitor_class=CancelMotion.__name__,
+                         monitor_name=name,
+                         start_monitors=start_monitors,
+                         error_message=error_message,
+                         error_code=error_code)
+        return name
+
+    def add_max_trajectory_length(self, max_trajectory_length: Optional[float] = None):
+        name = SetMaxTrajectoryLength.__name__
+        self.add_monitor(monitor_name=name,
+                         monitor_class=SetMaxTrajectoryLength.__name__,
+                         new_length=max_trajectory_length,
+                         start_monitors=[])
+        self.max_trajectory_length_set = True
+        return name
+
+    def add_print(self,
+                  message: str,
+                  start_monitors: List[str],
+                  name: Optional[str] = None) -> str:
+        if name is None:
+            name = f'print {message}'
+        self.add_monitor(monitor_class=Print.__name__,
+                         monitor_name=name,
+                         message=message,
+                         start_monitors=start_monitors)
+        return name
+
+    def add_sleep(self,
+                  seconds: float,
+                  start_monitors: Optional[List[str]] = None,
+                  name: Optional[str] = None) -> str:
+        if name is None:
+            name = f'sleep {seconds:.3f}s'
+        self.add_monitor(monitor_class=Sleep.__name__,
+                         monitor_name=name,
+                         seconds=seconds,
+                         start_monitors=start_monitors)
+        return name
+
+    def add_alternator(self,
+                       start_monitors: Optional[List[str]] = None,
+                       name: Optional[str] = None,
+                       mod: int = 2) -> str:
+        if name is None:
+            name = Alternator.__name__ + f' % {mod}'
+        self.add_monitor(monitor_class=Alternator.__name__,
+                         monitor_name=name,
+                         start_monitors=start_monitors,
+                         mod=mod)
+        return name
+
+    def add_payload_alternator(self,
+                               start_monitors: Optional[List[str]] = None,
+                               name: Optional[str] = None,
+                               mod: int = 2) -> str:
+        if name is None:
+            name = PayloadAlternator.__name__ + f' % {mod}'
+        self.add_monitor(monitor_class=Alternator.__name__,
+                         monitor_name=name,
+                         start_monitors=start_monitors,
+                         mod=mod)
         return name
 
 
@@ -1218,6 +1339,18 @@ class GiskardWrapper:
         self._client.wait_for_server()
         self.clear_motion_goals_and_monitors()
         rospy.sleep(.3)
+
+    def add_default_end_motion_conditions(self):
+        local_min_reached_monitor_name = self.monitors.add_local_minimum_reached()
+        for goal in self.motion_goals._goals:
+            goal.end_monitors.append(local_min_reached_monitor_name)
+        self.monitors.add_end_motion(start_monitors=self.monitors.get_monitor_names())
+        self.monitors.add_cancel_motion(start_monitors=[local_min_reached_monitor_name],
+                                        error_message=f'local minimum reached',
+                                        error_code=MoveResult.LOCAL_MINIMUM)
+        if not self.monitors.max_trajectory_length_set:
+            self.monitors.add_max_trajectory_length()
+        self.monitors.max_trajectory_length_set = False
 
     @property
     def robot_name(self):

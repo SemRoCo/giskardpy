@@ -5,12 +5,12 @@ from typing import Dict, Optional, List
 from geometry_msgs.msg import PoseStamped
 
 from giskardpy import casadi_wrapper as cas
-from giskardpy.goals.monitors.monitors import Monitor
+from giskardpy.monitors.monitors import ExpressionMonitor
 from giskardpy.god_map import god_map
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.exceptions import ConstraintException, ConstraintInitalizationException
 from giskardpy.goals.goal import Goal, NonMotionGoal
-from giskardpy.goals.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE, Task
+from giskardpy.tasks.task import WEIGHT_BELOW_CA, Task
 from giskardpy.model.joints import OmniDrive, DiffDrive, OmniDrivePR22, OneDofJoint
 from giskardpy.my_types import PrefixName, Derivatives
 from giskardpy.utils.expression_definition_utils import transform_msg
@@ -22,9 +22,9 @@ class SetSeedConfiguration(NonMotionGoal):
                  seed_configuration: Dict[str, float],
                  group_name: Optional[str] = None,
                  name: Optional[str] = None,
-                 start_monitors: Optional[List[Monitor]] = None,
-                 hold_monitors: Optional[List[Monitor]] = None,
-                 end_monitors: Optional[List[Monitor]] = None):
+                 start_monitors: Optional[List[ExpressionMonitor]] = None,
+                 hold_monitors: Optional[List[ExpressionMonitor]] = None,
+                 end_monitors: Optional[List[ExpressionMonitor]] = None):
         """
         Overwrite the configuration of the world to allow starting the planning from a different state.
         Can only be used in plan only mode.
@@ -53,9 +53,9 @@ class SetOdometry(NonMotionGoal):
                  group_name: str,
                  base_pose: PoseStamped,
                  name: Optional[str] = None,
-                 start_monitors: Optional[List[Monitor]] = None,
-                 hold_monitors: Optional[List[Monitor]] = None,
-                 end_monitors: Optional[List[Monitor]] = None):
+                 start_monitors: Optional[List[ExpressionMonitor]] = None,
+                 hold_monitors: Optional[List[ExpressionMonitor]] = None,
+                 end_monitors: Optional[List[ExpressionMonitor]] = None):
         self.group_name = group_name
         if name is None:
             name = f'{self.__class__.__name__}/{self.group_name}'
@@ -93,10 +93,9 @@ class JointVelocityLimit(Goal):
                  max_velocity: float = 1,
                  hard: bool = False,
                  name: Optional[str] = None,
-                 start_monitors: Optional[List[Monitor]] = None,
-                 hold_monitors: Optional[List[Monitor]] = None,
-                 end_monitors: Optional[List[Monitor]] = None
-                 ):
+                 start_monitors: Optional[List[ExpressionMonitor]] = None,
+                 hold_monitors: Optional[List[ExpressionMonitor]] = None,
+                 end_monitors: Optional[List[ExpressionMonitor]] = None):
         """
         Limits the joint velocity of a revolute joint.
         :param joint_name:
@@ -251,9 +250,9 @@ class AvoidJointLimits(Goal):
                  group_name: Optional[str] = None,
                  weight: float = WEIGHT_BELOW_CA,
                  name: Optional[str] = None,
-                 start_monitors: Optional[List[Monitor]] = None,
-                 hold_monitors: Optional[List[Monitor]] = None,
-                 end_monitors: Optional[List[Monitor]] = None
+                 start_monitors: Optional[List[ExpressionMonitor]] = None,
+                 hold_monitors: Optional[List[ExpressionMonitor]] = None,
+                 end_monitors: Optional[List[ExpressionMonitor]] = None
                  ):
         """
         Calls AvoidSingleJointLimits for each joint in joint_list
@@ -316,9 +315,9 @@ class JointPositionList(Goal):
                  weight: float = WEIGHT_BELOW_CA,
                  max_velocity: float = 1,
                  name: Optional[str] = None,
-                 start_monitors: Optional[List[Monitor]] = None,
-                 hold_monitors: Optional[List[Monitor]] = None,
-                 end_monitors: Optional[List[Monitor]] = None
+                 start_monitors: Optional[List[ExpressionMonitor]] = None,
+                 hold_monitors: Optional[List[ExpressionMonitor]] = None,
+                 end_monitors: Optional[List[ExpressionMonitor]] = None
                  ):
         """
         Calls JointPosition for a list of joints.

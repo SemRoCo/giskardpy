@@ -4,22 +4,18 @@ from geometry_msgs.msg import PoseStamped, PointStamped, QuaternionStamped, Vect
 
 from giskard_msgs.msg import MoveResult, CollisionEntry, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse, DyeGroupResponse, GetGroupInfoResponse, RegisterGroupResponse
-from giskardpy.goals.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
+from giskardpy.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
 from giskardpy.my_types import goal_parameter
 from giskardpy.python_interface.python_interface import GiskardWrapper
 
 
 class OldGiskardWrapper(GiskardWrapper):
     def execute(self, wait: bool = True) -> MoveResult:
-        local_min_reached_monitor_name = self.monitors.add_local_minimum_reached()
-        for goal in self.motion_goals._goals:
-            goal.end_monitors.append(local_min_reached_monitor_name)
+        self.add_default_end_motion_conditions()
         return super().execute(wait)
 
     def projection(self, wait: bool = True) -> MoveResult:
-        local_min_reached_monitor_name = self.monitors.add_local_minimum_reached()
-        for goal in self.motion_goals._goals:
-            goal.end_monitors.append(local_min_reached_monitor_name)
+        self.add_default_end_motion_conditions()
         return super().projection(wait)
 
     def _create_action_goal(self) -> MoveGoal:
@@ -47,8 +43,7 @@ class OldGiskardWrapper(GiskardWrapper):
         :param max_velocity: will be applied to all joints
         """
         if add_monitor:
-            monitor_name = self.monitors.add_joint_position(goal_state=goal_state,
-                                                            crucial=True)
+            monitor_name = self.monitors.add_joint_position(goal_state=goal_state)
             end_monitors_monitors = [monitor_name]
         else:
             end_monitors_monitors = []
@@ -59,7 +54,7 @@ class OldGiskardWrapper(GiskardWrapper):
                                              end_monitors=end_monitors_monitors,
                                              **kwargs)
 
-    def add_cart_goal(self,
+    def set_cart_goal(self,
                       goal_pose: PoseStamped,
                       tip_link: str,
                       root_link: str,
@@ -389,8 +384,8 @@ class OldGiskardWrapper(GiskardWrapper):
         If the trajectory is longer than new_length, Giskard will prempt the goal.
         :param new_length: in seconds
         """
-        self.motion_goals.set_max_traj_length(new_length=new_length,
-                                              **kwargs)
+        self.monitors.add_max_trajectory_length(max_trajectory_length=new_length,
+                                                **kwargs)
 
     def set_limit_cartesian_velocity_goal(self,
                                           tip_link: str,
@@ -745,6 +740,15 @@ class OldGiskardWrapper(GiskardWrapper):
                                        parent_link=parent_link,
                                        parent_link_group=parent_link_group,
                                        timeout=timeout)
+
+    def remove_group(self,
+                     name: str,
+                     timeout: float = 2) -> UpdateWorldResponse:
+        """
+        Removes a group and all links and joints it contains from the world.
+        Be careful, you can remove parts of the robot like that.
+        """
+        return self.world.remove_group(name=name, timeout=timeout)
 
     def update_parent_link_of_group(self,
                                     name: str,

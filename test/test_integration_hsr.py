@@ -15,6 +15,7 @@ from giskardpy.configs.qp_controller_config import QPControllerConfig
 from giskardpy.god_map import god_map
 from giskardpy.utils.utils import launch_launchfile
 from utils_for_tests import compare_poses, GiskardTestWrapper
+import giskardpy.utils.tfwrapper as tf
 
 
 class HSRTestWrapper(GiskardTestWrapper):
@@ -45,7 +46,7 @@ class HSRTestWrapper(GiskardTestWrapper):
         self.robot = god_map.world.groups[self.robot_name]
 
     def move_base(self, goal_pose):
-        self.add_cart_goal(goal_pose, tip_link='base_footprint', root_link=god_map.world.root_link_name)
+        self.set_cart_goal(goal_pose, tip_link='base_footprint', root_link=god_map.world.root_link_name)
         self.plan_and_execute()
 
     def open_gripper(self):
@@ -146,7 +147,7 @@ class TestJointGoals:
         p.header.frame_id = tip
         p.pose.position.z = 0.2
         p.pose.orientation.w = 1
-        zero_pose.add_cart_goal(goal_pose=p, tip_link=tip,
+        zero_pose.set_cart_goal(goal_pose=p, tip_link=tip,
                                 root_link='base_footprint')
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
@@ -171,7 +172,7 @@ class TestJointGoals:
         p.header.frame_id = tip
         p.pose.position.z = 0.15
         p.pose.orientation.w = 1
-        zero_pose.add_cart_goal(goal_pose=p, tip_link=tip,
+        zero_pose.set_cart_goal(goal_pose=p, tip_link=tip,
                                 root_link='base_footprint')
         zero_pose.plan_and_execute()
         np.testing.assert_almost_equal(god_map.world.state[arm_lift_joint].position, 0.3, decimal=2)
@@ -226,7 +227,7 @@ class TestCartGoals:
         base_goal.header.frame_id = 'map'
         base_goal.pose.position.x = 1
         base_goal.pose.orientation = Quaternion(*quaternion_about_axis(pi, [0, 0, 1]))
-        zero_pose.add_cart_goal(goal_pose=base_goal, tip_link='base_footprint', root_link='map')
+        zero_pose.set_cart_goal(goal_pose=base_goal, tip_link='base_footprint', root_link='map')
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
 
@@ -274,7 +275,7 @@ class TestCartGoals:
         r_goal = PoseStamped()
         r_goal.header.frame_id = zero_pose.tip
         r_goal.pose.orientation = Quaternion(*quaternion_about_axis(pi, [0, 0, 1]))
-        zero_pose.add_cart_goal(goal_pose=r_goal, tip_link=zero_pose.tip, root_link='map')
+        zero_pose.set_cart_goal(goal_pose=r_goal, tip_link=zero_pose.tip, root_link='map')
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
 
@@ -321,7 +322,8 @@ class TestConstraints:
                                             root_link='map')
         kitchen_setup.allow_all_collisions()
         # kitchen_setup.add_json_goal('AvoidJointLimits', percentage=10)
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
+        current_pose = god_map.world.compute_fk_pose(root='map', tip=kitchen_setup.tip)
 
         kitchen_setup.set_open_container_goal(tip_link=kitchen_setup.tip,
                                               environment_link=handle_name,
@@ -329,15 +331,22 @@ class TestConstraints:
         # kitchen_setup.set_json_goal('AvoidJointLimits', percentage=40)
         kitchen_setup.allow_all_collisions()
         # kitchen_setup.add_json_goal('AvoidJointLimits')
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
         kitchen_setup.set_env_state({'iai_fridge_door_joint': 1.5})
+
+        pose_reached = kitchen_setup.monitors.add_cartesian_pose('map',
+                                                                 tip_link=kitchen_setup.tip,
+                                                                 goal_pose=current_pose)
+        kitchen_setup.monitors.add_end_motion(start_monitors=[pose_reached])
 
         kitchen_setup.set_open_container_goal(tip_link=kitchen_setup.tip,
                                               environment_link=handle_name,
                                               goal_joint_state=0)
         kitchen_setup.allow_all_collisions()
         # kitchen_setup.set_json_goal('AvoidJointLimits', percentage=40)
-        kitchen_setup.plan_and_execute()
+
+        kitchen_setup.execute(add_local_minimum_reached=False)
+
         kitchen_setup.set_env_state({'iai_fridge_door_joint': 0})
 
         kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
@@ -359,7 +368,7 @@ class TestCollisionAvoidanceGoals:
         r_goal.header.frame_id = zero_pose.tip
         r_goal.pose.position.z = 0.5
         r_goal.pose.orientation.w = 1
-        zero_pose.add_cart_goal(goal_pose=r_goal, tip_link=zero_pose.tip, root_link='map')
+        zero_pose.set_cart_goal(goal_pose=r_goal, tip_link=zero_pose.tip, root_link='map')
         zero_pose.plan_and_execute()
 
     def test_self_collision_avoidance2(self, zero_pose: HSRTestWrapper):
@@ -380,7 +389,7 @@ class TestCollisionAvoidanceGoals:
         goal_pose.header.frame_id = 'hand_palm_link'
         goal_pose.pose.position.x = 0.5
         goal_pose.pose.orientation.w = 1
-        zero_pose.add_cart_goal(goal_pose=goal_pose, tip_link=zero_pose.tip, root_link='map')
+        zero_pose.set_cart_goal(goal_pose=goal_pose, tip_link=zero_pose.tip, root_link='map')
         zero_pose.plan_and_execute()
 
     def test_attached_collision1(self, box_setup: HSRTestWrapper):
@@ -399,7 +408,7 @@ class TestCollisionAvoidanceGoals:
                                                                           [0, -1, 0, 0],
                                                                           [1, 0, 0, 0],
                                                                           [0, 0, 0, 1]]))
-        box_setup.add_cart_goal(goal_pose=grasp_pose, tip_link=box_setup.tip, root_link='map')
+        box_setup.set_cart_goal(goal_pose=grasp_pose, tip_link=box_setup.tip, root_link='map')
         box_setup.plan_and_execute()
         box_setup.update_parent_link_of_group(box_name, box_setup.tip)
 

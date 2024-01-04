@@ -7,7 +7,7 @@ import numpy as np
 import rospy
 
 from giskard_msgs.msg import MoveResult
-from giskardpy.exceptions import GiskardException
+from giskardpy.exceptions import GiskardException, MonitorInitalizationException
 from giskardpy.monitors.monitors import Monitor
 from giskardpy.god_map import god_map
 from giskardpy.utils import logging
@@ -92,13 +92,16 @@ class SetMaxTrajectoryLength(CancelMotion):
                  name: Optional[str] = None,
                  start_monitors: Optional[List[Monitor]] = None,):
         if start_monitors:
-            raise GiskardException(f'Cannot set start_monitors for {SetMaxTrajectoryLength.__name__}')
+            raise MonitorInitalizationException(f'Cannot set start_monitors for {SetMaxTrajectoryLength.__name__}')
         if new_length is None:
             self.new_length = god_map.qp_controller_config.max_trajectory_length
         else:
             self.new_length = new_length
         error_message = f'Trajectory longer than {self.new_length}'
-        super().__init__(name=name, start_monitors=[], error_message=error_message, error_code=MoveResult.CONTROL_ERROR)
+        super().__init__(name=name,
+                         start_monitors=[],
+                         error_message=error_message,
+                         error_code=MoveResult.MAX_TRAJECTORY_LENGTH)
 
     @profile
     def __call__(self):

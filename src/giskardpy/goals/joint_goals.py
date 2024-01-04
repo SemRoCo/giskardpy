@@ -8,7 +8,7 @@ from giskardpy import casadi_wrapper as cas
 from giskardpy.monitors.monitors import ExpressionMonitor
 from giskardpy.god_map import god_map
 from giskardpy.symbol_manager import symbol_manager
-from giskardpy.exceptions import ConstraintException, ConstraintInitalizationException
+from giskardpy.exceptions import MotionBuildingException, GoalInitalizationException
 from giskardpy.goals.goal import Goal, NonMotionGoal
 from giskardpy.tasks.task import WEIGHT_BELOW_CA, Task
 from giskardpy.model.joints import OmniDrive, DiffDrive, OmniDrivePR22, OneDofJoint
@@ -38,7 +38,7 @@ class SetSeedConfiguration(NonMotionGoal):
         if group_name is not None:
             seed_configuration = {PrefixName(joint_name, group_name): v for joint_name, v in seed_configuration.items()}
         if god_map.is_goal_msg_type_execute() and not god_map.is_standalone():
-            raise ConstraintInitalizationException(f'It is not allowed to combine {str(self)} with plan and execute.')
+            raise GoalInitalizationException(f'It is not allowed to combine {str(self)} with plan and execute.')
         for joint_name, initial_joint_value in seed_configuration.items():
             joint_name = god_map.world.search_for_joint_name(joint_name, group_name)
             if joint_name not in god_map.world.state:
@@ -61,11 +61,11 @@ class SetOdometry(NonMotionGoal):
             name = f'{self.__class__.__name__}/{self.group_name}'
         super().__init__(name)
         if god_map.is_goal_msg_type_execute() and not god_map.is_standalone():
-            raise ConstraintInitalizationException(f'It is not allowed to combine {str(self)} with plan and execute.')
+            raise GoalInitalizationException(f'It is not allowed to combine {str(self)} with plan and execute.')
         brumbrum_joint_name = god_map.world.groups[group_name].root_link.child_joint_names[0]
         brumbrum_joint = god_map.world.joints[brumbrum_joint_name]
         if not isinstance(brumbrum_joint, (OmniDrive, DiffDrive, OmniDrivePR22)):
-            raise ConstraintInitalizationException(f'Group {group_name} has no odometry joint.')
+            raise GoalInitalizationException(f'Group {group_name} has no odometry joint.')
         base_pose = transform_msg(brumbrum_joint.parent_link_name, base_pose).pose
         god_map.world.state[brumbrum_joint.x.name].position = base_pose.position.x
         god_map.world.state[brumbrum_joint.y.name].position = base_pose.position.y
@@ -156,7 +156,7 @@ class ShakyJointPositionRevoluteOrPrismatic(Goal):
         super().__init__()
         self.joint_name = god_map.world.search_for_joint_name(joint_name, group_name)
         if not god_map.world.is_joint_revolute(self.joint_name) and not god_map.world.is_joint_prismatic(joint_name):
-            raise ConstraintException(
+            raise MotionBuildingException(
                 f'{self.__class__.__name__} called with non revolute/prismatic joint {joint_name}')
 
         self.goal = goal
@@ -212,7 +212,7 @@ class ShakyJointPositionContinuous(Goal):
         super().__init__()
         self.joint_name = god_map.world.search_for_joint_name(joint_name, group_name)
         if not god_map.world.is_joint_continuous(self.joint_name):
-            raise ConstraintException(f'{self.__class__.__name__} called with non continuous joint {joint_name}')
+            raise MotionBuildingException(f'{self.__class__.__name__} called with non continuous joint {joint_name}')
 
     def make_constraints(self):
         current_joint = self.get_joint_position_symbol(self.joint_name)
@@ -338,7 +338,7 @@ class JointPositionList(Goal):
         self.max_velocity = max_velocity
         self.weight = weight
         if len(goal_state) == 0:
-            raise ConstraintInitalizationException(f'Can\'t initialize {self} with no joints.')
+            raise GoalInitalizationException(f'Can\'t initialize {self} with no joints.')
         for joint_name, goal_position in goal_state.items():
             joint_name = god_map.world.search_for_joint_name(joint_name, group_name)
 

@@ -40,24 +40,9 @@ class SetQPSolver(NonMotionGoal):
         god_map.qp_controller_config.set_qp_solver(qp_solver_id)
 
 
-class SetMaxTrajLength(NonMotionGoal):
-    def __init__(self, new_length: int, name: Optional[str] = None, start_monitors: Optional[List[ExpressionMonitor]] = None,
-                 hold_monitors: Optional[List[ExpressionMonitor]] = None,
-                 end_monitors: Optional[List[ExpressionMonitor]] = None):
-        """
-        Overwrites Giskard trajectory length limit for planning.
-        If the trajectory is longer than new_length, Giskard will preempt the goal.
-        :param new_length: in seconds
-        """
-        if name is None:
-            name = self.__class__.__name__
-        super().__init__(name=name)
-        assert new_length > 0
-        god_map.qp_controller_config.max_trajectory_length = new_length
-
-
 class EnableVelocityTrajectoryTracking(NonMotionGoal):
-    def __init__(self, enabled: bool = True, name: Optional[str] = None, start_monitors: Optional[List[ExpressionMonitor]] = None,
+    def __init__(self, enabled: bool = True, name: Optional[str] = None,
+                 start_monitors: Optional[List[ExpressionMonitor]] = None,
                  hold_monitors: Optional[List[ExpressionMonitor]] = None,
                  end_monitors: Optional[List[ExpressionMonitor]] = None):
         """

@@ -10,7 +10,7 @@ from giskardpy.god_map import god_map
 from giskardpy.tasks.task import Task
 from giskardpy.utils.utils import string_shortener
 from giskardpy import casadi_wrapper as w
-from giskardpy.exceptions import ConstraintInitalizationException
+from giskardpy.exceptions import GoalInitalizationException
 from giskardpy.model.joints import OneDofJoint
 from giskardpy.my_types import PrefixName, Derivatives
 from giskardpy.qp.constraint import InequalityConstraint, EqualityConstraint, DerivativeInequalityConstraint, \
@@ -154,14 +154,14 @@ class Goal(ABC):
 
     def _task_sanity_check(self):
         if not self.has_tasks():
-            raise ConstraintInitalizationException(f'Goal {str(self)} has no tasks.')
+            raise GoalInitalizationException(f'Goal {str(self)} has no tasks.')
 
     def add_constraints_of_goal(self, goal: Goal):
         for task in goal.tasks:
             if not [t for t in self.tasks if t.name == task.name]:
                 self.tasks.append(task)
             else:
-                raise ConstraintInitalizationException(f'Constraint with name {task.name} already exists.')
+                raise GoalInitalizationException(f'Constraint with name {task.name} already exists.')
 
     def add_task(self, task: Task):
         if task.name != '':

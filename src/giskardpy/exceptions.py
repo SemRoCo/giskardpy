@@ -38,7 +38,13 @@ class GiskardException(Exception):
 GiskardException._error_code_map[MoveResult.ERROR] = GiskardException
 
 
+@GiskardException.register_error_code(MoveResult.SETUP_ERROR)
 class SetupException(GiskardException):
+    pass
+
+
+@GiskardException.register_error_code(MoveResult.DUPLICATE_NAME)
+class DuplicateNameException(GiskardException):
     pass
 
 
@@ -84,15 +90,13 @@ class UnknownGroupException(WorldException, KeyError):
     pass
 
 
+@GiskardException.register_error_code(MoveResult.UNKNOWN_LINK)
 class UnknownLinkException(WorldException, KeyError):
     pass
 
 
-class RobotExistsException(WorldException):
-    pass
-
-
-class DuplicateNameException(WorldException):
+@GiskardException.register_error_code(MoveResult.UNKNOWN_JOINT)
+class UnknownJointException(WorldException, KeyError):
     pass
 
 
@@ -105,23 +109,33 @@ class CorruptShapeException(WorldException):
 
 
 # %% error during motion problem building phase
-@GiskardException.register_error_code(MoveResult.CONSTRAINT_ERROR)
-class ConstraintException(GiskardException):
-    pass
-
-
-@GiskardException.register_error_code(MoveResult.UNKNOWN_CONSTRAINT)
-class UnknownConstraintException(ConstraintException, KeyError):
-    pass
-
-
-@GiskardException.register_error_code(MoveResult.CONSTRAINT_INITIALIZATION_ERROR)
-class ConstraintInitalizationException(ConstraintException):
+@GiskardException.register_error_code(MoveResult.MOTION_PROBLEM_BUILDING_ERROR)
+class MotionBuildingException(GiskardException):
     pass
 
 
 @GiskardException.register_error_code(MoveResult.INVALID_GOAL)
-class InvalidGoalException(ConstraintException):
+class InvalidGoalException(MotionBuildingException):
+    pass
+
+
+@GiskardException.register_error_code(MoveResult.UNKNOWN_GOAL)
+class UnknownGoalException(MotionBuildingException, KeyError):
+    pass
+
+
+@GiskardException.register_error_code(MoveResult.GOAL_INITIALIZATION_ERROR)
+class GoalInitalizationException(MotionBuildingException):
+    pass
+
+
+@GiskardException.register_error_code(MoveResult.UNKNOWN_MONITOR)
+class UnknownMonitorException(MotionBuildingException, KeyError):
+    pass
+
+
+@GiskardException.register_error_code(MoveResult.MONITOR_INITIALIZATION_ERROR)
+class MonitorInitalizationException(MotionBuildingException):
     pass
 
 
@@ -138,6 +152,11 @@ class ShakingException(PlanningException):
 
 @GiskardException.register_error_code(MoveResult.LOCAL_MINIMUM)
 class LocalMinimumException(PlanningException):
+    pass
+
+
+@GiskardException.register_error_code(MoveResult.MAX_TRAJECTORY_LENGTH)
+class MaxTrajectoryLengthException(PlanningException):
     pass
 
 

@@ -8,7 +8,7 @@ from giskardpy.configs.collision_avoidance_config import CollisionAvoidanceConfi
 from giskardpy.configs.qp_controller_config import QPControllerConfig
 from giskardpy.configs.robot_interface_config import RobotInterfaceConfig
 from giskardpy.configs.world_config import WorldConfig
-from giskardpy.exceptions import GiskardException
+from giskardpy.exceptions import GiskardException, SetupException
 from giskardpy.goals.goal import Goal
 from giskardpy.utils import logging
 from giskardpy.utils.utils import resolve_ros_iris, get_all_classes_in_package
@@ -86,14 +86,14 @@ class Giskard:
         world = god_map.world
         non_controlled_joints = set(world.movable_joint_names).difference(set(world.controlled_joints))
         if len(world.controlled_joints) == 0 and len(world.joints) > 0:
-            raise GiskardException('No joints are flagged as controlled.')
+            raise SetupException('No joints are flagged as controlled.')
         logging.loginfo(f'The following joints are non-fixed according to the urdf, '
                         f'but not flagged as controlled: {non_controlled_joints}.')
 
     def add_goal_package_name(self, package_name: str):
         new_goals = get_all_classes_in_package(package_name, Goal)
         if len(new_goals) == 0:
-            raise GiskardException(f'No classes of type \'{Goal.__name__}\' found in {package_name}.')
+            raise SetupException(f'No classes of type \'{Goal.__name__}\' found in {package_name}.')
         logging.loginfo(f'Made goal classes {new_goals} available Giskard.')
         self.goal_package_paths.add(package_name)
 

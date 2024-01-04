@@ -6,7 +6,7 @@ from typing import List, Optional
 import numpy as np
 
 import giskardpy.casadi_wrapper as cas
-from giskardpy.exceptions import GiskardException
+from giskardpy.exceptions import GiskardException, MonitorInitalizationException
 from giskardpy.god_map import god_map
 from giskardpy.my_types import Derivatives
 from giskardpy.symbol_manager import symbol_manager
@@ -40,7 +40,7 @@ class Monitor:
 
     def get_state_expression(self):
         if self.id == -1:
-            raise GiskardException(f'Id of {self.name} is not set.')
+            raise MonitorInitalizationException(f'Id of {self.name} is not set.')
         return symbol_manager.get_symbol(f'god_map.monitor_manager.state[{self.id}]')
 
     def formatted_name(self, quoted: bool = False) -> str:

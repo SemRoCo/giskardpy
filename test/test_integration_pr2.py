@@ -434,7 +434,7 @@ class TestJointGoals:
         zero_pose.plan_and_execute()
 
 
-class TestPayloadMonitor:
+class TestMonitors:
     def test_start_of_expression_monitor(self, zero_pose: PR2TestWrapper):
         time_above = zero_pose.monitors.add_time_above(threshold=5)
         local_min = zero_pose.monitors.add_local_minimum_reached(start_monitors=[time_above])
@@ -962,12 +962,12 @@ class TestConstraints:
         base_goal.pose.orientation.w = 1
         zero_pose.set_max_traj_length(new_length)
         zero_pose.set_cart_goal(base_goal, tip_link='base_footprint', root_link='map')
-        result = zero_pose.plan_and_execute(expected_error_code=MoveResult.CONTROL_ERROR)
+        result = zero_pose.plan_and_execute(expected_error_code=MoveResult.MAX_TRAJECTORY_LENGTH)
         dt = god_map.qp_controller_config.sample_period
         np.testing.assert_almost_equal(len(result.trajectory.points) * dt, new_length + dt * 2)
 
         zero_pose.set_cart_goal(base_goal, tip_link='base_footprint', root_link='map')
-        result = zero_pose.plan_and_execute(expected_error_code=MoveResult.CONTROL_ERROR)
+        result = zero_pose.plan_and_execute(expected_error_code=MoveResult.MAX_TRAJECTORY_LENGTH)
         dt = god_map.qp_controller_config.sample_period
         assert len(result.trajectory.points) * dt > new_length + 1
 

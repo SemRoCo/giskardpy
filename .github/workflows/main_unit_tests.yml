@@ -87,6 +87,10 @@ jobs:
         run: |
           roscd giskardpy
           python3 -m pytest -s test/test_cas_wrapper.py
+      - name: exceptions
+        run: |
+          roscd giskardpy
+          python3 -m pytest -s test/test_exceptions.py
   #    - name: Setup upterm session
   ##      if: always()
   #      if: failure()

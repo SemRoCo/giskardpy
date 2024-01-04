@@ -2,7 +2,7 @@ from typing import Optional, List, Union, Dict, Callable, Iterable
 
 import giskard_msgs.msg
 import giskardpy.casadi_wrapper as cas
-from giskardpy.exceptions import GiskardException, ConstraintInitalizationException
+from giskardpy.exceptions import GiskardException, GoalInitalizationException
 from giskardpy.monitors.monitors import ExpressionMonitor
 from giskardpy.my_types import Derivatives
 from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint, \
@@ -104,7 +104,7 @@ class Task:
                                       prediction_horizon: int,
                                       name: str = None):
         if task_expression.shape != (1, 1):
-            raise GiskardException(f'expression must have shape (1, 1), has {task_expression.shape}')
+            raise GoalInitalizationException(f'expression must have shape (1, 1), has {task_expression.shape}')
         name = name if name else f'{len(self.manip_constraints)}'
         self.manip_constraints[name] = ManipulabilityConstraint(name=name,
                                                                 expression=task_expression,
@@ -118,7 +118,7 @@ class Task:
                                              gain: float,
                                              prediction_horizon: int):
         if len(task_expressions) != len(names):
-            raise ConstraintInitalizationException('All parameters must have the same length.')
+            raise GoalInitalizationException('All parameters must have the same length.')
         for i in range(len(task_expressions)):
             name_suffix = names[i] if names else None
             self.add_manipulability_constraint(name=name_suffix,
@@ -149,7 +149,7 @@ class Task:
         :param upper_slack_limit: how much the upper error can be violated, don't use unless you know what you are doing
         """
         if task_expression.shape != (1, 1):
-            raise GiskardException(f'expression must have shape (1, 1), has {task_expression.shape}')
+            raise GoalInitalizationException(f'expression must have shape (1, 1), has {task_expression.shape}')
         name = name if name else f'{len(self.eq_constraints)}'
         lower_slack_limit = lower_slack_limit if lower_slack_limit is not None else -float('inf')
         upper_slack_limit = upper_slack_limit if upper_slack_limit is not None else float('inf')
@@ -187,7 +187,7 @@ class Task:
         :param upper_slack_limit: how much the upper error can be violated, don't use unless you know what you are doing
         """
         if task_expression.shape != (1, 1):
-            raise GiskardException(f'expression must have shape (1,1), has {task_expression.shape}')
+            raise GoalInitalizationException(f'expression must have shape (1,1), has {task_expression.shape}')
         name = name if name else ''
         name = str(self) + "/" + name
         if name in self.neq_constraints:
@@ -229,7 +229,7 @@ class Task:
                 or (names is not None and len(lower_errors) != len(names)) \
                 or (lower_slack_limits is not None and len(lower_errors) != len(lower_slack_limits)) \
                 or (upper_slack_limits is not None and len(lower_errors) != len(upper_slack_limits)):
-            raise ConstraintInitalizationException('All parameters must have the same length.')
+            raise GoalInitalizationException('All parameters must have the same length.')
         for i in range(len(lower_errors)):
             name_suffix = names[i] if names else None
             lower_slack_limit = lower_slack_limits[i] if lower_slack_limits else None

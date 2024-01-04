@@ -30,7 +30,7 @@ from giskardpy.monitors.payload_monitors import EndMotion, Print, Sleep, CancelM
     UpdateParentLinkOfGroup, PayloadAlternator
 from giskardpy.goals.open_close import Close, Open
 from giskardpy.goals.pointing import Pointing
-from giskardpy.goals.set_prediction_horizon import SetMaxTrajLength, SetPredictionHorizon
+from giskardpy.goals.set_prediction_horizon import SetPredictionHorizon
 from giskardpy.model.utils import make_world_body_box
 from giskardpy.my_types import goal_parameter
 from giskardpy.utils.utils import kwargs_to_json

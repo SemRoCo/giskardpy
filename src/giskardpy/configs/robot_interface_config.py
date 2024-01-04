@@ -6,7 +6,7 @@ from typing import Optional, List, Dict
 from giskardpy.god_map import god_map
 from giskardpy.tree.branches.giskard_bt import GiskardBT
 from giskardpy.tree.control_modes import ControlModes
-from giskardpy.exceptions import GiskardException
+from giskardpy.exceptions import GiskardException, SetupException
 from giskardpy.model.world import WorldTree
 from giskardpy.my_types import my_string, PrefixName, Derivatives
 
@@ -104,7 +104,7 @@ class RobotInterfaceConfig(ABC):
         :param group_name: Only needs to be specified, if there are more than two robots.
         """
         if self.control_mode != ControlModes.standalone:
-            raise GiskardException(f'Joints only need to be registered in {ControlModes.standalone.name} mode.')
+            raise SetupException(f'Joints only need to be registered in {ControlModes.standalone.name} mode.')
         joint_names = [self.world.search_for_joint_name(j, group_name) for j in joint_names]
         self.world.register_controlled_joints(joint_names)
 
@@ -123,7 +123,7 @@ class RobotInterfaceConfig(ABC):
         if group_name is None:
             group_name = self.world.robot_name
         if not god_map.is_planning():
-            raise GiskardException('add_follow_joint_trajectory_server only works in planning mode')
+            raise SetupException('add_follow_joint_trajectory_server only works in planning mode')
         self.tree.execute_traj.add_follow_joint_traj_action_server(namespace=namespace,
                                                                    group_name=group_name,
                                                                    fill_velocity_values=fill_velocity_values,

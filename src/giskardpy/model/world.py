@@ -20,7 +20,7 @@ from giskardpy import casadi_wrapper as w
 from giskardpy.casadi_wrapper import CompiledFunction
 from giskardpy.data_types import JointStates
 from giskardpy.exceptions import DuplicateNameException, UnknownGroupException, UnknownLinkException, \
-    WorldException, GiskardException
+    WorldException, GiskardException, UnknownJointException
 from giskardpy.god_map import god_map
 from giskardpy.model.joints import Joint, FixedJoint, PrismaticJoint, RevoluteJoint, OmniDrive, DiffDrive, \
     urdf_to_joint, VirtualFreeVariables, MovableJoint, Joint6DOF, OneDofJoint
@@ -637,7 +637,7 @@ class WorldTree(WorldTreeInterface):
         helper(parsed_urdf, urdf_root_link)
         if number_of_links_before + len(parsed_urdf.links) - 1 != len(self.links):
             # -1 because root link already exists
-            raise GiskardException(f'Failed to add urdf \'{group_name}\' to world')
+            raise WorldException(f'Failed to add urdf \'{group_name}\' to world')
 
         # if add_drive_joint_to_group:
         #     root_link = self.get_parent_link_of_link(urdf_root_link_name)
@@ -927,7 +927,7 @@ class WorldTree(WorldTreeInterface):
 
     def _raise_if_link_does_not_exist(self, link_name: my_string):
         if link_name not in self.links:
-            raise WorldException(f'Link \'{link_name}\' does not exist.')
+            raise UnknownLinkException(f'Link \'{link_name}\' does not exist.')
 
     def _raise_if_link_exists(self, link_name: my_string):
         if link_name in self.links:
@@ -935,7 +935,7 @@ class WorldTree(WorldTreeInterface):
 
     def _raise_if_joint_does_not_exist(self, joint_name: my_string):
         if joint_name not in self.joints:
-            raise WorldException(f'Joint \'{joint_name}\' does not exist.')
+            raise UnknownJointException(f'Joint \'{joint_name}\' does not exist.')
 
     def _raise_if_joint_exists(self, joint_name: my_string):
         if joint_name in self.joints:

@@ -10,7 +10,7 @@ from sensor_msgs.msg import LaserScan
 from visualization_msgs.msg import MarkerArray, Marker
 
 from giskardpy import casadi_wrapper as w
-from giskardpy.exceptions import GiskardException, ConstraintInitalizationException
+from giskardpy.exceptions import GiskardException, GoalInitalizationException, ExecutionException
 from giskardpy.goals.goal import Goal
 from giskardpy.monitors.monitors import ExpressionMonitor
 from giskardpy.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE, Task
@@ -286,7 +286,7 @@ class CarryMyBullshit(Goal):
                 print(f'waiting for at least 5 traj points, current length {len(CarryMyBullshit.trajectory)}')
                 rospy.sleep(1)
             else:
-                raise ConstraintInitalizationException(
+                raise GoalInitalizationException(
                     f'didn\'t receive enough points after {wait_for_patrick_timeout}s')
             logging.loginfo(f'waiting for one more target point for {wait_for_patrick_timeout}s')
             rospy.wait_for_message(patrick_topic_name, PointStamped, rospy.Duration(wait_for_patrick_timeout))
@@ -415,7 +415,7 @@ class CarryMyBullshit(Goal):
             self.last_target_age = rospy.get_rostime().to_sec() - self.human_point.header.stamp.to_sec()
             if self.last_target_age > self.target_age_exception_threshold:
                 raise_to_blackboard(
-                    GiskardException(f'lost target for longer than {self.target_age_exception_threshold}s'))
+                    ExecutionException(f'lost target for longer than {self.target_age_exception_threshold}s'))
         else:
             if closest_idx == CarryMyBullshit.trajectory.shape[0] - 1:
                 self.end_of_traj_reached = True

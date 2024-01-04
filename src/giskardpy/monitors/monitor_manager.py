@@ -6,7 +6,8 @@ import numpy as np
 
 import giskardpy.casadi_wrapper as cas
 from giskardpy.casadi_wrapper import CompiledFunction
-from giskardpy.exceptions import GiskardException, UnknownConstraintException, ConstraintInitalizationException
+from giskardpy.exceptions import GiskardException, UnknownGoalException, GoalInitalizationException, \
+    MonitorInitalizationException, UnknownMonitorException
 from giskardpy.monitors.monitors import ExpressionMonitor, Monitor
 import giskard_msgs.msg as giskard_msgs
 from giskardpy.monitors.payload_monitors import PayloadMonitor, CancelMotion
@@ -100,7 +101,7 @@ class MonitorManager:
     @profile
     def add_expression_monitor(self, monitor: ExpressionMonitor):
         if [x for x in self.monitors if x.name == monitor.name]:
-            raise GiskardException(f'Monitor named {monitor.name} already exists.')
+            raise MonitorInitalizationException(f'Monitor named {monitor.name} already exists.')
         self.expression_monitors.append(monitor)
         monitor.set_id(len(self.expression_monitors) - 1)
         # increase all payload monitor ids because expression monitors always come first
@@ -110,7 +111,7 @@ class MonitorManager:
     @profile
     def add_payload_monitor(self, monitor: PayloadMonitor):
         if [x for x in self.monitors if x.name == monitor.name]:
-            raise GiskardException(f'Monitor named {monitor.name} already exists.')
+            raise MonitorInitalizationException(f'Monitor named {monitor.name} already exists.')
         self.payload_monitors.append(monitor)
         monitor.set_id(len(self.monitors) - 1)
 
@@ -205,7 +206,7 @@ class MonitorManager:
                 logging.loginfo(f'Adding monitor of type: \'{monitor_msg.monitor_class}\'')
                 C = self.allowed_monitor_types[monitor_msg.monitor_class]
             except KeyError:
-                raise UnknownConstraintException(f'unknown monitor type: \'{monitor_msg.monitor_class}\'.')
+                raise UnknownMonitorException(f'unknown monitor type: \'{monitor_msg.monitor_class}\'.')
             try:
                 kwargs = json_str_to_kwargs(monitor_msg.kwargs)
                 start_monitors = god_map.monitor_manager.search_for_monitors(monitor_msg.start_monitors)
@@ -220,5 +221,5 @@ class MonitorManager:
                 traceback.print_exc()
                 error_msg = f'Initialization of \'{C.__name__}\' monitor failed: \n {e} \n'
                 if not isinstance(e, GiskardException):
-                    raise ConstraintInitalizationException(error_msg)
+                    raise MonitorInitalizationException(error_msg)
                 raise e

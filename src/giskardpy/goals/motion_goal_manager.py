@@ -3,7 +3,7 @@ from collections import defaultdict
 from copy import deepcopy
 from typing import List, Dict
 
-from giskardpy.exceptions import UnknownConstraintException, GiskardException, ConstraintInitalizationException, \
+from giskardpy.exceptions import UnknownGoalException, GiskardException, GoalInitalizationException, \
     DuplicateNameException
 from giskardpy.goals.collision_avoidance import ExternalCollisionAvoidance, SelfCollisionAvoidance
 from giskardpy.goals.goal import Goal
@@ -31,7 +31,7 @@ class MotionGoalManager:
                 logging.loginfo(f'Adding motion goal of type: \'{motion_goal.motion_goal_class}\' named: \'{motion_goal.name}\'')
                 C = self.allowed_motion_goal_types[motion_goal.motion_goal_class]
             except KeyError:
-                raise UnknownConstraintException(f'unknown constraint {motion_goal.motion_goal_class}.')
+                raise UnknownGoalException(f'unknown constraint {motion_goal.motion_goal_class}.')
             try:
                 params = json_str_to_kwargs(motion_goal.kwargs)
                 if motion_goal.name == '':
@@ -45,7 +45,7 @@ class MotionGoalManager:
                 traceback.print_exc()
                 error_msg = f'Initialization of \'{C.__name__}\' constraint failed: \n {e} \n'
                 if not isinstance(e, GiskardException):
-                    raise ConstraintInitalizationException(error_msg)
+                    raise GoalInitalizationException(error_msg)
                 raise e
 
     def add_motion_goal(self, goal: Goal):
@@ -175,7 +175,7 @@ class MotionGoalManager:
             try:
                 new_eq_constraints, new_neq_constraints, new_derivative_constraints, new_manip_constraints,  _debug_expressions = goal.get_constraints()
             except Exception as e:
-                raise ConstraintInitalizationException(str(e))
+                raise GoalInitalizationException(str(e))
             eq_constraints.update(new_eq_constraints)
             neq_constraints.update(new_neq_constraints)
             derivative_constraints.update(new_derivative_constraints)

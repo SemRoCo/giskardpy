@@ -5,7 +5,7 @@ from std_msgs.msg import Float64MultiArray
 
 from giskardpy.data_types import KeyDefaultDict
 from giskardpy.god_map import god_map
-from giskardpy.my_types import Derivatives
+from giskardpy.data_types import Derivatives
 from giskardpy.tree.behaviors.cmd_publisher import CommandPublisher
 from giskardpy.utils.decorators import record_time
 

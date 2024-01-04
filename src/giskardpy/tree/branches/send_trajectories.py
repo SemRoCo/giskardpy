@@ -2,7 +2,7 @@ from typing import Dict
 
 from py_trees import Sequence
 
-from giskardpy.my_types import PrefixName, Derivatives
+from giskardpy.data_types import PrefixName, Derivatives
 from giskardpy.tree.behaviors.send_trajectory import SendFollowJointTrajectory
 from giskardpy.tree.branches.control_loop import ControlLoop
 from giskardpy.tree.branches.prepare_control_loop import PrepareBaseTrajControlLoop

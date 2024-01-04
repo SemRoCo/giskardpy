@@ -12,7 +12,7 @@ from giskardpy.exceptions import ExecutionException, FollowJointTrajectory_INVAL
     ExecutionTimeoutException, ExecutionSucceededPrematurely, ExecutionPreemptedException
 from giskardpy.god_map import god_map
 from giskardpy.model.joints import OneDofJoint, OmniDrive
-from giskardpy.my_types import PrefixName, Derivatives
+from giskardpy.data_types import PrefixName, Derivatives
 
 try:
     import pr2_controllers_msgs.msg

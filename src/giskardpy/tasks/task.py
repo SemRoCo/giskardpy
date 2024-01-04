@@ -4,7 +4,7 @@ import giskard_msgs.msg
 import giskardpy.casadi_wrapper as cas
 from giskardpy.exceptions import GiskardException, GoalInitalizationException
 from giskardpy.monitors.monitors import ExpressionMonitor
-from giskardpy.my_types import Derivatives
+from giskardpy.data_types import Derivatives
 from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint, \
     ManipulabilityConstraint
 from giskardpy.utils.utils import string_shortener

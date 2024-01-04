@@ -33,7 +33,7 @@ from giskardpy.goals.diff_drive_goals import DiffDriveTangentialToPoint, KeepHan
 from giskardpy.god_map import god_map
 from giskardpy.model.collision_world_syncer import Collisions, Collision
 from giskardpy.model.joints import OneDofJoint, OmniDrive, DiffDrive
-from giskardpy.my_types import PrefixName, Derivatives
+from giskardpy.data_types import PrefixName, Derivatives
 from giskardpy.python_interface.old_python_interface import OldGiskardWrapper
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.qp_controller import available_solvers

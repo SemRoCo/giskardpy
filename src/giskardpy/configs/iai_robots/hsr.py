@@ -3,7 +3,7 @@ import numpy as np
 from giskardpy.configs.collision_avoidance_config import CollisionAvoidanceConfig
 from giskardpy.configs.robot_interface_config import StandAloneRobotInterfaceConfig, RobotInterfaceConfig
 from giskardpy.configs.world_config import WorldConfig
-from giskardpy.my_types import PrefixName, Derivatives
+from giskardpy.data_types import PrefixName, Derivatives
 
 
 class WorldWithHSRConfig(WorldConfig):

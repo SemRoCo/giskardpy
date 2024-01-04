@@ -7,7 +7,7 @@ import trimesh
 from giskardpy.god_map import god_map
 from giskardpy.model.collision_world_syncer import Collision
 from giskardpy.model.links import Link, LinkGeometry, BoxGeometry, SphereGeometry, CylinderGeometry, MeshGeometry
-from giskardpy.my_types import my_string, PrefixName
+from giskardpy.data_types import PrefixName
 from giskardpy.utils import logging
 from giskardpy.utils.utils import resolve_ros_iris, to_tmp_path, write_to_tmp, suppress_stdout
 

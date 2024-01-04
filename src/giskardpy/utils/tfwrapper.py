@@ -14,7 +14,7 @@ from tf2_py import InvalidArgumentException
 from tf2_ros import Buffer, TransformListener
 from visualization_msgs.msg import MarkerArray, Marker
 
-from giskardpy.my_types import PrefixName
+from giskardpy.data_types import PrefixName
 from giskardpy.utils import logging
 from giskardpy.utils.decorators import memoize
 

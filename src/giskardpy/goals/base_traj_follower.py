@@ -16,7 +16,7 @@ from giskardpy.monitors.monitors import ExpressionMonitor
 from giskardpy.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE, Task
 from giskardpy.god_map import god_map
 from giskardpy.model.joints import OmniDrive, OmniDrivePR22
-from giskardpy.my_types import my_string, Derivatives, PrefixName
+from giskardpy.data_types import my_string, Derivatives, PrefixName
 from giskardpy.utils import logging
 from giskardpy.utils.decorators import memoize_with_counter, clear_memo
 from giskardpy.utils.utils import raise_to_blackboard

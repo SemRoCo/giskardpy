@@ -14,7 +14,7 @@ from giskardpy.configs.qp_controller_config import SupportedQPSolver
 from giskardpy.exceptions import HardConstraintsViolatedException, QPSolverException, InfeasibleException, \
     VelocityLimitUnreachableException
 from giskardpy.god_map import god_map
-from giskardpy.my_types import Derivatives
+from giskardpy.data_types import Derivatives
 from giskardpy.qp.constraint import InequalityConstraint, EqualityConstraint, DerivativeInequalityConstraint, \
     ManipulabilityConstraint
 from giskardpy.qp.free_variable import FreeVariable

@@ -2,13 +2,97 @@ from __future__ import annotations
 
 from collections import defaultdict, deque
 from copy import deepcopy
-from typing import Optional, Dict, List
+from enum import IntEnum
+from typing import Optional, Generic, TypeVar, Dict, Union
 
+import genpy
 import numpy as np
+from geometry_msgs.msg import PoseStamped, PointStamped, Vector3Stamped, QuaternionStamped
 from sensor_msgs.msg import JointState
 
-from giskardpy.my_types import PrefixName, Derivatives
-from typing import Generic, TypeVar, Dict
+
+class PrefixName:
+    primary_separator = '/'
+    secondary_separator = '_'
+
+    def __init__(self, name: str, prefix: Union[str, PrefixName]):
+        if isinstance(prefix, PrefixName):
+            self.prefix = prefix.prefix
+            old_suffix = prefix.short_name
+            self.short_name = f'{old_suffix}{self.secondary_separator}{name}'
+        else:
+            self.short_name = name
+            self.prefix = prefix
+        if prefix:
+            self.long_name = f'{self.prefix}{self.primary_separator}{self.short_name}'
+        else:
+            self.long_name = name
+
+    @classmethod
+    def from_string(cls, name: my_string, set_none_if_no_slash: bool = False):
+        if isinstance(name, PrefixName):
+            return name
+        parts = name.split(cls.primary_separator)
+        if len(parts) != 2:
+            if set_none_if_no_slash:
+                return cls(parts[0], None)
+            else:
+                raise AttributeError(f'{name} can not be converted to a {str(cls)}.')
+        return cls(parts[1], parts[0])
+
+    def __str__(self):
+        return self.long_name.__str__()
+
+    def __repr__(self):
+        return self.long_name.__repr__()
+
+    def __hash__(self):
+        return self.long_name.__hash__()
+
+    def __eq__(self, other):
+        return self.long_name.__eq__(other.__str__())
+
+    def __ne__(self, other):
+        return self.long_name.__ne__(other.__str__())
+
+    def __le__(self, other):
+        return self.long_name.__le__(other.__str__())
+
+    def __ge__(self, other):
+        return self.long_name.__ge__(other.__str__())
+
+    def __gt__(self, other):
+        return self.long_name.__gt__(other.__str__())
+
+    def __lt__(self, other):
+        return self.long_name.__lt__(other.__str__())
+
+    def __contains__(self, item):
+        return self.long_name.__contains__(item.__str__())
+
+
+class Derivatives(IntEnum):
+    position = 0
+    velocity = 1
+    acceleration = 2
+    jerk = 3
+    snap = 4
+    crackle = 5
+    pop = 6
+
+    @classmethod
+    def range(cls, start: Derivatives, stop: Derivatives, step: int = 1):
+        """
+        Includes stop!
+        """
+        return [item for item in cls if start <= item <= stop][::step]
+
+
+my_string = Union[str, PrefixName]
+goal_parameter = Union[my_string, float, bool, genpy.Message, dict, list, IntEnum, None]
+derivative_map = Dict[Derivatives, float]
+derivative_joint_map = Dict[Derivatives, Dict[my_string, float]]
+transformable_message = Union[PoseStamped, PointStamped, Vector3Stamped, QuaternionStamped]
 
 
 class KeyDefaultDict(defaultdict):
@@ -134,7 +218,7 @@ class _JointState:
 
 
 K = TypeVar('K', bound=PrefixName)
-V = TypeVar('V', bound=JointState)
+V = TypeVar('V', bound=_JointState)
 
 
 class JointStates(defaultdict, Dict[K, V], Generic[K, V]):

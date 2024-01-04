@@ -32,7 +32,7 @@ from giskardpy.goals.open_close import Close, Open
 from giskardpy.goals.pointing import Pointing
 from giskardpy.goals.set_prediction_horizon import SetPredictionHorizon
 from giskardpy.model.utils import make_world_body_box
-from giskardpy.my_types import goal_parameter
+from giskardpy.data_types import goal_parameter
 from giskardpy.utils.utils import kwargs_to_json
 
 
@@ -323,10 +323,12 @@ class WorldWrapper:
 class MotionGoalWrapper:
     _goals: List[MotionGoal]
     _collision_entries: Dict[Tuple[Tuple[str, ...], Tuple[str, ...], Tuple[str, ...]], List[CollisionEntry]]
+    avoid_name_conflict: bool
 
-    def __init__(self, robot_name: str):
+    def __init__(self, robot_name: str, avoid_name_conflict: bool = False):
         self.robot_name = robot_name
         self.reset()
+        self.avoid_name_conflict = avoid_name_conflict
 
     def reset(self):
         """
@@ -335,9 +337,12 @@ class MotionGoalWrapper:
         self._goals = []
         self._collision_entries = defaultdict(list)
 
-    def get_goals(self):
+    def get_goals(self) -> List[MotionGoal]:
         self._add_collision_entries_as_goals()
         return self._goals
+
+    def number_of_goals(self) -> int:
+        return len(self._goals)
 
     def add_motion_goal(self, *,
                         motion_goal_class: str,
@@ -356,6 +361,8 @@ class MotionGoalWrapper:
         :param kwargs: kwargs for __init__ function of motion_goal_class
         """
         name = name or motion_goal_class
+        if self.avoid_name_conflict:
+            name += str(self.number_of_goals())
         motion_goal = MotionGoal()
         motion_goal.name = name
         motion_goal.motion_goal_class = motion_goal_class
@@ -1037,9 +1044,11 @@ class MotionGoalWrapper:
 class MonitorWrapper:
     _monitors: List[Monitor]
     max_trajectory_length_set: bool
+    avoid_name_conflict: bool
 
-    def __init__(self, robot_name: str):
+    def __init__(self, robot_name: str, avoid_name_conflict: bool = False):
         self._robot_name = robot_name
+        self.avoid_name_conflict = avoid_name_conflict
         self.max_trajectory_length_set = False
         self.reset()
 
@@ -1066,6 +1075,8 @@ class MonitorWrapper:
         :return: the name of the monitor
         """
         name = name or monitor_class
+        if self.avoid_name_conflict:
+            name += str(len(self._monitors))
         if [x for x in self._monitors if x.name == name]:
             raise KeyError(f'monitor named {name} already exists.')
         monitor = giskard_msgs.Monitor()
@@ -1381,10 +1392,10 @@ class MonitorWrapper:
 class GiskardWrapper:
     last_feedback: MoveFeedback = None
 
-    def __init__(self, node_name: str = 'giskard'):
+    def __init__(self, node_name: str = 'giskard', avoid_name_conflict: bool = False):
         self.world = WorldWrapper(node_name)
-        self.monitors = MonitorWrapper(self.robot_name)
-        self.motion_goals = MotionGoalWrapper(self.robot_name)
+        self.monitors = MonitorWrapper(self.robot_name, avoid_name_conflict=avoid_name_conflict)
+        self.motion_goals = MotionGoalWrapper(self.robot_name, avoid_name_conflict=avoid_name_conflict)
         self.clear_motion_goals_and_monitors()
         giskard_topic = f'{node_name}/command'
         self._client = SimpleActionClient(giskard_topic, MoveAction)

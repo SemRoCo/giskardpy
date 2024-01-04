@@ -11,7 +11,7 @@ from giskardpy.monitors.monitors import ExpressionMonitor
 from giskardpy.tasks.task import WEIGHT_ABOVE_CA, Task
 from giskardpy.god_map import god_map
 from giskardpy.model.joints import OmniDrivePR22
-from giskardpy.my_types import Derivatives
+from giskardpy.data_types import Derivatives
 from giskardpy.utils.expression_definition_utils import transform_msg
 
 

@@ -26,8 +26,8 @@ from giskardpy.model.joints import Joint, FixedJoint, PrismaticJoint, RevoluteJo
     urdf_to_joint, VirtualFreeVariables, MovableJoint, Joint6DOF, OneDofJoint
 from giskardpy.model.links import Link, MeshGeometry
 from giskardpy.model.utils import hacky_urdf_parser_fix
-from giskardpy.my_types import PrefixName, Derivatives, derivative_joint_map, derivative_map
-from giskardpy.my_types import my_string
+from giskardpy.data_types import PrefixName, Derivatives, derivative_joint_map, derivative_map
+from giskardpy.data_types import my_string
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.next_command import NextCommands
 from giskardpy.symbol_manager import symbol_manager

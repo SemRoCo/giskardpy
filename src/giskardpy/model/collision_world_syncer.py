@@ -15,7 +15,7 @@ from giskard_msgs.msg import CollisionEntry
 from giskardpy.exceptions import UnknownGroupException, UnknownLinkException
 from giskardpy.god_map import god_map
 from giskardpy.model.world import WorldBranch
-from giskardpy.my_types import my_string, Derivatives, PrefixName
+from giskardpy.data_types import my_string, Derivatives, PrefixName
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.utils import logging
 from giskardpy.utils.utils import resolve_ros_iris

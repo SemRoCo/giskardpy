@@ -176,7 +176,7 @@ class TestJointGoals:
             'ur5_wrist_3_joint': -2.5249870459186,
         })
         zero_pose.set_joint_goal({})
-        zero_pose.plan_and_execute(expected_error_code=MoveResult.CONSTRAINT_INITIALIZATION_ERROR)
+        zero_pose.plan_and_execute(expected_error_code=MoveResult.GOAL_INITIALIZATION_ERROR)
 
     def test_joint_movement2(self, zero_pose: DonbotTestWrapper):
         js = {

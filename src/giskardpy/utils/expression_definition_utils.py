@@ -5,7 +5,7 @@ from geometry_msgs.msg import PoseStamped, PointStamped, Vector3Stamped, Quatern
 
 from giskardpy.exceptions import UnknownGroupException
 from giskardpy.god_map import god_map
-from giskardpy.my_types import my_string, PrefixName
+from giskardpy.data_types import my_string, PrefixName
 import giskardpy.utils.tfwrapper as tf
 import giskardpy.casadi_wrapper as cas
 

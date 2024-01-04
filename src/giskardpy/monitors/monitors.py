@@ -8,7 +8,7 @@ import numpy as np
 import giskardpy.casadi_wrapper as cas
 from giskardpy.exceptions import GiskardException, MonitorInitalizationException
 from giskardpy.god_map import god_map
-from giskardpy.my_types import Derivatives
+from giskardpy.data_types import Derivatives
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils.utils import string_shortener
 

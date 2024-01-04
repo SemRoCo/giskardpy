@@ -3,7 +3,7 @@ import giskardpy.casadi_wrapper as w
 from giskardpy.goals.goal import Goal
 from giskardpy.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
 from giskardpy.god_map import god_map
-from giskardpy.my_types import PrefixName
+from giskardpy.data_types import PrefixName
 
 
 class PR2CasterConstraints(Goal):

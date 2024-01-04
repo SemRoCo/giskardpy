@@ -13,7 +13,7 @@ from giskardpy.monitors.monitors import ExpressionMonitor
 from giskardpy.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, Task
 from giskardpy.god_map import god_map
 from giskardpy.model.joints import DiffDrive, OmniDrivePR22
-from giskardpy.my_types import Derivatives
+from giskardpy.data_types import Derivatives
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils.expression_definition_utils import transform_msg_and_turn_to_expr, transform_msg
 from giskardpy.utils.tfwrapper import normalize

@@ -7,7 +7,7 @@ from sensor_msgs.msg import JointState
 
 from giskardpy.data_types import JointStates
 from giskardpy.god_map import god_map
-from giskardpy.my_types import PrefixName, Derivatives
+from giskardpy.data_types import PrefixName, Derivatives
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
 from giskardpy.utils.decorators import record_time

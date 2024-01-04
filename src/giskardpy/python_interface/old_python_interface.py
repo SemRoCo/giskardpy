@@ -4,12 +4,19 @@ from geometry_msgs.msg import PoseStamped, PointStamped, QuaternionStamped, Vect
 
 from giskard_msgs.msg import MoveResult, CollisionEntry, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse, DyeGroupResponse, GetGroupInfoResponse, RegisterGroupResponse
+from giskardpy.goals.cartesian_goals import CartesianPose
+from giskardpy.goals.joint_goals import JointPositionList
+from giskardpy.monitors.joint_monitors import JointGoalReached
 from giskardpy.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
-from giskardpy.my_types import goal_parameter
+from giskardpy.data_types import goal_parameter
 from giskardpy.python_interface.python_interface import GiskardWrapper
 
 
 class OldGiskardWrapper(GiskardWrapper):
+
+    def __init__(self, node_name: str = 'giskard'):
+        super().__init__(node_name, avoid_name_conflict=True)
+
     def execute(self, wait: bool = True) -> MoveResult:
         self.add_default_end_motion_conditions()
         return super().execute(wait)

@@ -1,17 +1,17 @@
 from __future__ import annotations
+
 import abc
 from abc import ABC
-from typing import Dict, Tuple, Optional, List, Union, Type
-from functools import cached_property
+from typing import Tuple, Optional, List, Union, Type
+
 import numpy as np
 import urdf_parser_py.urdf as up
-from geometry_msgs.msg import PoseStamped, Pose
+from geometry_msgs.msg import Pose
 
 import giskardpy.casadi_wrapper as w
 from giskardpy.data_types import JointStates
+from giskardpy.data_types import derivative_map, PrefixName, Derivatives
 from giskardpy.god_map import god_map
-from giskardpy.my_types import PrefixName, Derivatives
-from giskardpy.my_types import my_string, derivative_joint_map, derivative_map
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils.math import rpy_from_quaternion

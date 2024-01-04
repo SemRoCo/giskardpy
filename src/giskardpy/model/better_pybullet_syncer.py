@@ -14,7 +14,7 @@ from giskardpy.model.bpb_wrapper import create_cube_shape, create_object, create
     load_convex_mesh_shape, create_shape_from_link, to_giskard_collision
 from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer, Collision, Collisions
 from giskardpy.model.links import BoxGeometry, SphereGeometry, CylinderGeometry, MeshGeometry, Link
-from giskardpy.my_types import PrefixName
+from giskardpy.data_types import PrefixName
 from giskardpy.utils import logging
 from giskardpy.utils.tfwrapper import np_to_pose
 

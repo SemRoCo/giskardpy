@@ -1,7 +1,7 @@
 from typing import Dict, Tuple, List
 
 from giskard_msgs.msg import CollisionEntry
-from giskardpy.my_types import PrefixName
+from giskardpy.data_types import PrefixName
 
 
 # class CollisionMatrix:

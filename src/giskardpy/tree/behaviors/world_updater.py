@@ -21,7 +21,7 @@ from giskardpy.exceptions import CorruptShapeException, UnknownGroupException, \
     UnsupportedOptionException, DuplicateNameException, UnknownLinkException
 from giskardpy.god_map import god_map
 from giskardpy.model.world import WorldBranch
-from giskardpy.my_types import PrefixName
+from giskardpy.data_types import PrefixName
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.tree.behaviors.sync_joint_state import SyncJointState
 from giskardpy.tree.behaviors.sync_tf_frames import SyncTfFrames

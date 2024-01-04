@@ -1,6 +1,6 @@
 from giskardpy.configs.giskard import CollisionAvoidanceConfig, RobotInterfaceConfig
 from giskardpy.configs.world_config import WorldWithOmniDriveRobot
-from giskardpy.my_types import Derivatives
+from giskardpy.data_types import Derivatives
 
 
 class WorldWithPR2Config(WorldWithOmniDriveRobot):

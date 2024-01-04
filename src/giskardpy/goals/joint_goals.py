@@ -95,8 +95,7 @@ class JointVelocityLimit(Goal):
                  name: Optional[str] = None,
                  start_monitors: Optional[List[ExpressionMonitor]] = None,
                  hold_monitors: Optional[List[ExpressionMonitor]] = None,
-                 end_monitors: Optional[List[ExpressionMonitor]] = None
-                 ):
+                 end_monitors: Optional[List[ExpressionMonitor]] = None):
         """
         Limits the joint velocity of a revolute joint.
         :param joint_name:

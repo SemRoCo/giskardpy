@@ -21,17 +21,13 @@ from giskardpy.utils.decorators import catch_and_raise_to_blackboard
 
 
 class PayloadMonitor(Monitor, ABC):
-    id: int
-    name: str
     state: bool
     run_call_in_thread: bool
 
-    def __init__(self, name: str, start_monitors: List[Monitor], run_call_in_thread: bool):
-        self.id = -1
-        self.name = name
+    def __init__(self, name: str, start_monitors: List[Monitor], run_call_in_thread: bool, stay_one: bool = True):
         self.state = False
         self.run_call_in_thread = run_call_in_thread
-        super().__init__(name=name, start_monitors=start_monitors)
+        super().__init__(name=name, start_monitors=start_monitors, stay_one=stay_one)
 
     def get_state(self) -> bool:
         return self.state
@@ -158,3 +154,15 @@ class CollisionMatrixUpdater(PayloadMonitor):
         god_map.collision_scene.set_collision_matrix(self.collision_matrix)
         god_map.collision_scene.reset_cache()
         self.state = True
+
+
+class PayloadAlternator(PayloadMonitor):
+
+    def __init__(self, name: str, start_monitors: Optional[List[Monitor]] = None, mod: int = 2):
+        super().__init__(name, stay_one=False, start_monitors=start_monitors, run_call_in_thread=False)
+        self.mod = mod
+
+    def __call__(self):
+        self.state = np.floor(god_map.time) % self.mod == 0
+
+

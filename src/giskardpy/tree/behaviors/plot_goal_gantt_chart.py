@@ -4,8 +4,7 @@ from typing import List, Dict, Tuple, Optional
 import matplotlib.pyplot as plt
 import numpy as np
 from py_trees import Status
-from sortedcontainers import SortedDict
-
+import matplotlib.patches as mpatches
 from giskardpy.goals.collision_avoidance import CollisionAvoidance
 from giskardpy.goals.goal import Goal
 from giskardpy.goals.monitors.monitors import Monitor
@@ -13,8 +12,8 @@ from giskardpy.goals.monitors.payload_monitors import PayloadMonitor, EndMotion,
 from giskardpy.god_map import god_map
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
-from giskardpy.utils.decorators import record_time, catch_and_raise_to_blackboard
-from giskardpy.utils.utils import create_path, string_shortener
+from giskardpy.utils.decorators import record_time
+from giskardpy.utils.utils import create_path
 
 
 class PlotGanttChart(GiskardBehavior):
@@ -33,20 +32,45 @@ class PlotGanttChart(GiskardBehavior):
         num_tasks = task_plot_filter.tolist().count(True)
         num_bars = num_monitors + num_tasks
 
-        plt.figure(figsize=(god_map.time * 0.25 + 5, num_bars * 0.3))
+        figure_height = num_bars * 0.3
+        plt.figure(figsize=(god_map.time * 0.25 + 5, figure_height))
 
         self.plot_history(task_history, tasks, task_plot_filter)
         plt.axhline(y=num_tasks-0.5, color='black', linestyle='--')
         self.plot_history(monitor_history, monitors, monitor_plot_filter)
 
-        plt.gca().yaxis.tick_right()
-        plt.subplots_adjust(left=0.01, right=0.75)
         plt.xlabel('Time [s]')
-        plt.ylabel('Tasks')
         plt.xlim(0, monitor_history[-1][0])
+        plt.xticks(np.arange(0, god_map.time, 1))
+        # Create an instance of MaxNLocator with the desired maximum number of ticks
+        # locator = MaxNLocator(nbins=20)  # Adjust 'nbins' as needed for more ticks
+
+        # Set the locator for the x-axis
+        # plt.gca().xaxis.set_major_locator(locator)
+
+        plt.ylabel('Tasks | Monitors')
         plt.ylim(-1, num_bars)
-        plt.tight_layout()
+        plt.gca().yaxis.tick_right()
         plt.grid()
+
+        # legend_colors = ['green', 'gray', 'white', 'blue']
+        # legend_labels = ['Monitor==True\nTask started but not ended',
+        #                  'Monitor==False but active\nTask on hold',
+        #                  'Monitor==False and inactive\nTask not started or ended',
+        #                  'Monitor that ended/cancelled the motion']
+        # legend_handles = [mpatches.Patch(color=color, label=label, edgecolor='black', linewidth=1) for color, label in
+        #                   zip(legend_colors, legend_labels)]
+
+        # def abs_to_relative(value):
+        #     return value/figure_height
+
+        # Add custom legend to the plot
+        # plt.legend(handles=legend_handles, loc='upper left', bbox_to_anchor=(0, abs_to_relative(-0.9)))
+
+        # plt.subplots_adjust(left=0.05, right=0.75, bottom=0.4)
+        plt.subplots_adjust(left=0.05, right=0.75)
+        plt.tight_layout()
+
         create_path(file_name)
         plt.savefig(file_name)
         logging.loginfo(f'Saved gantt chart to {file_name}.')

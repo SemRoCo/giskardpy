@@ -21,12 +21,15 @@ class Monitor:
     name: str
     start_monitors: List[Monitor]
     plot: bool
+    stay_one: bool
 
-    def __init__(self, name: str, start_monitors: Optional[List[Monitor]] = None, plot: bool = True):
+    def __init__(self, name: str, start_monitors: Optional[List[Monitor]] = None, plot: bool = True,
+                 stay_one: bool = False):
         self.name = name
         self.start_monitors = start_monitors or []
         self.id = -1
         self.plot = plot
+        self.stay_one = stay_one
 
     @cached_property
     def state_filter(self) -> np.ndarray:
@@ -52,19 +55,17 @@ class Monitor:
 class ExpressionMonitor(Monitor):
     _expression: cas.Expression
     name: str
-    stay_one: bool
 
     def __init__(self, name: str, *, stay_one: bool = False,
                  start_monitors: Optional[List[Monitor]] = None,
                  plot: bool = True):
         self.id = -1
         self.name = name
-        self.stay_one = stay_one
         self.substitution_values = []
         self.substitution_keys = []
         self._expression = None
         self.start_monitors = start_monitors
-        super().__init__(name, start_monitors=start_monitors, plot=plot)
+        super().__init__(name, start_monitors=start_monitors, plot=plot, stay_one=stay_one)
 
     def set_id(self, id_: int):
         self.id = id_

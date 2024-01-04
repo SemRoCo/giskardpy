@@ -1,6 +1,6 @@
 import traceback
 from collections import OrderedDict
-from typing import List, Tuple, Dict, Optional, Callable, Union
+from typing import List, Tuple, Dict, Optional, Callable, Union, Iterable
 
 import numpy as np
 
@@ -9,7 +9,7 @@ from giskardpy.casadi_wrapper import CompiledFunction
 from giskardpy.exceptions import GiskardException, UnknownConstraintException, ConstraintInitalizationException
 from giskardpy.goals.monitors.monitors import ExpressionMonitor, Monitor
 import giskard_msgs.msg as giskard_msgs
-from giskardpy.goals.monitors.payload_monitors import PayloadMonitor, EndMotion, CancelMotion
+from giskardpy.goals.monitors.payload_monitors import PayloadMonitor, CancelMotion
 from giskardpy.god_map import god_map
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils import logging
@@ -26,7 +26,7 @@ def flipped_to_one(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     return np.logical_and(np.logical_not(a), np.logical_or(a, b))
 
 
-def monitor_list_to_monitor_name_tuple(monitors: List[Union[str, ExpressionMonitor]]) -> Tuple[str, ...]:
+def monitor_list_to_monitor_name_tuple(monitors: Iterable[Union[str, ExpressionMonitor]]) -> Tuple[str, ...]:
     return tuple(sorted(monitor.name if isinstance(monitor, Monitor) else monitor for monitor in monitors))
 
 

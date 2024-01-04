@@ -3,24 +3,17 @@ from __future__ import annotations
 import abc
 from abc import ABC
 from collections import OrderedDict
-from typing import Optional, Tuple, Dict, List, Union, Callable, TYPE_CHECKING, overload
-
-from geometry_msgs.msg import PoseStamped, PointStamped, QuaternionStamped, Vector3Stamped
+from typing import Optional, Tuple, Dict, List, Union
 
 from giskardpy.goals.monitors.monitors import ExpressionMonitor, Monitor
-from giskardpy.goals.tasks.task import Task, WEIGHT_BELOW_CA
+from giskardpy.goals.tasks.task import Task
 from giskardpy.god_map import god_map
-from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils.utils import string_shortener
 
-if TYPE_CHECKING:
-    from giskardpy.tree.control_modes import ControlModes
-
-import giskardpy.utils.tfwrapper as tf
 from giskardpy import casadi_wrapper as w
-from giskardpy.exceptions import ConstraintInitalizationException, UnknownGroupException
+from giskardpy.exceptions import ConstraintInitalizationException
 from giskardpy.model.joints import OneDofJoint
-from giskardpy.my_types import my_string, transformable_message, PrefixName, Derivatives
+from giskardpy.my_types import PrefixName, Derivatives
 from giskardpy.qp.constraint import InequalityConstraint, EqualityConstraint, DerivativeInequalityConstraint, \
     ManipulabilityConstraint
 

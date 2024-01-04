@@ -828,7 +828,7 @@ class TestPayloadMonitor:
     def test_hold_monitors(self, zero_pose: PR2TestWrapper):
         sleep = zero_pose.monitors.add_sleep(0.5)
         alternator2 = zero_pose.monitors.add_alternator(start_monitors=[sleep], mod=2)
-        alternator4 = zero_pose.monitors.add_alternator(start_monitors=[alternator2], mod=4)
+        alternator4 = zero_pose.monitors.add_payload_alternator(start_monitors=[alternator2], mod=4)
 
         base_goal = PoseStamped()
         base_goal.header.frame_id = 'map'

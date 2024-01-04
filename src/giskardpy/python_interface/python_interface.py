@@ -27,7 +27,7 @@ from giskardpy.goals.monitors.cartesian_monitors import PoseReached, PositionRea
 from giskardpy.goals.monitors.joint_monitors import JointGoalReached
 from giskardpy.goals.monitors.monitors import LocalMinimumReached, TimeAbove, Alternator
 from giskardpy.goals.monitors.payload_monitors import EndMotion, Print, Sleep, CancelMotion, SetMaxTrajectoryLength, \
-    UpdateParentLinkOfGroup
+    UpdateParentLinkOfGroup, PayloadAlternator
 from giskardpy.goals.open_close import Close, Open
 from giskardpy.goals.pointing import Pointing
 from giskardpy.goals.set_prediction_horizon import SetMaxTrajLength, SetPredictionHorizon
@@ -1294,6 +1294,18 @@ class MonitorWrapper:
                        mod: int = 2) -> str:
         if name is None:
             name = Alternator.__name__ + f' % {mod}'
+        self.add_monitor(monitor_class=Alternator.__name__,
+                         monitor_name=name,
+                         start_monitors=start_monitors,
+                         mod=mod)
+        return name
+
+    def add_payload_alternator(self,
+                               start_monitors: Optional[List[str]] = None,
+                               name: Optional[str] = None,
+                               mod: int = 2) -> str:
+        if name is None:
+            name = PayloadAlternator.__name__ + f' % {mod}'
         self.add_monitor(monitor_class=Alternator.__name__,
                          monitor_name=name,
                          start_monitors=start_monitors,

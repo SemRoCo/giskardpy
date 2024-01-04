@@ -6,7 +6,7 @@ import numpy as np
 import casadi as ca  # type: ignore
 import geometry_msgs.msg as geometry_msgs
 
-from giskardpy.my_types import PrefixName
+from giskardpy.data_types import PrefixName
 from scipy import sparse as sp
 
 all_expressions = Union[Symbol_, Symbol, Expression, Point3, Vector3, RotationMatrix, TransMatrix, Quaternion]

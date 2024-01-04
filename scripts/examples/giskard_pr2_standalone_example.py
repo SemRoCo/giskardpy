@@ -4,7 +4,7 @@ import rospy
 
 from giskardpy.configs.data_types import ControlModes, TfPublishingModes
 from giskardpy.configs.giskard import Giskard
-from giskardpy.my_types import Derivatives
+from giskardpy.data_types import Derivatives
 
 
 class MyPR2Setup(Giskard):

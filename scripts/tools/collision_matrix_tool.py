@@ -29,7 +29,7 @@ from giskardpy.model.collision_world_syncer import DisableCollisionReason
 from giskardpy.model.ros_msg_visualization import ROSMsgVisualization
 from giskardpy.model.utils import robot_name_from_urdf_string
 from giskardpy.model.world import WorldTree
-from giskardpy.my_types import PrefixName
+from giskardpy.data_types import PrefixName
 from giskardpy.tree.control_modes import ControlModes
 from giskardpy.utils.utils import resolve_ros_iris
 

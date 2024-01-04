@@ -12,7 +12,6 @@ from giskardpy.configs.behavior_tree_config import StandAloneBTConfig
 from giskardpy.configs.iai_robots.donbot import WorldWithBoxyBaseConfig, DonbotCollisionAvoidanceConfig, DonbotStandaloneInterfaceConfig
 from giskardpy.configs.giskard import Giskard
 from giskardpy.configs.qp_controller_config import QPControllerConfig
-from giskardpy.goals.goal import WEIGHT_BELOW_CA
 from giskardpy.god_map import god_map
 from giskardpy.utils.utils import launch_launchfile
 from utils_for_tests import GiskardTestWrapper

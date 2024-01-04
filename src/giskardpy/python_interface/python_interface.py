@@ -1366,11 +1366,10 @@ class MonitorWrapper:
         """
         if name is None:
             name = Alternator.__name__ + f' % {mod}'
-        self.add_monitor(monitor_class=Alternator.__name__,
-                         name=name,
-                         start_monitors=start_monitors,
-                         mod=mod)
-        return name
+        return self.add_monitor(monitor_class=Alternator.__name__,
+                                name=name,
+                                start_monitors=start_monitors,
+                                mod=mod)
 
     def add_payload_alternator(self,
                                start_monitors: Optional[List[str]] = None,
@@ -1382,11 +1381,10 @@ class MonitorWrapper:
         """
         if name is None:
             name = PayloadAlternator.__name__ + f' % {mod}'
-        self.add_monitor(monitor_class=Alternator.__name__,
-                         name=name,
-                         start_monitors=start_monitors,
-                         mod=mod)
-        return name
+        return self.add_monitor(monitor_class=Alternator.__name__,
+                                name=name,
+                                start_monitors=start_monitors,
+                                mod=mod)
 
 
 class GiskardWrapper:

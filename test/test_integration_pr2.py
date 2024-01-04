@@ -1066,7 +1066,7 @@ class TestConstraints:
         vel_limit = 0.4
         joint_goal = 1
         zero_pose.allow_all_collisions()
-        zero_pose.motion_goals.add_motion_goal(JointVelocityLimit.__name__,
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class=JointVelocityLimit.__name__,
                                                joint_names=[joint.short_name],
                                                max_velocity=vel_limit,
                                                hard=True)
@@ -1488,26 +1488,26 @@ class TestConstraints:
     def test_wrong_constraint_type(self, zero_pose: PR2TestWrapper):
         goal_state = {'r_elbow_flex_joint': -1.0}
         kwargs = {'goal_state': goal_state}
-        zero_pose.motion_goals.add_motion_goal('jointpos', **kwargs)
-        zero_pose.plan_and_execute(expected_error_code=MoveResult.UNKNOWN_CONSTRAINT)
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class='jointpos', **kwargs)
+        zero_pose.plan_and_execute(expected_error_code=MoveResult.UNKNOWN_GOAL)
 
     def test_python_code_in_constraint_type(self, zero_pose: PR2TestWrapper):
         goal_state = {'r_elbow_flex_joint': -1.0}
         kwargs = {'goal_state': goal_state}
-        zero_pose.motion_goals.add_motion_goal('print("muh")', **kwargs)
-        zero_pose.plan_and_execute(expected_error_code=MoveResult.UNKNOWN_CONSTRAINT)
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class='print("muh")', **kwargs)
+        zero_pose.plan_and_execute(expected_error_code=MoveResult.UNKNOWN_GOAL)
 
     def test_wrong_params1(self, zero_pose: PR2TestWrapper):
         goal_state = {5432: 'muh'}
         kwargs = {'goal_state': goal_state}
-        zero_pose.motion_goals.add_motion_goal('JointPositionList', **kwargs)
-        zero_pose.plan_and_execute(expected_error_code=MoveResult.CONSTRAINT_INITIALIZATION_ERROR)
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class='JointPositionList', **kwargs)
+        zero_pose.plan_and_execute(expected_error_code=MoveResult.GOAL_INITIALIZATION_ERROR)
 
     def test_wrong_params2(self, zero_pose: PR2TestWrapper):
         goal_state = {'r_elbow_flex_joint': 'muh'}
         kwargs = {'goal_state': goal_state}
-        zero_pose.motion_goals.add_motion_goal('JointPositionList', **kwargs)
-        zero_pose.plan_and_execute(expected_error_code=MoveResult.CONSTRAINT_INITIALIZATION_ERROR)
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class='JointPositionList', **kwargs)
+        zero_pose.plan_and_execute(expected_error_code=MoveResult.GOAL_INITIALIZATION_ERROR)
 
     # def test_align_planes2(self, zero_pose: PR2TestWrapper):
     #     # FIXME, what should I do with opposite vectors?
@@ -4283,7 +4283,8 @@ class TestBenchmark:
             for h in horizons:
                 js = {'torso_lift_joint': 1}
                 zero_pose.set_prediction_horizon(h)
-                zero_pose.motion_goals.add_motion_goal(SetQPSolver.__name__, qp_solver_id=qp_solver)
+                zero_pose.motion_goals.add_motion_goal(motion_goal_class=SetQPSolver.__name__,
+                                                       qp_solver_id=qp_solver)
                 zero_pose.set_joint_goal(js, add_monitor=False)
                 zero_pose.allow_all_collisions()
                 zero_pose.plan_and_execute()
@@ -4299,7 +4300,8 @@ class TestBenchmark:
         for qp_solver in self.qp_solvers:
             for h in horizons:
                 zero_pose.set_prediction_horizon(h)
-                zero_pose.motion_goals.add_motion_goal(SetQPSolver.__name__, qp_solver_id=qp_solver)
+                zero_pose.motion_goals.add_motion_goal(motion_goal_class=SetQPSolver.__name__,
+                                                       qp_solver_id=qp_solver)
                 zero_pose.set_joint_goal(zero_pose.better_pose, add_monitor=False)
                 zero_pose.allow_all_collisions()
                 zero_pose.plan_and_execute()
@@ -4314,7 +4316,8 @@ class TestBenchmark:
         for qp_solver in self.qp_solvers:
             for h in horizons:
                 zero_pose.set_prediction_horizon(h)
-                zero_pose.motion_goals.add_motion_goal(SetQPSolver.__name__, qp_solver_id=qp_solver)
+                zero_pose.motion_goals.add_motion_goal(motion_goal_class=SetQPSolver.__name__,
+                                                       qp_solver_id=qp_solver)
                 root = 'odom_combined'
 
                 r_goal = PoseStamped()
@@ -4341,7 +4344,8 @@ class TestBenchmark:
         for qp_solver in self.qp_solvers:
             for h in horizons:
                 fake_table_setup.set_prediction_horizon(h)
-                fake_table_setup.motion_goals.add_motion_goal(SetQPSolver.__name__, qp_solver_id=qp_solver)
+                fake_table_setup.motion_goals.add_motion_goal(motion_goal_class=SetQPSolver.__name__,
+                                                              qp_solver_id=qp_solver)
                 r_goal = PoseStamped()
                 r_goal.header.frame_id = 'map'
                 r_goal.pose.position.x = 0.8
@@ -4369,8 +4373,7 @@ class TestManipulability:
         zero_pose.set_cart_goal(p, zero_pose.r_tip, 'map')
         zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulability.__name__,
                                                root_link='torso_lift_link',
-                                               tip_link='r_gripper_tool_frame'
-                                               )
+                                               tip_link='r_gripper_tool_frame')
         zero_pose.plan_and_execute()
 
     def test_manip2(self, zero_pose: PR2TestWrapper):
@@ -4383,14 +4386,12 @@ class TestManipulability:
         zero_pose.set_cart_goal(p, zero_pose.r_tip, 'map')
         zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulability.__name__,
                                                root_link='torso_lift_link',
-                                               tip_link='r_gripper_tool_frame'
-                                               )
+                                               tip_link='r_gripper_tool_frame')
         p.pose.position = Point(1, 0.1, 0)
         zero_pose.set_cart_goal(p, zero_pose.l_tip, 'map')
         zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulability.__name__,
                                                root_link='torso_lift_link',
-                                               tip_link='l_gripper_tool_frame'
-                                               )
+                                               tip_link='l_gripper_tool_frame')
         zero_pose.execute(add_local_minimum_reached=True)
 
 # kernprof -lv py.test -s test/test_integration_pr2.py

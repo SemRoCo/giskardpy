@@ -2,11 +2,12 @@ from collections import defaultdict
 
 from py_trees import Status
 
-import giskardpy.identifier as identifier
 from giskardpy.data_types import JointStates
+from giskardpy.exceptions import ExecutionException
+from giskardpy.god_map import god_map
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
-from giskardpy.utils.decorators import record_time
+from giskardpy.utils.decorators import record_time, catch_and_raise_to_blackboard
 
 
 class LoopDetector(GiskardBehavior):
@@ -24,24 +25,24 @@ class LoopDetector(GiskardBehavior):
         super().initialise()
         self.past_joint_states = set()
         self.velocity_limits = defaultdict(lambda: 1.)
-        self.velocity_limits.update(self.world.get_all_free_variable_velocity_limits())
+        self.velocity_limits.update(god_map.world.get_all_free_variable_velocity_limits())
         for name, threshold in self.velocity_limits.items():
             if threshold < 0.001:
                 self.velocity_limits[name] = 0.001
 
+    @catch_and_raise_to_blackboard
     @record_time
     @profile
     def update(self):
-        current_js = self.god_map.get_data(identifier.joint_states)
-        planning_time = self.god_map.get_data(identifier.time)
+        current_js = god_map.world.state
+        planning_time = god_map.time
         rounded_js = self.round_js(current_js)
         if planning_time >= self.window_size and rounded_js in self.past_joint_states:
-            sample_period = self.god_map.get_data(identifier.sample_period)
             logging.loginfo('found loop, stopped planning.')
             run_time = self.get_runtime()
-            logging.loginfo('found goal trajectory with length {:.3f}s in {:.3f}s'.format(planning_time * sample_period,
-                                                                                          run_time))
-            return Status.SUCCESS
+            msg = f'found goal trajectory with length {planning_time * god_map.qp_controller_config.sample_period:.3}s in {run_time:.3}s'
+            logging.loginfo(msg)
+            raise ExecutionException(msg)
         self.past_joint_states.add(rounded_js)
         return Status.RUNNING
 

@@ -3,7 +3,7 @@ import numpy as np
 from giskardpy.configs.collision_avoidance_config import CollisionAvoidanceConfig
 from giskardpy.configs.robot_interface_config import StandAloneRobotInterfaceConfig, RobotInterfaceConfig
 from giskardpy.configs.world_config import WorldConfig
-from giskardpy.my_types import PrefixName, Derivatives
+from giskardpy.data_types import PrefixName, Derivatives
 
 
 class WorldWithHSRConfig(WorldConfig):
@@ -144,14 +144,11 @@ class HSRJointTrajInterfaceConfig(RobotInterfaceConfig):
         self.sync_joint_state_topic('/hsrb/joint_states')
         self.sync_odometry_topic('/hsrb/odom', self.drive_joint_name)
 
-        self.add_follow_joint_trajectory_server(namespace='/hsrb/head_trajectory_controller/follow_joint_trajectory',
-                                                state_topic='/hsrb/head_trajectory_controller/state',
+        self.add_follow_joint_trajectory_server(namespace='/hsrb/head_trajectory_controller',
                                                 fill_velocity_values=True)
-        self.add_follow_joint_trajectory_server(namespace='/hsrb/arm_trajectory_controller/follow_joint_trajectory',
-                                                state_topic='/hsrb/arm_trajectory_controller/state',
+        self.add_follow_joint_trajectory_server(namespace='/hsrb/arm_trajectory_controller',
                                                 fill_velocity_values=True)
-        self.add_follow_joint_trajectory_server(namespace='/hsrb/omni_base_controller/follow_joint_trajectory',
-                                                state_topic='/hsrb/omni_base_controller/state',
+        self.add_follow_joint_trajectory_server(namespace='/hsrb/omni_base_controller',
                                                 fill_velocity_values=True,
                                                 path_tolerance={
                                                     Derivatives.position: 1,

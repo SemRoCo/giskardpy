@@ -12,6 +12,9 @@ from giskardpy.configs.qp_controller_config import SupportedQPSolver
 from giskardpy.exceptions import HardConstraintsViolatedException, InfeasibleException, QPSolverException
 from giskardpy.utils import logging
 from giskardpy.utils.decorators import memoize
+from giskardpy.god_map import god_map
+from visualization_msgs.msg import MarkerArray, Marker
+import rospy
 
 
 def record_solver_call_time(function):
@@ -41,6 +44,7 @@ def record_solver_call_time(function):
 
 class QPSolver(ABC):
     free_symbols_str: List[str]
+    free_symbols: List[cas.ca.SX]
     solver_id: SupportedQPSolver
     qp_setup_function: cas.CompiledFunction
     # num_non_slack = num_non_slack
@@ -58,13 +62,14 @@ class QPSolver(ABC):
     @abc.abstractmethod
     def __init__(self, weights: cas.Expression, g: cas.Expression, lb: cas.Expression, ub: cas.Expression,
                  A: cas.Expression, A_slack: cas.Expression, lbA: cas.Expression, ubA: cas.Expression,
-                 E: cas.Expression, E_slack: cas.Expression, bE: cas.Expression):
+                 E: cas.Expression, E_slack: cas.Expression, bE: cas.Expression, constraint_jacobian: cas.Expression,
+                 grad_traces: [cas.Expression]):
         pass
 
     @classmethod
-    def get_solver_times(self) -> dict:
-        if hasattr(self, '_times'):
-            return self._times
+    def get_solver_times(cls) -> dict:
+        if hasattr(cls, '_times'):
+            return cls._times
         return {}
 
     def analyze_infeasibility(self):
@@ -178,7 +183,9 @@ class QPSolver(ABC):
                    A=cas.Expression(),
                    A_slack=cas.Expression(),
                    lbA=cas.Expression(),
-                   ubA=cas.Expression())
+                   ubA=cas.Expression(),
+                   constraint_jacobian=cas.Expression(),
+                   grad_traces=cas.Expression())
         return self
 
     @abc.abstractmethod
@@ -203,10 +210,28 @@ class QPSolver(ABC):
 
     @abc.abstractmethod
     def get_problem_data(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray,
-    np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+                                        np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """
         :return: weights, g, lb, ub, E, bE, A, lbA, ubA, weight_filter, bE_filter, bA_filter
         """
+
+    @profile
+    def init_manipulability_variables(self, constraint_jacobian, grad_traces):
+        self.use_manipulability = False
+        if constraint_jacobian:
+            self.JJT_f = constraint_jacobian.dot(constraint_jacobian.T).compile(self.free_symbols)
+            self.pred_horizon = god_map.manip_constraints[list(god_map.manip_constraints)[0]].prediction_horizon
+            self.use_manipulability = True
+            self.manip_gain = god_map.manip_constraints[list(god_map.manip_constraints)[0]].gain
+            self.det_symbol = cas.Symbol('det')
+            self.m_symbolic = cas.sqrt(self.det_symbol)
+            self.grad_traces_augmented = cas.vstack([cas.vstack(grad_traces)] * self.pred_horizon) * -self.manip_gain
+
+    @profile
+    def calc_det_of_jjt_manipulability(self, substitutions):
+        if self.use_manipulability:
+            self.JJT = self.JJT_f.fast_call(substitutions)
+            self.det = np.linalg.det(self.JJT)
 
 
 class QPSWIFTFormatter(QPSolver):
@@ -215,7 +240,8 @@ class QPSWIFTFormatter(QPSolver):
     @profile
     def __init__(self, weights: cas.Expression, g: cas.Expression, lb: cas.Expression, ub: cas.Expression,
                  E: cas.Expression, E_slack: cas.Expression, bE: cas.Expression,
-                 A: cas.Expression, A_slack: cas.Expression, lbA: cas.Expression, ubA: cas.Expression):
+                 A: cas.Expression, A_slack: cas.Expression, lbA: cas.Expression, ubA: cas.Expression,
+                 constraint_jacobian: cas.Expression, grad_traces: [cas.Expression]):
         """
         min_x 0.5 x^T H x + g^T x
         s.t.  Ex = b
@@ -264,19 +290,33 @@ class QPSWIFTFormatter(QPSolver):
         free_symbols.update(bE.free_symbols())
         free_symbols.update(nA_A.free_symbols())
         free_symbols.update(nlbA_ubA.free_symbols())
-        free_symbols = list(free_symbols)
+        self.free_symbols = list(free_symbols)
 
-        self.E_f = combined_E.compile(parameters=free_symbols, sparse=self.sparse)
-        self.nA_A_f = nA_A.compile(parameters=free_symbols, sparse=self.sparse)
-        self.combined_vector_f = cas.StackedCompiledFunction([weights,
-                                                              g,
-                                                              nlb_without_inf,
-                                                              ub_without_inf,
-                                                              bE,
-                                                              nlbA_ubA],
-                                                             parameters=free_symbols)
+        self.E_f = combined_E.compile(parameters=self.free_symbols, sparse=self.sparse)
+        self.nA_A_f = nA_A.compile(parameters=self.free_symbols, sparse=self.sparse)
 
-        self.free_symbols_str = [str(x) for x in free_symbols]
+        self.init_manipulability_variables(constraint_jacobian, grad_traces)
+
+        if self.use_manipulability:
+            self.combined_vector_f = cas.StackedCompiledFunction([weights,
+                                                                  g,
+                                                                  nlb_without_inf,
+                                                                  ub_without_inf,
+                                                                  bE,
+                                                                  nlbA_ubA,
+                                                                  self.grad_traces_augmented * self.m_symbolic,
+                                                                  self.m_symbolic],
+                                                                 parameters=self.free_symbols + [self.det_symbol.s])
+        else:
+            self.combined_vector_f = cas.StackedCompiledFunction([weights,
+                                                                  g,
+                                                                  nlb_without_inf,
+                                                                  ub_without_inf,
+                                                                  bE,
+                                                                  nlbA_ubA],
+                                                                 parameters=self.free_symbols)
+
+        self.free_symbols_str = [str(x) for x in self.free_symbols]
 
         if self.compute_nI_I:
             self._nAi_Ai_cache = {}
@@ -285,8 +325,16 @@ class QPSWIFTFormatter(QPSolver):
     def evaluate_functions(self, substitutions):
         self.nA_A = self.nA_A_f.fast_call(substitutions)
         self.E = self.E_f.fast_call(substitutions)
-        self.weights, self.g, self.nlb, self.ub, self.bE, self.nlbA_ubA = self.combined_vector_f.fast_call(
-            substitutions)
+        if self.use_manipulability:
+            self.calc_det_of_jjt_manipulability(substitutions)
+            self.weights, self.g, self.nlb, self.ub, self.bE, self.nlbA_ubA, m_grad, m = self.combined_vector_f.fast_call(
+                np.append(substitutions, self.det))
+            self.g[:len(m_grad)] = m_grad
+            god_map.qp_controller.manipulability_indexes[1] = god_map.qp_controller.manipulability_indexes[0]
+            god_map.qp_controller.manipulability_indexes[0] = m
+        else:
+            self.weights, self.g, self.nlb, self.ub, self.bE, self.nlbA_ubA = self.combined_vector_f.fast_call(
+                substitutions)
 
     @profile
     def problem_data_to_qp_format(self) \
@@ -422,7 +470,7 @@ class QPSWIFTFormatter(QPSolver):
 
     @profile
     def get_problem_data(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray,
-    np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+                                        np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """
         :return: weights, g, lb, ub, E, bE, A, lbA, ubA, weight_filter, bE_filter, bA_filter
         """

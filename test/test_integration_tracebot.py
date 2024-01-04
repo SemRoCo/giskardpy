@@ -65,6 +65,11 @@ class TracebotTestWrapper(GiskardTestWrapper):
 
 
 class TestTracebot:
+    def test_joint_goal(self, zero_pose: TracebotTestWrapper):
+        zero_pose.set_joint_goal(zero_pose.better_pose)
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute()
+
     def test_place_cylinder(self, better_pose: TracebotTestWrapper):
         cylinder_name = 'C'
         cylinder_height = 0.121
@@ -76,11 +81,11 @@ class TestTracebot:
         pose.header.frame_id = 'r_gripper_tool_frame'
         pose.pose.position.z = cylinder_height / 5
         pose.pose.orientation.w = 1
-        better_pose.add_cylinder(name=cylinder_name,
-                                 height=cylinder_height,
-                                 radius=0.0225,
-                                 pose=pose,
-                                 parent_link='r_gripper_tool_frame')
+        better_pose.add_cylinder_to_world(name=cylinder_name,
+                                          height=cylinder_height,
+                                          radius=0.0225,
+                                          pose=pose,
+                                          parent_link='r_gripper_tool_frame')
         better_pose.dye_group(cylinder_name, (0, 0, 1, 1))
 
         better_pose.set_json_goal('InsertCylinder',

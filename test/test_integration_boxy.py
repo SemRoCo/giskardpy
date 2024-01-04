@@ -11,6 +11,7 @@ from giskardpy.configs.iai_robots.boxy import BoxyCollisionAvoidanceConfig, Boxy
 from giskardpy.configs.iai_robots.donbot import WorldWithBoxyBaseConfig
 from giskardpy.configs.giskard import Giskard
 from giskardpy.configs.qp_controller_config import QPControllerConfig
+from giskardpy.god_map import god_map
 from giskardpy.utils.utils import launch_launchfile
 from utils_for_tests import GiskardTestWrapper
 
@@ -74,7 +75,6 @@ class BoxyTestWrapper(GiskardTestWrapper):
         self.camera_tip = 'camera_link'
         self.r_tip = 'right_gripper_tool_frame'
         self.l_tip = 'left_gripper_tool_frame'
-        self.robot_name = 'boxy'
         self.r_gripper_group = 'r_gripper'
         super().__init__(giskard)
 
@@ -143,7 +143,7 @@ class TestJointGoals:
 class TestConstraints:
     def test_pointing(self, better_pose: BoxyTestWrapper):
         tip = 'head_mount_kinect2_rgb_optical_frame'
-        goal_point = better_pose.world.compute_fk_point('map', better_pose.r_tip)
+        goal_point = god_map.world.compute_fk_point('map', better_pose.r_tip)
         z = Vector3Stamped()
         z.header.frame_id = tip
         z.vector.z = 1
@@ -158,7 +158,7 @@ class TestConstraints:
         np.testing.assert_almost_equal(expected_x.point.y, 0, 2)
         np.testing.assert_almost_equal(expected_x.point.x, 0, 2)
 
-        goal_point = better_pose.world.compute_fk_point('map', better_pose.r_tip)
+        goal_point = god_map.world.compute_fk_point('map', better_pose.r_tip)
         better_pose.set_pointing_goal(goal_point=goal_point, tip_link=tip, pointing_axis=z, root_link=better_pose.r_tip)
 
         r_goal = PoseStamped()
@@ -179,7 +179,7 @@ class TestConstraints:
         current_x.header.frame_id = tip
         current_x.vector.z = 1
 
-        expected_x = better_pose.world.compute_fk_point(tip, better_pose.r_tip)
+        expected_x = god_map.world.compute_fk_point(tip, better_pose.r_tip)
         np.testing.assert_almost_equal(expected_x.point.y, 0, 2)
         np.testing.assert_almost_equal(expected_x.point.x, 0, 2)
 
@@ -227,7 +227,7 @@ class TestConstraints:
         kitchen_setup.allow_all_collisions()  # makes execution faster
         kitchen_setup.plan_and_execute()  # send goal to Giskard
         # Update kitchen object
-        kitchen_setup.set_kitchen_js({'sink_area_left_middle_drawer_main_joint': 0.48})
+        kitchen_setup.set_env_state({'sink_area_left_middle_drawer_main_joint': 0.48})
 
         # Close drawer partially
         kitchen_setup.set_open_container_goal(tip_link=kitchen_setup.l_tip,
@@ -236,11 +236,11 @@ class TestConstraints:
         kitchen_setup.allow_all_collisions()  # makes execution faster
         kitchen_setup.plan_and_execute()  # send goal to Giskard
         # Update kitchen object
-        kitchen_setup.set_kitchen_js({'sink_area_left_middle_drawer_main_joint': 0.2})
+        kitchen_setup.set_env_state({'sink_area_left_middle_drawer_main_joint': 0.2})
 
         kitchen_setup.set_close_container_goal(tip_link=kitchen_setup.l_tip,
                                                environment_link=handle_name)
         kitchen_setup.allow_all_collisions()  # makes execution faster
         kitchen_setup.plan_and_execute()  # send goal to Giskard
         # Update kitchen object
-        kitchen_setup.set_kitchen_js({'sink_area_left_middle_drawer_main_joint': 0.0})
+        kitchen_setup.set_env_state({'sink_area_left_middle_drawer_main_joint': 0.0})

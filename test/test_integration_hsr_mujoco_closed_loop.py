@@ -122,7 +122,7 @@ def box_setup(zero_pose: HSRTestWrapper) -> HSRTestWrapper:
     p.pose.position.y = 0
     p.pose.position.z = 0.1
     p.pose.orientation.w = 1
-    zero_pose.add_box(name='box', size=(1, 1, 1), pose=p)
+    zero_pose.add_box_to_world(name='box', size=(1, 1, 1), pose=p)
     return zero_pose
 
 
@@ -230,11 +230,11 @@ class TestCartGoals:
         pose = PoseStamped()
         pose.header.frame_id = kitchen_setup.default_root
         pose.pose.orientation.w = 1
-        kitchen_setup.add_box(name=box1_name,
-                              size=(1,1,1),
-                              pose=pose,
-                              parent_link='hand_palm_link',
-                              parent_link_group='hsrb')
+        kitchen_setup.add_box_to_world(name=box1_name,
+                                       size=(1,1,1),
+                                       pose=pose,
+                                       parent_link='hand_palm_link',
+                                       parent_link_group='hsrb')
         kitchen_setup.world.save_graph_pdf()
 
     def test_move_base(self, zero_pose: HSRTestWrapper):
@@ -353,7 +353,7 @@ class TestConstraints:
         kitchen_setup.allow_all_collisions()
         # kitchen_setup.add_json_goal('AvoidJointLimits')
         kitchen_setup.plan_and_execute()
-        kitchen_setup.set_kitchen_js({'iai_fridge_door_joint': 1.5})
+        kitchen_setup.set_env_state({'iai_fridge_door_joint': 1.5})
 
         kitchen_setup.set_open_container_goal(tip_link=kitchen_setup.tip,
                                               environment_link=handle_name,
@@ -361,7 +361,7 @@ class TestConstraints:
         kitchen_setup.allow_all_collisions()
         # kitchen_setup.set_json_goal('AvoidJointLimits', percentage=40)
         kitchen_setup.plan_and_execute()
-        kitchen_setup.set_kitchen_js({'iai_fridge_door_joint': 0})
+        kitchen_setup.set_env_state({'iai_fridge_door_joint': 0})
 
         kitchen_setup.plan_and_execute()
 
@@ -415,7 +415,7 @@ class TestCollisionAvoidanceGoals:
         box_pose.pose.position = Point(0.85, 0.3, .66)
         box_pose.pose.orientation = Quaternion(0, 0, 0, 1)
 
-        box_setup.add_box(box_name, (0.07, 0.04, 0.1), box_pose)
+        box_setup.add_box_to_world(box_name, (0.07, 0.04, 0.1), box_pose)
         box_setup.open_gripper()
 
         grasp_pose = deepcopy(box_pose)
@@ -445,7 +445,7 @@ class TestCollisionAvoidanceGoals:
         p.pose.position.y = 0
         p.pose.position.z = 0.5
         p.pose.orientation.w = 1
-        zero_pose.add_box(name='box', size=(1, 1, 0.01), pose=p)
+        zero_pose.add_box_to_world(name='box', size=(1, 1, 0.01), pose=p)
 
         js = {'arm_flex_joint': 0}
         zero_pose.set_joint_goal(js, check=False)
@@ -459,11 +459,11 @@ class TestAddObject:
         pose.header.frame_id = zero_pose.default_root
         pose.pose.orientation.w = 1
         pose.pose.position.x = 1
-        zero_pose.add_box(name=box1_name,
-                              size=(1, 1, 1),
-                              pose=pose,
-                              parent_link='hand_palm_link',
-                              parent_link_group='hsrb4s')
+        zero_pose.add_box_to_world(name=box1_name,
+                                   size=(1, 1, 1),
+                                   pose=pose,
+                                   parent_link='hand_palm_link',
+                                   parent_link_group='hsrb4s')
 
         zero_pose.set_joint_goal({'arm_flex_joint': -0.7})
         zero_pose.plan_and_execute()

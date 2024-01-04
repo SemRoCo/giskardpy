@@ -1,13 +1,9 @@
-from copy import deepcopy
-
 import numpy as np
 import rospy
 from py_trees import Status
 from sensor_msgs.msg import JointState
 
-from giskardpy import identifier
-from giskardpy.data_types import JointStates
-from giskardpy.model.trajectory import Trajectory
+from giskardpy.god_map import god_map
 from giskardpy.qp.qp_controller import QPProblemBuilder
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.decorators import record_time
@@ -15,10 +11,10 @@ from giskardpy.utils.decorators import record_time
 
 class PublishDebugExpressions(GiskardBehavior):
     @profile
-    def __init__(self, name, publish_lb: bool = False, publish_ub: bool = False, publish_xdot: bool = False,
+    def __init__(self, name: str = 'publish qp data', publish_lb: bool = False, publish_ub: bool = False, publish_xdot: bool = False,
                  publish_lbA: bool = False, publish_ubA: bool = False, publish_Ax: bool = False,
                  publish_Ex: bool = False, publish_bE: bool = False,
-                 publish_weights: bool = False, publish_g: bool = False, publish_debug: bool = False, **kwargs):
+                 publish_weights: bool = False, publish_g: bool = False, publish_debug: bool = False):
         super().__init__(name)
         self.publish_lb = publish_lb
         self.publish_ub = publish_ub
@@ -48,7 +44,7 @@ class PublishDebugExpressions(GiskardBehavior):
         inequality_constr_names = qp_controller.inequality_bounds.names[bA_filter]
 
         if self.publish_debug:
-            for name, value in qp_controller.evaluated_debug_expressions.items():
+            for name, value in god_map.debug_expression_manager.evaluated_debug_expressions.items():
                 if isinstance(value, np.ndarray):
                     if len(value) > 1:
                         if len(value.shape) == 2:
@@ -110,7 +106,6 @@ class PublishDebugExpressions(GiskardBehavior):
             msg.position.extend(qp_controller.xdot_full.tolist())
 
         if self.publish_Ax or self.publish_Ex:
-            sample_period = self.god_map.get_data(identifier.sample_period)
             num_vel_constr = len(qp_controller.derivative_constraints) * (qp_controller.prediction_horizon - 2)
             num_neq_constr = len(qp_controller.inequality_constraints)
             num_eq_constr = len(qp_controller.equality_constraints)
@@ -137,7 +132,7 @@ class PublishDebugExpressions(GiskardBehavior):
     @record_time
     @profile
     def update(self):
-        qp_controller: QPProblemBuilder = self.god_map.get_data(identifier.qp_controller)
+        qp_controller: QPProblemBuilder = god_map.qp_controller
         msg = self.create_msg(qp_controller)
         self.publisher.publish(msg)
         return Status.RUNNING

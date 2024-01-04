@@ -3,16 +3,10 @@ from typing import Dict, Tuple, List
 
 import numpy as np
 
-from giskardpy import identifier
-from giskardpy.god_map import GodMap
-
 
 class TimeCollector:
     qp_solver_times: Dict[Tuple[str, int, int], List[float]] = defaultdict(list)
     separator = ';'
-
-    def __init__(self):
-        self.god_map = GodMap()
 
     def add_qp_solve_time(self, class_name, number_variables, number_constraints, time):
         self.qp_solver_times[class_name, number_variables, number_constraints].append(time)

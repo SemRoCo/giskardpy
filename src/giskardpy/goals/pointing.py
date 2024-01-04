@@ -1,12 +1,16 @@
 from __future__ import division
 
-from typing import Optional
+from typing import Optional, List
 
 from geometry_msgs.msg import Vector3Stamped, PointStamped
 
 import giskardpy.utils.tfwrapper as tf
 from giskardpy import casadi_wrapper as w
-from giskardpy.goals.goal import Goal, WEIGHT_BELOW_CA
+from giskardpy.goals.goal import Goal
+from giskardpy.monitors.monitors import ExpressionMonitor
+from giskardpy.tasks.task import WEIGHT_BELOW_CA, Task
+from giskardpy.god_map import god_map
+from giskardpy.utils.expression_definition_utils import transform_msg
 from giskardpy.utils.logging import logwarn
 
 
@@ -19,7 +23,11 @@ class Pointing(Goal):
                  root_group: Optional[str] = None,
                  pointing_axis: Vector3Stamped = None,
                  max_velocity: float = 0.3,
-                 weight: float = WEIGHT_BELOW_CA):
+                 weight: float = WEIGHT_BELOW_CA,
+                 name: Optional[str] = None,
+                 start_monitors: Optional[List[ExpressionMonitor]] = None,
+                 hold_monitors: Optional[List[ExpressionMonitor]] = None,
+                 end_monitors: Optional[List[ExpressionMonitor]] = None):
         """
         Will orient pointing_axis at goal_point.
         :param tip_link: tip link of the kinematic chain.
@@ -31,15 +39,17 @@ class Pointing(Goal):
         :param max_velocity: rad/s
         :param weight:
         """
-        super().__init__()
         self.weight = weight
         self.max_velocity = max_velocity
-        self.root = self.world.search_for_link_name(root_link, root_group)
-        self.tip = self.world.search_for_link_name(tip_link, tip_group)
-        self.root_P_goal_point = self.transform_msg(self.root, goal_point)
+        self.root = god_map.world.search_for_link_name(root_link, root_group)
+        self.tip = god_map.world.search_for_link_name(tip_link, tip_group)
+        self.root_P_goal_point = transform_msg(self.root, goal_point)
+        if name is None:
+            name = f'{self.__class__.__name__}/{self.root}/{self.tip}'
+        super().__init__(name)
 
         if pointing_axis is not None:
-            self.tip_V_pointing_axis = self.transform_msg(self.tip, pointing_axis)
+            self.tip_V_pointing_axis = transform_msg(self.tip, pointing_axis)
             self.tip_V_pointing_axis.vector = tf.normalize(self.tip_V_pointing_axis.vector)
         else:
             logwarn(f'Deprecated warning: Please set pointing_axis.')
@@ -47,9 +57,8 @@ class Pointing(Goal):
             self.tip_V_pointing_axis.header.frame_id = self.tip
             self.tip_V_pointing_axis.vector.z = 1
 
-    def make_constraints(self):
-        root_T_tip = self.get_fk(self.root, self.tip)
-        root_P_goal_point: w.Point3 = self.get_parameter_as_symbolic_expression('root_P_goal_point')
+        root_T_tip = god_map.world.compose_fk_expression(self.root, self.tip)
+        root_P_goal_point = w.Point3(self.root_P_goal_point)
         tip_V_pointing_axis = w.Vector3(self.tip_V_pointing_axis)
 
         root_V_goal_axis = root_P_goal_point - root_T_tip.to_position()
@@ -57,14 +66,12 @@ class Pointing(Goal):
         root_V_pointing_axis = root_T_tip.dot(tip_V_pointing_axis)
         root_V_pointing_axis.vis_frame = self.tip
         root_V_goal_axis.vis_frame = self.tip
-        self.add_debug_expr('goal_point', root_P_goal_point)
-        self.add_debug_expr('root_V_pointing_axis', root_V_pointing_axis)
-        self.add_debug_expr('root_V_goal_axis', root_V_goal_axis)
-        self.add_vector_goal_constraints(frame_V_current=root_V_pointing_axis,
+        # self.add_debug_expr('goal_point', root_P_goal_point)
+        # self.add_debug_expr('root_V_pointing_axis', root_V_pointing_axis)
+        # self.add_debug_expr('root_V_goal_axis', root_V_goal_axis)
+        task = Task('pointing')
+        task.add_vector_goal_constraints(frame_V_current=root_V_pointing_axis,
                                          frame_V_goal=root_V_goal_axis,
                                          reference_velocity=self.max_velocity,
                                          weight=self.weight)
-
-    def __str__(self):
-        s = super().__str__()
-        return f'{s}/{self.root}/{self.tip}'
+        self.add_task(task)

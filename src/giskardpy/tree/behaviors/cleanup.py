@@ -2,10 +2,13 @@ import rospy
 from py_trees import Status
 from visualization_msgs.msg import MarkerArray, Marker
 
-from giskardpy import identifier
+from giskardpy.debug_expression_manager import DebugExpressionManager
+from giskardpy.monitors.monitor_manager import MonitorManager
+from giskardpy.goals.motion_goal_manager import MotionGoalManager
+from giskardpy.god_map import god_map
 from giskardpy.model.collision_world_syncer import Collisions
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
-from giskardpy.utils.decorators import record_time
+from giskardpy.utils.decorators import record_time, catch_and_raise_to_blackboard
 
 
 class CleanUp(GiskardBehavior):
@@ -27,18 +30,17 @@ class CleanUp(GiskardBehavior):
     def initialise(self):
         if self.clear_markers_:
             self.clear_markers()
-        self.god_map.clear_cache()
-        giskard = self.god_map.get_data(identifier.giskard)
-        giskard.set_defaults()
-        # giskard.configure_execution()
-        self.god_map.set_data(identifier.goal_msg, None)
-        self.world.fast_all_fks = None
-        self.collision_scene.reset_cache()
-        self.god_map.set_data(identifier.closest_point, Collisions(1))
-        # self.god_map.safe_set_data(identifier.closest_point, None)
-        self.god_map.set_data(identifier.time, 1)
+        god_map.giskard.set_defaults()
+        god_map.world.fast_all_fks = None
+        god_map.collision_scene.reset_cache()
+        god_map.collision_scene.clear_collision_matrix()
+        god_map.closest_point = Collisions(1)
+        god_map.time = 0
+        god_map.control_cycle_counter = 1
+        god_map.monitor_manager = MonitorManager()
+        god_map.motion_goal_manager = MotionGoalManager()
+        god_map.debug_expression_manager = DebugExpressionManager()
 
-        self.god_map.set_data(identifier.next_move_goal, None)
         if hasattr(self.get_blackboard(), 'runtime'):
             del self.get_blackboard().runtime
 
@@ -49,8 +51,8 @@ class CleanUp(GiskardBehavior):
 class CleanUpPlanning(CleanUp):
     def initialise(self):
         super().initialise()
-        self.god_map.set_data(identifier.fill_trajectory_velocity_values, None)
+        god_map.fill_trajectory_velocity_values = None
 
-
-class CleanUpBaseController(CleanUp):
-    pass
+    @catch_and_raise_to_blackboard
+    def update(self):
+        return super().update()

@@ -2,14 +2,14 @@ from __future__ import annotations
 
 import builtins
 from copy import copy
-from typing import Union, List
+from typing import Union, List, TypeVar
 import math
 import casadi as ca  # type: ignore
 import numpy as np
 import geometry_msgs.msg as geometry_msgs
 import rospy
 from scipy import sparse as sp
-from giskardpy.my_types import PrefixName, Derivatives
+from giskardpy.data_types import PrefixName, Derivatives
 from giskardpy.utils import logging
 
 builtin_max = builtins.max
@@ -69,7 +69,7 @@ class CompiledFunction:
             except Exception:
                 self.compiled_f = ca.Function('f', parameters, ca.densify(expression.s))
             self.buf, self.f_eval = self.compiled_f.buffer()
-            if expression.shape[1] == 1:
+            if expression.shape[1] <= 1:
                 shape = expression.shape[0]
             else:
                 shape = expression.shape
@@ -699,16 +699,19 @@ class RotationMatrix(Symbol_):
     def to_axis_angle(self):
         return self.to_quaternion().to_axis_angle()
 
-    def to_angle(self, hint):
+    def to_angle(self, hint=None):
         """
         :param hint: A function whose sign of the result will be used to determine if angle should be positive or
                         negative
         :return:
         """
         axis, angle = self.to_axis_angle()
-        return normalize_angle(if_greater_zero(hint(axis),
-                                               if_result=angle,
-                                               else_result=-angle))
+        if hint is not None:
+            return normalize_angle(if_greater_zero(hint(axis),
+                                                   if_result=angle,
+                                                   else_result=-angle))
+        else:
+            return angle
 
     @classmethod
     def from_vectors(cls, x=None, y=None, z=None):
@@ -1326,6 +1329,7 @@ all_expressions = Union[Symbol_, Symbol, Expression, Point3, Vector3, RotationMa
 all_expressions_float = Union[Symbol, Expression, Point3, Vector3, RotationMatrix, TransMatrix, float, Quaternion]
 symbol_expr_float = Union[Symbol, Expression, float]
 symbol_expr = Union[Symbol, Expression]
+PreservedCasType = TypeVar('PreservedCasType', Point3, Vector3, TransMatrix, RotationMatrix, Quaternion, Expression)
 
 
 def var(variables_names: str):
@@ -1941,10 +1945,26 @@ def distance_point_to_line_segment(frame_P_current, frame_P_line_start, frame_P_
     return dist, Point3(nearest)
 
 
+def distance_point_to_line(frame_P_point, frame_P_line_point, frame_V_line_direction):
+    frame_P_current = Point3(frame_P_point)
+    frame_P_line_point = Point3(frame_P_line_point)
+    frame_V_line_direction = Vector3(frame_V_line_direction)
+
+    lp_vector = frame_P_current - frame_P_line_point
+    cross_product = cross(lp_vector, frame_V_line_direction)
+    distance = norm(cross_product) / norm(frame_V_line_direction)
+    return distance
+
+
 def angle_between_vector(v1, v2):
     v1 = v1[:3]
     v2 = v2[:3]
     return acos(dot(v1.T, v2) / (norm(v1) * norm(v2)))
+
+
+def rotational_error(r1, r2):
+    r_distance = r1.dot(r2.inverse())
+    return r_distance.to_angle()
 
 
 def velocity_limit_from_position_limit(acceleration_limit,
@@ -2119,3 +2139,21 @@ def vel_integral(vel_limit, jerk_limit, dt, ph):
     half1 = math.floor(ph / 2)
     x = f(0, 0, jerk_limit, half1, dt, ph)
     return x
+
+
+def substitute(expression, old_symbols, new_symbols):
+    sx = expression.s
+    old_symbols = Expression([_to_sx(s) for s in old_symbols]).s
+    new_symbols = Expression([_to_sx(s) for s in new_symbols]).s
+    sx = ca.substitute(sx, old_symbols, new_symbols)
+    return type(expression)(sx)
+
+
+def matrix_inverse(a):
+    if isinstance(a, TransMatrix):
+        return a.inverse()
+    return Expression(ca.inv(a.s))
+
+
+def gradient(ex, arg):
+    return Expression(ca.gradient(ex.s, arg.s))

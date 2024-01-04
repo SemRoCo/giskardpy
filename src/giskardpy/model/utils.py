@@ -9,7 +9,7 @@ def robot_name_from_urdf_string(urdf_string):
 
 
 def hacky_urdf_parser_fix(urdf_str):
-    # TODO this function is inefficient but the tested urdfs's aren't big enough for it to be a problem
+    # this function is inefficient but the tested urdfs's aren't big enough for it to be a problem
     fixed_urdf = ''
     delete = False
     black_list = ['transmission', 'gazebo']

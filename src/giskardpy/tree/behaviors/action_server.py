@@ -3,15 +3,15 @@ from queue import Queue, Empty
 import actionlib
 from py_trees import Blackboard
 
-from giskard_msgs.msg._MoveGoal import MoveGoal
-from giskard_msgs.msg._MoveResult import MoveResult
+from giskard_msgs.msg import MoveGoal
+from giskard_msgs.msg import MoveResult
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.decorators import record_time
 
 ERROR_CODE_TO_NAME = {getattr(MoveResult, x): x for x in dir(MoveResult) if x.isupper()}
 
 
-class ActionServerHandler(object):
+class ActionServerHandler:
     """
     Interface to action server which is more useful for behaviors.
     """
@@ -87,3 +87,6 @@ class ActionServerBehavior(GiskardBehavior):
 
     def get_as(self) -> ActionServerHandler:
         return self.as_handler
+
+    def pop_goal(self) -> MoveGoal:
+        return self.get_as().pop_goal()

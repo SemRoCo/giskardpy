@@ -7,9 +7,9 @@ on:
     branches:
       - master
   pull_request:
-    branches:
-      - master
-      - devel
+#    branches:
+#      - master
+#      - devel
   workflow_dispatch:
     inputs:
       logLevel:
@@ -52,6 +52,7 @@ jobs:
       test1: test/test_integration_pr2.py::TestConstraints
       test2: test/test_integration_pr2.py::TestCartGoals
       test3: test/test_integration_pr2.py::TestWorldManipulation
+      test4: test/test_integration_pr2.py::TestManipulability::test_manip1
   pr2_part2:
     needs: [ build_dependencies ]
     uses: ./.github/workflows/reusable_robot_ci.yml
@@ -62,7 +63,7 @@ jobs:
       test3: test/test_integration_pr2.py::TestSelfCollisionAvoidance
       test4: test/test_integration_pr2.py::TestInfoServices
       test5: test/test_integration_pr2.py::TestJointGoals
-      test6: test/test_integration_pr2.py::TestWayPoints
+      test6: test/test_integration_pr2.py::TestMonitors
   tiago:
     needs: [ build_dependencies ]
     uses: ./.github/workflows/reusable_robot_ci.yml

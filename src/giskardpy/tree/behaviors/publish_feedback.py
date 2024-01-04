@@ -1,14 +1,15 @@
 from py_trees import Status
 
 from giskard_msgs.msg import MoveFeedback
+from giskardpy.god_map import god_map
 from giskardpy.tree.behaviors.action_server import ActionServerBehavior
 from giskardpy.utils.decorators import record_time
 
 
 class PublishFeedback(ActionServerBehavior):
     @profile
-    def __init__(self, name, as_name, feedback):
-        super().__init__(name, as_name)
+    def __init__(self, name, feedback):
+        super().__init__(name, god_map.giskard.action_server_name)
         self.feedback = feedback
 
     @record_time

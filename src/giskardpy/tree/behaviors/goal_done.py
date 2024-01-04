@@ -1,7 +1,7 @@
 import rospy
 from py_trees import Status
 
-import giskardpy.identifier as identifier
+from giskardpy.god_map import god_map
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.decorators import record_time, catch_and_raise_to_blackboard
 
@@ -10,7 +10,7 @@ class GoalDone(GiskardBehavior):
     # @catch_and_raise_to_blackboard
     def update(self):
         all_goals_succeeded = None
-        for goal in self.god_map.get_data(identifier.goals).values():
+        for goal in god_map.motion_goal_manager.motion_goals.values():
             is_done = goal.is_done()
             if is_done is not None:
                 if all_goals_succeeded is None:
@@ -20,4 +20,4 @@ class GoalDone(GiskardBehavior):
         if all_goals_succeeded:
             return Status.SUCCESS
         else:
-            return Status.RUNNING
+            return Status.SUCCESS

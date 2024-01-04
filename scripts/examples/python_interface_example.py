@@ -1,6 +1,7 @@
 import rospy
 from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, PointStamped
-from giskardpy.python_interface import GiskardWrapper
+
+from giskardpy.python_interface.old_python_interface import OldGiskardWrapper
 
 # create goal joint state dictionary
 start_joint_state = {'r_elbow_flex_joint': -1.29610152504,
@@ -27,7 +28,7 @@ start_joint_state = {'r_elbow_flex_joint': -1.29610152504,
 rospy.init_node('test')
 
 rospy.loginfo('Instantiating Giskard wrapper.')
-giskard_wrapper = GiskardWrapper()
+giskard_wrapper = OldGiskardWrapper()
 
 # Remove everything but the robot.
 giskard_wrapper.clear_world()
@@ -46,7 +47,7 @@ giskard_wrapper.set_cart_goal(root_link='map', tip_link='base_footprint', goal_p
 
 # Turn off collision avoidance to make sure that the robot can recover from any state.
 giskard_wrapper.allow_all_collisions()
-giskard_wrapper.plan_and_execute()
+giskard_wrapper.execute()
 
 rospy.loginfo('Setting a Cartesian goal for the right gripper.')
 r_goal = PoseStamped()
@@ -63,7 +64,7 @@ l_goal.pose.orientation = Quaternion(0, 0, 0, 1)
 giskard_wrapper.set_cart_goal(root_link='map', tip_link='l_gripper_tool_frame', goal_pose=l_goal)
 
 rospy.loginfo('Executing both Cartesian goals at the same time')
-giskard_wrapper.plan_and_execute()
+giskard_wrapper.execute()
 
 rospy.loginfo('Combining a Cartesian goal with a partial joint goal.')
 p = PoseStamped()
@@ -81,7 +82,7 @@ rospy.loginfo('Setting joint goal for only the torso.')
 giskard_wrapper.set_joint_goal({'torso_lift_joint': 0.3})
 
 rospy.loginfo('Executing.')
-giskard_wrapper.plan_and_execute()
+giskard_wrapper.execute()
 
 rospy.loginfo('Setting a pointing goal via the json interface.')
 goal_point = PointStamped()
@@ -94,12 +95,12 @@ pointing_axis = Vector3Stamped()
 pointing_axis.header.frame_id = tip
 pointing_axis.vector.x = 1
 
-giskard_wrapper.set_json_goal('Pointing',
-                              tip_link=tip,
-                              root_link=root,
-                              goal_point=goal_point,
-                              pointing_axis=pointing_axis)
-giskard_wrapper.plan_and_execute()
+giskard_wrapper.motion_goals.add_motion_goal('Pointing',
+                                             tip_link=tip,
+                                             root_link=root,
+                                             goal_point=goal_point,
+                                             pointing_axis=pointing_axis)
+giskard_wrapper.execute()
 
 rospy.loginfo('Setting a pointing goal via the predefined Giskard wrapper function to look at the left hand.')
 goal_point = PointStamped()
@@ -127,7 +128,7 @@ giskard_wrapper.set_pointing_goal(tip_link='r_gripper_tool_frame',
                                   goal_point=goal_point,
                                   pointing_axis=pointing_axis)
 rospy.loginfo('Execute')
-giskard_wrapper.plan_and_execute()
+giskard_wrapper.execute()
 
 rospy.loginfo('Spawn a box in the world.')
 box_name = 'muh'
@@ -168,5 +169,4 @@ box_goal.pose.orientation.w = 1
 giskard_wrapper.set_cart_goal(goal_pose=box_goal,
                               tip_link=box_name,
                               root_link='map')
-giskard_wrapper.plan_and_execute()
-
+giskard_wrapper.execute()

@@ -1,7 +1,6 @@
 import rospy
 from py_trees import Status
 
-import giskardpy.identifier as identifier
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.decorators import record_time
 
@@ -20,14 +19,12 @@ class CommandPublisher(GiskardBehavior):
 
     @profile
     def initialise(self):
-        self.sample_period = self.god_map.get_data(identifier.sample_period)
-        # self.stamp = rospy.get_rostime()
         self.timer = rospy.Timer(period=rospy.Duration(1/self.hz), callback=self.publish_joint_state)
         super().initialise()
 
     def update(self):
         self.stamp = rospy.get_rostime()
-        return Status.RUNNING
+        return Status.SUCCESS
 
     def terminate(self, new_status):
         try:

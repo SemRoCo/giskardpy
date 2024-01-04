@@ -14,7 +14,7 @@ from tf2_py import InvalidArgumentException
 from tf2_ros import Buffer, TransformListener
 from visualization_msgs.msg import MarkerArray, Marker
 
-from giskardpy.my_types import PrefixName
+from giskardpy.data_types import PrefixName
 from giskardpy.utils import logging
 from giskardpy.utils.decorators import memoize
 
@@ -77,6 +77,7 @@ def get_full_frame_names(frame_name):
     if len(ret) == 0:
         raise KeyError(f'Could not find frame {frame_name} in the buffer of the tf Listener.')
     return ret
+
 
 def wait_for_transform(target_frame, source_frame, time, timeout):
     tfBuffer = get_tf_buffer()

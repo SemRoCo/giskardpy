@@ -172,6 +172,7 @@ catkin_install_python(PROGRAMS
 	scripts/iai_robots/pr2/iai_pr2.py
 	scripts/iai_robots/pr2/pr2_mujoco.py
 	scripts/iai_robots/pr2/pr2_standalone.py
+	scripts/iai_robots/stretch/stretch_standalone.py
 	scripts/iai_robots/tiago/tiago_standalone.py
 	scripts/iai_robots/tracy/tracy.py
 	scripts/iai_robots/tracy/tracy_standalone.py

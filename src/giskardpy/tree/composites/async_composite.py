@@ -5,7 +5,7 @@ from time import time
 import rospy
 from py_trees import Status, Composite
 
-from giskardpy import identifier
+from giskardpy.god_map import god_map
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.utils import raise_to_blackboard
 
@@ -18,7 +18,7 @@ class AsyncBehavior(GiskardBehavior, Composite):
         self.status_lock = RLock()
         self.looped_once = False
         if hz is not None:
-            hz = 1/self.god_map.get_data(identifier.sample_period)
+            hz = 1/god_map.qp_controller_config.sample_period
             self.sleeper = rospy.Rate(hz)
         else:
             self.sleeper = None

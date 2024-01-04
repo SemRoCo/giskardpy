@@ -10,7 +10,7 @@ from tf2_msgs.msg import TFMessage
 from visualization_msgs.msg import Marker, MarkerArray
 
 import giskardpy.casadi_wrapper as w
-import giskardpy.identifier as identifier
+from giskardpy.god_map import god_map
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.decorators import record_time
 from giskardpy.utils.tfwrapper import normalize_quaternion_msg, np_to_kdl, point_to_kdl, kdl_to_point, \
@@ -18,20 +18,20 @@ from giskardpy.utils.tfwrapper import normalize_quaternion_msg, np_to_kdl, point
 
 
 class DebugMarkerPublisher(GiskardBehavior):
-    colors = [ColorRGBA(0, 0, 0, 1),  # black
-              ColorRGBA(1, 0, 0, 1),  # red
-              ColorRGBA(0, 1, 0, 1),  # green
-              ColorRGBA(1, 1, 0, 1),  # yellow
-              ColorRGBA(0, 0, 1, 1),  # blue
-              ColorRGBA(1, 0, 1, 1),  # violet
-              ColorRGBA(0, 1, 1, 1),  # cyan
-              ColorRGBA(1, 1, 1, 1)]  # white
+    colors = [ColorRGBA(r=0, g=0, b=0, a=1),  # black
+              ColorRGBA(r=1, g=0, b=0, a=1),  # red
+              ColorRGBA(r=0, g=1, b=0, a=1),  # green
+              ColorRGBA(r=1, g=1, b=0, a=1),  # yellow
+              ColorRGBA(r=0, g=0, b=1, a=1),  # blue
+              ColorRGBA(r=1, g=0, b=1, a=1),  # violet
+              ColorRGBA(r=0, g=1, b=1, a=1),  # cyan
+              ColorRGBA(r=1, g=1, b=1, a=1)]  # white
 
     @profile
-    def __init__(self, name, tf_topic='/tf', map_frame: Optional[str] = None):
+    def __init__(self, name: str = 'debug marker', tf_topic: str = '/tf', map_frame: Optional[str] = None):
         super().__init__(name)
         if map_frame is None:
-            self.map_frame = str(self.world.root_link_name)
+            self.map_frame = str(god_map.world.root_link_name)
         else:
             self.map_frame = map_frame
         self.tf_pub = rospy.Publisher(tf_topic, TFMessage, queue_size=10)
@@ -40,6 +40,7 @@ class DebugMarkerPublisher(GiskardBehavior):
     @record_time
     def setup(self, timeout):
         self.clear_markers()
+        return super().setup(timeout)
 
     def publish_debug_markers(self):
         ms = MarkerArray()
@@ -54,7 +55,7 @@ class DebugMarkerPublisher(GiskardBehavior):
             if not hasattr(expr, 'reference_frame'):
                 continue
             if expr.reference_frame is not None:
-                map_T_ref = self.world.compute_fk_np(self.world.root_link_name, expr.reference_frame)
+                map_T_ref = god_map.world.compute_fk_np(god_map.world.root_link_name, expr.reference_frame)
             else:
                 map_T_ref = np.eye(4)
             if isinstance(expr, w.TransMatrix):
@@ -129,7 +130,7 @@ class DebugMarkerPublisher(GiskardBehavior):
                 if isinstance(expr, w.Vector3):
                     ref_V_d = value
                     if expr.vis_frame is not None:
-                        map_T_vis = self.world.compute_fk_np(self.world.root_link_name, expr.vis_frame)
+                        map_T_vis = god_map.world.compute_fk_np(god_map.world.root_link_name, expr.vis_frame)
                     else:
                         map_T_vis = np.eye(4)
                     map_V_d = np.dot(map_T_ref, ref_V_d)
@@ -170,9 +171,8 @@ class DebugMarkerPublisher(GiskardBehavior):
     @record_time
     @profile
     def update(self):
-        with self.god_map as god_map:
-            self.debugs = self.god_map.unsafe_get_data(identifier.debug_expressions)
-            if len(self.debugs) > 0:
-                self.debugs_evaluated = self.god_map.unsafe_get_data(identifier.debug_expressions_evaluated)
-                self.publish_debug_markers()
-        return Status.RUNNING
+        self.debugs = god_map.debug_expression_manager.debug_expressions
+        if len(self.debugs) > 0:
+            self.debugs_evaluated = god_map.debug_expression_manager.evaluated_debug_expressions
+            self.publish_debug_markers()
+        return Status.SUCCESS

@@ -1,24 +1,18 @@
 from __future__ import annotations
 
 import abc
-from collections import defaultdict
-from enum import Enum
 from typing import Dict, Optional, List, Union, DefaultDict, Tuple
 
-from giskardpy import identifier
 from giskardpy.exceptions import SetupException
-from giskardpy.god_map import GodMap
-from giskardpy.god_map_user import GodMapWorshipper
+from giskardpy.god_map import god_map
 from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer, CollisionAvoidanceGroupThresholds, \
     CollisionCheckerLib, CollisionAvoidanceThresholds
 from giskardpy.model.world import WorldTree
-from giskardpy.my_types import PrefixName
+from giskardpy.data_types import PrefixName
 from giskardpy.utils import logging
 
 
 class CollisionAvoidanceConfig(abc.ABC):
-    god_map = GodMap()
-
     def __init__(self, collision_checker: CollisionCheckerLib = CollisionCheckerLib.bpb):
         self._create_collision_checker(collision_checker)
 
@@ -27,7 +21,7 @@ class CollisionAvoidanceConfig(abc.ABC):
 
     @property
     def collision_scene(self) -> CollisionWorldSynchronizer:
-        return self.god_map.get_data(identifier.collision_scene)
+        return god_map.collision_scene
 
     @property
     def collision_checker_id(self) -> CollisionCheckerLib:
@@ -35,7 +29,7 @@ class CollisionAvoidanceConfig(abc.ABC):
 
     @property
     def world(self) -> WorldTree:
-        return self.god_map.get_data(identifier.world)
+        return god_map.world
 
     @abc.abstractmethod
     def setup(self):
@@ -44,8 +38,7 @@ class CollisionAvoidanceConfig(abc.ABC):
         """
 
     def _sanity_check(self):
-        if self.collision_checker_id != CollisionCheckerLib.none \
-                and not self.collision_scene.has_self_collision_matrix():
+        if god_map.is_collision_checking_enabled() and not self.collision_scene.has_self_collision_matrix():
             raise SetupException('You have to load a collision matrix, use: \n'
                                  'roslaunch giskardpy collision_matrix_tool.launch')
 
@@ -57,14 +50,14 @@ class CollisionAvoidanceConfig(abc.ABC):
             logging.loginfo('Using betterpybullet for collision checking.')
             try:
                 from giskardpy.model.better_pybullet_syncer import BetterPyBulletSyncer
-                self.god_map.set_data(identifier.collision_scene, BetterPyBulletSyncer())
+                god_map.collision_scene = BetterPyBulletSyncer()
                 return
             except ImportError as e:
                 logging.logerr(f'{e}; turning off collision avoidance.')
                 self._collision_checker = CollisionCheckerLib.none
         logging.logwarn('Using no collision checking.')
         from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
-        self.god_map.set_data(identifier.collision_scene, CollisionWorldSynchronizer())
+        god_map.collision_scene = CollisionWorldSynchronizer()
 
     def set_default_self_collision_avoidance(self,
                                              number_of_repeller: int = 1,
@@ -82,7 +75,7 @@ class CollisionAvoidanceConfig(abc.ABC):
         :param group_name: name of the group this default will be applied to
         """
         if group_name is None:
-            group_name = self.world.robot_name
+            group_name = god_map.world.robot_name
         new_default = CollisionAvoidanceThresholds(
             number_of_repeller=number_of_repeller,
             soft_threshold=soft_threshold,
@@ -129,7 +122,7 @@ class CollisionAvoidanceConfig(abc.ABC):
         :param max_velocity: how fast it will move away from collisions
         """
         if group_name is None:
-            group_name = self.world.robot_name
+            group_name = god_map.world.robot_name
         config = self.collision_scene.collision_avoidance_configs[group_name]
         joint_name = PrefixName(joint_name, group_name)
         if number_of_repeller is not None:
@@ -157,7 +150,7 @@ class CollisionAvoidanceConfig(abc.ABC):
         :param max_velocity: how fast it will move away from collisions
         """
         if group_name is None:
-            group_name = self.world.robot_name
+            group_name = god_map.world.robot_name
         config = self.collision_scene.collision_avoidance_configs[group_name]
         link_name = PrefixName(link_name, group_name)
         if number_of_repeller is not None:
@@ -176,7 +169,7 @@ class CollisionAvoidanceConfig(abc.ABC):
         :param group_name: name of the robot for which it will be applied, only needs to be set if there are multiple robots.
         """
         if group_name is None:
-            group_name = self.world.robot_name
+            group_name = god_map.world.robot_name
         if group_name not in self.collision_scene.self_collision_matrix_paths:
             self.collision_scene.load_self_collision_matrix_from_srdf(path_to_srdf, group_name)
         else:
@@ -189,9 +182,9 @@ class CollisionAvoidanceConfig(abc.ABC):
         collisions.
         """
         if group_name is None:
-            group_name = self.world.robot_name
+            group_name = god_map.world.robot_name
         for joint_name in joint_names:
-            world_joint_name = self.world.search_for_joint_name(joint_name, group_name)
+            world_joint_name = god_map.world.search_for_joint_name(joint_name, group_name)
             self.collision_scene.add_fixed_joint(world_joint_name)
 
 
@@ -204,6 +197,16 @@ class LoadSelfCollisionMatrixConfig(CollisionAvoidanceConfig):
     def setup(self):
         self.load_self_collision_matrix(self._path_to_self_collision_matrix)
 
+
+class _BPBCollisionAvoidanceConfig(CollisionAvoidanceConfig):
+    def __init__(self, collision_checker: CollisionCheckerLib = CollisionCheckerLib.bpb):
+        super().__init__(collision_checker)
+
+    def setup(self):
+        pass
+
+    def _sanity_check(self):
+        pass
 
 class DisableCollisionAvoidanceConfig(CollisionAvoidanceConfig):
     def __init__(self):

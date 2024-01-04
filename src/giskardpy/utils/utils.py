@@ -1,5 +1,8 @@
 from __future__ import division
 import hashlib
+
+import genpy
+import rostopic
 # I only do this, because otherwise test/test_integration_pr2.py::TestWorldManipulation::test_unsupported_options
 # fails on github actions
 import urdf_parser_py.urdf as up
@@ -13,7 +16,7 @@ import sys
 from collections import OrderedDict
 from contextlib import contextmanager
 from functools import cached_property
-from typing import Type, Optional, Dict, Any
+from typing import Type, Optional, Dict, Any, List, Union, Tuple
 
 import numpy as np
 import roslaunch
@@ -23,15 +26,16 @@ from genpy import Message
 from geometry_msgs.msg import PointStamped, Point, Vector3Stamped, Vector3, Pose, PoseStamped, QuaternionStamped, \
     Quaternion
 from py_trees import Blackboard
+from rospy import ROSException
 from rospy_message_converter.message_converter import \
     convert_ros_message_to_dictionary as original_convert_ros_message_to_dictionary, \
     convert_dictionary_to_ros_message as original_convert_dictionary_to_ros_message
+from rostopic import ROSTopicException
 from sensor_msgs.msg import JointState
 from visualization_msgs.msg import Marker, MarkerArray
 
-from giskardpy import identifier
-from giskardpy.god_map import GodMap
-from giskardpy.my_types import PrefixName
+from giskardpy.god_map import god_map
+from giskardpy.data_types import PrefixName
 from giskardpy.utils import logging
 
 
@@ -81,9 +85,9 @@ def get_all_classes_in_package(package_name: str, parent_class: Optional[Type] =
     for importer, modname, ispkg in pkgutil.iter_modules(package.__path__):
         try:
             module = __import__(f'{package.__name__}.{modname}', fromlist="dummy")
-        except:
+        except Exception as e:
             if not silent:
-                logging.loginfo(f'Failed to load {modname}')
+                logging.logwarn(f'Failed to load {modname}: {str(e)}')
             continue
         for name2, value2 in inspect.getmembers(module, inspect.isclass):
             if parent_class is None or issubclass(value2, parent_class) and package_name in str(value2):
@@ -146,12 +150,10 @@ def write_dict(d, f):
     f.write('\n')
 
 
-def position_dict_to_joint_states(joint_state_dict):
+def position_dict_to_joint_states(joint_state_dict: Dict[str, float]) -> JointState:
     """
     :param joint_state_dict: maps joint_name to position
-    :type joint_state_dict: dict
     :return: velocity and effort are filled with 0
-    :rtype: JointState
     """
     js = JointState()
     for k, v in joint_state_dict.items():
@@ -298,7 +300,7 @@ def write_to_tmp(file_name: str, file_str: str) -> str:
 
 
 def to_tmp_path(file_name: str) -> str:
-    path = GodMap().get_data(identifier.tmp_folder)
+    path = god_map.giskard.tmp_folder
     return resolve_ros_iris(f'{path}{file_name}')
 
 
@@ -368,8 +370,8 @@ def make_pose_from_parts(pose, frame_id, position, orientation):
         pose.pose.orientation = Quaternion(*(orientation if orientation is not None else [0, 0, 0, 1]))
     return pose
 
-def convert_ros_message_to_dictionary(message) -> dict:
 
+def convert_ros_message_to_dictionary(message) -> dict:
     if isinstance(message, list):
         for i, element in enumerate(message):
             message[i] = convert_ros_message_to_dictionary(element)
@@ -456,3 +458,123 @@ def publish_pose(pose: PoseStamped):
     ms = MarkerArray()
     ms.markers.append(m)
     _pose_publisher.publish(ms)
+
+
+def int_to_bit_list(number: int) -> List[int]:
+    return [2 ** i * int(bit) for i, bit in enumerate(reversed("{0:b}".format(number))) if int(bit) != 0]
+
+
+def split_pose_stamped(pose: PoseStamped) -> Tuple[PointStamped, QuaternionStamped]:
+    point = PointStamped()
+    point.header = pose.header
+    point.point = pose.pose.position
+
+    quaternion = QuaternionStamped()
+    quaternion.header = pose.header
+    quaternion.quaternion = pose.pose.orientation
+    return point, quaternion
+
+
+def json_str_to_kwargs(json_str: str) -> Dict[str, Any]:
+    d = json.loads(json_str)
+    return json_to_kwargs(d)
+
+
+def json_to_kwargs(d: dict) -> Dict[str, Any]:
+    if isinstance(d, list):
+        for i, element in enumerate(d):
+            d[i] = json_to_kwargs(element)
+
+    if isinstance(d, dict):
+        if 'message_type' in d:
+            d = convert_dictionary_to_ros_message(d)
+        else:
+            for key, value in d.copy().items():
+                d[key] = json_to_kwargs(value)
+
+    return d
+
+
+def kwargs_to_json(kwargs: Dict[str, Any]) -> str:
+    for k, v in kwargs.copy().items():
+        if v is None:
+            del kwargs[k]
+        else:
+            kwargs[k] = thing_to_json(v)
+    kwargs = replace_prefix_name_with_str(kwargs)
+    return json.dumps(kwargs)
+
+
+def thing_to_json(thing: Any) -> Any:
+    if isinstance(thing, list):
+        return [thing_to_json(x) for x in thing]
+    if isinstance(thing, dict):
+        return {k: thing_to_json(v) for k, v in thing.items()}
+    if isinstance(thing, Message):
+        return convert_ros_message_to_dictionary(thing)
+    return thing
+
+
+def string_shortener(original_str: str, max_lines: int, max_line_length: int) -> str:
+    if len(original_str) < max_line_length:
+        return original_str
+    lines = []
+    start = 0
+    for _ in range(max_lines):
+        end = start + max_line_length
+        lines.append(original_str[start:end])
+        if end >= len(original_str):
+            break
+        start = end
+
+    result = '\n'.join(lines)
+
+    # Check if string is cut off and add "..."
+    if len(original_str) > start:
+        result = result + '...'
+
+    return result
+
+
+def wait_for_topic_to_appear(topic_name: str, supported_types: List[Type[genpy.Message]]) -> Type[genpy.Message]:
+    waiting_message = f'Waiting for topic \'{topic_name}\' to appear...'
+    msg_type = None
+    while msg_type is None and not rospy.is_shutdown():
+        logging.loginfo(waiting_message)
+        try:
+            rostopic.get_info_text(topic_name)
+            msg_type, _, _ = rostopic.get_topic_class(topic_name)
+            if msg_type is None:
+                raise ROSTopicException()
+            if msg_type not in supported_types:
+                raise TypeError(f'Topic of type \'{msg_type}\' is not supported. '
+                                f'Must be one of: \'{supported_types}\'')
+            else:
+                logging.loginfo(f'\'{topic_name}\' appeared.')
+                return msg_type
+        except (ROSException, ROSTopicException) as e:
+            rospy.sleep(1)
+
+
+def get_ros_msgs_constant_name_by_value(ros_msg_class: genpy.Message, value: Union[str, int, float]) -> str:
+    for attr_name in dir(ros_msg_class):
+        if not attr_name.startswith('_'):
+            attr_value = getattr(ros_msg_class, attr_name)
+            if attr_value == value:
+                return attr_name
+    raise AttributeError(f'Message type {ros_msg_class} has no constant that matches {value}.')
+
+
+class ImmutableDict(dict):
+    """
+    A dict that prevent reassignment of keys.
+    """
+
+    def __setitem__(self, key, value):
+        if key in self:
+            raise ValueError(f'Key "{key}" already exists. Cannot reassign value.')
+        super().__setitem__(key, value)
+
+    def update(self, *args, **kwargs):
+        for k, v in dict(*args, **kwargs).items():
+            self.__setitem__(k, v)

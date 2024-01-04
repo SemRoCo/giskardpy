@@ -1,7 +1,9 @@
 from geometry_msgs.msg import PointStamped
 import giskardpy.casadi_wrapper as w
-from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
-from giskardpy.my_types import PrefixName
+from giskardpy.goals.goal import Goal
+from giskardpy.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
+from giskardpy.god_map import god_map
+from giskardpy.data_types import PrefixName
 
 
 class PR2CasterConstraints(Goal):
@@ -24,13 +26,13 @@ class PR2CasterConstraints(Goal):
 class Caster(Goal):
     def __init__(self, joint_name: str, velocity_limit: float = 1):
         super().__init__()
-        self.joint_name = self.world.search_for_joint_name(joint_name)
+        self.joint_name = god_map.world.search_for_joint_name(joint_name)
         self.velocity_limit = velocity_limit
 
     def make_constraints(self):
-        joint = self.world.get_joint(self.joint_name)
+        joint = god_map.world.get_joint(self.joint_name)
         link_name = joint.child_link_name
-        bf_T_caster = self.get_fk(PrefixName('base_footprint', 'pr2'), link_name)
+        bf_T_caster = god_map.world.compose_fk_expression(PrefixName('base_footprint', 'pr2'), link_name)
         bf_V_x = w.Vector3((1, 0, 0))
         bf_V_caster_x = bf_T_caster.dot(w.Vector3((1, 0, 0)))
         yaw = w.angle_between_vector(bf_V_x, bf_V_caster_x)
@@ -81,13 +83,13 @@ class Circle(Goal):
 
     def __init__(self, center: PointStamped, radius: float, tip_link: str, scale: float):
         super().__init__()
-        self.center = self.transform_msg(self.world.root_link_name, center)
+        self.center = self.transform_msg(god_map.world.root_link_name, center)
         self.radius = radius
         self.scale = scale
-        self.tip_link_name = self.world.get_link_name(tip_link)
+        self.tip_link_name = god_map.world.get_link_name(tip_link)
 
     def make_constraints(self):
-        map_T_bf = self.get_fk(self.world.root_link_name, self.tip_link_name)
+        map_T_bf = god_map.world.compose_fk_expression(god_map.world.root_link_name, self.tip_link_name)
         t = self.traj_time_in_seconds() * self.scale
         t = w.min(t, 30 * self.scale)
         x = w.cos(t) * self.radius
@@ -128,13 +130,13 @@ class Wave(Goal):
 
     def __init__(self, center: PointStamped, radius: float, tip_link: str, scale: float):
         super().__init__()
-        self.center = self.transform_msg(self.world.root_link_name, center)
+        self.center = self.transform_msg(god_map.world.root_link_name, center)
         self.radius = radius
         self.scale = scale
-        self.tip_link_name = self.world.get_link_name(tip_link)
+        self.tip_link_name = god_map.world.get_link_name(tip_link)
 
     def make_constraints(self):
-        map_T_bf = self.get_fk(self.world.root_link_name, self.tip_link_name)
+        map_T_bf = god_map.world.compose_fk_expression(god_map.world.root_link_name, self.tip_link_name)
         t = self.traj_time_in_seconds() * self.scale
         t = w.min(t, 30 * self.scale)
         x = w.sin(t) * self.radius

@@ -4,7 +4,7 @@ import numpy as np
 from geometry_msgs.msg import Quaternion, Point
 from tf.transformations import quaternion_multiply, quaternion_conjugate, quaternion_matrix, quaternion_from_matrix
 
-from giskardpy.my_types import Derivatives
+from giskardpy.data_types import Derivatives
 from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.qp.qp_solver_qpalm import QPSolverQPalm
 

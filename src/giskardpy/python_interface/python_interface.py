@@ -1,5 +1,5 @@
 from collections import defaultdict
-from typing import Dict, Tuple, Optional, List
+from typing import Dict, Tuple, Optional, List, Union
 
 import rospy
 from actionlib import SimpleActionClient
@@ -33,6 +33,7 @@ from giskardpy.goals.pointing import Pointing
 from giskardpy.goals.set_prediction_horizon import SetMaxTrajLength, SetPredictionHorizon
 from giskardpy.model.utils import make_world_body_box
 from giskardpy.my_types import goal_parameter
+from giskardpy.tasks.task import WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE, WEIGHT_ABOVE_CA
 from giskardpy.utils.utils import kwargs_to_json
 
 
@@ -341,21 +342,21 @@ class MotionGoalWrapper:
 
     def add_motion_goal(self,
                         motion_goal_class: str,
-                        name: str = '',
+                        name: Optional[str] = None,
                         start_monitors: Optional[List[str]] = None,
                         hold_monitors: Optional[List[str]] = None,
                         end_monitors: Optional[List[str]] = None,
                         **kwargs):
         """
         Generic function to add a motion goal.
-        :param motion_goal_class: Name of a class defined in
-        :param name:
-        :param start_monitors:
-        :param hold_monitors:
-        :param end_monitors:
-        :param kwargs:
-        :return:
+        :param motion_goal_class: Name of a class defined in src/giskardpy/goals
+        :param name: a unique name for the goal, will use class name by default
+        :param start_monitors: Goal will only be active if all start monitors are True. Use monitors with stay_one=True
+        :param hold_monitors: Goal will only be active if all hold monitors are False. Use monitors with stay_one=False
+        :param end_monitors: Goal will not be active if all end monitors are True. Use monitors with stay_one=True
+        :param kwargs: kwargs for __init__ function of motion_goal_class
         """
+        name = name or motion_goal_class
         motion_goal = MotionGoal()
         motion_goal.name = name
         motion_goal.motion_goal_class = motion_goal_class
@@ -364,6 +365,29 @@ class MotionGoalWrapper:
         motion_goal.end_monitors = end_monitors or []
         motion_goal.kwargs = kwargs_to_json(kwargs)
         self._goals.append(motion_goal)
+
+    def _add_collision_avoidance(self,
+                                 collisions: List[CollisionEntry],
+                                 start_monitors: Optional[List[str]] = None,
+                                 hold_monitors: Optional[List[str]] = None,
+                                 end_monitors: Optional[List[str]] = None):
+        start_monitors = start_monitors or ()
+        hold_monitors = hold_monitors or ()
+        end_monitors = end_monitors or ()
+        key = (tuple(start_monitors), tuple(hold_monitors), tuple(end_monitors))
+        self._collision_entries[key].extend(collisions)
+
+    def _add_collision_entries_as_goals(self):
+        for (start_monitors, hold_monitors, end_monitors), collision_entries in self._collision_entries.items():
+            name = 'collision avoidance'
+            if start_monitors or hold_monitors or end_monitors:
+                name += f'{start_monitors}, {hold_monitors}, {end_monitors}'
+            self.add_motion_goal(motion_goal_class=CollisionAvoidance.__name__,
+                                 name=name,
+                                 collision_entries=collision_entries,
+                                 start_monitors=list(start_monitors),
+                                 hold_monitors=list(hold_monitors),
+                                 end_monitors=list(end_monitors))
 
     def allow_collision(self,
                         group1: str = CollisionEntry.ALL,
@@ -416,9 +440,6 @@ class MotionGoalWrapper:
                              start_monitors: Optional[List[str]] = None,
                              hold_monitors: Optional[List[str]] = None,
                              end_monitors: Optional[List[str]] = None):
-        """
-        Allows all collisions for next goal.
-        """
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.ALLOW_COLLISION
         self._add_collision_avoidance(collisions=[collision_entry],
@@ -432,7 +453,6 @@ class MotionGoalWrapper:
                              hold_monitors: Optional[List[str]] = None,
                              end_monitors: Optional[List[str]] = None):
         """
-        Avoids all collisions for next goal.
         If you don't want to override the distance, don't call this function. Avoid all is the default, if you don't
         add any collision entries.
         :param min_distance: set this to overwrite default distances
@@ -470,9 +490,9 @@ class MotionGoalWrapper:
     def add_joint_position(self,
                            goal_state: Dict[str, float],
                            group_name: Optional[str] = None,
-                           weight: Optional[float] = None,
+                           weight: Optional[Union[WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE, WEIGHT_ABOVE_CA]] = None,
                            max_velocity: Optional[float] = None,
-                           name: str = '',
+                           name: Optional[str] = None,
                            start_monitors: List[str] = None,
                            hold_monitors: List[str] = None,
                            end_monitors: List[str] = None,
@@ -481,15 +501,15 @@ class MotionGoalWrapper:
         Sets joint position goals for all pairs in goal_state
         :param goal_state: maps joint_name to goal position
         :param group_name: if joint_name is not unique, search in this group for matches.
-        :param weight:
+        :param weight: None = use default weight
         :param max_velocity: will be applied to all joints
         """
         self.add_motion_goal(motion_goal_class=JointPositionList.__name__,
-                             name=name,
                              goal_state=goal_state,
                              group_name=group_name,
                              weight=weight,
                              max_velocity=max_velocity,
+                             name=name,
                              start_monitors=start_monitors,
                              hold_monitors=hold_monitors,
                              end_monitors=end_monitors,
@@ -501,17 +521,16 @@ class MotionGoalWrapper:
                            root_link: str,
                            tip_group: Optional[str] = None,
                            root_group: Optional[str] = None,
-                           max_linear_velocity: Optional[float] = None,
-                           max_angular_velocity: Optional[float] = None,
                            reference_linear_velocity: Optional[float] = None,
                            reference_angular_velocity: Optional[float] = None,
-                           weight: Optional[float] = None,
+                           weight: Optional[Union[WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE, WEIGHT_ABOVE_CA]] = None,
+                           name: Optional[str] = None,
                            start_monitors: List[str] = None,
                            hold_monitors: List[str] = None,
                            end_monitors: List[str] = None,
                            **kwargs: goal_parameter):
         """
-        This goal will use the kinematic chain between root and tip link to move tip link into the goal pose.
+        This goal will use the kinematic chain between root and tip link to move tip link to the goal pose.
         The max velocities enforce a strict limit, but require a lot of additional constraints, thus making the
         system noticeably slower.
         The reference velocities don't enforce a strict limit, but also don't require any additional constraints.
@@ -520,11 +539,9 @@ class MotionGoalWrapper:
         :param goal_pose: the goal pose
         :param root_group: a group name, where to search for root_link, only required to avoid name conflicts
         :param tip_group: a group name, where to search for tip_link, only required to avoid name conflicts
-        :param max_linear_velocity: m/s
-        :param max_angular_velocity: rad/s
         :param reference_linear_velocity: m/s
         :param reference_angular_velocity: rad/s
-        :param weight: default WEIGHT_ABOVE_CA
+        :param weight: None = use default weight
         """
         self.add_motion_goal(motion_goal_class=CartesianPose.__name__,
                              goal_pose=goal_pose,
@@ -532,38 +549,14 @@ class MotionGoalWrapper:
                              root_link=root_link,
                              root_group=root_group,
                              tip_group=tip_group,
-                             max_linear_velocity=max_linear_velocity,
-                             max_angular_velocity=max_angular_velocity,
                              reference_linear_velocity=reference_linear_velocity,
                              reference_angular_velocity=reference_angular_velocity,
                              weight=weight,
+                             name=name,
                              start_monitors=start_monitors,
                              hold_monitors=hold_monitors,
                              end_monitors=end_monitors,
                              **kwargs)
-
-    def _add_collision_avoidance(self,
-                                 collisions: List[CollisionEntry],
-                                 start_monitors: Optional[List[str]] = None,
-                                 hold_monitors: Optional[List[str]] = None,
-                                 end_monitors: Optional[List[str]] = None):
-        start_monitors = start_monitors or ()
-        hold_monitors = hold_monitors or ()
-        end_monitors = end_monitors or ()
-        key = (tuple(start_monitors), tuple(hold_monitors), tuple(end_monitors))
-        self._collision_entries[key].extend(collisions)
-
-    def _add_collision_entries_as_goals(self):
-        for (start_monitors, hold_monitors, end_monitors), collision_entries in self._collision_entries.items():
-            name = 'collision avoidance'
-            if start_monitors or hold_monitors or end_monitors:
-                name += f'{start_monitors}, {hold_monitors}, {end_monitors}'
-            self.add_motion_goal(motion_goal_class=CollisionAvoidance.__name__,
-                                 name=name,
-                                 collision_entries=collision_entries,
-                                 start_monitors=list(start_monitors),
-                                 hold_monitors=list(hold_monitors),
-                                 end_monitors=list(end_monitors))
 
     def add_align_planes(self,
                          goal_normal: Vector3Stamped,
@@ -573,7 +566,8 @@ class MotionGoalWrapper:
                          tip_group: str = None,
                          root_group: str = None,
                          reference_angular_velocity: Optional[float] = None,
-                         weight: Optional[float] = None,
+                         weight: Optional[Union[WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE, WEIGHT_ABOVE_CA]] = None,
+                         name: Optional[str] = None,
                          start_monitors: List[str] = None,
                          hold_monitors: List[str] = None,
                          end_monitors: List[str] = None,
@@ -598,6 +592,7 @@ class MotionGoalWrapper:
                              goal_normal=goal_normal,
                              max_angular_velocity=reference_angular_velocity,
                              weight=weight,
+                             name=name,
                              start_monitors=start_monitors,
                              hold_monitors=hold_monitors,
                              end_monitors=end_monitors,
@@ -606,8 +601,8 @@ class MotionGoalWrapper:
     def add_avoid_joint_limits(self,
                                percentage: int = 15,
                                joint_list: Optional[List[str]] = None,
-                               weight: Optional[float] = None,
-                               name: str = '',
+                               weight: Optional[Union[WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE, WEIGHT_ABOVE_CA]] = None,
+                               name: Optional[str] = None,
                                start_monitors: List[str] = None,
                                hold_monitors: List[str] = None,
                                end_monitors: List[str] = None):
@@ -618,8 +613,8 @@ class MotionGoalWrapper:
         self.add_motion_goal(motion_goal_class=AvoidJointLimits.__name__,
                              percentage=percentage,
                              weight=weight,
-                             name=name,
                              joint_list=joint_list,
+                             name=name,
                              start_monitors=start_monitors,
                              hold_monitors=hold_monitors,
                              end_monitors=end_monitors)
@@ -630,7 +625,8 @@ class MotionGoalWrapper:
                             tip_group: Optional[str] = None,
                             environment_group: Optional[str] = None,
                             goal_joint_state: Optional[float] = None,
-                            weight: Optional[float] = None,
+                            weight: Optional[Union[WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE, WEIGHT_ABOVE_CA]] = None,
+                            name: Optional[str] = None,
                             start_monitors: List[str] = None,
                             hold_monitors: List[str] = None,
                             end_monitors: List[str] = None):
@@ -644,6 +640,7 @@ class MotionGoalWrapper:
                              environment_group=environment_group,
                              goal_joint_state=goal_joint_state,
                              weight=weight,
+                             name=name,
                              start_monitors=start_monitors,
                              hold_monitors=hold_monitors,
                              end_monitors=end_monitors)
@@ -654,7 +651,8 @@ class MotionGoalWrapper:
                            tip_group: Optional[str] = None,
                            environment_group: Optional[str] = None,
                            goal_joint_state: Optional[float] = None,
-                           weight: Optional[float] = None,
+                           weight: Optional[Union[WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE, WEIGHT_ABOVE_CA]] = None,
+                           name: Optional[str] = None,
                            start_monitors: List[str] = None,
                            hold_monitors: List[str] = None,
                            end_monitors: List[str] = None):
@@ -677,6 +675,7 @@ class MotionGoalWrapper:
                              environment_group=environment_group,
                              goal_joint_state=goal_joint_state,
                              weight=weight,
+                             name=name,
                              start_monitors=start_monitors,
                              hold_monitors=hold_monitors,
                              end_monitors=end_monitors)
@@ -689,16 +688,18 @@ class MotionGoalWrapper:
                             root_group: Optional[str] = None,
                             reference_linear_velocity: Optional[float] = None,
                             reference_angular_velocity: Optional[float] = None,
-                            weight: Optional[float] = None,
+                            weight: Optional[Union[WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE, WEIGHT_ABOVE_CA]] = None,
+                            name: Optional[str] = None,
                             start_monitors: List[str] = None,
                             hold_monitors: List[str] = None,
                             end_monitors: List[str] = None,
                             **kwargs: goal_parameter):
         """
         This goal will use the kinematic chain between root and tip link to move tip link into the goal pose.
-        The max velocities enforce a strict limit, but require a lot of additional constraints, thus making the
-        system noticeably slower.
-        The reference velocities don't enforce a strict limit, but also don't require any additional constraints.
+        It is specifically for differential drives. Will drive towards the goal the following way:
+        1. orient to goal
+        2. drive to goal position in a straight line
+        3. orient to goal orientation
         :param root_link: name of the root link of the kin chain
         :param tip_link: name of the tip link of the kin chain
         :param goal_pose: the goal pose
@@ -706,7 +707,6 @@ class MotionGoalWrapper:
         :param tip_group: a group name, where to search for tip_link, only required to avoid name conflicts
         :param reference_linear_velocity: m/s
         :param reference_angular_velocity: rad/s
-        :param weight: default WEIGHT_ABOVE_CA
         """
         self.add_motion_goal(motion_goal_class=DiffDriveBaseGoal.__name__,
                              goal_pose=goal_pose,
@@ -717,6 +717,7 @@ class MotionGoalWrapper:
                              reference_linear_velocity=reference_linear_velocity,
                              reference_angular_velocity=reference_angular_velocity,
                              weight=weight,
+                             name=name,
                              start_monitors=start_monitors,
                              hold_monitors=hold_monitors,
                              end_monitors=end_monitors,
@@ -733,7 +734,8 @@ class MotionGoalWrapper:
                       root_group: Optional[str] = None,
                       reference_linear_velocity: Optional[float] = None,
                       reference_angular_velocity: Optional[float] = None,
-                      weight: Optional[float] = None,
+                      weight: Optional[Union[WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE, WEIGHT_ABOVE_CA]] = None,
+                      name: Optional[str] = None,
                       start_monitors: List[str] = None,
                       hold_monitors: List[str] = None,
                       end_monitors: List[str] = None,
@@ -752,7 +754,6 @@ class MotionGoalWrapper:
         :param tip_group: if tip_link is not unique, search in this group for matches
         :param reference_linear_velocity: m/s
         :param reference_angular_velocity: rad/s
-        :param weight:
         """
         self.add_motion_goal(motion_goal_class=GraspBar.__name__,
                              root_link=root_link,
@@ -766,6 +767,7 @@ class MotionGoalWrapper:
                              reference_linear_velocity=reference_linear_velocity,
                              reference_angular_velocity=reference_angular_velocity,
                              weight=weight,
+                             name=name,
                              start_monitors=start_monitors,
                              hold_monitors=hold_monitors,
                              end_monitors=end_monitors,
@@ -778,8 +780,9 @@ class MotionGoalWrapper:
                                      root_group: Optional[str] = None,
                                      max_linear_velocity: float = 0.1,
                                      max_angular_velocity: float = 0.5,
-                                     weight: Optional[float] = None,
+                                     weight: Optional[Union[WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE, WEIGHT_ABOVE_CA]] = None,
                                      hard: bool = False,
+                                     name: Optional[str] = None,
                                      start_monitors: List[str] = None,
                                      hold_monitors: List[str] = None,
                                      end_monitors: List[str] = None,
@@ -793,7 +796,6 @@ class MotionGoalWrapper:
         :param tip_group: if the tip_link is not unique, use this to say to which group the link belongs
         :param max_linear_velocity: m/s
         :param max_angular_velocity: rad/s
-        :param weight: default WEIGHT_ABOVE_CA
         :param hard: Turn this into a hard constraint. This make create unsolvable optimization problems
         """
         self.add_motion_goal(motion_goal_class=CartesianVelocityLimit.__name__,
@@ -805,19 +807,10 @@ class MotionGoalWrapper:
                              max_linear_velocity=max_linear_velocity,
                              max_angular_velocity=max_angular_velocity,
                              hard=hard,
+                             name=name,
                              start_monitors=start_monitors,
                              hold_monitors=hold_monitors,
                              end_monitors=end_monitors,
-                             **kwargs)
-
-    def set_max_traj_length(self, new_length: float, **kwargs: goal_parameter):
-        """
-        Overwrites Giskard trajectory length limit for planning.
-        If the trajectory is longer than new_length, Giskard will prempt the goal.
-        :param new_length: in seconds
-        """
-        self.add_motion_goal(motion_goal_class=SetMaxTrajLength.__name__,
-                             new_length=new_length,
                              **kwargs)
 
     def add_pointing(self,
@@ -828,7 +821,8 @@ class MotionGoalWrapper:
                      tip_group: Optional[str] = None,
                      root_group: Optional[str] = None,
                      max_velocity: float = 0.3,
-                     weight: Optional[float] = None,
+                     weight: Optional[Union[WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE, WEIGHT_ABOVE_CA]] = None,
+                     name: Optional[str] = None,
                      start_monitors: List[str] = None,
                      hold_monitors: List[str] = None,
                      end_monitors: List[str] = None,
@@ -842,7 +836,6 @@ class MotionGoalWrapper:
         :param root_group: if root_link is not unique, search this group for matches.
         :param pointing_axis: the axis of tip_link that will be used for pointing
         :param max_velocity: rad/s
-        :param weight:
         """
         self.add_motion_goal(motion_goal_class=Pointing.__name__,
                              tip_link=tip_link,
@@ -853,6 +846,7 @@ class MotionGoalWrapper:
                              pointing_axis=pointing_axis,
                              max_velocity=max_velocity,
                              weight=weight,
+                             name=name,
                              start_monitors=start_monitors,
                              hold_monitors=hold_monitors,
                              end_monitors=end_monitors,
@@ -875,7 +869,8 @@ class MotionGoalWrapper:
                                   tip_group: Optional[str] = None,
                                   root_group: Optional[str] = None,
                                   reference_velocity: Optional[float] = None,
-                                  weight: Optional[float] = None,
+                                  weight: Optional[Union[WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE, WEIGHT_ABOVE_CA]] = None,
+                                  name: Optional[str] = None,
                                   start_monitors: List[str] = None,
                                   hold_monitors: List[str] = None,
                                   end_monitors: List[str] = None,
@@ -889,7 +884,6 @@ class MotionGoalWrapper:
         :param root_group: if root link is not unique, you can use this to tell Giskard in which group to search.
         :param reference_velocity: rad/s, approx limit
         :param max_velocity: rad/s, strict limit, but will slow the system down
-        :param weight:
         """
         self.add_motion_goal(motion_goal_class=CartesianOrientation.__name__,
                              goal_orientation=goal_orientation,
@@ -899,20 +893,36 @@ class MotionGoalWrapper:
                              root_group=root_group,
                              reference_velocity=reference_velocity,
                              weight=weight,
+                             name=name,
                              start_monitors=start_monitors,
                              hold_monitors=hold_monitors,
                              end_monitors=end_monitors,
                              **kwargs)
 
-    def set_seed_configuration(self, seed_configuration, group_name: Optional[str] = None):
+    def set_seed_configuration(self,
+                               seed_configuration: Dict[str, float],
+                               group_name: Optional[str] = None,
+                               name: Optional[str] = None):
+        """
+        Only meant for use with projection. Changes the world state to seed_configuration before starting planning,
+        without having to plan a motion to it like with add_joint_position
+        """
         self.add_motion_goal(motion_goal_class=SetSeedConfiguration.__name__,
                              seed_configuration=seed_configuration,
-                             group_name=group_name)
+                             group_name=group_name,
+                             name=name)
 
-    def set_seed_odometry(self, base_pose, group_name: Optional[str] = None):
+    def set_seed_odometry(self,
+                          base_pose: PoseStamped,
+                          group_name: Optional[str] = None,
+                          name: Optional[str] = None):
+        """
+        Only meant for use with projection. Overwrites the odometry transform with base_pose.
+        """
         self.add_motion_goal(motion_goal_class=SetOdometry.__name__,
                              group_name=group_name,
-                             base_pose=base_pose)
+                             base_pose=base_pose,
+                             name=name)
 
     def add_cartesian_pose_straight(self,
                                     goal_pose: PoseStamped,
@@ -922,7 +932,8 @@ class MotionGoalWrapper:
                                     root_group: Optional[str] = None,
                                     reference_linear_velocity: Optional[float] = None,
                                     reference_angular_velocity: Optional[float] = None,
-                                    weight: Optional[float] = None,
+                                    weight: Optional[Union[WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE, WEIGHT_ABOVE_CA]] = None,
+                                    name: Optional[str] = None,
                                     start_monitors: List[str] = None,
                                     hold_monitors: List[str] = None,
                                     end_monitors: List[str] = None,
@@ -938,11 +949,8 @@ class MotionGoalWrapper:
         :param goal_pose: the goal pose
         :param tip_group: a group name, where to search for tip_link, only required to avoid name conflicts
         :param root_group: a group name, where to search for root_link, only required to avoid name conflicts
-        :param max_linear_velocity: m/s
-        :param max_angular_velocity: rad/s
         :param reference_linear_velocity: m/s
         :param reference_angular_velocity: rad/s
-        :param weight: default WEIGHT_ABOVE_CA
         """
         self.add_motion_goal(motion_goal_class=CartesianPoseStraight.__name__,
                              goal_pose=goal_pose,
@@ -953,6 +961,7 @@ class MotionGoalWrapper:
                              weight=weight,
                              reference_linear_velocity=reference_linear_velocity,
                              reference_angular_velocity=reference_angular_velocity,
+                             name=name,
                              start_monitors=start_monitors,
                              hold_monitors=hold_monitors,
                              end_monitors=end_monitors,
@@ -965,7 +974,8 @@ class MotionGoalWrapper:
                                tip_group: Optional[str] = None,
                                root_group: Optional[str] = None,
                                reference_velocity: Optional[float] = 0.2,
-                               weight: Optional[float] = None,
+                               weight: Optional[Union[WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE, WEIGHT_ABOVE_CA]] = None,
+                               name: Optional[str] = None,
                                start_monitors: List[str] = None,
                                hold_monitors: List[str] = None,
                                end_monitors: List[str] = None,
@@ -988,6 +998,7 @@ class MotionGoalWrapper:
                              root_group=root_group,
                              reference_velocity=reference_velocity,
                              weight=weight,
+                             name=name,
                              start_monitors=start_monitors,
                              hold_monitors=hold_monitors,
                              end_monitors=end_monitors,
@@ -1000,7 +1011,8 @@ class MotionGoalWrapper:
                                         tip_group: Optional[str] = None,
                                         root_group: Optional[str] = None,
                                         reference_velocity: float = None,
-                                        weight: Optional[float] = None,
+                                        weight: Optional[Union[WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE, WEIGHT_ABOVE_CA]] = None,
+                                        name: Optional[str] = None,
                                         start_monitors: List[str] = None,
                                         hold_monitors: List[str] = None,
                                         end_monitors: List[str] = None,
@@ -1016,6 +1028,7 @@ class MotionGoalWrapper:
                              root_group=root_group,
                              reference_velocity=reference_velocity,
                              weight=weight,
+                             name=name,
                              start_monitors=start_monitors,
                              hold_monitors=hold_monitors,
                              end_monitors=end_monitors,

@@ -67,9 +67,9 @@ class QPSolver(ABC):
         pass
 
     @classmethod
-    def get_solver_times(self) -> dict:
-        if hasattr(self, '_times'):
-            return self._times
+    def get_solver_times(cls) -> dict:
+        if hasattr(cls, '_times'):
+            return cls._times
         return {}
 
     def analyze_infeasibility(self):

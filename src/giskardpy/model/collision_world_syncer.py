@@ -1,21 +1,19 @@
 import os
-import itertools
 from collections import defaultdict
-from enum import Enum
 from copy import deepcopy
+from enum import Enum
 from itertools import product, combinations_with_replacement, combinations
-from time import time
-from typing import List, Dict, Optional, Tuple, Iterable, Set, DefaultDict, Callable, Union
+from typing import List, Dict, Optional, Tuple, Iterable, Set, DefaultDict, Callable
 
+import numpy as np
 from geometry_msgs.msg import Pose
 from lxml import etree
-import numpy as np
 
 from giskard_msgs.msg import CollisionEntry
+from giskardpy.data_types import my_string, Derivatives, PrefixName
 from giskardpy.exceptions import UnknownGroupException, UnknownLinkException
 from giskardpy.god_map import god_map
 from giskardpy.model.world import WorldBranch
-from giskardpy.data_types import my_string, Derivatives, PrefixName
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.utils import logging
 from giskardpy.utils.utils import resolve_ros_iris
@@ -54,9 +52,9 @@ class CollisionAvoidanceThresholds:
 
 class CollisionAvoidanceGroupThresholds:
     def __init__(self):
-        self.external_collision_avoidance: Dict[PrefixName, CollisionAvoidanceThresholds] = defaultdict(
+        self.external_collision_avoidance: DefaultDict[PrefixName, CollisionAvoidanceThresholds] = defaultdict(
             CollisionAvoidanceThresholds)
-        self.self_collision_avoidance: Dict[PrefixName, CollisionAvoidanceThresholds] = defaultdict(
+        self.self_collision_avoidance: DefaultDict[PrefixName, CollisionAvoidanceThresholds] = defaultdict(
             CollisionAvoidanceThresholds)
 
     def max_num_of_repeller(self):
@@ -271,11 +269,6 @@ class Collisions:
         return SortedCollisionResults()
 
     def get_external_collisions_long_key(self, link_a, link_b) -> Collision:
-        """
-        Collisions are saved as a list for each movable robot joint, sorted by contact distance
-        :type joint_name: str
-        :rtype: SortedKeyList
-        """
         return self.external_collision_long_key[link_a, link_b]
 
     @profile
@@ -315,7 +308,7 @@ class CollisionWorldSynchronizer:
     srdf_disable_self_collision = 'disable_self_collision'
     srdf_moveit_disable_collisions = 'disable_collisions'
     collision_checker_id = CollisionCheckerLib.none
-    _fixed_joints: Tuple[PrefixName]
+    _fixed_joints: Tuple[PrefixName, ...]
 
     def __init__(self):
         self.self_collision_matrix = {}
@@ -330,7 +323,7 @@ class CollisionWorldSynchronizer:
         self.collision_matrix = {}
 
     @property
-    def fixed_joints(self) -> Tuple[PrefixName]:
+    def fixed_joints(self) -> Tuple[PrefixName, ...]:
         return self._fixed_joints
 
     def add_fixed_joint(self, joint_name: PrefixName):

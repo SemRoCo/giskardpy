@@ -93,15 +93,6 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
         return self.kw.get_closest_filtered_POD_batch(query)
 
     @profile
-    def in_collision(self, link_a, link_b, distance):
-        result = False
-        for link_id_a in self.object_name_to_id[link_a]:
-            for link_id_b in self.object_name_to_id[link_b]:
-                query_result = self.kw.get_distance(link_id_a, link_id_b)
-                result |= len(query_result) > 0 and query_result[0].distance < distance
-        return result
-
-    @profile
     def sync(self):
         super().sync()
         if self.has_world_changed():

@@ -506,6 +506,7 @@ class TestMonitors:
         zero_pose.execute(add_local_minimum_reached=False)
 
     def test_bowl_and_cup_sequence(self, kitchen_setup: PR2TestWrapper):
+        kitchen_setup.set_avoid_name_conflict(False)
         # %% setup
         bowl_name = 'bowl'
         cup_name = 'cup'

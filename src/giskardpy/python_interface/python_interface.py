@@ -1401,6 +1401,11 @@ class GiskardWrapper:
         self.clear_motion_goals_and_monitors()
         rospy.sleep(.3)
 
+    def set_avoid_name_conflict(self, value: bool):
+        self.avoid_name_conflict = value
+        self.monitors.avoid_name_conflict = value
+        self.motion_goals.avoid_name_conflict = value
+
     def add_default_end_motion_conditions(self):
         local_min_reached_monitor_name = self.monitors.add_local_minimum_reached()
         for goal in self.motion_goals._goals:

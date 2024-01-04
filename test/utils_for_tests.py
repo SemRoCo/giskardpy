@@ -28,7 +28,6 @@ from giskardpy.configs.giskard import Giskard
 from giskardpy.configs.qp_controller_config import SupportedQPSolver
 from giskardpy.data_types import KeyDefaultDict
 from giskardpy.exceptions import UnknownGroupException
-from giskardpy.goals.cartesian_goals import PR2DiffDriveBaseGoal
 from giskardpy.goals.diff_drive_goals import DiffDriveTangentialToPoint, KeepHandInWorkspace
 from giskardpy.god_map import god_map
 from giskardpy.model.collision_world_syncer import Collisions, Collision
@@ -424,10 +423,6 @@ class GiskardTestWrapper(OldGiskardWrapper):
         # # self.set_base.call(goal)
         # rospy.sleep(0.5)
 
-    def set_move_base_goal(self, goal_pose):
-        self.motion_goals.add_motion_goal(motion_goal_class=PR2DiffDriveBaseGoal.__name__,
-                                          goal_pose=goal_pose)
-
     def set_keep_hand_in_workspace(self, tip_link, map_frame=None, base_footprint=None):
         self.motion_goals.add_motion_goal(motion_goal_class=KeepHandInWorkspace.__name__,
                                           tip_link=tip_link,
@@ -435,7 +430,7 @@ class GiskardTestWrapper(OldGiskardWrapper):
                                           base_footprint=base_footprint)
 
     def set_diff_drive_tangential_to_point(self, goal_point: PointStamped, weight: float = WEIGHT_ABOVE_CA, **kwargs):
-        self.motion_goals.add_motion_goal(DiffDriveTangentialToPoint.__name__,
+        self.motion_goals.add_motion_goal(motion_goal_class=DiffDriveTangentialToPoint.__name__,
                                           goal_point=goal_point,
                                           weight=weight,
                                           **kwargs)

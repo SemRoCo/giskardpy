@@ -204,7 +204,7 @@ class CarryMyBullshit(Goal):
                  clear_path: bool = False,
                  drive_back: bool = False,
                  enable_laser_avoidance: bool = True):
-        super().__init__()
+        super().__init__(name=None)
         if drive_back:
             logging.loginfo('driving back')
         self.end_of_traj_reached = False

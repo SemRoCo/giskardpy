@@ -58,7 +58,8 @@ class CartesianPosition(Goal):
                                         reference_velocity=self.reference_velocity,
                                         weight=self.weight)
         self.add_task(task)
-        self.connect_monitors_to_all_tasks(start_monitors=start_monitors, hold_monitors=hold_monitors, end_monitors=end_monitors)
+        self.connect_monitors_to_all_tasks(start_monitors=start_monitors, hold_monitors=hold_monitors,
+                                           end_monitors=end_monitors)
 
 
 class CartesianOrientation(Goal):
@@ -382,63 +383,6 @@ class DiffDriveBaseGoal(Goal):
                                      name='/rot2')
         self.add_task(task)
         self.connect_monitors_to_all_tasks(start_monitors, hold_monitors, end_monitors)
-
-
-class PR2DiffDriveBaseGoal(Goal):
-
-    def __init__(self, goal_pose: PoseStamped, max_linear_velocity: float = 0.1,
-                 max_angular_velocity: float = 0.5, weight: float = WEIGHT_ABOVE_CA, pointing_axis=None,
-                 root_group: Optional[str] = None, tip_group: Optional[str] = None,
-                 start_monitors: Optional[List[ExpressionMonitor]] = None,
-                 hold_monitors: Optional[List[ExpressionMonitor]] = None,
-                 end_monitors: Optional[List[ExpressionMonitor]] = None
-                 ):
-        super().__init__()
-        self.max_angular_velocity = max_angular_velocity
-        self.max_linear_velocity = max_linear_velocity
-        diff_drive_joints = [v for k, v in god_map.world.joints.items() if isinstance(v, OmniDrivePR22)]
-        assert len(diff_drive_joints) == 1
-        self.joint: OmniDrivePR22 = diff_drive_joints[0]
-        self.weight = weight
-        self.root_link = self.joint.parent_link_name
-        self.tip_link = self.joint.child_link_name
-        self.root_T_goal = transform_msg(self.root_link, goal_pose)
-        self.add_constraints_of_goal(CartesianPose(root_link=self.root_link,
-                                                   tip_link=self.tip_link,
-                                                   goal_pose=goal_pose,
-                                                   reference_linear_velocity=self.max_linear_velocity,
-                                                   reference_angular_velocity=self.max_angular_velocity,
-                                                   weight=WEIGHT_BELOW_CA))
-
-    def make_constraints(self):
-        root_T_tip = god_map.world.compose_fk_expression(self.root_link, self.tip_link)
-        root_P_tip = root_T_tip.to_position()
-
-        root_T_goal = cas.TransMatrix(self.root_T_goal)
-        root_P_goal = root_T_goal.to_position()
-
-        root_yaw1 = self.joint.yaw1_vel.get_symbol(Derivatives.position)
-        root_V_forward = cas.Vector3((cas.cos(root_yaw1), cas.sin(root_yaw1), 0))
-        root_V_forward.vis_frame = self.tip_link
-
-        root_V_goal = root_P_goal - root_P_tip
-        root_V_goal.scale(1)
-        root_V_goal.vis_frame = self.tip_link
-
-        self.add_debug_expr('root_P_goal', root_P_goal)
-        self.add_debug_expr('root_V_forward', root_V_forward)
-        self.add_debug_expr('root_V_goal', root_V_goal)
-
-        weight = cas.if_greater(cas.norm(root_P_goal - root_P_tip), 0.005, WEIGHT_ABOVE_CA, 0)
-
-        self.add_vector_goal_constraints(frame_V_current=root_V_forward,
-                                         frame_V_goal=root_V_goal,
-                                         reference_velocity=self.max_angular_velocity,
-                                         weight=weight,
-                                         name='angle')
-
-    def __str__(self) -> str:
-        return super().__str__()
 
 
 class CartesianPoseStraight(Goal):

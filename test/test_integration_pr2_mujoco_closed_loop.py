@@ -471,7 +471,7 @@ class TestConstraints:
                                                                       [0, 0, -1, 0],
                                                                       [-1, 0, 0, 0],
                                                                       [0, 0, 0, 1]]))
-        kitchen_setup.add_cart_goal(goal_pose=l_goal,
+        kitchen_setup.set_cart_goal(goal_pose=l_goal,
                                     tip_link=kitchen_setup.l_tip,
                                     root_link=kitchen_setup.default_root)
         kitchen_setup.allow_collision(kitchen_setup.l_gripper_group, bowl_name)
@@ -485,7 +485,7 @@ class TestConstraints:
                                                                       [-1, 0, 0, 0],
                                                                       [0, 0, 0, 1]]))
         kitchen_setup.set_avoid_joint_limits_goal(percentage=percentage)
-        kitchen_setup.add_cart_goal(goal_pose=r_goal,
+        kitchen_setup.set_cart_goal(goal_pose=r_goal,
                                     tip_link=kitchen_setup.r_tip,
                                     root_link=kitchen_setup.default_root,
                                     weight=WEIGHT_BELOW_CA)
@@ -493,10 +493,10 @@ class TestConstraints:
 
         l_goal.pose.position.z -= .2
         r_goal.pose.position.z -= .2
-        kitchen_setup.add_cart_goal(goal_pose=l_goal,
+        kitchen_setup.set_cart_goal(goal_pose=l_goal,
                                     tip_link=kitchen_setup.l_tip,
                                     root_link=kitchen_setup.default_root)
-        kitchen_setup.add_cart_goal(goal_pose=r_goal,
+        kitchen_setup.set_cart_goal(goal_pose=r_goal,
                                     tip_link=kitchen_setup.r_tip,
                                     root_link=kitchen_setup.default_root)
         kitchen_setup.set_avoid_joint_limits_goal(percentage=percentage)
@@ -527,8 +527,8 @@ class TestConstraints:
         cup_goal.pose.position = Point(.15, 0.25, .07)
         cup_goal.pose.orientation = Quaternion(0, 0, 0, 1)
 
-        kitchen_setup.add_cart_goal(goal_pose=bowl_goal, tip_link=bowl_name, root_link=kitchen_setup.default_root)
-        kitchen_setup.add_cart_goal(goal_pose=cup_goal, tip_link=cup_name, root_link=kitchen_setup.default_root)
+        kitchen_setup.set_cart_goal(goal_pose=bowl_goal, tip_link=bowl_name, root_link=kitchen_setup.default_root)
+        kitchen_setup.set_cart_goal(goal_pose=cup_goal, tip_link=cup_name, root_link=kitchen_setup.default_root)
         kitchen_setup.set_avoid_joint_limits_goal(percentage=percentage)
         kitchen_setup.avoid_all_collisions(0.05)
         kitchen_setup.plan_and_execute()
@@ -547,7 +547,7 @@ class TestActionServerEvents:
         p.header.frame_id = 'base_footprint'
         p.pose.position = Point(1, 0, 0)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
-        zero_pose.add_cart_goal(goal_pose=p, tip_link='base_footprint', root_link='map')
+        zero_pose.set_cart_goal(goal_pose=p, tip_link='base_footprint', root_link='map')
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute(expected_error_code=MoveResult.PREEMPTED, stop_after=1)
 
@@ -556,7 +556,7 @@ class TestActionServerEvents:
         p.header.frame_id = 'base_footprint'
         p.pose.position = Point(2, 0, 0)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
-        zero_pose.add_cart_goal(goal_pose=p, tip_link='base_footprint', root_link='map')
+        zero_pose.set_cart_goal(goal_pose=p, tip_link='base_footprint', root_link='map')
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute(expected_error_code=MoveResult.PREEMPTED, stop_after=6)
 
@@ -591,7 +591,7 @@ class TestManipulability:
         p.pose.position = Point(0.8, -0.3, 1)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.allow_all_collisions()
-        zero_pose.add_cart_goal(p, zero_pose.r_tip, 'map')
+        zero_pose.set_cart_goal(p, zero_pose.r_tip, 'map')
         zero_pose.add_motion_goal(motion_goal_class=MaxManipulability.__name__,
                                   root_link='torso_lift_link',
                                   tip_link='r_gripper_tool_frame'

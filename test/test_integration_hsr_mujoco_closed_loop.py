@@ -39,7 +39,7 @@ class HSRTestWrapper(GiskardTestWrapper):
         self.robot = self.world.groups[self.robot_name]
 
     def move_base(self, goal_pose):
-        self.add_cart_goal(goal_pose, tip_link='base_footprint', root_link=self.world.root_link_name)
+        self.set_cart_goal(goal_pose, tip_link='base_footprint', root_link=self.world.root_link_name)
         self.plan_and_execute()
 
     def open_gripper(self):
@@ -169,7 +169,7 @@ class TestJointGoals:
         p.header.frame_id = tip
         p.pose.position.z = 0.2
         p.pose.orientation.w = 1
-        zero_pose.add_cart_goal(goal_pose=p, tip_link=tip,
+        zero_pose.set_cart_goal(goal_pose=p, tip_link=tip,
                                 root_link='base_footprint')
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
@@ -194,7 +194,7 @@ class TestJointGoals:
         p.header.frame_id = tip
         p.pose.position.z = 0.15
         p.pose.orientation.w = 1
-        zero_pose.add_cart_goal(goal_pose=p, tip_link=tip,
+        zero_pose.set_cart_goal(goal_pose=p, tip_link=tip,
                                 root_link='base_footprint')
         zero_pose.plan_and_execute()
         np.testing.assert_almost_equal(zero_pose.world.state[arm_lift_joint].position, 0.3, decimal=2)
@@ -249,7 +249,7 @@ class TestCartGoals:
         base_goal.header.frame_id = 'map'
         base_goal.pose.position.x = 1
         base_goal.pose.orientation = Quaternion(*quaternion_about_axis(pi, [0, 0, 1]))
-        zero_pose.add_cart_goal(base_goal, 'base_footprint')
+        zero_pose.set_cart_goal(base_goal, 'base_footprint')
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
 
@@ -297,7 +297,7 @@ class TestCartGoals:
         r_goal = PoseStamped()
         r_goal.header.frame_id = zero_pose.tip
         r_goal.pose.orientation = Quaternion(*quaternion_about_axis(pi, [0, 0, 1]))
-        zero_pose.add_cart_goal(r_goal, zero_pose.tip)
+        zero_pose.set_cart_goal(r_goal, zero_pose.tip)
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
 
@@ -384,7 +384,7 @@ class TestCollisionAvoidanceGoals:
         r_goal.header.frame_id = zero_pose.tip
         r_goal.pose.position.z = 0.5
         r_goal.pose.orientation.w = 1
-        zero_pose.add_cart_goal(r_goal, zero_pose.tip)
+        zero_pose.set_cart_goal(r_goal, zero_pose.tip)
         zero_pose.plan_and_execute()
 
     def test_self_collision_avoidance2(self, zero_pose: HSRTestWrapper):
@@ -405,7 +405,7 @@ class TestCollisionAvoidanceGoals:
         goal_pose.header.frame_id = 'hand_palm_link'
         goal_pose.pose.position.x = 0.5
         goal_pose.pose.orientation.w = 1
-        zero_pose.add_cart_goal(goal_pose, zero_pose.tip)
+        zero_pose.set_cart_goal(goal_pose, zero_pose.tip)
         zero_pose.plan_and_execute()
 
     def test_attached_collision1(self, box_setup: HSRTestWrapper):
@@ -424,7 +424,7 @@ class TestCollisionAvoidanceGoals:
                                                                           [0, -1, 0, 0],
                                                                           [1, 0, 0, 0],
                                                                           [0, 0, 0, 1]]))
-        box_setup.add_cart_goal(grasp_pose, box_setup.tip)
+        box_setup.set_cart_goal(grasp_pose, box_setup.tip)
         box_setup.plan_and_execute()
         box_setup.update_parent_link_of_group(box_name, box_setup.tip)
 

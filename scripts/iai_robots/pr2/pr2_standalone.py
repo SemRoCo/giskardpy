@@ -33,5 +33,5 @@ if __name__ == '__main__':
                               drive_joint_name,
                           ]
                       ),
-                      behavior_tree_config=StandAloneBTConfig())
+                      behavior_tree_config=StandAloneBTConfig(publish_tf=True, publish_js=True))
     giskard.live()

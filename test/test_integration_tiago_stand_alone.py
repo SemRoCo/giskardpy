@@ -358,7 +358,7 @@ class TestCollisionAvoidance:
                                                                          [0, -1, 0, 0],
                                                                          [0, 0, -1, 0],
                                                                          [0, 0, 0, 1]]))
-        apartment_setup.add_cart_goal(left_pose,
+        apartment_setup.set_cart_goal(left_pose,
                                       tip_link=l_tcp,
                                       root_link=apartment_setup.default_root,
                                       weight=WEIGHT_ABOVE_CA * 10,
@@ -371,7 +371,7 @@ class TestCollisionAvoidance:
         apartment_setup.plan_and_execute()
 
         apartment_setup.set_diff_drive_tangential_to_point(goal_point=goal_point, weight=WEIGHT_BELOW_CA)
-        apartment_setup.add_cart_goal(left_pose,
+        apartment_setup.set_cart_goal(left_pose,
                                       tip_link=l_tcp,
                                       root_link=apartment_setup.default_root,
                                       add_monitor=False)
@@ -545,7 +545,7 @@ class TestCollisionAvoidance:
                                                                          [0, -1, 0, 0],
                                                                          [0, 0, -1, 0],
                                                                          [0, 0, 0, 1]]))
-        apartment_setup.add_cart_goal(left_pose,
+        apartment_setup.set_cart_goal(left_pose,
                                       tip_link=tcp,
                                       root_link=god_map.world.root_link_name,
                                       add_monitor=False)

@@ -54,7 +54,7 @@ class OldGiskardWrapper(GiskardWrapper):
                                              end_monitors=end_monitors_monitors,
                                              **kwargs)
 
-    def add_cart_goal(self,
+    def set_cart_goal(self,
                       goal_pose: PoseStamped,
                       tip_link: str,
                       root_link: str,
@@ -740,6 +740,15 @@ class OldGiskardWrapper(GiskardWrapper):
                                        parent_link=parent_link,
                                        parent_link_group=parent_link_group,
                                        timeout=timeout)
+
+    def remove_group(self,
+                     name: str,
+                     timeout: float = 2) -> UpdateWorldResponse:
+        """
+        Removes a group and all links and joints it contains from the world.
+        Be careful, you can remove parts of the robot like that.
+        """
+        return self.world.remove_group(name=name, timeout=timeout)
 
     def update_parent_link_of_group(self,
                                     name: str,

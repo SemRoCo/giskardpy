@@ -96,7 +96,7 @@ class DonbotTestWrapper(GiskardTestWrapper):
         self.plan_and_execute()
 
     def move_base(self, goal_pose):
-        self.add_cart_goal(goal_pose, tip_link='base_footprint', root_link='odom')
+        self.set_cart_goal(goal_pose, tip_link='base_footprint', root_link='odom')
         self.plan_and_execute()
 
     def set_localization(self, map_T_odom: PoseStamped):
@@ -315,7 +315,7 @@ class TestCartGoals:
         p.pose.position = Point(0, -0.1, 0)
         p.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 4, [1, 0, 0]))
         zero_pose.allow_self_collision()
-        zero_pose.add_cart_goal(p, zero_pose.gripper_tip, zero_pose.default_root)
+        zero_pose.set_cart_goal(p, zero_pose.gripper_tip, zero_pose.default_root)
         zero_pose.plan_and_execute()
 
     def test_cart_goal2(self, zero_pose: DonbotTestWrapper):
@@ -366,7 +366,7 @@ class TestCartGoals:
         goal_pose.pose.orientation.w = 0
 
         zero_pose.allow_self_collision()
-        zero_pose.add_cart_goal(goal_pose, zero_pose.camera_tip, zero_pose.default_root)
+        zero_pose.set_cart_goal(goal_pose, zero_pose.camera_tip, zero_pose.default_root)
         zero_pose.plan_and_execute()
 
     def test_endless_wiggling2(self, zero_pose: DonbotTestWrapper):
@@ -381,7 +381,7 @@ class TestCartGoals:
         goal_pose.pose.orientation.w = .9
 
         zero_pose.allow_self_collision()
-        zero_pose.add_cart_goal(goal_pose, zero_pose.gripper_tip, zero_pose.default_root)
+        zero_pose.set_cart_goal(goal_pose, zero_pose.gripper_tip, zero_pose.default_root)
         zero_pose.plan_and_execute()
 
     # def test_elbow_singularity(self, better_pose: DonbotTestWrapper):
@@ -438,7 +438,7 @@ class TestCartGoals:
         p.pose.position.y = 1
         p.pose.orientation.w = 1
         # zero_pose.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
-        zero_pose.add_cart_goal(goal_pose=p, tip_link='base_footprint', root_link='map')
+        zero_pose.set_cart_goal(goal_pose=p, tip_link='base_footprint', root_link='map')
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
 

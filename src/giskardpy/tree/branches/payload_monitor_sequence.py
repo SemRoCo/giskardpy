@@ -11,7 +11,7 @@ class PayloadMonitorSequence(Sequence):
     def __init__(self, monitor: PayloadMonitor):
         super().__init__(monitor.name)
         self.monitor = monitor
-        if self.monitor.stay_one:
+        if self.monitor.stay_true:
             self.add_child(DeleteMonitor(name=f'delete\nparent?', parent=self))
         if self.monitor.start_monitors:
             self.add_child(CheckMonitorState(name='check\n'+'\n'.join(x.name for x in self.monitor.start_monitors),

@@ -17,16 +17,17 @@ class PayloadMonitor(Monitor, ABC):
     state: bool
     run_call_in_thread: bool
 
-    def __init__(self, name: str, start_monitors: List[Monitor], run_call_in_thread: bool, stay_one: bool = True):
+    def __init__(self, *,
+                 run_call_in_thread: bool,
+                 name: Optional[str] = None,
+                 stay_true: bool = True,
+                 start_monitors: Optional[List[Monitor]] = None):
         self.state = False
         self.run_call_in_thread = run_call_in_thread
-        super().__init__(name=name, start_monitors=start_monitors, stay_one=stay_one)
+        super().__init__(name=name, start_monitors=start_monitors, stay_true=stay_true)
 
     def get_state(self) -> bool:
         return self.state
-
-    def set_id(self, id_: int):
-        self.id = id_
 
     @abc.abstractmethod
     def __call__(self):
@@ -36,7 +37,9 @@ class PayloadMonitor(Monitor, ABC):
 class WorldUpdatePayloadMonitor(PayloadMonitor):
     world_lock = Lock()
 
-    def __init__(self, name: str, start_monitors: List[Monitor]):
+    def __init__(self, *,
+                 name: Optional[str] = None,
+                 start_monitors: Optional[List[Monitor]] = None):
         super().__init__(name=name, start_monitors=start_monitors, run_call_in_thread=True)
 
     @abc.abstractmethod
@@ -50,8 +53,10 @@ class WorldUpdatePayloadMonitor(PayloadMonitor):
 
 
 class EndMotion(PayloadMonitor):
-    def __init__(self, name: str, start_monitors: List[Monitor]):
-        super().__init__(name, start_monitors, run_call_in_thread=False)
+    def __init__(self,
+                 name: Optional[str] = None,
+                 start_monitors: Optional[List[Monitor]] = None):
+        super().__init__(name=name, start_monitors=start_monitors, run_call_in_thread=False)
 
     def __call__(self):
         self.state = True
@@ -62,11 +67,11 @@ class EndMotion(PayloadMonitor):
 
 class CancelMotion(PayloadMonitor):
     def __init__(self,
-                 name: str,
-                 start_monitors: List[Monitor],
                  error_message: str,
-                 error_code: int = MoveResult.ERROR):
-        super().__init__(name, start_monitors, run_call_in_thread=False)
+                 error_code: int = MoveResult.ERROR,
+                 name: Optional[str] = None,
+                 start_monitors: Optional[List[Monitor]] = None):
+        super().__init__(name=name, start_monitors=start_monitors, run_call_in_thread=False)
         self.error_message = error_message
         self.error_code = error_code
 
@@ -82,7 +87,10 @@ class CancelMotion(PayloadMonitor):
 class SetMaxTrajectoryLength(CancelMotion):
     new_length: float
 
-    def __init__(self, name: str, new_length: Optional[float] = None, start_monitors: Optional[List[Monitor]] = None):
+    def __init__(self,
+                 new_length: Optional[float] = None,
+                 name: Optional[str] = None,
+                 start_monitors: Optional[List[Monitor]] = None,):
         if start_monitors:
             raise GiskardException(f'Cannot set start_monitors for {SetMaxTrajectoryLength.__name__}')
         if new_length is None:
@@ -90,7 +98,7 @@ class SetMaxTrajectoryLength(CancelMotion):
         else:
             self.new_length = new_length
         error_message = f'Trajectory longer than {self.new_length}'
-        super().__init__(name, start_monitors=[], error_message=error_message, error_code=MoveResult.CONTROL_ERROR)
+        super().__init__(name=name, start_monitors=[], error_message=error_message, error_code=MoveResult.CONTROL_ERROR)
 
     @profile
     def __call__(self):
@@ -99,9 +107,12 @@ class SetMaxTrajectoryLength(CancelMotion):
 
 
 class Print(PayloadMonitor):
-    def __init__(self, name: str, start_monitors: List[Monitor], message: str):
+    def __init__(self,
+                 message: str,
+                 name: Optional[str] = None,
+                 start_monitors: Optional[List[Monitor]] = None):
         self.message = message
-        super().__init__(name, start_monitors, run_call_in_thread=False)
+        super().__init__(name=name, start_monitors=start_monitors, run_call_in_thread=False)
 
     def __call__(self):
         logging.loginfo(self.message)
@@ -109,9 +120,12 @@ class Print(PayloadMonitor):
 
 
 class Sleep(PayloadMonitor):
-    def __init__(self, name: str, start_monitors: List[Monitor], seconds: float):
+    def __init__(self,
+                 seconds: float,
+                 name: Optional[str] = None,
+                 start_monitors: Optional[List[Monitor]] = None):
         self.seconds = seconds
-        super().__init__(name, start_monitors, run_call_in_thread=True)
+        super().__init__(name=name, start_monitors=start_monitors, run_call_in_thread=True)
 
     def __call__(self):
         rospy.sleep(self.seconds)
@@ -120,14 +134,14 @@ class Sleep(PayloadMonitor):
 
 class UpdateParentLinkOfGroup(WorldUpdatePayloadMonitor):
     def __init__(self,
-                 name: str,
-                 start_monitors: List[Monitor],
                  group_name: str,
                  parent_link: str,
-                 parent_link_group: Optional[str] = ''):
+                 parent_link_group: Optional[str] = '',
+                 name: Optional[str] = None,
+                 start_monitors: Optional[List[Monitor]] = None):
         self.group_name = group_name
         self.new_parent_link = god_map.world.search_for_link_name(parent_link, parent_link_group)
-        super().__init__(name, start_monitors)
+        super().__init__(name=name, start_monitors=start_monitors)
 
     def apply_world_update(self):
         god_map.world.move_group(group_name=self.group_name,
@@ -138,8 +152,11 @@ class UpdateParentLinkOfGroup(WorldUpdatePayloadMonitor):
 class CollisionMatrixUpdater(PayloadMonitor):
     collision_matrix: Dict[Tuple[str, str], float]
 
-    def __init__(self, name: str, start_monitors: List[Monitor], new_collision_matrix: Dict[Tuple[str, str], float]):
-        super().__init__(name, start_monitors, run_call_in_thread=False)
+    def __init__(self,
+                 new_collision_matrix: Dict[Tuple[str, str], float],
+                 name: Optional[str] = None,
+                 start_monitors: Optional[List[Monitor]] = None):
+        super().__init__(name=name, start_monitors=start_monitors, run_call_in_thread=False)
         self.collision_matrix = new_collision_matrix
 
     @profile
@@ -151,8 +168,11 @@ class CollisionMatrixUpdater(PayloadMonitor):
 
 class PayloadAlternator(PayloadMonitor):
 
-    def __init__(self, name: str, start_monitors: Optional[List[Monitor]] = None, mod: int = 2):
-        super().__init__(name, stay_one=False, start_monitors=start_monitors, run_call_in_thread=False)
+    def __init__(self,
+                 mod: int = 2,
+                 name: Optional[str] = None,
+                 start_monitors: Optional[List[Monitor]] = None):
+        super().__init__(name=name, stay_true=False, start_monitors=start_monitors, run_call_in_thread=False)
         self.mod = mod
 
     def __call__(self):

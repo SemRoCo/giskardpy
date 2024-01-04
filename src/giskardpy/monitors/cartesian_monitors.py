@@ -11,16 +11,16 @@ from giskardpy.utils.expression_definition_utils import transform_msg
 
 class PoseReached(ExpressionMonitor):
     def __init__(self,
-                 name: str,
                  root_link: str, tip_link: str,
                  goal_pose: PoseStamped,
                  root_group: Optional[str] = None,
                  tip_group: Optional[str] = None,
                  position_threshold: float = 0.01,
                  orientation_threshold: float = 0.01,
-                 stay_one: bool = True,
+                 name: Optional[str] = None,
+                 stay_true: bool = True,
                  start_monitors: Optional[List[Monitor]] = None):
-        super().__init__(name, stay_one=stay_one, start_monitors=start_monitors)
+        super().__init__(name=name, stay_true=stay_true, start_monitors=start_monitors)
         root_link = god_map.world.search_for_link_name(root_link, root_group)
         tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
         if not start_monitors:
@@ -52,15 +52,16 @@ class PoseReached(ExpressionMonitor):
 
 class PositionReached(ExpressionMonitor):
     def __init__(self,
-                 name: str,
-                 root_link: str, tip_link: str,
+                 root_link: str,
+                 tip_link: str,
                  goal_point: PointStamped,
                  root_group: Optional[str] = None,
                  tip_group: Optional[str] = None,
                  threshold: float = 0.01,
-                 stay_one: bool = True,
+                 name: Optional[str] = None,
+                 stay_true: bool = True,
                  start_monitors: Optional[List[Monitor]] = None):
-        super().__init__(name, stay_one=stay_one, start_monitors=start_monitors)
+        super().__init__(name=name, stay_true=stay_true, start_monitors=start_monitors)
         root_link = god_map.world.search_for_link_name(root_link, root_group)
         tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
         goal_point = transform_msg(root_link, goal_point)
@@ -72,16 +73,16 @@ class PositionReached(ExpressionMonitor):
 
 class OrientationReached(ExpressionMonitor):
     def __init__(self,
-                 name: str,
                  root_link: str,
                  tip_link: str,
                  goal_orientation: QuaternionStamped,
                  root_group: Optional[str] = None,
                  tip_group: Optional[str] = None,
                  threshold: float = 0.01,
-                 stay_one: bool = True,
+                 name: Optional[str] = None,
+                 stay_true: bool = True,
                  start_monitors: Optional[List[Monitor]] = None):
-        super().__init__(name, stay_one=stay_one, start_monitors=start_monitors)
+        super().__init__(name=name, stay_true=stay_true, start_monitors=start_monitors)
         root_link = god_map.world.search_for_link_name(root_link, root_group)
         tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
         goal_orientation = transform_msg(root_link, goal_orientation)
@@ -93,7 +94,6 @@ class OrientationReached(ExpressionMonitor):
 
 class PointingAt(ExpressionMonitor):
     def __init__(self,
-                 name: str,
                  tip_link: str,
                  goal_point: PointStamped,
                  root_link: str,
@@ -101,9 +101,10 @@ class PointingAt(ExpressionMonitor):
                  root_group: Optional[str] = None,
                  pointing_axis: Vector3Stamped = None,
                  threshold: float = 0.01,
-                 stay_one: bool = True,
+                 name: Optional[str] = None,
+                 stay_true: bool = True,
                  start_monitors: Optional[List[Monitor]] = None):
-        super().__init__(name, stay_one=stay_one, start_monitors=start_monitors)
+        super().__init__(name=name, stay_true=stay_true, start_monitors=start_monitors)
         self.root = god_map.world.search_for_link_name(root_link, root_group)
         self.tip = god_map.world.search_for_link_name(tip_link, tip_group)
         self.root_P_goal_point = transform_msg(self.root, goal_point)
@@ -126,7 +127,6 @@ class PointingAt(ExpressionMonitor):
 
 class VectorsAligned(ExpressionMonitor):
     def __init__(self,
-                 name: str,
                  root_link: str,
                  tip_link: str,
                  goal_normal: Vector3Stamped,
@@ -134,9 +134,10 @@ class VectorsAligned(ExpressionMonitor):
                  root_group: Optional[str] = None,
                  tip_group: Optional[str] = None,
                  threshold: float = 0.01,
-                 stay_one: bool = True,
+                 name: Optional[str] = None,
+                 stay_true: bool = True,
                  start_monitors: Optional[List[Monitor]] = None):
-        super().__init__(name, stay_one=stay_one, start_monitors=start_monitors)
+        super().__init__(name=name, stay_true=stay_true, start_monitors=start_monitors)
         self.root = god_map.world.search_for_link_name(root_link, root_group)
         self.tip = god_map.world.search_for_link_name(tip_link, tip_group)
 
@@ -157,7 +158,6 @@ class VectorsAligned(ExpressionMonitor):
 
 class DistanceToLine(ExpressionMonitor):
     def __init__(self,
-                 name: str,
                  root_link: str,
                  tip_link: str,
                  center_point: PointStamped,
@@ -166,9 +166,10 @@ class DistanceToLine(ExpressionMonitor):
                  root_group: Optional[str] = None,
                  tip_group: Optional[str] = None,
                  threshold: float = 0.01,
-                 stay_one: bool = True,
+                 name: Optional[str] = None,
+                 stay_true: bool = True,
                  start_monitors: Optional[List[Monitor]] = None):
-        super().__init__(name, stay_one=stay_one, start_monitors=start_monitors)
+        super().__init__(name=name, stay_true=stay_true, start_monitors=start_monitors)
         self.root = god_map.world.search_for_link_name(root_link, root_group)
         self.tip = god_map.world.search_for_link_name(tip_link, tip_group)
 

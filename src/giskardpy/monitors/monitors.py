@@ -1,18 +1,15 @@
 from __future__ import annotations
 
 from functools import cached_property
-from typing import Union, List, TypeVar, Optional
+from typing import List, Optional
 
 import numpy as np
 
 import giskardpy.casadi_wrapper as cas
-from giskardpy.casadi_wrapper import PreservedCasType
-from giskardpy.exceptions import UnknownGroupException, GiskardException
+from giskardpy.exceptions import GiskardException
 from giskardpy.god_map import god_map
-from giskardpy.my_types import Derivatives, my_string, transformable_message
-from giskardpy.qp.free_variable import FreeVariable
+from giskardpy.my_types import Derivatives
 from giskardpy.symbol_manager import symbol_manager
-import giskardpy.utils.tfwrapper as tf
 from giskardpy.utils.utils import string_shortener
 
 
@@ -21,15 +18,21 @@ class Monitor:
     name: str
     start_monitors: List[Monitor]
     plot: bool
-    stay_one: bool
+    stay_true: bool
 
-    def __init__(self, name: str, start_monitors: Optional[List[Monitor]] = None, plot: bool = True,
-                 stay_one: bool = False):
-        self.name = name
+    def __init__(self, *,
+                 name: Optional[str] = None,
+                 start_monitors: Optional[List[Monitor]] = None,
+                 plot: bool = True,
+                 stay_true: bool = False):
+        self.name = name or self.__class__.__name__
         self.start_monitors = start_monitors or []
         self.id = -1
         self.plot = plot
-        self.stay_one = stay_one
+        self.stay_true = stay_true
+
+    def set_id(self, id_: int):
+        self.id = id_
 
     @cached_property
     def state_filter(self) -> np.ndarray:
@@ -54,21 +57,16 @@ class Monitor:
 
 class ExpressionMonitor(Monitor):
     _expression: cas.Expression
-    name: str
 
-    def __init__(self, name: str, *, stay_one: bool = False,
+    def __init__(self,
+                 name: Optional[str] = None,
+                 stay_true: bool = False,
                  start_monitors: Optional[List[Monitor]] = None,
                  plot: bool = True):
-        self.id = -1
-        self.name = name
         self.substitution_values = []
         self.substitution_keys = []
         self._expression = None
-        self.start_monitors = start_monitors
-        super().__init__(name, start_monitors=start_monitors, plot=plot, stay_one=stay_one)
-
-    def set_id(self, id_: int):
-        self.id = id_
+        super().__init__(name=name, start_monitors=start_monitors, plot=plot, stay_true=stay_true)
 
     def set_expression(self, expression: cas.symbol_expr):
         self._expression = expression
@@ -88,13 +86,14 @@ class ExpressionMonitor(Monitor):
 
 class LocalMinimumReached(ExpressionMonitor):
     def __init__(self,
-                 name: str = 'local minimum reached',
+                 name: Optional[str] = None,
                  min_cut_off: float = 0.01,
                  max_cut_off: float = 0.06,
                  joint_convergence_threshold: float = 0.01,
                  windows_size: int = 1,
-                 start_monitors: Optional[List[Monitor]] = None):
-        super().__init__(name=name, stay_one=True, start_monitors=start_monitors)
+                 start_monitors: Optional[List[Monitor]] = None,
+                 stay_true: bool = True):
+        super().__init__(name=name, stay_true=stay_true, start_monitors=start_monitors)
         self.joint_convergence_threshold = joint_convergence_threshold
         self.min_cut_off = min_cut_off
         self.max_cut_off = max_cut_off
@@ -122,25 +121,29 @@ class LocalMinimumReached(ExpressionMonitor):
 
 
 class TimeAbove(ExpressionMonitor):
-    def __init__(self, *, threshold: Optional[float] = None, name: str = 'time above',
+    def __init__(self,
+                 threshold: Optional[float] = None,
+                 name: Optional[str] = None,
                  start_monitors: Optional[List[Monitor]] = None):
         super().__init__(name=name,
-                         stay_one=False,
+                         stay_true=False,
                          start_monitors=start_monitors)
         if threshold is None:
             threshold = god_map.qp_controller_config.max_trajectory_length
         traj_length_in_sec = symbol_manager.time
         condition = cas.greater(traj_length_in_sec, threshold)
-        # god_map.debug_expression_manager.add_debug_expression('time', traj_length_in_sec)
         self.set_expression(condition)
 
 
 class Alternator(ExpressionMonitor):
 
-    def __init__(self, name: str, *, stay_one: bool = False, start_monitors: Optional[List[Monitor]] = None,
+    def __init__(self,
+                 name: Optional[str] = None,
+                 stay_true: bool = False,
+                 start_monitors: Optional[List[Monitor]] = None,
                  mod: int = 2,
                  plot: bool = True):
-        super().__init__(name, stay_one=stay_one, start_monitors=start_monitors, plot=plot)
+        super().__init__(name, stay_true=stay_true, start_monitors=start_monitors, plot=plot)
         time = symbol_manager.time
         expr = cas.equal(cas.fmod(cas.floor(time), mod), 0)
         self.set_expression(expr)

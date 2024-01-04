@@ -59,7 +59,7 @@ class MonitorManager:
             expressions.append(monitor.get_expression())
         expressions = cas.Expression(expressions)
         self.compiled_monitors = expressions.compile(expressions.free_symbols())
-        self.stay_one_filter = np.array([x.stay_one for x in self.expression_monitors], dtype=bool)
+        self.stay_one_filter = np.array([x.stay_true for x in self.expression_monitors], dtype=bool)
         self.switches_state = np.zeros_like(self.stay_one_filter)
 
     @profile

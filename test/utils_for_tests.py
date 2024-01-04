@@ -1,5 +1,6 @@
 import csv
 import keyword
+import os
 from collections import defaultdict
 from copy import deepcopy
 from multiprocessing import Queue
@@ -23,25 +24,23 @@ from visualization_msgs.msg import Marker
 import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import CollisionEntry, MoveResult, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse, DyeGroupResponse
-
 from giskardpy.configs.giskard import Giskard
 from giskardpy.configs.qp_controller_config import SupportedQPSolver
 from giskardpy.data_types import KeyDefaultDict
+from giskardpy.exceptions import UnknownGroupException
 from giskardpy.goals.cartesian_goals import PR2DiffDriveBaseGoal
 from giskardpy.goals.diff_drive_goals import DiffDriveTangentialToPoint, KeepHandInWorkspace
-from giskardpy.tasks.task import WEIGHT_ABOVE_CA
 from giskardpy.god_map import god_map
 from giskardpy.model.collision_world_syncer import Collisions, Collision
-from giskardpy.my_types import PrefixName, Derivatives
-from giskardpy.exceptions import UnknownGroupException
 from giskardpy.model.joints import OneDofJoint, OmniDrive, DiffDrive
+from giskardpy.my_types import PrefixName, Derivatives
 from giskardpy.python_interface.old_python_interface import OldGiskardWrapper
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.qp_controller import available_solvers
+from giskardpy.tasks.task import WEIGHT_ABOVE_CA
 from giskardpy.utils import logging, utils
 from giskardpy.utils.math import compare_poses
 from giskardpy.utils.utils import resolve_ros_iris, position_dict_to_joint_states
-import os
 
 BIG_NUMBER = 1e100
 SMALL_NUMBER = 1e-100

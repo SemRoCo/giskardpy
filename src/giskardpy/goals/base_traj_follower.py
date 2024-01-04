@@ -1,27 +1,24 @@
 from __future__ import division
 
-from copy import deepcopy
-from typing import Optional, List, Tuple
+from typing import Optional, List
 
 import numpy as np
 # import matplotlib.pyplot as plt
-from scipy.interpolate import UnivariateSpline
 import rospy
-from geometry_msgs.msg import PointStamped, Vector3Stamped, Vector3, Point
+from geometry_msgs.msg import PointStamped, Vector3, Point
 from sensor_msgs.msg import LaserScan
 from visualization_msgs.msg import MarkerArray, Marker
 
 from giskardpy import casadi_wrapper as w
 from giskardpy.exceptions import GiskardException, ConstraintInitalizationException
 from giskardpy.goals.goal import Goal
-from giskardpy.goals.monitors.monitors import ExpressionMonitor
-from giskardpy.goals.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE, Task
+from giskardpy.monitors.monitors import ExpressionMonitor
+from giskardpy.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE, Task
 from giskardpy.god_map import god_map
 from giskardpy.model.joints import OmniDrive, OmniDrivePR22
 from giskardpy.my_types import my_string, Derivatives, PrefixName
 from giskardpy.utils import logging
 from giskardpy.utils.decorators import memoize_with_counter, clear_memo
-from giskardpy.utils.tfwrapper import point_to_np
 from giskardpy.utils.utils import raise_to_blackboard
 from giskardpy.symbol_manager import symbol_manager
 

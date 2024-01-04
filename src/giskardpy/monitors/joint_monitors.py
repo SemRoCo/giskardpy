@@ -1,7 +1,7 @@
 from typing import List, Dict, Optional
 
 import giskardpy.casadi_wrapper as cas
-from giskardpy.goals.monitors.monitors import ExpressionMonitor, Monitor
+from giskardpy.monitors.monitors import ExpressionMonitor, Monitor
 from giskardpy.god_map import god_map
 from giskardpy.my_types import Derivatives
 
@@ -21,13 +21,8 @@ class JointGoalReached(ExpressionMonitor):
                 error = cas.shortest_angular_distance(current, goal)
             else:
                 error = goal - current
-            if 'grasp' in name:
-                god_map.debug_expression_manager.add_debug_expression(str(joint_name), cas.min(cas.abs(error), threshold))
             comparison_list.append(cas.less(cas.abs(error), threshold))
         expression = cas.logic_all(cas.Expression(comparison_list))
         super().__init__(name, stay_one=stay_one, start_monitors=start_monitors)
         self.set_expression(expression)
-        if 'grasp' in name:
-            god_map.debug_expression_manager.add_debug_expression(f'joints reached raw', expression)
-            god_map.debug_expression_manager.add_debug_expression(f'joints reached', self.get_expression())
 

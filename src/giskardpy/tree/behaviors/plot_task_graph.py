@@ -1,19 +1,16 @@
-from collections import defaultdict
-from typing import List, Dict
+from typing import List
 
 import pydot
 from py_trees import Status
 
 from giskardpy.goals.collision_avoidance import CollisionAvoidance
 from giskardpy.goals.goal import Goal
-from giskardpy.goals.monitors.monitors import ExpressionMonitor, Monitor
-from giskardpy.goals.monitors.payload_monitors import EndMotion, CancelMotion
-from giskardpy.goals.tasks.task import Task
+from giskardpy.monitors.monitors import ExpressionMonitor, Monitor
+from giskardpy.monitors.payload_monitors import EndMotion, CancelMotion
 from giskardpy.god_map import god_map
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
 from giskardpy.utils.decorators import record_time, catch_and_raise_to_blackboard
-from giskardpy.utils.utils import create_path, string_shortener
 
 
 def create_graph(goals: List[Goal], all_monitors: List[Monitor], output_file: str = 'graph.png'):

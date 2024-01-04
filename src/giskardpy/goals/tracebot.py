@@ -7,9 +7,9 @@ from geometry_msgs.msg import Vector3Stamped, PointStamped
 
 from giskardpy import casadi_wrapper as cas
 from giskardpy.goals.goal import Goal
-from giskardpy.goals.tasks.task import WEIGHT_ABOVE_CA
-from giskardpy.goals.monitors.monitors import ExpressionMonitor
-from giskardpy.goals.tasks.task import Task
+from giskardpy.tasks.task import WEIGHT_ABOVE_CA
+from giskardpy.monitors.monitors import ExpressionMonitor
+from giskardpy.tasks.task import Task
 from giskardpy.god_map import god_map
 from giskardpy.utils.expression_definition_utils import transform_msg
 

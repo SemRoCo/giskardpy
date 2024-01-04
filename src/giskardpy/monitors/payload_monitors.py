@@ -1,23 +1,16 @@
 import abc
 from abc import ABC
 from threading import Lock
-from typing import Union, List, TypeVar, Optional, Dict, Tuple
+from typing import List, Optional, Dict, Tuple
 
 import numpy as np
 import rospy
 
-import giskardpy.casadi_wrapper as cas
 from giskard_msgs.msg import MoveResult
-from giskardpy.casadi_wrapper import PreservedCasType
-from giskardpy.exceptions import UnknownGroupException, PlanningException, GiskardException
-from giskardpy.goals.monitors.monitors import ExpressionMonitor, Monitor
+from giskardpy.exceptions import GiskardException
+from giskardpy.monitors.monitors import Monitor
 from giskardpy.god_map import god_map
-from giskardpy.my_types import Derivatives, my_string, transformable_message
-from giskardpy.qp.free_variable import FreeVariable
-from giskardpy.symbol_manager import symbol_manager
-import giskardpy.utils.tfwrapper as tf
 from giskardpy.utils import logging
-from giskardpy.utils.decorators import catch_and_raise_to_blackboard
 
 
 class PayloadMonitor(Monitor, ABC):

@@ -4,7 +4,7 @@ from geometry_msgs.msg import PoseStamped, PointStamped, QuaternionStamped, Vect
 
 from giskard_msgs.msg import MoveResult, CollisionEntry, MoveGoal
 from giskard_msgs.srv import UpdateWorldResponse, DyeGroupResponse, GetGroupInfoResponse, RegisterGroupResponse
-from giskardpy.goals.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
+from giskardpy.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
 from giskardpy.my_types import goal_parameter
 from giskardpy.python_interface.python_interface import GiskardWrapper
 

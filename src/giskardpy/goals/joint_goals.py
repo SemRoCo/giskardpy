@@ -5,12 +5,12 @@ from typing import Dict, Optional, List
 from geometry_msgs.msg import PoseStamped
 
 from giskardpy import casadi_wrapper as cas
-from giskardpy.goals.monitors.monitors import ExpressionMonitor
+from giskardpy.monitors.monitors import ExpressionMonitor
 from giskardpy.god_map import god_map
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.exceptions import ConstraintException, ConstraintInitalizationException
 from giskardpy.goals.goal import Goal, NonMotionGoal
-from giskardpy.goals.tasks.task import WEIGHT_BELOW_CA, Task
+from giskardpy.tasks.task import WEIGHT_BELOW_CA, Task
 from giskardpy.model.joints import OmniDrive, DiffDrive, OmniDrivePR22, OneDofJoint
 from giskardpy.my_types import PrefixName, Derivatives
 from giskardpy.utils.expression_definition_utils import transform_msg

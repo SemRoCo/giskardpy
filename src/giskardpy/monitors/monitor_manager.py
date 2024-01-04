@@ -7,9 +7,9 @@ import numpy as np
 import giskardpy.casadi_wrapper as cas
 from giskardpy.casadi_wrapper import CompiledFunction
 from giskardpy.exceptions import GiskardException, UnknownConstraintException, ConstraintInitalizationException
-from giskardpy.goals.monitors.monitors import ExpressionMonitor, Monitor
+from giskardpy.monitors.monitors import ExpressionMonitor, Monitor
 import giskard_msgs.msg as giskard_msgs
-from giskardpy.goals.monitors.payload_monitors import PayloadMonitor, CancelMotion
+from giskardpy.monitors.payload_monitors import PayloadMonitor, CancelMotion
 from giskardpy.god_map import god_map
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils import logging
@@ -45,8 +45,8 @@ class MonitorManager:
         self.expression_monitors = []
         self.payload_monitors = []
         self.allowed_monitor_types = {}
-        self.allowed_monitor_types.update(get_all_classes_in_package('giskardpy.goals.monitors',
-                                                                     Monitor))
+        self.allowed_monitor_types.update(get_all_classes_in_package(package_name='giskardpy.monitors',
+                                                                     parent_class=Monitor))
         self.substitution_values = {}
         self.triggers = {}
         self.state_history = []

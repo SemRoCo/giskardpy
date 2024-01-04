@@ -2,8 +2,7 @@ from threading import Thread
 
 from py_trees import Status
 
-from giskardpy.goals.monitors.payload_monitors import PayloadMonitor
-from giskardpy.god_map import god_map
+from giskardpy.monitors.payload_monitors import PayloadMonitor
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.decorators import record_time, catch_and_raise_to_blackboard
 

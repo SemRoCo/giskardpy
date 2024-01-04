@@ -7,8 +7,8 @@ from geometry_msgs.msg import Vector3Stamped, PointStamped
 import giskardpy.utils.tfwrapper as tf
 from giskardpy import casadi_wrapper as w
 from giskardpy.goals.goal import Goal
-from giskardpy.goals.monitors.monitors import ExpressionMonitor
-from giskardpy.goals.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE, Task
+from giskardpy.monitors.monitors import ExpressionMonitor
+from giskardpy.tasks.task import WEIGHT_ABOVE_CA, Task
 from giskardpy.god_map import god_map
 from giskardpy.model.joints import OmniDrivePR22
 from giskardpy.my_types import Derivatives

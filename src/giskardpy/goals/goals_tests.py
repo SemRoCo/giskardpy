@@ -3,8 +3,8 @@ from typing import Optional, List
 import numpy as np
 from geometry_msgs.msg import QuaternionStamped, PointStamped, PoseStamped, Vector3Stamped
 import giskardpy.casadi_wrapper as w
-from giskardpy.goals.goal import Goal, NonMotionGoal
-from giskardpy.goals.monitors.monitors import ExpressionMonitor
+from giskardpy.goals.goal import NonMotionGoal
+from giskardpy.monitors.monitors import ExpressionMonitor
 from giskardpy.god_map import god_map
 from giskardpy.symbol_manager import symbol_manager
 

@@ -1,11 +1,10 @@
-from typing import List, Dict, Optional
+from typing import List, Optional
 
 from geometry_msgs.msg import PointStamped, QuaternionStamped, PoseStamped, Vector3Stamped
 
 import giskardpy.casadi_wrapper as cas
-from giskardpy.goals.monitors.monitors import ExpressionMonitor, Monitor
+from giskardpy.monitors.monitors import ExpressionMonitor, Monitor
 from giskardpy.god_map import god_map
-from giskardpy.my_types import Derivatives
 import giskardpy.utils.tfwrapper as tf
 from giskardpy.utils.expression_definition_utils import transform_msg
 
@@ -123,8 +122,6 @@ class PointingAt(ExpressionMonitor):
                                               frame_V_line_direction=root_V_pointing_axis)
         expr = cas.less(cas.abs(distance), threshold)
         self.set_expression(expr)
-        god_map.debug_expression_manager.add_debug_expression('point', root_P_goal_point)
-        god_map.debug_expression_manager.add_debug_expression('pointing', root_V_pointing_axis)
 
 
 class VectorsAligned(ExpressionMonitor):

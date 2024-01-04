@@ -1,4 +1,4 @@
-from giskardpy.goals.monitors.payload_monitors import PayloadMonitor, EndMotion
+from giskardpy.monitors.payload_monitors import PayloadMonitor, EndMotion
 from giskardpy.tree.behaviors.max_trajectory_length import MaxTrajectoryLength
 from giskardpy.tree.branches.payload_monitor_sequence import PayloadMonitorSequence
 from giskardpy.tree.composites.running_selector import RunningSelector

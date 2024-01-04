@@ -3,7 +3,7 @@ from typing import Optional, List, Union, Dict, Callable, Iterable
 import giskard_msgs.msg
 import giskardpy.casadi_wrapper as cas
 from giskardpy.exceptions import GiskardException, ConstraintInitalizationException
-from giskardpy.goals.monitors.monitors import ExpressionMonitor
+from giskardpy.monitors.monitors import ExpressionMonitor
 from giskardpy.my_types import Derivatives
 from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint, \
     ManipulabilityConstraint

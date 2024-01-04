@@ -5,11 +5,8 @@ from typing import Optional, List
 import rospy
 from geometry_msgs.msg import Vector3Stamped, PointStamped
 
-import giskardpy.utils.tfwrapper as tf
-from giskardpy import casadi_wrapper as w
-from giskardpy.goals.goal import Goal
-from giskardpy.goals.monitors.monitors import ExpressionMonitor
-from giskardpy.goals.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE
+from giskardpy.monitors.monitors import ExpressionMonitor
+from giskardpy.tasks.task import WEIGHT_BELOW_CA
 from giskardpy.goals.pointing import Pointing
 from giskardpy.utils.expression_definition_utils import transform_msg
 

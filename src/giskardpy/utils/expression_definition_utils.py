@@ -5,12 +5,12 @@ from geometry_msgs.msg import PoseStamped, PointStamped, Vector3Stamped, Quatern
 
 from giskardpy.exceptions import UnknownGroupException
 from giskardpy.god_map import god_map
-from giskardpy.my_types import my_string, transformable_message, PrefixName
+from giskardpy.my_types import my_string, PrefixName
 import giskardpy.utils.tfwrapper as tf
 import giskardpy.casadi_wrapper as cas
 
 if TYPE_CHECKING:
-    from giskardpy.goals.monitors.monitors import ExpressionMonitor
+    from giskardpy.monitors.monitors import ExpressionMonitor
 
 
 @overload

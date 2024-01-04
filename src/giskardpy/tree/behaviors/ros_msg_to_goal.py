@@ -2,10 +2,10 @@ import traceback
 from py_trees import Status
 
 from giskard_msgs.msg import MoveGoal
-from giskardpy.exceptions import InvalidGoalException, GiskardException, ConstraintInitalizationException
+from giskardpy.exceptions import InvalidGoalException
 from giskardpy.goals.base_traj_follower import BaseTrajFollower
-from giskardpy.goals.monitors.monitors import TimeAbove
-from giskardpy.goals.monitors.payload_monitors import EndMotion
+from giskardpy.monitors.monitors import TimeAbove
+from giskardpy.monitors.payload_monitors import EndMotion
 from giskardpy.god_map import god_map
 from giskardpy.model.joints import OmniDrive, DiffDrive
 from giskardpy.tree.behaviors.plugin import GiskardBehavior

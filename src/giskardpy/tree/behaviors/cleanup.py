@@ -3,7 +3,7 @@ from py_trees import Status
 from visualization_msgs.msg import MarkerArray, Marker
 
 from giskardpy.debug_expression_manager import DebugExpressionManager
-from giskardpy.goals.monitors.monitor_manager import MonitorManager
+from giskardpy.monitors.monitor_manager import MonitorManager
 from giskardpy.goals.motion_goal_manager import MotionGoalManager
 from giskardpy.god_map import god_map
 from giskardpy.model.collision_world_syncer import Collisions

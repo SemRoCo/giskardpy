@@ -1,17 +1,10 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
 
-import rospy
-from py_trees import Status, Sequence
-from visualization_msgs.msg import MarkerArray, Marker
+from py_trees import Status
 
-from giskardpy.debug_expression_manager import DebugExpressionManager
-from giskardpy.goals.monitors.monitor_manager import MonitorManager
-from giskardpy.goals.motion_goal_manager import MotionGoalManager
 from giskardpy.god_map import god_map
-from giskardpy.model.collision_world_syncer import Collisions
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
-from giskardpy.utils.decorators import record_time, catch_and_raise_to_blackboard
 
 if TYPE_CHECKING:
     from giskardpy.tree.branches.payload_monitor_sequence import PayloadMonitorSequence

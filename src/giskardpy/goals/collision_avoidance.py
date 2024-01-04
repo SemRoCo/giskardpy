@@ -5,9 +5,9 @@ import giskardpy.casadi_wrapper as cas
 import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import CollisionEntry
 from giskardpy.goals.goal import Goal
-from giskardpy.goals.monitors.monitors import ExpressionMonitor
-from giskardpy.goals.monitors.payload_monitors import CollisionMatrixUpdater
-from giskardpy.goals.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE, Task
+from giskardpy.monitors.monitors import ExpressionMonitor
+from giskardpy.monitors.payload_monitors import CollisionMatrixUpdater
+from giskardpy.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE, Task
 from giskardpy.god_map import god_map
 from giskardpy.my_types import my_string
 from giskardpy.symbol_manager import symbol_manager

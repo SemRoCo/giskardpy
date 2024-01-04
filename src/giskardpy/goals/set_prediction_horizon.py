@@ -1,10 +1,9 @@
 from typing import Union, Optional, List
 
 from giskardpy.configs.qp_controller_config import SupportedQPSolver
-from giskardpy.goals.goal import Goal, NonMotionGoal
-from giskardpy.goals.monitors.monitors import ExpressionMonitor
+from giskardpy.goals.goal import NonMotionGoal
+from giskardpy.monitors.monitors import ExpressionMonitor
 from giskardpy.god_map import god_map
-from giskardpy.tree.behaviors.max_trajectory_length import MaxTrajectoryLength
 from giskardpy.utils import logging
 
 

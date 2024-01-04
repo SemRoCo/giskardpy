@@ -1,13 +1,7 @@
-import traceback
 from py_trees import Status
 
-from giskardpy.exceptions import InvalidGoalException, GiskardException
-from giskardpy.goals.base_traj_follower import BaseTrajFollower
-from giskardpy.goals.monitors.monitors import TimeAbove
 from giskardpy.god_map import god_map
-from giskardpy.model.joints import OmniDrive, DiffDrive
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
-from giskardpy.utils.logging import loginfo
 from giskardpy.utils.decorators import catch_and_raise_to_blackboard, record_time
 
 

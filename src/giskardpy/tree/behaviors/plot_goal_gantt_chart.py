@@ -4,11 +4,10 @@ from typing import List, Dict, Tuple, Optional
 import matplotlib.pyplot as plt
 import numpy as np
 from py_trees import Status
-import matplotlib.patches as mpatches
 from giskardpy.goals.collision_avoidance import CollisionAvoidance
 from giskardpy.goals.goal import Goal
-from giskardpy.goals.monitors.monitors import Monitor
-from giskardpy.goals.monitors.payload_monitors import PayloadMonitor, EndMotion, CancelMotion
+from giskardpy.monitors.monitors import Monitor
+from giskardpy.monitors.payload_monitors import PayloadMonitor, EndMotion, CancelMotion
 from giskardpy.god_map import god_map
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging

@@ -1,7 +1,7 @@
 from typing import Optional, List
 import giskardpy.casadi_wrapper as cas
-from giskardpy.goals.monitors.monitors import ExpressionMonitor
-from giskardpy.goals.tasks.task import Task
+from giskardpy.monitors.monitors import ExpressionMonitor
+from giskardpy.tasks.task import Task
 
 
 class JointPositionTask(Task):

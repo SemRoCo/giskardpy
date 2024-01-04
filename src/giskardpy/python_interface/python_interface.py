@@ -22,11 +22,11 @@ from giskardpy.goals.cartesian_goals import CartesianPose, DiffDriveBaseGoal, Ca
 from giskardpy.goals.collision_avoidance import CollisionAvoidance
 from giskardpy.goals.grasp_bar import GraspBar
 from giskardpy.goals.joint_goals import JointPositionList, AvoidJointLimits, SetSeedConfiguration, SetOdometry
-from giskardpy.goals.monitors.cartesian_monitors import PoseReached, PositionReached, OrientationReached, PointingAt, \
+from giskardpy.monitors.cartesian_monitors import PoseReached, PositionReached, OrientationReached, PointingAt, \
     VectorsAligned, DistanceToLine
-from giskardpy.goals.monitors.joint_monitors import JointGoalReached
-from giskardpy.goals.monitors.monitors import LocalMinimumReached, TimeAbove, Alternator
-from giskardpy.goals.monitors.payload_monitors import EndMotion, Print, Sleep, CancelMotion, SetMaxTrajectoryLength, \
+from giskardpy.monitors.joint_monitors import JointGoalReached
+from giskardpy.monitors.monitors import LocalMinimumReached, TimeAbove, Alternator
+from giskardpy.monitors.payload_monitors import EndMotion, Print, Sleep, CancelMotion, SetMaxTrajectoryLength, \
     UpdateParentLinkOfGroup, PayloadAlternator
 from giskardpy.goals.open_close import Close, Open
 from giskardpy.goals.pointing import Pointing
@@ -329,6 +329,9 @@ class MotionGoalWrapper:
         self.reset()
 
     def reset(self):
+        """
+        Clears all goals.
+        """
         self._goals = []
         self._collision_entries = defaultdict(list)
 
@@ -343,6 +346,16 @@ class MotionGoalWrapper:
                         hold_monitors: Optional[List[str]] = None,
                         end_monitors: Optional[List[str]] = None,
                         **kwargs):
+        """
+        Generic function to add a motion goal.
+        :param motion_goal_class: Name of a class defined in
+        :param name:
+        :param start_monitors:
+        :param hold_monitors:
+        :param end_monitors:
+        :param kwargs:
+        :return:
+        """
         motion_goal = MotionGoal()
         motion_goal.name = name
         motion_goal.motion_goal_class = motion_goal_class

@@ -5,11 +5,10 @@ from abc import ABC
 from collections import OrderedDict
 from typing import Optional, Tuple, Dict, List, Union
 
-from giskardpy.goals.monitors.monitors import ExpressionMonitor, Monitor
-from giskardpy.goals.tasks.task import Task
+from giskardpy.monitors.monitors import ExpressionMonitor, Monitor
 from giskardpy.god_map import god_map
+from giskardpy.tasks.task import Task
 from giskardpy.utils.utils import string_shortener
-
 from giskardpy import casadi_wrapper as w
 from giskardpy.exceptions import ConstraintInitalizationException
 from giskardpy.model.joints import OneDofJoint

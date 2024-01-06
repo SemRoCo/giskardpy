@@ -300,8 +300,9 @@ class DisableCollisionReason(Enum):
 
 
 class CollisionWorldSynchronizer:
+    # a blacklist of disabled collisions
     self_collision_matrix: Dict[Tuple[PrefixName, PrefixName], DisableCollisionReason]
-    self_collision_matrix_paths: Dict[str, str]
+    self_collision_matrix_paths: Dict[str, str]  # robot name -> path
     collision_avoidance_configs: Dict[str, CollisionAvoidanceGroupThresholds] = None
     disabled_links: Set[PrefixName]
     srdf_disable_all_collisions = 'disable_all_collisions'
@@ -479,17 +480,28 @@ class CollisionWorldSynchronizer:
                                       number_of_tries_always: int = 200,
                                       almost_percentage: float = 0.95,
                                       number_of_tries_never: int = 10000,
+                                      use_collision_checker: bool = True,
                                       save_to_tmp: bool = True,
+                                      overwrite_old_matrix: bool = True,
                                       progress_callback: Optional[Callable[[int, str], None]] = None) \
             -> Dict[Tuple[PrefixName, PrefixName], DisableCollisionReason]:
+        """
+        :param use_collision_checker: if False, only the parts will be called that don't require collision checking.
+        :param progress_callback: a function that is used to display the progress. it's called with a value of 0-100 and
+                                    a string representing the current action
+        """
         if progress_callback is None:
             progress_callback = lambda value, text: None
         if not self.is_collision_checking_enabled:
             return {}
         np.random.seed(1337)
         remaining_pairs = set()
-        self_collision_matrix = {}
+        if overwrite_old_matrix:
+            self_collision_matrix = {}
+        else:
+            self_collision_matrix = self.self_collision_matrix
         group = god_map.world.groups[group_name]
+        # TODO update collision matrix after attachments
         # 0. GENERATE ALL POSSIBLE LINK PAIRS
         if link_combinations is None:
             link_combinations = set(combinations_with_replacement(group.link_names_with_collisions, 2))
@@ -497,36 +509,36 @@ class CollisionWorldSynchronizer:
             remaining_pairs.add(god_map.world.sort_links(link_a, link_b))
 
         # %%
-        remaining_pairs, matrix_updates = self.compute_self_collision_matrix_adjacent(remaining_pairs,
-                                                                                      group)
+        remaining_pairs, matrix_updates = self.compute_self_collision_matrix_adjacent(remaining_pairs, group)
         self_collision_matrix.update(matrix_updates)
 
-        # %%
-        remaining_pairs, matrix_updates = self.compute_self_collision_matrix_default(remaining_pairs,
-                                                                                     group,
-                                                                                     distance_threshold_zero)
-        self_collision_matrix.update(matrix_updates)
+        if use_collision_checker:
+            # %%
+            remaining_pairs, matrix_updates = self.compute_self_collision_matrix_default(remaining_pairs,
+                                                                                         group,
+                                                                                         distance_threshold_zero)
+            self_collision_matrix.update(matrix_updates)
 
-        # %%
-        remaining_pairs, matrix_updates = self.compute_self_collision_matrix_always(
-            link_combinations=remaining_pairs,
-            group=group,
-            distance_threshold_always=distance_threshold_always,
-            number_of_tries=number_of_tries_always,
-            almost_percentage=almost_percentage)
-        self_collision_matrix.update(matrix_updates)
+            # %%
+            remaining_pairs, matrix_updates = self.compute_self_collision_matrix_always(
+                link_combinations=remaining_pairs,
+                group=group,
+                distance_threshold_always=distance_threshold_always,
+                number_of_tries=number_of_tries_always,
+                almost_percentage=almost_percentage)
+            self_collision_matrix.update(matrix_updates)
 
-        # %%
-        remaining_pairs, matrix_updates = self.compute_self_collision_matrix_never(
-            link_combinations=remaining_pairs,
-            group=group,
-            distance_threshold_never_initial=distance_threshold_never_max,
-            distance_threshold_never_min=distance_threshold_never_min,
-            distance_threshold_never_range=distance_threshold_never_range,
-            distance_threshold_never_zero=distance_threshold_never_zero,
-            number_of_tries=number_of_tries_never,
-            progress_callback=progress_callback)
-        self_collision_matrix.update(matrix_updates)
+            # %%
+            remaining_pairs, matrix_updates = self.compute_self_collision_matrix_never(
+                link_combinations=remaining_pairs,
+                group=group,
+                distance_threshold_never_initial=distance_threshold_never_max,
+                distance_threshold_never_min=distance_threshold_never_min,
+                distance_threshold_never_range=distance_threshold_never_range,
+                distance_threshold_never_zero=distance_threshold_never_zero,
+                number_of_tries=number_of_tries_never,
+                progress_callback=progress_callback)
+            self_collision_matrix.update(matrix_updates)
 
         if save_to_tmp:
             self.self_collision_matrix = self_collision_matrix
@@ -689,23 +701,10 @@ class CollisionWorldSynchronizer:
         path_to_tmp = god_map.giskard.tmp_folder
         return f'{path_to_tmp}{group_name}/{group_name}.srdf'
 
-    @profile
-    def update_collision_blacklist(self,
-                                   link_combinations: Optional[set] = None,
-                                   white_list_combinations: Optional[set] = None,
-                                   distance_threshold_zero: float = 0.05,
-                                   distance_threshold_rnd: float = 0.0,
-                                   non_controlled: bool = False,
-                                   steps: int = 10):
-        # FIXME
-        # for group_name in god_map.get_world().minimal_group_names:
-        #     self.update_group_blacklist(group_name, link_combinations, white_list_combinations, distance_threshold_zero,
-        #                                 distance_threshold_rnd, non_controlled, steps)
-        self.blacklist_inter_group_collisions()
-
-    def blacklist_inter_group_collisions(self):
+    def blacklist_inter_group_collisions(self) -> None:
         for group_a_name, group_b_name in combinations(god_map.world.minimal_group_names, 2):
-            if group_a_name in self.robot_names or group_b_name in self.robot_names:
+            one_group_is_robot = group_a_name in self.robot_names or group_b_name in self.robot_names
+            if one_group_is_robot:
                 if group_a_name in self.robot_names:
                     robot_group = god_map.world.groups[group_a_name]
                     other_group = god_map.world.groups[group_b_name]
@@ -713,21 +712,28 @@ class CollisionWorldSynchronizer:
                     robot_group = god_map.world.groups[group_b_name]
                     other_group = god_map.world.groups[group_a_name]
                 unmovable_links = robot_group.get_unmovable_links()
-                if len(unmovable_links) > 0:
+                if len(unmovable_links) > 0:  # ignore collisions between unmovable links of the robot and the env
                     for link_a, link_b in product(unmovable_links,
                                                   other_group.link_names_with_collisions):
                         self.self_collision_matrix[
                             god_map.world.sort_links(link_a, link_b)] = DisableCollisionReason.Unknown
                 continue
+            # disable all collisions of groups that aren't a robot
             group_a: WorldBranch = god_map.world.groups[group_a_name]
             group_b: WorldBranch = god_map.world.groups[group_b_name]
             for link_a, link_b in product(group_a.link_names_with_collisions, group_b.link_names_with_collisions):
                 self.self_collision_matrix[god_map.world.sort_links(link_a, link_b)] = DisableCollisionReason.Unknown
+        # disable non actuated groups
+        for group in god_map.world.groups.values():
+            if group.name not in self.robot_names:
+                for link_a, link_b in set(combinations_with_replacement(group.link_names_with_collisions, 2)):
+                    key = god_map.world.sort_links(link_a, link_b)
+                    self.self_collision_matrix[key] = DisableCollisionReason.Unknown
 
     def get_map_T_geometry(self, link_name: PrefixName, collision_id: int = 0) -> Pose:
         return god_map.world.compute_fk_pose_with_collision_offset(god_map.world.root_link_name, link_name, collision_id).pose
 
-    def set_joint_state_to_zero(self):
+    def set_joint_state_to_zero(self) -> None:
         for free_variable in god_map.world.free_variables:
             god_map.world.state[free_variable].position = 0
 
@@ -753,7 +759,7 @@ class CollisionWorldSynchronizer:
                     rnd_position = np.random.random() * np.pi * 2
                 god_map.world.state[joint_name].position = rnd_position
 
-    def has_self_collision_matrix(self):
+    def has_self_collision_matrix(self) -> bool:
         return len(self.self_collision_matrix_paths) > 0
 
     def find_colliding_combinations(self, link_combinations: Iterable[Tuple[PrefixName, PrefixName]],
@@ -768,17 +774,21 @@ class CollisionWorldSynchronizer:
     def in_collision(self, link_a: my_string, link_b: my_string, distance: float) -> bool:
         return False
 
-    def sync(self):
+    def sync(self) -> None:
         pass
 
-    def sync_links_with_world(self):
-        for old_link in list(self.disabled_links):
-            if old_link not in god_map.world.link_names:
-                self.disabled_links.discard(old_link)
-        for key, value in list(self.self_collision_matrix.items()):
-            link1, link2 = key
-            if link1 not in god_map.world.link_names or link2 not in god_map.world.link_names:
-                del self.self_collision_matrix[key]
+    def sync_world_model_update(self) -> None:
+        self.disabled_links = set()
+        self.self_collision_matrix = {}
+        for robot, srdf in self.self_collision_matrix_paths.items():
+            self.load_self_collision_matrix_from_srdf(srdf, robot)
+        for robot in self.robots:
+            self.compute_self_collision_matrix(robot.name,
+                                               use_collision_checker=False,
+                                               overwrite_old_matrix=False,
+                                               save_to_tmp=False)
+        # step 3 black list intergroup collisions
+        self.blacklist_inter_group_collisions()
 
     def add_added_checks(self):
         try:
@@ -858,7 +868,10 @@ class CollisionWorldSynchronizer:
                     elif self.is_avoid_collision(collision_entry):
                         if black_list_key not in self.self_collision_matrix:
                             if collision_entry.distance == -1:
-                                collision_matrix[collision_matrix_key] = collision_check_distances[robot_link]
+                                try:
+                                    collision_matrix[collision_matrix_key] = collision_check_distances[robot_link]
+                                except Exception as e:
+                                    pass
                             else:
                                 collision_matrix[collision_matrix_key] = collision_entry.distance
                     else:

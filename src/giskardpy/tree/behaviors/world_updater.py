@@ -1,5 +1,4 @@
 import traceback
-from collections import defaultdict
 from copy import deepcopy
 from itertools import product
 from queue import Queue
@@ -7,11 +6,9 @@ from xml.etree.ElementTree import ParseError
 
 import rospy
 from py_trees import Status
-from py_trees.meta import running_is_success
 from tf2_py import TransformException
 from visualization_msgs.msg import MarkerArray, Marker
 
-import giskardpy.casadi_wrapper as w
 from giskard_msgs.srv import UpdateWorld, UpdateWorldResponse, UpdateWorldRequest, GetGroupNamesResponse, \
     GetGroupNamesRequest, RegisterGroupRequest, RegisterGroupResponse, \
     GetGroupInfoResponse, GetGroupInfoRequest, DyeGroupResponse, GetGroupNames, GetGroupInfo, RegisterGroup, DyeGroup, \
@@ -21,13 +18,10 @@ from giskardpy.exceptions import CorruptShapeException, UnknownGroupException, \
     UnsupportedOptionException, DuplicateNameException, UnknownLinkException
 from giskardpy.god_map import god_map
 from giskardpy.model.world import WorldBranch
-from giskardpy.data_types import PrefixName
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
-from giskardpy.tree.behaviors.sync_joint_state import SyncJointState
-from giskardpy.tree.behaviors.sync_tf_frames import SyncTfFrames
 from giskardpy.utils import logging
 from giskardpy.utils.decorators import record_time
-from giskardpy.utils.tfwrapper import transform_pose, msg_to_homogeneous_matrix
+from giskardpy.utils.tfwrapper import transform_pose
 
 
 def exception_to_response(e, req):
@@ -210,7 +204,7 @@ class WorldUpdater(GiskardBehavior):
             req.pose.header.frame_id = god_map.world.search_for_link_name(req.pose.header.frame_id)
             global_pose = god_map.world.transform_msg(god_map.world.root_link_name, req.pose)
 
-        global_pose = god_map.world.transform_pose(req.parent_link, global_pose).pose
+        global_pose = god_map.world.transform_msg(req.parent_link, global_pose).pose
         god_map.world.add_world_body(group_name=req.group_name,
                                      msg=world_body,
                                      pose=global_pose,
@@ -224,10 +218,6 @@ class WorldUpdater(GiskardBehavior):
         # FIXME also keep track of base pose
         if world_body.tf_root_link_name:
             raise NotImplementedError('tf_root_link_name is not implemented')
-        parent_group = god_map.world.get_parent_group_name(req.group_name)
-        new_links = god_map.world.groups[req.group_name].link_names_with_collisions
-        god_map.collision_scene.update_self_collision_matrix(parent_group, new_links)
-        god_map.collision_scene.blacklist_inter_group_collisions()
 
     @profile
     def update_group_pose(self, req: UpdateWorldRequest):
@@ -235,13 +225,9 @@ class WorldUpdater(GiskardBehavior):
             raise UnknownGroupException(f'Can\'t update pose of unknown group: \'{req.group_name}\'')
         group = god_map.world.groups[req.group_name]
         joint_name = group.root_link.parent_joint_name
-        pose = god_map.world.transform_pose(god_map.world.joints[joint_name].parent_link_name, req.pose).pose
+        pose = god_map.world.transform_msg(god_map.world.joints[joint_name].parent_link_name, req.pose).pose
         god_map.world.joints[joint_name].update_transform(pose)
         god_map.world.notify_state_change()
-        god_map.collision_scene.remove_links_from_self_collision_matrix(set(group.link_names_with_collisions))
-        god_map.collision_scene.update_collision_blacklist(
-            link_combinations=set(product(group.link_names_with_collisions,
-                                          god_map.world.link_names_with_collisions)))
 
     @profile
     def update_parent_link(self, req: UpdateWorldRequest):
@@ -254,11 +240,6 @@ class WorldUpdater(GiskardBehavior):
             old_parent_link = group.parent_link_of_root
             god_map.world.move_group(req.group_name, req.parent_link)
             logging.loginfo(f'Reattached \'{req.group_name}\' from \'{old_parent_link}\' to \'{req.parent_link}\'.')
-            parent_group = god_map.world.get_parent_group_name(req.group_name)
-            new_links = god_map.world.groups[req.group_name].link_names_with_collisions
-            god_map.collision_scene.remove_links_from_self_collision_matrix(new_links)
-            god_map.collision_scene.update_self_collision_matrix(parent_group, new_links)
-            god_map.collision_scene.blacklist_inter_group_collisions()
         else:
             logging.logwarn(f'Didn\'t update world. \'{req.group_name}\' is already attached to \'{req.parent_link}\'.')
 

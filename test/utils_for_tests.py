@@ -613,10 +613,19 @@ class GiskardTestWrapper(OldGiskardWrapper):
         assert name not in god_map.world.groups
         assert name not in self.world.get_group_names()
         if expected_response == UpdateWorldResponse.SUCCESS:
+            # links removed from world
             for old_link_name in old_link_names:
                 assert old_link_name not in god_map.world.link_names_as_set
+            # joints removed from world
             for old_joint_name in old_joint_names:
                 assert old_joint_name not in god_map.world.joint_names
+            # links removed from collision scene
+            for link_a, link_b in god_map.collision_scene.self_collision_matrix:
+                try:
+                    assert link_a not in old_link_names
+                    assert link_b not in old_link_names
+                except AssertionError as e:
+                    pass
         if name in self.env_joint_state_pubs:
             self.env_joint_state_pubs[name].unregister()
             del self.env_joint_state_pubs[name]
@@ -665,6 +674,13 @@ class GiskardTestWrapper(OldGiskardWrapper):
                     parent_link = god_map.world.root_link_name
                 else:
                     parent_link = god_map.world.search_for_link_name(parent_link)
+                if parent_link in god_map.world.robots[0].link_names:
+                    object_links = god_map.world.groups[name].link_names
+                    for link_a, link_b in god_map.collision_scene.self_collision_matrix:
+                        if link_a in object_links or link_b in object_links:
+                            break
+                    else:
+                        assert False, 'object not in collision matrix'
                 assert parent_link == god_map.world.get_parent_link_of_link(god_map.world.groups[name].root_link_name)
         else:
             if expected_error_code != UpdateWorldResponse.DUPLICATE_GROUP_ERROR:
@@ -685,6 +701,7 @@ class GiskardTestWrapper(OldGiskardWrapper):
                                       parent_link=parent_link,
                                       parent_link_group=parent_link_group,
                                       timeout=timeout)
+        self.wait_heartbeats()
         self.check_add_object_result(response=response,
                                      name=name,
                                      size=size,

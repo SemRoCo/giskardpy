@@ -2535,6 +2535,7 @@ class TestWorldManipulation:
         p.pose.position = Point(1.2, 0, 1.6)
         p.pose.orientation = Quaternion(0.0, 0.0, 0.47942554, 0.87758256)
         zero_pose.add_box_to_world(object_name, size=(1, 1, 1), pose=p, timeout=timeout)
+        internal_object_name = god_map.world.search_for_link_name(object_name)
         zero_pose.update_parent_link_of_group(object_name, parent_link=zero_pose.r_tip, timeout=timeout)
         zero_pose.detach_group(object_name, timeout=timeout)
         zero_pose.remove_group(object_name, timeout=timeout)

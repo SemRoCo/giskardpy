@@ -96,7 +96,7 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
     def sync(self):
         super().sync()
         if self.has_world_changed():
-            self.sync_links_with_world()
+            self.sync_world_model_update()
             self.reset_cache()
             logging.logdebug('hard sync')
             for o in self.kw.collision_objects:

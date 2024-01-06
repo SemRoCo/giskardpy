@@ -486,6 +486,7 @@ class WorldTree(WorldTreeInterface):
                                                      collect_link_when=self.has_link_collisions)
         return link_names
 
+    @modifies_world
     def register_group(self, name: str, root_link_name: PrefixName, actuated: bool = False):
         """
         Create a new subgroup at root_link_name.

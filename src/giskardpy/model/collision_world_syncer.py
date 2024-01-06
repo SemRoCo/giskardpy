@@ -501,7 +501,6 @@ class CollisionWorldSynchronizer:
         else:
             self_collision_matrix = self.self_collision_matrix
         group = god_map.world.groups[group_name]
-        # TODO update collision matrix after attachments
         # 0. GENERATE ALL POSSIBLE LINK PAIRS
         if link_combinations is None:
             link_combinations = set(combinations_with_replacement(group.link_names_with_collisions, 2))

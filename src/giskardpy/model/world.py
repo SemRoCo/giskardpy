@@ -1717,7 +1717,9 @@ class WorldBranch(WorldTreeInterface):
     @cached_property
     def groups(self) -> Dict[str, WorldBranch]:
         return {group_name: group for group_name, group in god_map.world.groups.items() if
-                group.root_link_name in self.links and group.name != self.name}
+                group.root_link_name in self.links
+                and group.root_link_name != self.root_link_name
+                and group.name != self.name}
 
     @cached_property
     def links(self) -> Dict[PrefixName, Link]:

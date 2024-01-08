@@ -38,11 +38,6 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
 
     def reset_cache(self):
         self.query = None
-        for method_name in dir(self):
-            try:
-                getattr(self, method_name).memo.clear()
-            except:
-                pass
 
     @profile
     def cut_off_distances_to_query(self, cut_off_distances: Dict[Tuple[PrefixName, PrefixName], float],

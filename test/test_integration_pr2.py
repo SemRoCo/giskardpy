@@ -3354,7 +3354,6 @@ class TestCollisionAvoidanceGoals:
         box_setup.detach_group(attached_link_name)
 
     def test_attached_get_out_of_collision_and_stay_in_hard_threshold(self, box_setup: PR2TestWrapper):
-        # TODO this creates shaking with a box
         attached_link_name = 'pocky'
         p = PoseStamped()
         p.header.frame_id = box_setup.r_tip
@@ -3363,6 +3362,7 @@ class TestCollisionAvoidanceGoals:
                                                                  [0, 1, 0, 0],
                                                                  [-1, 0, 0, 0],
                                                                  [0, 0, 0, 1]]))
+        # fixme this creates shaking with a box
         box_setup.add_cylinder_to_world(attached_link_name,
                                         # size=(0.2, 0.04, 0.04),
                                         height=0.2,

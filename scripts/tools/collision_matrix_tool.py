@@ -614,8 +614,9 @@ class Application(QMainWindow):
             return
         try:
             if os.path.isfile(srdf_file):
-                reasons, disabled_links = god_map.collision_scene.load_self_collision_matrix_from_srdf(srdf_file,
-                                                                                                       self.group_name)
+                god_map.collision_scene.load_self_collision_matrix_from_srdf(srdf_file, self.group_name)
+                reasons = god_map.collision_scene.self_collision_matrix
+                disabled_links = god_map.collision_scene.disabled_links
                 self.table.update_disabled_links(disabled_links)
                 self.table.update_table(reasons)
                 self.progress.set_progress(100, f'Loaded {srdf_file}')

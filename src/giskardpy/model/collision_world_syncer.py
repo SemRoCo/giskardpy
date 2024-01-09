@@ -418,11 +418,11 @@ class CollisionWorldSynchronizer:
             logging.loginfo(f'Loaded self collision matrix: {path_to_srdf}')
         else:
             path_to_srdf, self_collision_matrix, disabled_links = self.self_collision_matrix_cache[group_name]
-            self.disabled_links = disabled_links
+            self.disabled_links = deepcopy(disabled_links)
         self.self_collision_matrix_cache[group_name] = (path_to_srdf,
                                                         deepcopy(self_collision_matrix),
                                                         deepcopy(self.disabled_links))
-        self.self_collision_matrix = self_collision_matrix
+        self.self_collision_matrix = deepcopy(self_collision_matrix)
 
     def robot(self, robot_name: str = '') -> WorldBranch:
         for robot in self.robots:
@@ -868,10 +868,7 @@ class CollisionWorldSynchronizer:
                     elif self.is_avoid_collision(collision_entry):
                         if black_list_key not in self.self_collision_matrix:
                             if collision_entry.distance == -1:
-                                try:
-                                    collision_matrix[collision_matrix_key] = collision_check_distances[robot_link]
-                                except Exception as e:
-                                    pass
+                                collision_matrix[collision_matrix_key] = collision_check_distances[robot_link]
                             else:
                                 collision_matrix[collision_matrix_key] = collision_entry.distance
                     else:

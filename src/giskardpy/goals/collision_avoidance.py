@@ -96,7 +96,7 @@ class ExternalCollisionAvoidance(Goal):
         distance_monitor = ExpressionMonitor(f'collision distance {self.name}', plot=False)
         distance_monitor.set_expression(cas.less(actual_distance, 50))
         self.add_monitor(distance_monitor)
-        task = Task('stay away')
+        task = self.create_and_add_task('stay away')
         task.add_hold_monitors_monitor(distance_monitor)
         task.add_inequality_constraint(reference_velocity=self.max_velocity,
                                        lower_error=lower_limit,
@@ -105,7 +105,6 @@ class ExternalCollisionAvoidance(Goal):
                                        task_expression=dist,
                                        lower_slack_limit=-float('inf'),
                                        upper_slack_limit=upper_slack)
-        self.add_task(task)
         self.connect_monitors_to_all_tasks(start_monitors, hold_monitors, end_monitors)
 
     def map_V_n_symbol(self):
@@ -207,7 +206,7 @@ class SelfCollisionAvoidance(Goal):
         distance_monitor = ExpressionMonitor(f'collision distance {self.name}', plot=False)
         distance_monitor.set_expression(cas.less(actual_distance, 50))
         self.add_monitor(distance_monitor)
-        task = Task('stay away')
+        task = self.create_and_add_task('stay away')
         task.add_hold_monitors_monitor(distance_monitor)
         task.add_inequality_constraint(reference_velocity=self.max_velocity,
                                        lower_error=lower_limit,
@@ -216,7 +215,6 @@ class SelfCollisionAvoidance(Goal):
                                        task_expression=dist,
                                        lower_slack_limit=-float('inf'),
                                        upper_slack_limit=upper_slack)
-        self.add_task(task)
         self.connect_monitors_to_all_tasks(start_monitors, hold_monitors, end_monitors)
 
     def get_contact_normal_in_b(self):
@@ -318,12 +316,11 @@ class CollisionAvoidanceHint(Goal):
         expr = root_V_avoidance_hint.dot(root_P_a)
 
         # self.add_debug_expr('dist', actual_distance)
-        task = Task(name='avoidance_hint')
+        task = self.create_and_add_task('avoidance_hint')
         task.add_equality_constraint(reference_velocity=max_velocity,
                                      equality_bound=max_velocity,
                                      weight=weight,
                                      task_expression=expr)
-        self.add_task(task)
         self.connect_monitors_to_all_tasks(start_monitors, hold_monitors, end_monitors)
 
     def get_actual_distance(self):

@@ -59,7 +59,7 @@ class AlignPlanes(Goal):
                    f'_Z:{self.tip_V_tip_normal.vector.z:.3f}'
         super().__init__(name)
 
-        task = Task('align planes')
+        task = self.create_and_add_task('align planes')
         tip_V_tip_normal = w.Vector3(self.tip_V_tip_normal)
         root_R_tip = god_map.world.compose_fk_expression(self.root, self.tip).to_rotation()
         root_V_tip_normal = root_R_tip.dot(tip_V_tip_normal)
@@ -68,5 +68,4 @@ class AlignPlanes(Goal):
                                          frame_V_goal=root_V_root_normal,
                                          reference_velocity=self.reference_velocity,
                                          weight=self.weight)
-        self.add_task(task)
         self.connect_monitors_to_all_tasks(start_monitors, hold_monitors, end_monitors)

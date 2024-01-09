@@ -1,12 +1,18 @@
-from typing import Optional, List, Union, Dict, Callable, Iterable
+from enum import IntEnum
+from typing import Optional, List, Union, Dict, Callable, Iterable, overload
+
+import numpy as np
 
 import giskard_msgs.msg
 import giskardpy.casadi_wrapper as cas
 from giskardpy.exceptions import GiskardException, GoalInitalizationException
+from giskardpy.god_map import god_map
 from giskardpy.monitors.monitors import ExpressionMonitor
-from giskardpy.data_types import Derivatives
+from giskardpy.data_types import Derivatives, PrefixName
 from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint, \
-    ManipulabilityConstraint
+    ManipulabilityConstraint, Constraint
+from giskardpy.symbol_manager import symbol_manager
+from giskardpy.utils.decorators import memoize
 from giskardpy.utils.utils import string_shortener
 
 WEIGHT_MAX = giskard_msgs.msg.Weights.WEIGHT_MAX
@@ -14,6 +20,13 @@ WEIGHT_ABOVE_CA = giskard_msgs.msg.Weights.WEIGHT_ABOVE_CA
 WEIGHT_COLLISION_AVOIDANCE = giskard_msgs.msg.Weights.WEIGHT_COLLISION_AVOIDANCE
 WEIGHT_BELOW_CA = giskard_msgs.msg.Weights.WEIGHT_BELOW_CA
 WEIGHT_MIN = giskard_msgs.msg.Weights.WEIGHT_MIN
+
+
+class TaskState(IntEnum):
+    not_started = 0
+    running = 1
+    on_hold = 2
+    done = 3
 
 
 class Task:
@@ -26,13 +39,15 @@ class Task:
     start_monitors: List[ExpressionMonitor]
     hold_monitors: List[ExpressionMonitor]
     end_monitors: List[ExpressionMonitor]
-    name: Optional[str]
+    _name: str
+    _parent_goal_name: str
 
-    def __init__(self, name: Optional[str] = None):
+    def __init__(self, parent_goal_name: str, name: Optional[str] = None):
         if name is None:
-            self.name = str(self.__class__.__name__)
+            self._name = str(self.__class__.__name__)
         else:
-            self.name = name
+            self._name = name
+        self._parent_goal_name = parent_goal_name
         self.eq_constraints = {}
         self.neq_constraints = {}
         self.derivative_constraints = {}
@@ -40,6 +55,10 @@ class Task:
         self.hold_monitors = []
         self.end_monitors = []
         self.manip_constraints = {}
+
+    @property
+    def name(self) -> PrefixName:
+        return PrefixName(self._name, self._parent_goal_name)
 
     def __str__(self):
         return self.name
@@ -70,31 +89,54 @@ class Task:
                                  f'already registered for end_monitors of task {self.name}')
         self.end_monitors.append(monitor)
 
-    def get_eq_constraints(self):
+    def get_eq_constraints(self) -> List[EqualityConstraint]:
         return self._apply_monitors_to_constraints(self.eq_constraints.values())
 
-    def get_neq_constraints(self):
+    def get_neq_constraints(self) -> List[InequalityConstraint]:
         return self._apply_monitors_to_constraints(self.neq_constraints.values())
 
-    def get_derivative_constraints(self):
+    def get_derivative_constraints(self) -> List[DerivativeInequalityConstraint]:
         return self._apply_monitors_to_constraints(self.derivative_constraints.values())
 
-    def get_manipulability_constraint(self):
-        return self.manip_constraints.values()
+    def get_manipulability_constraint(self) -> List[ManipulabilityConstraint]:
+        return list(self.manip_constraints.values())
 
-    def _apply_monitors_to_constraints(self, constraints: Iterable[Union[EqualityConstraint, InequalityConstraint,
-    DerivativeInequalityConstraint]]):
+    def get_state_expression(self) -> cas.Symbol:
+        return symbol_manager.get_symbol(f'god_map.motion_goal_manager.task_state["{self.name}"]')
+
+    @memoize
+    def get_start_monitor_filter(self) -> np.ndarray:
+        return god_map.monitor_manager.to_state_filter(self.start_monitors)
+
+    @memoize
+    def get_hold_monitor_filter(self) -> np.ndarray:
+        return god_map.monitor_manager.to_state_filter(self.hold_monitors)
+
+    @memoize
+    def get_end_monitor_filter(self) -> np.ndarray:
+        return god_map.monitor_manager.to_state_filter(self.end_monitors)
+
+
+    @overload
+    def _apply_monitors_to_constraints(self, constraints: Iterable[EqualityConstraint]) \
+            -> List[Union[EqualityConstraint]]:
+        ...
+
+    @overload
+    def _apply_monitors_to_constraints(self, constraints: Iterable[InequalityConstraint]) \
+            -> List[Union[InequalityConstraint]]:
+        ...
+
+    @overload
+    def _apply_monitors_to_constraints(self, constraints: Iterable[DerivativeInequalityConstraint]) \
+            -> List[Union[DerivativeInequalityConstraint]]:
+        ...
+
+    def _apply_monitors_to_constraints(self, constraints):
         output_constraints = []
         for constraint in constraints:
-            for monitor in self.start_monitors:
-                constraint.quadratic_weight *= monitor.get_state_expression()
-            for monitor in self.hold_monitors:
-                constraint.quadratic_weight *= monitor.get_state_expression()
-            if self.end_monitors:
-                end_weight = 1
-                for monitor in self.end_monitors:
-                    end_weight *= monitor.get_state_expression()
-                constraint.quadratic_weight *= (1 - end_weight)
+            is_running = cas.if_eq(self.get_state_expression(), TaskState.running, if_result=1, else_result=0)
+            constraint.quadratic_weight *= is_running
             output_constraints.append(constraint)
         return output_constraints
 
@@ -107,6 +149,7 @@ class Task:
             raise GoalInitalizationException(f'expression must have shape (1, 1), has {task_expression.shape}')
         name = name if name else f'{len(self.manip_constraints)}'
         self.manip_constraints[name] = ManipulabilityConstraint(name=name,
+                                                                parent_task_name=self.name,
                                                                 expression=task_expression,
                                                                 gain=gain,
                                                                 prediction_horizon=prediction_horizon)
@@ -154,6 +197,7 @@ class Task:
         lower_slack_limit = lower_slack_limit if lower_slack_limit is not None else -float('inf')
         upper_slack_limit = upper_slack_limit if upper_slack_limit is not None else float('inf')
         self.eq_constraints[name] = EqualityConstraint(name=name,
+                                                       parent_task_name=self.name,
                                                        expression=task_expression,
                                                        derivative_goal=equality_bound,
                                                        velocity_limit=reference_velocity,
@@ -196,6 +240,7 @@ class Task:
         lower_slack_limit = lower_slack_limit if lower_slack_limit is not None else -float('inf')
         upper_slack_limit = upper_slack_limit if upper_slack_limit is not None else float('inf')
         self.neq_constraints[name] = InequalityConstraint(name=name,
+                                                          parent_task_name=self.name,
                                                           expression=task_expression,
                                                           lower_error=lower_error,
                                                           upper_error=upper_error,
@@ -409,6 +454,7 @@ class Task:
         if name in self.derivative_constraints:
             raise KeyError(f'a constraint with name \'{name}\' already exists')
         self.derivative_constraints[name] = DerivativeInequalityConstraint(name=name,
+                                                                           parent_task_name=self.name,
                                                                            derivative=Derivatives.velocity,
                                                                            expression=task_expression,
                                                                            lower_limit=lower_velocity_limit,
@@ -450,6 +496,7 @@ class Task:
         if name in self.derivative_constraints:
             raise KeyError(f'a constraint with name \'{name}\' already exists')
         self.derivative_constraints[name] = DerivativeInequalityConstraint(name=name,
+                                                                           parent_task_name=self.name,
                                                                            derivative=Derivatives.acceleration,
                                                                            expression=task_expression,
                                                                            lower_limit=lower_acceleration_limit,
@@ -475,6 +522,7 @@ class Task:
         if name in self.derivative_constraints:
             raise KeyError(f'a constraint with name \'{name}\' already exists')
         self.derivative_constraints[name] = DerivativeInequalityConstraint(name=name,
+                                                                           parent_task_name=self.name,
                                                                            derivative=Derivatives.jerk,
                                                                            expression=task_expression,
                                                                            lower_limit=lower_jerk_limit,

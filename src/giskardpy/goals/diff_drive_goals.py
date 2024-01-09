@@ -52,7 +52,7 @@ class DiffDriveTangentialToPoint(Goal):
         tip_V_pointing_axis = w.Vector3(self.tip_V_pointing_axis)
         map_V_forward = w.dot(map_T_base, tip_V_pointing_axis)
 
-        task = Task()
+        task = self.create_and_add_task()
         if self.drive:
             angle = w.abs(w.angle_between_vector(map_V_forward, map_V_tangent))
             task.add_equality_constraint(reference_velocity=0.5,
@@ -73,7 +73,6 @@ class DiffDriveTangentialToPoint(Goal):
                                          weight=self.weight,
                                          task_expression=map_current_angle,
                                          name='/rot')
-        self.add_task(task)
 
 
 class PointingDiffDriveEEF(Goal):
@@ -172,12 +171,11 @@ class KeepHandInWorkspace(Goal):
 
         map_V_tip.scale(1)
         angle_error = w.angle_between_vector(base_footprint_V_tip, map_V_pointing_axis)
-        task = Task()
+        task = self.create_and_add_task()
         task.add_inequality_constraint(reference_velocity=0.5,
                                        lower_error=-angle_error - 0.2,
                                        upper_error=-angle_error + 0.2,
                                        weight=weight,
                                        task_expression=angle_error,
                                        name='/rot')
-        self.add_task(task)
         self.connect_monitors_to_all_tasks(start_monitors, hold_monitors, end_monitors)

@@ -38,8 +38,7 @@ class BaseTrajFollower(Goal):
         self.odom_link = self.joint.parent_link_name
         self.base_footprint_link = self.joint.child_link_name
         self.track_only_velocity = track_only_velocity
-        self.task = Task()
-        self.add_task(self.task)
+        self.task = self.create_and_add_task()
         trajectory = god_map.trajectory
         self.trajectory_length = len(trajectory.items())
         self.add_trans_constraints()

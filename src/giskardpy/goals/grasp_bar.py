@@ -77,7 +77,7 @@ class GraspBar(Goal):
         root_T_tip = god_map.world.compose_fk_expression(self.root, self.tip)
         root_V_tip_normal = w.dot(root_T_tip, tip_V_tip_grasp_axis)
 
-        task = Task('grasp bar')
+        task = self.create_and_add_task('grasp bar')
 
         task.add_vector_goal_constraints(frame_V_current=root_V_tip_normal,
                                          frame_V_goal=root_V_bar_axis,
@@ -95,5 +95,4 @@ class GraspBar(Goal):
                                         frame_P_goal=nearest,
                                         reference_velocity=self.reference_linear_velocity,
                                         weight=self.weight)
-        self.add_task(task)
         self.connect_monitors_to_all_tasks(start_monitors, hold_monitors, end_monitors)

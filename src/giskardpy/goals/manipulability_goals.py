@@ -33,7 +33,7 @@ class MaxManipulability(Goal):
             if 'joint' in joint and not god_map.world.is_joint_rotational(joint):
                 raise Exception('Non rotational joint in kinematic chain of Maximize Manipulability Goal')
 
-        task = Task(name='manipulability')
+        task = self.create_and_add_task('manipulability')
         root_T_tip = god_map.world.compose_fk_expression(self.root_link, self.tip_link)
         task.add_manipulability_constraint_vector(names=['x', 'y', 'z'],
                                                   task_expressions=root_T_tip.to_position()[:3],
@@ -44,7 +44,6 @@ class MaxManipulability(Goal):
                                                       task_expressions=root_T_tip.to_rotation().to_quaternion()[:3],
                                                       gain=gain,
                                                       prediction_horizon=prediction_horizon)
-        self.add_task(task)
         m = symbol_manager.get_symbol(f'god_map.qp_controller.manipulability_indexes[0]')
         old_m = symbol_manager.get_symbol(f'god_map.qp_controller.manipulability_indexes[1]')
         god_map.debug_expression_manager.add_debug_expression('mIndex_percentualDifference',

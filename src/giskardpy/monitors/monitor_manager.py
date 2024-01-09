@@ -188,6 +188,7 @@ class MonitorManager:
         self.state = next_state
         self.trigger_update_triggers(self.state)
         self.state_history.append((god_map.time, self.state))
+        god_map.motion_goal_manager.update_task_state(self.state)
 
     def evaluate_payload_monitors(self) -> np.ndarray:
         next_state = np.zeros(len(self.payload_monitors))

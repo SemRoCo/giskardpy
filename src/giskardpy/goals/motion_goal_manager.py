@@ -1,14 +1,20 @@
 import traceback
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 from copy import deepcopy
-from typing import List, Dict
+from typing import List, Dict, Tuple
 
+import numpy as np
+
+from giskardpy.data_types import PrefixName
 from giskardpy.exceptions import UnknownGoalException, GiskardException, GoalInitalizationException, \
     DuplicateNameException
 from giskardpy.goals.collision_avoidance import ExternalCollisionAvoidance, SelfCollisionAvoidance
 from giskardpy.goals.goal import Goal
 import giskard_msgs.msg as giskard_msgs
 from giskardpy.god_map import god_map
+from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint, \
+    ManipulabilityConstraint
+from giskardpy.tasks.task import TaskState, Task
 from giskardpy.utils import logging
 from giskardpy.utils.utils import get_all_classes_in_package, convert_dictionary_to_ros_message, \
     json_str_to_kwargs, ImmutableDict
@@ -16,9 +22,13 @@ from giskardpy.utils.utils import get_all_classes_in_package, convert_dictionary
 
 class MotionGoalManager:
     motion_goals: Dict[str, Goal] = None
+    tasks: Dict[PrefixName, Task]
+    task_state: Dict[PrefixName, TaskState]
 
     def __init__(self):
         self.motion_goals = {}
+        self.task_state = {}
+        self.tasks = {}
         goal_package_paths = god_map.giskard.goal_package_paths
         self.allowed_motion_goal_types = {}
         for path in goal_package_paths:
@@ -28,7 +38,8 @@ class MotionGoalManager:
     def parse_motion_goals(self, motion_goals: List[giskard_msgs.MotionGoal]):
         for motion_goal in motion_goals:
             try:
-                logging.loginfo(f'Adding motion goal of type: \'{motion_goal.motion_goal_class}\' named: \'{motion_goal.name}\'')
+                logging.loginfo(
+                    f'Adding motion goal of type: \'{motion_goal.motion_goal_class}\' named: \'{motion_goal.name}\'')
                 C = self.allowed_motion_goal_types[motion_goal.motion_goal_class]
             except KeyError:
                 raise UnknownGoalException(f'unknown constraint {motion_goal.motion_goal_class}.')
@@ -39,7 +50,8 @@ class MotionGoalManager:
                 start_monitors = god_map.monitor_manager.search_for_monitors(motion_goal.start_monitors)
                 hold_monitors = god_map.monitor_manager.search_for_monitors(motion_goal.hold_monitors)
                 end_monitors = god_map.monitor_manager.search_for_monitors(motion_goal.end_monitors)
-                c: Goal = C(name=motion_goal.name, start_monitors=start_monitors, hold_monitors=hold_monitors, end_monitors=end_monitors, **params)
+                c: Goal = C(name=motion_goal.name, start_monitors=start_monitors, hold_monitors=hold_monitors,
+                            end_monitors=end_monitors, **params)
                 self.add_motion_goal(c)
             except Exception as e:
                 traceback.print_exc()
@@ -48,11 +60,40 @@ class MotionGoalManager:
                     raise GoalInitalizationException(error_msg)
                 raise e
 
-    def add_motion_goal(self, goal: Goal):
+    def add_motion_goal(self, goal: Goal) -> None:
         name = goal.name
         if name in self.motion_goals:
             raise DuplicateNameException(f'Motion goal with name {name} already exists.')
         self.motion_goals[name] = goal
+        for task in goal.tasks:
+            if task.name in self.tasks:
+                raise DuplicateNameException(f'Task names {task.name} already exists.')
+            self.tasks[task.name] = task
+            if task.start_monitors:
+                self.task_state[task.name] = TaskState.not_started
+            else:
+                self.task_state[task.name] = TaskState.running
+
+    def update_task_state(self, new_state: np.ndarray) -> None:
+        for task_name, task in self.tasks.items():
+            task_state = self.task_state[task_name]
+            start_filter = god_map.monitor_manager.to_state_filter(task.start_monitors)
+            hold_filter = god_map.monitor_manager.to_state_filter(task.hold_monitors)
+            end_filter = god_map.monitor_manager.to_state_filter(task.end_monitors)
+            if task_state == TaskState.not_started:
+                started = bool(start_filter and np.all(new_state[start_filter]))
+                if started:
+                    self.task_state[task_name] = TaskState.running
+            elif task_state != TaskState.done:
+                is_done = bool(end_filter and np.all(new_state[end_filter]))
+                if is_done:
+                    self.task_state[task_name] = TaskState.done
+                on_hold = bool(hold_filter and np.any(new_state[hold_filter]))
+                if on_hold:
+                    self.task_state[task_name] = TaskState.on_hold
+                else:
+                    self.task_state[task_name] = TaskState.running
+
 
     @profile
     def parse_collision_entries(self, collision_entries: List[giskard_msgs.CollisionEntry]):
@@ -165,15 +206,30 @@ class MotionGoalManager:
         logging.loginfo(f'Adding {num_constr} self collision avoidance constraints.')
 
     @profile
-    def get_constraints_from_goals(self):
+    def get_constraints_from_goals(self) \
+            -> Tuple[Dict[str, EqualityConstraint],
+            Dict[str, InequalityConstraint],
+            Dict[str, DerivativeInequalityConstraint],
+            Dict[str, ManipulabilityConstraint]]:
         eq_constraints = ImmutableDict()
         neq_constraints = ImmutableDict()
         derivative_constraints = ImmutableDict()
         manip_constraints = ImmutableDict()
-        goals: Dict[str, Goal] = god_map.motion_goal_manager.motion_goals
-        for goal_name, goal in list(goals.items()):
+        for goal_name, goal in list(self.motion_goals.items()):
             try:
-                new_eq_constraints, new_neq_constraints, new_derivative_constraints, new_manip_constraints,  _debug_expressions = goal.get_constraints()
+                new_eq_constraints = OrderedDict()
+                new_neq_constraints = OrderedDict()
+                new_derivative_constraints = OrderedDict()
+                new_manip_constraints = OrderedDict()
+                for task in goal.tasks:
+                    for constraint in task.get_eq_constraints():
+                        new_eq_constraints[constraint.name] = constraint
+                    for constraint in task.get_neq_constraints():
+                        new_neq_constraints[constraint.name] = constraint
+                    for constraint in task.get_derivative_constraints():
+                        new_derivative_constraints[constraint.name] = constraint
+                    for constraint in task.get_manipulability_constraint():
+                        new_manip_constraints[constraint.name] = constraint
             except Exception as e:
                 raise GoalInitalizationException(str(e))
             eq_constraints.update(new_eq_constraints)

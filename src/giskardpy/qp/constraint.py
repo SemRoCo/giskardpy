@@ -3,12 +3,25 @@ from typing import List, Union, Optional, Callable
 
 import giskardpy.casadi_wrapper as cas
 from giskardpy.god_map import god_map
-from giskardpy.data_types import Derivatives
+from giskardpy.data_types import Derivatives, PrefixName
 
 DebugConstraint = namedtuple('debug', ['expr'])
 
 
-class InequalityConstraint:
+class Constraint:
+    _name: str
+    _parent_task_name: PrefixName
+
+    def __init__(self, name: str, parent_task_name: PrefixName):
+        self._name = name
+        self._parent_task_name = parent_task_name
+
+    @property
+    def name(self) -> PrefixName:
+        return PrefixName(self._name, self._parent_task_name)
+
+
+class InequalityConstraint(Constraint):
     lower_error = -1e4
     upper_error = 1e4
     lower_slack_limit = -1e4
@@ -17,6 +30,7 @@ class InequalityConstraint:
 
     def __init__(self,
                  name: str,
+                 parent_task_name: PrefixName,
                  expression: cas.Expression,
                  lower_error: cas.symbol_expr_float, upper_error: cas.symbol_expr_float,
                  velocity_limit: cas.symbol_expr_float,
@@ -25,7 +39,7 @@ class InequalityConstraint:
                  linear_weight: Optional[cas.symbol_expr_float] = None,
                  lower_slack_limit: Optional[cas.symbol_expr_float] = None,
                  upper_slack_limit: Optional[cas.symbol_expr_float] = None):
-        self.name = name
+        super().__init__(name, parent_task_name)
         self.expression = expression
         self.quadratic_weight = quadratic_weight
         if control_horizon is None:
@@ -52,7 +66,7 @@ class InequalityConstraint:
         return weight_normalized * self.control_horizon
 
 
-class EqualityConstraint:
+class EqualityConstraint(Constraint):
     bound = 0
     lower_slack_limit = -1e4
     upper_slack_limit = 1e4
@@ -60,6 +74,7 @@ class EqualityConstraint:
 
     def __init__(self,
                  name: str,
+                 parent_task_name: PrefixName,
                  expression: cas.Expression,
                  derivative_goal: cas.symbol_expr_float,
                  velocity_limit: cas.symbol_expr_float,
@@ -67,7 +82,7 @@ class EqualityConstraint:
                  linear_weight: Optional[cas.symbol_expr_float] = None,
                  lower_slack_limit: Optional[cas.symbol_expr_float] = None,
                  upper_slack_limit: Optional[cas.symbol_expr_float] = None):
-        self.name = name
+        super().__init__(name, parent_task_name)
         self.expression = expression
         self.quadratic_weight = quadratic_weight
         if control_horizon is None:
@@ -98,10 +113,11 @@ class EqualityConstraint:
                          self.velocity_limit * dt * self.control_horizon)
 
 
-class DerivativeInequalityConstraint:
+class DerivativeInequalityConstraint(Constraint):
 
     def __init__(self,
                  name: str,
+                 parent_task_name: PrefixName,
                  derivative: Derivatives,
                  expression: cas.Expression,
                  lower_limit: Union[cas.symbol_expr_float, List[cas.symbol_expr_float]],
@@ -113,7 +129,7 @@ class DerivativeInequalityConstraint:
                  control_horizon: Optional[cas.symbol_expr_float] = None,
                  linear_weight: cas.symbol_expr_float = None,
                  horizon_function: Optional[Callable[[float, int], float]] = None):
-        self.name = name
+        super().__init__(name, parent_task_name)
         self.derivative = derivative
         self.expression = expression
         self.quadratic_weight = quadratic_weight
@@ -160,13 +176,14 @@ class DerivativeInequalityConstraint:
         return self.horizon_function(weight_normalized, t)
 
 
-class ManipulabilityConstraint:
+class ManipulabilityConstraint(Constraint):
     def __init__(self,
                  name: str,
+                 parent_task_name: PrefixName,
                  expression: cas.Expression,
                  gain: float = 1,
                  prediction_horizon: int = 1):
-        self.name = name
+        super().__init__(name, parent_task_name)
         self.expression = expression
         if gain < 0:
             raise Exception('Manipulability gain value has to be positive')

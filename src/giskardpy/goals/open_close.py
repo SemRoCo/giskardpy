@@ -72,24 +72,22 @@ class Open(Goal):
 
         # %% position
         r_P_c = god_map.world.compose_fk_expression(self.handle_link, self.tip_link).to_position()
-        task = Task(name='position')
+        task = self.create_and_add_task('position')
         task.add_point_goal_constraints(frame_P_goal=handle_T_tip.to_position(),
                                         frame_P_current=r_P_c,
                                         reference_velocity=CartesianPosition.default_reference_velocity,
                                         weight=self.weight)
-        self.add_task(task)
 
         # %% orientation
         r_R_c = god_map.world.compose_fk_expression(self.handle_link, self.tip_link).to_rotation()
         c_R_r_eval = god_map.world.compose_fk_evaluated_expression(self.tip_link, self.handle_link).to_rotation()
 
-        task = Task(name='orientation')
+        task = self.create_and_add_task('orientation')
         task.add_rotation_goal_constraints(frame_R_current=r_R_c,
                                            frame_R_goal=handle_T_tip.to_rotation(),
                                            current_R_frame_eval=c_R_r_eval,
                                            reference_velocity=CartesianOrientation.default_reference_velocity,
                                            weight=self.weight)
-        self.add_task(task)
 
         self.connect_monitors_to_all_tasks(start_monitors=start_monitors,
                                            hold_monitors=hold_monitors,

@@ -112,7 +112,7 @@ class JointVelocityLimit(Goal):
             name = f'{self.__class__.__name__}/{self.joint_names}'
         super().__init__(name)
 
-        task = Task(name='joint vel limit')
+        task = self.create_and_add_task('joint vel limit')
         for joint_name in self.joint_names:
             joint_name = god_map.world.search_for_joint_name(joint_name, group_name)
             joint: OneDofJoint = god_map.world.joints[joint_name]
@@ -136,7 +136,6 @@ class JointVelocityLimit(Goal):
                                              weight=self.weight,
                                              task_expression=current_joint,
                                              velocity_limit=max_velocity)
-        self.add_task(task)
         self.connect_monitors_to_all_tasks(start_monitors, hold_monitors, end_monitors)
 
 
@@ -170,7 +169,7 @@ class AvoidJointLimits(Goal):
                 joint_list = god_map.world.controlled_joints
             else:
                 joint_list = god_map.world.groups[group_name].controlled_joints
-        task = Task('avoid joint limits')
+        task = self.create_and_add_task('avoid joint limits')
         for joint_name in joint_list:
             if god_map.world.is_joint_prismatic(joint_name) or god_map.world.is_joint_revolute(joint_name):
                 weight = self.weight
@@ -201,7 +200,6 @@ class AvoidJointLimits(Goal):
                                                upper_error=upper_err,
                                                weight=weight,
                                                task_expression=joint_symbol)
-        self.add_task(task)
         self.connect_monitors_to_all_tasks(start_monitors, hold_monitors, end_monitors)
 
 
@@ -252,7 +250,7 @@ class JointPositionList(Goal):
             self.goal_positions.append(goal_position)
             self.velocity_limits.append(velocity_limit)
 
-        task = Task(name='joint goal')
+        task = self.create_and_add_task('joint goal')
         for name, current, goal, velocity_limit in zip(self.names, self.current_positions,
                                                        self.goal_positions, self.velocity_limits):
             if god_map.world.is_joint_continuous(name):
@@ -266,5 +264,4 @@ class JointPositionList(Goal):
                                          weight=self.weight,
                                          task_expression=current)
 
-        self.add_task(task)
         self.connect_monitors_to_all_tasks(start_monitors, hold_monitors, end_monitors)

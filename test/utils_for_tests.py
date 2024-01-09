@@ -586,10 +586,12 @@ class GiskardTestWrapper(OldGiskardWrapper):
         self.world.register_group(new_group_name=new_group_name,
                                      root_link_group_name=root_link_group_name,
                                      root_link_name=root_link_name)
+        self.wait_heartbeats()
         assert new_group_name in self.world.get_group_names()
 
     def clear_world(self, timeout: float = TimeOut) -> UpdateWorldResponse:
         respone = self.world.clear(timeout=timeout)
+        self.wait_heartbeats()
         self.default_env_name = None
         assert respone.error_codes == UpdateWorldResponse.SUCCESS
         assert len(god_map.world.groups) == 1
@@ -607,16 +609,26 @@ class GiskardTestWrapper(OldGiskardWrapper):
             old_link_names = god_map.world.groups[name].link_names_as_set
             old_joint_names = god_map.world.groups[name].joint_names
         r = self.world.remove_group(name, timeout=timeout)
+        self.wait_heartbeats()
         assert r.error_codes == expected_response, \
             f'Got: \'{update_world_error_code(r.error_codes)}\', ' \
             f'expected: \'{update_world_error_code(expected_response)}.\''
         assert name not in god_map.world.groups
         assert name not in self.world.get_group_names()
         if expected_response == UpdateWorldResponse.SUCCESS:
+            # links removed from world
             for old_link_name in old_link_names:
                 assert old_link_name not in god_map.world.link_names_as_set
+            # joints removed from world
             for old_joint_name in old_joint_names:
                 assert old_joint_name not in god_map.world.joint_names
+            # links removed from collision scene
+            for link_a, link_b in god_map.collision_scene.self_collision_matrix:
+                try:
+                    assert link_a not in old_link_names
+                    assert link_b not in old_link_names
+                except AssertionError as e:
+                    pass
         if name in self.env_joint_state_pubs:
             self.env_joint_state_pubs[name].unregister()
             del self.env_joint_state_pubs[name]
@@ -627,6 +639,7 @@ class GiskardTestWrapper(OldGiskardWrapper):
     def detach_group(self, name, timeout: float = TimeOut, expected_response=UpdateWorldResponse.SUCCESS):
         if expected_response == UpdateWorldResponse.SUCCESS:
             response = self.world.detach_group(name, timeout=timeout)
+            self.wait_heartbeats()
             self.check_add_object_result(response=response,
                                          name=name,
                                          size=None,
@@ -665,6 +678,13 @@ class GiskardTestWrapper(OldGiskardWrapper):
                     parent_link = god_map.world.root_link_name
                 else:
                     parent_link = god_map.world.search_for_link_name(parent_link)
+                if parent_link in god_map.world.robots[0].link_names:
+                    object_links = god_map.world.groups[name].link_names
+                    for link_a, link_b in god_map.collision_scene.self_collision_matrix:
+                        if link_a in object_links or link_b in object_links:
+                            break
+                    else:
+                        assert False, f'{name} not in collision matrix'
                 assert parent_link == god_map.world.get_parent_link_of_link(god_map.world.groups[name].root_link_name)
         else:
             if expected_error_code != UpdateWorldResponse.DUPLICATE_GROUP_ERROR:
@@ -685,6 +705,7 @@ class GiskardTestWrapper(OldGiskardWrapper):
                                       parent_link=parent_link,
                                       parent_link_group=parent_link_group,
                                       timeout=timeout)
+        self.wait_heartbeats()
         self.check_add_object_result(response=response,
                                      name=name,
                                      size=size,
@@ -698,6 +719,7 @@ class GiskardTestWrapper(OldGiskardWrapper):
                           expected_error_code=UpdateWorldResponse.SUCCESS):
         try:
             res = self.world.update_group_pose(group_name, new_pose, timeout)
+            self.wait_heartbeats()
         except UnknownGroupException as e:
             assert expected_error_code == UpdateWorldResponse.UNKNOWN_GROUP_ERROR
         if expected_error_code == UpdateWorldResponse.SUCCESS:
@@ -719,6 +741,7 @@ class GiskardTestWrapper(OldGiskardWrapper):
                                          parent_link=parent_link,
                                          parent_link_group=parent_link_group,
                                          timeout=timeout)
+        self.wait_heartbeats()
         self.check_add_object_result(response=response,
                                      name=name,
                                      size=None,
@@ -744,6 +767,7 @@ class GiskardTestWrapper(OldGiskardWrapper):
                                            parent_link=parent_link,
                                            parent_link_group=parent_link_group,
                                            timeout=timeout)
+        self.wait_heartbeats()
         self.check_add_object_result(response=response,
                                      name=name,
                                      size=None,
@@ -769,6 +793,7 @@ class GiskardTestWrapper(OldGiskardWrapper):
                                        parent_link_group=parent_link_group,
                                        scale=scale,
                                        timeout=timeout)
+        self.wait_heartbeats()
         pose = utils.make_pose_from_parts(pose=pose, frame_id=pose.header.frame_id,
                                           position=pose.pose.position, orientation=pose.pose.orientation)
         self.check_add_object_result(response=response,

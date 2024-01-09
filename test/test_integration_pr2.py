@@ -2535,6 +2535,7 @@ class TestWorldManipulation:
         p.pose.position = Point(1.2, 0, 1.6)
         p.pose.orientation = Quaternion(0.0, 0.0, 0.47942554, 0.87758256)
         zero_pose.add_box_to_world(object_name, size=(1, 1, 1), pose=p, timeout=timeout)
+        internal_object_name = god_map.world.search_for_link_name(object_name)
         zero_pose.update_parent_link_of_group(object_name, parent_link=zero_pose.r_tip, timeout=timeout)
         zero_pose.detach_group(object_name, timeout=timeout)
         zero_pose.remove_group(object_name, timeout=timeout)
@@ -3353,7 +3354,6 @@ class TestCollisionAvoidanceGoals:
         box_setup.detach_group(attached_link_name)
 
     def test_attached_get_out_of_collision_and_stay_in_hard_threshold(self, box_setup: PR2TestWrapper):
-        # TODO this creates shaking with a box
         attached_link_name = 'pocky'
         p = PoseStamped()
         p.header.frame_id = box_setup.r_tip
@@ -3362,6 +3362,7 @@ class TestCollisionAvoidanceGoals:
                                                                  [0, 1, 0, 0],
                                                                  [-1, 0, 0, 0],
                                                                  [0, 0, 0, 1]]))
+        # fixme this creates shaking with a box
         box_setup.add_cylinder_to_world(attached_link_name,
                                         # size=(0.2, 0.04, 0.04),
                                         height=0.2,
@@ -3957,8 +3958,10 @@ class TestWorld:
         disabled_links = {world_setup.search_for_link_name('br_caster_l_wheel_link'),
                           world_setup.search_for_link_name('fr_caster_l_wheel_link')}
         reference_collision_scene = BetterPyBulletSyncer()
-        reference_reasons, reference_disabled_links = reference_collision_scene.load_self_collision_matrix_from_srdf(
+        reference_collision_scene.load_self_collision_matrix_from_srdf(
             'package://giskardpy/test/data/pr2_test.srdf', 'pr2')
+        reference_reasons = reference_collision_scene.self_collision_matrix
+        reference_disabled_links = reference_collision_scene.disabled_links
         collision_scene: CollisionWorldSynchronizer = god_map.collision_scene
         actual_reasons = collision_scene.compute_self_collision_matrix('pr2',
                                                                        number_of_tries_never=500)

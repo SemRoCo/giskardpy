@@ -38,11 +38,6 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
 
     def reset_cache(self):
         self.query = None
-        for method_name in dir(self):
-            try:
-                getattr(self, method_name).memo.clear()
-            except:
-                pass
 
     @profile
     def cut_off_distances_to_query(self, cut_off_distances: Dict[Tuple[PrefixName, PrefixName], float],
@@ -96,7 +91,7 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
     def sync(self):
         super().sync()
         if self.has_world_changed():
-            self.sync_links_with_world()
+            self.sync_world_model_update()
             self.reset_cache()
             logging.logdebug('hard sync')
             for o in self.kw.collision_objects:

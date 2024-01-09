@@ -72,13 +72,13 @@ class Giskard:
         """
         with god_map.world.modify_world():
             god_map.world_config.setup()
-        god_map.collision_avoidance_config.setup()
-        god_map.collision_avoidance_config._sanity_check()
         god_map.behavior_tree_config._create_behavior_tree()
         god_map.behavior_tree_config.setup()
         god_map.robot_interface_config.setup()
         self._controlled_joints_sanity_check()
         god_map.world.notify_model_change()
+        god_map.collision_avoidance_config.setup()
+        god_map.collision_avoidance_config._sanity_check()
         god_map.collision_scene.sync()
         god_map.tree.setup(30)
 

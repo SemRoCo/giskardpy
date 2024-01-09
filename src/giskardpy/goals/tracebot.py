@@ -131,4 +131,9 @@ class InsertCylinder(Goal):
         tilt_straight_task.add_start_monitors_monitor(bottom_reached_monitor)
         tilt_straight_task.add_end_monitors_monitor(tilt_monitor)
         self.add_task(tilt_straight_task)
-        self.connect_monitors_to_all_tasks(start_monitors, hold_monitors, end_monitors)
+        self.connect_hold_monitors_to_all_tasks(hold_monitors)
+        self.connect_start_monitors_to_all_tasks(start_monitors)
+        for monitor in end_monitors:
+            tilt_straight_task.add_end_monitors_monitor(monitor)
+            go_to_line.add_end_monitors_monitor(monitor)
+            insert_task.add_end_monitors_monitor(monitor)

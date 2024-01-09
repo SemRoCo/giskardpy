@@ -3958,8 +3958,10 @@ class TestWorld:
         disabled_links = {world_setup.search_for_link_name('br_caster_l_wheel_link'),
                           world_setup.search_for_link_name('fr_caster_l_wheel_link')}
         reference_collision_scene = BetterPyBulletSyncer()
-        reference_reasons, reference_disabled_links = reference_collision_scene.load_self_collision_matrix_from_srdf(
+        reference_collision_scene.load_self_collision_matrix_from_srdf(
             'package://giskardpy/test/data/pr2_test.srdf', 'pr2')
+        reference_reasons = reference_collision_scene.self_collision_matrix
+        reference_disabled_links = reference_collision_scene.disabled_links
         collision_scene: CollisionWorldSynchronizer = god_map.collision_scene
         actual_reasons = collision_scene.compute_self_collision_matrix('pr2',
                                                                        number_of_tries_never=500)

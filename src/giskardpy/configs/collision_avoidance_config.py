@@ -170,11 +170,12 @@ class CollisionAvoidanceConfig(abc.ABC):
         """
         if group_name is None:
             group_name = god_map.world.robot_name
-        if group_name not in self.collision_scene.self_collision_matrix_paths:
+        if group_name not in self.collision_scene.self_collision_matrix_cache:
             self.collision_scene.load_self_collision_matrix_from_srdf(path_to_srdf, group_name)
         else:
-            path_to_srdf = self.collision_scene.self_collision_matrix_paths[group_name]
-            self.collision_scene.load_self_collision_matrix_from_srdf(path_to_srdf, group_name)
+            path_to_srdf, self_collision_matrix, disabled_links = self.collision_scene.self_collision_matrix_cache[group_name]
+            self.collision_scene.self_collision_matrix = self_collision_matrix
+            self.collision_scene.disabled_links = disabled_links
 
     def fix_joints_for_collision_avoidance(self, joint_names: List[str], group_name: Optional[str] = None):
         """

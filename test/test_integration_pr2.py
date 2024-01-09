@@ -450,7 +450,7 @@ class TestMonitors:
                                                                name='joint_monitor1')
         joint_monitor2 = zero_pose.monitors.add_joint_position(pocky_pose,
                                                                name='joint_monitor2')
-        end_monitor = zero_pose.monitors.add_local_minimum_reached()
+        end_monitor = zero_pose.monitors.add_local_minimum_reached(start_monitors=[joint_monitor2])
 
         zero_pose.motion_goals.add_joint_position(name='g1',
                                                   goal_state=zero_pose.better_pose,

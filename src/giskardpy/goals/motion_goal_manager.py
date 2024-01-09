@@ -81,18 +81,16 @@ class MotionGoalManager:
             hold_filter = god_map.monitor_manager.to_state_filter(task.hold_monitors)
             end_filter = god_map.monitor_manager.to_state_filter(task.end_monitors)
             if task_state == TaskState.not_started:
-                started = bool(start_filter and np.all(new_state[start_filter]))
-                if started:
+                if len(start_filter) > 0 and np.all(new_state[start_filter]):
                     self.task_state[task_name] = TaskState.running
             elif task_state != TaskState.done:
-                is_done = bool(end_filter and np.all(new_state[end_filter]))
-                if is_done:
+                if len(end_filter) > 0 and np.all(new_state[end_filter]):
                     self.task_state[task_name] = TaskState.done
-                on_hold = bool(hold_filter and np.any(new_state[hold_filter]))
-                if on_hold:
-                    self.task_state[task_name] = TaskState.on_hold
                 else:
-                    self.task_state[task_name] = TaskState.running
+                    if len(hold_filter) > 0 and np.any(new_state[hold_filter]):
+                        self.task_state[task_name] = TaskState.on_hold
+                    else:
+                        self.task_state[task_name] = TaskState.running
 
 
     @profile

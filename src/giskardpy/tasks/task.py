@@ -5,7 +5,7 @@ import numpy as np
 
 import giskard_msgs.msg
 import giskardpy.casadi_wrapper as cas
-from giskardpy.exceptions import GiskardException, GoalInitalizationException
+from giskardpy.exceptions import GiskardException, GoalInitalizationException, DuplicateNameException
 from giskardpy.god_map import god_map
 from giskardpy.monitors.monitors import ExpressionMonitor
 from giskardpy.data_types import Derivatives, PrefixName
@@ -33,9 +33,9 @@ class Task:
     """
     Tasks are a set of constraints with the same predicates.
     """
-    eq_constraints: Dict[str, EqualityConstraint]
-    neq_constraints: Dict[str, InequalityConstraint]
-    derivative_constraints: Dict[str, DerivativeInequalityConstraint]
+    eq_constraints: Dict[PrefixName, EqualityConstraint]
+    neq_constraints: Dict[PrefixName, InequalityConstraint]
+    derivative_constraints: Dict[PrefixName, DerivativeInequalityConstraint]
     start_monitors: List[ExpressionMonitor]
     hold_monitors: List[ExpressionMonitor]
     end_monitors: List[ExpressionMonitor]
@@ -64,7 +64,7 @@ class Task:
         return self.name
 
     def formatted_name(self, quoted: bool = False) -> str:
-        formatted_name = string_shortener(original_str=self.name,
+        formatted_name = string_shortener(original_str=str(self.name),
                                           max_lines=4,
                                           max_line_length=25)
         if quoted:
@@ -116,7 +116,6 @@ class Task:
     def get_end_monitor_filter(self) -> np.ndarray:
         return god_map.monitor_manager.to_state_filter(self.end_monitors)
 
-
     @overload
     def _apply_monitors_to_constraints(self, constraints: Iterable[EqualityConstraint]) \
             -> List[Union[EqualityConstraint]]:
@@ -147,12 +146,13 @@ class Task:
                                       name: str = None):
         if task_expression.shape != (1, 1):
             raise GoalInitalizationException(f'expression must have shape (1, 1), has {task_expression.shape}')
-        name = name if name else f'{len(self.manip_constraints)}'
-        self.manip_constraints[name] = ManipulabilityConstraint(name=name,
-                                                                parent_task_name=self.name,
-                                                                expression=task_expression,
-                                                                gain=gain,
-                                                                prediction_horizon=prediction_horizon)
+        name = name or f'{len(self.manip_constraints)}'
+        constraint = ManipulabilityConstraint(name=name,
+                                              parent_task_name=self.name,
+                                              expression=task_expression,
+                                              gain=gain,
+                                              prediction_horizon=prediction_horizon)
+        self.manip_constraints[constraint.name] = constraint
 
     def add_manipulability_constraint_vector(self,
                                              task_expressions: Union[
@@ -193,18 +193,21 @@ class Task:
         """
         if task_expression.shape != (1, 1):
             raise GoalInitalizationException(f'expression must have shape (1, 1), has {task_expression.shape}')
-        name = name if name else f'{len(self.eq_constraints)}'
+        name = name or f'{len(self.eq_constraints)}'
         lower_slack_limit = lower_slack_limit if lower_slack_limit is not None else -float('inf')
         upper_slack_limit = upper_slack_limit if upper_slack_limit is not None else float('inf')
-        self.eq_constraints[name] = EqualityConstraint(name=name,
-                                                       parent_task_name=self.name,
-                                                       expression=task_expression,
-                                                       derivative_goal=equality_bound,
-                                                       velocity_limit=reference_velocity,
-                                                       quadratic_weight=weight,
-                                                       lower_slack_limit=lower_slack_limit,
-                                                       upper_slack_limit=upper_slack_limit,
-                                                       control_horizon=control_horizon)
+        constraint = EqualityConstraint(name=name,
+                                        parent_task_name=self.name,
+                                        expression=task_expression,
+                                        derivative_goal=equality_bound,
+                                        velocity_limit=reference_velocity,
+                                        quadratic_weight=weight,
+                                        lower_slack_limit=lower_slack_limit,
+                                        upper_slack_limit=upper_slack_limit,
+                                        control_horizon=control_horizon)
+        if constraint.name in self.eq_constraints:
+            raise DuplicateNameException(f'Constraint named {constraint.name} already exists.')
+        self.eq_constraints[constraint.name] = constraint
 
     def add_inequality_constraint(self,
                                   reference_velocity: cas.symbol_expr_float,
@@ -232,23 +235,23 @@ class Task:
         """
         if task_expression.shape != (1, 1):
             raise GoalInitalizationException(f'expression must have shape (1,1), has {task_expression.shape}')
-        name = name if name else ''
-        name = str(self) + "/" + name
-        if name in self.neq_constraints:
-            raise KeyError(f'A constraint with name \'{name}\' already exists. '
-                           f'You need to set a name, if you add multiple constraints.')
+        name = name or ''
         lower_slack_limit = lower_slack_limit if lower_slack_limit is not None else -float('inf')
         upper_slack_limit = upper_slack_limit if upper_slack_limit is not None else float('inf')
-        self.neq_constraints[name] = InequalityConstraint(name=name,
-                                                          parent_task_name=self.name,
-                                                          expression=task_expression,
-                                                          lower_error=lower_error,
-                                                          upper_error=upper_error,
-                                                          velocity_limit=reference_velocity,
-                                                          quadratic_weight=weight,
-                                                          lower_slack_limit=lower_slack_limit,
-                                                          upper_slack_limit=upper_slack_limit,
-                                                          control_horizon=control_horizon)
+        constraint = InequalityConstraint(name=name,
+                                          parent_task_name=self.name,
+                                          expression=task_expression,
+                                          lower_error=lower_error,
+                                          upper_error=upper_error,
+                                          velocity_limit=reference_velocity,
+                                          quadratic_weight=weight,
+                                          lower_slack_limit=lower_slack_limit,
+                                          upper_slack_limit=upper_slack_limit,
+                                          control_horizon=control_horizon)
+        if name in self.neq_constraints:
+            raise DuplicateNameException(f'A constraint with name \'{name}\' already exists. '
+                                         f'You need to set a name, if you add multiple constraints.')
+        self.neq_constraints[constraint.name] = constraint
 
     def add_inequality_constraint_vector(self,
                                          reference_velocities: Union[
@@ -429,7 +432,7 @@ class Task:
                                 weight: cas.symbol_expr_float,
                                 task_expression: cas.symbol_expr,
                                 velocity_limit: cas.symbol_expr_float,
-                                name_suffix: Optional[str] = None,
+                                name: Optional[str] = None,
                                 control_horizon: Optional[cas.symbol_expr_float] = None,
                                 lower_slack_limit: Union[cas.symbol_expr_float, List[cas.symbol_expr_float]] = -1e4,
                                 upper_slack_limit: Union[cas.symbol_expr_float, List[cas.symbol_expr_float]] = 1e4,
@@ -442,29 +445,29 @@ class Task:
         :param weight:
         :param task_expression:
         :param velocity_limit:
-        :param name_suffix:
+        :param name:
         :param lower_slack_limit:
         :param upper_slack_limit:
         :param horizon_function: A function that can takes 'weight' and the id within the horizon as input and computes
                                     a new weight. Can be used to give points towards the end of the horizon a different
                                     weight
         """
-        name_suffix = name_suffix if name_suffix else ''
-        name = str(self) + name_suffix
-        if name in self.derivative_constraints:
+        name = name or ''
+        constraint = DerivativeInequalityConstraint(name=name,
+                                                    parent_task_name=self.name,
+                                                    derivative=Derivatives.velocity,
+                                                    expression=task_expression,
+                                                    lower_limit=lower_velocity_limit,
+                                                    upper_limit=upper_velocity_limit,
+                                                    quadratic_weight=weight,
+                                                    normalization_factor=velocity_limit,
+                                                    lower_slack_limit=lower_slack_limit,
+                                                    upper_slack_limit=upper_slack_limit,
+                                                    control_horizon=control_horizon,
+                                                    horizon_function=horizon_function)
+        if constraint.name in self.derivative_constraints:
             raise KeyError(f'a constraint with name \'{name}\' already exists')
-        self.derivative_constraints[name] = DerivativeInequalityConstraint(name=name,
-                                                                           parent_task_name=self.name,
-                                                                           derivative=Derivatives.velocity,
-                                                                           expression=task_expression,
-                                                                           lower_limit=lower_velocity_limit,
-                                                                           upper_limit=upper_velocity_limit,
-                                                                           quadratic_weight=weight,
-                                                                           normalization_factor=velocity_limit,
-                                                                           lower_slack_limit=lower_slack_limit,
-                                                                           upper_slack_limit=upper_slack_limit,
-                                                                           control_horizon=control_horizon,
-                                                                           horizon_function=horizon_function)
+        self.derivative_constraints[constraint.name] = constraint
 
     def add_acceleration_constraint(self,
                                     lower_acceleration_limit: Union[cas.symbol_expr_float, List[cas.symbol_expr_float]],
@@ -472,7 +475,7 @@ class Task:
                                     weight: cas.symbol_expr_float,
                                     task_expression: cas.symbol_expr,
                                     acceleration_limit: cas.symbol_expr_float,
-                                    name_suffix: Optional[str] = None,
+                                    name: Optional[str] = None,
                                     lower_slack_limit: Union[cas.symbol_expr_float, List[cas.symbol_expr_float]] = -1e4,
                                     upper_slack_limit: Union[cas.symbol_expr_float, List[cas.symbol_expr_float]] = 1e4,
                                     horizon_function: Optional[Callable[[float, int], float]] = None):
@@ -484,28 +487,28 @@ class Task:
         :param weight:
         :param task_expression:
         :param acceleration_limit:
-        :param name_suffix:
+        :param name:
         :param lower_slack_limit:
         :param upper_slack_limit:
         :param horizon_function: A function that can takes 'weight' and the id within the horizon as input and computes
                                     a new weight. Can be used to give points towards the end of the horizon a different
                                     weight
         """
-        name_suffix = name_suffix if name_suffix else ''
-        name = str(self) + name_suffix
+        name = name if name else ''
+        constraint = DerivativeInequalityConstraint(name=name,
+                                                    parent_task_name=self.name,
+                                                    derivative=Derivatives.acceleration,
+                                                    expression=task_expression,
+                                                    lower_limit=lower_acceleration_limit,
+                                                    upper_limit=upper_acceleration_limit,
+                                                    quadratic_weight=weight,
+                                                    normalization_factor=acceleration_limit,
+                                                    lower_slack_limit=lower_slack_limit,
+                                                    upper_slack_limit=upper_slack_limit,
+                                                    horizon_function=horizon_function)
         if name in self.derivative_constraints:
-            raise KeyError(f'a constraint with name \'{name}\' already exists')
-        self.derivative_constraints[name] = DerivativeInequalityConstraint(name=name,
-                                                                           parent_task_name=self.name,
-                                                                           derivative=Derivatives.acceleration,
-                                                                           expression=task_expression,
-                                                                           lower_limit=lower_acceleration_limit,
-                                                                           upper_limit=upper_acceleration_limit,
-                                                                           quadratic_weight=weight,
-                                                                           normalization_factor=acceleration_limit,
-                                                                           lower_slack_limit=lower_slack_limit,
-                                                                           upper_slack_limit=upper_slack_limit,
-                                                                           horizon_function=horizon_function)
+            raise DuplicateNameException(f'a constraint with name \'{name}\' already exists')
+        self.derivative_constraints[constraint.name] = constraint
 
     def add_jerk_constraint(self,
                             lower_jerk_limit: Union[cas.symbol_expr_float, List[cas.symbol_expr_float]],
@@ -513,15 +516,12 @@ class Task:
                             weight: cas.symbol_expr_float,
                             task_expression: cas.symbol_expr,
                             acceleration_limit: cas.symbol_expr_float,
-                            name_suffix: Optional[str] = None,
+                            name: Optional[str] = None,
                             lower_slack_limit: Union[cas.symbol_expr_float, List[cas.symbol_expr_float]] = -1e4,
                             upper_slack_limit: Union[cas.symbol_expr_float, List[cas.symbol_expr_float]] = 1e4,
                             horizon_function: Optional[Callable[[float, int], float]] = None):
-        name_suffix = name_suffix if name_suffix else ''
-        name = str(self) + name_suffix
-        if name in self.derivative_constraints:
-            raise KeyError(f'a constraint with name \'{name}\' already exists')
-        self.derivative_constraints[name] = DerivativeInequalityConstraint(name=name,
+        name = name if name else ''
+        constraint = DerivativeInequalityConstraint(name=name,
                                                                            parent_task_name=self.name,
                                                                            derivative=Derivatives.jerk,
                                                                            expression=task_expression,
@@ -532,6 +532,9 @@ class Task:
                                                                            lower_slack_limit=lower_slack_limit,
                                                                            upper_slack_limit=upper_slack_limit,
                                                                            horizon_function=horizon_function)
+        if name in self.derivative_constraints:
+            raise KeyError(f'a constraint with name \'{name}\' already exists')
+        self.derivative_constraints[constraint.name] = constraint
 
     def add_translational_velocity_limit(self,
                                          frame_P_current: cas.Point3,
@@ -557,7 +560,7 @@ class Task:
                                      lower_slack_limit=-max_violation,
                                      upper_slack_limit=max_violation,
                                      velocity_limit=max_velocity,
-                                     name_suffix=f'{name}/vel')
+                                     name=f'{name}/vel')
 
     def add_rotational_velocity_limit(self,
                                       frame_R_current: cas.RotationMatrix,
@@ -582,5 +585,5 @@ class Task:
                                      task_expression=angle_error,
                                      lower_slack_limit=-max_violation,
                                      upper_slack_limit=max_violation,
-                                     name_suffix=f'{name}/q/vel',
+                                     name=f'{name}/q/vel',
                                      velocity_limit=max_velocity)

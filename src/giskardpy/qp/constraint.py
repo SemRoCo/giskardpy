@@ -17,8 +17,8 @@ class Constraint:
         self._parent_task_name = parent_task_name
 
     @property
-    def name(self) -> PrefixName:
-        return PrefixName(self._name, self._parent_task_name)
+    def name(self) -> str:
+        return str(PrefixName(self._name, self._parent_task_name))
 
 
 class InequalityConstraint(Constraint):

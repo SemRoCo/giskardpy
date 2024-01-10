@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from enum import IntEnum
 from functools import cached_property
 from typing import List, Optional
 
@@ -27,21 +28,28 @@ class Monitor:
                  stay_true: bool = False):
         self.name = name or self.__class__.__name__
         self.start_monitors = start_monitors or []
-        self.id = -1
+        self._id = -1
         self.plot = plot
         self.stay_true = stay_true
 
-    def set_id(self, id_: int):
-        self.id = id_
+    def set_id(self, new_id: int):
+        self._id = new_id
+
+    @property
+    def id(self) -> int:
+        if self._id == -1:
+            raise MonitorInitalizationException(f'Id of {self.name} is not set.')
+        return self._id
 
     @cached_property
     def state_filter(self) -> np.ndarray:
         return god_map.monitor_manager.to_state_filter(self.start_monitors)
 
     def get_state_expression(self):
-        if self.id == -1:
-            raise MonitorInitalizationException(f'Id of {self.name} is not set.')
         return symbol_manager.get_symbol(f'god_map.monitor_manager.state[{self.id}]')
+
+    def get_life_cycle_state_expression(self):
+        return symbol_manager.get_symbol(f'god_map.monitor_manager.life_cycle_state[{self.id}]')
 
     def formatted_name(self, quoted: bool = False) -> str:
         formatted_name = string_shortener(original_str=self.name,
@@ -71,17 +79,12 @@ class ExpressionMonitor(Monitor):
     def set_expression(self, expression: cas.symbol_expr):
         self._expression = expression
 
-    def apply_start_monitors_to_expression(self):
-        for monitor in self.start_monitors:
-            monitor_state = monitor.get_state_expression()
-            self._expression = cas.logic_and(self._expression, monitor_state)
-
     def get_expression(self):
         return self._expression
 
     def compile(self):
         # use this if you need to do stuff, after the qp controller has been initialized
-        self.apply_start_monitors_to_expression()
+        pass
 
 
 class LocalMinimumReached(ExpressionMonitor):
@@ -117,7 +120,6 @@ class LocalMinimumReached(ExpressionMonitor):
                 condition_list.append(cas.less(cas.abs(joint_vel_symbol), velocity_limit))
 
         self.set_expression(cas.logic_all(cas.Expression(condition_list)))
-        self.apply_start_monitors_to_expression()
 
 
 class TimeAbove(ExpressionMonitor):

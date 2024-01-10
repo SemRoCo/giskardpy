@@ -8,7 +8,7 @@ import giskardpy.casadi_wrapper as cas
 from giskardpy.exceptions import GiskardException, GoalInitalizationException, DuplicateNameException
 from giskardpy.god_map import god_map
 from giskardpy.monitors.monitors import ExpressionMonitor
-from giskardpy.data_types import Derivatives, PrefixName
+from giskardpy.data_types import Derivatives, PrefixName, TaskState
 from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint, \
     ManipulabilityConstraint, Constraint
 from giskardpy.symbol_manager import symbol_manager
@@ -20,13 +20,6 @@ WEIGHT_ABOVE_CA = giskard_msgs.msg.Weights.WEIGHT_ABOVE_CA
 WEIGHT_COLLISION_AVOIDANCE = giskard_msgs.msg.Weights.WEIGHT_COLLISION_AVOIDANCE
 WEIGHT_BELOW_CA = giskard_msgs.msg.Weights.WEIGHT_BELOW_CA
 WEIGHT_MIN = giskard_msgs.msg.Weights.WEIGHT_MIN
-
-
-class TaskState(IntEnum):
-    not_started = 0
-    running = 1
-    on_hold = 2
-    done = 3
 
 
 class Task:
@@ -144,7 +137,9 @@ class Task:
     def _apply_monitors_to_constraints(self, constraints):
         output_constraints = []
         for constraint in constraints:
-            is_running = cas.if_eq(self.get_state_expression(), TaskState.running, if_result=1, else_result=0)
+            is_running = cas.if_eq(self.get_state_expression(), int(TaskState.running),
+                                   if_result=1,
+                                   else_result=0)
             constraint.quadratic_weight *= is_running
             output_constraints.append(constraint)
         return output_constraints
@@ -532,16 +527,16 @@ class Task:
                             horizon_function: Optional[Callable[[float, int], float]] = None):
         name = name if name else ''
         constraint = DerivativeInequalityConstraint(name=name,
-                                                                           parent_task_name=self.name,
-                                                                           derivative=Derivatives.jerk,
-                                                                           expression=task_expression,
-                                                                           lower_limit=lower_jerk_limit,
-                                                                           upper_limit=upper_jerk_limit,
-                                                                           quadratic_weight=weight,
-                                                                           normalization_factor=acceleration_limit,
-                                                                           lower_slack_limit=lower_slack_limit,
-                                                                           upper_slack_limit=upper_slack_limit,
-                                                                           horizon_function=horizon_function)
+                                                    parent_task_name=self.name,
+                                                    derivative=Derivatives.jerk,
+                                                    expression=task_expression,
+                                                    lower_limit=lower_jerk_limit,
+                                                    upper_limit=upper_jerk_limit,
+                                                    quadratic_weight=weight,
+                                                    normalization_factor=acceleration_limit,
+                                                    lower_slack_limit=lower_slack_limit,
+                                                    upper_slack_limit=upper_slack_limit,
+                                                    horizon_function=horizon_function)
         if name in self.derivative_constraints:
             raise KeyError(f'a constraint with name \'{name}\' already exists')
         self.derivative_constraints[constraint.name] = constraint

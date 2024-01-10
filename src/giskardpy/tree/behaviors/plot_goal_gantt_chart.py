@@ -62,7 +62,8 @@ class PlotGanttChart(GiskardBehavior):
         color_map = {TaskState.not_started: 'white',
                      TaskState.on_hold: 'gray',
                      TaskState.running: 'green',
-                     TaskState.done: (0.7, 0.85, 0.7)}
+                     TaskState.failed: (0.85, 0.7, 0.7),
+                     TaskState.succeeded: (0.7, 0.85, 0.7)}
         state: Dict[str, Tuple[float, TaskState]] = {t.name: (0, TaskState.not_started) for t in things}
         for end_time, history_state in history:
             for thing_id, status in enumerate(history_state):
@@ -82,20 +83,11 @@ class PlotGanttChart(GiskardBehavior):
         # because the monitor state doesn't get updated after the final end motion becomes true
         god_map.monitor_manager.evaluate_monitors()
         monitor_history: List[Tuple[float, List[Optional[TaskState]]]] = []
-        for time_id, (time, state) in enumerate(god_map.monitor_manager.state_history):
-            next_monitor_state = [TaskState.running if x else TaskState.not_started for x in state]
-            if time_id >= 1:
-                for monitor_id, monitor in enumerate(god_map.monitor_manager.monitors):
-                    monitor_state = state[monitor_id]
-                    if not monitor.start_monitors:
-                        if isinstance(monitor, PayloadMonitor) and not monitor_state:
-                            next_monitor_state[monitor_id] = TaskState.on_hold
-                        continue
-                    prev_state = god_map.monitor_manager.state_history[time_id-1][1]
-                    active = np.all(prev_state[monitor.state_filter])
-                    if not monitor_state and active:
-                        next_monitor_state[monitor_id] = TaskState.on_hold
-            monitor_history.append((time, next_monitor_state))
+        for time_id, (time, (state, life_cycle_state)) in enumerate(god_map.monitor_manager.state_history):
+            for monitor_id in range(len(state)):
+                if not state[monitor_id] and life_cycle_state[monitor_id] == TaskState.running:
+                    life_cycle_state[monitor_id] = TaskState.on_hold
+            monitor_history.append((time, life_cycle_state))
 
         # add Nones to make sure all bars gets "ended"
         new_end_time = god_map.time + god_map.qp_controller_config.sample_period

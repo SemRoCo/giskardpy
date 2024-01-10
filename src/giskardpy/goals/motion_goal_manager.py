@@ -5,7 +5,7 @@ from typing import List, Dict, Tuple
 import giskardpy.casadi_wrapper as cas
 import numpy as np
 
-from giskardpy.data_types import PrefixName
+from giskardpy.data_types import PrefixName, TaskState
 from giskardpy.exceptions import UnknownGoalException, GiskardException, GoalInitalizationException, \
     DuplicateNameException
 from giskardpy.goals.collision_avoidance import ExternalCollisionAvoidance, SelfCollisionAvoidance
@@ -14,7 +14,7 @@ import giskard_msgs.msg as giskard_msgs
 from giskardpy.god_map import god_map
 from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint, \
     ManipulabilityConstraint
-from giskardpy.tasks.task import TaskState, Task
+from giskardpy.tasks.task import Task
 from giskardpy.utils import logging
 from giskardpy.utils.utils import get_all_classes_in_package, convert_dictionary_to_ros_message, \
     json_str_to_kwargs, ImmutableDict
@@ -112,14 +112,14 @@ class MotionGoalManager:
                 hold_if = state_symbol
             if len(end_filter) > 0:
                 else_result = cas.if_else(cas.logic_all(monitor_state[end_filter]),
-                                          if_result=int(TaskState.done),
+                                          if_result=int(TaskState.succeeded),
                                           else_result=hold_if)
             else:
                 else_result = hold_if
 
             state_f = cas.if_eq_cases(a=state_symbol,
                                       b_result_cases=[(int(TaskState.not_started), start_if),
-                                                      (int(TaskState.done), int(TaskState.done))],
+                                                      (int(TaskState.succeeded), int(TaskState.succeeded))],
                                       else_result=else_result)  # running or on_hold
             state_updater.append(state_f)
         state_updater = cas.Expression(state_updater)

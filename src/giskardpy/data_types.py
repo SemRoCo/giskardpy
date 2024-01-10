@@ -290,3 +290,11 @@ class BiDict(dict):
         if self[key] in self.inverse and not self.inverse[self[key]]:
             del self.inverse[self[key]]
         super().__delitem__(key)
+
+
+class TaskState(IntEnum):
+    not_started = 0
+    running = 1
+    on_hold = 2
+    succeeded = 3
+    failed = 4

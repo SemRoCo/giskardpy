@@ -69,9 +69,8 @@ class Pointing(Goal):
         # self.add_debug_expr('goal_point', root_P_goal_point)
         # self.add_debug_expr('root_V_pointing_axis', root_V_pointing_axis)
         # self.add_debug_expr('root_V_goal_axis', root_V_goal_axis)
-        task = Task('pointing')
+        task = self.create_and_add_task('pointing')
         task.add_vector_goal_constraints(frame_V_current=root_V_pointing_axis,
                                          frame_V_goal=root_V_goal_axis,
                                          reference_velocity=self.max_velocity,
                                          weight=self.weight)
-        self.add_task(task)

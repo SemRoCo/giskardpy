@@ -1620,6 +1620,17 @@ def if_eq(a, b, if_result, else_result):
 
 @profile
 def if_eq_cases(a, b_result_cases, else_result):
+    """
+    if a == b_result_cases[0][0]:
+        return b_result_cases[0][1]
+    elif a == b_result_cases[1][0]:
+        return b_result_cases[1][1]
+    elif a == b_result_cases[2][0]:
+        return b_result_cases[2][1]
+    ...
+    else:
+        return else_result
+    """
     a = _to_sx(a)
     else_result = _to_sx(else_result)
     result = _to_sx(else_result)

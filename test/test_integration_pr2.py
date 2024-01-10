@@ -450,7 +450,7 @@ class TestMonitors:
                                                                name='joint_monitor1')
         joint_monitor2 = zero_pose.monitors.add_joint_position(pocky_pose,
                                                                name='joint_monitor2')
-        end_monitor = zero_pose.monitors.add_local_minimum_reached()
+        end_monitor = zero_pose.monitors.add_local_minimum_reached(start_monitors=[joint_monitor2])
 
         zero_pose.motion_goals.add_joint_position(name='g1',
                                                   goal_state=zero_pose.better_pose,
@@ -829,11 +829,11 @@ class TestMonitors:
     def test_hold_monitors(self, zero_pose: PR2TestWrapper):
         sleep = zero_pose.monitors.add_sleep(0.5)
         alternator2 = zero_pose.monitors.add_alternator(start_monitors=[sleep], mod=2)
-        alternator4 = zero_pose.monitors.add_payload_alternator(start_monitors=[alternator2], mod=4)
+        alternator4 = zero_pose.monitors.add_alternator(start_monitors=[alternator2], mod=4)
 
         base_goal = PoseStamped()
         base_goal.header.frame_id = 'map'
-        base_goal.pose.position.x = 0.5
+        base_goal.pose.position.x = 1
         base_goal.pose.orientation.w = 1
         goal_reached = zero_pose.monitors.add_cartesian_pose(goal_pose=base_goal,
                                                              tip_link='base_footprint',
@@ -844,6 +844,29 @@ class TestMonitors:
                                                   tip_link='base_footprint',
                                                   root_link='map',
                                                   hold_monitors=[alternator4],
+                                                  end_monitors=[goal_reached])
+        local_min = zero_pose.monitors.add_local_minimum_reached(start_monitors=[goal_reached])
+
+        end = zero_pose.monitors.add_end_motion(start_monitors=[local_min])
+        zero_pose.motion_goals.allow_all_collisions()
+        zero_pose.execute(add_local_minimum_reached=False)
+
+    def test_start_monitors(self, zero_pose: PR2TestWrapper):
+        alternator2 = zero_pose.monitors.add_alternator(mod=2)
+
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = 'map'
+        base_goal.pose.position.x = 1
+        base_goal.pose.orientation.w = 1
+        goal_reached = zero_pose.monitors.add_cartesian_pose(goal_pose=base_goal,
+                                                             tip_link='base_footprint',
+                                                             root_link='map',
+                                                             name='goal reached')
+
+        zero_pose.motion_goals.add_cartesian_pose(goal_pose=base_goal,
+                                                  tip_link='base_footprint',
+                                                  root_link='map',
+                                                  start_monitors=[alternator2],
                                                   end_monitors=[goal_reached])
         local_min = zero_pose.monitors.add_local_minimum_reached(start_monitors=[goal_reached])
 
@@ -4406,7 +4429,7 @@ class TestManipulability:
 # pytest.main(['-s', __file__ + '::TestConstraints::test_RelativePositionSequence'])
 # pytest.main(['-s', __file__ + '::TestConstraints::test_open_dishwasher_apartment'])
 # pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_bowl_and_cup'])
-# pytest.main(['-s', __file__ + '::TestPayloadMonitor::test_bowl_and_cup_sequence'])
+# pytest.main(['-s', __file__ + '::TestMonitors::test_bowl_and_cup_sequence'])
 # pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_avoid_collision_go_around_corner'])
 # pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_avoid_collision_box_between_boxes'])
 # pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_avoid_self_collision'])

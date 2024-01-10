@@ -28,6 +28,12 @@ class PrefixName:
         else:
             self.long_name = name
 
+    def __len__(self) -> int:
+        return len(self.short_name) + len(self.long_name)
+
+    def __getitem__(self, item) -> str:
+        return str(self)[item]
+
     @classmethod
     def from_string(cls, name: my_string, set_none_if_no_slash: bool = False):
         if isinstance(name, PrefixName):
@@ -284,3 +290,11 @@ class BiDict(dict):
         if self[key] in self.inverse and not self.inverse[self[key]]:
             del self.inverse[self[key]]
         super().__delitem__(key)
+
+
+class TaskState(IntEnum):
+    not_started = 0
+    running = 1
+    on_hold = 2
+    succeeded = 3
+    failed = 4

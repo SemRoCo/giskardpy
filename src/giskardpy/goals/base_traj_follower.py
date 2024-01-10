@@ -38,8 +38,7 @@ class BaseTrajFollower(Goal):
         self.odom_link = self.joint.parent_link_name
         self.base_footprint_link = self.joint.child_link_name
         self.track_only_velocity = track_only_velocity
-        self.task = Task()
-        self.add_task(self.task)
+        self.task = self.create_and_add_task()
         trajectory = god_map.trajectory
         self.trajectory_length = len(trajectory.items())
         self.add_trans_constraints()
@@ -131,14 +130,14 @@ class BaseTrajFollower(Goal):
                                           weight=weight_vel,
                                           task_expression=map_T_base_footprint.to_position().x,
                                           velocity_limit=0.5,
-                                          name_suffix='/vel x')
+                                          name='/vel x')
         if isinstance(self.joint, OmniDrive):
             self.task.add_velocity_constraint(lower_velocity_limit=lba_y,
                                               upper_velocity_limit=uba_y,
                                               weight=weight_vel,
                                               task_expression=map_T_base_footprint.to_position().y,
                                               velocity_limit=0.5,
-                                              name_suffix='/vel y')
+                                              name='/vel y')
 
     @profile
     def rot_error_at(self, t_in_s: int):
@@ -161,7 +160,7 @@ class BaseTrajFollower(Goal):
                                           weight=WEIGHT_BELOW_CA,
                                           task_expression=self.joint.yaw.get_symbol(Derivatives.position),
                                           velocity_limit=0.5,
-                                          name_suffix='/rot')
+                                          name='/rot')
 
 
 class CarryMyBullshit(Goal):

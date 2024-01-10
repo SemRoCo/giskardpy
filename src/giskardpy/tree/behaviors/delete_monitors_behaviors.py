@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING
 
 from py_trees import Status
 
+from giskardpy.data_types import TaskState
 from giskardpy.god_map import god_map
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 
@@ -31,6 +32,10 @@ class DeleteMonitor(GiskardBehavior):
             for monitor in god_map.tree.control_loop_branch.check_monitors.children:
                 if monitor == self.parent or (hasattr(monitor, 'original') and monitor.original == self.parent):
                     god_map.tree.control_loop_branch.check_monitors.remove_child(monitor)
+                    monitor_id = self.parent.monitor.id
+                    current_life_cycle_state = god_map.monitor_manager.life_cycle_state[monitor_id]
+                    if current_life_cycle_state not in [TaskState.succeeded, TaskState.failed]:
+                        god_map.monitor_manager.life_cycle_state[monitor_id] = TaskState.succeeded
                     # return running because such that the following nodes are not called after the deleted comes
                     # into effect
                     return Status.RUNNING

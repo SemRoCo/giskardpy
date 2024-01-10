@@ -6,6 +6,7 @@ import numpy as np
 
 import giskardpy.casadi_wrapper as cas
 from giskardpy.casadi_wrapper import CompiledFunction
+from giskardpy.data_types import TaskState
 from giskardpy.exceptions import GiskardException, UnknownGoalException, GoalInitalizationException, \
     MonitorInitalizationException, UnknownMonitorException
 from giskardpy.monitors.monitors import ExpressionMonitor, Monitor
@@ -32,15 +33,15 @@ def monitor_list_to_monitor_name_tuple(monitors: Iterable[Union[str, ExpressionM
 
 
 class MonitorManager:
-    compiled_monitors: CompiledFunction
+    compiled_state_updater: CompiledFunction
+    compiled_life_cycle_state_updater: CompiledFunction
     state: np.ndarray  # order: ExpressionMonitors, PayloadMonitors
-    switch_filter = np.ndarray
-    switch_state = np.ndarray
+    life_cycle_state: np.ndarray  # order: ExpressionMonitors, PayloadMonitors
     expression_monitors: List[ExpressionMonitor]
     payload_monitors: List[PayloadMonitor]
     substitution_values: Dict[Tuple[str, ...], Dict[str, float]]
     triggers: Dict[Tuple[int, ...], Callable]
-    state_history: List[Tuple[float, np.ndarray]]
+    state_history: List[Tuple[float, Tuple[np.ndarray, np.ndarray]]]  # time -> (state, life_cycle_state)
 
     def __init__(self):
         self.expression_monitors = []
@@ -53,18 +54,7 @@ class MonitorManager:
         self.state_history = []
 
     @profile
-    def compile_expression_monitors(self):
-        expressions = []
-        for monitor in self.expression_monitors:
-            monitor.compile()
-            expressions.append(monitor.get_expression())
-        expressions = cas.Expression(expressions)
-        self.compiled_monitors = expressions.compile(expressions.free_symbols())
-        self.stay_one_filter = np.array([x.stay_true for x in self.expression_monitors], dtype=bool)
-        self.switches_state = np.zeros_like(self.stay_one_filter)
-
-    @profile
-    def compile_payload_monitors(self):
+    def add_payload_monitors_to_behavior_tree(self):
         self.payload_monitors = sorted(self.payload_monitors, key=lambda x: isinstance(x, CancelMotion))
         for monitor in self.payload_monitors:
             god_map.tree.control_loop_branch.check_monitors.add_monitor(monitor)
@@ -73,8 +63,10 @@ class MonitorManager:
     def compile_monitors(self):
         self.state_history = []
         self.state = np.zeros(len(self.monitors))
-        self.compile_expression_monitors()
-        self.compile_payload_monitors()
+        self.life_cycle_state = np.zeros(len(self.monitors))
+        self.set_initial_life_cycle_state()
+        self.compile_monitor_state_updater()
+        self.add_payload_monitors_to_behavior_tree()
         self._register_expression_update_triggers()
 
     @profile
@@ -84,15 +76,63 @@ class MonitorManager:
                 return monitor
         raise KeyError(f'No monitor of name \'{name}\' found.')
 
+    def set_initial_life_cycle_state(self):
+        for monitor in self.monitors:
+            if monitor.start_monitors:
+                self.life_cycle_state[monitor.id] = TaskState.not_started
+            else:
+                self.life_cycle_state[monitor.id] = TaskState.running
+
     @profile
-    def update_expr_monitor_state(self, new_state: np.ndarray) -> np.ndarray:
-        # Assuming new_state is a NumPy array with only 1 and 0
-        new_state = new_state.astype(int)
-        filtered_switches = self.switches_state[self.stay_one_filter]
-        filtered_new_state = new_state[self.stay_one_filter]
-        self.switches_state[self.stay_one_filter] = filtered_switches | filtered_new_state
-        next_state = self.switches_state | new_state
-        return next_state
+    def compile_monitor_state_updater(self):
+        symbols = []
+        for i in range(len(god_map.monitor_manager.monitors)):
+            symbols.append(self.monitors[i].get_state_expression())
+        monitor_state = cas.Expression(symbols)
+
+        symbols = []
+        for i in range(len(god_map.monitor_manager.monitors)):
+            symbols.append(self.monitors[i].get_life_cycle_state_expression())
+        monitor_life_cycle_state = cas.Expression(symbols)
+
+        state_updater = []
+        life_cycle_state_updater = []
+        for i, monitor in enumerate(self.monitors):
+            state_symbol = monitor_state[monitor.id]
+            life_cycle_state_symbol = monitor_life_cycle_state[monitor.id]
+            start_filter = self.to_state_filter(monitor.start_monitors)
+
+            if len(start_filter) > 0:
+                start_if = cas.if_else(cas.logic_all(monitor_state[start_filter]),
+                                       if_result=int(TaskState.running),
+                                       else_result=life_cycle_state_symbol)
+            else:
+                start_if = life_cycle_state_symbol
+
+            done_if = cas.if_else(condition=cas.logic_and(cas.Expression(monitor.stay_true), state_symbol),
+                                  if_result=int(TaskState.succeeded),
+                                  else_result=life_cycle_state_symbol)
+
+            life_cycle_state_f = cas.if_eq_cases(a=state_symbol,
+                                                 b_result_cases=[(int(TaskState.not_started), start_if),
+                                                                 (int(TaskState.running), done_if)],
+                                                 else_result=life_cycle_state_symbol)
+            life_cycle_state_updater.append(life_cycle_state_f)
+
+            if isinstance(monitor, ExpressionMonitor):
+                monitor.compile()
+                state_f = cas.if_eq(life_cycle_state_symbol, int(TaskState.running),
+                                    if_result=monitor.get_expression(),
+                                    else_result=state_symbol)
+            else:
+                state_f = state_symbol  # if payload monitor, copy last state
+            state_updater.append(state_f)
+
+        symbols = monitor_state.free_symbols() + monitor_life_cycle_state.free_symbols()
+        life_cycle_state_updater = cas.Expression(life_cycle_state_updater)
+        state_updater = cas.Expression(state_updater)
+        self.compiled_state_updater = state_updater.compile(state_updater.free_symbols())
+        self.compiled_life_cycle_state_updater = life_cycle_state_updater.compile(symbols)
 
     @property
     def monitors(self):
@@ -115,8 +155,9 @@ class MonitorManager:
         self.payload_monitors.append(monitor)
         monitor.set_id(len(self.monitors) - 1)
 
-    def get_state_dict(self) -> Dict[str, bool]:
-        return OrderedDict((monitor.name, bool(self.state[i])) for i, monitor in enumerate(self.monitors))
+    def get_state_dict(self) -> Dict[str, Tuple[str, bool]]:
+        return OrderedDict((monitor.name, (str(TaskState(self.life_cycle_state[i])), bool(self.state[i])))
+                           for i, monitor in enumerate(self.monitors))
 
     @profile
     def register_expression_updater(self, expression: cas.PreservedCasType,
@@ -138,7 +179,7 @@ class MonitorManager:
         return new_expression
 
     @profile
-    def to_state_filter(self, monitor_names: List[str]) -> np.ndarray:
+    def to_state_filter(self, monitor_names: List[Union[str, Monitor]]) -> np.ndarray:
         monitor_names = monitor_list_to_monitor_name_tuple(monitor_names)
         return np.array([monitor.id for monitor in self.monitors if monitor.name in monitor_names])
 
@@ -146,6 +187,7 @@ class MonitorManager:
     def _register_expression_update_triggers(self):
         for monitor_names, values in self.substitution_values.items():
             trigger_filter = tuple([i for i, m in enumerate(self.expression_monitors) if m.name in monitor_names])
+
             class Callback:
                 def __init__(self, monitor_names, values):
                     self.monitor_names = monitor_names
@@ -153,6 +195,7 @@ class MonitorManager:
 
                 def __call__(self):
                     return god_map.monitor_manager.update_substitution_values(self.monitor_names, self.keys)
+
             self.triggers[trigger_filter] = Callback(monitor_names, values)
 
     @profile
@@ -177,17 +220,19 @@ class MonitorManager:
 
     @profile
     def evaluate_monitors(self):
-        args = symbol_manager.resolve_symbols(self.compiled_monitors.str_params)
-        next_state = np.zeros_like(self.state)
+        # %% update life cycle state
+        args = np.concatenate((self.state, self.life_cycle_state))
+        self.life_cycle_state = self.compiled_life_cycle_state_updater.fast_call(args)
+
+        # %% update monitor state
+        args = symbol_manager.resolve_symbols(self.compiled_state_updater.str_params)
+        self.state = self.compiled_state_updater.fast_call(args)
 
         num_expr_monitors = len(self.expression_monitors)
-        expr_monitor_state = self.compiled_monitors.fast_call(args)
-        expr_monitor_state = self.update_expr_monitor_state(expr_monitor_state)
-        next_state[:num_expr_monitors] = expr_monitor_state
-        next_state[num_expr_monitors:] = self.evaluate_payload_monitors()
-        self.state = next_state
+        self.state[num_expr_monitors:] = self.evaluate_payload_monitors()
         self.trigger_update_triggers(self.state)
-        self.state_history.append((god_map.time, self.state))
+        self.state_history.append((god_map.time, (self.state.copy(), self.life_cycle_state.copy())))
+        god_map.motion_goal_manager.update_task_state(self.state)
 
     def evaluate_payload_monitors(self) -> np.ndarray:
         next_state = np.zeros(len(self.payload_monitors))

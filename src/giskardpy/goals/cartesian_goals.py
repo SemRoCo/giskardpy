@@ -52,12 +52,11 @@ class CartesianPosition(Goal):
         else:
             root_P_goal = transform_msg_and_turn_to_expr(self.root_link, goal_point)
         r_P_c = god_map.world.compose_fk_expression(self.root_link, self.tip_link).to_position()
-        task = Task(name='')
+        task = self.create_and_add_task()
         task.add_point_goal_constraints(frame_P_goal=root_P_goal,
                                         frame_P_current=r_P_c,
                                         reference_velocity=self.reference_velocity,
                                         weight=self.weight)
-        self.add_task(task)
         self.connect_monitors_to_all_tasks(start_monitors=start_monitors, hold_monitors=hold_monitors,
                                            end_monitors=end_monitors)
 
@@ -101,13 +100,12 @@ class CartesianOrientation(Goal):
         r_R_c = god_map.world.compose_fk_expression(self.root_link, self.tip_link).to_rotation()
         c_R_r_eval = god_map.world.compose_fk_evaluated_expression(self.tip_link, self.root_link).to_rotation()
 
-        task = Task(name='')
+        task = self.create_and_add_task()
         task.add_rotation_goal_constraints(frame_R_current=r_R_c,
                                            frame_R_goal=root_R_goal,
                                            current_R_frame_eval=c_R_r_eval,
                                            reference_velocity=self.reference_velocity,
                                            weight=self.weight)
-        self.add_task(task)
         self.connect_monitors_to_all_tasks(start_monitors, hold_monitors, end_monitors)
 
 
@@ -166,7 +164,7 @@ class CartesianPositionStraight(Goal):
         expr_p = a_T_t.to_position()
         dist = cas.norm(root_P_goal - root_P_tip)
 
-        task = Task(name='position straight')
+        task = self.create_and_add_task('position straight')
         task.add_equality_constraint_vector(reference_velocities=[self.reference_velocity] * 3,
                                             equality_bounds=[dist, 0, 0],
                                             weights=[WEIGHT_ABOVE_CA, WEIGHT_ABOVE_CA * 2, WEIGHT_ABOVE_CA * 2],
@@ -175,7 +173,6 @@ class CartesianPositionStraight(Goal):
                                                    'line/y',
                                                    'line/z'])
 
-        self.add_task(task)
         self.connect_monitors_to_all_tasks(start_monitors, hold_monitors, end_monitors)
 
 
@@ -366,7 +363,7 @@ class DiffDriveBaseGoal(Goal):
                                                        cas.greater_equal(cas.abs(distance), eps)),
                                          self.weight,
                                          0)
-        task = Task()
+        task = self.create_and_add_task()
         task.add_equality_constraint(reference_velocity=self.max_angular_velocity,
                                      equality_bound=rotate_to_goal_error,
                                      weight=weight_rotate_to_goal,
@@ -381,7 +378,6 @@ class DiffDriveBaseGoal(Goal):
                                      weight=weight_final_rotation,
                                      task_expression=map_current_angle,
                                      name='/rot2')
-        self.add_task(task)
         self.connect_monitors_to_all_tasks(start_monitors, hold_monitors, end_monitors)
 
 
@@ -449,7 +445,7 @@ class TranslationVelocityLimit(Goal):
 
         r_P_c = god_map.world.compose_fk_expression(self.root_link, self.tip_link).to_position()
         # self.add_debug_expr('limit', -self.max_velocity)
-        task = Task(name='limit translation vel')
+        task = self.create_and_add_task('limit translation vel')
         if not self.hard:
             task.add_translational_velocity_limit(frame_P_current=r_P_c,
                                                   max_velocity=self.max_velocity,
@@ -459,7 +455,6 @@ class TranslationVelocityLimit(Goal):
                                                   max_velocity=self.max_velocity,
                                                   weight=self.weight,
                                                   max_violation=0)
-        self.add_task(task)
         self.connect_monitors_to_all_tasks(start_monitors, hold_monitors, end_monitors)
 
 
@@ -485,7 +480,7 @@ class RotationVelocityLimit(Goal):
 
         r_R_c = god_map.world.compose_fk_expression(self.root_link, self.tip_link).to_rotation()
 
-        task = Task(name='rot vel limit')
+        task = self.create_and_add_task('rot vel limit')
         if self.hard:
             task.add_rotational_velocity_limit(frame_R_current=r_R_c,
                                                max_velocity=self.max_velocity,
@@ -495,7 +490,6 @@ class RotationVelocityLimit(Goal):
                                                max_velocity=self.max_velocity,
                                                weight=self.weight,
                                                max_violation=0)
-        self.add_task(task)
         self.connect_monitors_to_all_tasks(start_monitors, hold_monitors, end_monitors)
 
 
@@ -594,20 +588,18 @@ class RelativePositionSequence(Goal):
         error2 = cas.euclidean_distance(root_P_goal2_cached, root_P_current)
         error2_monitor.set_expression(cas.less(cas.abs(error2), 0.01))
 
-        step1 = Task(name='step1')
+        step1 = self.create_and_add_task('step1')
         step1.add_end_monitors_monitor(error1_monitor)
         step1.add_point_goal_constraints(root_P_current, root_P_goal1,
                                          reference_velocity=self.max_velocity,
                                          weight=self.weight)
-        self.add_task(step1)
 
-        self.step2 = Task(name='step2')
+        self.step2 = self.create_and_add_task('step2')
         self.step2.add_start_monitors_monitor(error1_monitor)
         self.step2.add_end_monitors_monitor(error2_monitor)
         self.step2.add_point_goal_constraints(root_P_current, root_P_goal2_cached,
                                               reference_velocity=self.max_velocity,
                                               weight=self.weight)
-        self.add_task(self.step2)
 
         self.connect_start_monitors_to_all_tasks(start_monitors)
         self.connect_hold_monitors_to_all_tasks(hold_monitors)

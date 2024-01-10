@@ -117,41 +117,6 @@ class Goal(ABC):
             acceleration_symbols.extend(god_map.world.joints[joint].free_variables)
         return [x.get_symbol(Derivatives.acceleration) for x in acceleration_symbols]
 
-    @profile
-    def get_constraints(self) -> Tuple[Dict[str, EqualityConstraint],
-    Dict[str, InequalityConstraint],
-    Dict[str, DerivativeInequalityConstraint],
-    Dict[str, Union[w.Symbol, float]],
-    Dict[str, ManipulabilityConstraint]]:
-        self._equality_constraints = OrderedDict()
-        self._inequality_constraints = OrderedDict()
-        self._derivative_constraints = OrderedDict()
-        self._debug_expressions = OrderedDict()
-        self._manip_constraints = OrderedDict()
-
-        self._task_sanity_check()
-
-        for task in self.tasks:
-            for constraint in task.get_eq_constraints():
-                name = f'{task.name}/{constraint.name}'
-                constraint.name = name
-                self._equality_constraints[constraint.name] = constraint
-            for constraint in task.get_neq_constraints():
-                name = f'{task.name}/{constraint.name}'
-                constraint.name = name
-                self._inequality_constraints[constraint.name] = constraint
-            for constraint in task.get_derivative_constraints():
-                name = f'{task.name}/{constraint.name}'
-                constraint.name = name
-                self._derivative_constraints[constraint.name] = constraint
-            for constraint in task.get_manipulability_constraint():
-                name = f'{task.name}/{constraint.name}'
-                constraint.name = name
-                self._manip_constraints[constraint.name] = constraint
-
-        return self._equality_constraints, self._inequality_constraints, self._derivative_constraints, \
-            self._manip_constraints, self._debug_expressions
-
     def _task_sanity_check(self):
         if not self.has_tasks():
             raise GoalInitalizationException(f'Goal {str(self)} has no tasks.')
@@ -163,18 +128,12 @@ class Goal(ABC):
             else:
                 raise GoalInitalizationException(f'Constraint with name {task.name} already exists.')
 
-    def add_task(self, task: Task):
-        if task.name != '':
-            task.name = f'{self.name}/{task.name}'
-        else:
-            task.name = self.name
+    def create_and_add_task(self, task_name: str = '') -> Task:
+        task = Task(name=task_name, parent_goal_name=self.name)
         self.tasks.append(task)
+        return task
 
-    def add_tasks(self, tasks: List[Task]):
-        for task in tasks:
-            self.add_task(task)
-
-    def add_monitor(self, monitor: ExpressionMonitor):
+    def add_monitor(self, monitor: ExpressionMonitor) -> None:
         god_map.monitor_manager.add_expression_monitor(monitor)
 
 

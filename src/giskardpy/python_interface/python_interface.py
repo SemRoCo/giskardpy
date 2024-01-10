@@ -1076,7 +1076,7 @@ class MonitorWrapper:
         """
         name = name or monitor_class
         if self.avoid_name_conflict:
-            name += str(len(self._monitors))
+            name = f'M{str(len(self._monitors))} {name}'
         if [x for x in self._monitors if x.name == name]:
             raise KeyError(f'monitor named {name} already exists.')
         monitor = giskard_msgs.Monitor()

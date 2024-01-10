@@ -2,7 +2,7 @@ import traceback
 from collections import defaultdict, OrderedDict
 from copy import deepcopy
 from typing import List, Dict, Tuple
-
+import giskardpy.casadi_wrapper as cas
 import numpy as np
 
 from giskardpy.data_types import PrefixName
@@ -23,11 +23,11 @@ from giskardpy.utils.utils import get_all_classes_in_package, convert_dictionary
 class MotionGoalManager:
     motion_goals: Dict[str, Goal] = None
     tasks: Dict[PrefixName, Task]
-    task_state: Dict[PrefixName, TaskState]
+    task_state: np.ndarray
+    compiled_state_updater: cas.CompiledFunction
 
     def __init__(self):
         self.motion_goals = {}
-        self.task_state = {}
         self.tasks = {}
         goal_package_paths = god_map.giskard.goal_package_paths
         self.allowed_motion_goal_types = {}
@@ -59,6 +59,13 @@ class MotionGoalManager:
                 if not isinstance(e, GiskardException):
                     raise GoalInitalizationException(error_msg)
                 raise e
+        self.task_state = np.zeros(len(self.tasks))
+        for task in self.tasks.values():
+            if task.start_monitors:
+                self.task_state[task.id] = TaskState.not_started
+            else:
+                self.task_state[task.id] = TaskState.running
+        self.compile_task_state_updater()
 
     def add_motion_goal(self, goal: Goal) -> None:
         name = goal.name
@@ -69,29 +76,49 @@ class MotionGoalManager:
             if task.name in self.tasks:
                 raise DuplicateNameException(f'Task names {task.name} already exists.')
             self.tasks[task.name] = task
-            if task.start_monitors:
-                self.task_state[task.name] = TaskState.not_started
-            else:
-                self.task_state[task.name] = TaskState.running
+            task.set_id(len(self.tasks) - 1)
 
+    @profile
+    def compile_task_state_updater(self):
+        symbols = []
+        for i in range(len(self.tasks)):
+            symbols.append(cas.Symbol(f'task {i}'))
+        task_state = cas.Expression(symbols)
+        symbols = []
+        for i in range(len(god_map.monitor_manager.monitors)):
+            symbols.append(cas.Symbol(f'monitor {i}'))
+        monitor_state = cas.Expression(symbols)
+
+        state_updater = []
+        for task in sorted(self.tasks.values(), key=lambda x: x.id):
+            start_filter = task.get_start_monitor_filter()
+            hold_filter = task.get_hold_monitor_filter()
+            end_filter = task.get_end_monitor_filter()
+            state_symbol = task_state[task.id]
+
+            start_if = cas.if_else(cas.logic_all(monitor_state[start_filter]),
+                                   if_result=int(TaskState.running),
+                                   else_result=state_symbol)
+            hold_if = cas.if_else(cas.logic_any(monitor_state[hold_filter]),
+                                  if_result=int(TaskState.on_hold),
+                                  else_result=int(TaskState.running))
+            else_result = cas.if_else(cas.logic_all(monitor_state[end_filter]),
+                                      if_result=int(TaskState.done),
+                                      else_result=hold_if)
+
+            state_f = cas.if_eq_cases(a=state_symbol,
+                                      b_result_cases=[(int(TaskState.not_started), start_if),
+                                                      (int(TaskState.done), int(TaskState.done))],
+                                      else_result=else_result)  # running or on_hold
+            state_updater.append(state_f)
+        state_updater = cas.Expression(state_updater)
+        symbols = task_state.free_symbols() + monitor_state.free_symbols()
+        self.compiled_state_updater = state_updater.compile(symbols)
+
+    @profile
     def update_task_state(self, new_state: np.ndarray) -> None:
-        for task_name, task in self.tasks.items():
-            task_state = self.task_state[task_name]
-            start_filter = god_map.monitor_manager.to_state_filter(task.start_monitors)
-            hold_filter = god_map.monitor_manager.to_state_filter(task.hold_monitors)
-            end_filter = god_map.monitor_manager.to_state_filter(task.end_monitors)
-            if task_state == TaskState.not_started:
-                if len(start_filter) > 0 and np.all(new_state[start_filter]):
-                    self.task_state[task_name] = TaskState.running
-            elif task_state != TaskState.done:
-                if len(end_filter) > 0 and np.all(new_state[end_filter]):
-                    self.task_state[task_name] = TaskState.done
-                else:
-                    if len(hold_filter) > 0 and np.any(new_state[hold_filter]):
-                        self.task_state[task_name] = TaskState.on_hold
-                    else:
-                        self.task_state[task_name] = TaskState.running
-
+        substitutions = np.concatenate((self.task_state, new_state))
+        self.task_state = self.compiled_state_updater.fast_call(substitutions)
 
     @profile
     def parse_collision_entries(self, collision_entries: List[giskard_msgs.CollisionEntry]):

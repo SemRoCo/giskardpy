@@ -41,6 +41,7 @@ class Task:
     end_monitors: List[ExpressionMonitor]
     _name: str
     _parent_goal_name: str
+    _id: int
 
     def __init__(self, parent_goal_name: str, name: Optional[str] = None):
         if name is None:
@@ -55,6 +56,15 @@ class Task:
         self.hold_monitors = []
         self.end_monitors = []
         self.manip_constraints = {}
+        self._id = -1
+
+    @property
+    def id(self) -> int:
+        assert self._id >= 0, f'id of {self.name} is not set.'
+        return self._id
+
+    def set_id(self, new_id: int) -> None:
+        self._id = new_id
 
     @property
     def name(self) -> PrefixName:
@@ -102,7 +112,7 @@ class Task:
         return list(self.manip_constraints.values())
 
     def get_state_expression(self) -> cas.Symbol:
-        return symbol_manager.get_symbol(f'god_map.motion_goal_manager.task_state["{self.name}"]')
+        return symbol_manager.get_symbol(f'god_map.motion_goal_manager.task_state[{self.id}]')
 
     @memoize
     def get_start_monitor_filter(self) -> np.ndarray:

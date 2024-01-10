@@ -17,8 +17,8 @@ from giskardpy.configs.giskard import Giskard
 from giskardpy.configs.iai_robots.pr2 import PR2CollisionAvoidance, PR2VelocityMujocoInterface, WorldWithPR2Config
 from giskardpy.configs.qp_controller_config import QPControllerConfig
 from giskardpy.data_types import JointStates
-from giskardpy.goals.goal import WEIGHT_BELOW_CA
 from giskardpy.god_map import god_map
+from giskardpy.tasks.task import WEIGHT_BELOW_CA
 from test_integration_pr2 import PR2TestWrapper, TestJointGoals, pocky_pose
 from giskardpy.goals.manipulability_goals import MaxManipulability
 

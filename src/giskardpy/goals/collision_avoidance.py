@@ -94,7 +94,7 @@ class ExternalCollisionAvoidance(Goal):
         weight = cas.save_division(WEIGHT_COLLISION_AVOIDANCE,  # divide by number of active repeller per link
                                    cas.min(number_of_external_collisions, self.num_repeller))
         distance_monitor = ExpressionMonitor(f'collision distance {self.name}', plot=False)
-        distance_monitor.set_expression(cas.less(actual_distance, 50))
+        distance_monitor.set_expression(cas.greater(actual_distance, 50))
         self.add_monitor(distance_monitor)
         task = self.create_and_add_task('stay away')
         task.add_hold_monitors_monitor(distance_monitor)
@@ -204,7 +204,7 @@ class SelfCollisionAvoidance(Goal):
         weight = cas.save_division(WEIGHT_COLLISION_AVOIDANCE,  # divide by number of active repeller per link
                                    cas.min(number_of_self_collisions, self.num_repeller))
         distance_monitor = ExpressionMonitor(f'collision distance {self.name}', plot=False)
-        distance_monitor.set_expression(cas.less(actual_distance, 50))
+        distance_monitor.set_expression(cas.greater(actual_distance, 50))
         self.add_monitor(distance_monitor)
         task = self.create_and_add_task('stay away')
         task.add_hold_monitors_monitor(distance_monitor)

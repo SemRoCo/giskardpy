@@ -833,7 +833,7 @@ class TestMonitors:
 
         base_goal = PoseStamped()
         base_goal.header.frame_id = 'map'
-        base_goal.pose.position.x = 0.5
+        base_goal.pose.position.x = 1
         base_goal.pose.orientation.w = 1
         goal_reached = zero_pose.monitors.add_cartesian_pose(goal_pose=base_goal,
                                                              tip_link='base_footprint',

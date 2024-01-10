@@ -851,6 +851,29 @@ class TestMonitors:
         zero_pose.motion_goals.allow_all_collisions()
         zero_pose.execute(add_local_minimum_reached=False)
 
+    def test_start_monitors(self, zero_pose: PR2TestWrapper):
+        alternator2 = zero_pose.monitors.add_alternator(mod=2)
+
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = 'map'
+        base_goal.pose.position.x = 1
+        base_goal.pose.orientation.w = 1
+        goal_reached = zero_pose.monitors.add_cartesian_pose(goal_pose=base_goal,
+                                                             tip_link='base_footprint',
+                                                             root_link='map',
+                                                             name='goal reached')
+
+        zero_pose.motion_goals.add_cartesian_pose(goal_pose=base_goal,
+                                                  tip_link='base_footprint',
+                                                  root_link='map',
+                                                  start_monitors=[alternator2],
+                                                  end_monitors=[goal_reached])
+        local_min = zero_pose.monitors.add_local_minimum_reached(start_monitors=[goal_reached])
+
+        end = zero_pose.monitors.add_end_motion(start_monitors=[local_min])
+        zero_pose.motion_goals.allow_all_collisions()
+        zero_pose.execute(add_local_minimum_reached=False)
+
     def test_RelativePositionSequence(self, zero_pose: PR2TestWrapper):
         goal1 = PointStamped()
         goal1.header.frame_id = 'base_footprint'

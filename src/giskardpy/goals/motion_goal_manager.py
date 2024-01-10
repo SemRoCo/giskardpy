@@ -25,12 +25,14 @@ class MotionGoalManager:
     tasks: Dict[PrefixName, Task]
     task_state: np.ndarray
     compiled_state_updater: cas.CompiledFunction
+    state_history: List[Tuple[float, np.ndarray]]
 
     def __init__(self):
         self.motion_goals = {}
         self.tasks = {}
         goal_package_paths = god_map.giskard.goal_package_paths
         self.allowed_motion_goal_types = {}
+        self.state_history = []
         for path in goal_package_paths:
             self.allowed_motion_goal_types.update(get_all_classes_in_package(path, Goal))
 
@@ -96,15 +98,24 @@ class MotionGoalManager:
             end_filter = task.get_end_monitor_filter()
             state_symbol = task_state[task.id]
 
-            start_if = cas.if_else(cas.logic_all(monitor_state[start_filter]),
-                                   if_result=int(TaskState.running),
-                                   else_result=state_symbol)
-            hold_if = cas.if_else(cas.logic_any(monitor_state[hold_filter]),
-                                  if_result=int(TaskState.on_hold),
-                                  else_result=int(TaskState.running))
-            else_result = cas.if_else(cas.logic_all(monitor_state[end_filter]),
-                                      if_result=int(TaskState.done),
-                                      else_result=hold_if)
+            if len(start_filter) > 0:
+                start_if = cas.if_else(cas.logic_all(monitor_state[start_filter]),
+                                       if_result=int(TaskState.running),
+                                       else_result=state_symbol)
+            else:
+                start_if = state_symbol
+            if len(hold_filter) > 0:
+                hold_if = cas.if_else(cas.logic_any(monitor_state[hold_filter]),
+                                      if_result=int(TaskState.on_hold),
+                                      else_result=int(TaskState.running))
+            else:
+                hold_if = state_symbol
+            if len(end_filter) > 0:
+                else_result = cas.if_else(cas.logic_all(monitor_state[end_filter]),
+                                          if_result=int(TaskState.done),
+                                          else_result=hold_if)
+            else:
+                else_result = hold_if
 
             state_f = cas.if_eq_cases(a=state_symbol,
                                       b_result_cases=[(int(TaskState.not_started), start_if),
@@ -119,6 +130,7 @@ class MotionGoalManager:
     def update_task_state(self, new_state: np.ndarray) -> None:
         substitutions = np.concatenate((self.task_state, new_state))
         self.task_state = self.compiled_state_updater.fast_call(substitutions)
+        self.state_history.append((god_map.time, self.task_state.copy()))
 
     @profile
     def parse_collision_entries(self, collision_entries: List[giskard_msgs.CollisionEntry]):

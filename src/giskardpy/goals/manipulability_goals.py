@@ -16,8 +16,7 @@ class MaxManipulability(Goal):
                  prediction_horizon: int = 5,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.TrueSymbol
-                 ):
+                 end_condition: cas.Expression = cas.TrueSymbol):
         self.root_link = god_map.world.search_for_link_name(root_link, None)
         self.tip_link = god_map.world.search_for_link_name(tip_link, None)
         if name is None:
@@ -51,7 +50,7 @@ class MaxManipulability(Goal):
         percentual_diff = 1 - cas.min(cas.save_division(old_m, m), 1)
         monitor = ExpressionMonitor(name=f'manipMonitor{tip_link}')
         monitor.set_expression(cas.less(percentual_diff, monitor_threshold))
-        task.add_end_condition_monitor(monitor)
+        task.end_condition = monitor
         self.add_monitor(monitor)
 
     """

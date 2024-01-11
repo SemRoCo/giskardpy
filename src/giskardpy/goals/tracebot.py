@@ -62,14 +62,15 @@ class InsertCylinder(Goal):
         root_P_top = root_P_hole + root_V_up * self.pre_grasp_height
         distance_to_top = cas.euclidean_distance(root_P_tip, root_P_top)
         top_reached = cas.less(distance_to_top, 0.01)
-        top_reached_monitor = ExpressionMonitor(name='top reached', stay_true=True)
+        top_reached_monitor = ExpressionMonitor(name='top reached', stay_true=True, start_monitors=start_monitors)
         self.add_monitor(top_reached_monitor)
         top_reached_monitor.set_expression(top_reached)
 
         distance_to_line, root_P_on_line = cas.distance_point_to_line_segment(root_P_tip, root_P_hole, root_P_top)
         distance_to_hole = cas.norm(root_P_hole - root_P_tip)
         bottom_reached = cas.less(distance_to_hole, 0.01)
-        bottom_reached_monitor = ExpressionMonitor('bottom reached', stay_true=True)
+        bottom_reached_monitor = ExpressionMonitor('bottom reached', stay_true=True,
+                                                   start_monitors=start_monitors)
         bottom_reached_monitor.set_expression(bottom_reached)
         self.add_monitor(bottom_reached_monitor)
 
@@ -87,9 +88,10 @@ class InsertCylinder(Goal):
                                               weight=self.weight,
                                               name='pregrasp')
         go_to_line.add_start_monitors_monitor(top_reached_monitor)
-        # self.add_debug_expr('root_P_goal', root_P_goal)
-        # self.add_debug_expr('root_P_tip', root_P_tip)
-        # self.add_debug_expr('weight_pregrasp', weight_pregrasp)
+        god_map.debug_expression_manager.add_debug_expression('root_V_up', root_V_up)
+        god_map.debug_expression_manager.add_debug_expression('root_P_hole', root_P_hole)
+        god_map.debug_expression_manager.add_debug_expression('root_P_tip', root_P_tip)
+        god_map.debug_expression_manager.add_debug_expression('root_P_top', root_P_top)
 
         # tilted orientation goal
         angle = cas.angle_between_vector(root_V_cylinder_z, root_V_up)
@@ -100,9 +102,8 @@ class InsertCylinder(Goal):
                                           weight=self.weight)
         tilt_task.add_end_monitors_monitor(bottom_reached_monitor)
         root_V_cylinder_z.vis_frame = self.tip
-        # self.add_debug_expr('root_V_cylinder_z', root_V_cylinder_z)
 
-        # # move down
+        # move down
         insert_task = self.create_and_add_task('insert')
         insert_task.add_point_goal_constraints(frame_P_current=root_P_tip,
                                                frame_P_goal=root_P_hole,
@@ -110,12 +111,9 @@ class InsertCylinder(Goal):
                                                weight=self.weight,
                                                name='insertion')
         insert_task.add_start_monitors_monitor(top_reached_monitor)
-        # self.add_debug_expr('root_P_hole', root_P_hole)
-        # self.add_debug_expr('weight_insert', weight_insert)
-        #
         # # tilt straight
         tilt_error = cas.angle_between_vector(root_V_cylinder_z, root_V_up)
-        tilt_monitor = ExpressionMonitor(name='straight')
+        tilt_monitor = ExpressionMonitor(name='straight', start_monitors=start_monitors)
         tilt_monitor.set_expression(cas.less(tilt_error, 0.01))
         self.add_monitor(tilt_monitor)
 
@@ -126,9 +124,10 @@ class InsertCylinder(Goal):
                                                        weight=self.weight)
         tilt_straight_task.add_start_monitors_monitor(bottom_reached_monitor)
         tilt_straight_task.add_end_monitors_monitor(tilt_monitor)
-        self.connect_hold_monitors_to_all_tasks(hold_monitors)
-        self.connect_start_monitors_to_all_tasks(start_monitors)
-        for monitor in end_monitors:
-            tilt_straight_task.add_end_monitors_monitor(monitor)
-            go_to_line.add_end_monitors_monitor(monitor)
-            insert_task.add_end_monitors_monitor(monitor)
+        self.connect_monitors_to_all_tasks(start_monitors, hold_monitors, end_monitors)
+        # self.connect_start_monitors_to_all_tasks(start_monitors)
+        # self.connect_hold_monitors_to_all_tasks(hold_monitors)
+        # for monitor in end_monitors:
+        #     tilt_straight_task.add_end_monitors_monitor(monitor)
+        #     go_to_line.add_end_monitors_monitor(monitor)
+        #     insert_task.add_end_monitors_monitor(monitor)

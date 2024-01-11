@@ -27,6 +27,7 @@ from giskardpy.goals.collision_avoidance import CollisionAvoidanceHint
 from giskardpy.goals.goals_tests import DebugGoal
 from giskardpy.goals.joint_goals import JointVelocityLimit
 from giskardpy.goals.set_prediction_horizon import SetQPSolver
+from giskardpy.goals.tracebot import InsertCylinder
 from giskardpy.god_map import god_map
 from giskardpy.model.better_pybullet_syncer import BetterPyBulletSyncer
 from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
@@ -504,6 +505,70 @@ class TestMonitors:
         zero_pose.allow_all_collisions()
         zero_pose.monitors.add_end_motion(start_monitors=[end_monitor])
         zero_pose.execute(add_local_minimum_reached=False)
+
+    def test_place_cylinder1(self, better_pose: PR2TestWrapper):
+        cylinder_name = 'C'
+        cylinder_height = 0.121
+        hole_point = PointStamped()
+        hole_point.header.frame_id = 'map'
+        hole_point.point.x = 1
+        hole_point.point.y = -1
+        hole_point.point.z = 0.5
+        pose = PoseStamped()
+        pose.header.frame_id = 'r_gripper_tool_frame'
+        pose.pose.orientation = Quaternion(*quaternion_from_matrix(np.array([[0, 0, 1, 0],
+                                                                             [0, 1, 0, 0],
+                                                                             [-1, 0, 0, 0],
+                                                                             [0, 0, 0, 1]])))
+        better_pose.add_cylinder_to_world(name=cylinder_name,
+                                          height=cylinder_height,
+                                          radius=0.0225,
+                                          pose=pose,
+                                          parent_link='r_gripper_tool_frame')
+        better_pose.dye_group(cylinder_name, (0, 0, 1, 1))
+
+        better_pose.motion_goals.add_motion_goal(motion_goal_class=InsertCylinder.__name__,
+                                                 cylinder_name=cylinder_name,
+                                                 cylinder_height=0.121,
+                                                 hole_point=hole_point)
+        better_pose.allow_all_collisions()
+        better_pose.plan_and_execute()
+
+    def test_place_cylinder2(self, better_pose: PR2TestWrapper):
+        cylinder_name = 'C'
+        cylinder_height = 0.121
+        hole_point = PointStamped()
+        hole_point.header.frame_id = 'map'
+        hole_point.point.x = 1
+        hole_point.point.y = -1
+        hole_point.point.z = 0.5
+        pose = PoseStamped()
+        pose.header.frame_id = 'r_gripper_tool_frame'
+        pose.pose.orientation = Quaternion(*quaternion_from_matrix(np.array([[0, 0, 1, 0],
+                                                                             [0, 1, 0, 0],
+                                                                             [-1, 0, 0, 0],
+                                                                             [0, 0, 0, 1]])))
+        better_pose.add_cylinder_to_world(name=cylinder_name,
+                                          height=cylinder_height,
+                                          radius=0.0225,
+                                          pose=pose,
+                                          parent_link='r_gripper_tool_frame')
+        better_pose.dye_group(cylinder_name, (0, 0, 1, 1))
+
+        sleep = better_pose.monitors.add_sleep(1)
+
+        local_min = better_pose.monitors.add_local_minimum_reached(start_monitors=[sleep])
+
+        better_pose.motion_goals.add_motion_goal(motion_goal_class=InsertCylinder.__name__,
+                                                 cylinder_name=cylinder_name,
+                                                 cylinder_height=0.121,
+                                                 hole_point=hole_point,
+                                                 start_monitors=[sleep],
+                                                 end_monitors=[])
+        better_pose.allow_all_collisions()
+        end = better_pose.monitors.add_end_motion(start_monitors=[local_min])
+
+        better_pose.execute(add_local_minimum_reached=False)
 
     def test_bowl_and_cup_sequence(self, kitchen_setup: PR2TestWrapper):
         kitchen_setup.set_avoid_name_conflict(False)

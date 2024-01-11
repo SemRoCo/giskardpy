@@ -1,20 +1,23 @@
+import ast
 from collections import defaultdict
-from typing import Dict, Tuple, Optional, List, Union
+from typing import Dict, Tuple, Optional, List
 
+import dill
 import rospy
 from actionlib import SimpleActionClient
 from geometry_msgs.msg import PoseStamped, Vector3Stamped, PointStamped, QuaternionStamped
 from rospy import ServiceException
 from shape_msgs.msg import SolidPrimitive
 
+import giskard_msgs.msg as giskard_msgs
 from giskard_msgs.msg import MoveAction, MoveGoal, WorldBody, CollisionEntry, MoveResult, MoveFeedback, MotionGoal, \
     Monitor
-import giskard_msgs.msg as giskard_msgs
 from giskard_msgs.srv import DyeGroupRequest, DyeGroup, GetGroupInfoRequest, DyeGroupResponse
 from giskard_msgs.srv import GetGroupNamesResponse, GetGroupInfoResponse, RegisterGroupRequest
 from giskard_msgs.srv import RegisterGroupResponse
 from giskard_msgs.srv import UpdateWorld, UpdateWorldRequest, UpdateWorldResponse, GetGroupInfo, \
     GetGroupNames, RegisterGroup
+from giskardpy.data_types import goal_parameter
 from giskardpy.exceptions import DuplicateNameException, UnknownGroupException
 from giskardpy.goals.align_planes import AlignPlanes
 from giskardpy.goals.cartesian_goals import CartesianPose, DiffDriveBaseGoal, CartesianVelocityLimit, \
@@ -22,17 +25,16 @@ from giskardpy.goals.cartesian_goals import CartesianPose, DiffDriveBaseGoal, Ca
 from giskardpy.goals.collision_avoidance import CollisionAvoidance
 from giskardpy.goals.grasp_bar import GraspBar
 from giskardpy.goals.joint_goals import JointPositionList, AvoidJointLimits, SetSeedConfiguration, SetOdometry
+from giskardpy.goals.open_close import Close, Open
+from giskardpy.goals.pointing import Pointing
+from giskardpy.goals.set_prediction_horizon import SetPredictionHorizon
+from giskardpy.model.utils import make_world_body_box
 from giskardpy.monitors.cartesian_monitors import PoseReached, PositionReached, OrientationReached, PointingAt, \
     VectorsAligned, DistanceToLine
 from giskardpy.monitors.joint_monitors import JointGoalReached
 from giskardpy.monitors.monitors import LocalMinimumReached, TimeAbove, Alternator
 from giskardpy.monitors.payload_monitors import EndMotion, Print, Sleep, CancelMotion, SetMaxTrajectoryLength, \
     UpdateParentLinkOfGroup, PayloadAlternator
-from giskardpy.goals.open_close import Close, Open
-from giskardpy.goals.pointing import Pointing
-from giskardpy.goals.set_prediction_horizon import SetPredictionHorizon
-from giskardpy.model.utils import make_world_body_box
-from giskardpy.data_types import goal_parameter
 from giskardpy.utils.utils import kwargs_to_json
 
 
@@ -347,9 +349,9 @@ class MotionGoalWrapper:
     def add_motion_goal(self, *,
                         motion_goal_class: str,
                         name: Optional[str] = None,
-                        start_monitors: Optional[List[str]] = None,
-                        hold_monitors: Optional[List[str]] = None,
-                        end_monitors: Optional[List[str]] = None,
+                        start_condition: str = '',
+                        hold_condition: str = '',
+                        end_condition: str = '',
                         **kwargs):
         """
         Generic function to add a motion goal.
@@ -366,9 +368,9 @@ class MotionGoalWrapper:
         motion_goal = MotionGoal()
         motion_goal.name = name
         motion_goal.motion_goal_class = motion_goal_class
-        motion_goal.start_monitors = start_monitors or []
-        motion_goal.hold_monitors = hold_monitors or []
-        motion_goal.end_monitors = end_monitors or []
+        motion_goal.start_condition = start_condition
+        motion_goal.hold_condition = hold_condition
+        motion_goal.end_condition = end_condition
         motion_goal.kwargs = kwargs_to_json(kwargs)
         self._goals.append(motion_goal)
 
@@ -391,9 +393,9 @@ class MotionGoalWrapper:
             self.add_motion_goal(motion_goal_class=CollisionAvoidance.__name__,
                                  name=name,
                                  collision_entries=collision_entries,
-                                 start_monitors=list(start_monitors),
-                                 hold_monitors=list(hold_monitors),
-                                 end_monitors=list(end_monitors))
+                                 start_condition='',
+                                 hold_condition='',
+                                 end_condition='')
 
     def allow_collision(self,
                         group1: str = CollisionEntry.ALL,
@@ -499,9 +501,9 @@ class MotionGoalWrapper:
                            weight: Optional[float] = None,
                            max_velocity: Optional[float] = None,
                            name: Optional[str] = None,
-                           start_monitors: List[str] = None,
-                           hold_monitors: List[str] = None,
-                           end_monitors: List[str] = None,
+                           start_condition: str = '',
+                           hold_condition: str = '',
+                           end_condition: str = '',
                            **kwargs: goal_parameter):
         """
         Sets joint position goals for all pairs in goal_state
@@ -516,9 +518,9 @@ class MotionGoalWrapper:
                              weight=weight,
                              max_velocity=max_velocity,
                              name=name,
-                             start_monitors=start_monitors,
-                             hold_monitors=hold_monitors,
-                             end_monitors=end_monitors,
+                             start_condition=start_condition,
+                             hold_condition=hold_condition,
+                             end_condition=end_condition,
                              **kwargs)
 
     def add_cartesian_pose(self,
@@ -1055,8 +1057,8 @@ class MonitorWrapper:
     def get_monitors(self) -> List[Monitor]:
         return self._monitors
 
-    def get_monitor_names(self) -> List[str]:
-        return [monitor.name for monitor in self._monitors]
+    def get_anded_monitor_names(self) -> str:
+        return ' and '.join(f'\'{monitor.name}\'' for monitor in self._monitors)
 
     def reset(self):
         self._monitors = []
@@ -1064,13 +1066,12 @@ class MonitorWrapper:
     def add_monitor(self, *,
                     monitor_class: str,
                     name: Optional[str] = None,
-                    start_monitors: Optional[List[str]] = None,
+                    start_condition: str = '',
                     **kwargs) -> str:
         """
         Generic function to add a monitor.
         :param monitor_class: Name of a class defined in src/giskardpy/monitors
         :param name: a unique name for the goal, will use class name by default
-        :param start_monitors: Goal will only be active if all start monitors are True. Use monitors with stay_true=True
         :param kwargs: kwargs for __init__ function of motion_goal_class
         :return: the name of the monitor
         """
@@ -1082,21 +1083,23 @@ class MonitorWrapper:
         monitor = giskard_msgs.Monitor()
         monitor.name = name
         monitor.monitor_class = monitor_class
-        monitor.start_monitors = start_monitors or []
+        monitor.start_condition = start_condition
         monitor.kwargs = kwargs_to_json(kwargs)
         self._monitors.append(monitor)
+        if not name.startswith('\'') and not name.startswith('"'):
+            name = f'\'{name}\''  # put all monitor names in quotes so that the user doesn't have to
         return name
 
     def add_local_minimum_reached(self,
                                   name: Optional[str] = None,
                                   stay_true: bool = True,
-                                  start_monitors: Optional[List[str]] = None):
+                                  start_condition: str = ''):
         """
         True if the world is currently in a local minimum.
         """
         return self.add_monitor(monitor_class=LocalMinimumReached.__name__,
                                 name=name,
-                                start_monitors=start_monitors,
+                                start_condition=start_condition,
                                 stay_true=stay_true)
 
     def add_time_above(self,
@@ -1115,7 +1118,7 @@ class MonitorWrapper:
                            goal_state: Dict[str, float],
                            threshold: float = 0.01,
                            name: Optional[str] = None,
-                           start_monitors: List[str] = None,
+                           start_condition: str = '',
                            stay_true: bool = True) -> str:
         """
         True if all joints in goal_state are closer than threshold to their respective value.
@@ -1124,7 +1127,7 @@ class MonitorWrapper:
                                 name=name,
                                 goal_state=goal_state,
                                 threshold=threshold,
-                                start_monitors=start_monitors,
+                                start_condition=start_condition,
                                 stay_true=stay_true)
 
     def add_cartesian_pose(self,
@@ -1278,7 +1281,7 @@ class MonitorWrapper:
                                 threshold=threshold)
 
     def add_end_motion(self,
-                       start_monitors: List[str],
+                       start_condition: str,
                        name: Optional[str] = None) -> str:
         """
         Ends the motion execution/planning if all start_monitors are True.
@@ -1286,10 +1289,10 @@ class MonitorWrapper:
         """
         return self.add_monitor(monitor_class=EndMotion.__name__,
                                 name=name,
-                                start_monitors=start_monitors)
+                                start_condition=start_condition)
 
     def add_cancel_motion(self,
-                          start_monitors: List[str],
+                          start_condition: str,
                           error_message: str,
                           error_code: int = MoveResult.ERROR,
                           name: Optional[str] = None) -> str:
@@ -1299,7 +1302,7 @@ class MonitorWrapper:
         """
         return self.add_monitor(monitor_class=CancelMotion.__name__,
                                 name=name,
-                                start_monitors=start_monitors,
+                                start_condition=start_condition,
                                 error_message=error_message,
                                 error_code=error_code)
 
@@ -1329,7 +1332,7 @@ class MonitorWrapper:
         return self.add_monitor(name=None,
                                 monitor_class=SetMaxTrajectoryLength.__name__,
                                 new_length=max_trajectory_length,
-                                start_monitors=[])
+                                start_condition='')
 
     def add_print(self,
                   message: str,
@@ -1409,9 +1412,12 @@ class GiskardWrapper:
     def add_default_end_motion_conditions(self):
         local_min_reached_monitor_name = self.monitors.add_local_minimum_reached()
         for goal in self.motion_goals._goals:
-            goal.end_monitors.append(local_min_reached_monitor_name)
-        self.monitors.add_end_motion(start_monitors=self.monitors.get_monitor_names())
-        self.monitors.add_cancel_motion(start_monitors=[local_min_reached_monitor_name],
+            if goal.end_condition:
+                goal.end_condition = f'({goal.end_condition}) and {local_min_reached_monitor_name}'
+            else:
+                goal.end_condition = local_min_reached_monitor_name
+        self.monitors.add_end_motion(start_condition=self.monitors.get_anded_monitor_names())
+        self.monitors.add_cancel_motion(start_condition=local_min_reached_monitor_name,
                                         error_message=f'local minimum reached',
                                         error_code=MoveResult.LOCAL_MINIMUM)
         if not self.monitors.max_trajectory_length_set:

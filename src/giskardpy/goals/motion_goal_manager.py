@@ -14,6 +14,7 @@ import giskard_msgs.msg as giskard_msgs
 from giskardpy.god_map import god_map
 from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint, \
     ManipulabilityConstraint
+from giskardpy.symbol_manager import symbol_manager
 from giskardpy.tasks.task import Task
 from giskardpy.utils import logging
 from giskardpy.utils.utils import get_all_classes_in_package, convert_dictionary_to_ros_message, \
@@ -49,11 +50,14 @@ class MotionGoalManager:
                 params = json_str_to_kwargs(motion_goal.kwargs)
                 if motion_goal.name == '':
                     motion_goal.name = None
-                start_monitors = god_map.monitor_manager.search_for_monitors(motion_goal.start_monitors)
-                hold_monitors = god_map.monitor_manager.search_for_monitors(motion_goal.hold_monitors)
-                end_monitors = god_map.monitor_manager.search_for_monitors(motion_goal.end_monitors)
-                c: Goal = C(name=motion_goal.name, start_monitors=start_monitors, hold_monitors=hold_monitors,
-                            end_monitors=end_monitors, **params)
+                start_condition = god_map.monitor_manager.logic_str_to_expr(motion_goal.start_condition)
+                hold_condition = god_map.monitor_manager.logic_str_to_expr(motion_goal.hold_condition)
+                end_condition = god_map.monitor_manager.logic_str_to_expr(motion_goal.end_condition)
+                c: Goal = C(name=motion_goal.name,
+                            start_condition=start_condition,
+                            hold_condition=hold_condition,
+                            end_condition=end_condition,
+                            **params)
                 self.add_motion_goal(c)
             except Exception as e:
                 traceback.print_exc()
@@ -63,10 +67,10 @@ class MotionGoalManager:
                 raise e
         self.task_state = np.zeros(len(self.tasks))
         for task in self.tasks.values():
-            if task.start_monitors:
-                self.task_state[task.id] = TaskState.not_started
-            else:
+            if cas.is_true(task.start_condition):
                 self.task_state[task.id] = TaskState.running
+            else:
+                self.task_state[task.id] = TaskState.not_started
         self.compile_task_state_updater()
 
     def add_motion_goal(self, goal: Goal) -> None:
@@ -83,35 +87,32 @@ class MotionGoalManager:
     @profile
     def compile_task_state_updater(self):
         symbols = []
-        for i in range(len(self.tasks)):
-            symbols.append(cas.Symbol(f'task {i}'))
+        for task in sorted(self.tasks.values(), key=lambda x: x.id):
+            symbols.append(task.get_state_expression())
         task_state = cas.Expression(symbols)
         symbols = []
-        for i in range(len(god_map.monitor_manager.monitors)):
-            symbols.append(cas.Symbol(f'monitor {i}'))
+        for i, monitor in enumerate(god_map.monitor_manager.monitors):
+            symbols.append(monitor.get_state_expression())
         monitor_state = cas.Expression(symbols)
 
         state_updater = []
         for task in sorted(self.tasks.values(), key=lambda x: x.id):
-            start_filter = task.get_start_monitor_filter()
-            hold_filter = task.get_hold_monitor_filter()
-            end_filter = task.get_end_monitor_filter()
             state_symbol = task_state[task.id]
 
-            if len(start_filter) > 0:
-                start_if = cas.if_else(cas.logic_all(monitor_state[start_filter]),
+            if not cas.is_true(task.start_condition):
+                start_if = cas.if_else(task.start_condition,
                                        if_result=int(TaskState.running),
                                        else_result=state_symbol)
             else:
                 start_if = state_symbol
-            if len(hold_filter) > 0:
-                hold_if = cas.if_else(cas.logic_any(monitor_state[hold_filter]),
+            if not cas.is_true(task.hold_condition):
+                hold_if = cas.if_else(task.hold_condition,
                                       if_result=int(TaskState.on_hold),
                                       else_result=int(TaskState.running))
             else:
                 hold_if = state_symbol
-            if len(end_filter) > 0:
-                else_result = cas.if_else(cas.logic_all(monitor_state[end_filter]),
+            if not cas.is_true(task.end_condition):
+                else_result = cas.if_else(task.end_condition,
                                           if_result=int(TaskState.succeeded),
                                           else_result=hold_if)
             else:

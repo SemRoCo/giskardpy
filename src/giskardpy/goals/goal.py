@@ -15,6 +15,7 @@ from giskardpy.model.joints import OneDofJoint
 from giskardpy.data_types import PrefixName, Derivatives
 from giskardpy.qp.constraint import InequalityConstraint, EqualityConstraint, DerivativeInequalityConstraint, \
     ManipulabilityConstraint
+import giskardpy.casadi_wrapper as cas
 
 
 class Goal(ABC):
@@ -24,9 +25,9 @@ class Goal(ABC):
     @abc.abstractmethod
     def __init__(self,
                  name: str,
-                 start_monitors: Optional[List[Monitor]] = None,
-                 hold_monitors: Optional[List[Monitor]] = None,
-                 end_monitors: Optional[List[Monitor]] = None):
+                 start_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.TrueSymbol,
+                 end_condition: cas.Expression = cas.TrueSymbol):
         """
         This is where you specify goal parameters and save them as self attributes.
         """
@@ -67,26 +68,25 @@ class Goal(ABC):
             return joint.get_symbol(Derivatives.position)
         raise TypeError(f'get_joint_position_symbol is only supported for OneDofJoint, not {type(joint)}')
 
-    def connect_start_monitors_to_all_tasks(self, monitors: List[ExpressionMonitor]):
-        for monitor in monitors:
-            for task in self.tasks:
-                task.add_start_monitors_monitor(monitor)
+    def connect_start_monitors_to_all_tasks(self, condition: cas.Expression):
+        for task in self.tasks:
+            task.start_condition = cas.logic_and(task.start_condition, condition)
 
-    def connect_hold_monitors_to_all_tasks(self, monitors: List[ExpressionMonitor]):
-        for monitor in monitors:
-            for task in self.tasks:
-                task.add_hold_monitors_monitor(monitor)
+    def connect_hold_monitors_to_all_tasks(self, condition: cas.Expression):
+        for task in self.tasks:
+            task.hold_condition = cas.logic_or(task.hold_condition, condition)
 
-    def connect_end_monitors_to_all_tasks(self, monitors: List[ExpressionMonitor]):
-        for monitor in monitors:
-            for task in self.tasks:
-                task.add_end_monitors_monitor(monitor)
+    def connect_end_monitors_to_all_tasks(self, condition: cas.Expression):
+        for task in self.tasks:
+            task.end_condition = cas.logic_and(task.end_condition, condition)
 
-    def connect_monitors_to_all_tasks(self, start_monitors: List[ExpressionMonitor],
-                                      hold_monitors: List[ExpressionMonitor], end_monitors: List[ExpressionMonitor]):
-        self.connect_start_monitors_to_all_tasks(start_monitors)
-        self.connect_hold_monitors_to_all_tasks(hold_monitors)
-        self.connect_end_monitors_to_all_tasks(end_monitors)
+    def connect_monitors_to_all_tasks(self,
+                                      start_condition: cas.Expression,
+                                      hold_condition: cas.Expression,
+                                      end_condition: cas.Expression):
+        self.connect_start_monitors_to_all_tasks(start_condition)
+        self.connect_hold_monitors_to_all_tasks(hold_condition)
+        self.connect_end_monitors_to_all_tasks(end_condition)
 
     def get_expr_velocity(self, expr: w.Expression) -> w.Expression:
         """

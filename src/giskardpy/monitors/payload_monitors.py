@@ -11,6 +11,7 @@ from giskardpy.exceptions import GiskardException, MonitorInitalizationException
 from giskardpy.monitors.monitors import Monitor
 from giskardpy.god_map import god_map
 from giskardpy.utils import logging
+import giskardpy.casadi_wrapper as cas
 
 
 class PayloadMonitor(Monitor, ABC):
@@ -21,10 +22,10 @@ class PayloadMonitor(Monitor, ABC):
                  run_call_in_thread: bool,
                  name: Optional[str] = None,
                  stay_true: bool = True,
-                 start_monitors: Optional[List[Monitor]] = None):
+                 start_condition: cas.Expression = cas.TrueSymbol,):
         self.state = False
         self.run_call_in_thread = run_call_in_thread
-        super().__init__(name=name, start_monitors=start_monitors, stay_true=stay_true)
+        super().__init__(name=name, start_condition=start_condition, stay_true=stay_true)
 
     def get_state(self) -> bool:
         return self.state
@@ -55,8 +56,8 @@ class WorldUpdatePayloadMonitor(PayloadMonitor):
 class EndMotion(PayloadMonitor):
     def __init__(self,
                  name: Optional[str] = None,
-                 start_monitors: Optional[List[Monitor]] = None):
-        super().__init__(name=name, start_monitors=start_monitors, run_call_in_thread=False)
+                 start_condition: cas.Expression = cas.TrueSymbol,):
+        super().__init__(name=name, start_condition=start_condition, run_call_in_thread=False)
 
     def __call__(self):
         self.state = True
@@ -70,8 +71,8 @@ class CancelMotion(PayloadMonitor):
                  error_message: str,
                  error_code: int = MoveResult.ERROR,
                  name: Optional[str] = None,
-                 start_monitors: Optional[List[Monitor]] = None):
-        super().__init__(name=name, start_monitors=start_monitors, run_call_in_thread=False)
+                 start_condition: cas.Expression = cas.TrueSymbol,):
+        super().__init__(name=name, start_condition=start_condition, run_call_in_thread=False)
         self.error_message = error_message
         self.error_code = error_code
 
@@ -90,8 +91,8 @@ class SetMaxTrajectoryLength(CancelMotion):
     def __init__(self,
                  new_length: Optional[float] = None,
                  name: Optional[str] = None,
-                 start_monitors: Optional[List[Monitor]] = None,):
-        if start_monitors:
+                 start_condition: cas.Expression = cas.TrueSymbol,):
+        if not (start_condition == cas.TrueSymbol).evaluate():
             raise MonitorInitalizationException(f'Cannot set start_monitors for {SetMaxTrajectoryLength.__name__}')
         if new_length is None:
             self.new_length = god_map.qp_controller_config.max_trajectory_length
@@ -99,7 +100,7 @@ class SetMaxTrajectoryLength(CancelMotion):
             self.new_length = new_length
         error_message = f'Trajectory longer than {self.new_length}'
         super().__init__(name=name,
-                         start_monitors=[],
+                         start_condition=start_condition,
                          error_message=error_message,
                          error_code=MoveResult.MAX_TRAJECTORY_LENGTH)
 

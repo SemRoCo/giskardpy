@@ -12,7 +12,7 @@ class JointGoalReached(ExpressionMonitor):
                  threshold: float,
                  name: Optional[str] = None,
                  stay_true: bool = True,
-                 start_monitors: Optional[List[Monitor]] = None):
+                 start_condition: cas.Expression = cas.TrueSymbol):
         comparison_list = []
         for joint_name, goal in goal_state.items():
             joint_name = god_map.world.search_for_joint_name(joint_name)
@@ -23,6 +23,6 @@ class JointGoalReached(ExpressionMonitor):
                 error = goal - current
             comparison_list.append(cas.less(cas.abs(error), threshold))
         expression = cas.logic_all(cas.Expression(comparison_list))
-        super().__init__(name, stay_true=stay_true, start_monitors=start_monitors)
+        super().__init__(name, stay_true=stay_true, start_condition=start_condition)
         self.set_expression(expression)
 

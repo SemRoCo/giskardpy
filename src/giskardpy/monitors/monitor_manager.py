@@ -1,18 +1,18 @@
+import ast
 import traceback
 from collections import OrderedDict
 from typing import List, Tuple, Dict, Optional, Callable, Union, Iterable
 
 import numpy as np
 
+import giskard_msgs.msg as giskard_msgs
 import giskardpy.casadi_wrapper as cas
 from giskardpy.casadi_wrapper import CompiledFunction
 from giskardpy.data_types import TaskState
-from giskardpy.exceptions import GiskardException, UnknownGoalException, GoalInitalizationException, \
-    MonitorInitalizationException, UnknownMonitorException
-from giskardpy.monitors.monitors import ExpressionMonitor, Monitor
-import giskard_msgs.msg as giskard_msgs
-from giskardpy.monitors.payload_monitors import PayloadMonitor, CancelMotion
+from giskardpy.exceptions import GiskardException, MonitorInitalizationException, UnknownMonitorException
 from giskardpy.god_map import god_map
+from giskardpy.monitors.monitors import ExpressionMonitor, Monitor
+from giskardpy.monitors.payload_monitors import PayloadMonitor, CancelMotion
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils import logging
 from giskardpy.utils.utils import get_all_classes_in_package, json_str_to_kwargs
@@ -53,6 +53,33 @@ class MonitorManager:
         self.triggers = {}
         self.state_history = []
 
+    def evaluate_expression(self, node):
+        if isinstance(node, ast.BoolOp):
+            if isinstance(node.op, ast.And):
+                return cas.logic_and(self.evaluate_expression(node.values[0]),
+                                     self.evaluate_expression(node.values[1]))
+            elif isinstance(node.op, ast.Or):
+                return cas.logic_or(self.evaluate_expression(node.values[0]),
+                                    self.evaluate_expression(node.values[1]))
+        elif isinstance(node, ast.UnaryOp):
+            if isinstance(node.op, ast.Not):
+                return cas.logic_not(self.evaluate_expression(node.operand))
+        elif isinstance(node, ast.Str):
+            # replace monitor name with its state expression
+            return self.get_monitor(node.value).get_state_expression()
+        raise Exception(f'failed to parse {node}')
+
+    def logic_str_to_expr(self, logic_str: str) -> cas.Expression:
+        if logic_str == '':
+            return cas.TrueSymbol
+        tree = ast.parse(logic_str, mode='eval')
+        try:
+            return self.evaluate_expression(tree.body)
+        except KeyError as e:
+            raise GiskardException(f'Unknown symbol {e}')
+        except Exception as e:
+            raise GiskardException(str(e))
+
     @profile
     def add_payload_monitors_to_behavior_tree(self):
         self.payload_monitors = sorted(self.payload_monitors, key=lambda x: isinstance(x, CancelMotion))
@@ -78,10 +105,10 @@ class MonitorManager:
 
     def set_initial_life_cycle_state(self):
         for monitor in self.monitors:
-            if monitor.start_monitors:
-                self.life_cycle_state[monitor.id] = TaskState.not_started
-            else:
+            if cas.is_true(monitor.start_condition):
                 self.life_cycle_state[monitor.id] = TaskState.running
+            else:
+                self.life_cycle_state[monitor.id] = TaskState.not_started
 
     @profile
     def compile_monitor_state_updater(self):
@@ -100,10 +127,9 @@ class MonitorManager:
         for i, monitor in enumerate(self.monitors):
             state_symbol = monitor_state[monitor.id]
             life_cycle_state_symbol = monitor_life_cycle_state[monitor.id]
-            start_filter = self.to_state_filter(monitor.start_monitors)
 
-            if len(start_filter) > 0:
-                start_if = cas.if_else(cas.logic_all(monitor_state[start_filter]),
+            if not cas.is_true(monitor.start_condition):
+                start_if = cas.if_else(monitor.start_condition,
                                        if_result=int(TaskState.running),
                                        else_result=life_cycle_state_symbol)
             else:
@@ -254,9 +280,9 @@ class MonitorManager:
                 raise UnknownMonitorException(f'unknown monitor type: \'{monitor_msg.monitor_class}\'.')
             try:
                 kwargs = json_str_to_kwargs(monitor_msg.kwargs)
-                start_monitors = god_map.monitor_manager.search_for_monitors(monitor_msg.start_monitors)
+                start_condition = self.logic_str_to_expr(monitor_msg.start_condition)
                 monitor = C(name=monitor_msg.name,
-                            start_monitors=start_monitors,
+                            start_condition=start_condition,
                             **kwargs)
                 if isinstance(monitor, ExpressionMonitor):
                     self.add_expression_monitor(monitor)

@@ -22,9 +22,9 @@ class SetSeedConfiguration(NonMotionGoal):
                  seed_configuration: Dict[str, float],
                  group_name: Optional[str] = None,
                  name: Optional[str] = None,
-                 start_monitors: Optional[List[ExpressionMonitor]] = None,
-                 hold_monitors: Optional[List[ExpressionMonitor]] = None,
-                 end_monitors: Optional[List[ExpressionMonitor]] = None):
+                 start_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.TrueSymbol,
+                 end_condition: cas.Expression = cas.TrueSymbol):
         """
         Overwrite the configuration of the world to allow starting the planning from a different state.
         Can only be used in plan only mode.
@@ -45,7 +45,7 @@ class SetSeedConfiguration(NonMotionGoal):
                 raise KeyError(f'World has no joint \'{joint_name}\'.')
             god_map.world.state[joint_name].position = initial_joint_value
         god_map.world.notify_state_change()
-        self.connect_monitors_to_all_tasks(start_monitors, hold_monitors, end_monitors)
+        self.connect_monitors_to_all_tasks(start_condition, hold_condition, end_condition)
 
 
 class SetOdometry(NonMotionGoal):
@@ -53,9 +53,9 @@ class SetOdometry(NonMotionGoal):
                  group_name: str,
                  base_pose: PoseStamped,
                  name: Optional[str] = None,
-                 start_monitors: Optional[List[ExpressionMonitor]] = None,
-                 hold_monitors: Optional[List[ExpressionMonitor]] = None,
-                 end_monitors: Optional[List[ExpressionMonitor]] = None):
+                 start_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.TrueSymbol,
+                 end_condition: cas.Expression = cas.TrueSymbol):
         self.group_name = group_name
         if name is None:
             name = f'{self.__class__.__name__}/{self.group_name}'
@@ -82,7 +82,7 @@ class SetOdometry(NonMotionGoal):
         else:
             god_map.world.state[brumbrum_joint.yaw.name].position = angle
         god_map.world.notify_state_change()
-        self.connect_monitors_to_all_tasks(start_monitors, hold_monitors, end_monitors)
+        self.connect_monitors_to_all_tasks(start_condition, hold_condition, end_condition)
 
 
 class JointVelocityLimit(Goal):
@@ -210,10 +210,9 @@ class JointPositionList(Goal):
                  weight: float = WEIGHT_BELOW_CA,
                  max_velocity: float = 1,
                  name: Optional[str] = None,
-                 start_monitors: Optional[List[ExpressionMonitor]] = None,
-                 hold_monitors: Optional[List[ExpressionMonitor]] = None,
-                 end_monitors: Optional[List[ExpressionMonitor]] = None
-                 ):
+                 start_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.TrueSymbol,
+                 end_condition: cas.Expression = cas.TrueSymbol):
         """
         Calls JointPosition for a list of joints.
         :param goal_state: maps joint_name to goal position
@@ -264,4 +263,4 @@ class JointPositionList(Goal):
                                          weight=self.weight,
                                          task_expression=current)
 
-        self.connect_monitors_to_all_tasks(start_monitors, hold_monitors, end_monitors)
+        self.connect_monitors_to_all_tasks(start_condition, hold_condition, end_condition)

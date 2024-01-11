@@ -451,17 +451,17 @@ class TestMonitors:
                                                                name='joint_monitor1')
         joint_monitor2 = zero_pose.monitors.add_joint_position(pocky_pose,
                                                                name='joint_monitor2')
-        end_monitor = zero_pose.monitors.add_local_minimum_reached(start_monitors=[joint_monitor2])
+        end_monitor = zero_pose.monitors.add_local_minimum_reached(start_condition=joint_monitor2)
 
         zero_pose.motion_goals.add_joint_position(name='g1',
                                                   goal_state=zero_pose.better_pose,
-                                                  end_monitors=[joint_monitor1])
+                                                  end_condition=joint_monitor1)
         zero_pose.motion_goals.add_joint_position(name='g2',
                                                   goal_state=pocky_pose,
-                                                  start_monitors=[joint_monitor1],
-                                                  end_monitors=[end_monitor, joint_monitor2])
+                                                  start_condition=joint_monitor1,
+                                                  end_condition=f'{end_monitor} and {joint_monitor2}')
         zero_pose.allow_all_collisions()
-        zero_pose.monitors.add_end_motion(start_monitors=[end_monitor])
+        zero_pose.monitors.add_end_motion(start_condition=end_monitor)
         zero_pose.execute(add_local_minimum_reached=False)
 
     def test_cart_goal_sequence(self, zero_pose: PR2TestWrapper):

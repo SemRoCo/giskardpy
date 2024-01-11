@@ -1,10 +1,13 @@
+import ast
 import numbers
 from typing import Dict, Callable
 
+from giskardpy.exceptions import GiskardException
 from giskardpy.god_map import god_map
 import numpy as np
 import giskardpy.casadi_wrapper as cas
 from giskardpy.utils.singleton import SingletonMeta
+
 
 
 class SymbolManager(metaclass=SingletonMeta):
@@ -16,7 +19,39 @@ class SymbolManager(metaclass=SingletonMeta):
         self.symbol_str_to_symbol = {}
         self.last_hash = -1
 
-    def get_symbol(self, symbol_reference):
+    def evaluate_expression(self, node):
+        if isinstance(node, ast.BoolOp):
+            if isinstance(node.op, ast.And):
+                return cas.logic_and(self.evaluate_expression(node.values[0]),
+                                     self.evaluate_expression(node.values[1]))
+            elif isinstance(node.op, ast.Or):
+                return cas.logic_or(self.evaluate_expression(node.values[0]),
+                                    self.evaluate_expression(node.values[1]))
+        elif isinstance(node, ast.UnaryOp):
+            if isinstance(node.op, ast.Not):
+                return cas.logic_not(self.evaluate_expression(node.operand))
+        elif isinstance(node, ast.Name):
+            # Replace with actual variable lookup or modify as needed
+            return god_map.monitor_manager.get_monitor(node.id).get_state_expression()
+        raise Exception(f'failed to parse {node}')
+
+    def logic_str_to_expr(self, logic_str: str) -> cas.Expression:
+        if logic_str == '':
+            return cas.TrueSymbol
+        tree = ast.parse(logic_str, mode='eval')
+        try:
+            return self.evaluate_expression(tree.body)
+        except KeyError as e:
+            raise GiskardException(f'Unknown symbol {e}')
+        except Exception as e:
+            raise GiskardException(e)
+
+    def get_symbol(self, symbol_reference: str) -> cas.Symbol:
+        """
+        Returns a symbol reference to the input parameter. If the symbol doesn't exist yet, it will be created.
+        :param symbol_reference: e.g. 'god_map.monitor_manager.monitors[0]'
+        :return: symbol reference
+        """
         if symbol_reference not in self.symbol_str_to_lambda:
             lambda_expr = eval(f'lambda: {symbol_reference}')
             self.symbol_str_to_lambda[symbol_reference] = lambda_expr

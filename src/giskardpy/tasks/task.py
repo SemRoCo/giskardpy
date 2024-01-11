@@ -7,7 +7,7 @@ import giskard_msgs.msg
 import giskardpy.casadi_wrapper as cas
 from giskardpy.exceptions import GiskardException, GoalInitalizationException, DuplicateNameException
 from giskardpy.god_map import god_map
-from giskardpy.monitors.monitors import ExpressionMonitor
+from giskardpy.monitors.monitors import ExpressionMonitor, Monitor
 from giskardpy.data_types import Derivatives, PrefixName, TaskState
 from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint, \
     ManipulabilityConstraint, Constraint
@@ -29,9 +29,9 @@ class Task:
     eq_constraints: Dict[PrefixName, EqualityConstraint]
     neq_constraints: Dict[PrefixName, InequalityConstraint]
     derivative_constraints: Dict[PrefixName, DerivativeInequalityConstraint]
-    start_condition: cas.Expression
-    hold_condition: cas.Expression
-    end_condition: cas.Expression
+    _start_condition: cas.Expression
+    _hold_condition: cas.Expression
+    _end_condition: cas.Expression
     _name: str
     _parent_goal_name: str
     _id: int
@@ -45,11 +45,44 @@ class Task:
         self.eq_constraints = {}
         self.neq_constraints = {}
         self.derivative_constraints = {}
-        self.start_condition = cas.TrueSymbol
-        self.hold_condition = cas.TrueSymbol
-        self.end_condition = cas.TrueSymbol
+        self._start_condition = cas.TrueSymbol
+        self._hold_condition = cas.TrueSymbol
+        self._end_condition = cas.TrueSymbol
         self.manip_constraints = {}
         self._id = -1
+
+    @property
+    def start_condition(self) -> cas.Expression:
+        return self._start_condition
+
+    @start_condition.setter
+    def start_condition(self, value: Union[Monitor, cas.Expression]) -> None:
+        if isinstance(value, Monitor):
+            self._start_condition = value.get_state_expression()
+        else:
+            self._start_condition = value
+
+    @property
+    def hold_condition(self) -> cas.Expression:
+        return self._hold_condition
+
+    @hold_condition.setter
+    def hold_condition(self, value: Union[Monitor, cas.Expression]) -> None:
+        if isinstance(value, Monitor):
+            self._hold_condition = value.get_state_expression()
+        else:
+            self._hold_condition = value
+
+    @property
+    def end_condition(self) -> cas.Expression:
+        return self._end_condition
+
+    @end_condition.setter
+    def end_condition(self, value: Union[Monitor, cas.Expression]) -> None:
+        if isinstance(value, Monitor):
+            self._end_condition = value.get_state_expression()
+        else:
+            self._end_condition = value
 
     @property
     def id(self) -> int:

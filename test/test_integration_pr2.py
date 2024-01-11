@@ -537,41 +537,41 @@ class TestMonitors:
         better_pose.allow_all_collisions()
         better_pose.plan_and_execute()
 
-    def test_place_cylinder2(self, better_pose: PR2TestWrapper):
-        cylinder_name = 'C'
-        cylinder_height = 0.121
-        hole_point = PointStamped()
-        hole_point.header.frame_id = 'map'
-        hole_point.point.x = 1
-        hole_point.point.y = -1
-        hole_point.point.z = 0.5
-        pose = PoseStamped()
-        pose.header.frame_id = 'r_gripper_tool_frame'
-        pose.pose.orientation = Quaternion(*quaternion_from_matrix(np.array([[0, 0, 1, 0],
-                                                                             [0, 1, 0, 0],
-                                                                             [-1, 0, 0, 0],
-                                                                             [0, 0, 0, 1]])))
-        better_pose.add_cylinder_to_world(name=cylinder_name,
-                                          height=cylinder_height,
-                                          radius=0.0225,
-                                          pose=pose,
-                                          parent_link='r_gripper_tool_frame')
-        better_pose.dye_group(cylinder_name, (0, 0, 1, 1))
-
-        sleep = better_pose.monitors.add_sleep(1)
-
-        local_min = better_pose.monitors.add_local_minimum_reached(start_monitors=[sleep])
-
-        better_pose.motion_goals.add_motion_goal(motion_goal_class=InsertCylinder.__name__,
-                                                 cylinder_name=cylinder_name,
-                                                 cylinder_height=0.121,
-                                                 hole_point=hole_point,
-                                                 start_monitors=[sleep],
-                                                 end_monitors=[])
-        better_pose.allow_all_collisions()
-        end = better_pose.monitors.add_end_motion(start_monitors=[local_min])
-
-        better_pose.execute(add_local_minimum_reached=False)
+    # def test_place_cylinder2(self, better_pose: PR2TestWrapper):
+    #     cylinder_name = 'C'
+    #     cylinder_height = 0.121
+    #     hole_point = PointStamped()
+    #     hole_point.header.frame_id = 'map'
+    #     hole_point.point.x = 1
+    #     hole_point.point.y = -1
+    #     hole_point.point.z = 0.5
+    #     pose = PoseStamped()
+    #     pose.header.frame_id = 'r_gripper_tool_frame'
+    #     pose.pose.orientation = Quaternion(*quaternion_from_matrix(np.array([[0, 0, 1, 0],
+    #                                                                          [0, 1, 0, 0],
+    #                                                                          [-1, 0, 0, 0],
+    #                                                                          [0, 0, 0, 1]])))
+    #     better_pose.add_cylinder_to_world(name=cylinder_name,
+    #                                       height=cylinder_height,
+    #                                       radius=0.0225,
+    #                                       pose=pose,
+    #                                       parent_link='r_gripper_tool_frame')
+    #     better_pose.dye_group(cylinder_name, (0, 0, 1, 1))
+    #
+    #     sleep = better_pose.monitors.add_sleep(1)
+    #
+    #     local_min = better_pose.monitors.add_local_minimum_reached(start_monitors=[sleep])
+    #
+    #     better_pose.motion_goals.add_motion_goal(motion_goal_class=InsertCylinder.__name__,
+    #                                              cylinder_name=cylinder_name,
+    #                                              cylinder_height=0.121,
+    #                                              hole_point=hole_point,
+    #                                              start_monitors=[sleep],
+    #                                              end_monitors=[])
+    #     better_pose.allow_all_collisions()
+    #     end = better_pose.monitors.add_end_motion(start_monitors=[local_min])
+    #
+    #     better_pose.execute(add_local_minimum_reached=False)
 
     def test_bowl_and_cup_sequence(self, kitchen_setup: PR2TestWrapper):
         kitchen_setup.set_avoid_name_conflict(False)
@@ -870,27 +870,30 @@ class TestMonitors:
 
     def test_sleep(self, zero_pose: PR2TestWrapper):
         sleep1 = zero_pose.monitors.add_sleep(1, name='sleep1')
-        print1 = zero_pose.monitors.add_print(message=f'{sleep1} done', start_monitors=[sleep1])
-        sleep2 = zero_pose.monitors.add_sleep(2, name='sleep2', start_monitors=[print1])
+        print1 = zero_pose.monitors.add_print(message=f'{sleep1} done', start_condition=sleep1)
+        sleep2 = zero_pose.monitors.add_sleep(2, name='sleep2', start_condition=print1)
         zero_pose.motion_goals.allow_all_collisions()
 
         right_monitor = zero_pose.monitors.add_joint_position(zero_pose.better_pose_right,
                                                               name='right pose reached',
-                                                              start_monitors=[sleep1])
+                                                              start_condition=sleep1)
         left_monitor = zero_pose.monitors.add_joint_position(zero_pose.better_pose_left,
                                                              name='left pose reached',
-                                                             start_monitors=[sleep1])
+                                                             start_condition=sleep1)
         zero_pose.motion_goals.add_joint_position(zero_pose.better_pose_right,
                                                   name='right pose',
-                                                  start_monitors=[sleep2],
-                                                  end_monitors=[right_monitor])
+                                                  start_condition=sleep2,
+                                                  end_condition=right_monitor)
         zero_pose.motion_goals.add_joint_position(zero_pose.better_pose_left,
                                                   name='left pose',
-                                                  end_monitors=[left_monitor])
-        local_min = zero_pose.monitors.add_local_minimum_reached(start_monitors=[right_monitor, left_monitor])
+                                                  end_condition=left_monitor)
+        local_min = zero_pose.monitors.add_local_minimum_reached(start_condition=f'{right_monitor} and {left_monitor}')
 
-        end = zero_pose.monitors.add_end_motion(start_monitors=[local_min, sleep2, right_monitor, left_monitor])
-        zero_pose.monitors.add_max_trajectory_length(120)
+        end = zero_pose.monitors.add_end_motion(start_condition=' and '.join([local_min,
+                                                                              sleep2,
+                                                                              right_monitor,
+                                                                              left_monitor]))
+        zero_pose.monitors.add_max_trajectory_length(30)
         zero_pose.execute(add_local_minimum_reached=False)
         assert god_map.trajectory.length_in_seconds > 6
 

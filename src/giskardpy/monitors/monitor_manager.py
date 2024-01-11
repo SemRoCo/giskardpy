@@ -1,6 +1,7 @@
 import ast
 import traceback
 from collections import OrderedDict
+from functools import cached_property
 from typing import List, Tuple, Dict, Optional, Callable, Union, Iterable
 
 import numpy as np
@@ -39,8 +40,7 @@ class MonitorManager:
     compiled_life_cycle_state_updater: CompiledFunction
     state_history: List[Tuple[float, Tuple[np.ndarray, np.ndarray]]]  # time -> (state, life_cycle_state)
 
-    expression_monitors: List[ExpressionMonitor]
-    payload_monitors: List[PayloadMonitor]
+    monitors: List[Monitor]
 
     substitution_values: Dict[int, Dict[str, float]]  # id -> (old_symbol, value)
     triggers: Dict[int, Callable]  # id -> updater callback
@@ -48,8 +48,7 @@ class MonitorManager:
     compiled_trigger_conditions: cas.CompiledFunction  # stacked compiled function which returns array of evaluated conditions
 
     def __init__(self):
-        self.expression_monitors = []
-        self.payload_monitors = []
+        self.monitors = []
         self.allowed_monitor_types = {}
         self.allowed_monitor_types.update(get_all_classes_in_package(package_name='giskardpy.monitors',
                                                                      parent_class=Monitor))
@@ -86,13 +85,13 @@ class MonitorManager:
             raise GiskardException(str(e))
 
     @profile
-    def add_payload_monitors_to_behavior_tree(self):
-        self.payload_monitors = sorted(self.payload_monitors, key=lambda x: isinstance(x, CancelMotion))
-        for monitor in self.payload_monitors:
+    def add_payload_monitors_to_behavior_tree(self) -> None:
+        payload_monitors = sorted(self.payload_monitors, key=lambda x: isinstance(x, CancelMotion))
+        for monitor in payload_monitors:
             god_map.tree.control_loop_branch.check_monitors.add_monitor(monitor)
 
     @profile
-    def compile_monitors(self):
+    def compile_monitors(self) -> None:
         self.state_history = []
         self.state = np.zeros(len(self.monitors))
         self.life_cycle_state = np.zeros(len(self.monitors))
@@ -102,7 +101,7 @@ class MonitorManager:
         self._register_expression_update_triggers()
 
     @profile
-    def get_monitor(self, name: str) -> ExpressionMonitor:
+    def get_monitor(self, name: str) -> Monitor:
         for monitor in self.monitors:
             if monitor.name == name:
                 return monitor
@@ -169,24 +168,25 @@ class MonitorManager:
         self.compiled_life_cycle_state_updater = life_cycle_state_updater.compile(symbols)
 
     @property
-    def monitors(self):
-        return self.expression_monitors + self.payload_monitors
+    def expression_monitors(self) -> List[ExpressionMonitor]:
+        return [x for x in self.monitors if isinstance(x, ExpressionMonitor)]
+
+    @property
+    def payload_monitors(self) -> List[PayloadMonitor]:
+        return [x for x in self.monitors if isinstance(x, PayloadMonitor)]
 
     @profile
     def add_expression_monitor(self, monitor: ExpressionMonitor):
         if [x for x in self.monitors if x.name == monitor.name]:
             raise MonitorInitalizationException(f'Monitor named {monitor.name} already exists.')
-        self.expression_monitors.append(monitor)
-        monitor.set_id(len(self.expression_monitors) - 1)
-        # increase all payload monitor ids because expression monitors always come first
-        for payload_monitor in self.payload_monitors:
-            payload_monitor.set_id(payload_monitor.id + 1)
+        self.monitors.append(monitor)
+        monitor.set_id(len(self.monitors) - 1)
 
     @profile
     def add_payload_monitor(self, monitor: PayloadMonitor):
         if [x for x in self.monitors if x.name == monitor.name]:
             raise MonitorInitalizationException(f'Monitor named {monitor.name} already exists.')
-        self.payload_monitors.append(monitor)
+        self.monitors.append(monitor)
         monitor.set_id(len(self.monitors) - 1)
 
     def get_state_dict(self) -> Dict[str, Tuple[str, bool]]:
@@ -259,6 +259,10 @@ class MonitorManager:
     def evaluate_trigger_conditions(self, state: np.ndarray) -> None:
         pass
 
+    @cached_property
+    def payload_monitor_filter(self):
+        return np.array([i for i, m in enumerate(self.monitors) if isinstance(m, PayloadMonitor)])
+
     @profile
     def evaluate_monitors(self):
         # %% update life cycle state
@@ -269,8 +273,7 @@ class MonitorManager:
         args = symbol_manager.resolve_symbols(self.compiled_state_updater.str_params)
         self.state = self.compiled_state_updater.fast_call(args)
 
-        num_expr_monitors = len(self.expression_monitors)
-        self.state[num_expr_monitors:] = self.evaluate_payload_monitors()
+        self.state[self.payload_monitor_filter] = self.evaluate_payload_monitors()
         self.trigger_update_triggers(self.state)
         self.state_history.append((god_map.time, (self.state.copy(), self.life_cycle_state.copy())))
         god_map.motion_goal_manager.update_task_state(self.state)

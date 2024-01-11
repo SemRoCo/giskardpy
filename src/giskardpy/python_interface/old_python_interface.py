@@ -50,15 +50,14 @@ class OldGiskardWrapper(GiskardWrapper):
         :param max_velocity: will be applied to all joints
         """
         if add_monitor:
-            monitor_name = self.monitors.add_joint_position(goal_state=goal_state)
-            end_condition_monitors = [monitor_name]
+            end_condition = self.monitors.add_joint_position(goal_state=goal_state)
         else:
-            end_condition_monitors = []
+            end_condition = ''
         self.motion_goals.add_joint_position(goal_state=goal_state,
                                              group_name=group_name,
                                              weight=weight,
                                              max_velocity=max_velocity,
-                                             end_condition=end_condition_monitors,
+                                             end_condition=end_condition,
                                              **kwargs)
 
     def set_cart_goal(self,
@@ -91,14 +90,13 @@ class OldGiskardWrapper(GiskardWrapper):
         :param weight: default WEIGHT_ABOVE_CA
         """
         if add_monitor:
-            monitor_name = self.monitors.add_cartesian_pose(root_link=root_link,
+            end_condition = self.monitors.add_cartesian_pose(root_link=root_link,
                                                             root_group=root_group,
                                                             tip_link=tip_link,
                                                             tip_group=tip_group,
                                                             goal_pose=goal_pose)
-            end_condition_monitors = [monitor_name]
         else:
-            end_condition_monitors = []
+            end_condition = ''
         self.motion_goals.add_cartesian_pose(goal_pose=goal_pose,
                                              tip_link=tip_link,
                                              root_link=root_link,
@@ -109,7 +107,7 @@ class OldGiskardWrapper(GiskardWrapper):
                                              reference_linear_velocity=reference_linear_velocity,
                                              reference_angular_velocity=reference_angular_velocity,
                                              weight=weight,
-                                             end_condition=end_condition_monitors,
+                                             end_condition=end_condition,
                                              **kwargs)
 
     def set_diff_drive_base_goal(self,
@@ -139,17 +137,16 @@ class OldGiskardWrapper(GiskardWrapper):
         """
         if add_monitor:
             monitor_name = f'{root_link}/{tip_link} pose reached'
-            monitor_name = self.monitors.add_cartesian_pose(name=monitor_name,
+            end_condition = self.monitors.add_cartesian_pose(name=monitor_name,
                                                             root_link=root_link,
                                                             root_group=root_group,
                                                             tip_link=tip_link,
                                                             tip_group=tip_group,
                                                             position_threshold=0.02,
                                                             goal_pose=goal_pose)
-            end_condition_monitors = [monitor_name]
         else:
-            end_condition_monitors = []
-        self.motion_goals.add_diff_drive_base(end_condition=end_condition_monitors,
+            end_condition = ''
+        self.motion_goals.add_diff_drive_base(end_condition=end_condition,
                                               goal_pose=goal_pose,
                                               tip_link=tip_link,
                                               root_link=root_link,
@@ -190,15 +187,14 @@ class OldGiskardWrapper(GiskardWrapper):
         """
         if add_monitor:
             monitor_name = f'{root_link}/{tip_link} pose reached'
-            monitor_name = self.monitors.add_cartesian_pose(name=monitor_name,
+            end_condition = self.monitors.add_cartesian_pose(name=monitor_name,
                                                             root_link=root_link,
                                                             root_group=root_group,
                                                             tip_link=tip_link,
                                                             tip_group=tip_group,
                                                             goal_pose=goal_pose)
-            end_condition_monitors = [monitor_name]
         else:
-            end_condition_monitors = []
+            end_condition = ''
         self.motion_goals.add_cartesian_pose_straight(end_condition=end_condition,
                                                       goal_pose=goal_pose,
                                                       tip_link=tip_link,
@@ -232,15 +228,14 @@ class OldGiskardWrapper(GiskardWrapper):
         """
         if add_monitor:
             monitor_name = f'{root_link}/{tip_link} position reached'
-            monitor_name = self.monitors.add_cartesian_position(name=monitor_name,
+            end_condition = self.monitors.add_cartesian_position(name=monitor_name,
                                                                 root_link=root_link,
                                                                 root_group=root_group,
                                                                 tip_link=tip_link,
                                                                 tip_group=tip_group,
                                                                 goal_point=goal_point)
-            end_condition = [monitor_name]
         else:
-            end_condition = []
+            end_condition = ''
         self.motion_goals.add_cartesian_position(end_condition=end_condition,
                                                  goal_point=goal_point,
                                                  tip_link=tip_link,
@@ -270,15 +265,14 @@ class OldGiskardWrapper(GiskardWrapper):
         """
         if add_monitor:
             monitor_name = f'{root_link}/{tip_link} position reached'
-            monitor_name = self.monitors.add_cartesian_position(name=monitor_name,
+            end_condition = self.monitors.add_cartesian_position(name=monitor_name,
                                                                 root_link=root_link,
                                                                 root_group=root_group,
                                                                 tip_link=tip_link,
                                                                 tip_group=tip_group,
                                                                 goal_point=goal_point)
-            end_condition = [monitor_name]
         else:
-            end_condition = []
+            end_condition = ''
         self.motion_goals.add_cartesian_position_straight(end_condition=end_condition,
                                                           goal_point=goal_point,
                                                           tip_link=tip_link,
@@ -312,15 +306,14 @@ class OldGiskardWrapper(GiskardWrapper):
         """
         if add_monitor:
             monitor_name = f'{root_link}/{tip_link} orientation reached'
-            monitor_name = self.monitors.add_cartesian_orientation(name=monitor_name,
+            end_condition = self.monitors.add_cartesian_orientation(name=monitor_name,
                                                                    root_link=root_link,
                                                                    root_group=root_group,
                                                                    tip_link=tip_link,
                                                                    tip_group=tip_group,
                                                                    goal_orientation=goal_orientation)
-            end_condition = [monitor_name]
         else:
-            end_condition = []
+            end_condition = ''
         self.motion_goals.add_cartesian_orientation(end_condition=end_condition,
                                                     goal_orientation=goal_orientation,
                                                     tip_link=tip_link,
@@ -355,16 +348,15 @@ class OldGiskardWrapper(GiskardWrapper):
         """
         if add_monitor:
             monitor_name = f'{root_link}/{tip_link} vectors aligned {len(self.monitors._monitors)}'
-            monitor_name = self.monitors.add_vectors_aligned(name=monitor_name,
+            end_condition = self.monitors.add_vectors_aligned(name=monitor_name,
                                                              root_link=root_link,
                                                              tip_link=tip_link,
                                                              goal_normal=goal_normal,
                                                              tip_normal=tip_normal,
                                                              root_group=root_group,
                                                              tip_group=tip_group)
-            end_condition = [monitor_name]
         else:
-            end_condition = []
+            end_condition = ''
         self.motion_goals.add_align_planes(end_condition=end_condition,
                                            tip_link=tip_link,
                                            tip_group=tip_group,
@@ -456,23 +448,22 @@ class OldGiskardWrapper(GiskardWrapper):
         :param reference_angular_velocity: rad/s
         :param weight:
         """
-        end_condition = []
+        end_condition = ''
         if add_monitor:
-            monitor_name = self.monitors.add_distance_to_line(root_link=root_link,
+            monitor_name1 = self.monitors.add_distance_to_line(root_link=root_link,
                                                               tip_link=tip_link,
                                                               center_point=bar_center,
                                                               line_axis=bar_axis,
                                                               line_length=bar_length,
                                                               root_group=root_group,
                                                               tip_group=tip_group)
-            end_condition.append(monitor_name)
-            monitor_name = self.monitors.add_vectors_aligned(root_link=root_link,
+            monitor_name2 = self.monitors.add_vectors_aligned(root_link=root_link,
                                                              tip_link=tip_link,
                                                              goal_normal=bar_axis,
                                                              tip_normal=tip_grasp_axis,
                                                              root_group=root_group,
                                                              tip_group=tip_group)
-            end_condition.append(monitor_name)
+            end_condition = f'{monitor_name1} and {monitor_name2}'
         self.motion_goals.add_grasp_bar(end_condition=end_condition,
                                         root_link=root_link,
                                         tip_link=tip_link,
@@ -553,15 +544,14 @@ class OldGiskardWrapper(GiskardWrapper):
         :param weight:
         """
         if add_monitor:
-            monitor_name = self.monitors.add_pointing_at(goal_point=goal_point,
+            end_condition = self.monitors.add_pointing_at(goal_point=goal_point,
                                                          tip_link=tip_link,
                                                          pointing_axis=pointing_axis,
                                                          root_link=root_link,
                                                          tip_group=tip_group,
                                                          root_group=root_group)
-            end_condition = [monitor_name]
         else:
-            end_condition = []
+            end_condition = ''
         self.motion_goals.add_pointing(end_condition=end_condition,
                                        tip_link=tip_link,
                                        tip_group=tip_group,

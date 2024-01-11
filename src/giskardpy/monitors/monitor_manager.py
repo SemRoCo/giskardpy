@@ -251,8 +251,8 @@ class MonitorManager:
     @profile
     def trigger_update_triggers(self, state: np.ndarray):
         condition_state = self.compiled_trigger_conditions.fast_call(state)
-        for updater_id in condition_state:
-            if updater_id in self.triggers:
+        for updater_id, value in enumerate(condition_state):
+            if updater_id in self.triggers and value:
                 self.triggers[updater_id]()
                 del self.triggers[updater_id]
 

@@ -961,6 +961,9 @@ class TestMonitors:
                                                tip_link='base_footprint')
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
+        current_pose = god_map.world.compute_fk_pose(root='map', tip='base_footprint')
+        np.testing.assert_almost_equal(current_pose.pose.position.x, 1, decimal=2)
+        np.testing.assert_almost_equal(current_pose.pose.position.y, 1, decimal=2)
 
     def test_print_event(self, zero_pose: PR2TestWrapper):
         monitor_name = zero_pose.monitors.add_joint_position(zero_pose.better_pose, name='goal')

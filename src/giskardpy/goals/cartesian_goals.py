@@ -583,25 +583,24 @@ class RelativePositionSequence(Goal):
 
         root_P_goal2_cached = transform_msg_and_turn_to_expr(self.root_link,
                                                              self.tip_P_goal2,
-                                                             [error1_monitor.name])
+                                                             error1_monitor.get_state_expression())
 
         error2 = cas.euclidean_distance(root_P_goal2_cached, root_P_current)
         error2_monitor.set_expression(cas.less(cas.abs(error2), 0.01))
 
         step1 = self.create_and_add_task('step1')
-        step1.add_end_condition_monitor(error1_monitor)
+        step1.end_condition = error1_monitor
         step1.add_point_goal_constraints(root_P_current, root_P_goal1,
                                          reference_velocity=self.max_velocity,
                                          weight=self.weight)
 
         self.step2 = self.create_and_add_task('step2')
-        self.step2.add_start_condition_monitor(error1_monitor)
-        self.step2.add_end_condition_monitor(error2_monitor)
+        self.step2.start_condition = error1_monitor
+        self.step2.end_condition = error2_monitor
         self.step2.add_point_goal_constraints(root_P_current, root_P_goal2_cached,
                                               reference_velocity=self.max_velocity,
                                               weight=self.weight)
 
         self.connect_start_condition_to_all_tasks(start_condition)
         self.connect_hold_condition_to_all_tasks(hold_condition)
-        for monitor in end_condition:
-            self.step2.add_end_condition_monitor(monitor)
+        self.step2.end_condition = cas.logic_and(self.step2.end_condition, end_condition)

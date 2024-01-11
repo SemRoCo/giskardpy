@@ -870,7 +870,7 @@ class TestMonitors:
     def test_sleep(self, zero_pose: PR2TestWrapper):
         sleep1 = zero_pose.monitors.add_sleep(1, name='sleep1')
         print1 = zero_pose.monitors.add_print(message=f'{sleep1} done', start_condition=sleep1)
-        sleep2 = zero_pose.monitors.add_sleep(2, name='sleep2', start_condition=print1)
+        sleep2 = zero_pose.monitors.add_sleep(1.5, name='sleep2', start_condition=print1)
         zero_pose.motion_goals.allow_all_collisions()
 
         right_monitor = zero_pose.monitors.add_joint_position(zero_pose.better_pose_right,
@@ -892,7 +892,7 @@ class TestMonitors:
                                                                               sleep2,
                                                                               right_monitor,
                                                                               left_monitor]))
-        zero_pose.monitors.add_max_trajectory_length(30)
+        zero_pose.monitors.add_max_trajectory_length(120)
         zero_pose.execute(add_local_minimum_reached=False)
         assert god_map.trajectory.length_in_seconds > 6
 

@@ -438,8 +438,8 @@ class TestJointGoals:
 class TestMonitors:
     def test_start_of_expression_monitor(self, zero_pose: PR2TestWrapper):
         time_above = zero_pose.monitors.add_time_above(threshold=5)
-        local_min = zero_pose.monitors.add_local_minimum_reached(start_monitors=[time_above])
-        end_monitor = zero_pose.monitors.add_end_motion(start_monitors=[local_min])
+        local_min = zero_pose.monitors.add_local_minimum_reached(start_condition=time_above)
+        end_monitor = zero_pose.monitors.add_end_motion(start_condition=local_min)
 
         zero_pose.motion_goals.add_joint_position(goal_state=zero_pose.default_pose)
         zero_pose.allow_all_collisions()
@@ -560,16 +560,15 @@ class TestMonitors:
     #
     #     sleep = better_pose.monitors.add_sleep(1)
     #
-    #     local_min = better_pose.monitors.add_local_minimum_reached(start_monitors=[sleep])
+    #     local_min = better_pose.monitors.add_local_minimum_reached(start_condition=sleep)
     #
     #     better_pose.motion_goals.add_motion_goal(motion_goal_class=InsertCylinder.__name__,
     #                                              cylinder_name=cylinder_name,
     #                                              cylinder_height=0.121,
     #                                              hole_point=hole_point,
-    #                                              start_monitors=[sleep],
-    #                                              end_monitors=[])
+    #                                              start_condition=sleep)
     #     better_pose.allow_all_collisions()
-    #     end = better_pose.monitors.add_end_motion(start_monitors=[local_min])
+    #     end = better_pose.monitors.add_end_motion(start_condition=local_min)
     #
     #     better_pose.execute(add_local_minimum_reached=False)
 
@@ -624,7 +623,7 @@ class TestMonitors:
                                                  tip_link=kitchen_setup.l_tip,
                                                  tip_grasp_axis=tip_grasp_axis,
                                                  root_link=kitchen_setup.default_root,
-                                                 end_monitors=[phase1])
+                                                 end_condition=phase1)
         x_gripper = Vector3Stamped()
         x_gripper.header.frame_id = kitchen_setup.l_tip
         x_gripper.vector.x = 1
@@ -637,15 +636,15 @@ class TestMonitors:
                                                     tip_normal=x_gripper,
                                                     root_link=kitchen_setup.default_root,
                                                     goal_normal=x_goal,
-                                                    end_monitors=[phase1])
+                                                    end_condition=phase1)
 
         # %% phase 2 open drawer
         phase2 = kitchen_setup.monitors.add_local_minimum_reached('phase 2',
-                                                                  start_monitors=[phase1])
+                                                                  start_condition=phase1)
         kitchen_setup.motion_goals.add_open_container(tip_link=kitchen_setup.l_tip,
                                                       environment_link=drawer_handle,
-                                                      start_monitors=[phase1],
-                                                      end_monitors=[phase2])
+                                                      start_condition=phase1,
+                                                      end_condition=phase2)
 
         # %% phase 3 pre grasp
 
@@ -656,32 +655,28 @@ class TestMonitors:
         base_pose.pose.orientation.w = 1
         joint_position_reached = kitchen_setup.monitors.add_joint_position(kitchen_setup.better_pose,
                                                                            name='phase 3 joint goal',
-                                                                           start_monitors=[phase2])
+                                                                           start_condition=phase2)
         base_pose_reached = kitchen_setup.monitors.add_cartesian_pose(root_link=kitchen_setup.default_root,
                                                                       tip_link='base_footprint',
                                                                       goal_pose=base_pose,
-                                                                      start_monitors=[phase2],
+                                                                      start_condition=phase2,
                                                                       name='phase 3 base goal')
         kitchen_setup.motion_goals.add_joint_position(kitchen_setup.better_pose,
-                                                      start_monitors=[phase2],
-                                                      end_monitors=[joint_position_reached])
+                                                      start_condition=phase2,
+                                                      end_condition=joint_position_reached)
         kitchen_setup.motion_goals.add_cartesian_pose(root_link=kitchen_setup.default_root,
                                                       tip_link='base_footprint',
                                                       goal_pose=base_pose,
-                                                      start_monitors=[phase2],
-                                                      end_monitors=[base_pose_reached])
+                                                      start_condition=phase2,
+                                                      end_condition=base_pose_reached)
 
         phase3 = kitchen_setup.monitors.add_local_minimum_reached('phase3 done',
-                                                                  start_monitors=[
+                                                                  start_condition=' and '.join([
                                                                       joint_position_reached,
                                                                       base_pose_reached
-                                                                  ])
+                                                                  ]))
 
         # %% phase 4 grasping
-        attach_cup = 'attach_cup'
-        attach_bowl = 'attach_bowl'
-        l_post_grasp = 'l_post_grasp'
-        r_post_grasp = 'r_post_grasp'
         # %% grasp bowl
         l_goal = deepcopy(bowl_pose)
         l_goal.header.frame_id = 'iai_kitchen/sink_area_left_middle_drawer_main'
@@ -694,37 +689,33 @@ class TestMonitors:
                                                                      tip_link=kitchen_setup.l_tip,
                                                                      goal_pose=l_goal,
                                                                      name='l_pre_grasp_pose',
-                                                                     start_monitors=[phase3])
+                                                                     start_condition=phase3)
         kitchen_setup.motion_goals.add_cartesian_pose(goal_pose=l_goal,
                                                       tip_link=kitchen_setup.l_tip,
                                                       root_link=kitchen_setup.default_root,
                                                       name=l_pre_grasp_pose,
-                                                      start_monitors=[phase3],
-                                                      end_monitors=[l_pre_grasp_pose])
+                                                      start_condition=phase3,
+                                                      end_condition=l_pre_grasp_pose)
         l_grasp_goal = deepcopy(l_goal)
         l_grasp_goal.pose.position.z -= .2
         l_grasp_pose = kitchen_setup.monitors.add_cartesian_pose(root_link=kitchen_setup.default_root,
                                                                  tip_link=kitchen_setup.l_tip,
                                                                  goal_pose=l_grasp_goal,
                                                                  name='l_grasp_pose',
-                                                                 start_monitors=[l_pre_grasp_pose])
+                                                                 start_condition=l_pre_grasp_pose)
+        attach_bowl = kitchen_setup.monitors.update_parent_link_of_group(start_condition=l_grasp_pose,
+                                                                         name='attach_bow',
+                                                                         group_name=bowl_name,
+                                                                         parent_link=kitchen_setup.l_tip)
         kitchen_setup.motion_goals.add_cartesian_pose(goal_pose=l_grasp_goal,
                                                       tip_link=kitchen_setup.l_tip,
                                                       root_link=kitchen_setup.default_root,
                                                       name=l_grasp_pose,
-                                                      start_monitors=[l_pre_grasp_pose],
-                                                      end_monitors=[attach_bowl])
-        kitchen_setup.monitors.update_parent_link_of_group(start_monitors=[l_grasp_pose],
-                                                           name=attach_bowl,
-                                                           group_name=bowl_name,
-                                                           parent_link=kitchen_setup.l_tip)
-        kitchen_setup.monitors.add_joint_position(goal_state=kitchen_setup.better_pose_left,
-                                                  name=l_post_grasp,
-                                                  start_monitors=[attach_bowl])
-        kitchen_setup.motion_goals.add_joint_position(goal_state=kitchen_setup.better_pose_left,
-                                                      name=l_post_grasp,
-                                                      start_monitors=[attach_bowl],
-                                                      end_monitors=[l_post_grasp, r_post_grasp])
+                                                      start_condition=l_pre_grasp_pose,
+                                                      end_condition=attach_bowl)
+        l_post_grasp = kitchen_setup.monitors.add_joint_position(goal_state=kitchen_setup.better_pose_left,
+                                                                 name='l_post_grasp',
+                                                                 start_condition=attach_bowl)
 
         # %% grasp cup
         r_goal = deepcopy(cup_pose)
@@ -738,49 +729,53 @@ class TestMonitors:
                                                                      tip_link=kitchen_setup.r_tip,
                                                                      goal_pose=r_goal,
                                                                      name='r_pre_grasp_pose',
-                                                                     start_monitors=[phase3])
+                                                                     start_condition=phase3)
         kitchen_setup.motion_goals.add_cartesian_pose(goal_pose=r_goal,
                                                       tip_link=kitchen_setup.r_tip,
                                                       root_link=kitchen_setup.default_root,
                                                       name=r_pre_grasp_pose,
-                                                      start_monitors=[phase3],
-                                                      end_monitors=[r_pre_grasp_pose])
+                                                      start_condition=phase3,
+                                                      end_condition=r_pre_grasp_pose)
         r_goal = deepcopy(r_goal)
         r_goal.pose.position.z -= .2
         r_grasp_pose = kitchen_setup.monitors.add_cartesian_pose(root_link=kitchen_setup.default_root,
                                                                  tip_link=kitchen_setup.r_tip,
                                                                  goal_pose=r_goal,
                                                                  name='r_grasp_pose',
-                                                                 start_monitors=[r_pre_grasp_pose])
+                                                                 start_condition=r_pre_grasp_pose)
+        attach_cup = kitchen_setup.monitors.update_parent_link_of_group(start_condition=r_grasp_pose,
+                                                                        name='attach_cup',
+                                                                        group_name=cup_name,
+                                                                        parent_link=kitchen_setup.r_tip)
         kitchen_setup.motion_goals.add_cartesian_pose(goal_pose=r_goal,
                                                       name=r_grasp_pose,
                                                       tip_link=kitchen_setup.r_tip,
                                                       root_link=kitchen_setup.default_root,
-                                                      start_monitors=[r_pre_grasp_pose],
-                                                      end_monitors=[attach_cup])
+                                                      start_condition=r_pre_grasp_pose,
+                                                      end_condition=attach_cup)
 
-        kitchen_setup.monitors.update_parent_link_of_group(start_monitors=[r_grasp_pose],
-                                                           name=attach_cup,
-                                                           group_name=cup_name,
-                                                           parent_link=kitchen_setup.r_tip)
-
-        kitchen_setup.monitors.add_joint_position(goal_state=kitchen_setup.better_pose_right,
-                                                  name=r_post_grasp,
-                                                  start_monitors=[attach_cup])
+        r_post_grasp = kitchen_setup.monitors.add_joint_position(goal_state=kitchen_setup.better_pose_right,
+                                                                 name='r_post_grasp',
+                                                                 start_condition=attach_cup)
         kitchen_setup.motion_goals.add_joint_position(goal_state=kitchen_setup.better_pose_right,
                                                       name=r_post_grasp,
-                                                      start_monitors=[attach_cup],
-                                                      end_monitors=[l_post_grasp, r_post_grasp])
+                                                      start_condition=attach_cup,
+                                                      end_condition=' and '.join([l_post_grasp, r_post_grasp]))
 
         kitchen_setup.motion_goals.add_avoid_joint_limits(percentage=percentage,
-                                                          start_monitors=[phase3],
-                                                          end_monitors=[attach_bowl, attach_cup])
+                                                          start_condition=phase3,
+                                                          end_condition=' and '.join([attach_bowl, attach_cup]))
         phase4 = kitchen_setup.monitors.add_local_minimum_reached(name='phase4',
-                                                                  start_monitors=[l_post_grasp, r_post_grasp])
+                                                                  start_condition=' and '.join([l_post_grasp,
+                                                                                                r_post_grasp]))
+        kitchen_setup.motion_goals.add_joint_position(goal_state=kitchen_setup.better_pose_left,
+                                                      name=l_post_grasp,
+                                                      start_condition=attach_bowl,
+                                                      end_condition=' and '.join([l_post_grasp, r_post_grasp]))
 
         # %% phase 5 rotate
         phase5 = kitchen_setup.monitors.add_local_minimum_reached(name='phase5',
-                                                                  start_monitors=[phase4])
+                                                                  start_condition=phase4)
 
         base_goal = PoseStamped()
         base_goal.header.frame_id = 'base_footprint'
@@ -790,12 +785,12 @@ class TestMonitors:
                                                       tip_link='base_footprint',
                                                       name='rotate_to_island',
                                                       root_link=kitchen_setup.default_root,
-                                                      start_monitors=[phase4],
-                                                      end_monitors=[phase5])
+                                                      start_condition=phase4,
+                                                      end_condition=phase5)
 
         # %% phase 6 place bowl and cup
         phase6 = kitchen_setup.monitors.add_local_minimum_reached(name='phase6',
-                                                                  start_monitors=[phase5])
+                                                                  start_condition=phase5)
         bowl_goal = PoseStamped()
         bowl_goal.header.frame_id = 'kitchen_island_surface'
         bowl_goal.pose.position = Point(.2, 0, .05)
@@ -816,33 +811,33 @@ class TestMonitors:
                                                                 tip_link=kitchen_setup.l_tip,
                                                                 goal_pose=bowl_goal,
                                                                 name='bowl_placed',
-                                                                start_monitors=[phase5])
+                                                                start_condition=phase5)
         kitchen_setup.motion_goals.add_cartesian_pose(goal_pose=bowl_goal,
                                                       tip_link=kitchen_setup.l_tip,
                                                       root_link=kitchen_setup.default_root,
                                                       name='place_bowl',
-                                                      start_monitors=[phase5],
-                                                      end_monitors=[bowl_placed, phase6])
+                                                      start_condition=phase5,
+                                                      end_condition=' and '.join([bowl_placed, phase6]))
         cup_placed = kitchen_setup.monitors.add_cartesian_pose(root_link=kitchen_setup.default_root,
                                                                tip_link=kitchen_setup.r_tip,
                                                                goal_pose=cup_goal,
                                                                name='cup_placed',
-                                                               start_monitors=[phase5])
+                                                               start_condition=phase5)
         kitchen_setup.motion_goals.add_cartesian_pose(goal_pose=cup_goal,
                                                       tip_link=kitchen_setup.r_tip,
                                                       root_link=kitchen_setup.default_root,
                                                       name='place_cup',
-                                                      start_monitors=[phase5],
-                                                      end_monitors=[cup_placed, phase6])
+                                                      start_condition=phase5,
+                                                      end_condition=' and '.join([cup_placed, phase6]))
         kitchen_setup.motion_goals.add_avoid_joint_limits(percentage=percentage,
                                                           name='avoid_joint_limits_while_placing',
-                                                          start_monitors=[phase5],
-                                                          end_monitors=[cup_placed, bowl_placed])
-        bowl_detached = kitchen_setup.monitors.update_parent_link_of_group(start_monitors=[bowl_placed],
+                                                          start_condition=phase5,
+                                                          end_condition=' and '.join([cup_placed, bowl_placed]))
+        bowl_detached = kitchen_setup.monitors.update_parent_link_of_group(start_condition=bowl_placed,
                                                                            name='detach_bowl',
                                                                            group_name=bowl_name,
                                                                            parent_link='map')
-        cup_detached = kitchen_setup.monitors.update_parent_link_of_group(start_monitors=[cup_placed],
+        cup_detached = kitchen_setup.monitors.update_parent_link_of_group(start_condition=cup_placed,
                                                                           name='detach_cup',
                                                                           group_name=cup_name,
                                                                           parent_link='map')
@@ -850,16 +845,20 @@ class TestMonitors:
         # %% phase7 final pose
         final_pose_monitor = kitchen_setup.monitors.add_joint_position(goal_state=kitchen_setup.better_pose,
                                                                        name='final pose',
-                                                                       start_monitors=[bowl_detached, cup_detached])
+                                                                       start_condition=' and '.join([bowl_detached,
+                                                                                                     cup_detached]))
         phase7 = kitchen_setup.monitors.add_local_minimum_reached(name='phase7',
-                                                                  start_monitors=[final_pose_monitor, bowl_detached,
-                                                                                  cup_detached])
+                                                                  start_condition=' and '.join([final_pose_monitor,
+                                                                                                bowl_detached,
+                                                                                                cup_detached]))
         kitchen_setup.motion_goals.add_joint_position(goal_state=kitchen_setup.better_pose,
                                                       name=final_pose_monitor,
-                                                      start_monitors=[phase6, bowl_detached, cup_detached],
-                                                      end_monitors=[final_pose_monitor, phase7])
+                                                      start_condition=' and '.join([phase6,
+                                                                                    bowl_detached,
+                                                                                    cup_detached]),
+                                                      end_condition=' and '.join([final_pose_monitor, phase7]))
 
-        kitchen_setup.monitors.add_end_motion(start_monitors=[phase7])
+        kitchen_setup.monitors.add_end_motion(start_condition=phase7)
         kitchen_setup.monitors.add_max_trajectory_length(120)
         kitchen_setup.avoid_all_collisions()
         kitchen_setup.allow_collision(group1=kitchen_setup.l_gripper_group,
@@ -938,11 +937,11 @@ class TestMonitors:
         zero_pose.motion_goals.add_cartesian_pose(goal_pose=base_goal,
                                                   tip_link='base_footprint',
                                                   root_link='map',
-                                                  start_monitors=[alternator2],
-                                                  end_monitors=[goal_reached])
-        local_min = zero_pose.monitors.add_local_minimum_reached(start_monitors=[goal_reached])
+                                                  start_condition=alternator2,
+                                                  end_condition=goal_reached)
+        local_min = zero_pose.monitors.add_local_minimum_reached(start_condition=goal_reached)
 
-        end = zero_pose.monitors.add_end_motion(start_monitors=[local_min])
+        end = zero_pose.monitors.add_end_motion(start_condition=local_min)
         zero_pose.motion_goals.allow_all_collisions()
         zero_pose.execute(add_local_minimum_reached=False)
 

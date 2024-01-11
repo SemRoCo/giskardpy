@@ -85,19 +85,22 @@ class MonitorManager:
             raise GiskardException(str(e))
 
     @profile
-    def add_payload_monitors_to_behavior_tree(self) -> None:
+    def add_payload_monitors_to_behavior_tree(self, traj_tracking: bool = False) -> None:
         payload_monitors = sorted(self.payload_monitors, key=lambda x: isinstance(x, CancelMotion))
         for monitor in payload_monitors:
-            god_map.tree.control_loop_branch.check_monitors.add_monitor(monitor)
+            if traj_tracking:
+                god_map.tree.execute_traj.base_closed_loop.check_monitors.add_monitor(monitor)
+            else:
+                god_map.tree.control_loop_branch.check_monitors.add_monitor(monitor)
 
     @profile
-    def compile_monitors(self) -> None:
+    def compile_monitors(self, traj_tracking: bool = False) -> None:
         self.state_history = []
         self.state = np.zeros(len(self.monitors))
         self.life_cycle_state = np.zeros(len(self.monitors))
         self.set_initial_life_cycle_state()
         self.compile_monitor_state_updater()
-        self.add_payload_monitors_to_behavior_tree()
+        self.add_payload_monitors_to_behavior_tree(traj_tracking=traj_tracking)
         self._register_expression_update_triggers()
 
     @profile
@@ -273,7 +276,8 @@ class MonitorManager:
         args = np.concatenate((self.state, self.life_cycle_state))
         self.life_cycle_state = self.compiled_life_cycle_state_updater.fast_call(args)
 
-        self.state[self.payload_monitor_filter] = self.evaluate_payload_monitors()
+        if len(self.payload_monitor_filter) > 0:
+            self.state[self.payload_monitor_filter] = self.evaluate_payload_monitors()
         self.trigger_update_triggers(self.state)
         self.state_history.append((god_map.time, (self.state.copy(), self.life_cycle_state.copy())))
         god_map.motion_goal_manager.update_task_state(self.state)

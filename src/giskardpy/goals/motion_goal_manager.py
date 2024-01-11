@@ -68,6 +68,9 @@ class MotionGoalManager:
                 if not isinstance(e, GiskardException):
                     raise GoalInitalizationException(error_msg)
                 raise e
+        self.init_task_state()
+
+    def init_task_state(self):
         self.task_state = np.zeros(len(self.tasks))
         for task in self.tasks.values():
             if cas.is_true(task.start_condition):

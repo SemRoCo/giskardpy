@@ -5,7 +5,7 @@ from typing import Optional, List
 from geometry_msgs.msg import Vector3Stamped, PointStamped
 
 import giskardpy.utils.tfwrapper as tf
-from giskardpy import casadi_wrapper as w
+import giskardpy.casadi_wrapper as cas
 from giskardpy.goals.goal import Goal
 from giskardpy.monitors.monitors import ExpressionMonitor
 from giskardpy.tasks.task import WEIGHT_BELOW_CA, Task
@@ -25,9 +25,9 @@ class Pointing(Goal):
                  max_velocity: float = 0.3,
                  weight: float = WEIGHT_BELOW_CA,
                  name: Optional[str] = None,
-                 start_monitors: Optional[List[ExpressionMonitor]] = None,
-                 hold_monitors: Optional[List[ExpressionMonitor]] = None,
-                 end_monitors: Optional[List[ExpressionMonitor]] = None):
+                 start_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.TrueSymbol,
+                 end_condition: cas.Expression = cas.TrueSymbol):
         """
         Will orient pointing_axis at goal_point.
         :param tip_link: tip link of the kinematic chain.
@@ -58,8 +58,8 @@ class Pointing(Goal):
             self.tip_V_pointing_axis.vector.z = 1
 
         root_T_tip = god_map.world.compose_fk_expression(self.root, self.tip)
-        root_P_goal_point = w.Point3(self.root_P_goal_point)
-        tip_V_pointing_axis = w.Vector3(self.tip_V_pointing_axis)
+        root_P_goal_point = cas.Point3(self.root_P_goal_point)
+        tip_V_pointing_axis = cas.Vector3(self.tip_V_pointing_axis)
 
         root_V_goal_axis = root_P_goal_point - root_T_tip.to_position()
         root_V_goal_axis.scale(1)

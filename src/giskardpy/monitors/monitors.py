@@ -43,7 +43,7 @@ class Monitor:
 
     @cached_property
     def state_filter(self) -> np.ndarray:
-        return god_map.monitor_manager.to_state_filter(self.start_monitors)
+        return god_map.monitor_manager.to_state_filter(self.start_condition)
 
     def get_state_expression(self):
         return symbol_manager.get_symbol(f'god_map.monitor_manager.state[{self.id}]')
@@ -126,10 +126,10 @@ class TimeAbove(ExpressionMonitor):
     def __init__(self,
                  threshold: Optional[float] = None,
                  name: Optional[str] = None,
-                 start_monitors: Optional[List[Monitor]] = None):
+                 start_condition: cas.Expression = cas.TrueSymbol):
         super().__init__(name=name,
                          stay_true=False,
-                         start_monitors=start_monitors)
+                         start_condition=start_condition)
         if threshold is None:
             threshold = god_map.qp_controller_config.max_trajectory_length
         traj_length_in_sec = symbol_manager.time
@@ -142,10 +142,10 @@ class Alternator(ExpressionMonitor):
     def __init__(self,
                  name: Optional[str] = None,
                  stay_true: bool = False,
-                 start_monitors: Optional[List[Monitor]] = None,
+                 start_condition: cas.Expression = cas.TrueSymbol,
                  mod: int = 2,
                  plot: bool = True):
-        super().__init__(name, stay_true=stay_true, start_monitors=start_monitors, plot=plot)
+        super().__init__(name, stay_true=stay_true, start_condition=start_condition, plot=plot)
         time = symbol_manager.time
         expr = cas.equal(cas.fmod(cas.floor(time), mod), 0)
         self.set_expression(expr)

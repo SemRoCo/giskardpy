@@ -24,9 +24,9 @@ class InsertCylinder(Goal):
                  tilt: float = np.pi / 10,
                  get_straight_after: float = 0.02,
                  name: Optional[str] = None,
-                 start_monitors: Optional[List[ExpressionMonitor]] = None,
-                 hold_monitors: Optional[List[ExpressionMonitor]] = None,
-                 end_monitors: Optional[List[ExpressionMonitor]] = None):
+                 start_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.TrueSymbol,
+                 end_condition: cas.Expression = cas.TrueSymbol):
         self.cylinder_name = cylinder_name
         self.get_straight_after = get_straight_after
         self.root = god_map.world.root_link_name
@@ -62,7 +62,7 @@ class InsertCylinder(Goal):
         root_P_top = root_P_hole + root_V_up * self.pre_grasp_height
         distance_to_top = cas.euclidean_distance(root_P_tip, root_P_top)
         top_reached = cas.less(distance_to_top, 0.01)
-        top_reached_monitor = ExpressionMonitor(name='top reached', stay_true=True, start_monitors=start_monitors)
+        top_reached_monitor = ExpressionMonitor(name='top reached', stay_true=True, start_condition=start_condition)
         self.add_monitor(top_reached_monitor)
         top_reached_monitor.set_expression(top_reached)
 
@@ -70,7 +70,7 @@ class InsertCylinder(Goal):
         distance_to_hole = cas.norm(root_P_hole - root_P_tip)
         bottom_reached = cas.less(distance_to_hole, 0.01)
         bottom_reached_monitor = ExpressionMonitor('bottom reached', stay_true=True,
-                                                   start_monitors=start_monitors)
+                                                   start_condition=start_condition)
         bottom_reached_monitor.set_expression(bottom_reached)
         self.add_monitor(bottom_reached_monitor)
 
@@ -79,7 +79,7 @@ class InsertCylinder(Goal):
                                              frame_P_goal=root_P_top,
                                              reference_velocity=0.1,
                                              weight=self.weight)
-        reach_top.add_end_monitors_monitor(top_reached_monitor)
+        reach_top.add_end_condition_monitor(top_reached_monitor)
 
         go_to_line = self.create_and_add_task('straight line')
         go_to_line.add_point_goal_constraints(frame_P_current=root_P_tip,
@@ -87,7 +87,7 @@ class InsertCylinder(Goal):
                                               reference_velocity=0.1,
                                               weight=self.weight,
                                               name='pregrasp')
-        go_to_line.add_start_monitors_monitor(top_reached_monitor)
+        go_to_line.add_start_condition_monitor(top_reached_monitor)
         god_map.debug_expression_manager.add_debug_expression('root_V_up', root_V_up)
         god_map.debug_expression_manager.add_debug_expression('root_P_hole', root_P_hole)
         god_map.debug_expression_manager.add_debug_expression('root_P_tip', root_P_tip)
@@ -100,7 +100,7 @@ class InsertCylinder(Goal):
                                           expr_goal=self.tilt,
                                           reference_velocity=0.1,
                                           weight=self.weight)
-        tilt_task.add_end_monitors_monitor(bottom_reached_monitor)
+        tilt_task.add_end_condition_monitor(bottom_reached_monitor)
         root_V_cylinder_z.vis_frame = self.tip
 
         # move down
@@ -110,10 +110,10 @@ class InsertCylinder(Goal):
                                                reference_velocity=0.1,
                                                weight=self.weight,
                                                name='insertion')
-        insert_task.add_start_monitors_monitor(top_reached_monitor)
+        insert_task.add_start_condition_monitor(top_reached_monitor)
         # # tilt straight
         tilt_error = cas.angle_between_vector(root_V_cylinder_z, root_V_up)
-        tilt_monitor = ExpressionMonitor(name='straight', start_monitors=start_monitors)
+        tilt_monitor = ExpressionMonitor(name='straight', start_condition=start_condition)
         tilt_monitor.set_expression(cas.less(tilt_error, 0.01))
         self.add_monitor(tilt_monitor)
 
@@ -122,12 +122,12 @@ class InsertCylinder(Goal):
                                                        frame_V_goal=root_V_up,
                                                        reference_velocity=0.1,
                                                        weight=self.weight)
-        tilt_straight_task.add_start_monitors_monitor(bottom_reached_monitor)
-        tilt_straight_task.add_end_monitors_monitor(tilt_monitor)
-        self.connect_monitors_to_all_tasks(start_monitors, hold_monitors, end_monitors)
-        # self.connect_start_monitors_to_all_tasks(start_monitors)
-        # self.connect_hold_monitors_to_all_tasks(hold_monitors)
-        # for monitor in end_monitors:
-        #     tilt_straight_task.add_end_monitors_monitor(monitor)
-        #     go_to_line.add_end_monitors_monitor(monitor)
-        #     insert_task.add_end_monitors_monitor(monitor)
+        tilt_straight_task.add_start_condition_monitor(bottom_reached_monitor)
+        tilt_straight_task.add_end_condition_monitor(tilt_monitor)
+        self.connect_monitors_to_all_tasks(start_condition, hold_condition, end_condition)
+        # self.connect_start_condition_to_all_tasks(start_condition)
+        # self.connect_hold_condition_to_all_tasks(hold_condition)
+        # for monitor in end_condition:
+        #     tilt_straight_task.add_end_condition_monitor(monitor)
+        #     go_to_line.add_end_condition_monitor(monitor)
+        #     insert_task.add_end_condition_monitor(monitor)

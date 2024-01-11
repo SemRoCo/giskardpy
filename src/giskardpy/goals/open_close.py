@@ -21,9 +21,9 @@ class Open(Goal):
                  max_velocity: float = 100,
                  weight: float = WEIGHT_ABOVE_CA,
                  name: Optional[str] = None,
-                 start_monitors: Optional[List[ExpressionMonitor]] = None,
-                 hold_monitors: Optional[List[ExpressionMonitor]] = None,
-                 end_monitors: Optional[List[ExpressionMonitor]] = None
+                 start_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.TrueSymbol,
+                 end_condition: cas.Expression = cas.TrueSymbol
                  ):
         """
         Open a container in an environment.
@@ -59,14 +59,14 @@ class Open(Goal):
         #                                            tip_group=tip_group,
         #                                            goal_pose=self.handle_T_tip,
         #                                            weight=self.weight,
-        #                                            start_monitors=start_monitors,
-        #                                            hold_monitors=hold_monitors,
-        #                                            end_monitors=end_monitors))
+        #                                            start_condition=start_condition,
+        #                                            hold_condition=hold_condition,
+        #                                            end_condition=end_condition))
 
-        if start_monitors:
+        if not cas.is_true(start_condition):
             handle_T_tip = god_map.world.compose_fk_expression(self.handle_link, self.tip_link)
             handle_T_tip = god_map.monitor_manager.register_expression_updater(handle_T_tip,
-                                                                               tuple(start_monitors))
+                                                                               start_condition)
         else:
             handle_T_tip = cas.TransMatrix(god_map.world.compute_fk_pose(self.handle_link, self.tip_link))
 
@@ -89,18 +89,18 @@ class Open(Goal):
                                            reference_velocity=CartesianOrientation.default_reference_velocity,
                                            weight=self.weight)
 
-        self.connect_monitors_to_all_tasks(start_monitors=start_monitors,
-                                           hold_monitors=hold_monitors,
-                                           end_monitors=end_monitors)
+        self.connect_monitors_to_all_tasks(start_condition=start_condition,
+                                           hold_condition=hold_condition,
+                                           end_condition=end_condition)
 
         goal_state = {self.joint_name.short_name: goal_joint_state}
         self.add_constraints_of_goal(JointPositionList(goal_state=goal_state,
                                                        group_name=self.joint_group.name,
                                                        max_velocity=max_velocity,
                                                        weight=WEIGHT_BELOW_CA,
-                                                       start_monitors=start_monitors,
-                                                       hold_monitors=hold_monitors,
-                                                       end_monitors=end_monitors))
+                                                       start_condition=start_condition,
+                                                       hold_condition=hold_condition,
+                                                       end_condition=end_condition))
 
 
 class Close(Goal):
@@ -112,9 +112,9 @@ class Close(Goal):
                  goal_joint_state: Optional[float] = None,
                  weight: float = WEIGHT_ABOVE_CA,
                  name: Optional[str] = None,
-                 start_monitors: Optional[List[ExpressionMonitor]] = None,
-                 hold_monitors: Optional[List[ExpressionMonitor]] = None,
-                 end_monitors: Optional[List[ExpressionMonitor]] = None
+                 start_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.TrueSymbol,
+                 end_condition: cas.Expression = cas.TrueSymbol
                  ):
         """
         Same as Open, but will use minimum value as default for goal_joint_state
@@ -137,6 +137,6 @@ class Close(Goal):
                                           environment_group=environment_group,
                                           goal_joint_state=goal_joint_state,
                                           weight=weight,
-                                          start_monitors=start_monitors,
-                                          hold_monitors=hold_monitors,
-                                          end_monitors=end_monitors))
+                                          start_condition=start_condition,
+                                          hold_condition=hold_condition,
+                                          end_condition=end_condition))

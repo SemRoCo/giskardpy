@@ -89,18 +89,6 @@ class Task:
     def get_state_expression(self) -> cas.Symbol:
         return symbol_manager.get_symbol(f'god_map.motion_goal_manager.task_state[{self.id}]')
 
-    @memoize
-    def get_start_monitor_filter(self) -> np.ndarray:
-        return god_map.monitor_manager.to_state_filter(self.start_monitors)
-
-    @memoize
-    def get_hold_monitor_filter(self) -> np.ndarray:
-        return god_map.monitor_manager.to_state_filter(self.hold_monitors)
-
-    @memoize
-    def get_end_monitor_filter(self) -> np.ndarray:
-        return god_map.monitor_manager.to_state_filter(self.end_monitors)
-
     @overload
     def _apply_monitors_to_constraints(self, constraints: Iterable[EqualityConstraint]) \
             -> List[Union[EqualityConstraint]]:

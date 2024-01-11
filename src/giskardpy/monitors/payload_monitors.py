@@ -40,8 +40,8 @@ class WorldUpdatePayloadMonitor(PayloadMonitor):
 
     def __init__(self, *,
                  name: Optional[str] = None,
-                 start_monitors: Optional[List[Monitor]] = None):
-        super().__init__(name=name, start_monitors=start_monitors, run_call_in_thread=True)
+                 start_condition: cas.Expression = cas.TrueSymbol):
+        super().__init__(name=name, start_condition=start_condition, run_call_in_thread=True)
 
     @abc.abstractmethod
     def apply_world_update(self):
@@ -93,7 +93,7 @@ class SetMaxTrajectoryLength(CancelMotion):
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,):
         if not (start_condition == cas.TrueSymbol).evaluate():
-            raise MonitorInitalizationException(f'Cannot set start_monitors for {SetMaxTrajectoryLength.__name__}')
+            raise MonitorInitalizationException(f'Cannot set start_condition for {SetMaxTrajectoryLength.__name__}')
         if new_length is None:
             self.new_length = god_map.qp_controller_config.max_trajectory_length
         else:
@@ -114,9 +114,9 @@ class Print(PayloadMonitor):
     def __init__(self,
                  message: str,
                  name: Optional[str] = None,
-                 start_monitors: Optional[List[Monitor]] = None):
+                 start_condition: cas.Expression = cas.TrueSymbol):
         self.message = message
-        super().__init__(name=name, start_monitors=start_monitors, run_call_in_thread=False)
+        super().__init__(name=name, start_condition=start_condition, run_call_in_thread=False)
 
     def __call__(self):
         logging.loginfo(self.message)
@@ -127,9 +127,9 @@ class Sleep(PayloadMonitor):
     def __init__(self,
                  seconds: float,
                  name: Optional[str] = None,
-                 start_monitors: Optional[List[Monitor]] = None):
+                 start_condition: cas.Expression = cas.TrueSymbol):
         self.seconds = seconds
-        super().__init__(name=name, start_monitors=start_monitors, run_call_in_thread=True)
+        super().__init__(name=name, start_condition=start_condition, run_call_in_thread=True)
 
     def __call__(self):
         rospy.sleep(self.seconds)
@@ -142,10 +142,10 @@ class UpdateParentLinkOfGroup(WorldUpdatePayloadMonitor):
                  parent_link: str,
                  parent_link_group: Optional[str] = '',
                  name: Optional[str] = None,
-                 start_monitors: Optional[List[Monitor]] = None):
+                 start_condition: cas.Expression = cas.TrueSymbol):
         self.group_name = group_name
         self.new_parent_link = god_map.world.search_for_link_name(parent_link, parent_link_group)
-        super().__init__(name=name, start_monitors=start_monitors)
+        super().__init__(name=name, start_condition=start_condition)
 
     def apply_world_update(self):
         god_map.world.move_group(group_name=self.group_name,
@@ -159,8 +159,8 @@ class CollisionMatrixUpdater(PayloadMonitor):
     def __init__(self,
                  new_collision_matrix: Dict[Tuple[str, str], float],
                  name: Optional[str] = None,
-                 start_monitors: Optional[List[Monitor]] = None):
-        super().__init__(name=name, start_monitors=start_monitors, run_call_in_thread=False)
+                 start_condition: cas.Expression = cas.TrueSymbol):
+        super().__init__(name=name, start_condition=start_condition, run_call_in_thread=False)
         self.collision_matrix = new_collision_matrix
 
     @profile
@@ -175,8 +175,8 @@ class PayloadAlternator(PayloadMonitor):
     def __init__(self,
                  mod: int = 2,
                  name: Optional[str] = None,
-                 start_monitors: Optional[List[Monitor]] = None):
-        super().__init__(name=name, stay_true=False, start_monitors=start_monitors, run_call_in_thread=False)
+                 start_condition: cas.Expression = cas.TrueSymbol):
+        super().__init__(name=name, stay_true=False, start_condition=start_condition, run_call_in_thread=False)
         self.mod = mod
 
     def __call__(self):

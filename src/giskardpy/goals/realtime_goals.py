@@ -8,6 +8,7 @@ from geometry_msgs.msg import Vector3Stamped, PointStamped
 from giskardpy.monitors.monitors import ExpressionMonitor
 from giskardpy.tasks.task import WEIGHT_BELOW_CA
 from giskardpy.goals.pointing import Pointing
+import giskardpy.casadi_wrapper as cas
 from giskardpy.utils.expression_definition_utils import transform_msg
 
 
@@ -21,9 +22,9 @@ class RealTimePointing(Pointing):
                  pointing_axis: Vector3Stamped = None,
                  max_velocity: float = 0.3,
                  weight: float = WEIGHT_BELOW_CA,
-                 start_monitors: Optional[List[ExpressionMonitor]] = None,
-                 hold_monitors: Optional[List[ExpressionMonitor]] = None,
-                 end_monitors: Optional[List[ExpressionMonitor]] = None
+                 start_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.TrueSymbol,
+                 end_condition: cas.Expression = cas.TrueSymbol
                  ):
         initial_goal = PointStamped()
         initial_goal.header.frame_id = 'base_footprint'

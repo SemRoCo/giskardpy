@@ -487,24 +487,27 @@ class TestMonitors:
                                                          root_link=root_link,
                                                          tip_link=tip_link,
                                                          goal_pose=pose2,
-                                                         start_monitors=[monitor1])
+                                                         start_condition=monitor1)
         end_monitor = zero_pose.monitors.add_local_minimum_reached()
 
         zero_pose.motion_goals.add_cartesian_pose(goal_pose=pose1,
                                                   name='g1',
                                                   root_link=root_link,
                                                   tip_link=tip_link,
-                                                  end_monitors=[monitor1])
+                                                  end_condition=monitor1)
         zero_pose.motion_goals.add_cartesian_pose(goal_pose=pose2,
                                                   name='g2',
                                                   root_link=root_link,
                                                   tip_link=tip_link,
                                                   relative=True,
-                                                  start_monitors=[monitor1],
-                                                  end_monitors=[monitor2, end_monitor])
+                                                  start_condition=monitor1,
+                                                  end_condition=f'{monitor2} and {end_monitor}')
         zero_pose.allow_all_collisions()
-        zero_pose.monitors.add_end_motion(start_monitors=[end_monitor])
+        zero_pose.monitors.add_end_motion(start_condition=end_monitor)
         zero_pose.execute(add_local_minimum_reached=False)
+        current_pose = god_map.world.compute_fk_pose(root=root_link, tip=tip_link)
+        np.testing.assert_almost_equal(current_pose.pose.position.x, 1, decimal=2)
+        np.testing.assert_almost_equal(current_pose.pose.position.y, 1, decimal=2)
 
     def test_place_cylinder1(self, better_pose: PR2TestWrapper):
         cylinder_name = 'C'

@@ -34,14 +34,18 @@ def monitor_list_to_monitor_name_tuple(monitors: Iterable[Union[str, ExpressionM
 
 class MonitorManager:
     compiled_state_updater: CompiledFunction
-    compiled_life_cycle_state_updater: CompiledFunction
     state: np.ndarray  # order: ExpressionMonitors, PayloadMonitors
     life_cycle_state: np.ndarray  # order: ExpressionMonitors, PayloadMonitors
+    compiled_life_cycle_state_updater: CompiledFunction
+    state_history: List[Tuple[float, Tuple[np.ndarray, np.ndarray]]]  # time -> (state, life_cycle_state)
+
     expression_monitors: List[ExpressionMonitor]
     payload_monitors: List[PayloadMonitor]
-    substitution_values: Dict[Tuple[str, ...], Dict[str, float]]
-    triggers: Dict[Tuple[int, ...], Callable]
-    state_history: List[Tuple[float, Tuple[np.ndarray, np.ndarray]]]  # time -> (state, life_cycle_state)
+
+    substitution_values: Dict[int, Dict[str, float]]  # id -> (old_symbol, value)
+    triggers: Dict[int, Callable]  # id -> updater callback
+    trigger_conditions: List[cas.Expression]  # id -> condition
+    compiled_trigger_conditions: cas.CompiledFunction  # stacked compiled function which returns array of evaluated conditions
 
     def __init__(self):
         self.expression_monitors = []
@@ -49,9 +53,10 @@ class MonitorManager:
         self.allowed_monitor_types = {}
         self.allowed_monitor_types.update(get_all_classes_in_package(package_name='giskardpy.monitors',
                                                                      parent_class=Monitor))
+        self.state_history = []
         self.substitution_values = {}
         self.triggers = {}
-        self.state_history = []
+        self.trigger_conditions = []
 
     def evaluate_expression(self, node):
         if isinstance(node, ast.BoolOp):
@@ -110,12 +115,15 @@ class MonitorManager:
             else:
                 self.life_cycle_state[monitor.id] = TaskState.not_started
 
+    def get_monitor_from_state_expr(self, expr: cas.Expression) -> Monitor:
+        for monitor in self.monitors:
+            if cas.is_true(monitor.get_state_expression() == expr):
+                return monitor
+        raise GiskardException('No monitor found.')
+
     @profile
     def compile_monitor_state_updater(self):
-        symbols = []
-        for i in range(len(god_map.monitor_manager.monitors)):
-            symbols.append(self.monitors[i].get_state_expression())
-        monitor_state = cas.Expression(symbols)
+        monitor_state = cas.Expression(self.get_state_expression_symbols())
 
         symbols = []
         for i in range(len(god_map.monitor_manager.monitors)):
@@ -187,21 +195,22 @@ class MonitorManager:
 
     @profile
     def register_expression_updater(self, expression: cas.PreservedCasType,
-                                    monitors: Tuple[Union[str, ExpressionMonitor], ...]) \
+                                    condition: cas.Expression) \
             -> cas.PreservedCasType:
         """
         Expression is updated when all monitors are 1 at the same time, but only once.
         """
-        if not monitors:
-            raise ValueError('monitors is empty.')
-        monitor_names = monitor_list_to_monitor_name_tuple(monitors)
+        updater_id = len(self.substitution_values)
+        if cas.is_true(condition):
+            raise ValueError('condition is always true')
         old_symbols = []
         new_symbols = []
         for i, symbol in enumerate(expression.free_symbols()):
             old_symbols.append(symbol)
-            new_symbols.append(self.get_substitution_key(monitor_names, str(symbol)))
+            new_symbols.append(self.get_substitution_key(updater_id, str(symbol)))
         new_expression = cas.substitute(expression, old_symbols, new_symbols)
-        self.update_substitution_values(monitor_names, [str(s) for s in old_symbols])
+        self.update_substitution_values(updater_id, [str(s) for s in old_symbols])
+        self.trigger_conditions.append(condition)
         return new_expression
 
     @profile
@@ -209,40 +218,46 @@ class MonitorManager:
         monitor_names = monitor_list_to_monitor_name_tuple(monitor_names)
         return np.array([monitor.id for monitor in self.monitors if monitor.name in monitor_names])
 
+    def get_state_expression_symbols(self) -> List[cas.Symbol]:
+        return [m.get_state_expression() for m in self.monitors]
+
     @profile
     def _register_expression_update_triggers(self):
-        for monitor_names, values in self.substitution_values.items():
-            trigger_filter = tuple([i for i, m in enumerate(self.expression_monitors) if m.name in monitor_names])
-
+        for updater_id, values in self.substitution_values.items():
             class Callback:
-                def __init__(self, monitor_names, values):
-                    self.monitor_names = monitor_names
+                def __init__(self, updater_id: int, values):
+                    self.updater_id = updater_id
                     self.keys = list(values.keys())
 
                 def __call__(self):
-                    return god_map.monitor_manager.update_substitution_values(self.monitor_names, self.keys)
+                    return god_map.monitor_manager.update_substitution_values(self.updater_id, self.keys)
 
-            self.triggers[trigger_filter] = Callback(monitor_names, values)
+            self.triggers[updater_id] = Callback(updater_id, values)
+        expr = cas.Expression(self.trigger_conditions)
+        self.compiled_trigger_conditions = expr.compile(self.get_state_expression_symbols())
 
     @profile
-    def update_substitution_values(self, monitor_names: Tuple[str, ...], keys: Optional[List[str]] = None):
+    def update_substitution_values(self, updater_id: int, keys: Optional[List[str]] = None):
         if keys is None:
-            keys = list(self.substitution_values[monitor_names].keys())
+            keys = list(self.substitution_values[updater_id].keys())
         values = symbol_manager.resolve_symbols(keys)
-        self.substitution_values[monitor_names] = {key: value for key, value in zip(keys, values)}
+        self.substitution_values[updater_id] = {key: value for key, value in zip(keys, values)}
 
     @profile
-    def get_substitution_key(self, monitor_names: Tuple[str, ...], original_expr: str) -> cas.Symbol:
+    def get_substitution_key(self, updater_id: int, original_expr: str) -> cas.Symbol:
         return symbol_manager.get_symbol(
-            f'god_map.monitor_manager.substitution_values[{monitor_names}]["{original_expr}"]')
+            f'god_map.monitor_manager.substitution_values[{updater_id}]["{original_expr}"]')
 
     @profile
     def trigger_update_triggers(self, state: np.ndarray):
-        non_zeros = state.nonzero()[0]
-        for trigger_map, trigger_function in list(self.triggers.items()):
-            if np.all(np.isin(trigger_map, non_zeros)):
-                trigger_function()
-                del self.triggers[trigger_map]
+        condition_state = self.compiled_trigger_conditions.fast_call(state)
+        for updater_id in condition_state:
+            if updater_id in self.triggers:
+                self.triggers[updater_id]()
+                del self.triggers[updater_id]
+
+    def evaluate_trigger_conditions(self, state: np.ndarray) -> None:
+        pass
 
     @profile
     def evaluate_monitors(self):

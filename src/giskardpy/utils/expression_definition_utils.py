@@ -50,35 +50,35 @@ def transform_msg(target_frame, msg, tf_timeout=1):
 
 @overload
 def transform_msg_and_turn_to_expr(root_link: PrefixName,
-                                   msg: Union[PoseStamped],
-                                   monitors: Optional[List[Union[str, ExpressionMonitor]]] = None) -> cas.TransMatrix: ...
+                                   msg: PoseStamped,
+                                   condition: Optional[cas.Expression] = None) -> cas.TransMatrix: ...
 
 
 @overload
 def transform_msg_and_turn_to_expr(root_link: PrefixName,
-                                   msg: Union[PointStamped],
-                                   monitors: Optional[List[Union[str, ExpressionMonitor]]] = None) -> cas.Point3: ...
+                                   msg: PointStamped,
+                                   condition: Optional[cas.Expression] = None) -> cas.Point3: ...
 
 
 @overload
 def transform_msg_and_turn_to_expr(root_link: PrefixName,
-                                   msg: Union[Vector3Stamped],
-                                   monitors: Optional[List[Union[str, ExpressionMonitor]]] = None) -> cas.Vector3: ...
+                                   msg: Vector3Stamped,
+                                   condition: Optional[cas.Expression] = None) -> cas.Vector3: ...
 
 
 @overload
 def transform_msg_and_turn_to_expr(root_link: PrefixName,
-                                   msg: Union[QuaternionStamped],
-                                   monitors: Optional[List[Union[str, ExpressionMonitor]]] = None) -> cas.RotationMatrix: ...
+                                   msg: QuaternionStamped,
+                                   condition: Optional[cas.Expression] = None) -> cas.RotationMatrix: ...
 
 
-def transform_msg_and_turn_to_expr(root_link, msg, update_on_monitors=None):
-    if update_on_monitors:
+def transform_msg_and_turn_to_expr(root_link, msg, condition=None):
+    if condition:
         goal_frame_id = god_map.world.search_for_link_name(msg.header.frame_id)
         goal_frame_id_X_goal = transform_msg(goal_frame_id, msg)
         root_T_goal_frame_id = god_map.world.compose_fk_expression(root_link, goal_frame_id)
         root_T_goal_frame_id = god_map.monitor_manager.register_expression_updater(root_T_goal_frame_id,
-                                                                                   tuple(update_on_monitors))
+                                                                                   condition)
         if isinstance(msg, PoseStamped):
             goal_frame_id_X_goal = cas.TransMatrix(goal_frame_id_X_goal)
         elif isinstance(msg, PointStamped):

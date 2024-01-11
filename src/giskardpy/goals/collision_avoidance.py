@@ -396,9 +396,9 @@ class CollisionAvoidance(Goal):
                                                                             soft_thresholds=soft_threshold,
                                                                             idx=i,
                                                                             num_repeller=number_of_repeller,
-                                                                            start_monitors=self.start_monitors,
-                                                                            hold_monitors=self.hold_monitors,
-                                                                            end_monitors=self.end_monitors))
+                                                                            start_condition=self.start_condition,
+                                                                            hold_condition=self.hold_condition,
+                                                                            end_condition=self.end_condition))
                     num_constrains += 1
         logging.loginfo(f'Adding {num_constrains} external collision avoidance constraints.')
 
@@ -464,8 +464,8 @@ class CollisionAvoidance(Goal):
                                                                     soft_threshold=soft_threshold,
                                                                     idx=i,
                                                                     num_repeller=number_of_repeller,
-                                                                    start_monitors=self.start_monitors,
-                                                                    hold_monitors=self.hold_monitors,
-                                                                    end_monitors=self.end_monitors))
+                                                                    start_condition=self.start_condition,
+                                                                    hold_condition=self.hold_condition,
+                                                                    end_condition=self.end_condition))
                 num_constr += 1
         logging.loginfo(f'Adding {num_constr} self collision avoidance constraints.')

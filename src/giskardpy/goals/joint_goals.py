@@ -93,9 +93,9 @@ class JointVelocityLimit(Goal):
                  max_velocity: float = 1,
                  hard: bool = False,
                  name: Optional[str] = None,
-                 start_monitors: Optional[List[ExpressionMonitor]] = None,
-                 hold_monitors: Optional[List[ExpressionMonitor]] = None,
-                 end_monitors: Optional[List[ExpressionMonitor]] = None):
+                 start_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.TrueSymbol,
+                 end_condition: cas.Expression = cas.TrueSymbol):
         """
         Limits the joint velocity of a revolute joint.
         :param joint_name:
@@ -136,7 +136,7 @@ class JointVelocityLimit(Goal):
                                              weight=self.weight,
                                              task_expression=current_joint,
                                              velocity_limit=max_velocity)
-        self.connect_monitors_to_all_tasks(start_monitors, hold_monitors, end_monitors)
+        self.connect_monitors_to_all_tasks(start_condition, hold_condition, end_condition)
 
 
 class AvoidJointLimits(Goal):
@@ -146,9 +146,9 @@ class AvoidJointLimits(Goal):
                  group_name: Optional[str] = None,
                  weight: float = WEIGHT_BELOW_CA,
                  name: Optional[str] = None,
-                 start_monitors: Optional[List[ExpressionMonitor]] = None,
-                 hold_monitors: Optional[List[ExpressionMonitor]] = None,
-                 end_monitors: Optional[List[ExpressionMonitor]] = None
+                 start_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.TrueSymbol,
+                 end_condition: cas.Expression = cas.TrueSymbol
                  ):
         """
         Calls AvoidSingleJointLimits for each joint in joint_list
@@ -200,7 +200,7 @@ class AvoidJointLimits(Goal):
                                                upper_error=upper_err,
                                                weight=weight,
                                                task_expression=joint_symbol)
-        self.connect_monitors_to_all_tasks(start_monitors, hold_monitors, end_monitors)
+        self.connect_monitors_to_all_tasks(start_condition, hold_condition, end_condition)
 
 
 class JointPositionList(Goal):

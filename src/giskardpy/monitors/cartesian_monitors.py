@@ -19,11 +19,11 @@ class PoseReached(ExpressionMonitor):
                  orientation_threshold: float = 0.01,
                  name: Optional[str] = None,
                  stay_true: bool = True,
-                 start_monitors: Optional[List[Monitor]] = None):
-        super().__init__(name=name, stay_true=stay_true, start_monitors=start_monitors)
+                 start_condition: cas.Expression = cas.TrueSymbol):
+        super().__init__(name=name, stay_true=stay_true, start_condition=start_condition)
         root_link = god_map.world.search_for_link_name(root_link, root_group)
         tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
-        if not start_monitors:
+        if cas.is_true(start_condition):
             goal_pose = transform_msg(root_link, goal_pose)
             root_T_goal = cas.TransMatrix(goal_pose)
         else:
@@ -31,7 +31,7 @@ class PoseReached(ExpressionMonitor):
             goal_frame_id_T_goal = transform_msg(goal_frame_id, goal_pose)
             root_T_goal_frame_id = god_map.world.compose_fk_expression(root_link, goal_frame_id)
             root_T_goal_frame_id = god_map.monitor_manager.register_expression_updater(root_T_goal_frame_id,
-                                                                                       tuple(start_monitors))
+                                                                                       start_condition)
             goal_frame_id_T_goal = cas.TransMatrix(goal_frame_id_T_goal)
             root_T_goal = root_T_goal_frame_id.dot(goal_frame_id_T_goal)
 
@@ -60,8 +60,8 @@ class PositionReached(ExpressionMonitor):
                  threshold: float = 0.01,
                  name: Optional[str] = None,
                  stay_true: bool = True,
-                 start_monitors: Optional[List[Monitor]] = None):
-        super().__init__(name=name, stay_true=stay_true, start_monitors=start_monitors)
+                 start_condition: cas.Expression = cas.TrueSymbol):
+        super().__init__(name=name, stay_true=stay_true, start_condition=start_condition)
         root_link = god_map.world.search_for_link_name(root_link, root_group)
         tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
         goal_point = transform_msg(root_link, goal_point)
@@ -81,8 +81,8 @@ class OrientationReached(ExpressionMonitor):
                  threshold: float = 0.01,
                  name: Optional[str] = None,
                  stay_true: bool = True,
-                 start_monitors: Optional[List[Monitor]] = None):
-        super().__init__(name=name, stay_true=stay_true, start_monitors=start_monitors)
+                 start_condition: cas.Expression = cas.TrueSymbol):
+        super().__init__(name=name, stay_true=stay_true, start_condition=start_condition)
         root_link = god_map.world.search_for_link_name(root_link, root_group)
         tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
         goal_orientation = transform_msg(root_link, goal_orientation)
@@ -103,8 +103,8 @@ class PointingAt(ExpressionMonitor):
                  threshold: float = 0.01,
                  name: Optional[str] = None,
                  stay_true: bool = True,
-                 start_monitors: Optional[List[Monitor]] = None):
-        super().__init__(name=name, stay_true=stay_true, start_monitors=start_monitors)
+                 start_condition: cas.Expression = cas.TrueSymbol):
+        super().__init__(name=name, stay_true=stay_true, start_condition=start_condition)
         self.root = god_map.world.search_for_link_name(root_link, root_group)
         self.tip = god_map.world.search_for_link_name(tip_link, tip_group)
         self.root_P_goal_point = transform_msg(self.root, goal_point)
@@ -136,8 +136,8 @@ class VectorsAligned(ExpressionMonitor):
                  threshold: float = 0.01,
                  name: Optional[str] = None,
                  stay_true: bool = True,
-                 start_monitors: Optional[List[Monitor]] = None):
-        super().__init__(name=name, stay_true=stay_true, start_monitors=start_monitors)
+                 start_condition: cas.Expression = cas.TrueSymbol):
+        super().__init__(name=name, stay_true=stay_true, start_condition=start_condition)
         self.root = god_map.world.search_for_link_name(root_link, root_group)
         self.tip = god_map.world.search_for_link_name(tip_link, tip_group)
 
@@ -168,8 +168,8 @@ class DistanceToLine(ExpressionMonitor):
                  threshold: float = 0.01,
                  name: Optional[str] = None,
                  stay_true: bool = True,
-                 start_monitors: Optional[List[Monitor]] = None):
-        super().__init__(name=name, stay_true=stay_true, start_monitors=start_monitors)
+                 start_condition: cas.Expression = cas.TrueSymbol):
+        super().__init__(name=name, stay_true=stay_true, start_condition=start_condition)
         self.root = god_map.world.search_for_link_name(root_link, root_group)
         self.tip = god_map.world.search_for_link_name(tip_link, tip_group)
 

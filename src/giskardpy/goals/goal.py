@@ -26,7 +26,7 @@ class Goal(ABC):
     def __init__(self,
                  name: str,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.TrueSymbol):
         """
         This is where you specify goal parameters and save them as self attributes.

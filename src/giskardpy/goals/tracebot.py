@@ -25,7 +25,7 @@ class InsertCylinder(Goal):
                  get_straight_after: float = 0.02,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.TrueSymbol):
         self.cylinder_name = cylinder_name
         self.get_straight_after = get_straight_after

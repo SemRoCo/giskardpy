@@ -899,8 +899,8 @@ class TestMonitors:
 
     def test_hold_monitors(self, zero_pose: PR2TestWrapper):
         sleep = zero_pose.monitors.add_sleep(0.5)
-        alternator2 = zero_pose.monitors.add_alternator(start_monitors=[sleep], mod=2)
-        alternator4 = zero_pose.monitors.add_alternator(start_monitors=[alternator2], mod=4)
+        alternator2 = zero_pose.monitors.add_alternator(start_condition=sleep, mod=2)
+        alternator4 = zero_pose.monitors.add_alternator(start_condition=alternator2, mod=4)
 
         base_goal = PoseStamped()
         base_goal.header.frame_id = 'map'
@@ -914,12 +914,13 @@ class TestMonitors:
         zero_pose.motion_goals.add_cartesian_pose(goal_pose=base_goal,
                                                   tip_link='base_footprint',
                                                   root_link='map',
-                                                  hold_monitors=[alternator4],
-                                                  end_monitors=[goal_reached])
-        local_min = zero_pose.monitors.add_local_minimum_reached(start_monitors=[goal_reached])
+                                                  hold_condition=alternator4,
+                                                  end_condition=goal_reached)
+        local_min = zero_pose.monitors.add_local_minimum_reached(start_condition=goal_reached)
 
-        end = zero_pose.monitors.add_end_motion(start_monitors=[local_min])
+        end = zero_pose.monitors.add_end_motion(start_condition=local_min)
         zero_pose.motion_goals.allow_all_collisions()
+        zero_pose.set_max_traj_length(30)
         zero_pose.execute(add_local_minimum_reached=False)
 
     def test_start_monitors(self, zero_pose: PR2TestWrapper):

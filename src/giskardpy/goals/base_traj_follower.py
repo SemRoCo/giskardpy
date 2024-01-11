@@ -29,7 +29,7 @@ class BaseTrajFollower(Goal):
                  track_only_velocity: bool = False,
                  weight: float = WEIGHT_ABOVE_CA,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.TrueSymbol):
         self.weight = weight
         self.joint_name = joint_name

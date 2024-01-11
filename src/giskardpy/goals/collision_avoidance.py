@@ -26,7 +26,7 @@ class ExternalCollisionAvoidance(Goal):
                  idx: int = 0,
                  num_repeller: int = 1,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.TrueSymbol):
         """
         Don't use me
@@ -144,7 +144,7 @@ class SelfCollisionAvoidance(Goal):
                  num_repeller: int = 1,
                  name_prefix: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.TrueSymbol):
         self.link_a = link_a
         self.link_b = link_b
@@ -243,7 +243,7 @@ class CollisionAvoidanceHint(Goal):
                  root_link=None, max_threshold=0.05, spring_threshold=None, weight=WEIGHT_ABOVE_CA,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.TrueSymbol):
         """
         This goal pushes the link_name in the direction of avoidance_hint, if it is closer than spring_threshold
@@ -341,7 +341,7 @@ class CollisionAvoidance(Goal):
                  collision_entries: List[CollisionEntry],
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.TrueSymbol):
         if name is None:
             name = self.__class__.__name__

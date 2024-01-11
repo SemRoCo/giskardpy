@@ -23,7 +23,7 @@ class RealTimePointing(Pointing):
                  max_velocity: float = 0.3,
                  weight: float = WEIGHT_BELOW_CA,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.TrueSymbol
                  ):
         initial_goal = PointStamped()

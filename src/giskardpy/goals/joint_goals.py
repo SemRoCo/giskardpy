@@ -23,7 +23,7 @@ class SetSeedConfiguration(NonMotionGoal):
                  group_name: Optional[str] = None,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.TrueSymbol):
         """
         Overwrite the configuration of the world to allow starting the planning from a different state.
@@ -54,7 +54,7 @@ class SetOdometry(NonMotionGoal):
                  base_pose: PoseStamped,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.TrueSymbol):
         self.group_name = group_name
         if name is None:
@@ -94,7 +94,7 @@ class JointVelocityLimit(Goal):
                  hard: bool = False,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.TrueSymbol):
         """
         Limits the joint velocity of a revolute joint.
@@ -147,7 +147,7 @@ class AvoidJointLimits(Goal):
                  weight: float = WEIGHT_BELOW_CA,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.TrueSymbol
                  ):
         """
@@ -211,7 +211,7 @@ class JointPositionList(Goal):
                  max_velocity: float = 1,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.TrueSymbol):
         """
         Calls JointPosition for a list of joints.

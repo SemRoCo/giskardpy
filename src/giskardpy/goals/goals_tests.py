@@ -13,7 +13,7 @@ class DebugGoal(NonMotionGoal):
     def __init__(self,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.TrueSymbol):
         if name is None:
             name = self.__class__.__name__

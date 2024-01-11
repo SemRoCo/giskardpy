@@ -15,7 +15,7 @@ class MaxManipulability(Goal):
                  monitor_threshold: float = 0.01,
                  prediction_horizon: int = 5,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.TrueSymbol
                  ):
         self.root_link = god_map.world.search_for_link_name(root_link, None)

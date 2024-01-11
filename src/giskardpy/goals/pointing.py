@@ -26,7 +26,7 @@ class Pointing(Goal):
                  weight: float = WEIGHT_BELOW_CA,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.TrueSymbol):
         """
         Will orient pointing_axis at goal_point.

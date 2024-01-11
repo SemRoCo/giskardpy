@@ -50,9 +50,12 @@ class MotionGoalManager:
                 params = json_str_to_kwargs(motion_goal.kwargs)
                 if motion_goal.name == '':
                     motion_goal.name = None
-                start_condition = god_map.monitor_manager.logic_str_to_expr(motion_goal.start_condition)
-                hold_condition = god_map.monitor_manager.logic_str_to_expr(motion_goal.hold_condition)
-                end_condition = god_map.monitor_manager.logic_str_to_expr(motion_goal.end_condition)
+                start_condition = god_map.monitor_manager.logic_str_to_expr(motion_goal.start_condition,
+                                                                            default=cas.TrueSymbol)
+                hold_condition = god_map.monitor_manager.logic_str_to_expr(motion_goal.hold_condition,
+                                                                           default=cas.FalseSymbol)
+                end_condition = god_map.monitor_manager.logic_str_to_expr(motion_goal.end_condition,
+                                                                          default=cas.TrueSymbol)
                 c: Goal = C(name=motion_goal.name,
                             start_condition=start_condition,
                             hold_condition=hold_condition,

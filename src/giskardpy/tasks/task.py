@@ -46,7 +46,7 @@ class Task:
         self.neq_constraints = {}
         self.derivative_constraints = {}
         self._start_condition = cas.TrueSymbol
-        self._hold_condition = cas.TrueSymbol
+        self._hold_condition = cas.FalseSymbol
         self._end_condition = cas.TrueSymbol
         self.manip_constraints = {}
         self._id = -1

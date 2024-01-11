@@ -73,9 +73,9 @@ class MonitorManager:
             return self.get_monitor(node.value).get_state_expression()
         raise Exception(f'failed to parse {node}')
 
-    def logic_str_to_expr(self, logic_str: str) -> cas.Expression:
+    def logic_str_to_expr(self, logic_str: str, default: cas.Expression) -> cas.Expression:
         if logic_str == '':
-            return cas.TrueSymbol
+            return default
         tree = ast.parse(logic_str, mode='eval')
         try:
             return self.evaluate_expression(tree.body)
@@ -298,7 +298,7 @@ class MonitorManager:
                 raise UnknownMonitorException(f'unknown monitor type: \'{monitor_msg.monitor_class}\'.')
             try:
                 kwargs = json_str_to_kwargs(monitor_msg.kwargs)
-                start_condition = self.logic_str_to_expr(monitor_msg.start_condition)
+                start_condition = self.logic_str_to_expr(monitor_msg.start_condition, default=cas.TrueSymbol)
                 monitor = C(name=monitor_msg.name,
                             start_condition=start_condition,
                             **kwargs)

@@ -265,13 +265,13 @@ class MonitorManager:
 
     @profile
     def evaluate_monitors(self):
-        # %% update life cycle state
-        args = np.concatenate((self.state, self.life_cycle_state))
-        self.life_cycle_state = self.compiled_life_cycle_state_updater.fast_call(args)
-
         # %% update monitor state
         args = symbol_manager.resolve_symbols(self.compiled_state_updater.str_params)
         self.state = self.compiled_state_updater.fast_call(args)
+
+        # %% update life cycle state
+        args = np.concatenate((self.state, self.life_cycle_state))
+        self.life_cycle_state = self.compiled_life_cycle_state_updater.fast_call(args)
 
         self.state[self.payload_monitor_filter] = self.evaluate_payload_monitors()
         self.trigger_update_triggers(self.state)

@@ -33,7 +33,7 @@ class GodMap:
     goal_id: int = -1
     monitor_manager: MonitorManager
     giskard: Giskard
-    time: float
+    time: float  # real/planning time in s
     control_cycle_counter: int
     world: WorldTree
     motion_goal_manager: MotionGoalManager

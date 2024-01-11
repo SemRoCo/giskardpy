@@ -39,7 +39,7 @@ jobs:
         with:
           path: 'ros_ws/src/giskard_msgs'
           repository: SemRoCo/giskard_msgs
-          ref: devel
+          ref: monitors_in_goals
       - name: Checkout qpoases
         uses: actions/checkout@v3
         with:

@@ -2,7 +2,6 @@ import ast
 from collections import defaultdict
 from typing import Dict, Tuple, Optional, List
 
-import dill
 import rospy
 from actionlib import SimpleActionClient
 from geometry_msgs.msg import PoseStamped, Vector3Stamped, PointStamped, QuaternionStamped

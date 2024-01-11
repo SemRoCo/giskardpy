@@ -9,7 +9,6 @@ import giskardpy.casadi_wrapper as cas
 from giskardpy.utils.singleton import SingletonMeta
 
 
-
 class SymbolManager(metaclass=SingletonMeta):
     symbol_str_to_lambda: Dict[str, Callable[[], float]]
     symbol_str_to_symbol: Dict[str, cas.Symbol]
@@ -18,33 +17,6 @@ class SymbolManager(metaclass=SingletonMeta):
         self.symbol_str_to_lambda = {}
         self.symbol_str_to_symbol = {}
         self.last_hash = -1
-
-    def evaluate_expression(self, node):
-        if isinstance(node, ast.BoolOp):
-            if isinstance(node.op, ast.And):
-                return cas.logic_and(self.evaluate_expression(node.values[0]),
-                                     self.evaluate_expression(node.values[1]))
-            elif isinstance(node.op, ast.Or):
-                return cas.logic_or(self.evaluate_expression(node.values[0]),
-                                    self.evaluate_expression(node.values[1]))
-        elif isinstance(node, ast.UnaryOp):
-            if isinstance(node.op, ast.Not):
-                return cas.logic_not(self.evaluate_expression(node.operand))
-        elif isinstance(node, ast.Name):
-            # Replace with actual variable lookup or modify as needed
-            return god_map.monitor_manager.get_monitor(node.id).get_state_expression()
-        raise Exception(f'failed to parse {node}')
-
-    def logic_str_to_expr(self, logic_str: str) -> cas.Expression:
-        if logic_str == '':
-            return cas.TrueSymbol
-        tree = ast.parse(logic_str, mode='eval')
-        try:
-            return self.evaluate_expression(tree.body)
-        except KeyError as e:
-            raise GiskardException(f'Unknown symbol {e}')
-        except Exception as e:
-            raise GiskardException(e)
 
     def get_symbol(self, symbol_reference: str) -> cas.Symbol:
         """

@@ -337,7 +337,7 @@ class TestConstraints:
         pose_reached = kitchen_setup.monitors.add_cartesian_pose('map',
                                                                  tip_link=kitchen_setup.tip,
                                                                  goal_pose=current_pose)
-        kitchen_setup.monitors.add_end_motion(start_monitors=[pose_reached])
+        kitchen_setup.monitors.add_end_motion(start_condition=pose_reached)
 
         kitchen_setup.set_open_container_goal(tip_link=kitchen_setup.tip,
                                               environment_link=handle_name,

@@ -965,7 +965,7 @@ class TestMonitors:
     def test_print_event(self, zero_pose: PR2TestWrapper):
         monitor_name = zero_pose.monitors.add_joint_position(zero_pose.better_pose, name='goal')
         zero_pose.motion_goals.add_joint_position(zero_pose.better_pose)
-        zero_pose.monitors.add_print(start_monitors=[monitor_name],
+        zero_pose.monitors.add_print(start_condition=monitor_name,
                                      message='=====================done=====================')
         zero_pose.execute()
 
@@ -986,22 +986,22 @@ class TestMonitors:
                                                                 root_link=root_link,
                                                                 tip_link=tip_link,
                                                                 goal_pose=pose1)
-        end_monitor = fake_table_setup.monitors.add_local_minimum_reached()
+        end_monitor = fake_table_setup.monitors.add_local_minimum_reached(start_condition=monitor2)
         # simple cartisian goal 2m to the front
         fake_table_setup.motion_goals.add_cartesian_pose(goal_pose=pose1,
                                                          name='g1',
                                                          root_link=root_link,
                                                          tip_link=tip_link,
-                                                         end_monitors=[monitor2, end_monitor])
+                                                         end_condition=f'{monitor2} and {end_monitor}')
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.AVOID_COLLISION
         collision_entry.distance = -1
 
-        fake_table_setup.avoid_all_collisions(end_monitors=[monitor1])
+        fake_table_setup.avoid_all_collisions(end_condition=monitor1)
 
-        fake_table_setup.allow_all_collisions(start_monitors=[monitor1])
-        fake_table_setup.avoid_collision(group1='pr2', group2='pr2', start_monitors=[monitor1])
-        fake_table_setup.monitors.add_end_motion(start_monitors=[end_monitor])
+        fake_table_setup.allow_all_collisions(start_condition=monitor1)
+        fake_table_setup.avoid_collision(group1='pr2', group2='pr2', start_condition=monitor1)
+        fake_table_setup.monitors.add_end_motion(start_condition=end_monitor)
 
         fake_table_setup.execute(add_local_minimum_reached=False)
 

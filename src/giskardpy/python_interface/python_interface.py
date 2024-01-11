@@ -324,7 +324,7 @@ class WorldWrapper:
 
 class MotionGoalWrapper:
     _goals: List[MotionGoal]
-    _collision_entries: Dict[Tuple[Tuple[str, ...], Tuple[str, ...], Tuple[str, ...]], List[CollisionEntry]]
+    _collision_entries: Dict[Tuple[str, str, str], List[CollisionEntry]]
     avoid_name_conflict: bool
 
     def __init__(self, robot_name: str, avoid_name_conflict: bool = False):
@@ -379,10 +379,7 @@ class MotionGoalWrapper:
                                  start_condition: str = '',
                                  hold_condition: str = '',
                                  end_condition: str = ''):
-        start_condition = start_condition or ()
-        hold_condition = hold_condition or ()
-        end_condition = end_condition or ()
-        key = (tuple(start_condition), tuple(hold_condition), tuple(end_condition))
+        key = (start_condition, hold_condition, end_condition)
         self._collision_entries[key].extend(collisions)
 
     def _add_collision_entries_as_goals(self):
@@ -393,9 +390,9 @@ class MotionGoalWrapper:
             self.add_motion_goal(motion_goal_class=CollisionAvoidance.__name__,
                                  name=name,
                                  collision_entries=collision_entries,
-                                 start_condition='',
-                                 hold_condition='',
-                                 end_condition='')
+                                 start_condition=start_condition,
+                                 hold_condition=hold_condition,
+                                 end_condition=end_condition)
 
     def allow_collision(self,
                         group1: str = CollisionEntry.ALL,

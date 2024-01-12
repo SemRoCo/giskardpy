@@ -26,6 +26,14 @@ class Monitor:
                  start_condition: cas.Expression = cas.TrueSymbol,
                  plot: bool = True,
                  stay_true: bool = False):
+        """
+        Every class inheriting from this can be called via the ROS interface.
+        :param name: name of the monitor
+        :param start_condition: A logical casadi expression using monitor variables, "not", "and" and "or". This monitor
+                                 will only get executed once this condition becomes True.
+        :param plot: If true, this monitor will not be plotted in the gantt chart and task graph.
+        :param stay_true: If True, this monitor will stay True once it gets into that state.
+        """
         self.name = name or self.__class__.__name__
         self.start_condition = start_condition
         self._id = -1
@@ -55,9 +63,12 @@ class Monitor:
         formatted_name = string_shortener(original_str=self.name,
                                           max_lines=4,
                                           max_line_length=25)
+        result = (f'{formatted_name}\n'
+                  f'----start_condition----\n'
+                  f'{god_map.monitor_manager.format_condition(self.start_condition)}')
         if quoted:
-            return '"' + formatted_name + '"'
-        return formatted_name
+            return '"' + result + '"'
+        return result
 
     def __repr__(self) -> str:
         return self.name
@@ -71,19 +82,28 @@ class ExpressionMonitor(Monitor):
                  stay_true: bool = False,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  plot: bool = True):
+        """
+        A Monitor whose state is determined by its expression.
+        Override this method, create an expression and assign its expression at the end.
+        """
         self.substitution_values = []
         self.substitution_keys = []
         self._expression = None
         super().__init__(name=name, start_condition=start_condition, plot=plot, stay_true=stay_true)
 
-    def set_expression(self, expression: cas.symbol_expr):
-        self._expression = expression
-
-    def get_expression(self):
+    @property
+    def expression(self) -> cas.Expression:
         return self._expression
 
-    def compile(self):
-        # use this if you need to do stuff, after the qp controller has been initialized
+    @expression.setter
+    def expression(self, expression: cas.Expression) -> None:
+        self._expression = expression
+
+    def compile(self) -> None:
+        """
+        Use this if you need to do stuff, after the qp controller has been initialized.
+        I only needed this once, so you probably don't either.
+        """
         pass
 
 
@@ -119,7 +139,7 @@ class LocalMinimumReached(ExpressionMonitor):
                     joint_vel_symbol = symbol_manager.get_symbol(expr)
                 condition_list.append(cas.less(cas.abs(joint_vel_symbol), velocity_limit))
 
-        self.set_expression(cas.logic_all(cas.Expression(condition_list)))
+        self.expression = cas.logic_all(cas.Expression(condition_list))
 
 
 class TimeAbove(ExpressionMonitor):
@@ -134,7 +154,7 @@ class TimeAbove(ExpressionMonitor):
             threshold = god_map.qp_controller_config.max_trajectory_length
         traj_length_in_sec = symbol_manager.time
         condition = cas.greater(traj_length_in_sec, threshold)
-        self.set_expression(condition)
+        self.expression = condition
 
 
 class Alternator(ExpressionMonitor):
@@ -148,4 +168,4 @@ class Alternator(ExpressionMonitor):
         super().__init__(name, stay_true=stay_true, start_condition=start_condition, plot=plot)
         time = symbol_manager.time
         expr = cas.equal(cas.fmod(cas.floor(time), mod), 0)
-        self.set_expression(expr)
+        self.expression = expr

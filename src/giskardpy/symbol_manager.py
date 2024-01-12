@@ -1,6 +1,6 @@
 import ast
 import numbers
-from typing import Dict, Callable
+from typing import Dict, Callable, Type, Optional, overload
 
 from giskardpy.exceptions import GiskardException
 from giskardpy.god_map import god_map
@@ -58,8 +58,21 @@ class SymbolManager(metaclass=SingletonMeta):
         else:
             return result
 
-    def get_expr(self, expr, input_type_hint=None, output_type_hint=None):
-        if input_type_hint is None:
+    @overload
+    def get_expr(self,
+                 expr: str,
+                 output_type_hint: cas.TransMatrix = None) -> cas.TransMatrix: ...
+
+    def get_expr(self, expr, output_type_hint=None):
+        """
+
+        :param expr: A string expression referring to a variable (on the god_map)
+        :param input_type_hint: Use this to specify the type of the input. If None, this function will try to evaluate
+                                expr and use it's type.
+        :param output_type_hint:
+        :return:
+        """
+        if output_type_hint is None:
             try:
                 data = eval(expr)
             except KeyError as e:

@@ -50,7 +50,7 @@ class MaxManipulability(Goal):
         percentual_diff = 1 - cas.min(cas.save_division(old_m, m), 1)
         monitor = ExpressionMonitor(name=f'manipMonitor{tip_link}')
         self.add_monitor(monitor)
-        monitor.set_expression(cas.less(percentual_diff, monitor_threshold))
+        monitor.expression = cas.less(percentual_diff, monitor_threshold)
         task.end_condition = monitor
 
     """

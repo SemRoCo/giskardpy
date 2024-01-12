@@ -870,7 +870,7 @@ class TestMonitors:
     def test_sleep(self, zero_pose: PR2TestWrapper):
         sleep1 = zero_pose.monitors.add_sleep(1, name='sleep1')
         print1 = zero_pose.monitors.add_print(message=f'{sleep1} done', start_condition=sleep1)
-        sleep2 = zero_pose.monitors.add_sleep(1.5, name='sleep2', start_condition=print1)
+        sleep2 = zero_pose.monitors.add_sleep(1.5, name='sleep2', start_condition=f'{print1} or not {sleep1}')
         zero_pose.motion_goals.allow_all_collisions()
 
         right_monitor = zero_pose.monitors.add_joint_position(zero_pose.better_pose_right,
@@ -999,10 +999,10 @@ class TestMonitors:
         collision_entry.type = CollisionEntry.AVOID_COLLISION
         collision_entry.distance = -1
 
-        fake_table_setup.avoid_all_collisions(end_condition=monitor1)
+        fake_table_setup.motion_goals.avoid_all_collisions(end_condition=monitor1)
 
-        fake_table_setup.allow_all_collisions(start_condition=monitor1)
-        fake_table_setup.avoid_collision(group1='pr2', group2='pr2', start_condition=monitor1)
+        fake_table_setup.motion_goals.allow_all_collisions(start_condition=monitor1)
+        fake_table_setup.motion_goals.avoid_collision(group1='pr2', group2='pr2', start_condition=monitor1)
         fake_table_setup.monitors.add_end_motion(start_condition=end_monitor)
 
         fake_table_setup.execute(add_local_minimum_reached=False)

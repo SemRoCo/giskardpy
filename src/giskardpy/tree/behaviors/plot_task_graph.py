@@ -13,6 +13,7 @@ from giskardpy.tasks.task import Task
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
 from giskardpy.utils.decorators import record_time, catch_and_raise_to_blackboard
+from giskardpy.utils.utils import create_path
 
 
 def create_graph(goals: List[Goal], all_monitors: List[Monitor], output_file: str = 'graph.png'):
@@ -77,8 +78,9 @@ def create_graph(goals: List[Goal], all_monitors: List[Monitor], output_file: st
             for expr in task.end_condition.free_symbols():
                 monitor = god_map.monitor_manager.get_monitor_from_state_expr(expr)
                 monitor_node = add_or_get_node(monitor)
-                graph.add_edge(pydot.Edge(goal_node, monitor_node, color='red'))
+                graph.add_edge(pydot.Edge(goal_node, monitor_node, color='red', arrowhead='none', arrowtail='normal', dir='both'))
 
+    create_path(output_file)
     graph.write_png(output_file)
     logging.loginfo(f'Saved task graph at {output_file}.')
 

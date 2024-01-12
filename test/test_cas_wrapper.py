@@ -183,6 +183,38 @@ class TestExpression(unittest.TestCase):
             r_cas = r_cas.evaluate()
             np.all(r_np == r_cas)
 
+    def test_logic_and(self):
+        s1 = w.Symbol('s1')
+        s2 = w.Symbol('s2')
+        expr = w.logic_and(w.TrueSymbol, s1)
+        assert not w.is_true(expr) and not w.is_false(expr)
+        expr = w.logic_and(w.FalseSymbol, s1)
+        assert w.is_false(expr)
+        expr = w.logic_and(w.TrueSymbol, w.TrueSymbol)
+        assert w.is_true(expr)
+        expr = w.logic_and(w.FalseSymbol, w.TrueSymbol)
+        assert w.is_false(expr)
+        expr = w.logic_and(w.FalseSymbol, w.FalseSymbol)
+        assert w.is_false(expr)
+        expr = w.logic_and(s1, s2)
+        assert not w.is_true(expr) and not w.is_false(expr)
+
+    def test_logic_or(self):
+        s1 = w.Symbol('s1')
+        s2 = w.Symbol('s2')
+        expr = w.logic_or(w.FalseSymbol, s1)
+        assert not w.is_true(expr) and not w.is_false(expr)
+        expr = w.logic_or(w.TrueSymbol, s1)
+        assert w.is_true(expr)
+        expr = w.logic_or(w.TrueSymbol, w.TrueSymbol)
+        assert w.is_true(expr)
+        expr = w.logic_or(w.FalseSymbol, w.TrueSymbol)
+        assert w.is_true(expr)
+        expr = w.logic_or(w.FalseSymbol, w.FalseSymbol)
+        assert w.is_false(expr)
+        expr = w.logic_or(s1, s2)
+        assert not w.is_true(expr) and not w.is_false(expr)
+
     def test_lt(self):
         e1 = w.Expression([1, 2, 3, -1])
         e2 = w.Expression([1, 1, -1, 3])

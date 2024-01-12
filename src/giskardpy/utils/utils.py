@@ -578,3 +578,7 @@ class ImmutableDict(dict):
     def update(self, *args, **kwargs):
         for k, v in dict(*args, **kwargs).items():
             self.__setitem__(k, v)
+
+
+def is_running_in_pytest():
+    return "pytest" in sys.modules

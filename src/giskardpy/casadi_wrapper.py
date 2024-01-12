@@ -1535,6 +1535,15 @@ def greater(x, y, decimal_places=None):
 
 def logic_and(*args):
     assert len(args) >= 2, 'and must be called with at least 2 arguments'
+    # if there is any False, return False
+    if [x for x in args if is_false(x)]:
+        return FalseSymbol
+    # filter all True
+    args = [x for x in args if not is_true(x)]
+    if len(args) == 0:
+        return TrueSymbol
+    if len(args) == 1:
+        return args[0]
     if len(args) == 2:
         return Expression(ca.logic_and(args[0].s, args[1].s))
     else:
@@ -1551,6 +1560,15 @@ def logic_all(args):
 
 def logic_or(*args):
     assert len(args) >= 2, 'and must be called with at least 2 arguments'
+    # if there is any True, return True
+    if [x for x in args if is_true(x)]:
+        return TrueSymbol
+    # filter all False
+    args = [x for x in args if not is_false(x)]
+    if len(args) == 0:
+        return FalseSymbol
+    if len(args) == 1:
+        return args[0]
     if len(args) == 2:
         return Expression(ca.logic_or(args[0].s, args[1].s))
     else:
@@ -2177,5 +2195,12 @@ def gradient(ex, arg):
 def is_true(expr):
     try:
         return (expr == TrueSymbol).evaluate()
+    except Exception as e:
+        return False
+
+
+def is_false(expr):
+    try:
+        return (expr == FalseSymbol).evaluate()
     except Exception as e:
         return False

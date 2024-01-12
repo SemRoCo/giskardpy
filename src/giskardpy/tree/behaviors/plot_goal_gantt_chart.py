@@ -32,7 +32,7 @@ class PlotGanttChart(GiskardBehavior):
         num_tasks = task_plot_filter.tolist().count(True)
         num_bars = num_monitors + num_tasks
 
-        figure_height = num_bars * 0.3
+        figure_height = 0.7 + num_bars * 0.19
         plt.figure(figsize=(god_map.time * 0.25 + 5, figure_height))
 
         self.plot_history(task_history, tasks, task_plot_filter)

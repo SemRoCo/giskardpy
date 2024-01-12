@@ -14,6 +14,5 @@ class PayloadMonitorSequence(Sequence):
         if self.monitor.stay_true:
             self.add_child(DeleteMonitor(name=f'delete\nparent?', parent=self))
         if self.monitor.start_condition:
-            self.add_child(CheckMonitorState(name=f'check\n{self.monitor.start_condition}',
-                                             monitor=self.monitor))
+            self.add_child(CheckMonitorState(monitor=self.monitor))
         self.add_child(ExecutePayloadMonitor(self.monitor))

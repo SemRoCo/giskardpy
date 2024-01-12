@@ -15,7 +15,7 @@ from giskard_msgs.msg import MoveResult, MoveGoal
 from giskardpy.configs.behavior_tree_config import ClosedLoopBTConfig
 from giskardpy.configs.giskard import Giskard
 from giskardpy.configs.iai_robots.pr2 import PR2CollisionAvoidance, PR2VelocityMujocoInterface, WorldWithPR2Config
-from giskardpy.configs.qp_controller_config import QPControllerConfig
+from giskardpy.configs.qp_controller_config import QPControllerConfig, SupportedQPSolver
 from giskardpy.data_types import JointStates
 from giskardpy.god_map import god_map
 from giskardpy.tasks.task import WEIGHT_BELOW_CA
@@ -60,7 +60,7 @@ class PR2TestWrapperMujoco(PR2TestWrapper):
                           collision_avoidance_config=PR2CollisionAvoidance(),
                           robot_interface_config=PR2VelocityMujocoInterface(),
                           behavior_tree_config=ClosedLoopBTConfig(debug_mode=True),
-                          qp_controller_config=QPControllerConfig())
+                          qp_controller_config=QPControllerConfig(qp_solver=SupportedQPSolver.gurobi))
         super().__init__(giskard)
 
     def reset_base(self):
@@ -78,7 +78,7 @@ class PR2TestWrapperMujoco(PR2TestWrapper):
         self.move_base(goal_pose)
 
     def reset(self):
-        # self.mujoco_reset()
+        self.mujoco_reset()
         super().reset()
 
 

@@ -459,7 +459,7 @@ class Task:
         :param upper_velocity_limit:
         :param weight:
         :param task_expression:
-        :param velocity_limit:
+        :param velocity_limit: Used for normalizing the expression, like reference_velocity, must be positive
         :param name:
         :param lower_slack_limit:
         :param upper_slack_limit:

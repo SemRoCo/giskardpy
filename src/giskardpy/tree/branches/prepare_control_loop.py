@@ -48,7 +48,7 @@ class PrepareBaseTrajControlLoop(Sequence):
         self.add_child(CleanUpPlanning('CleanUpPlanning'))
         self.add_child(AddBaseTrajFollowerGoal())
         self.add_child(InitQPController('InitQPController'))
-        self.add_child(CompileMonitors())
+        self.add_child(CompileMonitors(traj_tracking=True))
         self.add_child(SetTrackingStartTime('start tracking time'))
 
     def add_plot_goal_graph(self):

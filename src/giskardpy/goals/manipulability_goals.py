@@ -14,10 +14,9 @@ class MaxManipulability(Goal):
                  optimize_rotational_dofs=False,
                  monitor_threshold: float = 0.01,
                  prediction_horizon: int = 5,
-                 start_monitors: Optional[List[ExpressionMonitor]] = None,
-                 hold_monitors: Optional[List[ExpressionMonitor]] = None,
-                 end_monitors: Optional[List[ExpressionMonitor]] = None
-                 ):
+                 start_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 end_condition: cas.Expression = cas.TrueSymbol):
         self.root_link = god_map.world.search_for_link_name(root_link, None)
         self.tip_link = god_map.world.search_for_link_name(tip_link, None)
         if name is None:
@@ -50,9 +49,9 @@ class MaxManipulability(Goal):
                                                               1 - cas.min(cas.save_division(old_m, m), 1))
         percentual_diff = 1 - cas.min(cas.save_division(old_m, m), 1)
         monitor = ExpressionMonitor(name=f'manipMonitor{tip_link}')
-        monitor.set_expression(cas.less(percentual_diff, monitor_threshold))
-        task.add_end_monitors_monitor(monitor)
         self.add_monitor(monitor)
+        monitor.set_expression(cas.less(percentual_diff, monitor_threshold))
+        task.end_condition = monitor
 
     """
     This goal maximizes the manipulability of the kinematic chain between root_link and tip_link.

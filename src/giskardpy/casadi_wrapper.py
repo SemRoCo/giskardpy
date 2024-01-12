@@ -483,6 +483,10 @@ class Expression(Symbol_):
         return Expression(self.s.reshape(new_shape))
 
 
+TrueSymbol = Expression(True)
+FalseSymbol = Expression(False)
+
+
 class TransMatrix(Symbol_):
     @profile
     def __init__(self, data=None, sanity_check=True):
@@ -2168,3 +2172,10 @@ def matrix_inverse(a):
 
 def gradient(ex, arg):
     return Expression(ca.gradient(ex.s, arg.s))
+
+
+def is_true(expr):
+    try:
+        return (expr == TrueSymbol).evaluate()
+    except Exception as e:
+        return False

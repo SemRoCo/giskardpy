@@ -1,5 +1,6 @@
+import ast
 from collections import defaultdict
-from typing import Dict, Tuple, Optional, List, Union
+from typing import Dict, Tuple, Optional, List
 
 import rospy
 from actionlib import SimpleActionClient
@@ -7,14 +8,15 @@ from geometry_msgs.msg import PoseStamped, Vector3Stamped, PointStamped, Quatern
 from rospy import ServiceException
 from shape_msgs.msg import SolidPrimitive
 
+import giskard_msgs.msg as giskard_msgs
 from giskard_msgs.msg import MoveAction, MoveGoal, WorldBody, CollisionEntry, MoveResult, MoveFeedback, MotionGoal, \
     Monitor
-import giskard_msgs.msg as giskard_msgs
 from giskard_msgs.srv import DyeGroupRequest, DyeGroup, GetGroupInfoRequest, DyeGroupResponse
 from giskard_msgs.srv import GetGroupNamesResponse, GetGroupInfoResponse, RegisterGroupRequest
 from giskard_msgs.srv import RegisterGroupResponse
 from giskard_msgs.srv import UpdateWorld, UpdateWorldRequest, UpdateWorldResponse, GetGroupInfo, \
     GetGroupNames, RegisterGroup
+from giskardpy.data_types import goal_parameter
 from giskardpy.exceptions import DuplicateNameException, UnknownGroupException
 from giskardpy.goals.align_planes import AlignPlanes
 from giskardpy.goals.cartesian_goals import CartesianPose, DiffDriveBaseGoal, CartesianVelocityLimit, \
@@ -22,17 +24,16 @@ from giskardpy.goals.cartesian_goals import CartesianPose, DiffDriveBaseGoal, Ca
 from giskardpy.goals.collision_avoidance import CollisionAvoidance
 from giskardpy.goals.grasp_bar import GraspBar
 from giskardpy.goals.joint_goals import JointPositionList, AvoidJointLimits, SetSeedConfiguration, SetOdometry
+from giskardpy.goals.open_close import Close, Open
+from giskardpy.goals.pointing import Pointing
+from giskardpy.goals.set_prediction_horizon import SetPredictionHorizon
+from giskardpy.model.utils import make_world_body_box
 from giskardpy.monitors.cartesian_monitors import PoseReached, PositionReached, OrientationReached, PointingAt, \
     VectorsAligned, DistanceToLine
 from giskardpy.monitors.joint_monitors import JointGoalReached
 from giskardpy.monitors.monitors import LocalMinimumReached, TimeAbove, Alternator
 from giskardpy.monitors.payload_monitors import EndMotion, Print, Sleep, CancelMotion, SetMaxTrajectoryLength, \
     UpdateParentLinkOfGroup, PayloadAlternator
-from giskardpy.goals.open_close import Close, Open
-from giskardpy.goals.pointing import Pointing
-from giskardpy.goals.set_prediction_horizon import SetPredictionHorizon
-from giskardpy.model.utils import make_world_body_box
-from giskardpy.data_types import goal_parameter
 from giskardpy.utils.utils import kwargs_to_json
 
 
@@ -322,7 +323,7 @@ class WorldWrapper:
 
 class MotionGoalWrapper:
     _goals: List[MotionGoal]
-    _collision_entries: Dict[Tuple[Tuple[str, ...], Tuple[str, ...], Tuple[str, ...]], List[CollisionEntry]]
+    _collision_entries: Dict[Tuple[str, str, str], List[CollisionEntry]]
     avoid_name_conflict: bool
 
     def __init__(self, robot_name: str, avoid_name_conflict: bool = False):
@@ -347,60 +348,57 @@ class MotionGoalWrapper:
     def add_motion_goal(self, *,
                         motion_goal_class: str,
                         name: Optional[str] = None,
-                        start_monitors: Optional[List[str]] = None,
-                        hold_monitors: Optional[List[str]] = None,
-                        end_monitors: Optional[List[str]] = None,
+                        start_condition: str = '',
+                        hold_condition: str = '',
+                        end_condition: str = '',
                         **kwargs):
         """
         Generic function to add a motion goal.
         :param motion_goal_class: Name of a class defined in src/giskardpy/goals
         :param name: a unique name for the goal, will use class name by default
-        :param start_monitors: Goal will only be active if all start monitors are True. Use monitors with stay_true=True
-        :param hold_monitors: Goal will only be active if all hold monitors are False. Use monitors with stay_true=False
-        :param end_monitors: Goal will not be active if all end monitors are True. Use monitors with stay_true=True
+        :param start_condition: Goal will only be active if all start monitors are True. Use monitors with stay_true=True
+        :param hold_condition: Goal will only be active if all hold monitors are False. Use monitors with stay_true=False
+        :param end_condition: Goal will not be active if all end monitors are True. Use monitors with stay_true=True
         :param kwargs: kwargs for __init__ function of motion_goal_class
         """
         name = name or motion_goal_class
         if self.avoid_name_conflict:
-            name += str(self.number_of_goals())
+            name = f'G{self.number_of_goals()} {name}'
         motion_goal = MotionGoal()
         motion_goal.name = name
         motion_goal.motion_goal_class = motion_goal_class
-        motion_goal.start_monitors = start_monitors or []
-        motion_goal.hold_monitors = hold_monitors or []
-        motion_goal.end_monitors = end_monitors or []
+        motion_goal.start_condition = start_condition
+        motion_goal.hold_condition = hold_condition
+        motion_goal.end_condition = end_condition
         motion_goal.kwargs = kwargs_to_json(kwargs)
         self._goals.append(motion_goal)
 
     def _add_collision_avoidance(self,
                                  collisions: List[CollisionEntry],
-                                 start_monitors: Optional[List[str]] = None,
-                                 hold_monitors: Optional[List[str]] = None,
-                                 end_monitors: Optional[List[str]] = None):
-        start_monitors = start_monitors or ()
-        hold_monitors = hold_monitors or ()
-        end_monitors = end_monitors or ()
-        key = (tuple(start_monitors), tuple(hold_monitors), tuple(end_monitors))
+                                 start_condition: str = '',
+                                 hold_condition: str = '',
+                                 end_condition: str = ''):
+        key = (start_condition, hold_condition, end_condition)
         self._collision_entries[key].extend(collisions)
 
     def _add_collision_entries_as_goals(self):
-        for (start_monitors, hold_monitors, end_monitors), collision_entries in self._collision_entries.items():
+        for (start_condition, hold_condition, end_condition), collision_entries in self._collision_entries.items():
             name = 'collision avoidance'
-            if start_monitors or hold_monitors or end_monitors:
-                name += f'{start_monitors}, {hold_monitors}, {end_monitors}'
+            if start_condition or hold_condition or end_condition:
+                name += f'{start_condition}, {hold_condition}, {end_condition}'
             self.add_motion_goal(motion_goal_class=CollisionAvoidance.__name__,
                                  name=name,
                                  collision_entries=collision_entries,
-                                 start_monitors=list(start_monitors),
-                                 hold_monitors=list(hold_monitors),
-                                 end_monitors=list(end_monitors))
+                                 start_condition=start_condition,
+                                 hold_condition=hold_condition,
+                                 end_condition=end_condition)
 
     def allow_collision(self,
                         group1: str = CollisionEntry.ALL,
                         group2: str = CollisionEntry.ALL,
-                        start_monitors: Optional[List[str]] = None,
-                        hold_monitors: Optional[List[str]] = None,
-                        end_monitors: Optional[List[str]] = None):
+                        start_condition: str = '',
+                        hold_condition: str = '',
+                        end_condition: str = ''):
         """
         Tell Giskard to allow collision between group1 and group2. Use CollisionEntry.ALL to allow collision with all
         groups.
@@ -412,17 +410,17 @@ class MotionGoalWrapper:
         collision_entry.group1 = str(group1)
         collision_entry.group2 = str(group2)
         self._add_collision_avoidance(collisions=[collision_entry],
-                                      start_monitors=start_monitors,
-                                      hold_monitors=hold_monitors,
-                                      end_monitors=end_monitors)
+                                      start_condition=start_condition,
+                                      hold_condition=hold_condition,
+                                      end_condition=end_condition)
 
     def avoid_collision(self,
                         min_distance: Optional[float] = None,
                         group1: str = CollisionEntry.ALL,
                         group2: str = CollisionEntry.ALL,
-                        start_monitors: Optional[List[str]] = None,
-                        hold_monitors: Optional[List[str]] = None,
-                        end_monitors: Optional[List[str]] = None):
+                        start_condition: str = '',
+                        hold_condition: str = '',
+                        end_condition: str = ''):
         """
         Tell Giskard to avoid collision between group1 and group2. Use CollisionEntry.ALL to allow collision with all
         groups.
@@ -438,26 +436,26 @@ class MotionGoalWrapper:
         collision_entry.group1 = group1
         collision_entry.group2 = group2
         self._add_collision_avoidance(collisions=[collision_entry],
-                                      start_monitors=start_monitors,
-                                      hold_monitors=hold_monitors,
-                                      end_monitors=end_monitors)
+                                      start_condition=start_condition,
+                                      hold_condition=hold_condition,
+                                      end_condition=end_condition)
 
     def allow_all_collisions(self,
-                             start_monitors: Optional[List[str]] = None,
-                             hold_monitors: Optional[List[str]] = None,
-                             end_monitors: Optional[List[str]] = None):
+                             start_condition: str = '',
+                             hold_condition: str = '',
+                             end_condition: str = ''):
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.ALLOW_COLLISION
         self._add_collision_avoidance(collisions=[collision_entry],
-                                      start_monitors=start_monitors,
-                                      hold_monitors=hold_monitors,
-                                      end_monitors=end_monitors)
+                                      start_condition=start_condition,
+                                      hold_condition=hold_condition,
+                                      end_condition=end_condition)
 
     def avoid_all_collisions(self,
                              min_distance: Optional[float] = None,
-                             start_monitors: Optional[List[str]] = None,
-                             hold_monitors: Optional[List[str]] = None,
-                             end_monitors: Optional[List[str]] = None):
+                             start_condition: str = '',
+                             hold_condition: str = '',
+                             end_condition: str = ''):
         """
         If you don't want to override the distance, don't call this function. Avoid all is the default, if you don't
         add any collision entries.
@@ -469,15 +467,15 @@ class MotionGoalWrapper:
         collision_entry.type = CollisionEntry.AVOID_COLLISION
         collision_entry.distance = min_distance
         self._add_collision_avoidance(collisions=[collision_entry],
-                                      start_monitors=start_monitors,
-                                      hold_monitors=hold_monitors,
-                                      end_monitors=end_monitors)
+                                      start_condition=start_condition,
+                                      hold_condition=hold_condition,
+                                      end_condition=end_condition)
 
     def allow_self_collision(self,
                              robot_name: Optional[str] = None,
-                             start_monitors: Optional[List[str]] = None,
-                             hold_monitors: Optional[List[str]] = None,
-                             end_monitors: Optional[List[str]] = None):
+                             start_condition: str = '',
+                             hold_condition: str = '',
+                             end_condition: str = ''):
         """
         Allows the collision of the robot with itself for the next goal.
         :param robot_name: if there are multiple robots, specify which one.
@@ -489,9 +487,9 @@ class MotionGoalWrapper:
         collision_entry.group1 = robot_name
         collision_entry.group2 = robot_name
         self._add_collision_avoidance(collisions=[collision_entry],
-                                      start_monitors=start_monitors,
-                                      hold_monitors=hold_monitors,
-                                      end_monitors=end_monitors)
+                                      start_condition=start_condition,
+                                      hold_condition=hold_condition,
+                                      end_condition=end_condition)
 
     def add_joint_position(self,
                            goal_state: Dict[str, float],
@@ -499,9 +497,9 @@ class MotionGoalWrapper:
                            weight: Optional[float] = None,
                            max_velocity: Optional[float] = None,
                            name: Optional[str] = None,
-                           start_monitors: List[str] = None,
-                           hold_monitors: List[str] = None,
-                           end_monitors: List[str] = None,
+                           start_condition: str = '',
+                           hold_condition: str = '',
+                           end_condition: str = '',
                            **kwargs: goal_parameter):
         """
         Sets joint position goals for all pairs in goal_state
@@ -516,9 +514,9 @@ class MotionGoalWrapper:
                              weight=weight,
                              max_velocity=max_velocity,
                              name=name,
-                             start_monitors=start_monitors,
-                             hold_monitors=hold_monitors,
-                             end_monitors=end_monitors,
+                             start_condition=start_condition,
+                             hold_condition=hold_condition,
+                             end_condition=end_condition,
                              **kwargs)
 
     def add_cartesian_pose(self,
@@ -531,9 +529,9 @@ class MotionGoalWrapper:
                            reference_angular_velocity: Optional[float] = None,
                            weight: Optional[float] = None,
                            name: Optional[str] = None,
-                           start_monitors: List[str] = None,
-                           hold_monitors: List[str] = None,
-                           end_monitors: List[str] = None,
+                           start_condition: str = '',
+                           hold_condition: str = '',
+                           end_condition: str = '',
                            **kwargs: goal_parameter):
         """
         This goal will use the kinematic chain between root and tip link to move tip link to the goal pose.
@@ -559,9 +557,9 @@ class MotionGoalWrapper:
                              reference_angular_velocity=reference_angular_velocity,
                              weight=weight,
                              name=name,
-                             start_monitors=start_monitors,
-                             hold_monitors=hold_monitors,
-                             end_monitors=end_monitors,
+                             start_condition=start_condition,
+                             hold_condition=hold_condition,
+                             end_condition=end_condition,
                              **kwargs)
 
     def add_align_planes(self,
@@ -574,9 +572,9 @@ class MotionGoalWrapper:
                          reference_angular_velocity: Optional[float] = None,
                          weight: Optional[float] = None,
                          name: Optional[str] = None,
-                         start_monitors: List[str] = None,
-                         hold_monitors: List[str] = None,
-                         end_monitors: List[str] = None,
+                         start_condition: str = '',
+                         hold_condition: str = '',
+                         end_condition: str = '',
                          **kwargs: goal_parameter):
         """
         This goal will use the kinematic chain between tip and root to align tip_normal with goal_normal.
@@ -599,9 +597,9 @@ class MotionGoalWrapper:
                              max_angular_velocity=reference_angular_velocity,
                              weight=weight,
                              name=name,
-                             start_monitors=start_monitors,
-                             hold_monitors=hold_monitors,
-                             end_monitors=end_monitors,
+                             start_condition=start_condition,
+                             hold_condition=hold_condition,
+                             end_condition=end_condition,
                              **kwargs)
 
     def add_avoid_joint_limits(self,
@@ -609,9 +607,9 @@ class MotionGoalWrapper:
                                joint_list: Optional[List[str]] = None,
                                weight: Optional[float] = None,
                                name: Optional[str] = None,
-                               start_monitors: List[str] = None,
-                               hold_monitors: List[str] = None,
-                               end_monitors: List[str] = None):
+                               start_condition: str = '',
+                               hold_condition: str = '',
+                               end_condition: str = ''):
         """
         This goal will push joints away from their position limits. For example if percentage is 15 and the joint
         limits are 0-100, it will push it into the 15-85 range.
@@ -621,9 +619,9 @@ class MotionGoalWrapper:
                              weight=weight,
                              joint_list=joint_list,
                              name=name,
-                             start_monitors=start_monitors,
-                             hold_monitors=hold_monitors,
-                             end_monitors=end_monitors)
+                             start_condition=start_condition,
+                             hold_condition=hold_condition,
+                             end_condition=end_condition)
 
     def add_close_container(self,
                             tip_link: str,
@@ -633,9 +631,9 @@ class MotionGoalWrapper:
                             goal_joint_state: Optional[float] = None,
                             weight: Optional[float] = None,
                             name: Optional[str] = None,
-                            start_monitors: List[str] = None,
-                            hold_monitors: List[str] = None,
-                            end_monitors: List[str] = None):
+                            start_condition: str = '',
+                            hold_condition: str = '',
+                            end_condition: str = ''):
         """
         Same as Open, but will use minimum value as default for goal_joint_state
         """
@@ -647,9 +645,9 @@ class MotionGoalWrapper:
                              goal_joint_state=goal_joint_state,
                              weight=weight,
                              name=name,
-                             start_monitors=start_monitors,
-                             hold_monitors=hold_monitors,
-                             end_monitors=end_monitors)
+                             start_condition=start_condition,
+                             hold_condition=hold_condition,
+                             end_condition=end_condition)
 
     def add_open_container(self,
                            tip_link: str,
@@ -659,9 +657,9 @@ class MotionGoalWrapper:
                            goal_joint_state: Optional[float] = None,
                            weight: Optional[float] = None,
                            name: Optional[str] = None,
-                           start_monitors: List[str] = None,
-                           hold_monitors: List[str] = None,
-                           end_monitors: List[str] = None):
+                           start_condition: str = '',
+                           hold_condition: str = '',
+                           end_condition: str = ''):
         """
         Open a container in an environment.
         Only works with the environment was added as urdf.
@@ -682,9 +680,9 @@ class MotionGoalWrapper:
                              goal_joint_state=goal_joint_state,
                              weight=weight,
                              name=name,
-                             start_monitors=start_monitors,
-                             hold_monitors=hold_monitors,
-                             end_monitors=end_monitors)
+                             start_condition=start_condition,
+                             hold_condition=hold_condition,
+                             end_condition=end_condition)
 
     def add_diff_drive_base(self,
                             goal_pose: PoseStamped,
@@ -696,9 +694,9 @@ class MotionGoalWrapper:
                             reference_angular_velocity: Optional[float] = None,
                             weight: Optional[float] = None,
                             name: Optional[str] = None,
-                            start_monitors: List[str] = None,
-                            hold_monitors: List[str] = None,
-                            end_monitors: List[str] = None,
+                            start_condition: str = '',
+                            hold_condition: str = '',
+                            end_condition: str = '',
                             **kwargs: goal_parameter):
         """
         This goal will use the kinematic chain between root and tip link to move tip link into the goal pose.
@@ -724,9 +722,9 @@ class MotionGoalWrapper:
                              reference_angular_velocity=reference_angular_velocity,
                              weight=weight,
                              name=name,
-                             start_monitors=start_monitors,
-                             hold_monitors=hold_monitors,
-                             end_monitors=end_monitors,
+                             start_condition=start_condition,
+                             hold_condition=hold_condition,
+                             end_condition=end_condition,
                              **kwargs)
 
     def add_grasp_bar(self,
@@ -742,9 +740,9 @@ class MotionGoalWrapper:
                       reference_angular_velocity: Optional[float] = None,
                       weight: Optional[float] = None,
                       name: Optional[str] = None,
-                      start_monitors: List[str] = None,
-                      hold_monitors: List[str] = None,
-                      end_monitors: List[str] = None,
+                      start_condition: str = '',
+                      hold_condition: str = '',
+                      end_condition: str = '',
                       **kwargs: goal_parameter):
         """
         Like a CartesianPose but with more freedom.
@@ -774,9 +772,9 @@ class MotionGoalWrapper:
                              reference_angular_velocity=reference_angular_velocity,
                              weight=weight,
                              name=name,
-                             start_monitors=start_monitors,
-                             hold_monitors=hold_monitors,
-                             end_monitors=end_monitors,
+                             start_condition=start_condition,
+                             hold_condition=hold_condition,
+                             end_condition=end_condition,
                              **kwargs)
 
     def add_limit_cartesian_velocity(self,
@@ -789,9 +787,9 @@ class MotionGoalWrapper:
                                      weight: Optional[float] = None,
                                      hard: bool = False,
                                      name: Optional[str] = None,
-                                     start_monitors: List[str] = None,
-                                     hold_monitors: List[str] = None,
-                                     end_monitors: List[str] = None,
+                                     start_condition: str = '',
+                                     hold_condition: str = '',
+                                     end_condition: str = '',
                                      **kwargs: goal_parameter):
         """
         This goal will use put a strict limit on the Cartesian velocity. This will require a lot of constraints, thus
@@ -814,9 +812,9 @@ class MotionGoalWrapper:
                              max_angular_velocity=max_angular_velocity,
                              hard=hard,
                              name=name,
-                             start_monitors=start_monitors,
-                             hold_monitors=hold_monitors,
-                             end_monitors=end_monitors,
+                             start_condition=start_condition,
+                             hold_condition=hold_condition,
+                             end_condition=end_condition,
                              **kwargs)
 
     def add_pointing(self,
@@ -829,9 +827,9 @@ class MotionGoalWrapper:
                      max_velocity: float = 0.3,
                      weight: Optional[float] = None,
                      name: Optional[str] = None,
-                     start_monitors: List[str] = None,
-                     hold_monitors: List[str] = None,
-                     end_monitors: List[str] = None,
+                     start_condition: str = '',
+                     hold_condition: str = '',
+                     end_condition: str = '',
                      **kwargs: goal_parameter):
         """
         Will orient pointing_axis at goal_point.
@@ -853,9 +851,9 @@ class MotionGoalWrapper:
                              max_velocity=max_velocity,
                              weight=weight,
                              name=name,
-                             start_monitors=start_monitors,
-                             hold_monitors=hold_monitors,
-                             end_monitors=end_monitors,
+                             start_condition=start_condition,
+                             hold_condition=hold_condition,
+                             end_condition=end_condition,
                              **kwargs)
 
     def set_prediction_horizon(self, prediction_horizon: int, **kwargs: goal_parameter):
@@ -877,9 +875,9 @@ class MotionGoalWrapper:
                                   reference_velocity: Optional[float] = None,
                                   weight: Optional[float] = None,
                                   name: Optional[str] = None,
-                                  start_monitors: List[str] = None,
-                                  hold_monitors: List[str] = None,
-                                  end_monitors: List[str] = None,
+                                  start_condition: str = '',
+                                  hold_condition: str = '',
+                                  end_condition: str = '',
                                   **kwargs: goal_parameter):
         """
         Will use kinematic chain between root_link and tip_link to move tip_link to goal_orientation.
@@ -900,9 +898,9 @@ class MotionGoalWrapper:
                              reference_velocity=reference_velocity,
                              weight=weight,
                              name=name,
-                             start_monitors=start_monitors,
-                             hold_monitors=hold_monitors,
-                             end_monitors=end_monitors,
+                             start_condition=start_condition,
+                             hold_condition=hold_condition,
+                             end_condition=end_condition,
                              **kwargs)
 
     def set_seed_configuration(self,
@@ -940,9 +938,9 @@ class MotionGoalWrapper:
                                     reference_angular_velocity: Optional[float] = None,
                                     weight: Optional[float] = None,
                                     name: Optional[str] = None,
-                                    start_monitors: List[str] = None,
-                                    hold_monitors: List[str] = None,
-                                    end_monitors: List[str] = None,
+                                    start_condition: str = '',
+                                    hold_condition: str = '',
+                                    end_condition: str = '',
                                     **kwargs: goal_parameter):
         """
         This goal will use the kinematic chain between root and tip link to move tip link into the goal pose.
@@ -968,9 +966,9 @@ class MotionGoalWrapper:
                              reference_linear_velocity=reference_linear_velocity,
                              reference_angular_velocity=reference_angular_velocity,
                              name=name,
-                             start_monitors=start_monitors,
-                             hold_monitors=hold_monitors,
-                             end_monitors=end_monitors,
+                             start_condition=start_condition,
+                             hold_condition=hold_condition,
+                             end_condition=end_condition,
                              **kwargs)
 
     def add_cartesian_position(self,
@@ -982,9 +980,9 @@ class MotionGoalWrapper:
                                reference_velocity: Optional[float] = 0.2,
                                weight: Optional[float] = None,
                                name: Optional[str] = None,
-                               start_monitors: List[str] = None,
-                               hold_monitors: List[str] = None,
-                               end_monitors: List[str] = None,
+                               start_condition: str = '',
+                               hold_condition: str = '',
+                               end_condition: str = '',
                                **kwargs: goal_parameter):
         """
         Will use kinematic chain between root_link and tip_link to move tip_link to goal_point.
@@ -1005,9 +1003,9 @@ class MotionGoalWrapper:
                              reference_velocity=reference_velocity,
                              weight=weight,
                              name=name,
-                             start_monitors=start_monitors,
-                             hold_monitors=hold_monitors,
-                             end_monitors=end_monitors,
+                             start_condition=start_condition,
+                             hold_condition=hold_condition,
+                             end_condition=end_condition,
                              **kwargs)
 
     def add_cartesian_position_straight(self,
@@ -1019,9 +1017,9 @@ class MotionGoalWrapper:
                                         reference_velocity: float = None,
                                         weight: Optional[float] = None,
                                         name: Optional[str] = None,
-                                        start_monitors: List[str] = None,
-                                        hold_monitors: List[str] = None,
-                                        end_monitors: List[str] = None,
+                                        start_condition: str = '',
+                                        hold_condition: str = '',
+                                        end_condition: str = '',
                                         **kwargs: goal_parameter):
         """
         Same as set_translation_goal, but will try to move in a straight line.
@@ -1035,9 +1033,9 @@ class MotionGoalWrapper:
                              reference_velocity=reference_velocity,
                              weight=weight,
                              name=name,
-                             start_monitors=start_monitors,
-                             hold_monitors=hold_monitors,
-                             end_monitors=end_monitors,
+                             start_condition=start_condition,
+                             hold_condition=hold_condition,
+                             end_condition=end_condition,
                              **kwargs)
 
 
@@ -1055,8 +1053,8 @@ class MonitorWrapper:
     def get_monitors(self) -> List[Monitor]:
         return self._monitors
 
-    def get_monitor_names(self) -> List[str]:
-        return [monitor.name for monitor in self._monitors]
+    def get_anded_monitor_names(self) -> str:
+        return ' and '.join(f'\'{monitor.name}\'' for monitor in self._monitors)
 
     def reset(self):
         self._monitors = []
@@ -1064,13 +1062,12 @@ class MonitorWrapper:
     def add_monitor(self, *,
                     monitor_class: str,
                     name: Optional[str] = None,
-                    start_monitors: Optional[List[str]] = None,
+                    start_condition: str = '',
                     **kwargs) -> str:
         """
         Generic function to add a monitor.
         :param monitor_class: Name of a class defined in src/giskardpy/monitors
         :param name: a unique name for the goal, will use class name by default
-        :param start_monitors: Goal will only be active if all start monitors are True. Use monitors with stay_true=True
         :param kwargs: kwargs for __init__ function of motion_goal_class
         :return: the name of the monitor
         """
@@ -1082,40 +1079,42 @@ class MonitorWrapper:
         monitor = giskard_msgs.Monitor()
         monitor.name = name
         monitor.monitor_class = monitor_class
-        monitor.start_monitors = start_monitors or []
+        monitor.start_condition = start_condition
         monitor.kwargs = kwargs_to_json(kwargs)
         self._monitors.append(monitor)
+        if not name.startswith('\'') and not name.startswith('"'):
+            name = f'\'{name}\''  # put all monitor names in quotes so that the user doesn't have to
         return name
 
     def add_local_minimum_reached(self,
                                   name: Optional[str] = None,
                                   stay_true: bool = True,
-                                  start_monitors: Optional[List[str]] = None):
+                                  start_condition: str = ''):
         """
         True if the world is currently in a local minimum.
         """
         return self.add_monitor(monitor_class=LocalMinimumReached.__name__,
                                 name=name,
-                                start_monitors=start_monitors,
+                                start_condition=start_condition,
                                 stay_true=stay_true)
 
     def add_time_above(self,
                        threshold: float,
                        name: Optional[str] = None,
-                       start_monitors: List[str] = None):
+                       start_condition: str = ''):
         """
         True if the length of the trajectory is above threshold
         """
         return self.add_monitor(monitor_class=TimeAbove.__name__,
                                 name=name,
-                                start_monitors=start_monitors,
+                                start_condition=start_condition,
                                 threshold=threshold)
 
     def add_joint_position(self,
                            goal_state: Dict[str, float],
                            threshold: float = 0.01,
                            name: Optional[str] = None,
-                           start_monitors: List[str] = None,
+                           start_condition: str = '',
                            stay_true: bool = True) -> str:
         """
         True if all joints in goal_state are closer than threshold to their respective value.
@@ -1124,7 +1123,7 @@ class MonitorWrapper:
                                 name=name,
                                 goal_state=goal_state,
                                 threshold=threshold,
-                                start_monitors=start_monitors,
+                                start_condition=start_condition,
                                 stay_true=stay_true)
 
     def add_cartesian_pose(self,
@@ -1136,7 +1135,7 @@ class MonitorWrapper:
                            position_threshold: float = 0.01,
                            orientation_threshold: float = 0.01,
                            name: Optional[str] = None,
-                           start_monitors: Optional[List[str]] = None,
+                           start_condition: str = '',
                            stay_true: bool = True):
         """
         True if tip_link is closer than the thresholds to goal_pose.
@@ -1148,7 +1147,7 @@ class MonitorWrapper:
                                 goal_pose=goal_pose,
                                 root_group=root_group,
                                 tip_group=tip_group,
-                                start_monitors=start_monitors,
+                                start_condition=start_condition,
                                 position_threshold=position_threshold,
                                 orientation_threshold=orientation_threshold,
                                 stay_true=stay_true)
@@ -1161,7 +1160,7 @@ class MonitorWrapper:
                                tip_group: Optional[str] = None,
                                threshold: float = 0.01,
                                name: Optional[str] = None,
-                               start_monitors: List[str] = None,
+                               start_condition: str = '',
                                stay_true: bool = True) -> str:
         """
         True if tip_link is closer than threshold to goal_point.
@@ -1172,7 +1171,7 @@ class MonitorWrapper:
                                 tip_link=tip_link,
                                 goal_point=goal_point,
                                 root_group=root_group,
-                                start_monitors=start_monitors,
+                                start_condition=start_condition,
                                 tip_group=tip_group,
                                 threshold=threshold,
                                 stay_true=stay_true)
@@ -1187,7 +1186,7 @@ class MonitorWrapper:
                              root_group: Optional[str] = None,
                              tip_group: Optional[str] = None,
                              stay_true: bool = True,
-                             start_monitors: List[str] = None,
+                             start_condition: str = '',
                              threshold: float = 0.01):
         """
         True if tip_link is closer than threshold to the line defined by center_point, line_axis and line_length.
@@ -1199,7 +1198,7 @@ class MonitorWrapper:
                                 line_length=line_length,
                                 root_link=root_link,
                                 tip_link=tip_link,
-                                start_monitors=start_monitors,
+                                start_condition=start_condition,
                                 root_group=root_group,
                                 stay_true=stay_true,
                                 tip_group=tip_group,
@@ -1213,7 +1212,7 @@ class MonitorWrapper:
                                   tip_group: Optional[str] = None,
                                   threshold: float = 0.01,
                                   name: Optional[str] = None,
-                                  start_monitors: List[str] = None,
+                                  start_condition: str = '',
                                   stay_true: bool = True):
         """
         True if tip_link is closer than threshold to goal_orientation
@@ -1225,7 +1224,7 @@ class MonitorWrapper:
                                 goal_orientation=goal_orientation,
                                 root_group=root_group,
                                 tip_group=tip_group,
-                                start_monitors=start_monitors,
+                                start_condition=start_condition,
                                 threshold=threshold,
                                 stay_true=stay_true)
 
@@ -1236,7 +1235,7 @@ class MonitorWrapper:
                         root_link: str,
                         name: Optional[str] = None,
                         tip_group: Optional[str] = None,
-                        start_monitors: List[str] = None,
+                        start_condition: str = '',
                         root_group: Optional[str] = None,
                         threshold: float = 0.01) -> str:
         """
@@ -1248,7 +1247,7 @@ class MonitorWrapper:
                                 goal_point=goal_point,
                                 root_link=root_link,
                                 tip_group=tip_group,
-                                start_monitors=start_monitors,
+                                start_condition=start_condition,
                                 root_group=root_group,
                                 pointing_axis=pointing_axis,
                                 threshold=threshold)
@@ -1259,7 +1258,7 @@ class MonitorWrapper:
                             goal_normal: Vector3Stamped,
                             tip_normal: Vector3Stamped,
                             name: Optional[str] = None,
-                            start_monitors: List[str] = None,
+                            start_condition: str = '',
                             root_group: Optional[str] = None,
                             tip_group: Optional[str] = None,
                             threshold: float = 0.01) -> str:
@@ -1272,39 +1271,39 @@ class MonitorWrapper:
                                 tip_link=tip_link,
                                 goal_normal=goal_normal,
                                 tip_normal=tip_normal,
-                                start_monitors=start_monitors,
+                                start_condition=start_condition,
                                 root_group=root_group,
                                 tip_group=tip_group,
                                 threshold=threshold)
 
     def add_end_motion(self,
-                       start_monitors: List[str],
+                       start_condition: str,
                        name: Optional[str] = None) -> str:
         """
-        Ends the motion execution/planning if all start_monitors are True.
+        Ends the motion execution/planning if all start_condition are True.
         Use this to describe when your motion should end.
         """
         return self.add_monitor(monitor_class=EndMotion.__name__,
                                 name=name,
-                                start_monitors=start_monitors)
+                                start_condition=start_condition)
 
     def add_cancel_motion(self,
-                          start_monitors: List[str],
+                          start_condition: str,
                           error_message: str,
                           error_code: int = MoveResult.ERROR,
                           name: Optional[str] = None) -> str:
         """
-        Cancels the motion if all start_monitors are True and will make Giskard return the specified error code.
+        Cancels the motion if all start_condition are True and will make Giskard return the specified error code.
         Use this to describe when failure conditions.
         """
         return self.add_monitor(monitor_class=CancelMotion.__name__,
                                 name=name,
-                                start_monitors=start_monitors,
+                                start_condition=start_condition,
                                 error_message=error_message,
                                 error_code=error_code)
 
     def update_parent_link_of_group(self,
-                                    start_monitors: List[str],
+                                    start_condition: str,
                                     group_name: str,
                                     parent_link: str,
                                     parent_link_group: Optional[str] = '',
@@ -1315,7 +1314,7 @@ class MonitorWrapper:
         """
         return self.add_monitor(monitor_class=UpdateParentLinkOfGroup.__name__,
                                 name=name,
-                                start_monitors=start_monitors,
+                                start_condition=start_condition,
                                 group_name=group_name,
                                 parent_link=parent_link,
                                 parent_link_group=parent_link_group)
@@ -1329,35 +1328,35 @@ class MonitorWrapper:
         return self.add_monitor(name=None,
                                 monitor_class=SetMaxTrajectoryLength.__name__,
                                 new_length=max_trajectory_length,
-                                start_monitors=[])
+                                start_condition='')
 
     def add_print(self,
                   message: str,
-                  start_monitors: List[str],
+                  start_condition: str,
                   name: Optional[str] = None) -> str:
         """
         Debugging Monitor.
-        Print a message to the terminal if all start_monitors are True.
+        Print a message to the terminal if all start_condition are True.
         """
         return self.add_monitor(monitor_class=Print.__name__,
                                 name=name,
                                 message=message,
-                                start_monitors=start_monitors)
+                                start_condition=start_condition)
 
     def add_sleep(self,
                   seconds: float,
-                  start_monitors: Optional[List[str]] = None,
+                  start_condition: str = '',
                   name: Optional[str] = None) -> str:
         """
-        Calls rospy.sleep(seconds) when start_monitors are True and turns True itself afterward.
+        Calls rospy.sleep(seconds) when start_condition are True and turns True itself afterward.
         """
         return self.add_monitor(monitor_class=Sleep.__name__,
                                 name=name,
                                 seconds=seconds,
-                                start_monitors=start_monitors)
+                                start_condition=start_condition)
 
     def add_alternator(self,
-                       start_monitors: Optional[List[str]] = None,
+                       start_condition: str = '',
                        name: Optional[str] = None,
                        mod: int = 2) -> str:
         """
@@ -1368,11 +1367,11 @@ class MonitorWrapper:
             name = Alternator.__name__ + f' % {mod}'
         return self.add_monitor(monitor_class=Alternator.__name__,
                                 name=name,
-                                start_monitors=start_monitors,
+                                start_condition=start_condition,
                                 mod=mod)
 
     def add_payload_alternator(self,
-                               start_monitors: Optional[List[str]] = None,
+                               start_condition: str = '',
                                name: Optional[str] = None,
                                mod: int = 2) -> str:
         """
@@ -1383,7 +1382,7 @@ class MonitorWrapper:
             name = PayloadAlternator.__name__ + f' % {mod}'
         return self.add_monitor(monitor_class=Alternator.__name__,
                                 name=name,
-                                start_monitors=start_monitors,
+                                start_condition=start_condition,
                                 mod=mod)
 
 
@@ -1409,9 +1408,12 @@ class GiskardWrapper:
     def add_default_end_motion_conditions(self):
         local_min_reached_monitor_name = self.monitors.add_local_minimum_reached()
         for goal in self.motion_goals._goals:
-            goal.end_monitors.append(local_min_reached_monitor_name)
-        self.monitors.add_end_motion(start_monitors=self.monitors.get_monitor_names())
-        self.monitors.add_cancel_motion(start_monitors=[local_min_reached_monitor_name],
+            if goal.end_condition:
+                goal.end_condition = f'({goal.end_condition}) and {local_min_reached_monitor_name}'
+            else:
+                goal.end_condition = local_min_reached_monitor_name
+        self.monitors.add_end_motion(start_condition=self.monitors.get_anded_monitor_names())
+        self.monitors.add_cancel_motion(start_condition=local_min_reached_monitor_name,
                                         error_message=f'local minimum reached',
                                         error_code=MoveResult.LOCAL_MINIMUM)
         if not self.monitors.max_trajectory_length_set:

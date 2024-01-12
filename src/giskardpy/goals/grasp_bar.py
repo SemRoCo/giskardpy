@@ -5,7 +5,7 @@ from typing import Optional, List
 from geometry_msgs.msg import Vector3Stamped, PointStamped
 
 import giskardpy.utils.tfwrapper as tf
-from giskardpy import casadi_wrapper as w
+import giskardpy.casadi_wrapper as cas
 from giskardpy.goals.goal import Goal
 from giskardpy.monitors.monitors import ExpressionMonitor
 from giskardpy.tasks.task import WEIGHT_ABOVE_CA, Task
@@ -27,9 +27,9 @@ class GraspBar(Goal):
                  reference_angular_velocity: float = 0.5,
                  weight: float = WEIGHT_ABOVE_CA,
                  name: Optional[str] = None,
-                 start_monitors: Optional[List[ExpressionMonitor]] = None,
-                 hold_monitors: Optional[List[ExpressionMonitor]] = None,
-                 end_monitors: Optional[List[ExpressionMonitor]] = None
+                 start_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 end_condition: cas.Expression = cas.TrueSymbol
                  ):
         """
         Like a CartesianPose but with more freedom.
@@ -70,12 +70,12 @@ class GraspBar(Goal):
         self.weight = weight
 
 
-        root_V_bar_axis = w.Vector3(self.bar_axis)
-        tip_V_tip_grasp_axis = w.Vector3(self.tip_grasp_axis)
-        root_P_bar_center = w.Point3(self.bar_center)
+        root_V_bar_axis = cas.Vector3(self.bar_axis)
+        tip_V_tip_grasp_axis = cas.Vector3(self.tip_grasp_axis)
+        root_P_bar_center = cas.Point3(self.bar_center)
 
         root_T_tip = god_map.world.compose_fk_expression(self.root, self.tip)
-        root_V_tip_normal = w.dot(root_T_tip, tip_V_tip_grasp_axis)
+        root_V_tip_normal = cas.dot(root_T_tip, tip_V_tip_grasp_axis)
 
         task = self.create_and_add_task('grasp bar')
 
@@ -89,10 +89,10 @@ class GraspBar(Goal):
         root_P_line_start = root_P_bar_center + root_V_bar_axis * self.bar_length / 2
         root_P_line_end = root_P_bar_center - root_V_bar_axis * self.bar_length / 2
 
-        dist, nearest = w.distance_point_to_line_segment(root_P_tip, root_P_line_start, root_P_line_end)
+        dist, nearest = cas.distance_point_to_line_segment(root_P_tip, root_P_line_start, root_P_line_end)
 
         task.add_point_goal_constraints(frame_P_current=root_T_tip.to_position(),
                                         frame_P_goal=nearest,
                                         reference_velocity=self.reference_linear_velocity,
                                         weight=self.weight)
-        self.connect_monitors_to_all_tasks(start_monitors, hold_monitors, end_monitors)
+        self.connect_monitors_to_all_tasks(start_condition, hold_condition, end_condition)

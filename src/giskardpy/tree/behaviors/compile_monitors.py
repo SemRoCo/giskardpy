@@ -7,11 +7,12 @@ from giskardpy.utils.decorators import record_time, catch_and_raise_to_blackboar
 
 
 class CompileMonitors(GiskardBehavior):
-    def __init__(self, name: str = 'compile monitors'):
+    def __init__(self, name: str = 'compile monitors', traj_tracking: bool = False):
         super().__init__(name)
+        self.traj_tracking = traj_tracking
 
     @catch_and_raise_to_blackboard
     @record_time
     def update(self):
-        god_map.monitor_manager.compile_monitors()
+        god_map.monitor_manager.compile_monitors(traj_tracking=self.traj_tracking)
         return Status.SUCCESS

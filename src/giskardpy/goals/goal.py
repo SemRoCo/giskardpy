@@ -9,12 +9,13 @@ from giskardpy.monitors.monitors import ExpressionMonitor, Monitor
 from giskardpy.god_map import god_map
 from giskardpy.tasks.task import Task
 from giskardpy.utils.utils import string_shortener
-from giskardpy import casadi_wrapper as w
+import giskardpy.casadi_wrapper as cas
 from giskardpy.exceptions import GoalInitalizationException
 from giskardpy.model.joints import OneDofJoint
 from giskardpy.data_types import PrefixName, Derivatives
 from giskardpy.qp.constraint import InequalityConstraint, EqualityConstraint, DerivativeInequalityConstraint, \
     ManipulabilityConstraint
+import giskardpy.casadi_wrapper as cas
 
 
 class Goal(ABC):
@@ -24,9 +25,9 @@ class Goal(ABC):
     @abc.abstractmethod
     def __init__(self,
                  name: str,
-                 start_monitors: Optional[List[Monitor]] = None,
-                 hold_monitors: Optional[List[Monitor]] = None,
-                 end_monitors: Optional[List[Monitor]] = None):
+                 start_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 end_condition: cas.Expression = cas.TrueSymbol):
         """
         This is where you specify goal parameters and save them as self attributes.
         """
@@ -56,7 +57,7 @@ class Goal(ABC):
     def has_tasks(self) -> bool:
         return len(self.tasks) > 0
 
-    def get_joint_position_symbol(self, joint_name: PrefixName) -> Union[w.Symbol, float]:
+    def get_joint_position_symbol(self, joint_name: PrefixName) -> Union[cas.Symbol, float]:
         """
         returns a symbol that refers to the given joint
         """
@@ -67,51 +68,50 @@ class Goal(ABC):
             return joint.get_symbol(Derivatives.position)
         raise TypeError(f'get_joint_position_symbol is only supported for OneDofJoint, not {type(joint)}')
 
-    def connect_start_monitors_to_all_tasks(self, monitors: List[ExpressionMonitor]):
-        for monitor in monitors:
-            for task in self.tasks:
-                task.add_start_monitors_monitor(monitor)
+    def connect_start_condition_to_all_tasks(self, condition: cas.Expression):
+        for task in self.tasks:
+            task.start_condition = cas.logic_and(task.start_condition, condition)
 
-    def connect_hold_monitors_to_all_tasks(self, monitors: List[ExpressionMonitor]):
-        for monitor in monitors:
-            for task in self.tasks:
-                task.add_hold_monitors_monitor(monitor)
+    def connect_hold_condition_to_all_tasks(self, condition: cas.Expression):
+        for task in self.tasks:
+            task.hold_condition = cas.logic_or(task.hold_condition, condition)
 
-    def connect_end_monitors_to_all_tasks(self, monitors: List[ExpressionMonitor]):
-        for monitor in monitors:
-            for task in self.tasks:
-                task.add_end_monitors_monitor(monitor)
+    def connect_end_condition_to_all_tasks(self, condition: cas.Expression):
+        for task in self.tasks:
+            task.end_condition = cas.logic_and(task.end_condition, condition)
 
-    def connect_monitors_to_all_tasks(self, start_monitors: List[ExpressionMonitor],
-                                      hold_monitors: List[ExpressionMonitor], end_monitors: List[ExpressionMonitor]):
-        self.connect_start_monitors_to_all_tasks(start_monitors)
-        self.connect_hold_monitors_to_all_tasks(hold_monitors)
-        self.connect_end_monitors_to_all_tasks(end_monitors)
+    def connect_monitors_to_all_tasks(self,
+                                      start_condition: cas.Expression,
+                                      hold_condition: cas.Expression,
+                                      end_condition: cas.Expression):
+        self.connect_start_condition_to_all_tasks(start_condition)
+        self.connect_hold_condition_to_all_tasks(hold_condition)
+        self.connect_end_condition_to_all_tasks(end_condition)
 
-    def get_expr_velocity(self, expr: w.Expression) -> w.Expression:
+    def get_expr_velocity(self, expr: cas.Expression) -> cas.Expression:
         """
         Creates an expressions that computes the total derivative of expr
         """
-        return w.total_derivative(expr,
+        return cas.total_derivative(expr,
                                   self.joint_position_symbols,
                                   self.joint_velocity_symbols)
 
     @property
-    def joint_position_symbols(self) -> List[Union[w.Symbol, float]]:
+    def joint_position_symbols(self) -> List[Union[cas.Symbol, float]]:
         position_symbols = []
         for joint in god_map.world.controlled_joints:
             position_symbols.extend(god_map.world.joints[joint].free_variables)
         return [x.get_symbol(Derivatives.position) for x in position_symbols]
 
     @property
-    def joint_velocity_symbols(self) -> List[Union[w.Symbol, float]]:
+    def joint_velocity_symbols(self) -> List[Union[cas.Symbol, float]]:
         velocity_symbols = []
         for joint in god_map.world.controlled_joints:
             velocity_symbols.extend(god_map.world.joints[joint].free_variable_list)
         return [x.get_symbol(Derivatives.velocity) for x in velocity_symbols]
 
     @property
-    def joint_acceleration_symbols(self) -> List[Union[w.Symbol, float]]:
+    def joint_acceleration_symbols(self) -> List[Union[cas.Symbol, float]]:
         acceleration_symbols = []
         for joint in god_map.world.controlled_joints:
             acceleration_symbols.extend(god_map.world.joints[joint].free_variables)

@@ -7,7 +7,7 @@ import giskard_msgs.msg
 import giskardpy.casadi_wrapper as cas
 from giskardpy.exceptions import GiskardException, GoalInitalizationException, DuplicateNameException
 from giskardpy.god_map import god_map
-from giskardpy.monitors.monitors import ExpressionMonitor
+from giskardpy.monitors.monitors import ExpressionMonitor, Monitor
 from giskardpy.data_types import Derivatives, PrefixName, TaskState
 from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint, \
     ManipulabilityConstraint, Constraint
@@ -29,9 +29,9 @@ class Task:
     eq_constraints: Dict[PrefixName, EqualityConstraint]
     neq_constraints: Dict[PrefixName, InequalityConstraint]
     derivative_constraints: Dict[PrefixName, DerivativeInequalityConstraint]
-    start_monitors: List[ExpressionMonitor]
-    hold_monitors: List[ExpressionMonitor]
-    end_monitors: List[ExpressionMonitor]
+    _start_condition: cas.Expression
+    _hold_condition: cas.Expression
+    _end_condition: cas.Expression
     _name: str
     _parent_goal_name: str
     _id: int
@@ -45,11 +45,44 @@ class Task:
         self.eq_constraints = {}
         self.neq_constraints = {}
         self.derivative_constraints = {}
-        self.start_monitors = []
-        self.hold_monitors = []
-        self.end_monitors = []
+        self._start_condition = cas.TrueSymbol
+        self._hold_condition = cas.FalseSymbol
+        self._end_condition = cas.TrueSymbol
         self.manip_constraints = {}
         self._id = -1
+
+    @property
+    def start_condition(self) -> cas.Expression:
+        return self._start_condition
+
+    @start_condition.setter
+    def start_condition(self, value: Union[Monitor, cas.Expression]) -> None:
+        if isinstance(value, Monitor):
+            self._start_condition = value.get_state_expression()
+        else:
+            self._start_condition = value
+
+    @property
+    def hold_condition(self) -> cas.Expression:
+        return self._hold_condition
+
+    @hold_condition.setter
+    def hold_condition(self, value: Union[Monitor, cas.Expression]) -> None:
+        if isinstance(value, Monitor):
+            self._hold_condition = value.get_state_expression()
+        else:
+            self._hold_condition = value
+
+    @property
+    def end_condition(self) -> cas.Expression:
+        return self._end_condition
+
+    @end_condition.setter
+    def end_condition(self, value: Union[Monitor, cas.Expression]) -> None:
+        if isinstance(value, Monitor):
+            self._end_condition = value.get_state_expression()
+        else:
+            self._end_condition = value
 
     @property
     def id(self) -> int:
@@ -74,24 +107,6 @@ class Task:
             return '"' + formatted_name + '"'
         return formatted_name
 
-    def add_start_monitors_monitor(self, monitor: ExpressionMonitor):
-        if [m for m in self.start_monitors if m.name == monitor.name]:
-            raise AttributeError(f'Monitor with name {monitor.name} '
-                                 f'already registered for start_monitors of task {self.name}')
-        self.start_monitors.append(monitor)
-
-    def add_hold_monitors_monitor(self, monitor: ExpressionMonitor):
-        if [m for m in self.hold_monitors if m.name == monitor.name]:
-            raise AttributeError(f'Monitor with name {monitor.name} '
-                                 f'already registered for hold_monitors of task {self.name}')
-        self.hold_monitors.append(monitor)
-
-    def add_end_monitors_monitor(self, monitor: ExpressionMonitor):
-        if [m for m in self.end_monitors if m.name == monitor.name]:
-            raise AttributeError(f'Monitor with name {monitor.name} '
-                                 f'already registered for end_monitors of task {self.name}')
-        self.end_monitors.append(monitor)
-
     def get_eq_constraints(self) -> List[EqualityConstraint]:
         return self._apply_monitors_to_constraints(self.eq_constraints.values())
 
@@ -106,18 +121,6 @@ class Task:
 
     def get_state_expression(self) -> cas.Symbol:
         return symbol_manager.get_symbol(f'god_map.motion_goal_manager.task_state[{self.id}]')
-
-    @memoize
-    def get_start_monitor_filter(self) -> np.ndarray:
-        return god_map.monitor_manager.to_state_filter(self.start_monitors)
-
-    @memoize
-    def get_hold_monitor_filter(self) -> np.ndarray:
-        return god_map.monitor_manager.to_state_filter(self.hold_monitors)
-
-    @memoize
-    def get_end_monitor_filter(self) -> np.ndarray:
-        return god_map.monitor_manager.to_state_filter(self.end_monitors)
 
     @overload
     def _apply_monitors_to_constraints(self, constraints: Iterable[EqualityConstraint]) \

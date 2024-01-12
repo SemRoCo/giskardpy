@@ -372,6 +372,10 @@ class Vector3(Symbol_):
     def cross(self, other: Vector3) -> Vector3: ...
 
 
+TrueSymbol: Expression
+FalseSymbol: Expression
+
+
 class TransMatrix(Symbol_):
     reference_frame: Optional[PrefixName]
     child_frame: Optional[PrefixName]
@@ -888,3 +892,5 @@ def substitute(expression: PreservedCasType, old_symbols: List[Symbol], new_symb
 def matrix_inverse(a: Expression) -> Expression: ...
 
 def gradient(ex: Expression, arg:Expression) -> Expression: ...
+
+def is_true(expr: Expression) -> bool: ...

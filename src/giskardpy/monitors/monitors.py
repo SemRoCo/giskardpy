@@ -63,9 +63,12 @@ class Monitor:
         formatted_name = string_shortener(original_str=self.name,
                                           max_lines=4,
                                           max_line_length=25)
+        result = (f'{formatted_name}\n'
+                  f'----start_condition----\n'
+                  f'{god_map.monitor_manager.format_condition(self.start_condition)}')
         if quoted:
-            return '"' + formatted_name + '"'
-        return formatted_name
+            return '"' + result + '"'
+        return result
 
     def __repr__(self) -> str:
         return self.name

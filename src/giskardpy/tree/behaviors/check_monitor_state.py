@@ -10,9 +10,10 @@ from giskardpy.utils.decorators import record_time, catch_and_raise_to_blackboar
 
 class CheckMonitorState(GiskardBehavior):
     @profile
-    def __init__(self, name: str, monitor: Monitor):
-        super().__init__(name)
+    def __init__(self, monitor: Monitor):
         self.monitor = monitor
+        name = f'check\n{god_map.monitor_manager.format_condition(self.monitor.start_condition)}'
+        super().__init__(name)
 
     @catch_and_raise_to_blackboard
     @record_time

@@ -575,7 +575,7 @@ class RelativePositionSequence(Goal):
         error1_monitor = ExpressionMonitor(name='p1',
                                            stay_true=True)
         self.add_monitor(error1_monitor)
-        error1_monitor.set_expression(cas.less(cas.abs(error1), 0.01))
+        error1_monitor.expression = cas.less(cas.abs(error1), 0.01)
 
         error2_monitor = ExpressionMonitor(name='p2',
                                            stay_true=True)
@@ -586,7 +586,7 @@ class RelativePositionSequence(Goal):
                                                              error1_monitor.get_state_expression())
 
         error2 = cas.euclidean_distance(root_P_goal2_cached, root_P_current)
-        error2_monitor.set_expression(cas.less(cas.abs(error2), 0.01))
+        error2_monitor.expression = cas.less(cas.abs(error2), 0.01)
 
         step1 = self.create_and_add_task('step1')
         step1.end_condition = error1_monitor

@@ -25,7 +25,8 @@ class PayloadMonitor(Monitor, ABC):
                  start_condition: cas.Expression = cas.TrueSymbol):
         """
         A monitor which executes its __call__ function when start_condition becomes True.
-        Subclass this and implement __init__ and __call__.
+        Subclass this and implement __init__ and __call__. The __call__ method should change self.state to True when
+        it's done.
         :param run_call_in_thread: if True, calls __call__ in a separate thread. Use for expensive operations
         """
         self.state = False

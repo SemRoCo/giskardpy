@@ -82,19 +82,28 @@ class ExpressionMonitor(Monitor):
                  stay_true: bool = False,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  plot: bool = True):
+        """
+        A Monitor whose state is determined by its expression.
+        Override this method, create an expression and assign its expression at the end.
+        """
         self.substitution_values = []
         self.substitution_keys = []
         self._expression = None
         super().__init__(name=name, start_condition=start_condition, plot=plot, stay_true=stay_true)
 
-    def set_expression(self, expression: cas.symbol_expr):
-        self._expression = expression
-
-    def get_expression(self):
+    @property
+    def expression(self) -> cas.Expression:
         return self._expression
 
-    def compile(self):
-        # use this if you need to do stuff, after the qp controller has been initialized
+    @expression.setter
+    def expression(self, expression: cas.Expression) -> None:
+        self._expression = expression
+
+    def compile(self) -> None:
+        """
+        Use this if you need to do stuff, after the qp controller has been initialized.
+        I only needed this once, so you probably don't either.
+        """
         pass
 
 
@@ -130,7 +139,7 @@ class LocalMinimumReached(ExpressionMonitor):
                     joint_vel_symbol = symbol_manager.get_symbol(expr)
                 condition_list.append(cas.less(cas.abs(joint_vel_symbol), velocity_limit))
 
-        self.set_expression(cas.logic_all(cas.Expression(condition_list)))
+        self.expression = cas.logic_all(cas.Expression(condition_list))
 
 
 class TimeAbove(ExpressionMonitor):
@@ -145,7 +154,7 @@ class TimeAbove(ExpressionMonitor):
             threshold = god_map.qp_controller_config.max_trajectory_length
         traj_length_in_sec = symbol_manager.time
         condition = cas.greater(traj_length_in_sec, threshold)
-        self.set_expression(condition)
+        self.expression = condition
 
 
 class Alternator(ExpressionMonitor):
@@ -159,4 +168,4 @@ class Alternator(ExpressionMonitor):
         super().__init__(name, stay_true=stay_true, start_condition=start_condition, plot=plot)
         time = symbol_manager.time
         expr = cas.equal(cas.fmod(cas.floor(time), mod), 0)
-        self.set_expression(expr)
+        self.expression = expr

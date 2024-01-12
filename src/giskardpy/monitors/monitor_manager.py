@@ -174,7 +174,7 @@ class MonitorManager:
             if isinstance(monitor, ExpressionMonitor):
                 monitor.compile()
                 state_f = cas.if_eq(life_cycle_state_symbol, int(TaskState.running),
-                                    if_result=monitor.get_expression(),
+                                    if_result=monitor.expression,
                                     else_result=state_symbol)
             else:
                 state_f = state_symbol  # if payload monitor, copy last state

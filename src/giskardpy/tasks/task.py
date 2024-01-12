@@ -103,9 +103,16 @@ class Task:
         formatted_name = string_shortener(original_str=str(self.name),
                                           max_lines=4,
                                           max_line_length=25)
+        result = (f'{formatted_name}\n'
+                  f'----start_condition----\n'
+                  f'{god_map.monitor_manager.format_condition(self.start_condition)}\n'
+                  f'----hold_condition----\n'
+                  f'{god_map.monitor_manager.format_condition(self.hold_condition)}\n'
+                  f'----end_condition----\n'
+                  f'{god_map.monitor_manager.format_condition(self.end_condition)}')
         if quoted:
-            return '"' + formatted_name + '"'
-        return formatted_name
+            return '"' + result + '"'
+        return result
 
     def get_eq_constraints(self) -> List[EqualityConstraint]:
         return self._apply_monitors_to_constraints(self.eq_constraints.values())

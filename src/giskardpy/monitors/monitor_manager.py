@@ -129,7 +129,7 @@ class MonitorManager:
         """
         free_symbols = condition.free_symbols()
         if not free_symbols:
-            return 'True'
+            return str(cas.is_true(condition))
         condition = str(condition)
         state_to_monitor_map = {str(x): f'\'{self.get_monitor_from_state_expr(x).name}\'' for x in free_symbols}
         state_to_monitor_map['&&'] = '\nand '

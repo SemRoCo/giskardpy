@@ -1173,20 +1173,6 @@ class TestConstraints:
         np.testing.assert_almost_equal(god_map.world.state[joint].position, joint_goal, decimal=3)
         np.testing.assert_array_less(god_map.trajectory.to_dict()[1][joint], vel_limit + 1e-5)
 
-    def test_JointVelocityRevolute2(self, zero_pose: PR2TestWrapper):
-        joint = god_map.world.search_for_joint_name('r_shoulder_lift_joint')
-        vel_limit = 0.4
-        joint_goal = -1
-        zero_pose.allow_all_collisions()
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class=JointVelocityLimit.__name__,
-                                               joint_names=[joint.short_name],
-                                               max_velocity=vel_limit,
-                                               hard=True)
-        zero_pose.set_joint_goal(goal_state={joint.short_name: joint_goal})
-        zero_pose.plan_and_execute()
-        np.testing.assert_almost_equal(god_map.world.state[joint].position, joint_goal, decimal=3)
-        np.testing.assert_array_less(god_map.trajectory.to_dict()[1][joint], vel_limit + 1e-5)
-
     def test_JointPosition_kitchen(self, kitchen_setup: PR2TestWrapper):
         joint_name1 = 'iai_fridge_door_joint'
         joint_name2 = 'sink_area_left_upper_drawer_main_joint'

@@ -1,4 +1,3 @@
-import ast
 from collections import defaultdict
 from typing import Dict, Tuple, Optional, List
 
@@ -356,9 +355,10 @@ class MotionGoalWrapper:
         Generic function to add a motion goal.
         :param motion_goal_class: Name of a class defined in src/giskardpy/goals
         :param name: a unique name for the goal, will use class name by default
-        :param start_condition: Goal will only be active if all start monitors are True. Use monitors with stay_true=True
-        :param hold_condition: Goal will only be active if all hold monitors are False. Use monitors with stay_true=False
-        :param end_condition: Goal will not be active if all end monitors are True. Use monitors with stay_true=True
+        :param start_condition: a logical expression to define the start condition for this monitor. e.g.
+                                    not 'monitor1' and ('monitor2' or 'monitor3')
+        :param hold_condition: a logical expression. Goal will be on hold if it is True and active otherwise
+        :param end_condition: a logical expression. Goal will become inactive when this becomes True.
         :param kwargs: kwargs for __init__ function of motion_goal_class
         """
         name = name or motion_goal_class
@@ -1068,8 +1068,10 @@ class MonitorWrapper:
         Generic function to add a monitor.
         :param monitor_class: Name of a class defined in src/giskardpy/monitors
         :param name: a unique name for the goal, will use class name by default
+        :param start_condition: a logical expression to define the start condition for this monitor. e.g.
+                                    not 'monitor1' and ('monitor2' or 'monitor3')
         :param kwargs: kwargs for __init__ function of motion_goal_class
-        :return: the name of the monitor
+        :return: the name of the monitor with added quotes to be used in logical expressions for conditions.
         """
         name = name or monitor_class
         if self.avoid_name_conflict:
@@ -1390,6 +1392,12 @@ class GiskardWrapper:
     last_feedback: MoveFeedback = None
 
     def __init__(self, node_name: str = 'giskard', avoid_name_conflict: bool = False):
+        """
+        Python wrapper for the ROS interface of Giskard.
+        :param node_name: node name of Giskard
+        :param avoid_name_conflict: if True, Giskard will automatically add an id to monitors and goals to avoid name
+                                    conflicts.
+        """
         self.world = WorldWrapper(node_name)
         self.monitors = MonitorWrapper(self.robot_name, avoid_name_conflict=avoid_name_conflict)
         self.motion_goals = MotionGoalWrapper(self.robot_name, avoid_name_conflict=avoid_name_conflict)

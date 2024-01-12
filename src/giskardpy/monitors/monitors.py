@@ -26,6 +26,14 @@ class Monitor:
                  start_condition: cas.Expression = cas.TrueSymbol,
                  plot: bool = True,
                  stay_true: bool = False):
+        """
+        Every class inheriting from this can be called via the ROS interface.
+        :param name: name of the monitor
+        :param start_condition: A logical casadi expression using monitor variables, "not", "and" and "or". This monitor
+                                 will only get executed once this condition becomes True.
+        :param plot: If true, this monitor will not be plotted in the gantt chart and task graph.
+        :param stay_true: If True, this monitor will stay True once it gets into that state.
+        """
         self.name = name or self.__class__.__name__
         self.start_condition = start_condition
         self._id = -1

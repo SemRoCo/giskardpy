@@ -22,7 +22,12 @@ class PayloadMonitor(Monitor, ABC):
                  run_call_in_thread: bool,
                  name: Optional[str] = None,
                  stay_true: bool = True,
-                 start_condition: cas.Expression = cas.TrueSymbol,):
+                 start_condition: cas.Expression = cas.TrueSymbol):
+        """
+        A monitor which executes its __call__ function when start_condition becomes True.
+        Subclass this and implement __init__ and __call__.
+        :param run_call_in_thread: if True, calls __call__ in a separate thread. Use for expensive operations
+        """
         self.state = False
         self.run_call_in_thread = run_call_in_thread
         super().__init__(name=name, start_condition=start_condition, stay_true=stay_true)

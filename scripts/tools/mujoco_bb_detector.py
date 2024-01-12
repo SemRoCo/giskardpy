@@ -5,7 +5,7 @@ import time
 from scipy.spatial.transform import Rotation
 import numpy as np
 
-
+# TODO: Debug, it does not work well with the cup in the pr2 demo
 class MujocoBBDetector:
     def __init__(self, sub_topic: str, pub_topic: str):
         self.objects = {}
@@ -31,6 +31,10 @@ class MujocoBBDetector:
             min_x = min_y = min_z = float('inf')
             max_x = max_y = max_z = float('-inf')
             object_data = self.objects[key]
+            px = 0
+            py = 0
+            pz = 0
+            counter = 0
             for pose, scale in object_data:
                 # Calculate 8 vertices using the scale parameter
                 x = scale.x / 2
@@ -54,14 +58,19 @@ class MujocoBBDetector:
 
                 # Calculate the size of the bounding box
                 rot_scale = np.dot(rotation.as_matrix(), [scale.x, scale.y, scale.z])
-                bbox_size_x = rot_scale[0]
-                bbox_size_y = rot_scale[1]
-                bbox_size_z = rot_scale[2]
+                bbox_size_x = scale.x #rot_scale[0]
+                bbox_size_y = scale.y #rot_scale[1]
+                bbox_size_z = scale.z #rot_scale[2]
 
                 # Calculate the center of the bounding box
                 bbox_center_x = pose.position.x
                 bbox_center_y = pose.position.y
                 bbox_center_z = pose.position.z
+
+                px += pose.position.x
+                py += pose.position.y
+                pz += pose.position.z
+                counter += 1
 
                 # Update min and max coordinates in each dimension
                 min_x = min(min_x, bbox_center_x - bbox_size_x / 2)
@@ -89,11 +98,12 @@ class MujocoBBDetector:
             marker.ns = key
             marker.id = 1
             marker.action = 0
-            marker.pose.orientation.w = 1
+            marker.pose.orientation = pose.orientation
             # marker.pose.orientation = object_data[0][0].orientation
-            marker.pose.position.x = bbox_center_x
-            marker.pose.position.y = bbox_center_y
-            marker.pose.position.z = bbox_center_z
+
+            marker.pose.position.x = px / counter#bbox_center_x
+            marker.pose.position.y = py / counter#bbox_center_y
+            marker.pose.position.z = pz / counter#bbox_center_z
             marker.scale.x = bbox_size_x
             marker.scale.y = bbox_size_y
             marker.scale.z = bbox_size_z

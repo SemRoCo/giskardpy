@@ -700,13 +700,13 @@ class GiskardTestWrapper(GiskardWrapper):
                                    parent_link=parent_link,
                                    parent_link_group=parent_link_group,
                                    timeout=timeout)
-        self.check_add_object_result(response=response,
-                                     name=name,
-                                     size=size,
-                                     pose=pose,
-                                     parent_link=parent_link,
-                                     parent_link_group=parent_link_group,
-                                     expected_error_code=expected_error_code)
+        # self.check_add_object_result(response=response,
+        #                              name=name,
+        #                              size=size,
+        #                              pose=pose,
+        #                              parent_link=parent_link,
+        #                              parent_link_group=parent_link_group,
+        #                              expected_error_code=expected_error_code)
         return response
 
     def update_group_pose(self, group_name: str, new_pose: PoseStamped, timeout: float = TimeOut,

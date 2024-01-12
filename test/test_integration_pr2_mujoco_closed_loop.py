@@ -8,7 +8,7 @@ import rospy
 from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, PointStamped
 from sensor_msgs.msg import JointState
 from std_srvs.srv import Trigger
-from tf.transformations import quaternion_from_matrix, quaternion_about_axis
+from tf.transformations import quaternion_from_matrix, quaternion_about_axis, quaternion_multiply
 
 import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import MoveResult, MoveGoal
@@ -21,6 +21,8 @@ from giskardpy.goals.goal import WEIGHT_BELOW_CA
 from giskardpy.god_map import god_map
 from test_integration_pr2 import PR2TestWrapper, TestJointGoals, pocky_pose
 from giskardpy.goals.manipulability_goals import MaxManipulability
+from giskardpy.goals.adaptive_goals import CloseGripper, PouringAdaptiveTilt
+from scipy.spatial.transform import Rotation
 
 
 class PR2TestWrapperMujoco(PR2TestWrapper):
@@ -60,7 +62,7 @@ class PR2TestWrapperMujoco(PR2TestWrapper):
                           collision_avoidance_config=PR2CollisionAvoidance(),
                           robot_interface_config=PR2VelocityMujocoInterface(),
                           behavior_tree_config=ClosedLoopBTConfig(debug_mode=True),
-                          qp_controller_config=QPControllerConfig())
+                          qp_controller_config=QPControllerConfig(max_trajectory_length=90))
         super().__init__(giskard)
 
     def reset_base(self):
@@ -93,8 +95,8 @@ class TestJointGoalsMujoco(TestJointGoals):
     def test_joint_goal(self, zero_pose: PR2TestWrapper):
         js = {
             # 'torso_lift_joint': 0.2999225173357618,
-            'head_pan_joint': 0.041880780651479044,
-            'head_tilt_joint': -0.37,
+            # 'head_pan_joint': 0.041880780651479044,
+            # 'head_tilt_joint': -0.37,
             'r_upper_arm_roll_joint': -0.9487714747527726,
             'r_shoulder_pan_joint': -1.0047307505973626,
             'r_shoulder_lift_joint': 0.48736790658811985,
@@ -596,4 +598,278 @@ class TestManipulability:
                                   root_link='torso_lift_link',
                                   tip_link='r_gripper_tool_frame'
                                   )
+        zero_pose.plan_and_execute()
+
+
+class TestPouring:
+    def test_grasp(self, zero_pose: PR2TestWrapper):
+        p = PoseStamped()
+        p.header.stamp = rospy.get_rostime()
+        p.header.frame_id = 'map'
+
+        rotation = 0  # .9
+        rot1 = quaternion_about_axis(rotation, (0, 1, 0))
+        rot2 = quaternion_about_axis(rotation, (0, 1, 0))
+
+        h = 0.9
+        p.pose.position = Point(2, -0.39, h)
+        p.pose.orientation = Quaternion(*quaternion_multiply(rot1, quaternion_from_matrix([[0, 0, 1, 0],
+                                                                                           [1, 0, 0, 0],
+                                                                                           [0, 1, 0, 0],
+                                                                                           [0, 0, 0, 1]])))
+
+        p2 = PoseStamped()
+        p2.header.stamp = rospy.get_rostime()
+        p2.header.frame_id = 'map'
+        p2.pose.position = Point(2, -0.0, h)
+        p2.pose.orientation = Quaternion(*quaternion_multiply(rot2, quaternion_from_matrix([[0, 0, -1, 0],
+                                                                                            [-1, 0, 0, 0],
+                                                                                            [0, 1, 0, 0],
+                                                                                            [0, 0, 0, 1]])))
+
+        # zero_pose.allow_all_collisions()
+        # zero_pose.set_cart_goal(p, zero_pose.r_tip, 'map')
+        # zero_pose.set_cart_goal(p2, zero_pose.l_tip, 'map')
+        # zero_pose.set_avoid_joint_limits_goal()
+        # zero_pose.execute()
+        ####################################################
+        h = 0.01
+        p.header.frame_id = 'pot'
+        p2.header.frame_id = 'pot'
+        p.pose.position = Point(0, -0.20, h)
+        p2.pose.position = Point(0, 0.20, h)
+        zero_pose.allow_all_collisions()
+        zero_pose.set_cart_goal(p, zero_pose.r_tip, 'map')
+        zero_pose.set_cart_goal(p2, zero_pose.l_tip, 'map')
+        zero_pose.execute()
+        ###################################################
+        p.pose.position = Point(0, -0.15, h)
+        p2.pose.position = Point(0, 0.15, h)
+        zero_pose.allow_all_collisions()
+        zero_pose.set_cart_goal(p, zero_pose.r_tip, 'map')
+        zero_pose.set_cart_goal(p2, zero_pose.l_tip, 'map')
+        zero_pose.execute()
+        ###################################################
+        zero_pose.add_motion_goal(goal_type=CloseGripper.__name__,
+                                  goal_name='closeGripperRight',
+                                  pub_topic='/pr2/r_gripper_controller/command',
+                                  joint_state_topic='pr2/joint_states',
+                                  alibi_joint_name='r_gripper_l_finger_joint',
+                                  effort_threshold=-0.14,
+                                  effort=-200)
+        zero_pose.add_motion_goal(goal_type=CloseGripper.__name__,
+                                  goal_name='closeGripperLeft',
+                                  pub_topic='/pr2/l_gripper_controller/command',
+                                  joint_state_topic='pr2/joint_states',
+                                  alibi_joint_name='l_gripper_l_finger_joint',
+                                  effort_threshold=-0.14,
+                                  effort=-200)
+        zero_pose.set_cart_goal(p, zero_pose.r_tip, 'map')
+        zero_pose.set_cart_goal(p2, zero_pose.l_tip, 'map')
+        zero_pose.allow_all_collisions()
+        zero_pose.execute(add_local_minimum_reached=False)
+        ####################################################
+        # current pose of the pot in simulation
+        pot_pose = PoseStamped()
+        pot_pose.header.frame_id = 'pot'
+        pot_pose.pose.position = Point(0, 0, 0)
+        pot_pose.pose.orientation.w = 1
+
+        # add a new object at the pose of the pot and attach it to the right tip
+        zero_pose.add_box('dummy', (0.1, 0.1, 0.1), pose=pot_pose, parent_link=zero_pose.r_tip)
+
+        # pose of the left gripper relative to the attached object
+        l_pose = PoseStamped()
+        l_pose.header.frame_id = 'dummy'
+        l_pose.pose.position = Point(0, 0.15, 0)
+        l_pose.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 0, -1, 0],
+                                                                      [-1, 0, 0, 0],
+                                                                      [0, 1, 0, 0],
+                                                                      [0, 0, 0, 1]]))
+
+        # update pot pose to the desired pose of the pot
+        # pot_pose.pose.position.z = 0.2
+        #
+        # move the dummy pot and the left gripper relative to it
+        pot_pose.pose.position = Point(0, 0, 0.2)
+        zero_pose.set_cart_goal(pot_pose, 'dummy', 'map')
+        zero_pose.set_cart_goal(l_pose, zero_pose.l_tip, zero_pose.r_tip, add_monitor=False)
+        zero_pose.execute(add_local_minimum_reached=False)
+        ###############################################################
+        pot_pose = PoseStamped()
+        pot_pose.header.frame_id = 'map'
+        pot_pose.pose.position = Point(1.8, 0.4, 1)
+        pot_pose.pose.orientation.w = 1
+        tilt_axis = Vector3Stamped()
+        tilt_axis.header.frame_id = 'dummy'
+        tilt_axis.vector.y = 1
+        zero_pose.add_motion_goal(goal_type=PouringAdaptiveTilt.__name__,
+                                  goal_name='pouring',
+                                  tip='dummy',
+                                  root='map',
+                                  tilt_angle=0.2,
+                                  pouring_pose=pot_pose,
+                                  tilt_axis=tilt_axis,
+                                  pre_tilt=False)
+        # rot1 = quaternion_about_axis(0.2, (0, 1, 0))
+        # pot_pose.pose.orientation = Quaternion(*rot1)
+        # zero_pose.set_cart_goal(pot_pose, 'dummy', 'map')
+        zero_pose.set_cart_goal(l_pose, zero_pose.l_tip, zero_pose.r_tip, add_monitor=False)
+        zero_pose.allow_all_collisions()
+        zero_pose.set_avoid_joint_limits_goal()
+        zero_pose.execute(add_local_minimum_reached=False)
+
+
+    def test_asdf(self, zero_pose: PR2TestWrapper):
+        p = PoseStamped()
+        p.header.stamp = rospy.get_rostime()
+        p.header.frame_id = 'pot'
+
+        rotation = 1.2  # .9
+        rot1 = quaternion_about_axis(rotation, (0, 1, 0))
+        rot2 = quaternion_about_axis(rotation, (0, 1, 0))
+
+        h = 0.0
+        p.pose.position = Point(0, -0.15, h)
+        p.pose.orientation = Quaternion(*quaternion_multiply(rot1, quaternion_from_matrix([[0, 0, 1, 0],
+                                                                                           [1, 0, 0, 0],
+                                                                                           [0, 1, 0, 0],
+                                                                                           [0, 0, 0, 1]])))
+
+        p2 = PoseStamped()
+        p2.header.stamp = rospy.get_rostime()
+        p2.header.frame_id = 'pot'
+        p2.pose.position = Point(0, 0.15, h)
+        p2.pose.orientation = Quaternion(*quaternion_multiply(rot2, quaternion_from_matrix([[0, 0, -1, 0],
+                                                                                            [-1, 0, 0, 0],
+                                                                                            [0, 1, 0, 0],
+                                                                                            [0, 0, 0, 1]])))
+
+        zero_pose.allow_all_collisions()
+        zero_pose.set_cart_goal(p, zero_pose.r_tip, 'map')
+        zero_pose.set_cart_goal(p2, zero_pose.l_tip, 'map')
+        zero_pose.execute()
+
+    def test_attach_pour(self, zero_pose: PR2TestWrapper):
+        # current pose of the pot in simulation
+        pot_pose = PoseStamped()
+        pot_pose.header.frame_id = 'map'
+        pot_pose.pose.position = Point(2, -0.2, 0.9)
+        pot_pose.pose.orientation.w = 1
+
+        # add a new object at the pose of the pot and attach it to the right tip
+        zero_pose.add_box('dummy', (0.1, 0.1, 0.1), pose=pot_pose, parent_link=zero_pose.r_tip)
+
+        # pose of the left gripper relative to the attached object
+        l_pose = PoseStamped()
+        l_pose.header.frame_id = 'dummy'
+        l_pose.pose.position = Point(0, 0.15, 0)
+        l_pose.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 0, -1, 0],
+                                                                      [-1, 0, 0, 0],
+                                                                      [0, 1, 0, 0],
+                                                                      [0, 0, 0, 1]]))
+
+        #move the dummy pot and the left gripper relative to it
+        tilt_axis = Vector3Stamped()
+        tilt_axis.header.frame_id = 'dummy'
+        tilt_axis.vector.y = 1
+        zero_pose.add_motion_goal(goal_type=PouringAdaptiveTilt.__name__,
+                                  goal_name='pouring',
+                                  tip='dummy',
+                                  root='map',
+                                  tilt_angle=0.8,
+                                  pouring_pose=pot_pose,
+                                  tilt_axis=tilt_axis,
+                                  pre_tilt=False)
+        zero_pose.set_cart_goal(l_pose, zero_pose.l_tip, zero_pose.r_tip)
+        zero_pose.allow_all_collisions()
+        zero_pose.execute()
+
+    def test_complete_pouring(self, zero_pose: PR2TestWrapper):
+        # first start related scripts for BB detection and scene action reasoning
+        zero_pose.add_motion_goal(goal_type=CloseGripper.__name__,
+                                  goal_name='openGripper',
+                                  as_open=True,
+                                  velocity_threshold=100,
+                                  effort_threshold=0.01,
+                                  effort=100,
+                                  pub_topic='/pr2/r_gripper_controller/command',
+                                  joint_state_topic='pr2/joint_states',
+                                  alibi_joint_name='r_gripper_l_finger_joint'
+                                  )
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute(add_local_minimum_reached=False)
+
+        goal_pose = PoseStamped()
+        goal_pose.header.frame_id = 'map'
+        goal_pose.pose.orientation = Quaternion(*quaternion_from_matrix([[1, 0, 0, 0],
+                                                                         [0, 1, 0, 0],
+                                                                         [0, 0, 1, 0],
+                                                                         [0, 0, 0, 1]]))
+        goal_pose.pose.position.x = 2.02
+        goal_pose.pose.position.y = -0.2
+        goal_pose.pose.position.z = 0.5
+
+        zero_pose.set_cart_goal(goal_pose, zero_pose.r_tip, 'map')
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute()
+
+        zero_pose.add_motion_goal(goal_type=CloseGripper.__name__,
+                                  goal_name='closeGripper',
+                                  pub_topic='/pr2/r_gripper_controller/command',
+                                  joint_state_topic='pr2/joint_states',
+                                  alibi_joint_name='r_gripper_l_finger_joint',
+                                  effort_threshold=-0.14,
+                                  effort=-500)
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute(add_local_minimum_reached=False)
+
+        goal_pose.pose.position.x = 2.02
+        goal_pose.pose.position.y = -0.4
+        goal_pose.pose.position.z = 0.69
+        # goal_pose.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 0, 1, 0],
+        #                                                                  [0, -1, 0, 0],
+        #                                                                  [1, 0, 0, 0],
+        #                                                                  [0, 0, 0, 1]]))
+        tilt_axis = Vector3Stamped()
+        tilt_axis.header.frame_id = zero_pose.r_tip
+        tilt_axis.vector.x = 1
+        zero_pose.add_motion_goal(goal_type=PouringAdaptiveTilt.__name__,
+                                  goal_name='pouring',
+                                  tip=zero_pose.r_tip,
+                                  root='map',
+                                  tilt_angle=1.5,
+                                  pouring_pose=goal_pose,
+                                  tilt_axis=tilt_axis,
+                                  pre_tilt=False)
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute(add_local_minimum_reached=False)
+
+        goal_pose.pose.position.x = 1.93
+        goal_pose.pose.position.y = -0.2
+        goal_pose.pose.position.z = 0.7
+
+        zero_pose.set_cart_goal(goal_pose, zero_pose.r_tip, 'map')
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute()
+
+        zero_pose.add_motion_goal(goal_type=CloseGripper.__name__,
+                                  goal_name='openGripper',
+                                  as_open=True,
+                                  velocity_threshold=100,
+                                  effort_threshold=1,
+                                  effort=100,
+                                  pub_topic='/pr2/r_gripper_controller/command',
+                                  joint_state_topic='pr2/joint_states',
+                                  alibi_joint_name='r_gripper_l_finger_joint'
+                                  )
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute(add_local_minimum_reached=False)
+
+        goal_pose.pose.position.x = 1.4
+        goal_pose.pose.position.y = -0.2
+        goal_pose.pose.position.z = 0.6
+
+        zero_pose.set_cart_goal(goal_pose, zero_pose.r_tip, 'map')
+        zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()

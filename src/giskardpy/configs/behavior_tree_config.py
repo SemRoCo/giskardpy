@@ -205,7 +205,7 @@ class ClosedLoopBTConfig(BehaviorTreeConfig):
         # self.add_qp_data_publisher(publish_xdot=True, publish_lb=True, publish_ub=True)
         if self.debug_mode:
             # self.add_trajectory_plotter(wait=True)
-            # self.add_debug_trajectory_plotter(wait=True)
+            self.add_debug_trajectory_plotter(wait=True)
             self.add_gantt_chart_plotter()
             self.add_goal_graph_plotter()
             self.add_debug_marker_publisher()

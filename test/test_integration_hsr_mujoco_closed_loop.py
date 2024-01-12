@@ -19,6 +19,7 @@ from utils_for_tests import compare_poses, GiskardTestWrapper
 from giskardpy.goals.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE
 from giskardpy.goals.adaptive_goals import CloseGripper, PouringAdaptiveTilt
 from giskardpy.goals.manipulability_goals import MaxManipulability
+import giskardpy.utils.tfwrapper as tf
 
 
 class HSRTestWrapper(GiskardTestWrapper):
@@ -40,7 +41,7 @@ class HSRTestWrapper(GiskardTestWrapper):
             giskard = Giskard(world_config=WorldWithHSRConfig(),
                               collision_avoidance_config=HSRCollisionAvoidanceConfig(),
                               robot_interface_config=HSRStandaloneInterface(),
-                              behavior_tree_config=StandAloneBTConfig(),
+                              behavior_tree_config=StandAloneBTConfig(debug_mode=True),
                               qp_controller_config=QPControllerConfig())
         self.gripper_group = 'gripper'
         # self.r_gripper = rospy.ServiceProxy('r_gripper_simulator/set_joint_states', SetJointState)
@@ -649,7 +650,7 @@ class TestServo:
         goal_pose = PoseStamped()
         goal_pose.header.frame_id = 'map'
         goal_pose.pose.position.x = 1.9
-        goal_pose.pose.position.y = 0.20
+        goal_pose.pose.position.y = -0.20
         goal_pose.pose.position.z = 0.65
         goal_pose.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 0, 1, 0],
                                                                          [0, -1, 0, 0],
@@ -663,11 +664,33 @@ class TestServo:
                                   goal_name='pouring',
                                   tip='hand_palm_link',
                                   root='map',
-                                  tilt_angle=2,
+                                  tilt_angle=-1.5,
                                   pouring_pose=goal_pose,
                                   tilt_axis=tilt_axis,
-                                  with_feedback=False)
+                                  with_feedback=True)
         # TODO: investigate different ways to get to a description of the frames from a description of the task
         #       This should mainly concern the tip link, the tilt axis in it and and the direction of the angle
+        zero_pose.allow_all_collisions()
+        zero_pose.execute(add_local_minimum_reached=False)
+
+    def test_tilt_tray(self, zero_pose):
+        goal_pose = tf.lookup_pose('map', 'hand_palm_link')
+        goal_pose.pose.position.x += 0.1
+
+        tilt_axis = Vector3Stamped()
+        tilt_axis.header.frame_id = 'hand_palm_link'
+        tilt_axis.vector.z = 1
+
+        # zero_pose.set_joint_goal({'arm_flex_joint': -0.8}, weight=WEIGHT_BELOW_CA)
+
+        zero_pose.add_motion_goal(goal_type=PouringAdaptiveTilt.__name__,
+                                  goal_name='pouring',
+                                  tip='hand_palm_link',
+                                  root='map',
+                                  tilt_angle=0.2,
+                                  pouring_pose=goal_pose,
+                                  tilt_axis=tilt_axis,
+                                  with_feedback=True)
+
         zero_pose.allow_all_collisions()
         zero_pose.execute(add_local_minimum_reached=False)

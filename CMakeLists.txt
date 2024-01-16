@@ -183,6 +183,7 @@ catkin_install_python(PROGRAMS
 	scripts/tools/move_base_simple_goal_diff_drive.py
 	scripts/tools/print_joint_state.py
 	scripts/examples/python_interface_example.py
+	scripts/examples/old_python_interface_example.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 ## Mark executables and/or libraries for installation

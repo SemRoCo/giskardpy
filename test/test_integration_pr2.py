@@ -888,7 +888,6 @@ class TestMonitors:
         zero_pose.motion_goals.add_joint_position(zero_pose.better_pose_left,
                                                   name='left pose',
                                                   end_condition=left_monitor)
-        local_min = zero_pose.monitors.add_local_minimum_reached(start_condition=f'{right_monitor} and {left_monitor}')
 
         base_goal = PoseStamped()
         base_goal.header.frame_id = 'map'
@@ -904,6 +903,7 @@ class TestMonitors:
                                                   hold_condition=f'not {alternator}',
                                                   end_condition=base_monitor)
 
+        local_min = zero_pose.monitors.add_local_minimum_reached(stay_true=False)
         end = zero_pose.monitors.add_end_motion(start_condition=' and '.join([local_min,
                                                                               sleep2,
                                                                               right_monitor,
@@ -2869,6 +2869,26 @@ class TestSelfCollisionAvoidance:
         zero_pose.check_cpi_geq(zero_pose.get_l_gripper_links(), 0.048)
         zero_pose.check_cpi_geq([attached_link_name], 0.048)
         zero_pose.detach_group(attached_link_name)
+
+    def test_box_overlapping_with_gripper(self, better_pose: PR2TestWrapper):
+        box_name = 'muh'
+        box_pose = PoseStamped()
+        box_pose.header.frame_id = 'r_gripper_tool_frame'
+        box_pose.pose.orientation.w = 1
+        better_pose.add_box(name=box_name,
+                            size=(0.2, 0.1, 0.1),
+                            pose=box_pose,
+                            parent_link='r_gripper_tool_frame')
+
+        rospy.loginfo('Set a Cartesian goal for the box')
+        box_goal = PoseStamped()
+        box_goal.header.frame_id = box_name
+        box_goal.pose.position.x = -0.5
+        box_goal.pose.orientation.w = 1
+        better_pose.set_cart_goal(goal_pose=box_goal,
+                                  tip_link=box_name,
+                                  root_link='map')
+        better_pose.execute()
 
     def test_allow_self_collision_in_arm(self, zero_pose: PR2TestWrapper):
         goal_js = {

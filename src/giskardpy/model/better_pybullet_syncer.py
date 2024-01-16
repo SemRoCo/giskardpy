@@ -91,7 +91,6 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
     def sync(self):
         super().sync()
         if self.has_world_changed():
-            self.sync_world_model_update()
             self.reset_cache()
             logging.logdebug('hard sync')
             for o in self.kw.collision_objects:
@@ -103,6 +102,7 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
                 link = god_map.world.links[link_name]
                 self.add_object(link)
                 self.objects_in_order.append(self.object_name_to_id[link_name])
+            self.sync_world_model_update()
             bpb.batch_set_transforms(self.objects_in_order, god_map.world.compute_all_collision_fks())
         else:
             bpb.batch_set_transforms(self.objects_in_order, god_map.world.compute_all_collision_fks())

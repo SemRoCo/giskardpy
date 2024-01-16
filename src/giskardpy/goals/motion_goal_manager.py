@@ -31,10 +31,9 @@ class MotionGoalManager:
     def __init__(self):
         self.motion_goals = {}
         self.tasks = {}
-        goal_package_paths = god_map.giskard.goal_package_paths
         self.allowed_motion_goal_types = {}
         self.state_history = []
-        for path in goal_package_paths:
+        for path in god_map.giskard.goal_package_paths:
             self.allowed_motion_goal_types.update(get_all_classes_in_package(path, Goal))
 
     @profile

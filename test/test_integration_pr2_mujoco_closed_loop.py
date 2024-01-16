@@ -569,20 +569,6 @@ class TestActionServerEvents:
         zero_pose.plan_and_execute(expected_error_code=MoveResult.INVALID_GOAL)
 
 
-# kernprof -lv py.test -s test/test_integration_pr2.py
-# time: [1-9][1-9]*.[1-9]* s
-# import pytest
-# pytest.main(['-s', __file__ + '::TestJointGoals::test_joint_goal2'])
-# pytest.main(['-s', __file__ + '::TestConstraints::test_open_dishwasher_apartment'])
-# pytest.main(['-s', __file__ + '::TestConstraints::test_bowl_and_cup'])
-# pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_avoid_collision_go_around_corner'])
-# pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_avoid_collision_box_between_boxes'])
-# pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_avoid_self_collision'])
-# pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_avoid_collision_at_kitchen_corner'])
-# pytest.main(['-s', __file__ + '::TestWayPoints::test_waypoints2'])
-# pytest.main(['-s', __file__ + '::TestCartGoals::test_keep_position3'])
-
-
 class TestManipulability:
     def test_manip1(self, zero_pose: PR2TestWrapper):
         p = PoseStamped()
@@ -593,7 +579,19 @@ class TestManipulability:
         zero_pose.allow_all_collisions()
         zero_pose.set_cart_goal(p, zero_pose.r_tip, 'map')
         zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulability.__name__,
-                                  root_link='torso_lift_link',
-                                  tip_link='r_gripper_tool_frame'
-                                  )
+                                               root_link='torso_lift_link',
+                                               tip_link='r_gripper_tool_frame')
         zero_pose.plan_and_execute()
+
+# kernprof -lv py.test -s test/test_integration_pr2.py
+# time: [1-9][1-9]*.[1-9]* s
+# import pytest
+# pytest.main(['-s', __file__ + '::TestJointGoals::test_joint_goal'])
+# pytest.main(['-s', __file__ + '::TestConstraints::test_open_dishwasher_apartment'])
+# pytest.main(['-s', __file__ + '::TestConstraints::test_bowl_and_cup'])
+# pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_avoid_collision_go_around_corner'])
+# pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_avoid_collision_box_between_boxes'])
+# pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_avoid_self_collision'])
+# pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_avoid_collision_at_kitchen_corner'])
+# pytest.main(['-s', __file__ + '::TestWayPoints::test_waypoints2'])
+# pytest.main(['-s', __file__ + '::TestCartGoals::test_keep_position3'])

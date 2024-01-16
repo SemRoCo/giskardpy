@@ -50,8 +50,8 @@ class MonitorManager:
     def __init__(self):
         self.monitors = []
         self.allowed_monitor_types = {}
-        self.allowed_monitor_types.update(get_all_classes_in_package(package_name='giskardpy.monitors',
-                                                                     parent_class=Monitor))
+        for path in god_map.giskard.monitor_package_paths:
+            self.allowed_monitor_types.update(get_all_classes_in_package(path, Monitor))
         self.state_history = []
         self.substitution_values = {}
         self.triggers = {}

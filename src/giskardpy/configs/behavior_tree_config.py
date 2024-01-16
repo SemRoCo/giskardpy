@@ -9,8 +9,16 @@ from giskardpy.tree.control_modes import ControlModes
 
 class BehaviorTreeConfig(ABC):
 
-    def __init__(self, mode: ControlModes):
+    def __init__(self, mode: ControlModes, control_loop_max_hz: float = 100):
+        """
+
+        :param mode: Defines the default setup of the behavior tree.
+        :param control_loop_max_hz: if mode == ControlModes.standalone: limits the simulation speed
+                       if mode == ControlModes.open_loop: limits the control loop of the base tracker
+                       if mode == ControlModes.close_loop: limits the control loop
+        """
         self._control_mode = mode
+        self.control_loop_max_hz = control_loop_max_hz
 
     @abstractmethod
     def setup(self):
@@ -34,9 +42,6 @@ class BehaviorTreeConfig(ABC):
         :param rate: in /s
         """
         self.tree_tick_rate = rate
-
-    def add_sleeper(self, time: float):
-        self.add_sleeper(time)
 
     def add_visualization_marker_publisher(self,
                                            add_to_sync: Optional[bool] = None,
@@ -66,7 +71,7 @@ class BehaviorTreeConfig(ABC):
         QP data is streamed and can be visualized in e.g. plotjuggler. Useful for debugging.
         """
         self.add_evaluate_debug_expressions()
-        if god_map.is_planning():
+        if god_map.is_open_loop():
             self.tree.execute_traj.base_closed_loop.publish_state.add_qp_data_publisher(
                 publish_lb=publish_lb,
                 publish_ub=publish_ub,
@@ -108,7 +113,7 @@ class BehaviorTreeConfig(ABC):
         """
         self.add_evaluate_debug_expressions()
         self.tree.cleanup_control_loop.add_plot_debug_trajectory(normalize_position=normalize_position,
-                                                                              wait=wait)
+                                                                 wait=wait)
 
     def add_gantt_chart_plotter(self):
         self.add_evaluate_debug_expressions()
@@ -131,8 +136,8 @@ class BehaviorTreeConfig(ABC):
         Publishes tf for Giskard's internal state.
         """
         self.tree.wait_for_goal.publish_state.add_tf_publisher(include_prefix=include_prefix,
-                                                                            tf_topic=tf_topic,
-                                                                            mode=mode)
+                                                               tf_topic=tf_topic,
+                                                               mode=mode)
 
     def add_evaluate_debug_expressions(self):
         self.tree.prepare_control_loop.add_compile_debug_expressions()
@@ -140,7 +145,7 @@ class BehaviorTreeConfig(ABC):
             self.tree.control_loop_branch.add_evaluate_debug_expressions(log_traj=False)
         else:
             self.tree.control_loop_branch.add_evaluate_debug_expressions(log_traj=True)
-        if god_map.is_planning():
+        if god_map.is_open_loop():
             god_map.tree.execute_traj.prepare_base_control.add_compile_debug_expressions()
             god_map.tree.execute_traj.base_closed_loop.add_evaluate_debug_expressions(log_traj=False)
 
@@ -156,14 +161,21 @@ class BehaviorTreeConfig(ABC):
 
 class StandAloneBTConfig(BehaviorTreeConfig):
     def __init__(self,
-                 planning_sleep: Optional[float] = None,
                  debug_mode: bool = False,
                  publish_js: bool = False,
-                 publish_tf: bool = False):
-        super().__init__(ControlModes.standalone)
-        self.planning_sleep = planning_sleep
+                 publish_tf: bool = False,
+                 max_simulation_hz: Optional[float] = None):
+        """
+        The default behavior tree for Giskard in standalone mode. Make sure to set up the robot interface accordingly.
+        :param debug_mode: enable various debugging tools.
+        :param publish_js: publish current world state.
+        :param publish_tf: publish all link poses in tf.
+        :param max_simulation_hz: if not None, will limit the frequency of the simulation.
+        """
         if god_map.is_in_github_workflow():
             debug_mode = False
+            max_simulation_hz = None
+        super().__init__(ControlModes.standalone, control_loop_max_hz=max_simulation_hz)
         self.debug_mode = debug_mode
         self.publish_js = publish_js
         self.publish_tf = publish_tf
@@ -179,16 +191,20 @@ class StandAloneBTConfig(BehaviorTreeConfig):
             self.add_goal_graph_plotter()
             self.add_debug_marker_publisher()
         # self.add_debug_marker_publisher()
-        if self.planning_sleep is not None:
-            self.add_sleeper(self.planning_sleep)
         if self.publish_js:
             self.add_js_publisher()
 
 
 class OpenLoopBTConfig(BehaviorTreeConfig):
-    def __init__(self, planning_sleep: Optional[float] = None, debug_mode: bool = False):
-        super().__init__(ControlModes.open_loop)
-        self.planning_sleep = planning_sleep
+    def __init__(self, debug_mode: bool = False, control_loop_max_hz: Optional[float] = None):
+        """
+        The default behavior tree for Giskard in open-loop mode. It will first plan the trajectory in simulation mode
+        and then publish it to connected joint trajectory followers. The base trajectory is tracked with a closed-loop
+        controller.
+        :param debug_mode:  enable various debugging toold.
+        :param control_loop_max_hz: if not None, limits the frequency of the base trajectory controller.
+        """
+        super().__init__(ControlModes.open_loop, control_loop_max_hz=control_loop_max_hz)
         if god_map.is_in_github_workflow():
             debug_mode = False
         self.debug_mode = debug_mode
@@ -207,13 +223,16 @@ class OpenLoopBTConfig(BehaviorTreeConfig):
                 # publish_lbA=True,
                 # publish_ubA=True
             )
-        if self.planning_sleep is not None:
-            self.add_sleeper(self.planning_sleep)
 
 
 class ClosedLoopBTConfig(BehaviorTreeConfig):
-    def __init__(self, debug_mode: bool = False):
-        super().__init__(ControlModes.close_loop)
+    def __init__(self, debug_mode: bool = False, control_loop_max_hz: Optional[float] = None):
+        """
+        The default configuration for Giskard in closed loop mode. Make use to set up the robot interface accordingly.
+        :param debug_mode: If True, will publish debug data on topics. This will significantly slow down the control loop.
+        :param control_loop_max_hz: Limits the control loop frequency. If None, it will go as fast as possible.
+        """
+        super().__init__(ControlModes.close_loop, control_loop_max_hz=control_loop_max_hz)
         if god_map.is_in_github_workflow():
             debug_mode = False
         self.debug_mode = debug_mode

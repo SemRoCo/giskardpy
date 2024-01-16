@@ -49,7 +49,11 @@ class GiskardBT(BehaviourTree):
         self.root = Sequence('Giskard')
         self.wait_for_goal = WaitForGoal()
         self.prepare_control_loop = failure_is_success(PrepareControlLoop)()
-        self.control_loop_branch = failure_is_success(ControlLoop)()
+        if self.is_open_loop():
+            max_hz = None
+        else:
+            max_hz = god_map.behavior_tree_config.control_loop_max_hz
+        self.control_loop_branch = failure_is_success(ControlLoop)(max_hz=max_hz)
         if self.is_closed_loop():
             self.control_loop_branch.add_closed_loop_behaviors()
         else:
@@ -57,7 +61,7 @@ class GiskardBT(BehaviourTree):
 
         self.post_processing = failure_is_success(PostProcessing)()
         self.cleanup_control_loop = CleanupControlLoop()
-        if self.is_planning():
+        if self.is_open_loop():
             self.execute_traj = failure_is_success(ExecuteTraj)()
 
         self.root.add_child(self.wait_for_goal)
@@ -77,7 +81,7 @@ class GiskardBT(BehaviourTree):
     def is_standalone(self):
         return self.control_mode == self.control_mode.standalone
 
-    def is_planning(self):
+    def is_open_loop(self):
         return self.control_mode == self.control_mode.open_loop
 
     @toggle_on('visualization_mode')
@@ -92,7 +96,7 @@ class GiskardBT(BehaviourTree):
 
     @toggle_on('projection_mode')
     def switch_to_projection(self):
-        if self.is_planning():
+        if self.is_open_loop():
             self.root.remove_child(self.execute_traj)
         elif self.is_closed_loop():
             self.control_loop_branch.switch_to_projection()
@@ -100,7 +104,7 @@ class GiskardBT(BehaviourTree):
 
     @toggle_off('projection_mode')
     def switch_to_execution(self):
-        if self.is_planning():
+        if self.is_open_loop():
             self.root.insert_child(self.execute_traj, -2)
         elif self.is_closed_loop():
             self.control_loop_branch.switch_to_closed_loop()

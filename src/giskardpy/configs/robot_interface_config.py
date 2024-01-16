@@ -93,7 +93,7 @@ class RobotInterfaceConfig(ABC):
         if god_map.is_closed_loop():
             self.tree.control_loop_branch.send_controls.add_send_cmd_velocity(cmd_vel_topic=cmd_vel_topic,
                                                                               joint_name=joint_name)
-        elif god_map.is_planning():
+        elif god_map.is_open_loop():
             self.tree.execute_traj.add_base_traj_action_server(cmd_vel_topic=cmd_vel_topic,
                                                                joint_name=joint_name)
 
@@ -122,7 +122,7 @@ class RobotInterfaceConfig(ABC):
         """
         if group_name is None:
             group_name = self.world.robot_name
-        if not god_map.is_planning():
+        if not god_map.is_open_loop():
             raise SetupException('add_follow_joint_trajectory_server only works in planning mode')
         self.tree.execute_traj.add_follow_joint_traj_action_server(namespace=namespace,
                                                                    group_name=group_name,

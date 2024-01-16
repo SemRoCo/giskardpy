@@ -1,6 +1,7 @@
 import traceback
 from threading import RLock, Thread
 from time import time
+from typing import Optional, Generator
 
 import rospy
 from py_trees import Status, Composite
@@ -11,28 +12,36 @@ from giskardpy.utils.utils import raise_to_blackboard
 
 
 class AsyncBehavior(GiskardBehavior, Composite):
+    """
+    A composite that runs its children in a different thread.
+    Status is Running if all children are Running.
+    If one child returns either Success or Failure, this behavior will return it as well.
+    """
 
-    def __init__(self, name, hz=None):
+    def __init__(self, name: str, max_hz: Optional[float] = None):
+        """
+        :param name:
+        :param max_hz: The frequency at which this thread is looped will be limited to this value, if possible.
+        """
         super().__init__(name)
         self.set_status(Status.INVALID)
         self.status_lock = RLock()
         self.looped_once = False
-        if hz is not None:
-            hz = 1/god_map.qp_controller_config.sample_period
-            self.sleeper = rospy.Rate(hz)
+        if max_hz is not None:
+            self.sleeper = rospy.Rate(max_hz)
         else:
             self.sleeper = None
 
-    def initialise(self):
+    def initialise(self) -> None:
         self.looped_once = False
         self.update_thread = Thread(target=self.loop_over_plugins)
         self.update_thread.start()
         super().initialise()
 
-    def is_running(self):
+    def is_running(self) -> bool:
         return self.status == Status.RUNNING
 
-    def terminate(self, new_status):
+    def terminate(self, new_status: Status) -> None:
         with self.status_lock:
             self.set_status(Status.FAILURE)
         try:
@@ -44,7 +53,7 @@ class AsyncBehavior(GiskardBehavior, Composite):
         self.stop_children()
         super().terminate(new_status)
 
-    def stop_children(self):
+    def stop_children(self) -> None:
         for child in self.children:
             child.stop()
 
@@ -55,14 +64,14 @@ class AsyncBehavior(GiskardBehavior, Composite):
                 self.initialise()
             yield self
 
-    def set_status(self, new_state):
+    def set_status(self, new_state: Status) -> None:
         self.status = new_state
 
     def tip(self):
         return GiskardBehavior.tip(self)
 
     @profile
-    def loop_over_plugins(self):
+    def loop_over_plugins(self) -> None:
         try:
             self.get_blackboard().runtime = time()
             while self.is_running() and not rospy.is_shutdown():
@@ -79,7 +88,6 @@ class AsyncBehavior(GiskardBehavior, Composite):
                             return
                 self.looped_once = True
                 if self.sleeper:
-                    a = rospy.get_rostime()
                     self.sleeper.sleep()
         except Exception as e:
             traceback.print_exc()

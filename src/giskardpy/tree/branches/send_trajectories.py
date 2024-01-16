@@ -3,6 +3,7 @@ from typing import Dict
 from py_trees import Sequence
 
 from giskardpy.data_types import PrefixName, Derivatives
+from giskardpy.god_map import god_map
 from giskardpy.tree.behaviors.send_trajectory import SendFollowJointTrajectory
 from giskardpy.tree.branches.control_loop import ControlLoop
 from giskardpy.tree.branches.prepare_control_loop import PrepareBaseTrajControlLoop
@@ -21,7 +22,7 @@ class ExecuteTraj(Sequence):
         self.prepare_base_control = PrepareBaseTrajControlLoop()
         self.insert_child(self.prepare_base_control, 0)
 
-        self.base_closed_loop = ControlLoop(log_traj=False)
+        self.base_closed_loop = ControlLoop(log_traj=False, max_hz=god_map.behavior_tree_config.control_loop_max_hz)
         self.base_closed_loop.add_closed_loop_behaviors()
         self.move_robots.add_child(self.base_closed_loop)
 

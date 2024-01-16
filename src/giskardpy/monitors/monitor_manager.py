@@ -60,11 +60,9 @@ class MonitorManager:
     def evaluate_expression(self, node):
         if isinstance(node, ast.BoolOp):
             if isinstance(node.op, ast.And):
-                return cas.logic_and(self.evaluate_expression(node.values[0]),
-                                     self.evaluate_expression(node.values[1]))
+                return cas.logic_and(*[self.evaluate_expression(x) for x in node.values])
             elif isinstance(node.op, ast.Or):
-                return cas.logic_or(self.evaluate_expression(node.values[0]),
-                                    self.evaluate_expression(node.values[1]))
+                return cas.logic_or(*[self.evaluate_expression(x) for x in node.values])
         elif isinstance(node, ast.UnaryOp):
             if isinstance(node.op, ast.Not):
                 return cas.logic_not(self.evaluate_expression(node.operand))

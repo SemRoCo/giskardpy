@@ -869,6 +869,7 @@ class TestMonitors:
         kitchen_setup.execute(add_local_minimum_reached=False)
 
     def test_sleep(self, zero_pose: PR2TestWrapper):
+        alternator = zero_pose.monitors.add_alternator()
         sleep1 = zero_pose.monitors.add_sleep(1, name='sleep1')
         print1 = zero_pose.monitors.add_print(message=f'{sleep1} done', start_condition=sleep1)
         sleep2 = zero_pose.monitors.add_sleep(1.5, name='sleep2', start_condition=f'{print1} or not {sleep1}')
@@ -889,13 +890,30 @@ class TestMonitors:
                                                   end_condition=left_monitor)
         local_min = zero_pose.monitors.add_local_minimum_reached(start_condition=f'{right_monitor} and {left_monitor}')
 
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = 'map'
+        base_goal.pose.position.x = 2
+        base_goal.pose.orientation.w = 1
+        base_monitor = zero_pose.monitors.add_cartesian_pose(root_link='map',
+                                                             tip_link='base_footprint',
+                                                             goal_pose=base_goal)
+
+        zero_pose.motion_goals.add_cartesian_pose(root_link='map',
+                                                  tip_link='base_footprint',
+                                                  goal_pose=base_goal,
+                                                  hold_condition=f'not {alternator}',
+                                                  end_condition=base_monitor)
+
         end = zero_pose.monitors.add_end_motion(start_condition=' and '.join([local_min,
                                                                               sleep2,
                                                                               right_monitor,
-                                                                              left_monitor]))
+                                                                              left_monitor,
+                                                                              base_monitor]))
         zero_pose.monitors.add_max_trajectory_length(120)
         zero_pose.execute(add_local_minimum_reached=False)
         assert god_map.trajectory.length_in_seconds > 6
+        current_pose = god_map.world.compute_fk_pose(root='map', tip='base_footprint')
+        compare_poses(current_pose.pose, base_goal.pose)
 
     def test_hold_monitors(self, zero_pose: PR2TestWrapper):
         sleep = zero_pose.monitors.add_sleep(0.5)

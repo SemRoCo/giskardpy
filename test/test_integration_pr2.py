@@ -2203,257 +2203,6 @@ class TestCartGoals:
         zero_pose.plan_and_execute()
 
 
-# class TestShaking(object):
-#     def test_wiggle_prismatic_joint_neglectable_shaking(self, kitchen_setup: PR2TestWrapper):
-#         # FIXME
-#         sample_period = kitchen_setup.god_map.get_data(identifier.sample_period)
-#         frequency_range = kitchen_setup.god_map.get_data(identifier.frequency_range)
-#         amplitude_threshold = kitchen_setup.god_map.get_data(identifier.amplitude_threshold)
-#         max_detectable_freq = int(1 / (2 * sample_period))
-#         min_wiggle_frequency = int(frequency_range * max_detectable_freq)
-#         while np.fmod(min_wiggle_frequency, 5.0) != 0.0:
-#             min_wiggle_frequency += 1
-#         distance_between_frequencies = 5
-#
-#         for i, t in enumerate([('torso_lift_joint', 0.05), ('odom_x_joint', 0.5)]):  # max vel: 0.015 and 0.5
-#             for f in range(min_wiggle_frequency, max_detectable_freq, distance_between_frequencies):
-#                 target_freq = float(f)
-#                 joint = t[0]
-#                 goal = t[1]
-#                 kitchen_setup.set_json_goal('JointPositionPrismatic',
-#                                             joint_name=joint,
-#                                             goal=0.0,
-#                                             )
-#                 kitchen_setup.plan_and_execute()
-#                 kitchen_setup.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
-#                 kitchen_setup.set_json_goal('ShakyJointPositionRevoluteOrPrismatic',
-#                                             joint_name=joint,
-#                                             noise_amplitude=amplitude_threshold - 0.05,
-#                                             goal=goal,
-#                                             frequency=target_freq
-#                                             )
-#                 kitchen_setup.plan_and_execute()
-#
-#     def test_wiggle_revolute_joint_neglectable_shaking(self, kitchen_setup: PR2TestWrapper):
-#         # FIXME
-#         sample_period = kitchen_setup.god_map.get_data(identifier.sample_period)
-#         frequency_range = kitchen_setup.god_map.get_data(identifier.frequency_range)
-#         amplitude_threshold = kitchen_setup.god_map.get_data(identifier.amplitude_threshold)
-#         max_detectable_freq = int(1 / (2 * sample_period))
-#         min_wiggle_frequency = int(frequency_range * max_detectable_freq)
-#         while np.fmod(min_wiggle_frequency, 5.0) != 0.0:
-#             min_wiggle_frequency += 1
-#         distance_between_frequencies = 5
-#
-#         for i, joint in enumerate(['r_wrist_flex_joint', 'head_pan_joint']):  # max vel: 1.0 and 0.5
-#             for f in range(min_wiggle_frequency, max_detectable_freq, distance_between_frequencies):
-#                 target_freq = float(f)
-#                 kitchen_setup.set_json_goal('JointPositionRevolute',
-#                                             joint_name=joint,
-#                                             goal=0.0,
-#                                             )
-#                 kitchen_setup.plan_and_execute()
-#                 kitchen_setup.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
-#                 kitchen_setup.set_json_goal('ShakyJointPositionRevoluteOrPrismatic',
-#                                             joint_name=joint,
-#                                             noise_amplitude=amplitude_threshold - 0.05,
-#                                             goal=-1.0,
-#                                             frequency=target_freq
-#                                             )
-#                 kitchen_setup.plan_and_execute()
-#
-#     def test_wiggle_continuous_joint_neglectable_shaking(self, kitchen_setup: PR2TestWrapper):
-#         sample_period = kitchen_setup.god_map.get_data(identifier.sample_period)
-#         frequency_range = kitchen_setup.god_map.get_data(identifier.frequency_range)
-#         amplitude_threshold = kitchen_setup.god_map.get_data(identifier.amplitude_threshold)
-#         max_detectable_freq = int(1 / (2 * sample_period))
-#         min_wiggle_frequency = int(frequency_range * max_detectable_freq)
-#         while np.fmod(min_wiggle_frequency, 5.0) != 0.0:
-#             min_wiggle_frequency += 1
-#         distance_between_frequencies = 5
-#
-#         for continuous_joint in ['l_wrist_roll_joint', 'r_forearm_roll_joint']:  # max vel. of 1.0 and 1.0
-#             for f in range(min_wiggle_frequency, max_detectable_freq, distance_between_frequencies):
-#                 kitchen_setup.set_json_goal('JointPositionContinuous',
-#                                             joint_name=continuous_joint,
-#                                             goal=5.0,
-#                                             )
-#                 kitchen_setup.plan_and_execute()
-#                 target_freq = float(f)
-#                 kitchen_setup.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
-#                 kitchen_setup.set_json_goal('ShakyJointPositionContinuous',
-#                                             joint_name=continuous_joint,
-#                                             goal=-5.0,
-#                                             noise_amplitude=amplitude_threshold - 0.05,
-#                                             frequency=target_freq
-#                                             )
-#                 kitchen_setup.plan_and_execute()
-#
-#     def test_wiggle_revolute_joint_shaking(self, kitchen_setup: PR2TestWrapper):
-#         sample_period = kitchen_setup.god_map.get_data(identifier.sample_period)
-#         frequency_range = kitchen_setup.god_map.get_data(identifier.frequency_range)
-#         max_detectable_freq = int(1 / (2 * sample_period))
-#         min_wiggle_frequency = int(frequency_range * max_detectable_freq)
-#         while np.fmod(min_wiggle_frequency, 5.0) != 0.0:
-#             min_wiggle_frequency += 1
-#         distance_between_frequencies = 5
-#
-#         for joint in ['head_pan_joint', 'r_wrist_flex_joint']:  # max vel: 1.0 and 0.5
-#             for f in range(min_wiggle_frequency, max_detectable_freq, distance_between_frequencies):
-#                 kitchen_setup.set_json_goal('JointPositionRevolute',
-#                                             joint_name=joint,
-#                                             goal=0.5,
-#                                             )
-#                 kitchen_setup.plan_and_execute()
-#                 target_freq = float(f)
-#                 kitchen_setup.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
-#                 kitchen_setup.set_json_goal('ShakyJointPositionRevoluteOrPrismatic',
-#                                             joint_name=joint,
-#                                             goal=0.0,
-#                                             frequency=target_freq
-#                                             )
-#                 r = kitchen_setup.plan_and_execute(expected_error_codes=[GiskardError.SHAKING])
-#                 assert len(r.error_codes) != 0
-#                 error_code = r.error_codes[0]
-#                 assert error_code == GiskardError.SHAKING
-#                 error_message = r.error_messages[0]
-#                 freqs_str = re.findall("[0-9]+\.[0-9]+ hertz", error_message)
-#                 assert any(map(lambda f_str: float(f_str[:-6]) == target_freq, freqs_str))
-#
-#     def test_wiggle_prismatic_joint_shaking(self, kitchen_setup: PR2TestWrapper):
-#         sample_period = kitchen_setup.god_map.get_data(identifier.sample_period)
-#         frequency_range = kitchen_setup.god_map.get_data(identifier.frequency_range)
-#         max_detectable_freq = int(1 / (2 * sample_period))
-#         min_wiggle_frequency = int(frequency_range * max_detectable_freq)
-#         while np.fmod(min_wiggle_frequency, 5.0) != 0.0:
-#             min_wiggle_frequency += 1
-#         distance_between_frequencies = 5
-#
-#         for joint in ['odom_x_joint']:  # , 'torso_lift_joint']: # max vel: 0.015 and 0.5
-#             for f in range(min_wiggle_frequency, max_detectable_freq, distance_between_frequencies):
-#                 kitchen_setup.set_json_goal('JointPositionPrismatic',
-#                                             joint_name=joint,
-#                                             goal=0.02,
-#                                             )
-#                 kitchen_setup.plan_and_execute()
-#                 target_freq = float(f)
-#                 kitchen_setup.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
-#                 kitchen_setup.set_json_goal('ShakyJointPositionRevoluteOrPrismatic',
-#                                             joint_name=joint,
-#                                             goal=0.0,
-#                                             frequency=target_freq
-#                                             )
-#                 r = kitchen_setup.plan_and_execute(expected_error_codes=[GiskardError.SHAKING])
-#                 assert len(r.error_codes) != 0
-#                 error_code = r.error_codes[0]
-#                 assert error_code == GiskardError.SHAKING
-#                 error_message = r.error_messages[0]
-#                 freqs_str = re.findall("[0-9]+\.[0-9]+ hertz", error_message)
-#                 assert any(map(lambda f_str: float(f_str[:-6]) == target_freq, freqs_str))
-#
-#     def test_wiggle_continuous_joint_shaking(self, kitchen_setup: PR2TestWrapper):
-#         sample_period = kitchen_setup.god_map.get_data(identifier.sample_period)
-#         frequency_range = kitchen_setup.god_map.get_data(identifier.frequency_range)
-#         max_detectable_freq = int(1 / (2 * sample_period))
-#         min_wiggle_frequency = int(frequency_range * max_detectable_freq)
-#         while np.fmod(min_wiggle_frequency, 5.0) != 0.0:
-#             min_wiggle_frequency += 1
-#         distance_between_frequencies = 5
-#
-#         for continuous_joint in ['l_wrist_roll_joint', 'r_forearm_roll_joint']:  # max vel. of 1.0 and 1.0
-#             for f in range(min_wiggle_frequency, max_detectable_freq, distance_between_frequencies):
-#                 kitchen_setup.set_json_goal('JointPositionContinuous',
-#                                             joint_name=continuous_joint,
-#                                             goal=5.0,
-#                                             )
-#                 kitchen_setup.plan_and_execute()
-#                 target_freq = float(f)
-#                 kitchen_setup.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
-#                 kitchen_setup.set_json_goal('ShakyJointPositionContinuous',
-#                                             joint_name=continuous_joint,
-#                                             goal=-5.0,
-#                                             frequency=target_freq
-#                                             )
-#                 r = kitchen_setup.plan_and_execute(expected_error_codes=[GiskardError.SHAKING])
-#                 assert len(r.error_codes) != 0
-#                 error_code = r.error_codes[0]
-#                 assert error_code == GiskardError.SHAKING
-#                 error_message = r.error_messages[0]
-#                 freqs_str = re.findall("[0-9]+\.[0-9]+ hertz", error_message)
-#                 assert any(map(lambda f_str: float(f_str[:-6]) == target_freq, freqs_str))
-#
-#     def test_only_revolute_joint_shaking(self, kitchen_setup: PR2TestWrapper):
-#         sample_period = kitchen_setup.god_map.get_data(identifier.sample_period)
-#         frequency_range = kitchen_setup.god_map.get_data(identifier.frequency_range)
-#         amplitude_threshold = kitchen_setup.god_map.get_data(identifier.amplitude_threshold)
-#         max_detectable_freq = int(1 / (2 * sample_period))
-#         min_wiggle_frequency = int(frequency_range * max_detectable_freq)
-#         while np.fmod(min_wiggle_frequency, 5.0) != 0.0:
-#             min_wiggle_frequency += 1
-#         distance_between_frequencies = 5
-#
-#         for revolute_joint in ['r_wrist_flex_joint', 'head_pan_joint']:  # max vel. of 1.0 and 1.0
-#             for f in range(min_wiggle_frequency, max_detectable_freq, distance_between_frequencies):
-#                 target_freq = float(f)
-#
-#                 if f == min_wiggle_frequency:
-#                     kitchen_setup.set_json_goal('JointPositionRevolute',
-#                                                 joint_name=revolute_joint,
-#                                                 goal=0.0,
-#                                                 )
-#                     kitchen_setup.plan_and_execute()
-#
-#                 kitchen_setup.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
-#                 kitchen_setup.set_json_goal('ShakyJointPositionRevoluteOrPrismatic',
-#                                             joint_name=revolute_joint,
-#                                             goal=0.0,
-#                                             noise_amplitude=amplitude_threshold + 0.02,
-#                                             frequency=target_freq
-#                                             )
-#                 r = kitchen_setup.plan_and_execute(expected_error_codes=[GiskardError.SHAKING])
-#                 assert len(r.error_codes) != 0
-#                 error_code = r.error_codes[0]
-#                 assert error_code == GiskardError.SHAKING
-#                 error_message = r.error_messages[0]
-#                 freqs_str = re.findall("[0-9]+\.[0-9]+ hertz", error_message)
-#                 assert any(map(lambda f_str: float(f_str[:-6]) == target_freq, freqs_str))
-#
-#     def test_only_revolute_joint_neglectable_shaking(self, kitchen_setup: PR2TestWrapper):
-#         # FIXME
-#         sample_period = kitchen_setup.god_map.get_data(identifier.sample_period)
-#         frequency_range = kitchen_setup.god_map.get_data(identifier.frequency_range)
-#         amplitude_threshold = kitchen_setup.god_map.get_data(identifier.amplitude_threshold)
-#         max_detectable_freq = int(1 / (2 * sample_period))
-#         min_wiggle_frequency = int(frequency_range * max_detectable_freq)
-#         while np.fmod(min_wiggle_frequency, 5.0) != 0.0:
-#             min_wiggle_frequency += 1
-#         distance_between_frequencies = 5
-#
-#         for revolute_joint in ['r_wrist_flex_joint', 'head_pan_joint']:  # max vel. of 1.0 and 0.5
-#             for f in range(min_wiggle_frequency, max_detectable_freq, distance_between_frequencies):
-#                 target_freq = float(f)
-#                 if f == min_wiggle_frequency:
-#                     kitchen_setup.set_json_goal('JointPositionRevolute',
-#                                                 joint_name=revolute_joint,
-#                                                 goal=0.0,
-#                                                 )
-#                     kitchen_setup.plan_and_execute()
-#                 kitchen_setup.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
-#                 kitchen_setup.set_json_goal('ShakyJointPositionRevoluteOrPrismatic',
-#                                             joint_name=revolute_joint,
-#                                             goal=0.0,
-#                                             noise_amplitude=amplitude_threshold - 0.02,
-#                                             frequency=target_freq
-#                                             )
-#                 r = kitchen_setup.plan_and_execute()
-#                 if any(map(lambda c: c == GiskardError.SHAKING, r.error_codes)):
-#                     error_message = r.error_messages[0]
-#                     freqs_str = re.findall("[0-9]+\.[0-9]+ hertz", error_message)
-#                     assert all(map(lambda f_str: float(f_str[:-6]) != target_freq, freqs_str))
-#                 else:
-#                     assert True
-
-
 class TestWorldManipulation:
 
     def test_save_graph_pdf(self, kitchen_setup):
@@ -2765,7 +2514,7 @@ class TestWorldManipulation:
         req.pose = PoseStamped()
         req.parent_link = zero_pose.r_tip
         req.operation = 42
-        assert zero_pose.world._send_goal_and_wait(req).error_code == GiskardError.INVALID_WORLD_OPERATION
+        assert zero_pose.world._send_goal_and_wait(req).error.code == GiskardError.INVALID_WORLD_OPERATION
 
     def test_remove_unkown_group(self, zero_pose: PR2TestWrapper):
         zero_pose.remove_group('muh', expected_response=GiskardError.UNKNOWN_GROUP)
@@ -2780,7 +2529,7 @@ class TestWorldManipulation:
         req.pose.header.frame_id = 'map'
         req.parent_link = 'base_link'
         req.operation = WorldGoal.ADD
-        assert zero_pose.world._send_goal_and_wait(req).error_code == GiskardError.CORRUPT_SHAPE
+        assert zero_pose.world._send_goal_and_wait(req).error.code == GiskardError.CORRUPT_SHAPE
 
     def test_tf_error(self, zero_pose: PR2TestWrapper):
         req = WorldGoal()
@@ -2789,7 +2538,7 @@ class TestWorldManipulation:
         req.pose = PoseStamped()
         req.parent_link = 'base_link'
         req.operation = WorldGoal.ADD
-        assert zero_pose.world._send_goal_and_wait(req).error_code == GiskardError.TRANSFORM_ERROR
+        assert zero_pose.world._send_goal_and_wait(req).error.code == GiskardError.TRANSFORM_ERROR
 
     def test_unsupported_options(self, kitchen_setup: PR2TestWrapper):
         wb = WorldBody()
@@ -2805,7 +2554,7 @@ class TestWorldManipulation:
         req.pose = pose
         req.parent_link = 'base_link'
         req.operation = WorldGoal.ADD
-        assert kitchen_setup.world._send_goal_and_wait(req).error_code == GiskardError.CORRUPT_URDF
+        assert kitchen_setup.world._send_goal_and_wait(req).error.code == GiskardError.CORRUPT_URDF
 
 
 class TestSelfCollisionAvoidance:

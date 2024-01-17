@@ -79,7 +79,7 @@ class EmptyProblemException(InfeasibleException, DontPrintStackTrace):
     pass
 
 
-# %% world state exceptions
+# %% world exceptions
 @GiskardException.register_error_code(GiskardError.WORLD_ERROR)
 class WorldException(GiskardException):
     pass
@@ -100,11 +100,28 @@ class UnknownJointException(WorldException, KeyError):
     pass
 
 
-class UnsupportedOptionException(WorldException):
+@GiskardException.register_error_code(GiskardError.INVALID_WORLD_OPERATION)
+class InvalidWorldOperationException(WorldException, KeyError):
     pass
 
 
+@GiskardException.register_error_code(GiskardError.CORRUPT_SHAPE)
 class CorruptShapeException(WorldException):
+    pass
+
+
+@GiskardException.register_error_code(GiskardError.CORRUPT_MESH)
+class CorruptMeshException(CorruptShapeException):
+    pass
+
+
+@GiskardException.register_error_code(GiskardError.CORRUPT_URDF)
+class CorruptURDFException(CorruptShapeException):
+    pass
+
+
+@GiskardException.register_error_code(GiskardError.TRANSFORM_ERROR)
+class TransformException(WorldException):
     pass
 
 

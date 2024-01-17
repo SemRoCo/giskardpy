@@ -95,6 +95,6 @@ class PlotTaskMonitorGraph(GiskardBehavior):
     @record_time
     @profile
     def update(self):
-        file_name = god_map.giskard.tmp_folder + f'task_graphs/goal_{god_map.goal_id}.png'
+        file_name = god_map.giskard.tmp_folder + f'task_graphs/goal_{god_map.move_action_server.goal_id}.png'
         create_graph(god_map.motion_goal_manager.motion_goals.values(), god_map.monitor_manager.monitors, file_name)
         return Status.SUCCESS

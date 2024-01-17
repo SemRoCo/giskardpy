@@ -16,10 +16,13 @@ class ActionServerHandler:
     """
     Interface to action server which is more useful for behaviors.
     """
+    goal_id: int
+    name: str
 
     @record_time
     def __init__(self, action_name: str, action_type: Any):
         self.name = action_name
+        self.goal_id = -1
         self.goal_msg = None
         self._result_msg = None
         self.goal_queue = Queue(1)
@@ -38,6 +41,7 @@ class ActionServerHandler:
     def accept_goal(self) -> None:
         try:
             self.goal_msg = self.goal_queue.get_nowait()
+            self.goal_id += 1
         except Empty:
             return None
 

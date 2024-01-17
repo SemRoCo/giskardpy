@@ -2,8 +2,8 @@ from typing import Dict, Optional, List, Tuple
 
 from geometry_msgs.msg import PoseStamped, PointStamped, QuaternionStamped, Vector3Stamped
 
-from giskard_msgs.msg import MoveResult, CollisionEntry, MoveGoal
-from giskard_msgs.srv import UpdateWorldResponse, DyeGroupResponse, GetGroupInfoResponse, RegisterGroupResponse
+from giskard_msgs.msg import MoveResult, CollisionEntry, MoveGoal, WorldResult
+from giskard_msgs.srv import DyeGroupResponse, GetGroupInfoResponse
 from giskardpy.data_types import goal_parameter
 from giskardpy.python_interface.python_interface import GiskardWrapper
 from giskardpy.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
@@ -625,8 +625,7 @@ class OldGiskardWrapper(GiskardWrapper):
                 size: Tuple[float, float, float],
                 pose: PoseStamped,
                 parent_link: str = '',
-                parent_link_group: str = '',
-                timeout: float = 2) -> UpdateWorldResponse:
+                parent_link_group: str = '') -> WorldResult:
         """
         Adds a new box to the world tree and attaches it to parent_link.
         If parent_link_group and parent_link are empty, the box will be attached to the world root link, e.g., map.
@@ -635,23 +634,20 @@ class OldGiskardWrapper(GiskardWrapper):
         :param pose: Where the root link of the new object will be positioned
         :param parent_link: Name of the link, the object will get attached to
         :param parent_link_group: Name of the group in which Giskard will search for parent_link
-        :param timeout: Can wait this many seconds, in case Giskard is busy
         :return: Response message of the service call
         """
         return self.world.add_box(name=name,
                                   size=size,
                                   pose=pose,
                                   parent_link=parent_link,
-                                  parent_link_group=parent_link_group,
-                                  timeout=timeout)
+                                  parent_link_group=parent_link_group)
 
     def add_sphere(self,
                    name: str,
                    radius: float,
                    pose: PoseStamped,
                    parent_link: str = '',
-                   parent_link_group: str = '',
-                   timeout: float = 2) -> UpdateWorldResponse:
+                   parent_link_group: str = '') -> WorldResult:
         """
         See add_box.
         """
@@ -659,8 +655,7 @@ class OldGiskardWrapper(GiskardWrapper):
                                      radius=radius,
                                      pose=pose,
                                      parent_link=parent_link,
-                                     parent_link_group=parent_link_group,
-                                     timeout=timeout)
+                                     parent_link_group=parent_link_group)
 
     def add_mesh(self,
                  name: str,
@@ -668,8 +663,7 @@ class OldGiskardWrapper(GiskardWrapper):
                  pose: PoseStamped,
                  parent_link: str = '',
                  parent_link_group: str = '',
-                 scale: Tuple[float, float, float] = (1, 1, 1),
-                 timeout: float = 2) -> UpdateWorldResponse:
+                 scale: Tuple[float, float, float] = (1, 1, 1)) -> WorldResult:
         """
         See add_box.
         :param mesh: path to the mesh location, can be ros package path, e.g.,
@@ -680,8 +674,7 @@ class OldGiskardWrapper(GiskardWrapper):
                                    scale=scale,
                                    pose=pose,
                                    parent_link=parent_link,
-                                   parent_link_group=parent_link_group,
-                                   timeout=timeout)
+                                   parent_link_group=parent_link_group)
 
     def add_cylinder(self,
                      name: str,
@@ -689,8 +682,7 @@ class OldGiskardWrapper(GiskardWrapper):
                      radius: float,
                      pose: PoseStamped,
                      parent_link: str = '',
-                     parent_link_group: str = '',
-                     timeout: float = 2) -> UpdateWorldResponse:
+                     parent_link_group: str = '') -> WorldResult:
         """
         See add_box.
         """
@@ -699,42 +691,36 @@ class OldGiskardWrapper(GiskardWrapper):
                                        radius=radius,
                                        pose=pose,
                                        parent_link=parent_link,
-                                       parent_link_group=parent_link_group,
-                                       timeout=timeout)
+                                       parent_link_group=parent_link_group)
 
-    def remove_group(self,
-                     name: str,
-                     timeout: float = 2) -> UpdateWorldResponse:
+    def remove_group(self, name: str) -> WorldResult:
         """
         Removes a group and all links and joints it contains from the world.
         Be careful, you can remove parts of the robot like that.
         """
-        return self.world.remove_group(name=name, timeout=timeout)
+        return self.world.remove_group(name=name)
 
     def update_parent_link_of_group(self,
                                     name: str,
                                     parent_link: str,
-                                    parent_link_group: Optional[str] = '',
-                                    timeout: float = 2) -> UpdateWorldResponse:
+                                    parent_link_group: Optional[str] = '') -> WorldResult:
         """
         Removes the joint connecting the root link of a group and attaches it to a parent_link.
         The object will not move relative to the world's root link in this process.
         :param name: name of the group
         :param parent_link: name of the new parent link
         :param parent_link_group: if parent_link is not unique, search in this group for matches.
-        :param timeout: how long to wait in case Giskard is busy processing a goal.
         :return: result message
         """
         return self.world.update_parent_link_of_group(name=name,
                                                       parent_link=parent_link,
-                                                      parent_link_group=parent_link_group,
-                                                      timeout=timeout)
+                                                      parent_link_group=parent_link_group)
 
-    def detach_group(self, object_name: str, timeout: float = 2):
+    def detach_group(self, object_name: str):
         """
         A wrapper for update_parent_link_of_group which set parent_link to the root link of the world.
         """
-        return self.world.detach_group(oname=object_name, timeout=timeout)
+        return self.world.detach_group(oname=object_name)
 
     def add_urdf(self,
                  name: str,
@@ -742,8 +728,7 @@ class OldGiskardWrapper(GiskardWrapper):
                  pose: PoseStamped,
                  parent_link: str = '',
                  parent_link_group: str = '',
-                 js_topic: Optional[str] = '',
-                 timeout: float = 2) -> UpdateWorldResponse:
+                 js_topic: Optional[str] = '') -> WorldResult:
         """
         Adds a urdf to the world.
         :param name: name the group containing the urdf will have.
@@ -752,7 +737,6 @@ class OldGiskardWrapper(GiskardWrapper):
         :param parent_link: to which link the urdf will be attached
         :param parent_link_group: if parent_link is not unique, search here for matches.
         :param js_topic: Giskard will listen on that topic for joint states and update the urdf accordingly
-        :param timeout: how long to wait if Giskard is busy.
         :return: response message
         """
         return self.world.add_urdf(name=name,
@@ -760,8 +744,7 @@ class OldGiskardWrapper(GiskardWrapper):
                                    pose=pose,
                                    js_topic=js_topic,
                                    parent_link=parent_link,
-                                   parent_link_group=parent_link_group,
-                                   timeout=timeout)
+                                   parent_link_group=parent_link_group)
 
     def dye_group(self, group_name: str, rgba: Tuple[float, float, float, float]) -> DyeGroupResponse:
         """
@@ -787,18 +770,17 @@ class OldGiskardWrapper(GiskardWrapper):
         """
         return self.world.get_controlled_joints(group_name=group_name)
 
-    def update_group_pose(self, group_name: str, new_pose: PoseStamped, timeout: float = 2) -> UpdateWorldResponse:
+    def update_group_pose(self, group_name: str, new_pose: PoseStamped) -> WorldResult:
         """
         Overwrites the pose specified in the joint that connects the two groups.
         :param group_name: Name of the group that will move
         :param new_pose: New pose of the group
-        :param timeout: How long to wait if Giskard is busy
         :return: Giskard's reply
         """
-        return self.world.update_group_pose(group_name=group_name, new_pose=new_pose, timeout=timeout)
+        return self.world.update_group_pose(group_name=group_name, new_pose=new_pose)
 
     def register_group(self, new_group_name: str, root_link_name: str,
-                       root_link_group_name: str) -> RegisterGroupResponse:
+                       root_link_group_name: str) -> WorldResult:
         """
         Register a new group for reference in collision checking. All child links of root_link_name will belong to it.
         :param new_group_name: Name of the new group.
@@ -810,8 +792,8 @@ class OldGiskardWrapper(GiskardWrapper):
                                    root_link_name=root_link_name,
                                    root_link_group_name=root_link_group_name)
 
-    def clear_world(self, timeout: float = 2) -> UpdateWorldResponse:
+    def clear_world(self) -> WorldResult:
         """
         Resets the world to what it was when Giskard was launched.
         """
-        return self.world.clear(timeout=timeout)
+        return self.world.clear()

@@ -33,7 +33,6 @@ if TYPE_CHECKING:
 
 
 class GodMap:
-    goal_id: int = -1
     monitor_manager: MonitorManager
     giskard: Giskard
     time: float  # real/planning time in s

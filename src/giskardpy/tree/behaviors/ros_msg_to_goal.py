@@ -32,8 +32,7 @@ class ParseActionGoal(GiskardBehavior):
     @profile
     def update(self):
         move_goal = god_map.move_action_server.goal_msg
-        god_map.goal_id += 1
-        loginfo(f'Parsing goal #{god_map.goal_id} message.')
+        loginfo(f'Parsing goal #{god_map.move_action_server.goal_id} message.')
         self.sanity_check(move_goal)
         try:
             god_map.monitor_manager.parse_monitors(move_goal.monitors)

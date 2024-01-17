@@ -785,7 +785,6 @@ class CollisionWorldSynchronizer:
         pass
 
     def sync_world_model_update(self) -> None:
-        logging.loginfo('updating collision scene')
         self.disabled_links = set()
         self.self_collision_matrix = {}
         for robot, (srdf, self_collision_matrix, disabled_link) in self.self_collision_matrix_cache.items():
@@ -801,7 +800,6 @@ class CollisionWorldSynchronizer:
                                                    overwrite_old_matrix=False,
                                                    save_to_tmp=False)
         self.blacklist_inter_group_collisions()
-        logging.loginfo('done updating collision scene')
 
     def add_added_checks(self):
         try:

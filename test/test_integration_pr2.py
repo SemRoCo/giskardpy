@@ -326,11 +326,8 @@ class TestJointGoals:
             'l_wrist_flex_joint': -0.1,
             'l_wrist_roll_joint': -6.062015047706399,
         }
-        # zero_pose.set_joint_goal(js)
-        # zero_pose.add_joint_goal_monitor('asdf', goal_state=js, threshold=0.005, crucial=False)
         zero_pose.set_joint_goal(goal_state=js)
         zero_pose.allow_all_collisions()
-        # zero_pose.set_json_goal('EnableVelocityTrajectoryTracking', enabled=True)
         zero_pose.plan_and_execute()
 
     def test_joint_goal_projection(self, zero_pose: PR2TestWrapper):
@@ -2644,18 +2641,17 @@ class TestWorldManipulation:
                                     expected_error_code=UpdateWorldResponse.CORRUPT_MESH_ERROR)
 
     def test_add_attach_detach_remove_add(self, zero_pose: PR2TestWrapper):
-        timeout = 1
         object_name = 'muh'
         p = PoseStamped()
         p.header.frame_id = 'map'
         p.pose.position = Point(1.2, 0, 1.6)
         p.pose.orientation = Quaternion(0.0, 0.0, 0.47942554, 0.87758256)
-        zero_pose.add_box_to_world(object_name, size=(1, 1, 1), pose=p, timeout=timeout)
+        zero_pose.add_box_to_world(object_name, size=(1, 1, 1), pose=p)
         internal_object_name = god_map.world.search_for_link_name(object_name)
-        zero_pose.update_parent_link_of_group(object_name, parent_link=zero_pose.r_tip, timeout=timeout)
-        zero_pose.detach_group(object_name, timeout=timeout)
-        zero_pose.remove_group(object_name, timeout=timeout)
-        zero_pose.add_box_to_world(object_name, size=(1, 1, 1), pose=p, timeout=timeout)
+        zero_pose.update_parent_link_of_group(object_name, parent_link=zero_pose.r_tip)
+        zero_pose.detach_group(object_name)
+        zero_pose.remove_group(object_name)
+        zero_pose.add_box_to_world(object_name, size=(1, 1, 1), pose=p)
 
     def test_attach_to_kitchen(self, kitchen_setup: PR2TestWrapper):
         object_name = 'muh'
@@ -2766,7 +2762,6 @@ class TestWorldManipulation:
 
     def test_invalid_update_world(self, zero_pose: PR2TestWrapper):
         req = UpdateWorldRequest()
-        req.timeout = 500
         req.body = WorldBody()
         req.pose = PoseStamped()
         req.parent_link = zero_pose.r_tip

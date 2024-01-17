@@ -9,7 +9,7 @@ from shape_msgs.msg import SolidPrimitive
 
 import giskard_msgs.msg as giskard_msgs
 from giskard_msgs.msg import MoveAction, MoveGoal, WorldBody, CollisionEntry, MoveResult, MoveFeedback, MotionGoal, \
-    Monitor
+    Monitor, WorldGoal, WorldAction, WorldResult
 from giskard_msgs.srv import DyeGroupRequest, DyeGroup, GetGroupInfoRequest, DyeGroupResponse
 from giskard_msgs.srv import GetGroupNamesResponse, GetGroupInfoResponse, RegisterGroupRequest
 from giskard_msgs.srv import RegisterGroupResponse
@@ -38,47 +38,44 @@ from giskardpy.utils.utils import kwargs_to_json
 
 class WorldWrapper:
     def __init__(self, node_name: str):
-        self._update_world_srv = rospy.ServiceProxy(f'{node_name}/update_world', UpdateWorld)
         self._get_group_info_srv = rospy.ServiceProxy(f'{node_name}/get_group_info', GetGroupInfo)
         self._get_group_names_srv = rospy.ServiceProxy(f'{node_name}/get_group_names', GetGroupNames)
         self._register_groups_srv = rospy.ServiceProxy(f'{node_name}/register_groups', RegisterGroup)
         self._dye_group_srv = rospy.ServiceProxy(f'{node_name}/dye_group', DyeGroup)
-        rospy.wait_for_service(f'{node_name}/update_world')
+        self._client = SimpleActionClient('update_world', WorldAction)
+        self._client.wait_for_server()
         self.robot_name = self.get_group_names()[0]
 
-    def clear(self, timeout: float = 2) -> UpdateWorldResponse:
+    def clear(self) -> WorldResult:
         """
         Resets the world to what it was when Giskard was launched.
         """
-        req = UpdateWorldRequest()
+        req = WorldGoal()
         req.operation = UpdateWorldRequest.REMOVE_ALL
-        req.timeout = timeout
-        result: UpdateWorldResponse = self._update_world_srv.call(req)
-        return result
+        return self._send_goal_and_wait(req)
 
-    def remove_group(self,
-                     name: str,
-                     timeout: float = 2) -> UpdateWorldResponse:
+    def remove_group(self, name: str) -> WorldResult:
         """
         Removes a group and all links and joints it contains from the world.
         Be careful, you can remove parts of the robot like that.
         """
         world_body = WorldBody()
-        req = UpdateWorldRequest()
+        req = WorldGoal()
         req.group_name = str(name)
         req.operation = UpdateWorldRequest.REMOVE
-        req.timeout = timeout
         req.body = world_body
-        result: UpdateWorldResponse = self._update_world_srv.call(req)
-        return result
+        return self._send_goal_and_wait(req)
+
+    def _send_goal_and_wait(self, goal: WorldGoal) -> WorldResult:
+        self._client.send_goal_and_wait(goal)
+        return self._client.get_result()
 
     def add_box(self,
                 name: str,
                 size: Tuple[float, float, float],
                 pose: PoseStamped,
                 parent_link: str = '',
-                parent_link_group: str = '',
-                timeout: float = 2) -> UpdateWorldResponse:
+                parent_link_group: str = '') -> WorldResult:
         """
         Adds a new box to the world tree and attaches it to parent_link.
         If parent_link_group and parent_link are empty, the box will be attached to the world root link, e.g., map.
@@ -87,26 +84,23 @@ class WorldWrapper:
         :param pose: Where the root link of the new object will be positioned
         :param parent_link: Name of the link, the object will get attached to
         :param parent_link_group: Name of the group in which Giskard will search for parent_link
-        :param timeout: Can wait this many seconds, in case Giskard is busy
         :return: Response message of the service call
         """
-        req = UpdateWorldRequest()
+        req = WorldGoal()
         req.group_name = str(name)
         req.operation = UpdateWorldRequest.ADD
-        req.timeout = timeout
         req.body = make_world_body_box(size[0], size[1], size[2])
         req.parent_link_group = parent_link_group
         req.parent_link = parent_link
         req.pose = pose
-        return self._update_world_srv.call(req)
+        return self._send_goal_and_wait(req)
 
     def add_sphere(self,
                    name: str,
                    radius: float,
                    pose: PoseStamped,
                    parent_link: str = '',
-                   parent_link_group: str = '',
-                   timeout: float = 2) -> UpdateWorldResponse:
+                   parent_link_group: str = '') -> WorldResult:
         """
         See add_box.
         """
@@ -114,15 +108,14 @@ class WorldWrapper:
         world_body.type = WorldBody.PRIMITIVE_BODY
         world_body.shape.type = SolidPrimitive.SPHERE
         world_body.shape.dimensions.append(radius)
-        req = UpdateWorldRequest()
+        req = WorldGoal()
         req.group_name = str(name)
         req.operation = UpdateWorldRequest.ADD
-        req.timeout = timeout
         req.body = world_body
         req.pose = pose
         req.parent_link = parent_link
         req.parent_link_group = parent_link_group
-        return self._update_world_srv.call(req)
+        return self._send_goal_and_wait(req)
 
     def add_mesh(self,
                  name: str,
@@ -130,8 +123,7 @@ class WorldWrapper:
                  pose: PoseStamped,
                  parent_link: str = '',
                  parent_link_group: str = '',
-                 scale: Tuple[float, float, float] = (1, 1, 1),
-                 timeout: float = 2) -> UpdateWorldResponse:
+                 scale: Tuple[float, float, float] = (1, 1, 1)) -> WorldResult:
         """
         See add_box.
         :param mesh: path to the mesh location, can be ros package path, e.g.,
@@ -140,10 +132,9 @@ class WorldWrapper:
         world_body = WorldBody()
         world_body.type = WorldBody.MESH_BODY
         world_body.mesh = mesh
-        req = UpdateWorldRequest()
+        req = WorldGoal()
         req.group_name = str(name)
         req.operation = UpdateWorldRequest.ADD
-        req.timeout = timeout
         req.body = world_body
         req.pose = pose
         req.body.scale.x = scale[0]
@@ -151,7 +142,7 @@ class WorldWrapper:
         req.body.scale.z = scale[2]
         req.parent_link = parent_link
         req.parent_link_group = parent_link_group
-        return self._update_world_srv.call(req)
+        return self._send_goal_and_wait(req)
 
     def add_cylinder(self,
                      name: str,
@@ -159,8 +150,7 @@ class WorldWrapper:
                      radius: float,
                      pose: PoseStamped,
                      parent_link: str = '',
-                     parent_link_group: str = '',
-                     timeout: float = 2) -> UpdateWorldResponse:
+                     parent_link_group: str = '') -> WorldResult:
         """
         See add_box.
         """
@@ -170,21 +160,19 @@ class WorldWrapper:
         world_body.shape.dimensions = [0, 0]
         world_body.shape.dimensions[SolidPrimitive.CYLINDER_HEIGHT] = height
         world_body.shape.dimensions[SolidPrimitive.CYLINDER_RADIUS] = radius
-        req = UpdateWorldRequest()
+        req = WorldGoal()
         req.group_name = str(name)
         req.operation = UpdateWorldRequest.ADD
-        req.timeout = timeout
         req.body = world_body
         req.pose = pose
         req.parent_link = parent_link
         req.parent_link_group = parent_link_group
-        return self._update_world_srv.call(req)
+        return self._send_goal_and_wait(req)
 
     def update_parent_link_of_group(self,
                                     name: str,
                                     parent_link: str,
-                                    parent_link_group: Optional[str] = '',
-                                    timeout: float = 2) -> UpdateWorldResponse:
+                                    parent_link_group: Optional[str] = '') -> WorldResult:
         """
         Removes the joint connecting the root link of a group and attaches it to a parent_link.
         The object will not move relative to the world's root link in this process.
@@ -194,23 +182,21 @@ class WorldWrapper:
         :param timeout: how long to wait in case Giskard is busy processing a goal.
         :return: result message
         """
-        req = UpdateWorldRequest()
+        req = WorldGoal()
         req.operation = UpdateWorldRequest.UPDATE_PARENT_LINK
         req.group_name = str(name)
         req.parent_link = parent_link
         req.parent_link_group = parent_link_group
-        req.timeout = timeout
-        return self._update_world_srv.call(req)
+        return self._send_goal_and_wait(req)
 
-    def detach_group(self, object_name: str, timeout: float = 2):
+    def detach_group(self, object_name: str) -> WorldResult:
         """
         A wrapper for update_parent_link_of_group which set parent_link to the root link of the world.
         """
-        req = UpdateWorldRequest()
-        req.timeout = timeout
+        req = WorldGoal()
         req.group_name = str(object_name)
         req.operation = req.UPDATE_PARENT_LINK
-        return self._update_world_srv.call(req)
+        return self._send_goal_and_wait(req)
 
     def add_urdf(self,
                  name: str,
@@ -218,8 +204,7 @@ class WorldWrapper:
                  pose: PoseStamped,
                  parent_link: str = '',
                  parent_link_group: str = '',
-                 js_topic: Optional[str] = '',
-                 timeout: float = 2) -> UpdateWorldResponse:
+                 js_topic: Optional[str] = '') -> WorldResult:
         """
         Adds a urdf to the world.
         :param name: name the group containing the urdf will have.
@@ -228,7 +213,6 @@ class WorldWrapper:
         :param parent_link: to which link the urdf will be attached
         :param parent_link_group: if parent_link is not unique, search here for matches.
         :param js_topic: Giskard will listen on that topic for joint states and update the urdf accordingly
-        :param timeout: how long to wait if Giskard is busy.
         :return: response message
         """
         js_topic = str(js_topic)
@@ -236,15 +220,14 @@ class WorldWrapper:
         urdf_body.type = WorldBody.URDF_BODY
         urdf_body.urdf = str(urdf)
         urdf_body.joint_state_topic = js_topic
-        req = UpdateWorldRequest()
+        req = WorldGoal()
         req.group_name = str(name)
         req.operation = UpdateWorldRequest.ADD
-        req.timeout = timeout
         req.body = urdf_body
         req.pose = pose
         req.parent_link = parent_link
         req.parent_link_group = parent_link_group
-        return self._update_world_srv.call(req)
+        return self._send_goal_and_wait(req)
 
     def dye_group(self, group_name: str, rgba: Tuple[float, float, float, float]) -> DyeGroupResponse:
         """
@@ -279,28 +262,26 @@ class WorldWrapper:
         """
         return self.get_group_info(group_name).controlled_joints
 
-    def update_group_pose(self, group_name: str, new_pose: PoseStamped, timeout: float = 2) -> UpdateWorldResponse:
+    def update_group_pose(self, group_name: str, new_pose: PoseStamped) -> WorldResult:
         """
         Overwrites the pose specified in the joint that connects the two groups.
         :param group_name: Name of the group that will move
         :param new_pose: New pose of the group
-        :param timeout: How long to wait if Giskard is busy
         :return: Giskard's reply
         """
-        req = UpdateWorldRequest()
+        req = WorldGoal()
         req.operation = req.UPDATE_POSE
         req.group_name = group_name
         req.pose = new_pose
-        req.timeout = timeout
-        res = self._update_world_srv.call(req)
-        if res.error_codes == UpdateWorldResponse.SUCCESS:
+        res = self._send_goal_and_wait(req)
+        if res.error_code == UpdateWorldResponse.SUCCESS:
             return res
-        if res.error_codes == UpdateWorldResponse.UNKNOWN_GROUP_ERROR:
+        if res.error_code == UpdateWorldResponse.UNKNOWN_GROUP_ERROR:
             raise UnknownGroupException(res.error_msg)
         raise ServiceException(res.error_msg)
 
     def register_group(self, new_group_name: str, root_link_name: str,
-                       root_link_group_name: str) -> RegisterGroupResponse:
+                       root_link_group_name: str) -> WorldResult:
         """
         Register a new group for reference in collision checking. All child links of root_link_name will belong to it.
         :param new_group_name: Name of the new group.
@@ -308,14 +289,15 @@ class WorldWrapper:
         :param root_link_group_name: Name of the group root_link_name belongs to
         :return: RegisterGroupResponse
         """
-        req = RegisterGroupRequest()
+        req = WorldGoal()
+        req.operation = WorldGoal.REGISTER_GROUP
         req.group_name = new_group_name
-        req.parent_group_name = root_link_group_name
-        req.root_link_name = root_link_name
-        res: RegisterGroupResponse = self._register_groups_srv.call(req)
-        if res.error_codes == res.DUPLICATE_GROUP_ERROR:
+        req.parent_link_group = root_link_group_name
+        req.parent_link = root_link_name
+        res = self._send_goal_and_wait(req)
+        if res.error_code == res.DUPLICATE_GROUP_ERROR:
             raise DuplicateNameException(f'Group with name {new_group_name} already exists.')
-        if res.error_codes == res.BUSY:
+        if res.error_code == res.BUSY:
             raise ServiceException('Giskard is busy and can\'t process service call.')
         return res
 

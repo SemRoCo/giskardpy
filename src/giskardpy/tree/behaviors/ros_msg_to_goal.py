@@ -32,7 +32,7 @@ class ParseActionGoal(GiskardBehavior):
     @profile
     def update(self):
         loginfo('Parsing goal message.')
-        move_goal = god_map.goal_msg
+        move_goal = god_map.move_action_server.goal_msg
         god_map.goal_id += 1
         self.sanity_check(move_goal)
         try:
@@ -62,7 +62,7 @@ class SetExecutionMode(GiskardBehavior):
     @record_time
     @profile
     def update(self):
-        loginfo(f'Goal is of type {get_ros_msgs_constant_name_by_value(type(god_map.goal_msg), god_map.goal_msg.type)}')
+        loginfo(f'Goal is of type {get_ros_msgs_constant_name_by_value(type(god_map.move_action_server.goal_msg), god_map.move_action_server.goal_msg.type)}')
         if god_map.is_goal_msg_type_projection():
             god_map.tree.switch_to_projection()
         elif god_map.is_goal_msg_type_execute():

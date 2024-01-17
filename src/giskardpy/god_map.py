@@ -8,6 +8,7 @@ import rospy
 from giskard_msgs.msg import MoveGoal, MoveResult
 
 if TYPE_CHECKING:
+    from giskardpy.tree.behaviors.action_server import ActionServerHandler
     from giskardpy.configs.behavior_tree_config import BehaviorTreeConfig
     from giskardpy.tree.branches.giskard_bt import GiskardBT
     from giskardpy.model.joints import Joint
@@ -51,7 +52,8 @@ class GodMap:
     world_config: WorldConfig
     collision_avoidance_config: CollisionAvoidanceConfig
     collision_avoidance_configs: Dict[str, CollisionAvoidanceGroupThresholds]
-    goal_msg: MoveGoal
+    move_action_server: ActionServerHandler
+    world_action_server: ActionServerHandler
     trajectory: Trajectory
     qp_solver_solution: NextCommands
     added_collision_checks: Dict[Tuple[PrefixName, PrefixName], float]
@@ -59,7 +61,6 @@ class GodMap:
     # collision_matrix: Dict[Tuple[PrefixName, PrefixName], float]
     time_delay: rospy.Duration
     tracking_start_time: rospy.Time
-    result_message: MoveResult
     eq_constraints: Dict[str, EqualityConstraint]
     neq_constraints: Dict[str, InequalityConstraint]
     derivative_constraints: Dict[str, DerivativeInequalityConstraint]
@@ -71,13 +72,13 @@ class GodMap:
     controlled_joints: List[Joint]
 
     def is_goal_msg_type_execute(self):
-        return self.goal_msg.type in [MoveGoal.EXECUTE]
+        return self.move_action_server.goal_msg.type in [MoveGoal.EXECUTE]
 
     def is_goal_msg_type_projection(self):
-        return MoveGoal.PROJECTION == self.goal_msg.type
+        return MoveGoal.PROJECTION == self.move_action_server.goal_msg.type
 
     def is_goal_msg_type_undefined(self):
-        return MoveGoal.UNDEFINED == self.goal_msg.type
+        return MoveGoal.UNDEFINED == self.move_action_server.goal_msg.type
 
     def is_closed_loop(self):
         return self.tree.is_closed_loop()

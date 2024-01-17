@@ -2,6 +2,8 @@ import traceback
 from copy import deepcopy
 from itertools import product
 from queue import Queue
+from threading import Thread
+from typing import Optional
 from xml.etree.ElementTree import ParseError
 
 import rospy
@@ -9,6 +11,7 @@ from py_trees import Status
 from tf2_py import TransformException
 from visualization_msgs.msg import MarkerArray, Marker
 
+from giskard_msgs.msg import WorldResult, WorldGoal
 from giskard_msgs.srv import UpdateWorld, UpdateWorldResponse, UpdateWorldRequest, GetGroupNamesResponse, \
     GetGroupNamesRequest, RegisterGroupRequest, RegisterGroupResponse, \
     GetGroupInfoResponse, GetGroupInfoRequest, DyeGroupResponse, GetGroupNames, GetGroupInfo, RegisterGroup, DyeGroup, \
@@ -18,6 +21,7 @@ from giskardpy.exceptions import CorruptShapeException, UnknownGroupException, \
     UnsupportedOptionException, DuplicateNameException, UnknownLinkException
 from giskardpy.god_map import god_map
 from giskardpy.model.world import WorldBranch
+from giskardpy.tree.behaviors.action_server import ActionServerHandler
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
 from giskardpy.utils.decorators import record_time
@@ -59,57 +63,56 @@ def exception_to_response(e, req):
                                                    str(e)))
 
 
-class WaitForWorldUpdateCall(GiskardBehavior):
-    has_request: bool
-
-    def __init__(self):
-        super().__init__()
-        self.has_request = False
-        self.marker_publisher = rospy.Publisher('~visualization_marker_array', MarkerArray, queue_size=1)
-        self.srv_update_world = rospy.Service('~update_world', UpdateWorld, self.update_world_cb)
-        self.get_group_names = rospy.Service('~get_group_names', GetGroupNames, self.get_group_names_cb)
-        self.get_group_info = rospy.Service('~get_group_info', GetGroupInfo, self.get_group_info_cb)
-        self.register_groups = rospy.Service('~register_groups', RegisterGroup, self.register_groups_cb)
-        self.dye_group = rospy.Service('~dye_group', DyeGroup, self.dye_group)
-
-    def update(self):
-        if self.has_request:
-            return Status.SUCCESS
-        return Status.FAILURE
-
-
 class ProcessWorldUpdate(GiskardBehavior):
-    pass
 
-
-class SendWorldUpdateResponse(GiskardBehavior):
-    pass
-
-
-class WorldUpdater(GiskardBehavior):
-    READY = 0
-    BUSY = 1
-    STALL = 2
-
-    @profile
-    def __init__(self, name: str):
+    def __init__(self, action_server: ActionServerHandler):
+        self.action_server = action_server
+        name = f'Processing \'{self.action_server.name}\''
+        self.started = False
         super().__init__(name)
-        self.original_link_names = god_map.world.link_names_as_set
-        self.service_in_use = Queue(maxsize=1)
-        self.work_permit = Queue(maxsize=1)
-        self.update_ticked = Queue(maxsize=1)
-        self.timer_state = self.READY
 
     @record_time
     @profile
     def setup(self, timeout: float = 5.0):
         self.marker_publisher = rospy.Publisher('~visualization_marker_array', MarkerArray, queue_size=1)
-        self.srv_update_world = rospy.Service('~update_world', UpdateWorld, self.update_world_cb)
         self.get_group_names = rospy.Service('~get_group_names', GetGroupNames, self.get_group_names_cb)
         self.get_group_info = rospy.Service('~get_group_info', GetGroupInfo, self.get_group_info_cb)
-        self.register_groups = rospy.Service('~register_groups', RegisterGroup, self.register_groups_cb)
         self.dye_group = rospy.Service('~dye_group', DyeGroup, self.dye_group)
-        return super(WorldUpdater, self).setup(timeout)
+        return super().setup(timeout)
+
+    def update(self) -> Status:
+        if not self.started:
+            self.worker_thread = Thread(target=self.process_goal)
+            self.worker_thread.start()
+            self.started = True
+        if self.worker_thread.is_alive():
+            return Status.RUNNING
+        self.started = False
+        return Status.SUCCESS
+
+    def process_goal(self):
+        req = self.action_server.goal_msg
+        result = WorldResult()
+        result.error_code = WorldResult.SUCCESS
+        try:
+            if req.operation == UpdateWorldRequest.ADD:
+                self.add_object(req)
+            elif req.operation == UpdateWorldRequest.UPDATE_PARENT_LINK:
+                self.update_parent_link(req)
+            elif req.operation == UpdateWorldRequest.UPDATE_POSE:
+                self.update_group_pose(req)
+            elif req.operation == WorldGoal.REGISTER_GROUP:
+                self.register_group(req)
+            elif req.operation == UpdateWorldRequest.REMOVE:
+                self.remove_object(req.group_name)
+            elif req.operation == UpdateWorldRequest.REMOVE_ALL:
+                self.clear_world()
+            else:
+                result.error_code = WorldResult.INVALID_OPERATION
+                result.error_msg = f'Received invalid operation code: {req.operation}'
+        except Exception as e:
+            self.action_server.result_msg = exception_to_response(e, req)
+        self.action_server.result_msg = result
 
     def dye_group(self, req: DyeGroupRequest):
         res = DyeGroupResponse()
@@ -125,18 +128,10 @@ class WorldUpdater(GiskardBehavior):
         return res
 
     @profile
-    def register_groups_cb(self, req: RegisterGroupRequest) -> RegisterGroupResponse:
-        link_name = god_map.world.search_for_link_name(req.root_link_name, req.parent_group_name)
-        god_map.world.register_group(req.group_name, link_name)
-        res = RegisterGroupResponse()
-        res.error_codes = res.SUCCESS
-        return res
-
-    @profile
     def get_group_names_cb(self, req: GetGroupNamesRequest) -> GetGroupNamesResponse:
         group_names = god_map.world.group_names
         res = GetGroupNamesResponse()
-        res.group_names = list(group_names)
+        res.group_names = list(sorted(group_names))
         return res
 
     @profile
@@ -159,67 +154,6 @@ class WorldUpdater(GiskardBehavior):
             res.error_codes = GetGroupInfoResponse.GROUP_NOT_FOUND_ERROR
 
         return res
-
-    @record_time
-    @profile
-    def update(self):
-        try:
-            if self.timer_state == self.STALL:
-                self.timer_state = self.READY
-                return Status.SUCCESS
-            if self.service_in_use.empty():
-                return Status.SUCCESS
-            else:
-                if self.timer_state == self.READY:
-                    self.timer_state = self.BUSY
-                    self.work_permit.put(1)
-            return Status.RUNNING
-        finally:
-            if self.update_ticked.empty():
-                self.update_ticked.put(1)
-
-    @profile
-    def update_world_cb(self, req: UpdateWorldRequest) -> UpdateWorldResponse:
-        """
-        Callback function of the ROS service to update the internal giskard world.
-        :param req: Service request as received from the service client.
-        :return: Service response, reporting back any runtime errors that occurred.
-        """
-        self.service_in_use.put('muh')
-        try:
-            # make sure update had a chance to add a work permit
-            self.update_ticked.get()
-            # calling this twice, because it may still have a tick from the prev update call
-            self.update_ticked.get()
-            self.work_permit.get(timeout=req.timeout)
-            try:
-                response = UpdateWorldResponse()
-                if req.operation == UpdateWorldRequest.ADD:
-                    self.add_object(req)
-                elif req.operation == UpdateWorldRequest.UPDATE_PARENT_LINK:
-                    self.update_parent_link(req)
-                elif req.operation == UpdateWorldRequest.UPDATE_POSE:
-                    self.update_group_pose(req)
-                elif req.operation == UpdateWorldRequest.REMOVE:
-                    self.remove_object(req.group_name)
-                elif req.operation == UpdateWorldRequest.REMOVE_ALL:
-                    self.clear_world()
-                else:
-                    response = UpdateWorldResponse(UpdateWorldResponse.INVALID_OPERATION,
-                                                   f'Received invalid operation code: {req.operation}')
-            except Exception as e:
-                response = exception_to_response(e, req)
-        except Exception as e:
-            response = UpdateWorldResponse()
-            response.error_codes = UpdateWorldResponse.BUSY
-            logging.logwarn('Rejected world update because Giskard is busy.')
-        finally:
-            while not god_map.collision_scene.is_world_model_up_to_date():
-                rospy.sleep(0.1)
-            self.clear_markers()
-            self.timer_state = self.STALL
-            self.service_in_use.get_nowait()
-            return response
 
     @profile
     def add_object(self, req: UpdateWorldRequest):
@@ -293,8 +227,64 @@ class WorldUpdater(GiskardBehavior):
         god_map.world.notify_state_change()
         god_map.collision_scene.sync()
         god_map.collision_avoidance_config.setup()
-        self.clear_markers()
+        # self.clear_markers()
         logging.loginfo('Cleared world.')
+
+    def register_group(self, req: WorldGoal):
+        link_name = god_map.world.search_for_link_name(link_name=req.parent_link, group_name=req.parent_link_group)
+        god_map.world.register_group(name=req.group_name, root_link_name=link_name)
+        logging.loginfo(f'Registered new group \'{req.group_name}\'')
+
+
+class WorldUpdater(GiskardBehavior):
+    READY = 0
+    BUSY = 1
+    STALL = 2
+
+    @profile
+    def __init__(self, name: str):
+        super().__init__(name)
+        self.original_link_names = god_map.world.link_names_as_set
+        self.service_in_use = Queue(maxsize=1)
+        self.work_permit = Queue(maxsize=1)
+        self.update_ticked = Queue(maxsize=1)
+        self.timer_state = self.READY
+
+    @record_time
+    @profile
+    def setup(self, timeout: float = 5.0):
+        self.srv_update_world = rospy.Service('~update_world', UpdateWorld, self.update_world_cb)
+        self.get_group_names = rospy.Service('~get_group_names', GetGroupNames, self.get_group_names_cb)
+        self.get_group_info = rospy.Service('~get_group_info', GetGroupInfo, self.get_group_info_cb)
+        self.register_groups = rospy.Service('~register_groups', RegisterGroup, self.register_groups_cb)
+        self.dye_group = rospy.Service('~dye_group', DyeGroup, self.dye_group)
+        return super(WorldUpdater, self).setup(timeout)
+
+    @profile
+    def register_groups_cb(self, req: RegisterGroupRequest) -> RegisterGroupResponse:
+        link_name = god_map.world.search_for_link_name(req.root_link_name, req.parent_group_name)
+        god_map.world.register_group(req.group_name, link_name)
+        res = RegisterGroupResponse()
+        res.error_codes = res.SUCCESS
+        return res
+
+    @record_time
+    @profile
+    def update(self):
+        try:
+            if self.timer_state == self.STALL:
+                self.timer_state = self.READY
+                return Status.SUCCESS
+            if self.service_in_use.empty():
+                return Status.SUCCESS
+            else:
+                if self.timer_state == self.READY:
+                    self.timer_state = self.BUSY
+                    self.work_permit.put(1)
+            return Status.RUNNING
+        finally:
+            if self.update_ticked.empty():
+                self.update_ticked.put(1)
 
     def clear_markers(self):
         msg = MarkerArray()

@@ -18,8 +18,8 @@ class PrepareControlLoop(Sequence):
     def __init__(self, name: str = 'prepare control loop'):
         super().__init__(name)
         self.has_compile_debug_expressions = False
-        self.add_child(PublishFeedback('publish feedback2',
-                                       MoveFeedback.PLANNING))
+        # self.add_child(PublishFeedback('publish feedback2',
+        #                                MoveFeedback.PLANNING))
         self.add_child(CleanUpPlanning('CleanUpPlanning'))
         self.add_child(NewTrajectory('NewTrajectory'))
         self.add_child(SetExecutionMode())
@@ -43,8 +43,8 @@ class PrepareBaseTrajControlLoop(Sequence):
     def __init__(self, name: str = 'prepare control loop'):
         super().__init__(name)
         self.has_compile_debug_expressions = False
-        self.add_child(PublishFeedback('publish feedback2',
-                                       MoveFeedback.PLANNING))
+        # self.add_child(PublishFeedback('publish feedback2',
+        #                                MoveFeedback.PLANNING))
         self.add_child(CleanUpPlanning('CleanUpPlanning'))
         self.add_child(AddBaseTrajFollowerGoal())
         self.add_child(InitQPController('InitQPController'))

@@ -20,9 +20,9 @@ class Synchronization(Sequence):
     def __init__(self):
         super().__init__('synchronize')
         self.sync_tf_frames = None
-        self.collision_scene_updater = CollisionSceneUpdater('update collision scene')
-        self.add_child(self.collision_scene_updater)
+        self.collision_scene_updater = CollisionSceneUpdater()
         self.add_child(NotifyStateChange())
+        self.add_child(self.collision_scene_updater)
         self.added_behaviors = []
 
     def _number_of_synchronisation_behaviors(self) -> int:

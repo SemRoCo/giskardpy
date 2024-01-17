@@ -786,7 +786,7 @@ class OldGiskardWrapper(GiskardWrapper):
         :param new_group_name: Name of the new group.
         :param root_link_name: root link of the new group
         :param root_link_group_name: Name of the group root_link_name belongs to
-        :return: RegisterGroupResponse
+        :return: WorldResult
         """
         return self.register_group(new_group_name=new_group_name,
                                    root_link_name=root_link_name,

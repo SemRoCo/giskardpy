@@ -11,8 +11,8 @@ import giskard_msgs.msg as giskard_msgs
 from giskard_msgs.msg import MoveAction, MoveGoal, WorldBody, CollisionEntry, MoveResult, MoveFeedback, MotionGoal, \
     Monitor, WorldGoal, WorldAction, WorldResult, GiskardError
 from giskard_msgs.srv import DyeGroupRequest, DyeGroup, GetGroupInfoRequest, DyeGroupResponse
+from giskard_msgs.srv import GetGroupInfo, GetGroupNames
 from giskard_msgs.srv import GetGroupNamesResponse, GetGroupInfoResponse
-from giskard_msgs.srv import GetGroupInfo, GetGroupNames, RegisterGroup
 from giskardpy.data_types import goal_parameter
 from giskardpy.exceptions import DuplicateNameException, UnknownGroupException
 from giskardpy.goals.align_planes import AlignPlanes
@@ -38,7 +38,6 @@ class WorldWrapper:
     def __init__(self, node_name: str):
         self._get_group_info_srv = rospy.ServiceProxy(f'{node_name}/get_group_info', GetGroupInfo)
         self._get_group_names_srv = rospy.ServiceProxy(f'{node_name}/get_group_names', GetGroupNames)
-        self._register_groups_srv = rospy.ServiceProxy(f'{node_name}/register_groups', RegisterGroup)
         self._dye_group_srv = rospy.ServiceProxy(f'{node_name}/dye_group', DyeGroup)
         self._client = SimpleActionClient('update_world', WorldAction)
         self._client.wait_for_server()
@@ -285,7 +284,7 @@ class WorldWrapper:
         :param new_group_name: Name of the new group.
         :param root_link_name: root link of the new group
         :param root_link_group_name: Name of the group root_link_name belongs to
-        :return: RegisterGroupResponse
+        :return: WorldResult
         """
         req = WorldGoal()
         req.operation = WorldGoal.REGISTER_GROUP

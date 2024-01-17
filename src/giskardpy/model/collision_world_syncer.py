@@ -357,11 +357,14 @@ class CollisionWorldSynchronizer:
         else:
             added_checks[key] = distance
 
-    def has_world_changed(self):
+    def has_world_changed(self) -> bool:
         if self.world_version != god_map.world.model_version:
             self.world_version = god_map.world.model_version
             return True
         return False
+
+    def is_world_model_up_to_date(self) -> bool:
+        return self.world_version == god_map.world.model_version
 
     @property
     def is_collision_checking_enabled(self) -> bool:
@@ -782,6 +785,7 @@ class CollisionWorldSynchronizer:
         pass
 
     def sync_world_model_update(self) -> None:
+        logging.loginfo('updating collision scene')
         self.disabled_links = set()
         self.self_collision_matrix = {}
         for robot, (srdf, self_collision_matrix, disabled_link) in self.self_collision_matrix_cache.items():
@@ -797,6 +801,7 @@ class CollisionWorldSynchronizer:
                                                    overwrite_old_matrix=False,
                                                    save_to_tmp=False)
         self.blacklist_inter_group_collisions()
+        logging.loginfo('done updating collision scene')
 
     def add_added_checks(self):
         try:

@@ -59,6 +59,33 @@ def exception_to_response(e, req):
                                                    str(e)))
 
 
+class WaitForWorldUpdateCall(GiskardBehavior):
+    has_request: bool
+
+    def __init__(self):
+        super().__init__()
+        self.has_request = False
+        self.marker_publisher = rospy.Publisher('~visualization_marker_array', MarkerArray, queue_size=1)
+        self.srv_update_world = rospy.Service('~update_world', UpdateWorld, self.update_world_cb)
+        self.get_group_names = rospy.Service('~get_group_names', GetGroupNames, self.get_group_names_cb)
+        self.get_group_info = rospy.Service('~get_group_info', GetGroupInfo, self.get_group_info_cb)
+        self.register_groups = rospy.Service('~register_groups', RegisterGroup, self.register_groups_cb)
+        self.dye_group = rospy.Service('~dye_group', DyeGroup, self.dye_group)
+
+    def update(self):
+        if self.has_request:
+            return Status.SUCCESS
+        return Status.FAILURE
+
+
+class ProcessWorldUpdate(GiskardBehavior):
+    pass
+
+
+class SendWorldUpdateResponse(GiskardBehavior):
+    pass
+
+
 class WorldUpdater(GiskardBehavior):
     READY = 0
     BUSY = 1
@@ -166,6 +193,7 @@ class WorldUpdater(GiskardBehavior):
             self.update_ticked.get()
             self.work_permit.get(timeout=req.timeout)
             try:
+                response = UpdateWorldResponse()
                 if req.operation == UpdateWorldRequest.ADD:
                     self.add_object(req)
                 elif req.operation == UpdateWorldRequest.UPDATE_PARENT_LINK:
@@ -177,20 +205,21 @@ class WorldUpdater(GiskardBehavior):
                 elif req.operation == UpdateWorldRequest.REMOVE_ALL:
                     self.clear_world()
                 else:
-                    return UpdateWorldResponse(UpdateWorldResponse.INVALID_OPERATION,
-                                               f'Received invalid operation code: {req.operation}')
-                return UpdateWorldResponse()
+                    response = UpdateWorldResponse(UpdateWorldResponse.INVALID_OPERATION,
+                                                   f'Received invalid operation code: {req.operation}')
             except Exception as e:
-                return exception_to_response(e, req)
+                response = exception_to_response(e, req)
         except Exception as e:
             response = UpdateWorldResponse()
             response.error_codes = UpdateWorldResponse.BUSY
             logging.logwarn('Rejected world update because Giskard is busy.')
-            return response
         finally:
+            while not god_map.collision_scene.is_world_model_up_to_date():
+                rospy.sleep(0.1)
+            self.clear_markers()
             self.timer_state = self.STALL
             self.service_in_use.get_nowait()
-            self.clear_markers()
+            return response
 
     @profile
     def add_object(self, req: UpdateWorldRequest):

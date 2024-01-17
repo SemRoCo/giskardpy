@@ -32,7 +32,6 @@ class Open(Goal):
         self.tip_link = self.world.search_for_link_name(tip_link, tip_group)
         self.handle_link = self.world.search_for_link_name(environment_link, environment_group)
         self.joint_name = self.world.get_movable_parent_joint(self.handle_link)
-        self.joint_group = self.world.get_group_of_joint(self.joint_name)
         self.handle_T_tip = self.world.compute_fk_pose(self.handle_link, self.tip_link)
 
         _, max_position = self.world.get_joint_position_limits(self.joint_name)
@@ -48,7 +47,7 @@ class Open(Goal):
                                                    goal_pose=self.handle_T_tip,
                                                    weight=self.weight * 100))
         self.add_constraints_of_goal(JointPosition(joint_name=self.joint_name.short_name,
-                                                   group_name=self.joint_group.name,
+                                                   group_name=self.joint_name.prefix,
                                                    goal=goal_joint_state,
                                                    weight=weight))
 

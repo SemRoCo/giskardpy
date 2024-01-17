@@ -1111,6 +1111,10 @@ class TestConstraints:
         goal_angle = np.pi / 4
         handle_frame_id = 'sink_area_dish_washer_door_handle'
         handle_name = 'sink_area_dish_washer_door_handle'
+        kitchen_setup.register_group('dishwasher', root_link_name='sink_area_dish_washer_main',
+                                     root_link_group_name=kitchen_setup.kitchen_name)
+        kitchen_setup.register_group('handle', root_link_name=handle_name,
+                                     root_link_group_name=kitchen_setup.kitchen_name)
         bar_axis = Vector3Stamped()
         bar_axis.header.frame_id = handle_frame_id
         bar_axis.vector.y = 1

@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+import os
+from typing import TYPE_CHECKING, List, Dict, Tuple
+
 import rospy
 
 from giskard_msgs.msg import MoveGoal, MoveResult
-from typing import TYPE_CHECKING, List, Dict, Tuple
-import os
 
 if TYPE_CHECKING:
+    from giskardpy.configs.behavior_tree_config import BehaviorTreeConfig
     from giskardpy.tree.branches.giskard_bt import GiskardBT
     from giskardpy.model.joints import Joint
     from giskardpy.model.ros_msg_visualization import ROSMsgVisualization
@@ -44,6 +46,7 @@ class GodMap:
     max_derivative: Derivatives
     qp_controller: QPProblemBuilder
     qp_controller_config: QPControllerConfig
+    behavior_tree_config: BehaviorTreeConfig
     collision_checker_id: CollisionCheckerLib
     world_config: WorldConfig
     collision_avoidance_config: CollisionAvoidanceConfig
@@ -82,8 +85,8 @@ class GodMap:
     def is_standalone(self):
         return self.tree.is_standalone()
 
-    def is_planning(self):
-        return self.tree.is_planning()
+    def is_open_loop(self):
+        return self.tree.is_open_loop()
 
     def is_collision_checking_enabled(self):
         return self.collision_scene.collision_checker_id != self.collision_scene.collision_checker_id.none

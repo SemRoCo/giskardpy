@@ -73,7 +73,7 @@ def create_graph(goals: List[Goal], all_monitors: List[Monitor], output_file: st
             for expr in task.hold_condition.free_symbols():
                 monitor = god_map.monitor_manager.get_monitor_from_state_expr(expr)
                 monitor_node = add_or_get_node(monitor)
-                graph.add_edge(pydot.Edge(monitor_node, goal_node, color='yellow'))
+                graph.add_edge(pydot.Edge(monitor_node, goal_node, color='orange'))
 
             for expr in task.end_condition.free_symbols():
                 monitor = god_map.monitor_manager.get_monitor_from_state_expr(expr)

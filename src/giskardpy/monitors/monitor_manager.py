@@ -50,8 +50,8 @@ class MonitorManager:
     def __init__(self):
         self.monitors = []
         self.allowed_monitor_types = {}
-        self.allowed_monitor_types.update(get_all_classes_in_package(package_name='giskardpy.monitors',
-                                                                     parent_class=Monitor))
+        for path in god_map.giskard.monitor_package_paths:
+            self.allowed_monitor_types.update(get_all_classes_in_package(path, Monitor))
         self.state_history = []
         self.substitution_values = {}
         self.triggers = {}
@@ -60,11 +60,9 @@ class MonitorManager:
     def evaluate_expression(self, node):
         if isinstance(node, ast.BoolOp):
             if isinstance(node.op, ast.And):
-                return cas.logic_and(self.evaluate_expression(node.values[0]),
-                                     self.evaluate_expression(node.values[1]))
+                return cas.logic_and(*[self.evaluate_expression(x) for x in node.values])
             elif isinstance(node.op, ast.Or):
-                return cas.logic_or(self.evaluate_expression(node.values[0]),
-                                    self.evaluate_expression(node.values[1]))
+                return cas.logic_or(*[self.evaluate_expression(x) for x in node.values])
         elif isinstance(node, ast.UnaryOp):
             if isinstance(node.op, ast.Not):
                 return cas.logic_not(self.evaluate_expression(node.operand))

@@ -1413,7 +1413,13 @@ class GiskardWrapper:
         self.monitors.avoid_name_conflict = value
         self.motion_goals.avoid_name_conflict = value
 
-    def add_default_end_motion_conditions(self):
+    def add_default_end_motion_conditions(self) -> None:
+        """
+        1. Adds a local minimum reached monitor and adds it as an end_condition to all previously defined motion goals.
+        2. Adds an end motion monitor, start_condition = all previously defined monitors are True.
+        3. Adds a cancel motion monitor, start_condition = local minimum reached mit not all other monitors are True.
+        4. Adds a max trajectory length monitor, if one wasn't added already.
+        """
         local_min_reached_monitor_name = self.monitors.add_local_minimum_reached()
         for goal in self.motion_goals._goals:
             if goal.end_condition:

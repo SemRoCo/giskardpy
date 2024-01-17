@@ -177,13 +177,13 @@ catkin_install_python(PROGRAMS
 	scripts/iai_robots/tracy/tracy.py
 	scripts/iai_robots/tracy/tracy_standalone.py
 	scripts/other_robots/armar/armar_standalone.py
-	scripts/examples/giskard_pr2_standalone_example.py
 	scripts/tools/interactive_marker.py
 	scripts/tools/joystick_e_stop.py
 	scripts/tools/move_base_simple_goal.py
 	scripts/tools/move_base_simple_goal_diff_drive.py
 	scripts/tools/print_joint_state.py
 	scripts/examples/python_interface_example.py
+	scripts/examples/old_python_interface_example.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 ## Mark executables and/or libraries for installation

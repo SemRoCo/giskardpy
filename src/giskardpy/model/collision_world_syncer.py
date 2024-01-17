@@ -304,9 +304,9 @@ class CollisionWorldSynchronizer:
     self_collision_matrix: Dict[Tuple[PrefixName, PrefixName], DisableCollisionReason]
     # robot name -> path, self collision matrix
     self_collision_matrix_cache: Dict[str,
-                                      Tuple[str,
-                                            Dict[Tuple[PrefixName, PrefixName], DisableCollisionReason],
-                                            Set[PrefixName]]]
+    Tuple[str,
+    Dict[Tuple[PrefixName, PrefixName], DisableCollisionReason],
+    Set[PrefixName]]]
     collision_avoidance_configs: Dict[str, CollisionAvoidanceGroupThresholds] = None
     disabled_links: Set[PrefixName]
     srdf_disable_all_collisions = 'disable_all_collisions'
@@ -593,6 +593,8 @@ class CollisionWorldSynchronizer:
         """
         Disable link pairs that are (almost) always in collision.
         """
+        if number_of_tries == 0:
+            return link_combinations, {}
         with god_map.world.reset_joint_state_context():
             self_collision_matrix = {}
             remaining_pairs = deepcopy(link_combinations)
@@ -622,6 +624,8 @@ class CollisionWorldSynchronizer:
         """
         Disable link pairs that are never in collision.
         """
+        if number_of_tries == 0:
+            return link_combinations, {}
         with god_map.world.reset_joint_state_context():
             one_percent = number_of_tries // 100
             self_collision_matrix = {}
@@ -783,11 +787,15 @@ class CollisionWorldSynchronizer:
         for robot, (srdf, self_collision_matrix, disabled_link) in self.self_collision_matrix_cache.items():
             self.load_self_collision_matrix_from_srdf(srdf, robot)
         for robot in self.robots:
-            self.compute_self_collision_matrix(robot.name,
-                                               use_collision_checker=False,
-                                               overwrite_old_matrix=False,
-                                               save_to_tmp=False)
-        # step 3 black list intergroup collisions
+            attached_links = [link for link in robot.link_names_with_collisions
+                              if (link, link) not in self.self_collision_matrix]
+            link_combinations = set(product(attached_links, robot.link_names_with_collisions))
+            if link_combinations:
+                self.compute_self_collision_matrix(robot.name,
+                                                   link_combinations=link_combinations,
+                                                   use_collision_checker=True,
+                                                   overwrite_old_matrix=False,
+                                                   save_to_tmp=False)
         self.blacklist_inter_group_collisions()
 
     def add_added_checks(self):

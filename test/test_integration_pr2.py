@@ -15,8 +15,7 @@ from shape_msgs.msg import SolidPrimitive
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
 import giskardpy.utils.tfwrapper as tf
-from giskard_msgs.msg import MoveResult, WorldBody, CollisionEntry
-from giskard_msgs.srv import UpdateWorldResponse, UpdateWorldRequest
+from giskard_msgs.msg import WorldBody, CollisionEntry, WorldGoal, GiskardError
 from giskardpy.configs.behavior_tree_config import StandAloneBTConfig
 from giskardpy.configs.giskard import Giskard
 from giskardpy.configs.iai_robots.pr2 import PR2CollisionAvoidance, PR2StandaloneInterface, WorldWithPR2Config
@@ -1056,7 +1055,7 @@ class TestConstraints:
     def test_VelocityLimitUnreachableException(self, zero_pose: PR2TestWrapper):
         zero_pose.set_prediction_horizon(prediction_horizon=7)
         zero_pose.set_joint_goal(zero_pose.better_pose)
-        zero_pose.plan_and_execute(expected_error_code=MoveResult.VELOCITY_LIMIT_UNREACHABLE)
+        zero_pose.plan_and_execute(expected_error_code=GiskardError.VELOCITY_LIMIT_UNREACHABLE)
 
     def test_SetPredictionHorizon11(self, zero_pose: PR2TestWrapper):
         default_prediction_horizon = god_map.qp_controller_config.prediction_horizon
@@ -1076,12 +1075,12 @@ class TestConstraints:
         base_goal.pose.orientation.w = 1
         zero_pose.set_max_traj_length(new_length)
         zero_pose.set_cart_goal(base_goal, tip_link='base_footprint', root_link='map')
-        result = zero_pose.plan_and_execute(expected_error_code=MoveResult.MAX_TRAJECTORY_LENGTH)
+        result = zero_pose.plan_and_execute(expected_error_code=GiskardError.MAX_TRAJECTORY_LENGTH)
         dt = god_map.qp_controller_config.sample_period
         np.testing.assert_almost_equal(len(result.trajectory.points) * dt, new_length + dt * 2)
 
         zero_pose.set_cart_goal(base_goal, tip_link='base_footprint', root_link='map')
-        result = zero_pose.plan_and_execute(expected_error_code=MoveResult.MAX_TRAJECTORY_LENGTH)
+        result = zero_pose.plan_and_execute(expected_error_code=GiskardError.MAX_TRAJECTORY_LENGTH)
         dt = god_map.qp_controller_config.sample_period
         assert len(result.trajectory.points) * dt > new_length + 1
 
@@ -1603,25 +1602,25 @@ class TestConstraints:
         goal_state = {'r_elbow_flex_joint': -1.0}
         kwargs = {'goal_state': goal_state}
         zero_pose.motion_goals.add_motion_goal(motion_goal_class='jointpos', **kwargs)
-        zero_pose.plan_and_execute(expected_error_code=MoveResult.UNKNOWN_GOAL)
+        zero_pose.plan_and_execute(expected_error_code=GiskardError.UNKNOWN_GOAL)
 
     def test_python_code_in_constraint_type(self, zero_pose: PR2TestWrapper):
         goal_state = {'r_elbow_flex_joint': -1.0}
         kwargs = {'goal_state': goal_state}
         zero_pose.motion_goals.add_motion_goal(motion_goal_class='print("muh")', **kwargs)
-        zero_pose.plan_and_execute(expected_error_code=MoveResult.UNKNOWN_GOAL)
+        zero_pose.plan_and_execute(expected_error_code=GiskardError.UNKNOWN_GOAL)
 
     def test_wrong_params1(self, zero_pose: PR2TestWrapper):
         goal_state = {5432: 'muh'}
         kwargs = {'goal_state': goal_state}
         zero_pose.motion_goals.add_motion_goal(motion_goal_class='JointPositionList', **kwargs)
-        zero_pose.plan_and_execute(expected_error_code=MoveResult.GOAL_INITIALIZATION_ERROR)
+        zero_pose.plan_and_execute(expected_error_code=GiskardError.GOAL_INITIALIZATION_ERROR)
 
     def test_wrong_params2(self, zero_pose: PR2TestWrapper):
         goal_state = {'r_elbow_flex_joint': 'muh'}
         kwargs = {'goal_state': goal_state}
         zero_pose.motion_goals.add_motion_goal(motion_goal_class='JointPositionList', **kwargs)
-        zero_pose.plan_and_execute(expected_error_code=MoveResult.GOAL_INITIALIZATION_ERROR)
+        zero_pose.plan_and_execute(expected_error_code=GiskardError.GOAL_INITIALIZATION_ERROR)
 
     # def test_align_planes2(self, zero_pose: PR2TestWrapper):
     #     # FIXME, what should I do with opposite vectors?
@@ -2082,7 +2081,7 @@ class TestCartGoals:
         zero_pose.set_cart_goal(goal_pose=p,
                                 tip_link='base_footprint',
                                 root_link='map')
-        zero_pose.plan_and_execute(expected_error_code=MoveResult.LOCAL_MINIMUM)
+        zero_pose.plan_and_execute(expected_error_code=GiskardError.LOCAL_MINIMUM)
 
     def test_cart_goal_1eef2(self, zero_pose: PR2TestWrapper):
         # zero_pose.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
@@ -2313,10 +2312,10 @@ class TestCartGoals:
 #                                             goal=0.0,
 #                                             frequency=target_freq
 #                                             )
-#                 r = kitchen_setup.plan_and_execute(expected_error_codes=[MoveResult.SHAKING])
+#                 r = kitchen_setup.plan_and_execute(expected_error_codes=[GiskardError.SHAKING])
 #                 assert len(r.error_codes) != 0
 #                 error_code = r.error_codes[0]
-#                 assert error_code == MoveResult.SHAKING
+#                 assert error_code == GiskardError.SHAKING
 #                 error_message = r.error_messages[0]
 #                 freqs_str = re.findall("[0-9]+\.[0-9]+ hertz", error_message)
 #                 assert any(map(lambda f_str: float(f_str[:-6]) == target_freq, freqs_str))
@@ -2344,10 +2343,10 @@ class TestCartGoals:
 #                                             goal=0.0,
 #                                             frequency=target_freq
 #                                             )
-#                 r = kitchen_setup.plan_and_execute(expected_error_codes=[MoveResult.SHAKING])
+#                 r = kitchen_setup.plan_and_execute(expected_error_codes=[GiskardError.SHAKING])
 #                 assert len(r.error_codes) != 0
 #                 error_code = r.error_codes[0]
-#                 assert error_code == MoveResult.SHAKING
+#                 assert error_code == GiskardError.SHAKING
 #                 error_message = r.error_messages[0]
 #                 freqs_str = re.findall("[0-9]+\.[0-9]+ hertz", error_message)
 #                 assert any(map(lambda f_str: float(f_str[:-6]) == target_freq, freqs_str))
@@ -2375,10 +2374,10 @@ class TestCartGoals:
 #                                             goal=-5.0,
 #                                             frequency=target_freq
 #                                             )
-#                 r = kitchen_setup.plan_and_execute(expected_error_codes=[MoveResult.SHAKING])
+#                 r = kitchen_setup.plan_and_execute(expected_error_codes=[GiskardError.SHAKING])
 #                 assert len(r.error_codes) != 0
 #                 error_code = r.error_codes[0]
-#                 assert error_code == MoveResult.SHAKING
+#                 assert error_code == GiskardError.SHAKING
 #                 error_message = r.error_messages[0]
 #                 freqs_str = re.findall("[0-9]+\.[0-9]+ hertz", error_message)
 #                 assert any(map(lambda f_str: float(f_str[:-6]) == target_freq, freqs_str))
@@ -2411,10 +2410,10 @@ class TestCartGoals:
 #                                             noise_amplitude=amplitude_threshold + 0.02,
 #                                             frequency=target_freq
 #                                             )
-#                 r = kitchen_setup.plan_and_execute(expected_error_codes=[MoveResult.SHAKING])
+#                 r = kitchen_setup.plan_and_execute(expected_error_codes=[GiskardError.SHAKING])
 #                 assert len(r.error_codes) != 0
 #                 error_code = r.error_codes[0]
-#                 assert error_code == MoveResult.SHAKING
+#                 assert error_code == GiskardError.SHAKING
 #                 error_message = r.error_messages[0]
 #                 freqs_str = re.findall("[0-9]+\.[0-9]+ hertz", error_message)
 #                 assert any(map(lambda f_str: float(f_str[:-6]) == target_freq, freqs_str))
@@ -2447,7 +2446,7 @@ class TestCartGoals:
 #                                             frequency=target_freq
 #                                             )
 #                 r = kitchen_setup.plan_and_execute()
-#                 if any(map(lambda c: c == MoveResult.SHAKING, r.error_codes)):
+#                 if any(map(lambda c: c == GiskardError.SHAKING, r.error_codes)):
 #                     error_message = r.error_messages[0]
 #                     freqs_str = re.findall("[0-9]+\.[0-9]+ hertz", error_message)
 #                     assert all(map(lambda f_str: float(f_str[:-6]) != target_freq, freqs_str))
@@ -2564,7 +2563,7 @@ class TestWorldManipulation:
         p.pose.orientation = Quaternion(0.0, 0.0, 0.47942554, 0.87758256)
         zero_pose.add_box_to_world(object_name, size=(1, 1, 1), pose=p)
         zero_pose.add_box_to_world(object_name, size=(1, 1, 1), pose=p,
-                                   expected_error_code=UpdateWorldResponse.DUPLICATE_GROUP_ERROR)
+                                   expected_error_code=GiskardError.DUPLICATE_NAME)
 
     def test_add_remove_sphere(self, zero_pose: PR2TestWrapper):
         object_name = 'muh'
@@ -2638,7 +2637,7 @@ class TestWorldManipulation:
         p.pose.position = Point(0.1, 0, 0)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.add_mesh_to_world(object_name, mesh='package://giskardpy/test/urdfs/meshes/muh.obj', pose=p,
-                                    expected_error_code=UpdateWorldResponse.CORRUPT_MESH_ERROR)
+                                    expected_error_code=GiskardError.CORRUPT_MESH)
 
     def test_add_attach_detach_remove_add(self, zero_pose: PR2TestWrapper):
         object_name = 'muh'
@@ -2692,7 +2691,7 @@ class TestWorldManipulation:
         p.pose.orientation = Quaternion(0.0, 0.0, 0.47942554, 0.87758256)
         zero_pose.add_box_to_world(group_name, size=(1, 1, 1), pose=p)
         p.pose.position = Point(1, 0, 0)
-        zero_pose.update_group_pose('asdf', p, expected_error_code=UpdateWorldResponse.UNKNOWN_GROUP_ERROR)
+        zero_pose.update_group_pose('asdf', p, expected_error_code=GiskardError.UNKNOWN_GROUP)
         zero_pose.update_group_pose(group_name, p)
 
     def test_update_group_pose2(self, zero_pose: PR2TestWrapper):
@@ -2703,7 +2702,7 @@ class TestWorldManipulation:
         p.pose.orientation = Quaternion(0.0, 0.0, 0.47942554, 0.87758256)
         zero_pose.add_box_to_world(group_name, size=(1, 1, 1), pose=p, parent_link='r_gripper_tool_frame')
         p.pose.position = Point(1, 0, 0)
-        zero_pose.update_group_pose('asdf', p, expected_error_code=UpdateWorldResponse.UNKNOWN_GROUP_ERROR)
+        zero_pose.update_group_pose('asdf', p, expected_error_code=GiskardError.UNKNOWN_GROUP)
         zero_pose.update_group_pose(group_name, p)
         zero_pose.set_joint_goal(zero_pose.better_pose)
         zero_pose.allow_all_collisions()
@@ -2741,13 +2740,13 @@ class TestWorldManipulation:
                                    size=(0.1, 0.02, 0.02),
                                    pose=p,
                                    parent_link='muh',
-                                   expected_error_code=UpdateWorldResponse.UNKNOWN_LINK_ERROR)
+                                   expected_error_code=GiskardError.UNKNOWN_LINK)
 
     def test_reattach_unknown_object(self, zero_pose: PR2TestWrapper):
         zero_pose.update_parent_link_of_group('muh',
                                               parent_link='',
                                               parent_link_group='',
-                                              expected_response=UpdateWorldResponse.UNKNOWN_GROUP_ERROR)
+                                              expected_response=GiskardError.UNKNOWN_GROUP)
 
     def test_add_remove_box(self, zero_pose: PR2TestWrapper):
         object_name = 'muh'
@@ -2761,36 +2760,36 @@ class TestWorldManipulation:
         zero_pose.remove_group(object_name)
 
     def test_invalid_update_world(self, zero_pose: PR2TestWrapper):
-        req = UpdateWorldRequest()
+        req = WorldGoal()
         req.body = WorldBody()
         req.pose = PoseStamped()
         req.parent_link = zero_pose.r_tip
         req.operation = 42
-        assert zero_pose.world._update_world_srv.call(req).error_codes == UpdateWorldResponse.INVALID_OPERATION
+        assert zero_pose.world._send_goal_and_wait(req).error_code == GiskardError.INVALID_WORLD_OPERATION
 
     def test_remove_unkown_group(self, zero_pose: PR2TestWrapper):
-        zero_pose.remove_group('muh', expected_response=UpdateWorldResponse.UNKNOWN_GROUP_ERROR)
+        zero_pose.remove_group('muh', expected_response=GiskardError.UNKNOWN_GROUP)
 
     def test_corrupt_shape_error(self, zero_pose: PR2TestWrapper):
         p = PoseStamped()
         p.header.frame_id = 'base_link'
-        req = UpdateWorldRequest()
+        req = WorldGoal()
         req.body = WorldBody(type=WorldBody.PRIMITIVE_BODY,
                              shape=SolidPrimitive(type=42))
         req.pose = PoseStamped()
         req.pose.header.frame_id = 'map'
         req.parent_link = 'base_link'
-        req.operation = UpdateWorldRequest.ADD
-        assert zero_pose.world._update_world_srv.call(req).error_codes == UpdateWorldResponse.CORRUPT_SHAPE_ERROR
+        req.operation = WorldGoal.ADD
+        assert zero_pose.world._send_goal_and_wait(req).error_code == GiskardError.CORRUPT_SHAPE
 
     def test_tf_error(self, zero_pose: PR2TestWrapper):
-        req = UpdateWorldRequest()
+        req = WorldGoal()
         req.body = WorldBody(type=WorldBody.PRIMITIVE_BODY,
                              shape=SolidPrimitive(type=1))
         req.pose = PoseStamped()
         req.parent_link = 'base_link'
-        req.operation = UpdateWorldRequest.ADD
-        assert zero_pose.world._update_world_srv.call(req).error_codes == UpdateWorldResponse.TF_ERROR
+        req.operation = WorldGoal.ADD
+        assert zero_pose.world._send_goal_and_wait(req).error_code == GiskardError.TRANSFORM_ERROR
 
     def test_unsupported_options(self, kitchen_setup: PR2TestWrapper):
         wb = WorldBody()
@@ -2801,12 +2800,12 @@ class TestWorldManipulation:
         pose.pose.orientation = Quaternion(w=1)
         wb.type = WorldBody.URDF_BODY
 
-        req = UpdateWorldRequest()
+        req = WorldGoal()
         req.body = wb
         req.pose = pose
         req.parent_link = 'base_link'
-        req.operation = UpdateWorldRequest.ADD
-        assert kitchen_setup.world._update_world_srv.call(req).error_codes == UpdateWorldResponse.CORRUPT_URDF_ERROR
+        req.operation = WorldGoal.ADD
+        assert kitchen_setup.world._send_goal_and_wait(req).error_code == GiskardError.CORRUPT_URDF
 
 
 class TestSelfCollisionAvoidance:
@@ -3030,7 +3029,7 @@ class TestSelfCollisionAvoidance:
         zero_pose.set_cart_goal(p, zero_pose.l_tip, 'base_footprint')
         zero_pose.allow_all_collisions()
         zero_pose.execute()
-        zero_pose.execute(expected_error_code=MoveResult.SELF_COLLISION_VIOLATED)
+        zero_pose.execute(expected_error_code=GiskardError.SELF_COLLISION_VIOLATED)
 
 
 class TestCollisionAvoidanceGoals:
@@ -3128,15 +3127,15 @@ class TestCollisionAvoidanceGoals:
         pose.pose.position = Point(2, 0, 0)
         pose.pose.orientation = Quaternion(w=1)
         kitchen_setup.teleport_base(pose)
-        kitchen_setup.plan_and_execute(expected_error_code=MoveResult.HARD_CONSTRAINTS_VIOLATED)
+        kitchen_setup.plan_and_execute(expected_error_code=GiskardError.HARD_CONSTRAINTS_VIOLATED)
 
     def test_unknown_group1(self, box_setup: PR2TestWrapper):
         box_setup.avoid_collision(min_distance=0.05, group1='muh')
-        box_setup.plan_and_execute(MoveResult.UNKNOWN_GROUP)
+        box_setup.plan_and_execute(GiskardError.UNKNOWN_GROUP)
 
     def test_unknown_group2(self, box_setup: PR2TestWrapper):
         box_setup.avoid_collision(group2='muh')
-        box_setup.plan_and_execute(MoveResult.UNKNOWN_GROUP)
+        box_setup.plan_and_execute(GiskardError.UNKNOWN_GROUP)
 
     def test_base_link_in_collision(self, zero_pose: PR2TestWrapper):
         zero_pose.allow_self_collision()

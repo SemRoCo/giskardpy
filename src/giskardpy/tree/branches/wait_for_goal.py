@@ -4,7 +4,6 @@ from giskard_msgs.msg import MoveAction
 from giskardpy.god_map import god_map
 from giskardpy.tree.behaviors.action_server import ActionServerHandler
 from giskardpy.tree.behaviors.goal_received import GoalReceived
-from giskardpy.tree.behaviors.world_updater import WorldUpdater
 from giskardpy.tree.branches.publish_state import PublishState
 from giskardpy.tree.branches.synchronization import Synchronization
 from giskardpy.tree.branches.update_world import UpdateWorld

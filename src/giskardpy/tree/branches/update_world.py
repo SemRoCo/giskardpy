@@ -7,7 +7,7 @@ from giskardpy.tree.behaviors.collision_scene_updater import CollisionSceneUpdat
 from giskardpy.tree.behaviors.goal_received import GoalReceived
 from giskardpy.tree.behaviors.notify_state_change import NotifyStateChange, NotifyModelChange
 from giskardpy.tree.behaviors.send_result import SendResult
-from giskardpy.tree.behaviors.world_updater import WorldUpdater, ProcessWorldUpdate
+from giskardpy.tree.behaviors.world_updater import ProcessWorldUpdate
 from giskardpy.tree.branches.publish_state import PublishState
 from giskardpy.tree.branches.synchronization import Synchronization
 
@@ -16,7 +16,7 @@ class UpdateWorld(Sequence):
     synchronization: Synchronization
     publish_state: PublishState
     goal_received: GoalReceived
-    world_updater: WorldUpdater
+    process_goal: ProcessWorldUpdate
 
     def __init__(self):
         name = 'update world'

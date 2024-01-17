@@ -77,18 +77,3 @@ class ActionServerHandler:
 
     def is_preempt_requested(self):
         return self._as.is_preempt_requested()
-
-
-class ActionServerBehavior(GiskardBehavior):
-    as_handler: ActionServerHandler
-
-    @record_time
-    def __init__(self, name: str, action_server: ActionServerHandler):
-        self.as_handler = action_server
-        super().__init__(name)
-
-    def get_as(self) -> ActionServerHandler:
-        return self.as_handler
-
-    def pop_goal(self) -> MoveGoal:
-        return self.get_as().accept_goal()

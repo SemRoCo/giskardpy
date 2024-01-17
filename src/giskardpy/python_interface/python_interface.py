@@ -9,7 +9,7 @@ from shape_msgs.msg import SolidPrimitive
 
 import giskard_msgs.msg as giskard_msgs
 from giskard_msgs.msg import MoveAction, MoveGoal, WorldBody, CollisionEntry, MoveResult, MoveFeedback, MotionGoal, \
-    Monitor, WorldGoal, WorldAction, WorldResult
+    Monitor, WorldGoal, WorldAction, WorldResult, GiskardError
 from giskard_msgs.srv import DyeGroupRequest, DyeGroup, GetGroupInfoRequest, DyeGroupResponse
 from giskard_msgs.srv import GetGroupNamesResponse, GetGroupInfoResponse, RegisterGroupRequest
 from giskard_msgs.srv import RegisterGroupResponse
@@ -295,10 +295,8 @@ class WorldWrapper:
         req.parent_link_group = root_link_group_name
         req.parent_link = root_link_name
         res = self._send_goal_and_wait(req)
-        if res.error_code == res.DUPLICATE_GROUP_ERROR:
+        if res.error.code == GiskardError.DUPLICATE_NAME:
             raise DuplicateNameException(f'Group with name {new_group_name} already exists.')
-        if res.error_code == res.BUSY:
-            raise ServiceException('Giskard is busy and can\'t process service call.')
         return res
 
 
@@ -1274,7 +1272,7 @@ class MonitorWrapper:
     def add_cancel_motion(self,
                           start_condition: str,
                           error_message: str,
-                          error_code: int = MoveResult.ERROR,
+                          error_code: int = GiskardError.ERROR,
                           name: Optional[str] = None) -> str:
         """
         Cancels the motion if all start_condition are True and will make Giskard return the specified error code.
@@ -1411,7 +1409,7 @@ class GiskardWrapper:
         self.monitors.add_end_motion(start_condition=self.monitors.get_anded_monitor_names())
         self.monitors.add_cancel_motion(start_condition=local_min_reached_monitor_name,
                                         error_message=f'local minimum reached',
-                                        error_code=MoveResult.LOCAL_MINIMUM)
+                                        error_code=GiskardError.LOCAL_MINIMUM)
         if not self.monitors.max_trajectory_length_set:
             self.monitors.add_max_trajectory_length()
         self.monitors.max_trajectory_length_set = False

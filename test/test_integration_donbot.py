@@ -7,7 +7,7 @@ from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, Po
 from tf.transformations import quaternion_about_axis, quaternion_matrix, rotation_from_matrix
 
 import giskardpy.utils.tfwrapper as tf
-from giskard_msgs.msg import MoveResult
+from giskard_msgs.msg import GiskardError
 from giskardpy.configs.behavior_tree_config import StandAloneBTConfig
 from giskardpy.configs.iai_robots.donbot import WorldWithBoxyBaseConfig, DonbotCollisionAvoidanceConfig, DonbotStandaloneInterfaceConfig
 from giskardpy.configs.giskard import Giskard
@@ -176,7 +176,7 @@ class TestJointGoals:
             'ur5_wrist_3_joint': -2.5249870459186,
         })
         zero_pose.set_joint_goal({})
-        zero_pose.plan_and_execute(expected_error_code=MoveResult.GOAL_INITIALIZATION_ERROR)
+        zero_pose.plan_and_execute(expected_error_code=GiskardError.GOAL_INITIALIZATION_ERROR)
 
     def test_joint_movement2(self, zero_pose: DonbotTestWrapper):
         js = {

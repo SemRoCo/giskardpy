@@ -7,10 +7,8 @@ from tf2_py import TransformException
 from visualization_msgs.msg import MarkerArray
 
 from giskard_msgs.msg import WorldResult, WorldGoal, GiskardError
-from giskard_msgs.srv import UpdateWorldRequest, GetGroupNamesResponse, \
-    GetGroupNamesRequest, GetGroupInfoResponse, GetGroupInfoRequest, DyeGroupResponse, GetGroupNames, GetGroupInfo, \
-    DyeGroup, \
-    DyeGroupRequest
+from giskard_msgs.srv import GetGroupNamesResponse, GetGroupNamesRequest, GetGroupInfoResponse, GetGroupInfoRequest, \
+    DyeGroupResponse, GetGroupNames, GetGroupInfo, DyeGroup, DyeGroupRequest
 from giskardpy.data_types import JointStates
 from giskardpy.exceptions import UnknownGroupException, \
     GiskardException
@@ -55,17 +53,17 @@ class ProcessWorldUpdate(GiskardBehavior):
         req = self.action_server.goal_msg
         result = WorldResult()
         try:
-            if req.operation == UpdateWorldRequest.ADD:
+            if req.operation == WorldGoal.ADD:
                 self.add_object(req)
-            elif req.operation == UpdateWorldRequest.UPDATE_PARENT_LINK:
+            elif req.operation == WorldGoal.UPDATE_PARENT_LINK:
                 self.update_parent_link(req)
-            elif req.operation == UpdateWorldRequest.UPDATE_POSE:
+            elif req.operation == WorldGoal.UPDATE_POSE:
                 self.update_group_pose(req)
             elif req.operation == WorldGoal.REGISTER_GROUP:
                 self.register_group(req)
-            elif req.operation == UpdateWorldRequest.REMOVE:
+            elif req.operation == WorldGoal.REMOVE:
                 self.remove_object(req.group_name)
-            elif req.operation == UpdateWorldRequest.REMOVE_ALL:
+            elif req.operation == WorldGoal.REMOVE_ALL:
                 self.clear_world()
             else:
                 result.error.code = GiskardError.INVALID_WORLD_OPERATION
@@ -118,7 +116,7 @@ class ProcessWorldUpdate(GiskardBehavior):
         return res
 
     @profile
-    def add_object(self, req: UpdateWorldRequest):
+    def add_object(self, req: WorldGoal):
         req.parent_link = god_map.world.search_for_link_name(req.parent_link, req.parent_link_group)
         world_body = req.body
         if req.pose.header.frame_id == '':
@@ -145,7 +143,7 @@ class ProcessWorldUpdate(GiskardBehavior):
             raise NotImplementedError('tf_root_link_name is not implemented')
 
     @profile
-    def update_group_pose(self, req: UpdateWorldRequest):
+    def update_group_pose(self, req: WorldGoal):
         if req.group_name not in god_map.world.groups:
             raise UnknownGroupException(f'Can\'t update pose of unknown group: \'{req.group_name}\'')
         group = god_map.world.groups[req.group_name]
@@ -155,7 +153,7 @@ class ProcessWorldUpdate(GiskardBehavior):
         god_map.world.notify_state_change()
 
     @profile
-    def update_parent_link(self, req: UpdateWorldRequest):
+    def update_parent_link(self, req: WorldGoal):
         req.parent_link = god_map.world.search_for_link_name(link_name=req.parent_link,
                                                              group_name=req.parent_link_group)
         if req.group_name not in god_map.world.groups:

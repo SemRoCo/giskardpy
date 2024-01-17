@@ -11,10 +11,8 @@ import giskard_msgs.msg as giskard_msgs
 from giskard_msgs.msg import MoveAction, MoveGoal, WorldBody, CollisionEntry, MoveResult, MoveFeedback, MotionGoal, \
     Monitor, WorldGoal, WorldAction, WorldResult, GiskardError
 from giskard_msgs.srv import DyeGroupRequest, DyeGroup, GetGroupInfoRequest, DyeGroupResponse
-from giskard_msgs.srv import GetGroupNamesResponse, GetGroupInfoResponse, RegisterGroupRequest
-from giskard_msgs.srv import RegisterGroupResponse
-from giskard_msgs.srv import UpdateWorld, UpdateWorldRequest, UpdateWorldResponse, GetGroupInfo, \
-    GetGroupNames, RegisterGroup
+from giskard_msgs.srv import GetGroupNamesResponse, GetGroupInfoResponse
+from giskard_msgs.srv import GetGroupInfo, GetGroupNames, RegisterGroup
 from giskardpy.data_types import goal_parameter
 from giskardpy.exceptions import DuplicateNameException, UnknownGroupException
 from giskardpy.goals.align_planes import AlignPlanes
@@ -51,7 +49,7 @@ class WorldWrapper:
         Resets the world to what it was when Giskard was launched.
         """
         req = WorldGoal()
-        req.operation = UpdateWorldRequest.REMOVE_ALL
+        req.operation = WorldGoal.REMOVE_ALL
         return self._send_goal_and_wait(req)
 
     def remove_group(self, name: str) -> WorldResult:
@@ -62,7 +60,7 @@ class WorldWrapper:
         world_body = WorldBody()
         req = WorldGoal()
         req.group_name = str(name)
-        req.operation = UpdateWorldRequest.REMOVE
+        req.operation = WorldGoal.REMOVE
         req.body = world_body
         return self._send_goal_and_wait(req)
 
@@ -88,7 +86,7 @@ class WorldWrapper:
         """
         req = WorldGoal()
         req.group_name = str(name)
-        req.operation = UpdateWorldRequest.ADD
+        req.operation = WorldGoal.ADD
         req.body = make_world_body_box(size[0], size[1], size[2])
         req.parent_link_group = parent_link_group
         req.parent_link = parent_link
@@ -110,7 +108,7 @@ class WorldWrapper:
         world_body.shape.dimensions.append(radius)
         req = WorldGoal()
         req.group_name = str(name)
-        req.operation = UpdateWorldRequest.ADD
+        req.operation = WorldGoal.ADD
         req.body = world_body
         req.pose = pose
         req.parent_link = parent_link
@@ -134,7 +132,7 @@ class WorldWrapper:
         world_body.mesh = mesh
         req = WorldGoal()
         req.group_name = str(name)
-        req.operation = UpdateWorldRequest.ADD
+        req.operation = WorldGoal.ADD
         req.body = world_body
         req.pose = pose
         req.body.scale.x = scale[0]
@@ -162,7 +160,7 @@ class WorldWrapper:
         world_body.shape.dimensions[SolidPrimitive.CYLINDER_RADIUS] = radius
         req = WorldGoal()
         req.group_name = str(name)
-        req.operation = UpdateWorldRequest.ADD
+        req.operation = WorldGoal.ADD
         req.body = world_body
         req.pose = pose
         req.parent_link = parent_link
@@ -183,7 +181,7 @@ class WorldWrapper:
         :return: result message
         """
         req = WorldGoal()
-        req.operation = UpdateWorldRequest.UPDATE_PARENT_LINK
+        req.operation = WorldGoal.UPDATE_PARENT_LINK
         req.group_name = str(name)
         req.parent_link = parent_link
         req.parent_link_group = parent_link_group
@@ -222,7 +220,7 @@ class WorldWrapper:
         urdf_body.joint_state_topic = js_topic
         req = WorldGoal()
         req.group_name = str(name)
-        req.operation = UpdateWorldRequest.ADD
+        req.operation = WorldGoal.ADD
         req.body = urdf_body
         req.pose = pose
         req.parent_link = parent_link
@@ -274,11 +272,11 @@ class WorldWrapper:
         req.group_name = group_name
         req.pose = new_pose
         res = self._send_goal_and_wait(req)
-        if res.error_code == UpdateWorldResponse.SUCCESS:
+        if res.error.code == GiskardError.SUCCESS:
             return res
-        if res.error_code == UpdateWorldResponse.UNKNOWN_GROUP_ERROR:
-            raise UnknownGroupException(res.error_msg)
-        raise ServiceException(res.error_msg)
+        if res.error.code == GiskardError.UNKNOWN_GROUP:
+            raise UnknownGroupException(res.error.msg)
+        raise ServiceException(res.error.msg)
 
     def register_group(self, new_group_name: str, root_link_name: str,
                        root_link_group_name: str) -> WorldResult:

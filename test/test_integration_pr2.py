@@ -2531,6 +2531,19 @@ class TestWorldManipulation:
         req.operation = WorldGoal.ADD
         assert zero_pose.world._send_goal_and_wait(req).error.code == GiskardError.CORRUPT_SHAPE
 
+    def test_busy(self, zero_pose: PR2TestWrapper):
+        p = PoseStamped()
+        p.header.frame_id = 'base_link'
+        req = WorldGoal()
+        req.body = WorldBody(type=WorldBody.PRIMITIVE_BODY,
+                             shape=SolidPrimitive(type=42))
+        req.pose = PoseStamped()
+        req.pose.header.frame_id = 'map'
+        req.parent_link = 'base_link'
+        req.operation = WorldGoal.ADD
+        assert zero_pose.world._client.send_goal_and_wait(req).error.code == GiskardError.CORRUPT_SHAPE
+        assert zero_pose.world._client.send_goal_and_wait(req).error.code == GiskardError.CORRUPT_SHAPE
+
     def test_tf_error(self, zero_pose: PR2TestWrapper):
         req = WorldGoal()
         req.body = WorldBody(type=WorldBody.PRIMITIVE_BODY,

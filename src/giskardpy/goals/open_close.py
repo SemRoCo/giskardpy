@@ -41,7 +41,6 @@ class Open(Goal):
         self.tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
         self.handle_link = god_map.world.search_for_link_name(environment_link, environment_group)
         self.joint_name = god_map.world.get_movable_parent_joint(self.handle_link)
-        self.joint_group = god_map.world.get_group_of_joint(self.joint_name)
         self.handle_T_tip = god_map.world.compute_fk_pose(self.handle_link, self.tip_link)
         if name is None:
             name = f'{self.__class__.__name__}'
@@ -52,16 +51,6 @@ class Open(Goal):
             goal_joint_state = max_position
         else:
             goal_joint_state = min(max_position, goal_joint_state)
-
-        # self.add_constraints_of_goal(CartesianPose(root_link=environment_link,
-        #                                            root_group=environment_group,
-        #                                            tip_link=tip_link,
-        #                                            tip_group=tip_group,
-        #                                            goal_pose=self.handle_T_tip,
-        #                                            weight=self.weight,
-        #                                            start_condition=start_condition,
-        #                                            hold_condition=hold_condition,
-        #                                            end_condition=end_condition))
 
         if not cas.is_true(start_condition):
             handle_T_tip = god_map.world.compose_fk_expression(self.handle_link, self.tip_link)
@@ -95,7 +84,6 @@ class Open(Goal):
 
         goal_state = {self.joint_name.short_name: goal_joint_state}
         self.add_constraints_of_goal(JointPositionList(goal_state=goal_state,
-                                                       group_name=self.joint_group.name,
                                                        max_velocity=max_velocity,
                                                        weight=WEIGHT_BELOW_CA,
                                                        start_condition=start_condition,

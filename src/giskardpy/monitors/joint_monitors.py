@@ -23,5 +23,5 @@ class JointGoalReached(ExpressionMonitor):
                 error = goal - current
             comparison_list.append(cas.less(cas.abs(error), threshold))
         expression = cas.logic_all(cas.Expression(comparison_list))
-        super().__init__(name, stay_true=stay_true, start_condition=start_condition)
+        super().__init__(name=name, stay_true=stay_true, start_condition=start_condition)
         self.expression = expression

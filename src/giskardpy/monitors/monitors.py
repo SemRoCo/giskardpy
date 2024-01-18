@@ -165,7 +165,7 @@ class Alternator(ExpressionMonitor):
                  start_condition: cas.Expression = cas.TrueSymbol,
                  mod: int = 2,
                  plot: bool = True):
-        super().__init__(name, stay_true=stay_true, start_condition=start_condition, plot=plot)
+        super().__init__(name=name, stay_true=stay_true, start_condition=start_condition, plot=plot)
         time = symbol_manager.time
         expr = cas.equal(cas.fmod(cas.floor(time), mod), 0)
         self.expression = expr

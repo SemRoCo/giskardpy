@@ -51,20 +51,12 @@ def vector(x):
     return st.lists(float_no_nan_no_inf(), min_size=x, max_size=x)
 
 
-update_world_error_codes = {value: name for name, value in vars(WorldResult).items() if
-                            isinstance(value, int) and name[0].isupper()}
+error_codes = {value: name for name, value in vars(GiskardError).items() if
+               isinstance(value, int) and name[0].isupper()}
 
 
-def update_world_error_code(code):
-    return update_world_error_codes[code]
-
-
-move_result_error_codes = {value: name for name, value in vars(MoveResult).items() if
-                           isinstance(value, int) and name[0].isupper()}
-
-
-def move_result_error_code(code):
-    return move_result_error_codes[code]
+def error_code_to_name(code):
+    return error_codes[code]
 
 
 def angle_positive():
@@ -302,7 +294,7 @@ class GiskardTestWrapper(OldGiskardWrapper):
     def dye_group(self, group_name: str, rgba: Tuple[float, float, float, float],
                   expected_error_codes=(DyeGroupResponse.SUCCESS,)):
         res = self.world.dye_group(group_name, rgba)
-        assert res.error_code in expected_error_codes
+        assert res.error_codes in expected_error_codes
 
     def heart_beat(self, timer_thing):
         if self._alive:
@@ -498,8 +490,8 @@ class GiskardTestWrapper(OldGiskardWrapper):
             error_code = r.error.code
             error_message = r.error.msg
             assert error_code == expected_error_code, \
-                f'got: {move_result_error_code(error_code)}, ' \
-                f'expected: {move_result_error_code(expected_error_code)} | error_massage: {error_message}'
+                f'got: {error_code_to_name(error_code)}, ' \
+                f'expected: {error_code_to_name(expected_error_code)} | error_massage: {error_message}'
             if error_code == GiskardError.SUCCESS:
                 try:
                     self.wait_heartbeats(30)
@@ -602,8 +594,8 @@ class GiskardTestWrapper(OldGiskardWrapper):
         r = self.world.remove_group(name)
         self.wait_heartbeats()
         assert r.error.code == expected_response, \
-            f'Got: \'{update_world_error_code(r.error.code)}\', ' \
-            f'expected: \'{update_world_error_code(expected_response)}.\''
+            f'Got: \'{error_code_to_name(r.error.code)}\', ' \
+            f'expected: \'{error_code_to_name(expected_response)}.\''
         assert name not in god_map.world.groups
         assert name not in self.world.get_group_names()
         if expected_response == GiskardError.SUCCESS:
@@ -648,8 +640,8 @@ class GiskardTestWrapper(OldGiskardWrapper):
                                 parent_link_group: str,
                                 expected_error_code: int):
         assert response.error.code == expected_error_code, \
-            f'Got: \'{update_world_error_code(response.error.code)}\', ' \
-            f'expected: \'{update_world_error_code(expected_error_code)}.\''
+            f'Got: \'{error_code_to_name(response.error.code)}\', ' \
+            f'expected: \'{error_code_to_name(expected_error_code)}.\''
         if expected_error_code == GiskardError.SUCCESS:
             assert name in self.world.get_group_names()
             response2 = self.world.get_group_info(name)
@@ -827,8 +819,8 @@ class GiskardTestWrapper(OldGiskardWrapper):
                                                    parent_link_group=parent_link_group)
         self.wait_heartbeats()
         assert r.error.code == expected_response, \
-            f'Got: \'{update_world_error_code(r.error.code)}\', ' \
-            f'expected: \'{update_world_error_code(expected_response)}.\''
+            f'Got: \'{error_code_to_name(r.error.code)}\', ' \
+            f'expected: \'{error_code_to_name(expected_response)}.\''
         if r.error.code == GiskardError.SUCCESS:
             self.check_add_object_result(response=r,
                                          name=name,

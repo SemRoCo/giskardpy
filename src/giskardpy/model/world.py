@@ -7,6 +7,7 @@ from copy import deepcopy
 from functools import cached_property, wraps
 from itertools import combinations
 from typing import Dict, Union, Tuple, Set, Optional, List, Callable, Sequence, Type, overload
+from xml.etree.ElementTree import ParseError
 
 import numpy as np
 import urdf_parser_py.urdf as up
@@ -20,7 +21,7 @@ from giskardpy import casadi_wrapper as w
 from giskardpy.casadi_wrapper import CompiledFunction
 from giskardpy.data_types import JointStates
 from giskardpy.exceptions import DuplicateNameException, UnknownGroupException, UnknownLinkException, \
-    WorldException, GiskardException, UnknownJointException
+    WorldException, GiskardException, UnknownJointException, CorruptURDFException
 from giskardpy.god_map import god_map
 from giskardpy.model.joints import Joint, FixedJoint, PrismaticJoint, RevoluteJoint, OmniDrive, DiffDrive, \
     urdf_to_joint, VirtualFreeVariables, MovableJoint, Joint6DOF, OneDofJoint
@@ -590,7 +591,10 @@ class WorldTree(WorldTreeInterface):
         :param actuated: if the urdf is controlled by Giskard, important for self collision avoidance
         """
         with suppress_stderr():
-            parsed_urdf: up.Robot = up.URDF.from_xml_string(hacky_urdf_parser_fix(urdf))
+            try:
+                parsed_urdf: up.Robot = up.URDF.from_xml_string(hacky_urdf_parser_fix(urdf))
+            except ParseError as e:
+                raise CorruptURDFException(str(e))
         if group_name in self.groups:
             raise DuplicateNameException(
                 f'Failed to add group \'{group_name}\' because one with such a name already exists')

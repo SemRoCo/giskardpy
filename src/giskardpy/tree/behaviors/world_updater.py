@@ -3,7 +3,6 @@ from threading import Thread
 
 import rospy
 from py_trees import Status
-from tf2_py import TransformException
 from visualization_msgs.msg import MarkerArray
 
 from giskard_msgs.msg import WorldResult, WorldGoal, GiskardError
@@ -11,7 +10,7 @@ from giskard_msgs.srv import GetGroupNamesResponse, GetGroupNamesRequest, GetGro
     DyeGroupResponse, GetGroupNames, GetGroupInfo, DyeGroup, DyeGroupRequest
 from giskardpy.data_types import JointStates
 from giskardpy.exceptions import UnknownGroupException, \
-    GiskardException
+    GiskardException, TransformException
 from giskardpy.god_map import god_map
 from giskardpy.model.world import WorldBranch
 from giskardpy.tree.behaviors.action_server import ActionServerHandler

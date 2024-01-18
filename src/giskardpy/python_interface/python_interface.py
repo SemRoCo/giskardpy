@@ -39,8 +39,9 @@ class WorldWrapper:
         self._get_group_info_srv = rospy.ServiceProxy(f'{node_name}/get_group_info', GetGroupInfo)
         self._get_group_names_srv = rospy.ServiceProxy(f'{node_name}/get_group_names', GetGroupNames)
         self._dye_group_srv = rospy.ServiceProxy(f'{node_name}/dye_group', DyeGroup)
-        self._client = SimpleActionClient('update_world', WorldAction)
+        self._client = SimpleActionClient(f'{node_name}/update_world', WorldAction)
         self._client.wait_for_server()
+        rospy.wait_for_service(self._get_group_names_srv.resolved_name)
         self.robot_name = self.get_group_names()[0]
 
     def clear(self) -> WorldResult:

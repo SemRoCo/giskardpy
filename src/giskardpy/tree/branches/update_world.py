@@ -21,7 +21,7 @@ class UpdateWorld(Sequence):
     def __init__(self):
         name = 'update world'
         super().__init__(name)
-        god_map.world_action_server = ActionServerHandler(action_name='update_world', action_type=WorldAction)
+        god_map.world_action_server = ActionServerHandler(action_name='~update_world', action_type=WorldAction)
         self.goal_received = GoalReceived(god_map.world_action_server)
         self.send_result = SendResult(action_server=god_map.world_action_server)
         self.process_goal = ProcessWorldUpdate(action_server=god_map.world_action_server)

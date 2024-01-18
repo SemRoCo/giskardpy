@@ -357,11 +357,14 @@ class CollisionWorldSynchronizer:
         else:
             added_checks[key] = distance
 
-    def has_world_changed(self):
+    def has_world_changed(self) -> bool:
         if self.world_version != god_map.world.model_version:
             self.world_version = god_map.world.model_version
             return True
         return False
+
+    def is_world_model_up_to_date(self) -> bool:
+        return self.world_version == god_map.world.model_version
 
     @property
     def is_collision_checking_enabled(self) -> bool:

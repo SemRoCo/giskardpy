@@ -48,7 +48,7 @@ class ControlLoop(AsyncBehavior):
         self.send_controls = success_is_running(SendControls)()
         self.closed_loop_synchronization = success_is_running(Synchronization)()
 
-        self.add_child(failure_is_running(GoalCanceled)('goal canceled', god_map.giskard.action_server_name))
+        self.add_child(failure_is_running(GoalCanceled)(god_map.move_action_server))
 
         if god_map.is_collision_checking_enabled():
             self.add_child(CollisionChecker('collision checker'))

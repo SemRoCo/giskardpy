@@ -11,7 +11,7 @@ from tf.transformations import euler_matrix
 from visualization_msgs.msg import Marker, MarkerArray
 
 from giskard_msgs.msg import WorldBody
-from giskardpy.exceptions import CorruptShapeException
+from giskardpy.exceptions import CorruptShapeException, CorruptMeshException
 from giskardpy.model.utils import cube_volume, cube_surface, sphere_volume, cylinder_volume, cylinder_surface
 from giskardpy.data_types import PrefixName
 from giskardpy.data_types import my_string
@@ -114,7 +114,7 @@ class MeshGeometry(LinkGeometry):
         self._file_name_ros_iris = file_name
         self.set_collision_file_name(self.file_name_absolute)
         if not os.path.isfile(resolve_ros_iris(file_name)):
-            raise CorruptShapeException(f'Can\'t find file {file_name}')
+            raise CorruptMeshException(f'Can\'t find file {file_name}')
         if scale is None:
             self.scale = [1, 1, 1]
         else:

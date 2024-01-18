@@ -69,9 +69,7 @@ class GiskardBT(BehaviourTree):
         self.root.add_child(self.control_loop_branch)
         self.root.add_child(self.cleanup_control_loop)
         self.root.add_child(self.post_processing)
-        self.root.add_child(SendResult('send result',
-                                       god_map.giskard.action_server_name,
-                                       MoveAction))
+        self.root.add_child(SendResult(god_map.move_action_server))
         super().__init__(self.root)
         self.switch_to_execution()
 

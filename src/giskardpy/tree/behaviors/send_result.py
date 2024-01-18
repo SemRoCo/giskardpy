@@ -1,27 +1,19 @@
-from py_trees import Blackboard, Status
+from py_trees import Status
 
-from giskard_msgs.msg import MoveResult
-from giskardpy.god_map import god_map
-from giskardpy.tree.behaviors.action_server import ActionServerBehavior
-from giskardpy.utils import logging
+from giskardpy.tree.behaviors.action_server import ActionServerHandler
+from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.decorators import record_time
 
 
-class SendResult(ActionServerBehavior):
+class SendResult(GiskardBehavior):
+
+    def __init__(self, action_server: ActionServerHandler):
+        self.action_server = action_server
+        name = f'send result to \'{action_server.name}\''
+        super().__init__(name)
+
     @record_time
     @profile
     def update(self):
-        result: MoveResult = god_map.result_message
-
-        if result.error_code == MoveResult.PREEMPTED:
-            logging.logerr('Goal preempted')
-            self.get_as().send_preempted(result)
-            return Status.SUCCESS
-        if result.error_code != MoveResult.SUCCESS:
-            logging.logwarn('Failed to execute goal.')
-            self.get_as().send_aborted(result)
-            return Status.SUCCESS
-        else:
-            logging.loginfo('----------------Successfully executed goal.----------------')
-        self.get_as().send_result(result)
+        self.action_server.send_result()
         return Status.SUCCESS

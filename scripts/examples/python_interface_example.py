@@ -1,6 +1,8 @@
 import rospy
 from geometry_msgs.msg import PoseStamped
 
+from giskardpy.goals.joint_goals import JointPositionList
+from giskardpy.monitors.joint_monitors import JointGoalReached
 from giskardpy.python_interface.python_interface import GiskardWrapper
 
 # %% Define goals for later
@@ -51,25 +53,32 @@ sleep2 = giskard_wrapper.monitors.add_sleep(1.5, name='sleep2', start_condition=
 
 # %% Now Let's define some motion goals.
 # We want to reach two joint goals, so we first define monitors for checking that end condition.
-right_monitor = giskard_wrapper.monitors.add_joint_position(right_arm_goal,
+right_monitor = giskard_wrapper.monitors.add_joint_position(goal_state=right_arm_goal,
                                                             name='right pose reached',
                                                             start_condition=sleep1)
-left_monitor = giskard_wrapper.monitors.add_joint_position(left_arm_goal,
-                                                           name='left pose reached',
-                                                           start_condition=sleep1)
+# You can use add_motion_goal to add any monitor implemented in giskardpy.monitor.
+# All remaining parameters are forwarded to the __init__ function of that class.
+# All specialized add_ functions are just wrappers for add_monitor.
+left_monitor = giskard_wrapper.monitors.add_monitor(monitor_class=JointGoalReached.__name__,
+                                                    goal_state=left_arm_goal,
+                                                    name='left pose reached',
+                                                    start_condition=sleep1,
+                                                    threshold=0.01)
 
 # We set two separate motion goals for the joints of the left and right arm.
 # All motion goal related operations are groups under giskard_wrapper.motion_goals.
 # The one for the right arm starts when the sleep2 monitor is done and ends, when the right_monitor is done,
 # meaning it continues until the joint goal was reached.
-giskard_wrapper.motion_goals.add_joint_position(right_arm_goal,
+giskard_wrapper.motion_goals.add_joint_position(goal_state=right_arm_goal,
                                                 name='right pose',
                                                 start_condition=sleep2,
                                                 end_condition=right_monitor)
-# This joint goal start immediately and finished when its goal was reached.
-giskard_wrapper.motion_goals.add_joint_position(left_arm_goal,
-                                                name='left pose',
-                                                end_condition=left_monitor)
+# You can use add_motion_goal to add any motion goal implemented in giskardpy.goals.
+# All remaining parameters are forwarded to the __init__ function of that class.
+giskard_wrapper.motion_goals.add_motion_goal(motion_goal_class=JointPositionList.__name__,
+                                             goal_state=left_arm_goal,
+                                             name='left pose',
+                                             end_condition=left_monitor)
 
 # %% Now let's define a goal for the base, 2m in front of it.
 # First we define a monitor which checks if that pose was reached.
@@ -108,29 +117,37 @@ giskard_wrapper.monitors.add_max_trajectory_length(120)
 # Lastly we allow all collisions
 giskard_wrapper.motion_goals.allow_all_collisions()
 # And execute the goal.
+rospy.loginfo('Sending first goal.')
 giskard_wrapper.execute()
+rospy.loginfo('First goal finished.')
 
 # %% manipulate world
 box_name = 'muh'
 box_pose = PoseStamped()
 box_pose.header.frame_id = 'r_gripper_tool_frame'
 box_pose.pose.orientation.w = 1
+rospy.loginfo('Add box.')
 giskard_wrapper.world.add_box(name=box_name,
                               size=(0.2, 0.1, 0.1),
                               pose=box_pose,
                               parent_link='map')
+rospy.loginfo('Clear world.')
 giskard_wrapper.world.clear()
 
+rospy.loginfo('Add box again.')
 giskard_wrapper.world.add_box(name=box_name,
                               size=(0.2, 0.1, 0.1),
                               pose=box_pose,
                               parent_link='map')
 
+rospy.loginfo('Attach box at gripper.')
 giskard_wrapper.world.update_parent_link_of_group(name=box_name,
                                                   parent_link='r_gripper_tool_frame')
 
+rospy.loginfo('Delete box.')
 giskard_wrapper.world.remove_group(name=box_name)
 
+rospy.loginfo('Add a new box directly at gripper.')
 giskard_wrapper.world.add_box(name=box_name,
                               size=(0.2, 0.1, 0.1),
                               pose=box_pose,
@@ -148,6 +165,6 @@ giskard_wrapper.motion_goals.add_cartesian_pose(goal_pose=box_goal,
 
 # If you don't want to create complicated monitor/motion goal chains, the default ending conditions might be sufficient.
 giskard_wrapper.add_default_end_motion_conditions()
+rospy.loginfo('Send cartesian goal for box.')
 giskard_wrapper.execute()
-
-print('done')
+rospy.loginfo('Done.')

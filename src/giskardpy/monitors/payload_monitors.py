@@ -6,7 +6,7 @@ from typing import List, Optional, Dict, Tuple
 import numpy as np
 import rospy
 
-from giskard_msgs.msg import MoveResult
+from giskard_msgs.msg import MoveResult, GiskardError
 from giskardpy.exceptions import GiskardException, MonitorInitalizationException
 from giskardpy.monitors.monitors import Monitor
 from giskardpy.god_map import god_map
@@ -75,7 +75,7 @@ class EndMotion(PayloadMonitor):
 class CancelMotion(PayloadMonitor):
     def __init__(self,
                  error_message: str,
-                 error_code: int = MoveResult.ERROR,
+                 error_code: int = GiskardError.ERROR,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,):
         super().__init__(name=name, start_condition=start_condition, run_call_in_thread=False)
@@ -108,7 +108,7 @@ class SetMaxTrajectoryLength(CancelMotion):
         super().__init__(name=name,
                          start_condition=start_condition,
                          error_message=error_message,
-                         error_code=MoveResult.MAX_TRAJECTORY_LENGTH)
+                         error_code=GiskardError.MAX_TRAJECTORY_LENGTH)
 
     @profile
     def __call__(self):

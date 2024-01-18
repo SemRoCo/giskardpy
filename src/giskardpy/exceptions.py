@@ -1,4 +1,4 @@
-from giskard_msgs.msg import MoveResult
+from giskard_msgs.msg import GiskardError
 
 
 class DontPrintStackTrace:
@@ -6,7 +6,7 @@ class DontPrintStackTrace:
 
 
 class GiskardException(Exception):
-    error_code: int = MoveResult.ERROR
+    error_code: int = GiskardError.ERROR
     error_message: str = ''
     _error_code_map = {}
 
@@ -14,11 +14,11 @@ class GiskardException(Exception):
         super().__init__(error_message)
         self.error_message = error_message
 
-    def to_move_result(self) -> MoveResult:
-        move_result = MoveResult()
-        move_result.error_code = self.error_code
-        move_result.error_message = self.error_message
-        return move_result
+    def to_error_msg(self) -> GiskardError:
+        error = GiskardError()
+        error.code = self.error_code
+        error.msg = self.error_message
+        return error
 
     @classmethod
     def register_error_code(cls, error_code):
@@ -35,188 +35,205 @@ class GiskardException(Exception):
         return subclass(error_message=error_message)
 
 
-GiskardException._error_code_map[MoveResult.ERROR] = GiskardException
+GiskardException._error_code_map[GiskardError.ERROR] = GiskardException
 
 
-@GiskardException.register_error_code(MoveResult.SETUP_ERROR)
+@GiskardException.register_error_code(GiskardError.SETUP_ERROR)
 class SetupException(GiskardException):
     pass
 
 
-@GiskardException.register_error_code(MoveResult.DUPLICATE_NAME)
+@GiskardException.register_error_code(GiskardError.DUPLICATE_NAME)
 class DuplicateNameException(GiskardException):
     pass
 
 
 # %% solver exceptions
-@GiskardException.register_error_code(MoveResult.QP_SOLVER_ERROR)
+@GiskardException.register_error_code(GiskardError.QP_SOLVER_ERROR)
 class QPSolverException(GiskardException):
     pass
 
 
-@GiskardException.register_error_code(MoveResult.INFEASIBLE)
+@GiskardException.register_error_code(GiskardError.INFEASIBLE)
 class InfeasibleException(QPSolverException):
     pass
 
 
-@GiskardException.register_error_code(MoveResult.VELOCITY_LIMIT_UNREACHABLE)
+@GiskardException.register_error_code(GiskardError.VELOCITY_LIMIT_UNREACHABLE)
 class VelocityLimitUnreachableException(QPSolverException):
     pass
 
 
-@GiskardException.register_error_code(MoveResult.OUT_OF_JOINT_LIMITS)
+@GiskardException.register_error_code(GiskardError.OUT_OF_JOINT_LIMITS)
 class OutOfJointLimitsException(InfeasibleException):
     pass
 
 
-@GiskardException.register_error_code(MoveResult.HARD_CONSTRAINTS_VIOLATED)
+@GiskardException.register_error_code(GiskardError.HARD_CONSTRAINTS_VIOLATED)
 class HardConstraintsViolatedException(InfeasibleException):
     pass
 
 
-@GiskardException.register_error_code(MoveResult.EMPTY_PROBLEM)
+@GiskardException.register_error_code(GiskardError.EMPTY_PROBLEM)
 class EmptyProblemException(InfeasibleException, DontPrintStackTrace):
     pass
 
 
-# %% world state exceptions
-@GiskardException.register_error_code(MoveResult.WORLD_ERROR)
+# %% world exceptions
+@GiskardException.register_error_code(GiskardError.WORLD_ERROR)
 class WorldException(GiskardException):
     pass
 
 
-@GiskardException.register_error_code(MoveResult.UNKNOWN_GROUP)
+@GiskardException.register_error_code(GiskardError.UNKNOWN_GROUP)
 class UnknownGroupException(WorldException, KeyError):
     pass
 
 
-@GiskardException.register_error_code(MoveResult.UNKNOWN_LINK)
+@GiskardException.register_error_code(GiskardError.UNKNOWN_LINK)
 class UnknownLinkException(WorldException, KeyError):
     pass
 
 
-@GiskardException.register_error_code(MoveResult.UNKNOWN_JOINT)
+@GiskardException.register_error_code(GiskardError.UNKNOWN_JOINT)
 class UnknownJointException(WorldException, KeyError):
     pass
 
 
-class UnsupportedOptionException(WorldException):
+@GiskardException.register_error_code(GiskardError.INVALID_WORLD_OPERATION)
+class InvalidWorldOperationException(WorldException, KeyError):
     pass
 
 
+@GiskardException.register_error_code(GiskardError.CORRUPT_SHAPE)
 class CorruptShapeException(WorldException):
     pass
 
 
+@GiskardException.register_error_code(GiskardError.CORRUPT_MESH)
+class CorruptMeshException(CorruptShapeException):
+    pass
+
+
+@GiskardException.register_error_code(GiskardError.CORRUPT_URDF)
+class CorruptURDFException(CorruptShapeException):
+    pass
+
+
+@GiskardException.register_error_code(GiskardError.TRANSFORM_ERROR)
+class TransformException(WorldException):
+    pass
+
+
 # %% error during motion problem building phase
-@GiskardException.register_error_code(MoveResult.MOTION_PROBLEM_BUILDING_ERROR)
+@GiskardException.register_error_code(GiskardError.MOTION_PROBLEM_BUILDING_ERROR)
 class MotionBuildingException(GiskardException):
     pass
 
 
-@GiskardException.register_error_code(MoveResult.INVALID_GOAL)
+@GiskardException.register_error_code(GiskardError.INVALID_GOAL)
 class InvalidGoalException(MotionBuildingException):
     pass
 
 
-@GiskardException.register_error_code(MoveResult.UNKNOWN_GOAL)
+@GiskardException.register_error_code(GiskardError.UNKNOWN_GOAL)
 class UnknownGoalException(MotionBuildingException, KeyError):
     pass
 
 
-@GiskardException.register_error_code(MoveResult.GOAL_INITIALIZATION_ERROR)
+@GiskardException.register_error_code(GiskardError.GOAL_INITIALIZATION_ERROR)
 class GoalInitalizationException(MotionBuildingException):
     pass
 
 
-@GiskardException.register_error_code(MoveResult.UNKNOWN_MONITOR)
+@GiskardException.register_error_code(GiskardError.UNKNOWN_MONITOR)
 class UnknownMonitorException(MotionBuildingException, KeyError):
     pass
 
 
-@GiskardException.register_error_code(MoveResult.MONITOR_INITIALIZATION_ERROR)
+@GiskardException.register_error_code(GiskardError.MONITOR_INITIALIZATION_ERROR)
 class MonitorInitalizationException(MotionBuildingException):
     pass
 
 
 # %% errors during planning
-@GiskardException.register_error_code(MoveResult.CONTROL_ERROR)
+@GiskardException.register_error_code(GiskardError.CONTROL_ERROR)
 class PlanningException(GiskardException):
     pass
 
 
-@GiskardException.register_error_code(MoveResult.SHAKING)
+@GiskardException.register_error_code(GiskardError.SHAKING)
 class ShakingException(PlanningException):
     pass
 
 
-@GiskardException.register_error_code(MoveResult.LOCAL_MINIMUM)
+@GiskardException.register_error_code(GiskardError.LOCAL_MINIMUM)
 class LocalMinimumException(PlanningException):
     pass
 
 
-@GiskardException.register_error_code(MoveResult.MAX_TRAJECTORY_LENGTH)
+@GiskardException.register_error_code(GiskardError.MAX_TRAJECTORY_LENGTH)
 class MaxTrajectoryLengthException(PlanningException):
     pass
 
 
-@GiskardException.register_error_code(MoveResult.SELF_COLLISION_VIOLATED)
+@GiskardException.register_error_code(GiskardError.SELF_COLLISION_VIOLATED)
 class SelfCollisionViolatedException(PlanningException):
     pass
 
 
 # errors during execution
-@GiskardException.register_error_code(MoveResult.EXECUTION_ERROR)
+@GiskardException.register_error_code(GiskardError.EXECUTION_ERROR)
 class ExecutionException(GiskardException):
     pass
 
 
-@GiskardException.register_error_code(MoveResult.FollowJointTrajectory_INVALID_GOAL)
+@GiskardException.register_error_code(GiskardError.FollowJointTrajectory_INVALID_GOAL)
 class FollowJointTrajectory_INVALID_GOAL(ExecutionException):
     pass
 
 
-@GiskardException.register_error_code(MoveResult.FollowJointTrajectory_INVALID_JOINTS)
+@GiskardException.register_error_code(GiskardError.FollowJointTrajectory_INVALID_JOINTS)
 class FollowJointTrajectory_INVALID_JOINTS(ExecutionException):
     pass
 
 
-@GiskardException.register_error_code(MoveResult.FollowJointTrajectory_OLD_HEADER_TIMESTAMP)
+@GiskardException.register_error_code(GiskardError.FollowJointTrajectory_OLD_HEADER_TIMESTAMP)
 class FollowJointTrajectory_OLD_HEADER_TIMESTAMP(ExecutionException):
     pass
 
 
-@GiskardException.register_error_code(MoveResult.FollowJointTrajectory_PATH_TOLERANCE_VIOLATED)
+@GiskardException.register_error_code(GiskardError.FollowJointTrajectory_PATH_TOLERANCE_VIOLATED)
 class FollowJointTrajectory_PATH_TOLERANCE_VIOLATED(ExecutionException):
     pass
 
 
-@GiskardException.register_error_code(MoveResult.FollowJointTrajectory_GOAL_TOLERANCE_VIOLATED)
+@GiskardException.register_error_code(GiskardError.FollowJointTrajectory_GOAL_TOLERANCE_VIOLATED)
 class FollowJointTrajectory_GOAL_TOLERANCE_VIOLATED(ExecutionException):
     pass
 
 
-@GiskardException.register_error_code(MoveResult.PREEMPTED)
+@GiskardException.register_error_code(GiskardError.PREEMPTED)
 class PreemptedException(ExecutionException):
     pass
 
 
-@GiskardException.register_error_code(MoveResult.EXECUTION_PREEMPTED)
+@GiskardException.register_error_code(GiskardError.EXECUTION_PREEMPTED)
 class ExecutionPreemptedException(ExecutionException):
     pass
 
 
-@GiskardException.register_error_code(MoveResult.EXECUTION_TIMEOUT)
+@GiskardException.register_error_code(GiskardError.EXECUTION_TIMEOUT)
 class ExecutionTimeoutException(ExecutionException):
     pass
 
 
-@GiskardException.register_error_code(MoveResult.EXECUTION_SUCCEEDED_PREMATURELY)
+@GiskardException.register_error_code(GiskardError.EXECUTION_SUCCEEDED_PREMATURELY)
 class ExecutionSucceededPrematurely(ExecutionException):
     pass
 
 
 # %% behavior tree exceptions
-@GiskardException.register_error_code(MoveResult.BEHAVIOR_TREE_ERROR)
+@GiskardException.register_error_code(GiskardError.BEHAVIOR_TREE_ERROR)
 class BehaviorTreeException(GiskardException):
     pass

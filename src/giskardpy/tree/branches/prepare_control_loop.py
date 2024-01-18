@@ -1,13 +1,11 @@
 from py_trees import Sequence
 
-from giskard_msgs.msg import MoveFeedback
 from giskardpy.tree.behaviors.cleanup import CleanUpPlanning
 from giskardpy.tree.behaviors.compile_debug_expressions import CompileDebugExpressions
 from giskardpy.tree.behaviors.compile_monitors import CompileMonitors
 from giskardpy.tree.behaviors.init_qp_controller import InitQPController
 from giskardpy.tree.behaviors.new_trajectory import NewTrajectory
 from giskardpy.tree.behaviors.plot_task_graph import PlotTaskMonitorGraph
-from giskardpy.tree.behaviors.publish_feedback import PublishFeedback
 from giskardpy.tree.behaviors.ros_msg_to_goal import ParseActionGoal, AddBaseTrajFollowerGoal, SetExecutionMode
 from giskardpy.tree.behaviors.set_tracking_start_time import SetTrackingStartTime
 
@@ -18,8 +16,6 @@ class PrepareControlLoop(Sequence):
     def __init__(self, name: str = 'prepare control loop'):
         super().__init__(name)
         self.has_compile_debug_expressions = False
-        self.add_child(PublishFeedback('publish feedback2',
-                                       MoveFeedback.PLANNING))
         self.add_child(CleanUpPlanning('CleanUpPlanning'))
         self.add_child(NewTrajectory('NewTrajectory'))
         self.add_child(SetExecutionMode())
@@ -43,8 +39,6 @@ class PrepareBaseTrajControlLoop(Sequence):
     def __init__(self, name: str = 'prepare control loop'):
         super().__init__(name)
         self.has_compile_debug_expressions = False
-        self.add_child(PublishFeedback('publish feedback2',
-                                       MoveFeedback.PLANNING))
         self.add_child(CleanUpPlanning('CleanUpPlanning'))
         self.add_child(AddBaseTrajFollowerGoal())
         self.add_child(InitQPController('InitQPController'))

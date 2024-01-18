@@ -68,7 +68,7 @@ class Giskard:
         if additional_monitor_package_paths is None:
             additional_monitor_package_paths = set()
         for additional_path in additional_monitor_package_paths:
-            self.add_goal_package_name(additional_path)
+            self.add_monitor_package_name(additional_path)
         god_map.hack = 0
 
     def set_defaults(self) -> None:
@@ -114,7 +114,7 @@ class Giskard:
         if len(new_monitors) == 0:
             raise SetupException(f'No classes of type \'{Monitor.__name__}\' found in \'{package_name}\'.')
         logging.loginfo(f'Made Monitor classes \'{new_monitors}\' available Giskard.')
-        self.goal_package_paths.add(package_name)
+        self.monitor_package_paths.add(package_name)
 
     def live(self):
         """

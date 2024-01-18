@@ -77,7 +77,7 @@ class Monitor:
 class ExpressionMonitor(Monitor):
     _expression: cas.Expression
 
-    def __init__(self,
+    def __init__(self, *,
                  name: Optional[str] = None,
                  stay_true: bool = False,
                  start_condition: cas.Expression = cas.TrueSymbol,

@@ -198,7 +198,7 @@ class SymbolManager(metaclass=SingletonMeta):
 
     def _pose_to_transmatrix(self, variable_ref_str: str) -> cas.TransMatrix:
         p = self._point_msg_to_point3(f'{variable_ref_str}.position')
-        r = self._quaternion_msg_to_rotation(f'{variable_ref_str}.rotation')
+        r = self._quaternion_msg_to_rotation(f'{variable_ref_str}.orientation')
         return cas.TransMatrix.from_point_rotation_matrix(p, r)
 
     def _list_to_transmatrix(self, variable_ref_str: str) -> cas.TransMatrix:

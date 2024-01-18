@@ -184,11 +184,11 @@ class StandAloneBTConfig(BehaviorTreeConfig):
         self.add_visualization_marker_publisher(add_to_sync=True, add_to_control_loop=True)
         if self.publish_tf:
             self.add_tf_publisher(include_prefix=True, mode=TfPublishingModes.all)
+        self.add_gantt_chart_plotter()
+        self.add_goal_graph_plotter()
         if self.debug_mode:
             self.add_trajectory_plotter(wait=True)
             self.add_debug_trajectory_plotter(wait=True)
-            self.add_gantt_chart_plotter()
-            self.add_goal_graph_plotter()
             self.add_debug_marker_publisher()
         # self.add_debug_marker_publisher()
         if self.publish_js:
@@ -211,11 +211,11 @@ class OpenLoopBTConfig(BehaviorTreeConfig):
 
     def setup(self):
         self.add_visualization_marker_publisher(add_to_sync=True, add_to_control_loop=True)
+        self.add_gantt_chart_plotter()
+        self.add_goal_graph_plotter()
         if self.debug_mode:
             self.add_trajectory_plotter(wait=True)
             self.add_debug_trajectory_plotter(wait=True)
-            # self.add_gantt_chart_plotter()
-            # self.add_goal_graph_plotter()
             self.add_debug_marker_publisher()
             self.add_qp_data_publisher(
                 publish_debug=True,
@@ -240,11 +240,11 @@ class ClosedLoopBTConfig(BehaviorTreeConfig):
     def setup(self):
         self.add_visualization_marker_publisher(add_to_sync=True, add_to_control_loop=False)
         # self.add_qp_data_publisher(publish_xdot=True, publish_lb=True, publish_ub=True)
+        self.add_gantt_chart_plotter()
+        self.add_goal_graph_plotter()
         if self.debug_mode:
             # self.add_trajectory_plotter(wait=True)
             # self.add_debug_trajectory_plotter(wait=True)
-            # self.add_gantt_chart_plotter()
-            # self.add_goal_graph_plotter()
             self.add_debug_marker_publisher()
             self.add_qp_data_publisher(
                 publish_debug=True,

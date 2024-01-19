@@ -1,6 +1,6 @@
 from __future__ import division
 
-from typing import Optional, List
+from typing import Optional
 
 import numpy as np
 from geometry_msgs.msg import Vector3Stamped, PointStamped
@@ -9,7 +9,6 @@ from giskardpy import casadi_wrapper as cas
 from giskardpy.goals.goal import Goal
 from giskardpy.tasks.task import WEIGHT_ABOVE_CA
 from giskardpy.monitors.monitors import ExpressionMonitor
-from giskardpy.tasks.task import Task
 from giskardpy.god_map import god_map
 from giskardpy.utils.expression_definition_utils import transform_msg
 
@@ -69,7 +68,7 @@ class InsertCylinder(Goal):
         distance_to_line, root_P_on_line = cas.distance_point_to_line_segment(root_P_tip, root_P_hole, root_P_top)
         distance_to_hole = cas.norm(root_P_hole - root_P_tip)
         bottom_reached = cas.less(distance_to_hole, 0.01)
-        bottom_reached_monitor = ExpressionMonitor('bottom reached', stay_true=True,
+        bottom_reached_monitor = ExpressionMonitor(name='bottom reached', stay_true=True,
                                                    start_condition=start_condition)
         bottom_reached_monitor.expression = bottom_reached
         self.add_monitor(bottom_reached_monitor)

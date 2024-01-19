@@ -9,9 +9,15 @@ from numpy import pi
 from std_srvs.srv import Trigger
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
-from giskardpy.configs.iai_robots.hsr import HSR_MujocoRealtime
+from giskardpy.configs.iai_robots.hsr import HSRCollisionAvoidanceConfig, WorldWithHSRConfig, HSRStandaloneInterface \
+    , HSRMujocoVelocityInterface
+from giskardpy.configs.qp_controller_config import QPControllerConfig, SupportedQPSolver
+from giskardpy.configs.behavior_tree_config import StandAloneBTConfig, ClosedLoopBTConfig
+from giskardpy.configs.giskard import Giskard
 from giskardpy.utils.utils import launch_launchfile
 from utils_for_tests import compare_poses, GiskardTestWrapper
+from giskardpy.goals.manipulability_goals import MaxManipulability
+import giskardpy.utils.tfwrapper as tf
 
 
 class HSRTestWrapper(GiskardTestWrapper):
@@ -26,20 +32,23 @@ class HSRTestWrapper(GiskardTestWrapper):
     }
     better_pose = default_pose
 
-    def __init__(self, config=None):
+    def __init__(self, giskard=None):
         self.tip = 'hand_gripper_tool_frame'
-        self.robot_name = 'hsr'
-        if config is None:
-            config = HSR_MujocoRealtime
+        if giskard is None:
+            giskard = Giskard(world_config=WorldWithHSRConfig(),
+                              collision_avoidance_config=HSRCollisionAvoidanceConfig(),
+                              robot_interface_config=HSRStandaloneInterface(),
+                              behavior_tree_config=StandAloneBTConfig(debug_mode=True),
+                              qp_controller_config=QPControllerConfig(qp_solver=SupportedQPSolver.gurobi))
         self.gripper_group = 'gripper'
         # self.r_gripper = rospy.ServiceProxy('r_gripper_simulator/set_joint_states', SetJointState)
         # self.l_gripper = rospy.ServiceProxy('l_gripper_simulator/set_joint_states', SetJointState)
         self.odom_root = 'odom'
-        super().__init__(config)
-        self.robot = self.world.groups[self.robot_name]
+        super().__init__(giskard)
+        # self.robot = self.world.groups[self.robot_name]
 
     def move_base(self, goal_pose):
-        self.set_cart_goal(goal_pose, tip_link='base_footprint', root_link=self.world.root_link_name)
+        self.set_cart_goal(goal_pose, tip_link='base_footprint', root_link='map')
         self.plan_and_execute()
 
     def open_gripper(self):
@@ -55,40 +64,49 @@ class HSRTestWrapper(GiskardTestWrapper):
 
     def reset_base(self):
         p = PoseStamped()
-        p.header.frame_id = 'map'
+        p.header.frame_id = tf.get_tf_root()
         p.pose.orientation.w = 1
-        if self.is_standalone():
-            self.teleport_base(p)
-        else:
-            self.move_base(p)
 
     def reset(self):
-        self.clear_world()
-        # self.close_gripper()
-        self.reset_base()
-        self.register_group('gripper',
-                            root_link_group_name=self.robot_name,
-                            root_link_name='hand_palm_link')
+        super().reset()
 
     def teleport_base(self, goal_pose, group_name: Optional[str] = None):
-        self.set_seed_odometry(base_pose=goal_pose, group_name=group_name)
         self.allow_all_collisions()
-        self.plan_and_execute()
+        self.move_base(goal_pose)
+
+    def set_localization(self, map_T_odom: PoseStamped):
+        pass
 
 
 class HSRTestWrapperMujoco(HSRTestWrapper):
+    better_pose = {
+        'arm_flex_joint': -0.7,
+        'arm_lift_joint': 0.2,
+        'arm_roll_joint': 0.0,
+        'head_pan_joint': -0.1,
+        'head_tilt_joint': 0.1,
+        'wrist_flex_joint': -0.9,
+        'wrist_roll_joint': -0.4,
+    }
+    default_pose = better_pose
+
     def __init__(self):
         # self.r_gripper = rospy.ServiceProxy('r_gripper_simulator/set_joint_states', SetJointState)
         # self.l_gripper = rospy.ServiceProxy('l_gripper_simulator/set_joint_states', SetJointState)
         self.mujoco_reset = rospy.ServiceProxy('mujoco/reset', Trigger)
         self.odom_root = 'odom'
-        super().__init__()
+        giskard = Giskard(world_config=WorldWithHSRConfig(description_name='/hsrb4s/robot_description'),
+                          collision_avoidance_config=HSRCollisionAvoidanceConfig(),
+                          robot_interface_config=HSRMujocoVelocityInterface(),
+                          behavior_tree_config=ClosedLoopBTConfig(debug_mode=True),
+                          qp_controller_config=QPControllerConfig(max_trajectory_length=30))
+        super().__init__(giskard)
 
     def reset_base(self):
         p = PoseStamped()
         p.header.frame_id = 'map'
         p.pose.orientation.w = 1
-        self.move_base(p)
+        # self.move_base(p)
 
     def teleport_base(self, goal_pose, group_name: Optional[str] = None):
         self.move_base(goal_pose)
@@ -107,9 +125,9 @@ class HSRTestWrapperMujoco(HSRTestWrapper):
 
 @pytest.fixture(scope='module')
 def giskard(request, ros):
-    launch_launchfile('package://hsr_description/launch/upload_hsrb.launch')
-    c = HSRTestWrapper()
-    # c = HSRTestWrapperMujoco()
+    # launch_launchfile('package://hsr_description/launch/upload_hsrb.launch')
+    # c = HSRTestWrapper()
+    c = HSRTestWrapperMujoco()
     request.addfinalizer(c.tear_down)
     return c
 

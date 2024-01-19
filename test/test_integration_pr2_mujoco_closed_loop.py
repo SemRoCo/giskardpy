@@ -656,14 +656,14 @@ class TestPouring:
                                   joint_state_topic='pr2/joint_states',
                                   alibi_joint_name='r_gripper_l_finger_joint',
                                   effort_threshold=-0.14,
-                                  effort=-200)
+                                  effort=-180)
         zero_pose.add_motion_goal(goal_type=CloseGripper.__name__,
                                   goal_name='closeGripperLeft',
                                   pub_topic='/pr2/l_gripper_controller/command',
                                   joint_state_topic='pr2/joint_states',
                                   alibi_joint_name='l_gripper_l_finger_joint',
                                   effort_threshold=-0.14,
-                                  effort=-200)
+                                  effort=-180)
         zero_pose.set_cart_goal(p, zero_pose.r_tip, 'map')
         zero_pose.set_cart_goal(p2, zero_pose.l_tip, 'map')
         zero_pose.allow_all_collisions()

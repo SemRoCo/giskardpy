@@ -147,11 +147,11 @@ class PouringAdaptiveTilt(Goal):
         angle = w.rotational_error(root_R_tip, root_R_tip_desired_pre)
         # TODO: how can the speed of a rotation be controlled from the outside?
         if self.tilt_angle < 0:
-            angle_a = -0.05 * is_forward + 1 * is_backward
+            angle_a = -0.03 * is_forward + 1 * is_backward
             stop_to_large = w.logic_any(w.Expression([w.if_greater(angle, 3, 0, 1), w.if_greater(angle_a, 0, 1, 0)]))
             stop_to_small = w.if_less(angle, 0.1, 0, 1)
         else:
-            angle_a = 0.05 * is_forward - 1 * is_backward
+            angle_a = 0.03 * is_forward - 1 * is_backward
             stop_to_large = w.logic_any(w.Expression([w.if_greater(angle, 3, 0, 1), w.if_less(angle_a, 0, 1, 0)]))
             stop_to_small = w.logic_any(w.Expression([w.if_less(angle, 0.1, 0, 1), w.if_greater(angle_a, 0, 1, 0)]))
         tip_R_tip_a = w.RotationMatrix().from_axis_angle(tip_V_tilt_axis, angle_a)
@@ -214,7 +214,7 @@ class PouringAdaptiveTilt(Goal):
         is_y = symbol_manager.get_symbol(f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\'].move_y')
         is_y_back = symbol_manager.get_symbol(f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\'].move_y_back')
         root_V_adapt = w.Vector3([0.02 * is_x - 0.02 * is_x_back,
-                                  0.02 * is_y - 0.03 * is_y_back,
+                                  0.01 * is_y - 0.01 * is_y_back,
                                   0
                                   ])
         adapt_pos_task.add_equality_constraint_vector(reference_velocities=[self.max_vel]*3,
@@ -222,6 +222,18 @@ class PouringAdaptiveTilt(Goal):
                                                       weights=[self.weight]*3,
                                                       task_expression=root_T_tip.to_position()[:3],
                                                       names=['aposx', 'aposy', 'aposz'])
+        # adapt_pos_task.add_velocity_constraint(lower_velocity_limit=root_V_adapt[0],
+        #                                        upper_velocity_limit=root_V_adapt[0],
+        #                                        weight=self.weight,
+        #                                        task_expression=root_T_tip.to_position()[0],
+        #                                        velocity_limit=root_V_adapt[0],
+        #                                        name_suffix='second')
+        # adapt_pos_task.add_velocity_constraint(lower_velocity_limit=-0.2,
+        #                                        upper_velocity_limit=-0.2,
+        #                                        weight=self.weight,
+        #                                        task_expression=root_T_tip.to_position()[1],
+        #                                        velocity_limit=0.2)
+
         self.add_task(adapt_pos_task)
 
         external_end_monitor = Monitor('isFnished', crucial=True)

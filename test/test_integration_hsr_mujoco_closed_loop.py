@@ -11,7 +11,7 @@ from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
 from giskardpy.configs.iai_robots.hsr import HSRCollisionAvoidanceConfig, WorldWithHSRConfig, HSRStandaloneInterface \
     , HSRMujocoVelocityInterface
-from giskardpy.configs.qp_controller_config import QPControllerConfig
+from giskardpy.configs.qp_controller_config import QPControllerConfig, SupportedQPSolver
 from giskardpy.configs.behavior_tree_config import StandAloneBTConfig, ClosedLoopBTConfig
 from giskardpy.configs.giskard import Giskard
 from giskardpy.utils.utils import launch_launchfile
@@ -42,7 +42,7 @@ class HSRTestWrapper(GiskardTestWrapper):
                               collision_avoidance_config=HSRCollisionAvoidanceConfig(),
                               robot_interface_config=HSRStandaloneInterface(),
                               behavior_tree_config=StandAloneBTConfig(debug_mode=True),
-                              qp_controller_config=QPControllerConfig())
+                              qp_controller_config=QPControllerConfig(qp_solver=SupportedQPSolver.gurobi))
         self.gripper_group = 'gripper'
         # self.r_gripper = rospy.ServiceProxy('r_gripper_simulator/set_joint_states', SetJointState)
         # self.l_gripper = rospy.ServiceProxy('l_gripper_simulator/set_joint_states', SetJointState)
@@ -650,7 +650,7 @@ class TestServo:
         goal_pose = PoseStamped()
         goal_pose.header.frame_id = 'map'
         goal_pose.pose.position.x = 1.9
-        goal_pose.pose.position.y = -0.20
+        goal_pose.pose.position.y = 0.25
         goal_pose.pose.position.z = 0.65
         goal_pose.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 0, 1, 0],
                                                                          [0, -1, 0, 0],
@@ -664,7 +664,7 @@ class TestServo:
                                   goal_name='pouring',
                                   tip='hand_palm_link',
                                   root='map',
-                                  tilt_angle=-1.5,
+                                  tilt_angle=1.5,
                                   pouring_pose=goal_pose,
                                   tilt_axis=tilt_axis,
                                   with_feedback=True)

@@ -23,6 +23,7 @@ class RealKinSimPlugin(GiskardBehavior):
         # if self.last_time is None:
         next_cmds = god_map.qp_solver_solution
         dt = next_time - self.last_time
+        dt = min(dt, god_map.qp_controller_config.sample_period)
         god_map.world.update_state(next_cmds, dt)
         self.last_time = next_time
         # god_map.get_world().notify_state_change()

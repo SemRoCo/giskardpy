@@ -23,7 +23,7 @@ class ExecutePayloadMonitor(GiskardBehavior):
     def update(self):
         if self.monitor.run_call_in_thread:
             if not self.started:
-                self.payload_thread = Thread(target=self.monitor)
+                self.payload_thread = Thread(target=self.monitor, name=self.monitor.name)
                 self.payload_thread.start()
                 self.started = True
             if self.payload_thread.is_alive():

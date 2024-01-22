@@ -3,7 +3,6 @@ import keyword
 import os
 from collections import defaultdict
 from copy import deepcopy
-from multiprocessing import Queue
 from time import time
 from typing import Tuple, Optional, List, Dict, Union
 
@@ -15,7 +14,6 @@ from geometry_msgs.msg import PoseStamped, Point, PointStamped
 from hypothesis import assume
 from hypothesis.strategies import composite
 from numpy import pi
-from rospy import Timer
 from sensor_msgs.msg import JointState
 from std_msgs.msg import ColorRGBA
 from tf2_py import LookupException, ExtrapolationException
@@ -39,6 +37,7 @@ from giskardpy.qp.qp_controller import available_solvers
 from giskardpy.tasks.task import WEIGHT_ABOVE_CA
 from giskardpy.utils import logging, utils
 from giskardpy.utils.math import compare_poses
+from giskardpy.utils.ros_timer import Timer
 from giskardpy.utils.utils import resolve_ros_iris, position_dict_to_joint_states
 
 BIG_NUMBER = 1e100
@@ -226,13 +225,12 @@ class GiskardTestWrapper(OldGiskardWrapper):
             god_map.tree.turn_off_visualization()
         if 'QP_SOLVER' in os.environ:
             god_map.qp_controller_config.set_qp_solver(SupportedQPSolver[os.environ['QP_SOLVER']])
-        self.heart = Timer(period=rospy.Duration(god_map.tree.tick_rate), callback=self.heart_beat)
+        self.heart = Timer(period=rospy.Duration(god_map.tree.tick_rate), callback=self.heart_beat,
+                           thread_name='giskard_bt')
         # self.namespaces = namespaces
         self.robot_names = [list(god_map.world.groups.keys())[0]]
         super().__init__(node_name='tests')
-        self.results = Queue(100)
         self.default_root = str(god_map.world.root_link_name)
-        self.goal_checks = []
 
         def create_publisher(topic):
             p = rospy.Publisher(topic, JointState, queue_size=10)
@@ -492,17 +490,8 @@ class GiskardTestWrapper(OldGiskardWrapper):
             assert error_code == expected_error_code, \
                 f'got: {error_code_to_name(error_code)}, ' \
                 f'expected: {error_code_to_name(expected_error_code)} | error_massage: {error_message}'
-            if error_code == GiskardError.SUCCESS:
-                try:
-                    self.wait_heartbeats(30)
-                    for goal_checker in self.goal_checks:
-                        goal_checker()
-                except:
-                    logging.logerr(f'Goal did\'t pass test.')
-                    raise
             # self.are_joint_limits_violated()
         finally:
-            self.goal_checks = []
             self.sync_world_with_trajectory()
         return r
 

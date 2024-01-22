@@ -40,7 +40,7 @@ class ProcessWorldUpdate(GiskardBehavior):
     def update(self) -> Status:
         if not self.started:
             logging.loginfo(f'Processing world goal #{god_map.world_action_server.goal_id}.')
-            self.worker_thread = Thread(target=self.process_goal)
+            self.worker_thread = Thread(target=self.process_goal, name=self.name)
             self.worker_thread.start()
             self.started = True
         if self.worker_thread.is_alive():

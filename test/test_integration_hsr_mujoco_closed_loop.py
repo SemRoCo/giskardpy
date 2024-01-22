@@ -18,6 +18,7 @@ from giskardpy.utils.utils import launch_launchfile
 from utils_for_tests import compare_poses, GiskardTestWrapper
 from giskardpy.goals.manipulability_goals import MaxManipulability
 import giskardpy.utils.tfwrapper as tf
+from giskardpy.goals.action_goals import PouringAction
 
 
 class HSRTestWrapper(GiskardTestWrapper):
@@ -99,7 +100,7 @@ class HSRTestWrapperMujoco(HSRTestWrapper):
                           collision_avoidance_config=HSRCollisionAvoidanceConfig(),
                           robot_interface_config=HSRMujocoVelocityInterface(),
                           behavior_tree_config=ClosedLoopBTConfig(debug_mode=True),
-                          qp_controller_config=QPControllerConfig(max_trajectory_length=30))
+                          qp_controller_config=QPControllerConfig(max_trajectory_length=200))
         super().__init__(giskard)
 
     def reset_base(self):
@@ -485,3 +486,11 @@ class TestAddObject:
 
         zero_pose.set_joint_goal({'arm_flex_joint': -0.7})
         zero_pose.plan_and_execute()
+
+
+class TestActionGoals:
+    def test_pouring_action(self, zero_pose):
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class=PouringAction.__name__,
+                                               tip_link='hand_palm_link',
+                                               root_link='map')
+        zero_pose.execute(add_local_minimum_reached=False)

@@ -5,10 +5,11 @@ import time
 from scipy.spatial.transform import Rotation
 import numpy as np
 
-# TODO: Debug, it does not work well with the cup in the pr2 demo
+# TODO: Debug, the size of the bounding box increases extremely when the pot rotates!!!
 class MujocoBBDetector:
     def __init__(self, sub_topic: str, pub_topic: str):
         self.objects = {}
+        self.object_bb = {}
         rospy.Subscriber(sub_topic, MarkerArray, self.callback)
         self.pub = rospy.Publisher(pub_topic, MarkerArray, queue_size=1)
         # timer = threading.Timer(1 / 100, self.publish)
@@ -84,6 +85,10 @@ class MujocoBBDetector:
             bbox_size_x = max_x - min_x
             bbox_size_y = max_y - min_y
             bbox_size_z = max_z - min_z
+            if key not in self.object_bb.keys():
+                self.object_bb[key] = [bbox_size_x, bbox_size_y, bbox_size_z]
+            else:
+                bbox_size_x, bbox_size_y, bbox_size_z = self.object_bb[key]
 
             # Calculate the center of the overall bounding box
             bbox_center_x = (min_x + max_x) / 2
@@ -101,9 +106,9 @@ class MujocoBBDetector:
             marker.pose.orientation = pose.orientation
             # marker.pose.orientation = object_data[0][0].orientation
 
-            marker.pose.position.x = px / counter#bbox_center_x
-            marker.pose.position.y = py / counter#bbox_center_y
-            marker.pose.position.z = pz / counter#bbox_center_z
+            marker.pose.position.x = bbox_center_x
+            marker.pose.position.y = bbox_center_y
+            marker.pose.position.z = bbox_center_z
             marker.scale.x = bbox_size_x
             marker.scale.y = bbox_size_y
             marker.scale.z = bbox_size_z

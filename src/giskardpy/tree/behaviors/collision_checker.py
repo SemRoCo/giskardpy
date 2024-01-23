@@ -1,5 +1,3 @@
-from multiprocessing import Lock
-
 from py_trees import Status
 
 from giskardpy.exceptions import SelfCollisionViolatedException
@@ -7,20 +5,18 @@ from giskardpy.god_map import god_map
 from giskardpy.model.collision_world_syncer import Collisions
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.decorators import catch_and_raise_to_blackboard, record_time
-from giskardpy.utils.utils import raise_to_blackboard
 
 
 class CollisionChecker(GiskardBehavior):
     @profile
-    def __init__(self, name):
+    def __init__(self, name: str):
         super().__init__(name)
-        self.lock = Lock()
 
-    def initialise(self):
+    def initialise(self) -> None:
         god_map.collision_scene.add_added_checks()
         super().initialise()
 
-    def are_self_collisions_violated(self, collsions: Collisions):
+    def are_self_collisions_violated(self, collsions: Collisions) -> None:
         for key, self_collisions in collsions.self_collisions.items():
             for self_collision in self_collisions[:-1]:  # the last collision is always some default crap
                 if self_collision.link_b_hash == 0:
@@ -34,7 +30,7 @@ class CollisionChecker(GiskardBehavior):
     @catch_and_raise_to_blackboard
     @record_time
     @profile
-    def update(self):
+    def update(self) -> Status:
         """
         Computes closest point info for all robot links and safes it to the god map.
         """

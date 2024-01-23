@@ -2,13 +2,10 @@ from copy import deepcopy
 
 import rospy
 from py_trees import Status
-from rospy.timer import TimerEvent
-from std_msgs.msg import Float64MultiArray, Float64
+from std_msgs.msg import Float64
 
 from giskardpy.data_types import KeyDefaultDict
 from giskardpy.god_map import god_map
-from giskardpy.data_types import Derivatives
-from giskardpy.tree.behaviors.cmd_publisher import CommandPublisher
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.decorators import catch_and_raise_to_blackboard
 

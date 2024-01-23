@@ -6,7 +6,7 @@ import giskardpy.casadi_wrapper as cas
 from giskardpy.monitors.monitors import ExpressionMonitor, Monitor
 from giskardpy.god_map import god_map
 import giskardpy.utils.tfwrapper as tf
-from giskardpy.utils.expression_definition_utils import transform_msg
+from giskardpy.utils.expression_definition_utils import transform_msg, transform_msg_and_turn_to_expr
 
 
 class PoseReached(ExpressionMonitor):
@@ -17,23 +17,17 @@ class PoseReached(ExpressionMonitor):
                  tip_group: Optional[str] = None,
                  position_threshold: float = 0.01,
                  orientation_threshold: float = 0.01,
+                 absolute: bool = False,
                  name: Optional[str] = None,
                  stay_true: bool = True,
                  start_condition: cas.Expression = cas.TrueSymbol):
         super().__init__(name=name, stay_true=stay_true, start_condition=start_condition)
         root_link = god_map.world.search_for_link_name(root_link, root_group)
         tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
-        if cas.is_true(start_condition):
-            goal_pose = transform_msg(root_link, goal_pose)
-            root_T_goal = cas.TransMatrix(goal_pose)
+        if absolute:
+            root_T_goal = transform_msg_and_turn_to_expr(root_link, goal_pose, cas.TrueSymbol)
         else:
-            goal_frame_id = god_map.world.search_for_link_name(goal_pose.header.frame_id)
-            goal_frame_id_T_goal = transform_msg(goal_frame_id, goal_pose)
-            root_T_goal_frame_id = god_map.world.compose_fk_expression(root_link, goal_frame_id)
-            root_T_goal_frame_id = god_map.monitor_manager.register_expression_updater(root_T_goal_frame_id,
-                                                                                       start_condition)
-            goal_frame_id_T_goal = cas.TransMatrix(goal_frame_id_T_goal)
-            root_T_goal = root_T_goal_frame_id.dot(goal_frame_id_T_goal)
+            root_T_goal = transform_msg_and_turn_to_expr(root_link, goal_pose, start_condition)
 
         # %% position error
         r_P_g = root_T_goal.to_position()
@@ -58,14 +52,19 @@ class PositionReached(ExpressionMonitor):
                  root_group: Optional[str] = None,
                  tip_group: Optional[str] = None,
                  threshold: float = 0.01,
+                 absolute: bool = False,
                  name: Optional[str] = None,
                  stay_true: bool = True,
                  start_condition: cas.Expression = cas.TrueSymbol):
         super().__init__(name=name, stay_true=stay_true, start_condition=start_condition)
         root_link = god_map.world.search_for_link_name(root_link, root_group)
         tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
-        goal_point = transform_msg(root_link, goal_point)
-        r_P_g = cas.Point3(goal_point)
+
+        if absolute:
+            r_P_g = transform_msg_and_turn_to_expr(root_link, goal_point, cas.TrueSymbol)
+        else:
+            r_P_g = transform_msg_and_turn_to_expr(root_link, goal_point, start_condition)
+
         r_P_c = god_map.world.compose_fk_expression(root_link, tip_link).to_position()
         distance_to_goal = cas.euclidean_distance(r_P_g, r_P_c)
         self.expression = cas.less(distance_to_goal, threshold)
@@ -79,14 +78,19 @@ class OrientationReached(ExpressionMonitor):
                  root_group: Optional[str] = None,
                  tip_group: Optional[str] = None,
                  threshold: float = 0.01,
+                 absolute: bool = False,
                  name: Optional[str] = None,
                  stay_true: bool = True,
                  start_condition: cas.Expression = cas.TrueSymbol):
         super().__init__(name=name, stay_true=stay_true, start_condition=start_condition)
         root_link = god_map.world.search_for_link_name(root_link, root_group)
         tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
-        goal_orientation = transform_msg(root_link, goal_orientation)
-        r_R_g = cas.RotationMatrix(goal_orientation)
+
+        if absolute:
+            r_R_g = transform_msg_and_turn_to_expr(root_link, goal_orientation, cas.TrueSymbol)
+        else:
+            r_R_g = transform_msg_and_turn_to_expr(root_link, goal_orientation, start_condition)
+
         r_R_c = god_map.world.compose_fk_expression(root_link, tip_link).to_rotation()
         rotation_error = cas.rotational_error(r_R_c, r_R_g)
         self.expression = cas.less(cas.abs(rotation_error), threshold)

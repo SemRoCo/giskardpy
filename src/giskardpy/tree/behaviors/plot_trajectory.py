@@ -21,7 +21,7 @@ class PlotTrajectory(GiskardBehavior):
 
     @profile
     def initialise(self):
-        self.plot_thread = Thread(target=self.plot)
+        self.plot_thread = Thread(target=self.plot, name=self.name)
         self.plot_thread.start()
 
     def plot(self):

@@ -1,3 +1,5 @@
+from typing import List
+
 import rospy
 from py_trees import Status
 from std_msgs.msg import Float64
@@ -14,7 +16,7 @@ class JointVelController(GiskardBehavior):
 
     @record_time
     @profile
-    def __init__(self, namespaces=None):
+    def __init__(self, namespaces: List[str]):
         super().__init__('joint velocity publisher')
         self.namespaces = namespaces
         self.publishers = []

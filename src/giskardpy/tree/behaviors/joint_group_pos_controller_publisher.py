@@ -3,18 +3,19 @@ from copy import deepcopy
 import rospy
 from std_msgs.msg import Float64MultiArray
 
+from giskardpy.data_types import Derivatives
 from giskardpy.data_types import KeyDefaultDict
 from giskardpy.god_map import god_map
-from giskardpy.data_types import Derivatives
-from giskardpy.tree.behaviors.cmd_publisher import CommandPublisher
+from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.decorators import record_time
 
 
-class JointGroupPosController(CommandPublisher):
+class JointGroupPosController(GiskardBehavior):
+    # FIXME
     @record_time
     @profile
-    def __init__(self, namespace='/joint_group_pos_controller', group_name: str = None, hz=100):
-        super().__init__(namespace, hz)
+    def __init__(self, namespace='/joint_group_pos_controller'):
+        super().__init__(namespace)
         self.namespace = namespace
         self.cmd_topic = f'{self.namespace}/command'
         self.cmd_pub = rospy.Publisher(self.cmd_topic, Float64MultiArray, queue_size=10)
@@ -48,7 +49,7 @@ class JointGroupPosController(CommandPublisher):
                 #     dt = 0.0
                 # dt -= 1/self.hz
                 position = js[joint_name].position + velocity * (
-                            (time.current_real - self.stamp).to_sec() - 1 / self.hz)
+                        (time.current_real - self.stamp).to_sec() - 1 / self.hz)
             except KeyError:
                 position = js[joint_name].position
             msg.data.append(position)

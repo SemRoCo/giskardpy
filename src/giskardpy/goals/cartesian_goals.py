@@ -1,6 +1,6 @@
 from __future__ import division
 
-from typing import Optional, List
+from typing import Optional
 
 import numpy as np
 from geometry_msgs.msg import PointStamped, PoseStamped, QuaternionStamped
@@ -8,13 +8,13 @@ from geometry_msgs.msg import Vector3Stamped
 from tf.transformations import rotation_from_matrix
 
 from giskardpy import casadi_wrapper as cas
-from giskardpy.goals.goal import Goal
-from giskardpy.monitors.monitors import ExpressionMonitor
-from giskardpy.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, Task
-from giskardpy.god_map import god_map
-from giskardpy.model.joints import DiffDrive, OmniDrivePR22
 from giskardpy.data_types import Derivatives
+from giskardpy.goals.goal import Goal
+from giskardpy.god_map import god_map
+from giskardpy.model.joints import DiffDrive
+from giskardpy.monitors.monitors import ExpressionMonitor
 from giskardpy.symbol_manager import symbol_manager
+from giskardpy.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
 from giskardpy.utils.expression_definition_utils import transform_msg_and_turn_to_expr, transform_msg
 from giskardpy.utils.tfwrapper import normalize
 from giskardpy.utils.utils import split_pose_stamped
@@ -28,7 +28,7 @@ class CartesianPosition(Goal):
                  tip_group: Optional[str] = None,
                  reference_velocity: Optional[float] = None,
                  weight: float = WEIGHT_ABOVE_CA,
-                 relative: bool = False,
+                 absolute: bool = False,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
@@ -45,12 +45,10 @@ class CartesianPosition(Goal):
             reference_velocity = self.default_reference_velocity
         self.reference_velocity = reference_velocity
         self.weight = weight
-        if not cas.is_true(start_condition):
-            relative = True
-        if relative:
-            root_P_goal = transform_msg_and_turn_to_expr(self.root_link, goal_point, start_condition)
+        if absolute:
+            root_P_goal = transform_msg_and_turn_to_expr(self.root_link, goal_point, cas.TrueSymbol)
         else:
-            root_P_goal = transform_msg_and_turn_to_expr(self.root_link, goal_point)
+            root_P_goal = transform_msg_and_turn_to_expr(self.root_link, goal_point, start_condition)
         r_P_c = god_map.world.compose_fk_expression(self.root_link, self.tip_link).to_position()
         task = self.create_and_add_task()
         task.add_point_goal_constraints(frame_P_goal=root_P_goal,
@@ -73,7 +71,7 @@ class CartesianOrientation(Goal):
                  reference_velocity: Optional[float] = None,
                  weight: float = WEIGHT_ABOVE_CA,
                  name: Optional[str] = None,
-                 relative: bool = False,
+                 absolute: bool = False,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.TrueSymbol):
@@ -90,12 +88,10 @@ class CartesianOrientation(Goal):
         self.reference_velocity = reference_velocity
         self.weight = weight
 
-        if not cas.is_true(start_condition):
-            relative = True
-        if relative:
-            root_R_goal = transform_msg_and_turn_to_expr(self.root_link, goal_orientation, start_condition)
+        if absolute:
+            root_R_goal = transform_msg_and_turn_to_expr(self.root_link, goal_orientation, cas.TrueSymbol)
         else:
-            root_R_goal = transform_msg_and_turn_to_expr(self.root_link, goal_orientation)
+            root_R_goal = transform_msg_and_turn_to_expr(self.root_link, goal_orientation, start_condition)
 
         r_R_c = god_map.world.compose_fk_expression(self.root_link, self.tip_link).to_rotation()
         c_R_r_eval = god_map.world.compose_fk_evaluated_expression(self.tip_link, self.root_link).to_rotation()
@@ -118,11 +114,11 @@ class CartesianPositionStraight(Goal):
                  tip_group: Optional[str] = None,
                  reference_velocity: Optional[float] = None,
                  name: Optional[str] = None,
+                 absolute: bool = False,
                  weight: float = WEIGHT_ABOVE_CA,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.TrueSymbol,
-                 ):
+                 end_condition: cas.Expression = cas.TrueSymbol):
         """
         Same as CartesianPosition, but tries to move the tip_link in a straight line to the goal_point.
         """
@@ -132,7 +128,10 @@ class CartesianPositionStraight(Goal):
         self.weight = weight
         self.root_link = god_map.world.search_for_link_name(root_link, root_group)
         self.tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
-        self.goal_point = transform_msg(self.root_link, goal_point)
+        if absolute:
+            self.goal_point = transform_msg_and_turn_to_expr(self.root_link, goal_point, cas.TrueSymbol)
+        else:
+            self.goal_point = transform_msg_and_turn_to_expr(self.root_link, goal_point, start_condition)
         if name is None:
             name = f'{self.__class__.__name__}/{self.root_link}/{self.tip_link}'
         super().__init__(name)
@@ -186,7 +185,7 @@ class CartesianPose(Goal):
                  reference_linear_velocity: Optional[float] = None,
                  reference_angular_velocity: Optional[float] = None,
                  name: Optional[str] = None,
-                 relative: bool = False,
+                 absolute: bool = False,
                  weight=WEIGHT_ABOVE_CA,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
@@ -201,8 +200,7 @@ class CartesianPose(Goal):
         :param goal_pose: the goal pose
         :param root_group: a group name, where to search for root_link, only required to avoid name conflicts
         :param tip_group: a group name, where to search for tip_link, only required to avoid name conflicts
-        :param max_linear_velocity: m/s
-        :param max_angular_velocity: rad/s
+        :param absolute: if False, the goal is updated when start_condition turns True.
         :param reference_linear_velocity: m/s
         :param reference_angular_velocity: rad/s
         :param weight: default WEIGHT_ABOVE_CA
@@ -230,7 +228,7 @@ class CartesianPose(Goal):
                                                        reference_velocity=reference_linear_velocity,
                                                        weight=self.weight,
                                                        name=position_name,
-                                                       relative=relative,
+                                                       absolute=absolute,
                                                        start_condition=start_condition,
                                                        hold_condition=hold_condition,
                                                        end_condition=end_condition))
@@ -243,7 +241,7 @@ class CartesianPose(Goal):
                                                           reference_velocity=reference_angular_velocity,
                                                           weight=self.weight,
                                                           name=orientation_name,
-                                                          relative=relative,
+                                                          absolute=absolute,
                                                           start_condition=start_condition,
                                                           hold_condition=hold_condition,
                                                           end_condition=end_condition))
@@ -388,11 +386,11 @@ class CartesianPoseStraight(Goal):
                  reference_linear_velocity: Optional[float] = None,
                  reference_angular_velocity: Optional[float] = None,
                  weight: float = WEIGHT_ABOVE_CA,
+                 absolute: bool = False,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.TrueSymbol,
-                 ):
+                 end_condition: cas.Expression = cas.TrueSymbol):
         """
         See CartesianPose. In contrast to it, this goal will try to move tip_link in a straight line.
         """
@@ -409,6 +407,7 @@ class CartesianPoseStraight(Goal):
                                                                goal_point=goal_point,
                                                                reference_velocity=reference_linear_velocity,
                                                                weight=weight,
+                                                               absolute=absolute,
                                                                start_condition=start_condition,
                                                                hold_condition=hold_condition,
                                                                end_condition=end_condition))
@@ -418,6 +417,7 @@ class CartesianPoseStraight(Goal):
                                                           tip_group=tip_group,
                                                           goal_orientation=goal_orientation,
                                                           reference_velocity=reference_angular_velocity,
+                                                          absolute=absolute,
                                                           weight=weight,
                                                           start_condition=start_condition,
                                                           hold_condition=hold_condition,
@@ -429,8 +429,7 @@ class TranslationVelocityLimit(Goal):
                  weight=WEIGHT_ABOVE_CA, max_velocity=0.1, hard=True, name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.TrueSymbol,
-                 ):
+                 end_condition: cas.Expression = cas.TrueSymbol):
         """
         See CartesianVelocityLimit
         """
@@ -463,8 +462,7 @@ class RotationVelocityLimit(Goal):
                  weight=WEIGHT_ABOVE_CA, max_velocity=0.5, hard=True, name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.TrueSymbol,
-                 ):
+                 end_condition: cas.Expression = cas.TrueSymbol):
         """
         See CartesianVelocityLimit
         """
@@ -506,8 +504,7 @@ class CartesianVelocityLimit(Goal):
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.TrueSymbol,
-                 ):
+                 end_condition: cas.Expression = cas.TrueSymbol):
         """
         This goal will use put a strict limit on the Cartesian velocity. This will require a lot of constraints, thus
         slowing down the system noticeably.
@@ -557,6 +554,9 @@ class RelativePositionSequence(Goal):
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.TrueSymbol):
+        """
+        Only meant for testing.
+        """
         self.root_link = god_map.world.search_for_link_name(root_link)
         self.tip_link = god_map.world.search_for_link_name(tip_link)
         if name is None:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import overload, Union, Optional, List, TYPE_CHECKING
 
+import rospy
 from geometry_msgs.msg import PoseStamped, PointStamped, Vector3Stamped, QuaternionStamped
 
 from giskardpy.exceptions import UnknownGroupException
@@ -51,29 +52,29 @@ def transform_msg(target_frame, msg, tf_timeout=1):
 @overload
 def transform_msg_and_turn_to_expr(root_link: PrefixName,
                                    msg: PoseStamped,
-                                   condition: Optional[cas.Expression] = None) -> cas.TransMatrix: ...
+                                   condition: cas.Expression) -> cas.TransMatrix: ...
 
 
 @overload
 def transform_msg_and_turn_to_expr(root_link: PrefixName,
                                    msg: PointStamped,
-                                   condition: Optional[cas.Expression] = None) -> cas.Point3: ...
+                                   condition: cas.Expression) -> cas.Point3: ...
 
 
 @overload
 def transform_msg_and_turn_to_expr(root_link: PrefixName,
                                    msg: Vector3Stamped,
-                                   condition: Optional[cas.Expression] = None) -> cas.Vector3: ...
+                                   condition: cas.Expression) -> cas.Vector3: ...
 
 
 @overload
 def transform_msg_and_turn_to_expr(root_link: PrefixName,
                                    msg: QuaternionStamped,
-                                   condition: Optional[cas.Expression] = None) -> cas.RotationMatrix: ...
+                                   condition: cas.Expression) -> cas.RotationMatrix: ...
 
 
-def transform_msg_and_turn_to_expr(root_link, msg, condition=None):
-    if condition:
+def transform_msg_and_turn_to_expr(root_link, msg, condition):
+    if not cas.is_true(condition):
         goal_frame_id = god_map.world.search_for_link_name(msg.header.frame_id)
         goal_frame_id_X_goal = transform_msg(goal_frame_id, msg)
         root_T_goal_frame_id = god_map.world.compose_fk_expression(root_link, goal_frame_id)

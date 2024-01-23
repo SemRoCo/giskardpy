@@ -1282,23 +1282,6 @@ class MonitorWrapper:
                                 error_message=error_message,
                                 error_code=error_code)
 
-    def update_parent_link_of_group(self,
-                                    start_condition: str,
-                                    group_name: str,
-                                    parent_link: str,
-                                    parent_link_group: Optional[str] = '',
-                                    name: Optional[str] = None) -> str:
-        """
-        A PayloadMonitor that works like world.update_parent_link_of_group().
-        CAUTION! the model changes will only come into effect, once the motion is finished.
-        """
-        return self.add_monitor(monitor_class=UpdateParentLinkOfGroup.__name__,
-                                name=name,
-                                start_condition=start_condition,
-                                group_name=group_name,
-                                parent_link=parent_link,
-                                parent_link_group=parent_link_group)
-
     def add_max_trajectory_length(self,
                                   max_trajectory_length: Optional[float] = None) -> str:
         """

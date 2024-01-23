@@ -496,7 +496,6 @@ class TestMonitors:
                                                   name='g2',
                                                   root_link=root_link,
                                                   tip_link=tip_link,
-                                                  relative=True,
                                                   start_condition=monitor1,
                                                   end_condition=f'{monitor2} and {end_monitor}')
         zero_pose.allow_all_collisions()
@@ -533,41 +532,6 @@ class TestMonitors:
                                                  hole_point=hole_point)
         better_pose.allow_all_collisions()
         better_pose.plan_and_execute()
-
-    # def test_place_cylinder2(self, better_pose: PR2TestWrapper):
-    #     cylinder_name = 'C'
-    #     cylinder_height = 0.121
-    #     hole_point = PointStamped()
-    #     hole_point.header.frame_id = 'map'
-    #     hole_point.point.x = 1
-    #     hole_point.point.y = -1
-    #     hole_point.point.z = 0.5
-    #     pose = PoseStamped()
-    #     pose.header.frame_id = 'r_gripper_tool_frame'
-    #     pose.pose.orientation = Quaternion(*quaternion_from_matrix(np.array([[0, 0, 1, 0],
-    #                                                                          [0, 1, 0, 0],
-    #                                                                          [-1, 0, 0, 0],
-    #                                                                          [0, 0, 0, 1]])))
-    #     better_pose.add_cylinder_to_world(name=cylinder_name,
-    #                                       height=cylinder_height,
-    #                                       radius=0.0225,
-    #                                       pose=pose,
-    #                                       parent_link='r_gripper_tool_frame')
-    #     better_pose.dye_group(cylinder_name, (0, 0, 1, 1))
-    #
-    #     sleep = better_pose.monitors.add_sleep(1)
-    #
-    #     local_min = better_pose.monitors.add_local_minimum_reached(start_condition=sleep)
-    #
-    #     better_pose.motion_goals.add_motion_goal(motion_goal_class=InsertCylinder.__name__,
-    #                                              cylinder_name=cylinder_name,
-    #                                              cylinder_height=0.121,
-    #                                              hole_point=hole_point,
-    #                                              start_condition=sleep)
-    #     better_pose.allow_all_collisions()
-    #     end = better_pose.monitors.add_end_motion(start_condition=local_min)
-    #
-    #     better_pose.execute(add_local_minimum_reached=False)
 
     def test_bowl_and_cup_sequence(self, kitchen_setup: PR2TestWrapper):
         kitchen_setup.set_avoid_name_conflict(False)
@@ -700,7 +664,7 @@ class TestMonitors:
                                                                  goal_pose=l_grasp_goal,
                                                                  name='l_grasp_pose',
                                                                  start_condition=l_pre_grasp_pose)
-        attach_bowl = kitchen_setup.monitors.update_parent_link_of_group(start_condition=l_grasp_pose,
+        attach_bowl = kitchen_setup.monitors_update_parent_link_of_group(start_condition=l_grasp_pose,
                                                                          name='attach_bow',
                                                                          group_name=bowl_name,
                                                                          parent_link=kitchen_setup.l_tip)
@@ -740,7 +704,7 @@ class TestMonitors:
                                                                  goal_pose=r_goal,
                                                                  name='r_grasp_pose',
                                                                  start_condition=r_pre_grasp_pose)
-        attach_cup = kitchen_setup.monitors.update_parent_link_of_group(start_condition=r_grasp_pose,
+        attach_cup = kitchen_setup.monitors_update_parent_link_of_group(start_condition=r_grasp_pose,
                                                                         name='attach_cup',
                                                                         group_name=cup_name,
                                                                         parent_link=kitchen_setup.r_tip)
@@ -830,11 +794,11 @@ class TestMonitors:
                                                           name='avoid_joint_limits_while_placing',
                                                           start_condition=phase5,
                                                           end_condition=' and '.join([cup_placed, bowl_placed]))
-        bowl_detached = kitchen_setup.monitors.update_parent_link_of_group(start_condition=bowl_placed,
+        bowl_detached = kitchen_setup.monitors_update_parent_link_of_group(start_condition=bowl_placed,
                                                                            name='detach_bowl',
                                                                            group_name=bowl_name,
                                                                            parent_link='map')
-        cup_detached = kitchen_setup.monitors.update_parent_link_of_group(start_condition=cup_placed,
+        cup_detached = kitchen_setup.monitors_update_parent_link_of_group(start_condition=cup_placed,
                                                                           name='detach_cup',
                                                                           group_name=cup_name,
                                                                           parent_link='map')

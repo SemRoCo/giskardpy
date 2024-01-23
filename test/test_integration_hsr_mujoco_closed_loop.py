@@ -614,7 +614,7 @@ class TestServo:
                                   goal_name='pouring',
                                   tip='hand_palm_link',
                                   root='map',
-                                  tilt_angle=1.5,
+                                  tilt_angle=1,
                                   pouring_pose=goal_pose,
                                   tilt_axis=tilt_axis,
                                   pre_tilt=True)

@@ -9,6 +9,7 @@ from giskardpy.utils.utils import is_running_in_pytest
 
 class RealKinSimPlugin(GiskardBehavior):
     last_time: float
+    print_warning = is_running_in_pytest()
 
     def initialise(self):
         self.last_time = None
@@ -22,16 +23,13 @@ class RealKinSimPlugin(GiskardBehavior):
         if next_time <= 0.0 or self.last_time is None:
             self.last_time = next_time
             return Status.RUNNING
-        # if self.last_time is None:
         next_cmds = god_map.qp_solver_solution
         dt = next_time - self.last_time
         if dt > god_map.qp_controller_config.sample_period:
-            if not is_running_in_pytest():
-                logging.logwarn(f'dt is larger than sample period of the MPC! '
-                                f'{dt:.5f} > {god_map.qp_controller_config.sample_period}. '
-                                f'Your computer is too slow.')
+            # if self.print_warning:
+            #     logging.logwarn(f'dt is larger than sample period of the MPC! '
+            #                     f'{dt:.5f} > {god_map.qp_controller_config.sample_period}. ')
             dt = god_map.qp_controller_config.sample_period
         god_map.world.update_state(next_cmds, dt)
         self.last_time = next_time
-        # god_map.get_world().notify_state_change()
         return Status.RUNNING

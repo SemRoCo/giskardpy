@@ -1,13 +1,13 @@
 import traceback
-from threading import RLock, Thread
+from threading import Thread
 from time import time
-from typing import Optional, Generator
+from typing import Optional
 
 import rospy
 from py_trees import Status, Composite
 
-from giskardpy.god_map import god_map
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
+from giskardpy.utils.ros_timer import Rate
 from giskardpy.utils.utils import raise_to_blackboard
 
 
@@ -26,10 +26,7 @@ class AsyncBehavior(GiskardBehavior, Composite):
         super().__init__(name)
         self.set_status(Status.INVALID)
         self.looped_once = False
-        if max_hz is not None:
-            self.sleeper = rospy.Rate(max_hz)
-        else:
-            self.sleeper = None
+        self.max_hz = max_hz
 
     def initialise(self) -> None:
         self.looped_once = False
@@ -71,6 +68,10 @@ class AsyncBehavior(GiskardBehavior, Composite):
     def loop_over_plugins(self) -> None:
         try:
             self.get_blackboard().runtime = time()
+            if self.max_hz is not None:
+                self.sleeper = Rate(self.max_hz, complain=True)
+            else:
+                self.sleeper = None
             while self.is_running() and not rospy.is_shutdown():
                 for child in self.children:
                     if not self.is_running():

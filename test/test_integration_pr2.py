@@ -162,7 +162,7 @@ class PR2TestWrapper(GiskardTestWrapper):
                               robot_interface_config=PR2StandaloneInterface(drive_joint_name=drive_joint_name),
                               collision_avoidance_config=PR2CollisionAvoidance(drive_joint_name=drive_joint_name),
                               behavior_tree_config=StandAloneBTConfig(debug_mode=True,
-                                                                      max_simulation_hz=100),
+                                                                      simulation_max_hz=None),
                               qp_controller_config=QPControllerConfig())
         super().__init__(giskard)
         self.robot = god_map.world.groups[self.robot_name]

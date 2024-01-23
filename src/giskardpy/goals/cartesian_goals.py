@@ -46,7 +46,7 @@ class CartesianPosition(Goal):
         self.reference_velocity = reference_velocity
         self.weight = weight
         if absolute:
-            root_P_goal = transform_msg_and_turn_to_expr(self.root_link, goal_point)
+            root_P_goal = transform_msg_and_turn_to_expr(self.root_link, goal_point, cas.TrueSymbol)
         else:
             root_P_goal = transform_msg_and_turn_to_expr(self.root_link, goal_point, start_condition)
         r_P_c = god_map.world.compose_fk_expression(self.root_link, self.tip_link).to_position()
@@ -89,7 +89,7 @@ class CartesianOrientation(Goal):
         self.weight = weight
 
         if absolute:
-            root_R_goal = transform_msg_and_turn_to_expr(self.root_link, goal_orientation)
+            root_R_goal = transform_msg_and_turn_to_expr(self.root_link, goal_orientation, cas.TrueSymbol)
         else:
             root_R_goal = transform_msg_and_turn_to_expr(self.root_link, goal_orientation, start_condition)
 
@@ -129,7 +129,7 @@ class CartesianPositionStraight(Goal):
         self.root_link = god_map.world.search_for_link_name(root_link, root_group)
         self.tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
         if absolute:
-            self.goal_point = transform_msg_and_turn_to_expr(self.root_link, goal_point)
+            self.goal_point = transform_msg_and_turn_to_expr(self.root_link, goal_point, cas.TrueSymbol)
         else:
             self.goal_point = transform_msg_and_turn_to_expr(self.root_link, goal_point, start_condition)
         if name is None:

@@ -461,7 +461,7 @@ class TestMonitors:
         zero_pose.monitors.add_end_motion(start_condition=end_monitor)
         zero_pose.execute(add_local_minimum_reached=False)
 
-    def test_cart_goal_sequence(self, zero_pose: PR2TestWrapper):
+    def test_cart_goal_sequence_relative(self, zero_pose: PR2TestWrapper):
         pose1 = PoseStamped()
         pose1.header.frame_id = 'map'
         pose1.pose.position.x = 1
@@ -499,10 +499,59 @@ class TestMonitors:
                                                   start_condition=monitor1,
                                                   end_condition=f'{monitor2} and {end_monitor}')
         zero_pose.allow_all_collisions()
-        zero_pose.monitors.add_end_motion(start_condition=end_monitor)
+        zero_pose.monitors.add_end_motion(start_condition=' and '.join([end_monitor, monitor2]))
+        zero_pose.set_max_traj_length(30)
         zero_pose.execute(add_local_minimum_reached=False)
         current_pose = god_map.world.compute_fk_pose(root=root_link, tip=tip_link)
         np.testing.assert_almost_equal(current_pose.pose.position.x, 1, decimal=2)
+        np.testing.assert_almost_equal(current_pose.pose.position.y, 1, decimal=2)
+
+    def test_cart_goal_sequence_absolute(self, zero_pose: PR2TestWrapper):
+        pose1 = PoseStamped()
+        pose1.header.frame_id = 'map'
+        pose1.pose.position.x = 1
+        pose1.pose.orientation.w = 1
+
+        pose2 = PoseStamped()
+        pose2.header.frame_id = 'base_footprint'
+        pose2.pose.position.y = 1
+        pose2.pose.orientation.w = 1
+
+        root_link = 'map'
+        tip_link = 'base_footprint'
+
+        monitor1 = zero_pose.monitors.add_cartesian_pose(name='pose1',
+                                                         root_link=root_link,
+                                                         tip_link=tip_link,
+                                                         goal_pose=pose1)
+
+        monitor2 = zero_pose.monitors.add_cartesian_pose(name='pose2',
+                                                         root_link=root_link,
+                                                         tip_link=tip_link,
+                                                         goal_pose=pose2,
+                                                         absolute=True,
+                                                         start_condition=monitor1)
+        end_monitor = zero_pose.monitors.add_local_minimum_reached()
+
+        zero_pose.motion_goals.add_cartesian_pose(goal_pose=pose1,
+                                                  name='g1',
+                                                  root_link=root_link,
+                                                  tip_link=tip_link,
+                                                  end_condition=monitor1)
+        zero_pose.motion_goals.add_cartesian_pose(goal_pose=pose2,
+                                                  name='g2',
+                                                  root_link=root_link,
+                                                  tip_link=tip_link,
+                                                  absolute=True,
+                                                  start_condition=monitor1,
+                                                  end_condition=f'{monitor2} and {end_monitor}')
+        zero_pose.allow_all_collisions()
+        zero_pose.monitors.add_end_motion(start_condition=' and '.join([end_monitor, monitor2]))
+        zero_pose.set_max_traj_length(30)
+        zero_pose.execute(add_local_minimum_reached=False)
+
+        current_pose = god_map.world.compute_fk_pose(root=root_link, tip=tip_link)
+        np.testing.assert_almost_equal(current_pose.pose.position.x, 0, decimal=2)
         np.testing.assert_almost_equal(current_pose.pose.position.y, 1, decimal=2)
 
     def test_place_cylinder1(self, better_pose: PR2TestWrapper):

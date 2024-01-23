@@ -602,6 +602,65 @@ class TestManipulability:
 
 
 class TestPouring:
+    def test_pour_tray(self, zero_pose: PR2TestWrapper):
+        tip_link = zero_pose.l_tip
+        p = PoseStamped()
+        p.header.stamp = rospy.get_rostime()
+        p.header.frame_id = 'map'
+
+        p.pose.position = Point(1.7, -0.2, 0.6)
+        p.pose.orientation = Quaternion(*quaternion_from_matrix([[1, 0, 0, 0],
+                                                                 [0, 0, -1, 0],
+                                                                 [0, 1, 0, 0],
+                                                                 [0, 0, 0, 1]]))
+        zero_pose.set_cart_goal(p, tip_link, 'map')
+        zero_pose.execute()
+
+        p.pose.position = Point(1.78, -0.2, 0.6)
+        zero_pose.set_cart_goal(p, tip_link, 'map')
+        zero_pose.execute()
+
+        zero_pose.add_motion_goal(goal_type=CloseGripper.__name__,
+                                  goal_name='closeGripperLeft',
+                                  pub_topic='/pr2/l_gripper_controller/command',
+                                  joint_state_topic='pr2/joint_states',
+                                  alibi_joint_name='l_gripper_l_finger_joint',
+                                  effort_threshold=-0.14,
+                                  effort=-200)
+        zero_pose.execute()
+
+        p.pose.position = Point(1.78, -0.2, 0.8)
+        zero_pose.set_cart_goal(p, tip_link, 'map')
+        zero_pose.execute()
+
+        pot_pose = PoseStamped()
+        pot_pose.header.frame_id = 'tray'
+        pot_pose.pose.position = Point(0, 0, 0)
+        pot_pose.pose.orientation.w = 1
+
+        # add a new object at the pose of the pot and attach it to the right tip
+        zero_pose.add_box('dummy', (0.1, 0.1, 0.1), pose=pot_pose, parent_link=tip_link)
+
+        pot_pose = PoseStamped()
+        pot_pose.header.frame_id = 'map'
+        pot_pose.pose.position = Point(1.9, 0.37, 1)#Point(2, 0.3, 1)
+        pot_pose.pose.orientation.w = 1
+        tilt_axis = Vector3Stamped()
+        tilt_axis.header.frame_id = 'dummy'
+        tilt_axis.vector.y = 1
+        zero_pose.add_motion_goal(goal_type=PouringAdaptiveTilt.__name__,
+                                  goal_name='pouring',
+                                  tip='dummy',
+                                  root='map',
+                                  tilt_angle=0.5,
+                                  pouring_pose=pot_pose,
+                                  tilt_axis=tilt_axis,
+                                  pre_tilt=False,
+                                  with_feedback=True)
+        zero_pose.execute(add_local_minimum_reached=False)
+
+
+
     def test_grasp(self, zero_pose: PR2TestWrapper):
         p = PoseStamped()
         p.header.stamp = rospy.get_rostime()
@@ -719,7 +778,6 @@ class TestPouring:
         zero_pose.set_avoid_joint_limits_goal()
         zero_pose.execute(add_local_minimum_reached=False)
 
-
     def test_asdf(self, zero_pose: PR2TestWrapper):
         p = PoseStamped()
         p.header.stamp = rospy.get_rostime()
@@ -769,7 +827,7 @@ class TestPouring:
                                                                       [0, 1, 0, 0],
                                                                       [0, 0, 0, 1]]))
 
-        #move the dummy pot and the left gripper relative to it
+        # move the dummy pot and the left gripper relative to it
         tilt_axis = Vector3Stamped()
         tilt_axis.header.frame_id = 'dummy'
         tilt_axis.vector.y = 1

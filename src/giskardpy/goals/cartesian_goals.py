@@ -200,7 +200,7 @@ class CartesianPose(Goal):
         :param goal_pose: the goal pose
         :param root_group: a group name, where to search for root_link, only required to avoid name conflicts
         :param tip_group: a group name, where to search for tip_link, only required to avoid name conflicts
-        :param absolute: if True, the goal is not updated when start_condition turns True.
+        :param absolute: if False, the goal is updated when start_condition turns True.
         :param reference_linear_velocity: m/s
         :param reference_angular_velocity: rad/s
         :param weight: default WEIGHT_ABOVE_CA

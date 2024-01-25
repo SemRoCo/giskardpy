@@ -246,12 +246,15 @@ class PouringAdaptiveTilt(Goal):
 
     def callback(self, action_string: String):
         self.action_string = action_string.data
-        if 'increase' in action_string.data:
-            self.forward = True
-            self.backward = False
-        elif 'decrease' in action_string.data:
-            self.backward = True
+        if 'increase' in action_string.data and 'decrease' in action_string.data:
             self.forward = False
+            self.backward = True
+        elif 'decrease' in action_string.data:
+            self.forward = False
+            self.backward = True
+        elif 'increase' in action_string.data:
+            self.backward = False
+            self.forward = True
         else:
             self.forward = False
             self.backward = False

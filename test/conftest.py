@@ -13,13 +13,7 @@ from utils_for_tests import GiskardTestWrapper
 
 @pytest.fixture(scope='module')
 def ros(request):
-    try:
-        logging.loginfo('deleting tmp test folder')
-        # shutil.rmtree(folder_name)
-    except Exception:
-        pass
-
-        logging.loginfo('init ros')
+    logging.loginfo('init ros')
     rospy.init_node('tests')
     tf.init(60)
 
@@ -30,11 +24,6 @@ def ros(request):
             logging.logerr(f'Failed to render behavior tree.')
         logging.loginfo('shutdown ros')
         rospy.signal_shutdown('die')
-        try:
-            logging.loginfo('deleting tmp test folder')
-            # shutil.rmtree(folder_name)
-        except Exception:
-            pass
 
     try:
         rospy.get_param('kitchen_description')

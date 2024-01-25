@@ -1,15 +1,9 @@
-from copy import deepcopy
-
 import rospy
 from py_trees import Status
-from py_trees.behaviours import Running
 from std_msgs.msg import Float64MultiArray
-from sensor_msgs.msg import JointState
 
-from giskardpy.data_types import KeyDefaultDict, JointStates
+from giskardpy.data_types import KeyDefaultDict
 from giskardpy.god_map import god_map
-from giskardpy.data_types import Derivatives
-from giskardpy.tree.behaviors.cmd_publisher import CommandPublisher
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.decorators import catch_and_raise_to_blackboard, record_time
 from giskardpy.utils.utils import wait_for_topic_to_appear
@@ -17,7 +11,7 @@ from giskardpy.utils.utils import wait_for_topic_to_appear
 
 class JointGroupVelController(GiskardBehavior):
     @profile
-    def __init__(self, namespace, group_name: str = None, hz=100):
+    def __init__(self, namespace):
         super().__init__(namespace)
         self.namespace = namespace
         self.cmd_topic = f'{self.namespace}/command'

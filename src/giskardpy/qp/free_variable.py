@@ -50,8 +50,8 @@ class FreeVariable:
                 pass
 
     @memoize
-    def get_lower_limit(self, derivative: Derivatives, default: bool = False, evaluated: bool = False) -> Union[
-        w.Expression, float]:
+    def get_lower_limit(self, derivative: Derivatives, default: bool = False, evaluated: bool = False) \
+            -> Union[w.Expression, float]:
         if not default and derivative in self.default_lower_limits and derivative in self.lower_limits:
             expr = w.max(self.default_lower_limits[derivative], self.lower_limits[derivative])
         elif derivative in self.default_lower_limits:

@@ -306,7 +306,8 @@ class GiskardTestWrapper(OldGiskardWrapper):
         self._alive = True
 
     def print_qp_solver_times(self):
-        with open('benchmark.csv', mode='w', newline='') as csvfile:
+        file_name = f'{god_map.giskard.tmp_folder}/benchmark.csv'
+        with open(file_name, mode='w', newline='') as csvfile:
             csvwriter = csv.writer(csvfile, delimiter=';', quotechar='"', quoting=csv.QUOTE_MINIMAL)
             csvwriter.writerow(['solver',
                                 'filtered_variables',
@@ -334,7 +335,7 @@ class GiskardTestWrapper(OldGiskardWrapper):
                                         str(int(god_map.qp_controller_config.max_derivative)),
                                         str(times)])
 
-        logging.loginfo('saved benchmark file')
+        logging.loginfo(f'saved benchmark file in {file_name}')
 
     def tear_down(self):
         self.print_qp_solver_times()

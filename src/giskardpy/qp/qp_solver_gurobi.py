@@ -12,7 +12,8 @@ from giskardpy.exceptions import QPSolverException, InfeasibleException, HardCon
 from giskardpy.qp.qp_solver import record_solver_call_time, QPSWIFTFormatter
 from giskardpy.utils import logging
 
-gurobipy.setParam('LogToConsole', False)
+gurobipy.setParam(gurobipy.GRB.Param.LogToConsole, False)
+gurobipy.setParam(gurobipy.GRB.Param.FeasibilityTol, 2.5e-5)
 
 error_info = {
     gurobipy.GRB.LOADED: "Model is loaded, but no solution information is available.",
@@ -73,13 +74,13 @@ class QPSolverGurobi(QPSWIFTFormatter):
         self.started = False
 
     def print_debug(self):
-        gurobipy.setParam('LogToConsole', True)
+        gurobipy.setParam(gurobipy.GRB.Param.LogToConsole, True)
         logging.logwarn(error_info[self.qpProblem.status])
         self.qpProblem.reset()
         self.qpProblem.optimize()
         self.qpProblem.printStats()
         self.qpProblem.printQuality()
-        gurobipy.setParam('LogToConsole', False)
+        gurobipy.setParam(gurobipy.GRB.Param.LogToConsole, False)
 
     def analyze_infeasibility(self):
         self.qpProblem.computeIIS()

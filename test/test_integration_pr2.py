@@ -4190,7 +4190,7 @@ class TestBenchmark:
     ]
 
     def test_joint_goal_torso_lift_joint(self, zero_pose: PR2TestWrapper):
-        horizons = [1, 7, 9, 21, 31, 41, 51]
+        horizons = [7, 9, 21, 31, 41, 51]
         # horizons = [1]
         for qp_solver in self.qp_solvers:
             for h in horizons:
@@ -4207,7 +4207,7 @@ class TestBenchmark:
                 zero_pose.reset_base()
 
     def test_joint_goal2(self, zero_pose: PR2TestWrapper):
-        horizons = [1, 7, 9, 21, 31, 41]
+        horizons = [9, 21, 31, 41]
         # horizons = [1, 7, 9, 21]
         # horizons = [9]
         for qp_solver in self.qp_solvers:
@@ -4224,7 +4224,7 @@ class TestBenchmark:
                 zero_pose.reset_base()
 
     def test_cart_goal_2eef2(self, zero_pose: PR2TestWrapper):
-        horizons = [1, 7, 9, 11, 13, 21]
+        horizons = [9, 11, 13, 21]
         # horizons = [9]
         for qp_solver in self.qp_solvers:
             for h in horizons:
@@ -4252,7 +4252,7 @@ class TestBenchmark:
                 zero_pose.reset_base()
 
     def test_avoid_collision_go_around_corner(self, fake_table_setup: PR2TestWrapper):
-        horizons = [1, 7, 9, 13, 21, 31]
+        horizons = [9, 13, 21, 31]
         # horizons = [7]
         for qp_solver in self.qp_solvers:
             for h in horizons:

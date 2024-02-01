@@ -16,9 +16,12 @@ from giskardpy.god_map import god_map
 from visualization_msgs.msg import MarkerArray, Marker
 import rospy
 
+from giskardpy.utils.utils import is_running_in_pytest
+
 
 def record_solver_call_time(function):
-    return function
+    if not is_running_in_pytest():
+        return function
 
     @wraps(function)
     def wrapper(*args, **kwargs):

@@ -133,8 +133,11 @@ class Goal(ABC):
         self.tasks.append(task)
         return task
 
-    def add_monitor(self, monitor: ExpressionMonitor) -> None:
-        god_map.monitor_manager.add_expression_monitor(monitor)
+    def add_monitor(self, monitor: Monitor) -> None:
+        if isinstance(monitor, ExpressionMonitor):
+            god_map.monitor_manager.add_expression_monitor(monitor)
+        else:
+            god_map.monitor_manager.add_payload_monitor(monitor)
 
 
 class NonMotionGoal(Goal):

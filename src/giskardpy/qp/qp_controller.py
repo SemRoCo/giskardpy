@@ -42,9 +42,9 @@ def save_pandas(dfs, names, path, time: float, folder_name: Optional[str] = None
             if df.shape[1] > 1:
                 for column_name, column in df.T.items():
                     zero_filtered_column = column.replace(0, pd.np.nan).dropna(how='all').replace(pd.np.nan, 0)
-                    csv_string += zero_filtered_column.add_prefix(column_name + '||').to_csv(float_format='%.4f')
+                    csv_string += zero_filtered_column.add_prefix(column_name + '||').to_csv(float_format='%.6f')
             else:
-                csv_string += df.to_csv(float_format='%.4f')
+                csv_string += df.to_csv(float_format='%.6f')
         file_name2 = f'{folder_name}{name}.csv'
         with open(file_name2, 'w') as f:
             f.write(csv_string)
@@ -618,13 +618,13 @@ class EqualityModel(ProblemDataPart):
         |    1   |        |        |   -sp  |        |        |        |        |        | = last velocity
         |       1|        |        |     -sp|        |        |        |        |        |
         |--------------------------------------------------------------------------------|
-        |-1      | 0      |        |        |-sp     |        |        |        |        | # -v_c + v_n - a_n * dt = 0
-        |   -1   |    0   |        |        |   -sp  |        |        |        |        | = 0
-        |      -1|       0|        |        |     -sp|        |        |        |        |
+        |-1      | 1      |        |        |-sp     |        |        |        |        | # -v_c + v_n - a_n * dt = 0
+        |   -1   |    1   |        |        |   -sp  |        |        |        |        | = 0
+        |      -1|       1|        |        |     -sp|        |        |        |        |
         |--------------------------------------------------------------------------------|
-        |        | 0      | 0      |        |        | 0      |        |        |        | # -v_c + v_n - a_n * dt = 0
-        |        |    0   |    0   |        |        |    0   |        |        |        | = 0
-        |        |       0|       0|        |        |       0|        |        |        |
+        |        |-1      | 1      |        |        |-sp     |        |        |        | # -v_c + v_n - a_n * dt = 0
+        |        |   -1   |    1   |        |        |   -sp  |        |        |        | = 0
+        |        |      -1|       1|        |        |     -sp|        |        |        |
         |================================================================================|
         |        |        |        | 1      |        |        |-sp     |        |        | # a_n - j_n * dt = last acc
         |        |        |        |    1   |        |        |   -sp  |        |        | = last acceleration
@@ -634,9 +634,9 @@ class EqualityModel(ProblemDataPart):
         |        |        |        |   -1   |    1   |        |        |   -sp  |        | = 0
         |        |        |        |      -1|       1|        |        |     -sp|        |
         |--------------------------------------------------------------------------------|
-        |        |        |        |        |-1      | 0      |        |        |-sp     | # -a_c + a_n - j_n * dt = 0
-        |        |        |        |        |   -1   |    0   |        |        |   -sp  | = 0
-        |        |        |        |        |      -1|       0|        |        |     -sp|
+        |        |        |        |        |-1      | 1      |        |        |-sp     | # -a_c + a_n - j_n * dt = 0
+        |        |        |        |        |   -1   |    1   |        |        |   -sp  | = 0
+        |        |        |        |        |      -1|       1|        |        |     -sp|
         |--------------------------------------------------------------------------------|
         x_n - xd_n * dt = x_c
         - x_c + x_n - xd_n * dt = 0
@@ -1213,49 +1213,72 @@ class QPProblemBuilder:
         logging.loginfo('No slack limit violation detected.')
 
     def _viz_mpc(self, joint_name):
-        def pad(a, desired_length):
-            tmp = np.zeros(desired_length)
+        def pad(a, desired_length, pad_value):
+            tmp = np.ones(desired_length) * pad_value
             tmp[:len(a)] = a
             return tmp
 
-        sample_period = self.state[str(god_map.qp_controller_config.sample_period)]
+        free_variable: FreeVariable = [x for x in self.free_variables if x.name == joint_name][0]
+        sample_period = god_map.qp_controller_config.sample_period
         try:
-            start_pos = self.state[joint_name]
+            start_pos = god_map.world.state[joint_name].position
         except KeyError:
             logging.loginfo('start position not found in state')
             start_pos = 0
         ts = np.array([(i + 1) * sample_period for i in range(self.prediction_horizon)])
-        filtered_x = self.p_xdot.filter(like='{}'.format(joint_name), axis=0)
-        velocities = filtered_x[:self.prediction_horizon].values
-        if joint_name in self.state:
-            accelerations = filtered_x[self.prediction_horizon:self.prediction_horizon * 2].values
-            jerks = filtered_x[self.prediction_horizon * 2:self.prediction_horizon * 3].values
+        filtered_x = self.p_xdot.filter(like=f'{joint_name}', axis=0)
+        vel_end = self.prediction_horizon - self.order + 1
+        acc_end = vel_end + self.prediction_horizon - self.order + 2
+        velocities = filtered_x[:vel_end].values
         positions = [start_pos]
         for x_ in velocities:
             positions.append(positions[-1] + x_ * sample_period)
 
         positions = np.array(positions[1:])
-        velocities = pad(velocities.T[0], len(ts))
-        positions = pad(positions.T[0], len(ts))
+        positions = pad(positions.T[0], len(ts), pad_value=positions[-1])
+        velocities = pad(velocities.T[0], len(ts), pad_value=0)
 
-        f, axs = plt.subplots(4, sharex=True)
+        if joint_name in god_map.world.state:
+            accelerations = filtered_x[vel_end:acc_end].values
+            jerks = filtered_x[acc_end:].values
+            accelerations = pad(accelerations.T[0], len(ts), pad_value=0)
+
+        f, axs = plt.subplots(4, sharex=True, figsize=(2 + self.prediction_horizon, 16))
         axs[0].set_title('position')
         axs[0].plot(ts, positions, 'b')
         axs[0].grid()
         axs[1].set_title('velocity')
         axs[1].plot(ts, velocities, 'b')
         axs[1].grid()
-        if joint_name in self.state:
+        if joint_name in god_map.world.state:
             axs[2].set_title('acceleration')
             axs[2].plot(ts, accelerations, 'b')
             axs[2].grid()
             axs[3].set_title('jerk')
             axs[3].plot(ts, jerks, 'b')
             axs[3].grid()
+        for i, ax in enumerate(axs):
+            derivative = Derivatives(i)
+            if not free_variable.has_position_limits():
+                continue
+            upper_limit = free_variable.get_upper_limit(derivative, evaluated=True)
+            if not np.isinf(upper_limit):
+                ax.axhline(y=upper_limit, color='k', linestyle='--')
+            lower_limit = free_variable.get_lower_limit(derivative, evaluated=True)
+            if not np.isinf(lower_limit):
+                ax.axhline(y=lower_limit, color='k', linestyle='--')
+        # Example: Set x-ticks for each subplot
+        tick_labels = [f'{x}/{x * sample_period:.3f}' for x in range(self.prediction_horizon)]
+
+        axs[-1].set_xticks(ts)  # Set tick locations
+        axs[-1].set_xticklabels(tick_labels)  # Set custom tick labels
+
         plt.tight_layout()
         path, dirs, files = next(os.walk('tmp_data/mpc'))
         file_count = len(files)
-        plt.savefig('tmp_data/mpc/mpc_{}_{}.png'.format(joint_name, file_count))
+        file_name = f'{god_map.giskard.tmp_folder}/mpc/mpc_{joint_name}_{file_count}.png'
+        create_path(file_name)
+        plt.savefig(file_name)
 
     @profile
     def _create_debug_pandas(self, qp_solver: QPSolver):

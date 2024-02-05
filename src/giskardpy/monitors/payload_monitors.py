@@ -205,7 +205,7 @@ class CloseGripper(PayloadMonitor):
                  joint_name='hand_motor_joint',
                  as_open=False
                  ):
-        super().__init__(name=name, start_condition=start_condition, run_call_in_thread=False)
+        super().__init__(name=name, start_condition=start_condition, run_call_in_thread=False, stay_true=False)
         self.pub = rospy.Publisher(pub_topic, Float64, queue_size=1)
         self.effort = 0
         self.velocity_threshold = velocity_threshold
@@ -218,7 +218,7 @@ class CloseGripper(PayloadMonitor):
         self.msg.data = effort
 
     def __call__(self, *args, **kwargs):
-
+        self.pub.publish(self.msg)
         if not self.as_open and self.effort < self.effort_threshold:
             self.state = True
         elif self.as_open and self.effort > self.effort_threshold:
@@ -233,4 +233,4 @@ class CloseGripper(PayloadMonitor):
                     self.effort = effort
                 else:
                     self.effort = 0
-        self.pub.publish(self.msg)
+        # self.pub.publish(self.msg)

@@ -490,7 +490,7 @@ class TestAddObject:
 
 class TestActionGoals:
     def test_pouring_action(self, zero_pose):
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class=PouringAction.__name__,
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class='PouringAction2',
                                                tip_link='hand_palm_link',
                                                root_link='map')
         zero_pose.execute(add_local_minimum_reached=False)
@@ -611,9 +611,19 @@ class TestActionGoals:
         zero_pose.allow_all_collisions()
         zero_pose.execute()
         # add the pickup action
+        goal_pose = PoseStamped()
+        goal_pose.header.frame_id = 'hand_palm_link'
+        goal_pose.pose.position.x = 0.1
+        goal_pose.pose.orientation.w = 1
         zero_pose.motion_goals.add_motion_goal(motion_goal_class='PickUp',
                                                name='pickup',
                                                root_link='map',
-                                               tip_link='hand_palm_link')
-        # zero_pose.add_default_end_motion_conditions()
+                                               tip_link='hand_palm_link',
+                                               goal_pose=goal_pose)
+        zero_pose.monitors.add_end_motion(
+            start_condition=zero_pose.monitors.add_cartesian_pose('map', 'hand_palm_link', goal_pose))
         zero_pose.execute(add_local_minimum_reached=False)
+
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class='PutDown',
+                                               name='putdown')
+        zero_pose.execute()

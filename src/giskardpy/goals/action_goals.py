@@ -193,6 +193,195 @@ class PouringAction(Goal):
             self.all_commands[command] = 1
 
 
+class PouringAction2(Goal):
+    def __init__(self, tip_link: str, root_link: str,
+                 tip_group: str = None, root_group: str = None,
+                 max_velocity: float = 0.3, weight: float = WEIGHT_ABOVE_CA,
+                 name: str = None,
+                 state_topic: str = '/pouringActions',
+                 start_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 end_condition: cas.Expression = cas.TrueSymbol
+                 ):
+        self.root_link = god_map.world.search_for_link_name(root_link, root_group)
+        self.tip_link2 = god_map.world.search_for_link_name('hand_camera_frame', tip_group)
+        self.tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
+        if name is None:
+            name = f'{self.__class__.__name__}/{self.root_link}/{self.tip_link}'
+        super().__init__(name)
+        self.max_vel = max_velocity / 2
+        self.weight = weight
+        self.root_group = root_group
+        self.tip_group = tip_group
+        self.pouring_forward = False
+        self.pouring_left = False
+        self.pouring_up = False
+        self.pouring_backward = False
+        self.pouring_right = False
+        self.pouring_down = False
+        self.pouring_keep_upright = False
+        self.pouring_tilt_left = False
+        self.pouring_tilt_right = False
+        self.pouring_rotate_right = False
+        self.pouring_rotate_left = False
+        self.map_key_command = {'w': 'forward',
+                                's': 'backward',
+                                'a': 'left',
+                                'd': 'right',
+                                'u': 'up',
+                                'j': 'down',
+                                'y': 'move_to',
+                                'g': 'tilt_left',
+                                'h': 'tilt_right',
+                                'q': 'keep_upright',
+                                'z': 'rotate_left',
+                                'x': 'rotate_right',
+                                'p': 'pickup',
+                                'l': 'putdown'}
+        self.all_commands = {'forward': 0,
+                             'backward': 0,
+                             'left': 0,
+                             'right': 0,
+                             'up': 0,
+                             'down': 0,
+                             'move_to': 0,
+                             'tilt_left': 0,
+                             'tilt_right': 0,
+                             'keep_upright': 0,
+                             'rotate_left': 0,
+                             'rotate_right': 0,
+                             'pickup': 0,
+                             'putdown': 0}
+        self.all_commands_empty = deepcopy(self.all_commands)
+        self.sub = rospy.Subscriber(state_topic, String, self.cb, queue_size=10)
+
+        root_T_tip = god_map.world.compose_fk_expression(self.root_link, self.tip_link)
+        root_P_tip = root_T_tip.to_position()
+
+        is_forward = symbol_manager.get_symbol(
+            f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\'].all_commands[\'forward\']')
+        is_left = symbol_manager.get_symbol(
+            f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\'].all_commands[\'left\']')
+        is_up = symbol_manager.get_symbol(
+            f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\'].all_commands[\'up\']')
+        is_backward = symbol_manager.get_symbol(
+            f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\'].all_commands[\'backward\']')
+        is_right = symbol_manager.get_symbol(
+            f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\'].all_commands[\'right\']')
+        is_down = symbol_manager.get_symbol(
+            f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\'].all_commands[\'down\']')
+
+        task_movement = self.create_and_add_task('movement')
+        is_translation = cas.min(1, is_forward + is_left + is_up + is_backward + is_right + is_down)
+        task_movement.add_equality_constraint_vector(reference_velocities=[self.max_vel] * 3,
+                                                     equality_bounds=[
+                                                         self.max_vel * is_forward + self.max_vel * -1 * is_backward,
+                                                         self.max_vel * is_left + self.max_vel * -1 * is_right,
+                                                         self.max_vel * is_up + self.max_vel * -1 * is_down],
+                                                     weights=[self.weight * is_translation] * 3,
+                                                     task_expression=root_P_tip[:3],
+                                                     names=['forward-back', 'left-right', 'up-down'])
+
+        is_uprigth = symbol_manager.get_symbol(
+            f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\'].all_commands[\'keep_upright\']')
+
+        task_movement.add_vector_goal_constraints(frame_V_current=cas.Vector3(root_T_tip[:3, 0]),
+                                                  frame_V_goal=cas.Vector3([0, 0, 1]),
+                                                  reference_velocity=self.max_vel,
+                                                  weight=self.weight * is_uprigth,
+                                                  name='upright')
+
+        is_tilt_left = symbol_manager.get_symbol(
+            f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\'].all_commands[\'tilt_left\']')
+        is_tilt_right = symbol_manager.get_symbol(
+            f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\'].all_commands[\'tilt_right\']')
+        # Todo: I might have to save a reference pose when the pouring starts to define rotation around that
+        root_R_tip = god_map.world.compose_fk_expression(self.root_link, self.tip_link).to_rotation()
+        tip_R_tip = cas.RotationMatrix()
+        angle = -0.5 * is_tilt_left + 0.5 * is_tilt_right
+        tip_R_tip[0, 0] = cas.cos(angle)
+        tip_R_tip[1, 0] = cas.sin(angle)
+        tip_R_tip[0, 1] = -cas.sin(angle)
+        tip_R_tip[1, 1] = cas.cos(angle)
+        tip_R_tip[2, 2] = 1
+        root_R_tip_desire = root_R_tip.dot(tip_R_tip)
+        task_movement.add_equality_constraint_vector(reference_velocities=[self.max_vel] * 4,
+                                                     equality_bounds=[root_R_tip_desire[0, 0] - root_R_tip[0, 0],
+                                                                      root_R_tip_desire[1, 0] - root_R_tip[1, 0],
+                                                                      root_R_tip_desire[0, 1] - root_R_tip[0, 1],
+                                                                      root_R_tip_desire[1, 1] - root_R_tip[1, 1]
+                                                                      ],
+                                                     weights=[self.weight * cas.max(is_tilt_left, is_tilt_right)] * 4,
+                                                     task_expression=[root_R_tip[0, 0],
+                                                                      root_R_tip[1, 0],
+                                                                      root_R_tip[0, 1],
+                                                                      root_R_tip[1, 1]],
+                                                     names=['tipr1', 'tipr2', 'tipr3', 'tipr4'])
+        task_movement.add_equality_constraint_vector(reference_velocities=[self.max_vel] * 3,
+                                                     equality_bounds=[0] * 3,
+                                                     weights=[self.weight * cas.max(is_tilt_left, is_tilt_right)] * 3,
+                                                     task_expression=root_P_tip[:3],
+                                                     names=['tipp1', 'tipp2', 'tipp3'])
+        root_V_tip_z = root_R_tip[:3, 2]
+        root_V_z = cas.Vector3([0, 0, 1])
+        exp = root_V_tip_z.dot(root_V_z[:3])
+        task_movement.add_equality_constraint(reference_velocity=self.max_vel,
+                                              equality_bound=0 - exp,
+                                              weight=self.weight * cas.max(is_tilt_left, is_tilt_right),
+                                              task_expression=exp)
+
+        is_rotate_left = symbol_manager.get_symbol(
+            f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\'].all_commands[\'rotate_left\']')
+        is_rotate_right = symbol_manager.get_symbol(
+            f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\'].all_commands[\'rotate_right\']')
+        base_link = god_map.world.search_for_link_name('base_footprint')
+        root_R_base = god_map.world.compose_fk_expression(self.root_link, base_link).to_rotation()
+        base_R_base = cas.RotationMatrix()
+        angle = 0.5 * is_rotate_left - 0.5 * is_rotate_right
+        base_R_base[0, 0] = cas.cos(angle)
+        base_R_base[1, 0] = cas.sin(angle)
+        base_R_base[0, 1] = -cas.sin(angle)
+        base_R_base[1, 1] = cas.cos(angle)
+        base_R_base[2, 2] = 1
+        root_R_base_desire = root_R_base.dot(base_R_base)
+        task_movement.add_equality_constraint_vector(reference_velocities=[self.max_vel] * 4,
+                                                     equality_bounds=[root_R_base_desire[0, 0] - root_R_base[0, 0],
+                                                                      root_R_base_desire[1, 0] - root_R_base[1, 0],
+                                                                      root_R_base_desire[0, 1] - root_R_base[0, 1],
+                                                                      root_R_base_desire[1, 1] - root_R_base[1, 1]
+                                                                      ],
+                                                     weights=[self.weight * cas.max(is_rotate_left,
+                                                                                    is_rotate_right)] * 4,
+                                                     task_expression=[root_R_base[0, 0],
+                                                                      root_R_base[1, 0],
+                                                                      root_R_base[0, 1],
+                                                                      root_R_base[1, 1]],
+                                                     names=['baser1', 'baser2', 'baser3', 'baser4'])
+
+        is_pickup = symbol_manager.get_symbol(
+            f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\'].all_commands[\'pickup\']')
+        is_putdown = symbol_manager.get_symbol(
+            f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\'].all_commands[\'putdown\']')
+        goal_pose = PoseStamped()
+        goal_pose.header.frame_id = 'hand_palm_link'
+        goal_pose.pose.position.x = 0.1
+        goal_pose.pose.orientation.w = 1
+        self.add_constraints_of_goal(
+            PickUp(root_link=root_link, tip_link=tip_link, goal_pose=goal_pose, hold_condition=is_pickup,
+                   name='pickup'))
+        self.add_constraints_of_goal(PutDown(name='putdown', hold_condition=is_putdown))
+
+    def cb(self, data: String):
+        if data.data == '':
+            self.all_commands = deepcopy(self.all_commands_empty)
+            return
+        keys = data.data.split(';')
+        commands = [self.map_key_command[key] for key in keys]
+        self.all_commands = deepcopy(self.all_commands_empty)
+        for command in commands:
+            self.all_commands[command] = 1
+
+
 # This code is mostly copied from the original align planes goal
 class AlignGripperToObject(Goal):
     def __init__(self,
@@ -265,29 +454,34 @@ class PickUp(Goal):
     def __init__(self,
                  root_link: str,
                  tip_link: str,
+                 goal_pose: PoseStamped,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.TrueSymbol
                  ):
         super().__init__(name)
-        m = CloseGripper(name='closeGripperPayloadMonitor')
+        m = CloseGripper(name='closeGripperPayloadMonitor', start_condition=hold_condition)
         self.add_monitor(m)
-
-        goal_pose = PoseStamped()
-        goal_pose.header.frame_id = tip_link
-        goal_pose.pose.position.x = 0.1
-        goal_pose.pose.orientation.w = 1
-
-        goal_point = PointStamped()
-        goal_point.header.frame_id = tip_link
-        goal_point.point.x = 0.1
-        m2 = PositionReached(root_link, tip_link, goal_point, absolute=True, start_condition=m.get_state_expression())
-        self.add_monitor(m2)
-
         self.add_constraints_of_goal(CartesianPose(root_link=root_link,
                                                    tip_link=tip_link,
                                                    goal_pose=goal_pose,
                                                    name='movePickUp',
-                                                   start_condition=m.get_state_expression(),
-                                                   end_condition=m2.get_state_expression()))
+                                                   start_condition=m.get_state_expression()))
+
+
+class PutDown(Goal):
+    def __init__(self,
+                 name: Optional[str] = None,
+                 start_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 end_condition: cas.Expression = cas.TrueSymbol
+                 ):
+        super().__init__(name)
+        m = CloseGripper(name='openGripperPayloadMonitor',
+                         as_open=True,
+                         velocity_threshold=100,
+                         effort_threshold=1,
+                         effort=100,
+                         start_condition=hold_condition)
+        self.add_monitor(m)

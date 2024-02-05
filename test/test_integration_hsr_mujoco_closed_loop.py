@@ -19,6 +19,7 @@ from utils_for_tests import compare_poses, GiskardTestWrapper
 from giskardpy.goals.manipulability_goals import MaxManipulability
 import giskardpy.utils.tfwrapper as tf
 from giskardpy.goals.action_goals import PouringAction
+from giskardpy.goals.adaptive_goals import CloseGripper, PouringAdaptiveTilt
 
 
 class HSRTestWrapper(GiskardTestWrapper):
@@ -250,7 +251,7 @@ class TestCartGoals:
         pose.header.frame_id = kitchen_setup.default_root
         pose.pose.orientation.w = 1
         kitchen_setup.add_box_to_world(name=box1_name,
-                                       size=(1,1,1),
+                                       size=(1, 1, 1),
                                        pose=pose,
                                        parent_link='hand_palm_link',
                                        parent_link_group='hsrb')
@@ -397,7 +398,6 @@ class TestCollisionAvoidanceGoals:
         current_state = {k.short_name: v for k, v in current_state.items()}
         zero_pose.compare_joint_state(current_state, zero_pose.default_pose)
 
-
     def test_self_collision_avoidance(self, zero_pose: HSRTestWrapper):
         r_goal = PoseStamped()
         r_goal.header.frame_id = zero_pose.tip
@@ -493,4 +493,127 @@ class TestActionGoals:
         zero_pose.motion_goals.add_motion_goal(motion_goal_class=PouringAction.__name__,
                                                tip_link='hand_palm_link',
                                                root_link='map')
+        zero_pose.execute(add_local_minimum_reached=False)
+
+    def test_complete_pouring(self, zero_pose):
+        # first start related scripts for BB detection and scene action reasoning
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class=CloseGripper.__name__,
+                                               name='openGripper',
+                                               as_open=True,
+                                               velocity_threshold=100,
+                                               effort_threshold=1,
+                                               effort=100)
+        zero_pose.allow_all_collisions()
+        zero_pose.execute()
+
+        goal_pose = PoseStamped()
+        goal_pose.header.frame_id = 'map'
+        goal_pose.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 0, 1, 0],
+                                                                         [0, -1, 0, 0],
+                                                                         [1, 0, 0, 0],
+                                                                         [0, 0, 0, 1]]))
+        goal_pose.pose.position.x = 1.95
+        goal_pose.pose.position.y = -0.2
+        goal_pose.pose.position.z = 0.3
+
+        zero_pose.set_cart_goal(goal_pose, 'hand_palm_link', 'map')
+        zero_pose.allow_all_collisions()
+        zero_pose.execute()
+
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class=CloseGripper.__name__,
+                                               name='closeGripper')
+        zero_pose.allow_all_collisions()
+        zero_pose.execute()
+
+        goal_pose.pose.position.x = 1.95
+        goal_pose.pose.position.y = -0.4
+        goal_pose.pose.position.z = 0.49
+        # goal_pose.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 0, 1, 0],
+        #                                                                  [0, -1, 0, 0],
+        #                                                                  [1, 0, 0, 0],
+        #                                                                  [0, 0, 0, 1]]))
+        tilt_axis = Vector3Stamped()
+        tilt_axis.header.frame_id = 'hand_palm_link'
+        tilt_axis.vector.z = 1
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class=PouringAdaptiveTilt.__name__,
+                                               name='pouring',
+                                               tip='hand_palm_link',
+                                               root='map',
+                                               tilt_angle=1,
+                                               pouring_pose=goal_pose,
+                                               tilt_axis=tilt_axis,
+                                               pre_tilt=True)
+        zero_pose.allow_all_collisions()
+        zero_pose.execute(add_local_minimum_reached=False)
+
+        goal_pose.pose.position.x = 1.93
+        goal_pose.pose.position.y = -0.2
+        goal_pose.pose.position.z = 0.3
+
+        zero_pose.set_cart_goal(goal_pose, 'hand_palm_link', 'map')
+        zero_pose.allow_all_collisions()
+        zero_pose.execute()
+
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class=CloseGripper.__name__,
+                                               name='openGripper',
+                                               as_open=True,
+                                               velocity_threshold=100,
+                                               effort_threshold=1,
+                                               effort=100)
+        zero_pose.allow_all_collisions()
+        zero_pose.execute()
+
+        goal_pose.pose.position.x = 1.4
+        goal_pose.pose.position.y = -0.2
+        goal_pose.pose.position.z = 0.4
+
+        zero_pose.set_cart_goal(goal_pose, 'hand_palm_link', 'map')
+        zero_pose.allow_all_collisions()
+        zero_pose.execute()
+
+    def test_align_gripper_to_object(self, zero_pose):
+        goal_normal = Vector3Stamped()
+        goal_normal.header.frame_id = 'free_cup'
+        goal_normal.vector.y = -1
+        tip_normal = Vector3Stamped()
+        tip_normal.header.frame_id = 'hand_palm_link'
+        tip_normal.vector.y = 1
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class='AlignGripperToObject',
+                                               name='align',
+                                               tip_link='hand_palm_link',
+                                               root_link='map',
+                                               goal_normal=goal_normal,
+                                               tip_normal=tip_normal)
+        # publish goal_normal again to /align_goal to change the alignement
+        zero_pose.execute(add_local_minimum_reached=False)
+
+    def test_pickup(self, zero_pose):
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class=CloseGripper.__name__,
+                                               name='openGripper',
+                                               as_open=True,
+                                               velocity_threshold=100,
+                                               effort_threshold=1,
+                                               effort=100)
+        zero_pose.allow_all_collisions()
+        zero_pose.execute()
+
+        goal_pose = PoseStamped()
+        goal_pose.header.frame_id = 'map'
+        goal_pose.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 0, 1, 0],
+                                                                         [0, -1, 0, 0],
+                                                                         [1, 0, 0, 0],
+                                                                         [0, 0, 0, 1]]))
+        goal_pose.pose.position.x = 1.95
+        goal_pose.pose.position.y = -0.2
+        goal_pose.pose.position.z = 0.3
+
+        zero_pose.set_cart_goal(goal_pose, 'hand_palm_link', 'map')
+        zero_pose.allow_all_collisions()
+        zero_pose.execute()
+        # add the pickup action
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class='PickUp',
+                                               name='pickup',
+                                               root_link='map',
+                                               tip_link='hand_palm_link')
+        # zero_pose.add_default_end_motion_conditions()
         zero_pose.execute(add_local_minimum_reached=False)

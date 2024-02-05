@@ -5,6 +5,8 @@ from typing import List, Optional, Dict, Tuple
 
 import numpy as np
 import rospy
+from std_msgs.msg import Float64
+from sensor_msgs.msg import JointState
 
 from giskard_msgs.msg import MoveResult, GiskardError
 from giskardpy.exceptions import GiskardException, MonitorInitalizationException
@@ -191,3 +193,44 @@ class PayloadAlternator(PayloadMonitor):
         self.state = np.floor(god_map.time) % self.mod == 0
 
 
+class CloseGripper(PayloadMonitor):
+    def __init__(self,
+                 name: Optional[str] = None,
+                 start_condition: cas.Expression = cas.TrueSymbol,
+                 effort: int = -180,
+                 pub_topic='hsrb4s/hand_motor_joint_velocity_controller/command',
+                 joint_state_topic='hsrb4s/joint_states',
+                 velocity_threshold=0.1,
+                 effort_threshold=-1,
+                 joint_name='hand_motor_joint',
+                 as_open=False
+                 ):
+        super().__init__(name=name, start_condition=start_condition, run_call_in_thread=False)
+        self.pub = rospy.Publisher(pub_topic, Float64, queue_size=1)
+        self.effort = 0
+        self.velocity_threshold = velocity_threshold
+        rospy.Subscriber(joint_state_topic, JointState, self.callback)
+        self.joint_name = joint_name
+        self.effort_threshold = effort_threshold
+        self.effort_cmd = effort
+        self.as_open = as_open
+        self.msg = Float64()
+        self.msg.data = effort
+
+    def __call__(self, *args, **kwargs):
+
+        if not self.as_open and self.effort < self.effort_threshold:
+            self.state = True
+        elif self.as_open and self.effort > self.effort_threshold:
+            self.state = True
+        else:
+            self.state = False
+
+    def callback(self, joints: JointState):
+        for name, effort, velocity in zip(joints.name, joints.effort, joints.velocity):
+            if self.joint_name in name:
+                if abs(velocity) < self.velocity_threshold:
+                    self.effort = effort
+                else:
+                    self.effort = 0
+        self.pub.publish(self.msg)

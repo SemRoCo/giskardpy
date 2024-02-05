@@ -13,14 +13,20 @@ from giskardpy.monitors.monitors import ExpressionMonitor
 from giskardpy.god_map import god_map
 from copy import deepcopy
 from giskardpy.symbol_manager import symbol_manager
+from giskardpy.utils.expression_definition_utils import transform_msg
+from giskardpy.utils.logging import logwarn
+from typing import Optional
+import giskardpy.utils.tfwrapper as tf
+from giskardpy.monitors.payload_monitors import CloseGripper
+from giskardpy.monitors.cartesian_monitors import PositionReached
 
 
 class PouringAction(Goal):
     def __init__(self, tip_link: str, root_link: str,
                  tip_group: str = None, root_group: str = None,
                  max_velocity: float = 0.3, weight: float = WEIGHT_ABOVE_CA,
-                 name: String = None,
-                 state_topic: str ='/pouringActions',
+                 name: str = None,
+                 state_topic: str = '/pouringActions',
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.TrueSymbol
@@ -168,7 +174,8 @@ class PouringAction(Goal):
                                                                       root_R_base_desire[0, 1] - root_R_base[0, 1],
                                                                       root_R_base_desire[1, 1] - root_R_base[1, 1]
                                                                       ],
-                                                     weights=[self.weight * cas.max(is_rotate_left, is_rotate_right)] * 4,
+                                                     weights=[self.weight * cas.max(is_rotate_left,
+                                                                                    is_rotate_right)] * 4,
                                                      task_expression=[root_R_base[0, 0],
                                                                       root_R_base[1, 0],
                                                                       root_R_base[0, 1],
@@ -184,3 +191,103 @@ class PouringAction(Goal):
         self.all_commands = deepcopy(self.all_commands_empty)
         for command in commands:
             self.all_commands[command] = 1
+
+
+# This code is mostly copied from the original align planes goal
+class AlignGripperToObject(Goal):
+    def __init__(self,
+                 root_link: str,
+                 tip_link: str,
+                 goal_normal: Vector3Stamped,
+                 tip_normal: Vector3Stamped,
+                 root_group: Optional[str] = None,
+                 tip_group: Optional[str] = None,
+                 reference_velocity: float = 0.5,
+                 weight: float = WEIGHT_ABOVE_CA,
+                 name: Optional[str] = None,
+                 start_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 end_condition: cas.Expression = cas.TrueSymbol,
+                 **kwargs):
+        """
+        This goal will use the kinematic chain between tip and root to align tip_normal with goal_normal.
+        :param root_link: root link of the kinematic chain
+        :param tip_link: tip link of the kinematic chain
+        :param goal_normal:
+        :param tip_normal:
+        :param root_group: if root_link is not unique, search in this group for matches.
+        :param tip_group: if tip_link is not unique, search in this group for matches.
+        :param reference_velocity: rad/s
+        :param weight:
+        """
+        if 'root_normal' in kwargs:
+            logwarn('Deprecated warning: use goal_normal instead of root_normal')
+            goal_normal = kwargs['root_normal']
+        self.root = god_map.world.search_for_link_name(root_link, root_group)
+        self.tip = god_map.world.search_for_link_name(tip_link, tip_group)
+        self.reference_velocity = reference_velocity
+        self.weight = weight
+
+        self.tip_V_tip_normal = transform_msg(self.tip, tip_normal)
+        self.tip_V_tip_normal.vector = tf.normalize(self.tip_V_tip_normal.vector)
+
+        self.root_V_root_normal = transform_msg(self.root, goal_normal)
+        self.root_V_root_normal.vector = tf.normalize(self.root_V_root_normal.vector)
+        sub = rospy.Subscriber('/align_goal', Vector3Stamped, callback=self.callback)
+
+        if name is None:
+            name = f'{self.__class__.__name__}/{self.root}/{self.tip}' \
+                   f'_X:{self.tip_V_tip_normal.vector.x:.3f}' \
+                   f'_Y:{self.tip_V_tip_normal.vector.y:.3f}' \
+                   f'_Z:{self.tip_V_tip_normal.vector.z:.3f}'
+        super().__init__(name)
+
+        task = self.create_and_add_task('align planes')
+        tip_V_tip_normal = cas.Vector3(self.tip_V_tip_normal)
+        root_R_tip = god_map.world.compose_fk_expression(self.root, self.tip).to_rotation()
+        root_V_tip_normal = root_R_tip.dot(tip_V_tip_normal)
+        root_V_root_normal = symbol_manager.get_expr(
+            f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\'].root_V_root_normal',
+            input_type_hint=Vector3Stamped)
+        task.add_vector_goal_constraints(frame_V_current=root_V_tip_normal,
+                                         frame_V_goal=root_V_root_normal,
+                                         reference_velocity=self.reference_velocity,
+                                         weight=self.weight)
+        self.connect_monitors_to_all_tasks(start_condition, hold_condition, end_condition)
+
+    def callback(self, data: Vector3Stamped):
+        self.root_V_root_normal = transform_msg(self.root, data)
+        self.root_V_root_normal.vector = tf.normalize(self.root_V_root_normal.vector)
+
+
+class PickUp(Goal):
+    # close the gripper and move up a bit
+    def __init__(self,
+                 root_link: str,
+                 tip_link: str,
+                 name: Optional[str] = None,
+                 start_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 end_condition: cas.Expression = cas.TrueSymbol
+                 ):
+        super().__init__(name)
+        m = CloseGripper(name='closeGripperPayloadMonitor')
+        self.add_monitor(m)
+
+        goal_pose = PoseStamped()
+        goal_pose.header.frame_id = tip_link
+        goal_pose.pose.position.x = 0.1
+        goal_pose.pose.orientation.w = 1
+
+        goal_point = PointStamped()
+        goal_point.header.frame_id = tip_link
+        goal_point.point.x = 0.1
+        m2 = PositionReached(root_link, tip_link, goal_point, absolute=True, start_condition=m.get_state_expression())
+        self.add_monitor(m2)
+
+        self.add_constraints_of_goal(CartesianPose(root_link=root_link,
+                                                   tip_link=tip_link,
+                                                   goal_pose=goal_pose,
+                                                   name='movePickUp',
+                                                   start_condition=m.get_state_expression(),
+                                                   end_condition=m2.get_state_expression()))

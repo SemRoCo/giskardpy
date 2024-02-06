@@ -32,7 +32,14 @@ class SymbolManager(metaclass=SingletonMeta):
         return self.symbol_str_to_symbol[symbol_reference]
 
     def resolve_symbols(self, symbols):
-        return np.array([self.symbol_str_to_lambda[s]() for s in symbols], dtype=float)
+        try:
+            return np.array([self.symbol_str_to_lambda[s]() for s in symbols], dtype=float)
+        except Exception as e:
+            for s in symbols:
+                try:
+                    self.symbol_str_to_lambda[s]()
+                except Exception as e2:
+                    raise GiskardException(f'Cannot resolve {s} ({e2.__class__.__name__}: {str(e2)})')
 
     def compile_resolve_symbols(self, symbols):
         self.c = eval('lambda: np.array([' + ', '.join(symbols) + '])')

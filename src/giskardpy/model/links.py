@@ -91,6 +91,8 @@ class LinkGeometry:
             else:
                 raise CorruptShapeException(f'Primitive shape of type {msg.shape.type} not supported.')
         elif msg.type == msg.MESH_BODY:
+            if msg.scale.x == 0 or msg.scale.y == 0 or msg.scale.z == 0:
+                raise CorruptShapeException(f'Scale of mesh contains 0: {msg.scale}')
             geometry = MeshGeometry(link_T_geometry=np.eye(4),
                                     file_name=msg.mesh,
                                     scale=[msg.scale.x, msg.scale.y, msg.scale.z],

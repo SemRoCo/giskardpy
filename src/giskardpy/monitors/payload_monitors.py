@@ -203,7 +203,8 @@ class CloseGripper(PayloadMonitor):
                  velocity_threshold=0.1,
                  effort_threshold=-1,
                  joint_name='hand_motor_joint',
-                 as_open=False
+                 as_open=False,
+                 motion_goal_name=None
                  ):
         super().__init__(name=name, start_condition=start_condition, run_call_in_thread=False, stay_true=False)
         self.pub = rospy.Publisher(pub_topic, Float64, queue_size=1)
@@ -216,9 +217,25 @@ class CloseGripper(PayloadMonitor):
         self.as_open = as_open
         self.msg = Float64()
         self.msg.data = effort
+        self.motion_goal_name = motion_goal_name
+        self.msg_e = Float64()
+        self.msg_e.data = 0
+        if self.as_open:
+            self.cmd = 'putdown'
+        else:
+            self.cmd = 'pickup'
+        self.stopped = False
 
     def __call__(self, *args, **kwargs):
-        self.pub.publish(self.msg)
+        # read motion goal state from the godmap to publish zero once
+        is_active = god_map.motion_goal_manager.motion_goals[self.motion_goal_name].all_commands[self.cmd]
+        if is_active:
+            self.pub.publish(self.msg)
+            self.stopped = False
+        elif not is_active and not self.stopped:
+            self.pub.publish(self.msg_e)
+            self.stopped = True
+
         if not self.as_open and self.effort < self.effort_threshold:
             self.state = True
         elif self.as_open and self.effort > self.effort_threshold:

@@ -199,6 +199,7 @@ class PouringAction2(Goal):
                  max_velocity: float = 0.3, weight: float = WEIGHT_ABOVE_CA,
                  name: str = None,
                  state_topic: str = '/pouringActions',
+                 object_name: str = 'free_cup',
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.TrueSymbol
@@ -237,7 +238,8 @@ class PouringAction2(Goal):
                                 'z': 'rotate_left',
                                 'x': 'rotate_right',
                                 'p': 'pickup',
-                                'l': 'putdown'}
+                                'l': 'putdown',
+                                'm': 'align'}
         self.all_commands = {'forward': 0,
                              'backward': 0,
                              'left': 0,
@@ -251,7 +253,8 @@ class PouringAction2(Goal):
                              'rotate_left': 0,
                              'rotate_right': 0,
                              'pickup': 0,
-                             'putdown': 0}
+                             'putdown': 0,
+                             'align': 0}
         self.all_commands_empty = deepcopy(self.all_commands)
         self.sub = rospy.Subscriber(state_topic, String, self.cb, queue_size=10)
 
@@ -366,10 +369,37 @@ class PouringAction2(Goal):
         goal_pose.header.frame_id = 'hand_palm_link'
         goal_pose.pose.position.x = 0.1
         goal_pose.pose.orientation.w = 1
+        m1 = ExpressionMonitor(name='test1')
+        m1.expression = is_pickup
+        self.add_monitor(m1)
+        m2 = ExpressionMonitor(name='test2')
+        m2.expression = is_putdown
+        self.add_monitor(m2)
         self.add_constraints_of_goal(
-            PickUp(root_link=root_link, tip_link=tip_link, goal_pose=goal_pose, hold_condition=is_pickup,
-                   name='pickup'))
-        self.add_constraints_of_goal(PutDown(name='putdown', hold_condition=is_putdown))
+            PickUp(root_link=root_link, tip_link=tip_link, goal_pose=goal_pose,
+                   hold_condition=cas.logic_not(m1.get_state_expression()),
+                   name='pickup', parent_goal_name=str(self)))
+        self.add_constraints_of_goal(PutDown(name='putdown', parent_goal_name=str(self)))
+
+        goal_normal = Vector3Stamped()
+        goal_normal.header.frame_id = object_name
+        goal_normal.vector.y = -1
+        tip_normal = Vector3Stamped()
+        tip_normal.header.frame_id = 'hand_palm_link'
+        tip_normal.vector.y = 1
+        is_align = symbol_manager.get_symbol(
+            f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\'].all_commands[\'align\']')
+        m3 = ExpressionMonitor(name='test3')
+        m3.expression = is_align
+        self.add_monitor(m3)
+        god_map.motion_goal_manager.add_motion_goal(AlignGripperToObject(root_link=root_link, tip_link=tip_link,
+                                                          goal_normal=goal_normal,
+                                                          tip_normal=tip_normal,
+                                                          hold_condition=cas.logic_not(m3.get_state_expression())))
+        # self.add_constraints_of_goal(AlignGripperToObject(root_link=root_link, tip_link=tip_link,
+        #                                                   goal_normal=goal_normal,
+        #                                                   tip_normal=tip_normal,
+        #                                                   hold_condition=cas.logic_not(m3.get_state_expression())))
 
     def cb(self, data: String):
         if data.data == '':
@@ -425,10 +455,7 @@ class AlignGripperToObject(Goal):
         sub = rospy.Subscriber('/align_goal', Vector3Stamped, callback=self.callback)
 
         if name is None:
-            name = f'{self.__class__.__name__}/{self.root}/{self.tip}' \
-                   f'_X:{self.tip_V_tip_normal.vector.x:.3f}' \
-                   f'_Y:{self.tip_V_tip_normal.vector.y:.3f}' \
-                   f'_Z:{self.tip_V_tip_normal.vector.z:.3f}'
+            name = f'{self.__class__.__name__}/{self.root}/{self.tip}'
         super().__init__(name)
 
         task = self.create_and_add_task('align planes')
@@ -456,32 +483,36 @@ class PickUp(Goal):
                  tip_link: str,
                  goal_pose: PoseStamped,
                  name: Optional[str] = None,
+                 parent_goal_name=None,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.TrueSymbol
                  ):
         super().__init__(name)
-        m = CloseGripper(name='closeGripperPayloadMonitor', start_condition=hold_condition)
+        m = CloseGripper(name='closeGripperPayloadMonitor', motion_goal_name=parent_goal_name)
         self.add_monitor(m)
-        self.add_constraints_of_goal(CartesianPose(root_link=root_link,
-                                                   tip_link=tip_link,
-                                                   goal_pose=goal_pose,
-                                                   name='movePickUp',
-                                                   start_condition=m.get_state_expression()))
+        # self.add_constraints_of_goal(CartesianPose(root_link=root_link,
+        #                                            tip_link=tip_link,
+        #                                            goal_pose=goal_pose,
+        #                                            name='movePickUp',
+        #                                            start_condition=m.get_state_expression(),
+        #                                            hold_condition=cas.logic_or(cas.logic_not(m.get_state_expression()),
+        #                                                                        hold_condition)))
 
 
 class PutDown(Goal):
     def __init__(self,
                  name: Optional[str] = None,
+                 parent_goal_name=None,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.TrueSymbol
                  ):
         super().__init__(name)
         m = CloseGripper(name='openGripperPayloadMonitor',
+                         motion_goal_name=parent_goal_name,
                          as_open=True,
                          velocity_threshold=100,
                          effort_threshold=1,
-                         effort=100,
-                         start_condition=hold_condition)
+                         effort=100)
         self.add_monitor(m)

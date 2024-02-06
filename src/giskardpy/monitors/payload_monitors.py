@@ -232,7 +232,7 @@ class CloseGripper(PayloadMonitor):
         if is_active:
             self.pub.publish(self.msg)
             self.stopped = False
-        elif not is_active and not self.stopped:
+        elif self.as_open and not is_active and not self.stopped:
             self.pub.publish(self.msg_e)
             self.stopped = True
 

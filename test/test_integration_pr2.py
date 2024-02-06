@@ -23,7 +23,7 @@ from giskardpy.configs.qp_controller_config import SupportedQPSolver, QPControll
 from giskardpy.goals.cartesian_goals import RelativePositionSequence
 from giskardpy.goals.caster import Circle, Wave
 from giskardpy.goals.collision_avoidance import CollisionAvoidanceHint
-from giskardpy.goals.goals_tests import DebugGoal
+from giskardpy.goals.goals_tests import DebugGoal, CannotResolveSymbol
 from giskardpy.goals.joint_goals import JointVelocityLimit
 from giskardpy.goals.set_prediction_horizon import SetQPSolver
 from giskardpy.goals.tracebot import InsertCylinder
@@ -1046,6 +1046,11 @@ class TestConstraints:
         zero_pose.motion_goals.add_motion_goal(motion_goal_class=DebugGoal.__name__)
         zero_pose.set_joint_goal(zero_pose.better_pose)
         zero_pose.plan_and_execute()
+
+    def test_cannot_resolve_symbol(self, zero_pose: PR2TestWrapper):
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class=CannotResolveSymbol.__name__,
+                                               joint_name='torso_lift_joint')
+        zero_pose.plan_and_execute(expected_error_code=GiskardError.ERROR)
 
     def test_SetSeedConfiguration(self, zero_pose: PR2TestWrapper):
         zero_pose.set_seed_configuration(seed_configuration=zero_pose.better_pose)
@@ -2542,6 +2547,17 @@ class TestWorldManipulation:
         req = WorldGoal()
         req.body = WorldBody(type=WorldBody.PRIMITIVE_BODY,
                              shape=SolidPrimitive(type=42))
+        req.pose = PoseStamped()
+        req.pose.header.frame_id = 'map'
+        req.parent_link = 'base_link'
+        req.operation = WorldGoal.ADD
+        assert zero_pose.world._send_goal_and_wait(req).error.code == GiskardError.CORRUPT_SHAPE
+
+    def test_corrupt_shape_error_scale_0(self, zero_pose: PR2TestWrapper):
+        p = PoseStamped()
+        p.header.frame_id = 'base_link'
+        req = WorldGoal()
+        req.body = WorldBody(type=WorldBody.MESH_BODY)
         req.pose = PoseStamped()
         req.pose.header.frame_id = 'map'
         req.parent_link = 'base_link'

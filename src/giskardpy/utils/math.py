@@ -152,8 +152,8 @@ def mpc(upper_limits: Tuple[Tuple[float, ...], ...],
         current_values: Tuple[float, ...],
         dt: float,
         ph: int,
-        q_weight: Tuple[float],
-        lin_weight: Tuple[float],
+        q_weight: Tuple[float, ...],
+        lin_weight: Tuple[float, ...],
         solver_class: Optional[Type[QPSolver]] = None,
         link_to_current_vel: bool = True) -> np.ndarray:
     if solver_class is None:
@@ -212,9 +212,9 @@ def simple_mpc(vel_limit, acc_limit, jerk_limit, current_vel, current_acc, dt, p
                solver_class=solver_class, link_to_current_vel=link_to_current_vel)
 
 
-def mpc_velocities(upper_limits: Dict[Derivatives, List[float]],
-                   lower_limits: Dict[Derivatives, List[float]],
-                   current_values: Dict[Derivatives, float],
+def mpc_velocities(upper_limits: Tuple[Tuple[float, ...], ...],
+                   lower_limits: Tuple[Tuple[float, ...], ...],
+                   current_values: Tuple[float, ...],
                    dt: float,
                    ph: int,
                    solver_class=None):

@@ -1937,24 +1937,30 @@ class TestCASWrapper(unittest.TestCase):
             lb = lb.evaluate()
             ub = ub.evaluate()
             b = np.hstack((lb, ub))
-            lower_limits = {
-                Derivatives.velocity: lb.T[0][:ph],
-                Derivatives.acceleration: lb.T[0][ph:ph * 2],
-                Derivatives.jerk: lb.T[0][-ph:]
-            }
-            upper_limits = {
-                Derivatives.velocity: ub.T[0][:ph],
-                Derivatives.acceleration: ub.T[0][ph:ph * 2],
-                Derivatives.jerk: ub.T[0][-ph:]
-            }
-            lower_limits2 = deepcopy(lower_limits)
-            upper_limits2 = deepcopy(upper_limits)
-            lower_limits2[Derivatives.jerk] = -np.ones(ph) * j_b
-            upper_limits2[Derivatives.jerk] = np.ones(ph) * j_b
-            current_values = {
-                Derivatives.velocity: v_c,
-                Derivatives.acceleration: a_c,
-            }
+            lower_limits = (
+                tuple(lb.T[0][:ph].tolist()),
+                tuple(lb.T[0][ph:ph * 2].tolist()),
+                tuple(lb.T[0][-ph:].tolist())
+            )
+            upper_limits = (
+                tuple(ub.T[0][:ph].tolist()),
+                tuple(ub.T[0][ph:ph * 2].tolist()),
+                tuple(ub.T[0][-ph:].tolist())
+            )
+            lower_limits2 = (
+                tuple(lb.T[0][:ph].tolist()),
+                tuple(lb.T[0][ph:ph * 2].tolist()),
+                (j_b,) * ph
+            )
+            upper_limits2 = (
+                tuple(ub.T[0][:ph].tolist()),
+                tuple(ub.T[0][ph:ph * 2].tolist()),
+                (j_b,) * ph
+            )
+            current_values = (
+                v_c,
+                a_c,
+            )
             try:
                 result = giskard_math.mpc_velocities(upper_limits=upper_limits2,
                                                      lower_limits=lower_limits2,

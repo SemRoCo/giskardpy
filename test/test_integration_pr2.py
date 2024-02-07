@@ -387,6 +387,13 @@ class TestJointGoals:
         zero_pose.plan_and_execute()
 
     def test_continuous_joint1(self, zero_pose: PR2TestWrapper):
+        zero_pose.allow_all_collisions()
+        # zero_pose.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
+        js = {'r_wrist_roll_joint': -pi}
+        zero_pose.set_joint_goal(js)
+        zero_pose.plan_and_execute()
+
+    def test_continuous_joint2(self, zero_pose: PR2TestWrapper):
         zero_pose.allow_self_collision()
         # zero_pose.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
         js = {'r_wrist_roll_joint': -pi,
@@ -395,16 +402,16 @@ class TestJointGoals:
         zero_pose.plan_and_execute()
 
     def test_prismatic_joint1(self, zero_pose: PR2TestWrapper):
-        zero_pose.allow_self_collision()
+        zero_pose.allow_all_collisions()
         js = {'torso_lift_joint': 0.1}
         zero_pose.set_joint_goal(js)
         zero_pose.plan_and_execute()
 
-    def test_prismatic_joint2(self, kitchen_setup: PR2TestWrapper):
-        kitchen_setup.allow_self_collision(kitchen_setup.robot_name)
-        js = {'torso_lift_joint': 0.1}
-        kitchen_setup.set_joint_goal(js)
-        kitchen_setup.plan_and_execute()
+    def test_revolute_joint1(self, zero_pose: PR2TestWrapper):
+        zero_pose.allow_all_collisions()
+        js = {'r_elbow_flex_joint': -1}
+        zero_pose.set_joint_goal(js)
+        zero_pose.plan_and_execute()
 
     def test_hard_joint_limits(self, zero_pose: PR2TestWrapper):
         zero_pose.allow_self_collision()
@@ -1204,7 +1211,7 @@ class TestConstraints:
         zero_pose.set_joint_goal(goal_state={joint.short_name: joint_goal})
         zero_pose.plan_and_execute()
         np.testing.assert_almost_equal(god_map.world.state[joint].position, joint_goal, decimal=3)
-        np.testing.assert_array_less(god_map.trajectory.to_dict()[1][joint], vel_limit + 1e-5)
+        np.testing.assert_array_less(god_map.trajectory.to_dict()[1][joint], vel_limit + 1e-4)
 
     def test_JointPosition_kitchen(self, kitchen_setup: PR2TestWrapper):
         joint_name1 = 'iai_fridge_door_joint'

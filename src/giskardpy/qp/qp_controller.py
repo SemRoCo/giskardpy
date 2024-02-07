@@ -19,7 +19,7 @@ from giskardpy.qp.constraint import InequalityConstraint, EqualityConstraint, De
     ManipulabilityConstraint
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.next_command import NextCommands
-from giskardpy.qp.pos_in_vel_limits import b_profile
+from giskardpy.qp.pos_in_vel_limits import b_profile, unreachable_velocity_limits
 from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils import logging
@@ -283,6 +283,7 @@ class FreeVariableBounds(ProblemDataPart):
                          max_derivative=max_derivative)
         self.evaluated = True
 
+    @profile
     def velocity_limit(self, v: FreeVariable):
         current_position = v.get_symbol(Derivatives.position)
         lower_velocity_limit = v.get_lower_limit(Derivatives.velocity, evaluated=True)
@@ -302,33 +303,48 @@ class FreeVariableBounds(ProblemDataPart):
             ub = cas.Expression([upper_velocity_limit] * self.prediction_horizon
                                 + [upper_acc_limit] * self.prediction_horizon
                                 + [upper_jerk_limit] * self.prediction_horizon)
-            return lb, ub
+        else:
+            lower_limit = v.get_lower_limit(Derivatives.position, evaluated=True)
+            upper_limit = v.get_upper_limit(Derivatives.position, evaluated=True)
 
-        lower_limit = v.get_lower_limit(Derivatives.position, evaluated=True)
-        upper_limit = v.get_upper_limit(Derivatives.position, evaluated=True)
-
-        try:
-            lb, ub = b_profile(current_pos=current_position,
-                               current_vel=current_vel,
-                               current_acc=current_acc,
-                               pos_limits=(lower_limit, upper_limit),
-                               vel_limits=(lower_velocity_limit, upper_velocity_limit),
-                               acc_limits=(lower_acc_limit, upper_acc_limit),
-                               jerk_limits=(lower_jerk_limit, upper_jerk_limit),
-                               dt=self.dt,
-                               ph=self.prediction_horizon)
-        except InfeasibleException as e:
-            max_reachable_vel = giskard_math.max_velocity_from_horizon_and_jerk(self.prediction_horizon,
-                                                                                upper_jerk_limit, self.dt)
-            if max_reachable_vel < upper_velocity_limit:
-                error_msg = f'Free variable "{v.name}" can\'t reach velocity limit of "{upper_velocity_limit}". ' \
-                            f'Maximum reachable with prediction horizon = "{self.prediction_horizon}", ' \
-                            f'jerk limit = "{upper_jerk_limit}" and dt = "{self.dt}" is "{max_reachable_vel}".'
-                logging.logerr(error_msg)
-                raise VelocityLimitUnreachableException(error_msg)
-            else:
-                raise
-
+            try:
+                lb, ub = b_profile(current_pos=current_position,
+                                   current_vel=current_vel,
+                                   current_acc=current_acc,
+                                   pos_limits=(lower_limit, upper_limit),
+                                   vel_limits=(lower_velocity_limit, upper_velocity_limit),
+                                   acc_limits=(lower_acc_limit, upper_acc_limit),
+                                   jerk_limits=(lower_jerk_limit, upper_jerk_limit),
+                                   dt=self.dt,
+                                   ph=self.prediction_horizon)
+            except InfeasibleException as e:
+                max_reachable_vel = giskard_math.max_velocity_from_horizon_and_jerk(self.prediction_horizon,
+                                                                                    upper_jerk_limit, self.dt)
+                if max_reachable_vel < upper_velocity_limit:
+                    error_msg = f'Free variable "{v.name}" can\'t reach velocity limit of "{upper_velocity_limit}". ' \
+                                f'Maximum reachable with prediction horizon = "{self.prediction_horizon}", ' \
+                                f'jerk limit = "{upper_jerk_limit}" and dt = "{self.dt}" is "{max_reachable_vel}".'
+                    logging.logerr(error_msg)
+                    raise VelocityLimitUnreachableException(error_msg)
+                else:
+                    raise
+        # %% set velocity limits to infinite, that can't be reached due to acc/jerk limits anyway
+        velocity_limits_to_be_removed = unreachable_velocity_limits(vel_limit=upper_velocity_limit,
+                                                                    acc_limit=upper_acc_limit,
+                                                                    jerk_limit=upper_jerk_limit,
+                                                                    dt=self.dt,
+                                                                    ph=self.prediction_horizon)
+        for i, remove_vel_limit in enumerate(velocity_limits_to_be_removed):
+            if remove_vel_limit:
+                ub[i] = np.inf
+        velocity_limits_to_be_removed = unreachable_velocity_limits(vel_limit=-lower_velocity_limit,
+                                                                    acc_limit=-lower_acc_limit,
+                                                                    jerk_limit=-lower_jerk_limit,
+                                                                    dt=self.dt,
+                                                                    ph=self.prediction_horizon)
+        for i, remove_vel_limit in enumerate(velocity_limits_to_be_removed):
+            if remove_vel_limit:
+                lb[i] = -np.inf
         return lb, ub
 
     @profile
@@ -611,35 +627,21 @@ class EqualityModel(ProblemDataPart):
     @profile
     def derivative_link_model(self) -> cas.Expression:
         """
-        |   t1   |   t2   |   t3   |   t1   |   t2   |   t3   |   t1   |   t2   |   t3   | prediction horizon
-        |v1 v2 v3|v1 v2 v3|v1 v2 v3|a1 a2 a3|a1 a2 a3|a1 a2 a3|j1 j2 j3|j1 j2 j3|j1 j2 j3| free variables / slack
-        |--------------------------------------------------------------------------------|
-        | 1      |        |        |-sp     |        |        |        |        |        | # v_n - a_n * dt = last vel
-        |    1   |        |        |   -sp  |        |        |        |        |        | = last velocity
-        |       1|        |        |     -sp|        |        |        |        |        |
-        |--------------------------------------------------------------------------------|
-        |-1      | 1      |        |        |-sp     |        |        |        |        | # -v_c + v_n - a_n * dt = 0
-        |   -1   |    1   |        |        |   -sp  |        |        |        |        | = 0
-        |      -1|       1|        |        |     -sp|        |        |        |        |
-        |--------------------------------------------------------------------------------|
-        |        |-1      | 1      |        |        |-sp     |        |        |        | # -v_c + v_n - a_n * dt = 0
-        |        |   -1   |    1   |        |        |   -sp  |        |        |        | = 0
-        |        |      -1|       1|        |        |     -sp|        |        |        |
-        |================================================================================|
-        |        |        |        | 1      |        |        |-sp     |        |        | # a_n - j_n * dt = last acc
-        |        |        |        |    1   |        |        |   -sp  |        |        | = last acceleration
-        |        |        |        |       1|        |        |     -sp|        |        |
-        |--------------------------------------------------------------------------------|
-        |        |        |        |-1      | 1      |        |        |-sp     |        | # -a_c + a_n - j_n * dt = 0
-        |        |        |        |   -1   |    1   |        |        |   -sp  |        | = 0
-        |        |        |        |      -1|       1|        |        |     -sp|        |
-        |--------------------------------------------------------------------------------|
-        |        |        |        |        |-1      | 1      |        |        |-sp     | # -a_c + a_n - j_n * dt = 0
-        |        |        |        |        |   -1   |    1   |        |        |   -sp  | = 0
-        |        |        |        |        |      -1|       1|        |        |     -sp|
-        |--------------------------------------------------------------------------------|
-        x_n - xd_n * dt = x_c
-        - x_c + x_n - xd_n * dt = 0
+        Layout for prediction horizon 5
+        Slots are matrices of |controlled variables| x |controlled variables|
+        | vt0 | vt1 | vt2 | at0 | at1 | at2 | at3 | jt0 | jt1 | jt2 | jt3 | jt4 |
+        |-----------------------------------------------------------------------|
+        |  1  |     |     | -dt |     |     |     |     |     |     |     |     | last_v =  vt0 - at0*dt
+        | -1  |  1  |     |     | -dt |     |     |     |     |     |     |     |      0 = -vt0 + vt1 - at1 * dt
+        |     | -1  |  1  |     |     | -dt |     |     |     |     |     |     |      0 = -vt1 + vt2 - at2 * dt
+        |     |     | -1  |     |     |     | -dt |     |     |     |     |     |      0 = -vt2 + vt3 - at3 * dt
+        |=======================================================================|
+        |     |     |     |  1  |     |     |     | -dt |     |     |     |     | last_a =  at0 - jt0*dt
+        |     |     |     | -1  |  1  |     |     |     | -dt |     |     |     |      0 = -at0 + at1 - jt1 * dt
+        |     |     |     |     | -1  |  1  |     |     |     | -dt |     |     |      0 = -at1 + at2 - jt2 * dt
+        |     |     |     |     |     | -1  |  1  |     |     |     | -dt |     |      0 = -at2 + at3 - jt3 * dt
+        |     |     |     |     |     |     | -1  |     |     |     |     | -dt |      0 = -at3 + at4 - jt4 * dt
+        |-----------------------------------------------------------------------|
         """
         num_rows = self.number_of_free_variables * self.prediction_horizon * (self.max_derivative - 1)
         num_columns = self.number_of_free_variables * self.prediction_horizon * self.max_derivative

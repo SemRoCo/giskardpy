@@ -96,7 +96,7 @@ class QPSolver(ABC):
             return self.solver_call(*problem_data)
 
     @staticmethod
-    def to_inf_filter(casadi_array):
+    def to_inf_filter(casadi_array: cas.Expression) -> np.ndarray:
         # FIXME, buggy if a function happens to evaluate with all 0 input
         if casadi_array.shape[0] == 0:
             return np.eye(0)

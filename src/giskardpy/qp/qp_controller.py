@@ -19,7 +19,7 @@ from giskardpy.qp.constraint import InequalityConstraint, EqualityConstraint, De
     ManipulabilityConstraint
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.next_command import NextCommands
-from giskardpy.qp.pos_in_vel_limits import b_profile, vel_with_max_jerk_profile
+from giskardpy.qp.pos_in_vel_limits import b_profile, unreachable_velocity_limits
 from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils import logging
@@ -283,6 +283,7 @@ class FreeVariableBounds(ProblemDataPart):
                          max_derivative=max_derivative)
         self.evaluated = True
 
+    @profile
     def velocity_limit(self, v: FreeVariable):
         current_position = v.get_symbol(Derivatives.position)
         lower_velocity_limit = v.get_lower_limit(Derivatives.velocity, evaluated=True)
@@ -327,14 +328,23 @@ class FreeVariableBounds(ProblemDataPart):
                     raise VelocityLimitUnreachableException(error_msg)
                 else:
                     raise
-        filter = vel_with_max_jerk_profile(vel_limit=upper_velocity_limit,
-                                           jerk_limit=upper_jerk_limit,
-                                           dt=self.dt,
-                                           ph=self.prediction_horizon)
-        for i, x in enumerate(filter):
-            if x:
-                lb[i] = -np.inf
+        # %% set velocity limits to infinite, that can't be reached due to acc/jerk limits anyway
+        velocity_limits_to_be_removed = unreachable_velocity_limits(vel_limit=upper_velocity_limit,
+                                                                    acc_limit=upper_acc_limit,
+                                                                    jerk_limit=upper_jerk_limit,
+                                                                    dt=self.dt,
+                                                                    ph=self.prediction_horizon)
+        for i, remove_vel_limit in enumerate(velocity_limits_to_be_removed):
+            if remove_vel_limit:
                 ub[i] = np.inf
+        velocity_limits_to_be_removed = unreachable_velocity_limits(vel_limit=-lower_velocity_limit,
+                                                                    acc_limit=-lower_acc_limit,
+                                                                    jerk_limit=-lower_jerk_limit,
+                                                                    dt=self.dt,
+                                                                    ph=self.prediction_horizon)
+        for i, remove_vel_limit in enumerate(velocity_limits_to_be_removed):
+            if remove_vel_limit:
+                lb[i] = -np.inf
         return lb, ub
 
     @profile

@@ -65,15 +65,14 @@ def compute_projected_vel_profile(current_vel, current_acc, target_vel_profile, 
     return cas.Expression(vel_profile), acc_profile, jerk_profile
 
 
-def vel_with_max_jerk_profile(vel_limit: float, jerk_limit: float, dt: float, ph: int) -> list:
-    vel = 0
-    acc = 0
-    vel_profile = []
-    for i in range(ph):
-        acc += jerk_limit * dt
-        vel += acc * dt
-        vel_profile.append(vel < vel_limit)
-    return list(reversed(vel_profile))
+def unreachable_velocity_limits(vel_limit: float, acc_limit: float, jerk_limit: float, dt: float, ph: int) -> list:
+    unlimited_vel_profile = gm.simple_mpc(vel_limit=np.inf, acc_limit=acc_limit, jerk_limit=jerk_limit, current_vel=0,
+                                          current_acc=0, dt=dt, ph=ph, q_weight=(0, 0, 0), lin_weight=(0, 0, -1),
+                                          link_to_current_vel=False)
+    vel_profile2 = []
+    for i, vel in enumerate(unlimited_vel_profile[:ph]):
+        vel_profile2.append(vel < vel_limit)
+    return vel_profile2
 
 
 def b_profile(current_pos, current_vel, current_acc,

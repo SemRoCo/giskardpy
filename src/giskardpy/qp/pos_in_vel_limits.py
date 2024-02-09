@@ -1,3 +1,5 @@
+from typing import List
+
 import numpy as np
 import giskardpy.casadi_wrapper as cas
 import giskardpy.utils.math as gm
@@ -13,9 +15,13 @@ def shifted_velocity_profile(vel_profile, acc_profile, distance, dt):
         condition = dt * sum(vel_profile[x:])
         vel_result = np.concatenate([vel_profile[x + 1:], np.zeros(x + 1)])
         acc_result = np.concatenate([acc_profile[x + 1:], np.zeros(x + 1)])
-        vel_if_cases.append((condition, vel_result))
-        acc_if_cases.append((condition, acc_result))
-    shifted_vel_profile = cas.if_less_eq_cases(distance, vel_if_cases, vel_profile)
+        if condition > 0:
+            vel_if_cases.append((condition, vel_result))
+            acc_if_cases.append((condition, acc_result))
+    vel_if_cases.append((2 * vel_if_cases[-1][0] - vel_if_cases[-2][0], vel_profile))
+    default_vel_profile = np.full(vel_profile.shape[0], vel_profile[0])
+
+    shifted_vel_profile = cas.if_less_eq_cases(distance, vel_if_cases, default_vel_profile)
     shifted_acc_profile = cas.if_less_eq_cases(distance, acc_if_cases, acc_profile)
     return shifted_vel_profile, shifted_acc_profile
 
@@ -65,14 +71,17 @@ def compute_projected_vel_profile(current_vel, current_acc, target_vel_profile, 
     return cas.Expression(vel_profile), acc_profile, jerk_profile
 
 
-def unreachable_velocity_limits(vel_limit: float, acc_limit: float, jerk_limit: float, dt: float, ph: int) -> list:
-    unlimited_vel_profile = gm.simple_mpc(vel_limit=np.inf, acc_limit=acc_limit, jerk_limit=jerk_limit, current_vel=0,
-                                          current_acc=0, dt=dt, ph=ph, q_weight=(0, 0, 0), lin_weight=(0, 0, -1),
-                                          link_to_current_vel=False)
-    vel_profile2 = []
-    for i, vel in enumerate(unlimited_vel_profile[:ph]):
-        vel_profile2.append(vel < vel_limit)
-    return vel_profile2
+def unreachable_velocity_limits(vel_limit: float, acc_limit: float, jerk_limit: float, dt: float, ph: int) \
+        -> List[float]:
+    vel_profile = [0, 0]  # because last two vel are always 0
+    vel = 0
+    acc = 0
+    for i in range(ph - 2):
+        acc += jerk_limit * dt
+        acc = min(acc, acc_limit)
+        vel += acc * dt
+        vel_profile.append(vel)
+    return list(reversed(vel_profile))
 
 
 def b_profile(current_pos, current_vel, current_acc,
@@ -98,16 +107,15 @@ def b_profile(current_pos, current_vel, current_acc,
     pos_error_lb = pos_limit_lb - current_pos
     pos_error_ub = pos_limit_ub - current_pos
     # %% limits to profile, if vel integral bigger than remaining distance to pos limits
-    pos_vel_profile_lb, shifted_acc_profile_lb = shifted_velocity_profile(vel_profile=vel_profile_mpc,
-                                                                          acc_profile=acc_profile_mpc,
-                                                                          distance=-pos_error_lb,
-                                                                          dt=dt)
+    pos_vel_profile_lb, _ = shifted_velocity_profile(vel_profile=vel_profile_mpc,
+                                                     acc_profile=acc_profile_mpc,
+                                                     distance=-pos_error_lb,
+                                                     dt=dt)
     pos_vel_profile_lb *= -1
-    shifted_acc_profile_lb *= -1
-    pos_vel_profile_ub, shifted_acc_profile_ub = shifted_velocity_profile(vel_profile=vel_profile_mpc,
-                                                                          acc_profile=acc_profile_mpc,
-                                                                          distance=pos_error_ub,
-                                                                          dt=dt)
+    pos_vel_profile_ub, _ = shifted_velocity_profile(vel_profile=vel_profile_mpc,
+                                                     acc_profile=acc_profile_mpc,
+                                                     distance=pos_error_ub,
+                                                     dt=dt)
     # %% when limits are violated, compute the max velocity that can be reached in one step from zero and put it as
     # negative limits
     one_step_change_ = jerk_limit * dt ** 2

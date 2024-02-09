@@ -1667,6 +1667,13 @@ def if_eq_cases(a, b_result_cases, else_result):
 def if_less_eq_cases(a, b_result_cases, else_result):
     """
     This only works if b_result_cases is sorted in ascending order.
+    if a <= b_result_cases[0][0]:
+        return b_result_cases[0][1]
+    elif a <= b_result_cases[1][0]:
+        return b_result_cases[1][1]
+    ...
+    else:
+        return else_result
     """
     a = _to_sx(a)
     result = _to_sx(else_result)
@@ -2204,3 +2211,6 @@ def is_false(expr):
         return (expr == FalseSymbol).evaluate()
     except Exception as e:
         return False
+
+def is_constant(expr):
+    return len(expr.free_symbols()) == 0

@@ -334,17 +334,15 @@ class FreeVariableBounds(ProblemDataPart):
                                                                     jerk_limit=upper_jerk_limit,
                                                                     dt=self.dt,
                                                                     ph=self.prediction_horizon)
-        for i, remove_vel_limit in enumerate(velocity_limits_to_be_removed):
-            if remove_vel_limit:
-                ub[i] = np.inf
+        for i in range(self.prediction_horizon):
+            ub[i] = cas.if_less(ub[i], velocity_limits_to_be_removed[i], ub[i], np.inf)
         velocity_limits_to_be_removed = unreachable_velocity_limits(vel_limit=-lower_velocity_limit,
                                                                     acc_limit=-lower_acc_limit,
                                                                     jerk_limit=-lower_jerk_limit,
                                                                     dt=self.dt,
                                                                     ph=self.prediction_horizon)
-        for i, remove_vel_limit in enumerate(velocity_limits_to_be_removed):
-            if remove_vel_limit:
-                lb[i] = -np.inf
+        for i in range(self.prediction_horizon):
+            lb[i] = cas.if_less(-lb[i], velocity_limits_to_be_removed[i], lb[i], -np.inf)
         return lb, ub
 
     @profile
@@ -1179,7 +1177,9 @@ class QPProblemBuilder:
         try:
             self.xdot_full = self.qp_solver.solve_and_retry(substitutions=substitutions)
             # self._create_debug_pandas(self.qp_solver)
-            return NextCommands(self.free_variables, self.xdot_full, self.order, self.prediction_horizon)
+            # return NextCommands(self.free_variables, self.xdot_full, self.order, self.prediction_horizon)
+            next_cmd = NextCommands(self.free_variables, self.xdot_full, self.order, self.prediction_horizon)
+            return next_cmd
         except InfeasibleException as e_original:
             self.xdot_full = None
             self._create_debug_pandas(self.qp_solver)
@@ -1228,7 +1228,7 @@ class QPProblemBuilder:
             logging.loginfo('start position not found in state')
             start_pos = 0
         ts = np.array([(i + 1) * sample_period for i in range(self.prediction_horizon)])
-        filtered_x = self.p_xdot.filter(like=f'{joint_name}', axis=0)
+        filtered_x = self.p_xdot.filter(like=f'/{joint_name}/', axis=0)
         vel_end = self.prediction_horizon - self.order + 1
         acc_end = vel_end + self.prediction_horizon - self.order + 2
         velocities = filtered_x[:vel_end].values

@@ -123,6 +123,7 @@ class QPSolver(ABC):
         except QPSolverException as e:
             try:
                 logging.loginfo(f'{e}; retrying with relaxed constraints.')
+                substitutions[god_map.qp_controller.get_inf_limits_symbol_id()] = 0
                 return self.solve(substitutions, relax_hard_constraints=True)
             except InfeasibleException as e2:
                 logging.loginfo('Failed to relax constraints.')

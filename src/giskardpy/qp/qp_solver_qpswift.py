@@ -156,8 +156,14 @@ class QPSolverQPSwift(QPSWIFTFormatter):
         nlb_relaxed = nlb.copy()
         ub_relaxed = ub.copy()
         if self.num_slack_variables > 0:
-            lb_non_slack_without_inf = np.where(self.static_lb_finite_filter[:self.num_non_slack_variables])[0].shape[0]
-            ub_non_slack_without_inf = np.where(self.static_ub_finite_filter[:self.num_non_slack_variables])[0].shape[0]
+            lb_filter = self.weight_filter & self.static_lb_finite_filter
+            lb_filter[self.static_lb_finite_filter] &= self.nlb_secondary_finite_filter
+            lb_filter = lb_filter[:self.num_non_slack_variables]
+            ub_filter = self.weight_filter & self.static_ub_finite_filter
+            ub_filter[self.static_ub_finite_filter] &= self.ub_secondary_finite_filter
+            ub_filter = ub_filter[:self.num_non_slack_variables]
+            lb_non_slack_without_inf = np.where(lb_filter)[0].shape[0]
+            ub_non_slack_without_inf = np.where(ub_filter)[0].shape[0]
             nlb_relaxed[lb_non_slack_without_inf:] += self.retry_added_slack
             ub_relaxed[ub_non_slack_without_inf:] += self.retry_added_slack
         else:

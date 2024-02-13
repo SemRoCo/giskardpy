@@ -282,7 +282,6 @@ class FreeVariableBounds(ProblemDataPart):
                          prediction_horizon=prediction_horizon,
                          max_derivative=max_derivative)
         self.evaluated = True
-        self.inf_limits_symbol = symbol_manager.get_symbol('god_map.inf_limits_symbol')
 
     @profile
     def velocity_limit(self, v: FreeVariable):
@@ -336,18 +335,14 @@ class FreeVariableBounds(ProblemDataPart):
                                                                     dt=self.dt,
                                                                     ph=self.prediction_horizon)
         for i in range(self.prediction_horizon):
-            ub[i] = cas.if_else(self.inf_limits_symbol,
-                                cas.if_less(ub[i], velocity_limits_to_be_removed[i], ub[i], np.inf),
-                                ub[i])
+            ub[i] = cas.if_less(ub[i], velocity_limits_to_be_removed[i], ub[i], np.inf)
         velocity_limits_to_be_removed = unreachable_velocity_limits(vel_limit=-lower_velocity_limit,
                                                                     acc_limit=-lower_acc_limit,
                                                                     jerk_limit=-lower_jerk_limit,
                                                                     dt=self.dt,
                                                                     ph=self.prediction_horizon)
         for i in range(self.prediction_horizon):
-            lb[i] = cas.if_else(self.inf_limits_symbol,
-                                cas.if_less(-lb[i], velocity_limits_to_be_removed[i], lb[i], -np.inf),
-                                lb[i])
+            lb[i] = cas.if_less(-lb[i], velocity_limits_to_be_removed[i], lb[i], -np.inf)
         return lb, ub
 
     @profile
@@ -1016,7 +1011,6 @@ class QPProblemBuilder:
                  retries_with_relaxed_constraints: int = 0,
                  retry_added_slack: float = 100,
                  retry_weight_factor: float = 100):
-        god_map.inf_limits_symbol = 0
         self.free_variables = []
         self.equality_constraints = []
         self.inequality_constraints = []
@@ -1146,10 +1140,6 @@ class QPProblemBuilder:
 
     def get_parameter_names(self):
         return self.qp_solver.free_symbols_str
-
-    # @memoize
-    def get_inf_limits_symbol_id(self) -> int:
-        return self.get_parameter_names().index('god_map.inf_limits_symbol')
 
     def save_all_pandas(self, folder_name: Optional[str] = None):
         if hasattr(self, 'p_xdot') and self.p_xdot is not None:

@@ -19,7 +19,7 @@ from giskardpy.qp.constraint import InequalityConstraint, EqualityConstraint, De
     ManipulabilityConstraint
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.next_command import NextCommands
-from giskardpy.qp.pos_in_vel_limits import b_profile, unreachable_velocity_limits
+from giskardpy.qp.pos_in_vel_limits import b_profile, no_vel_limit_vel_profile
 from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils import logging
@@ -329,22 +329,18 @@ class FreeVariableBounds(ProblemDataPart):
                 else:
                     raise
         # %% set velocity limits to infinite, that can't be reached due to acc/jerk limits anyway
-        velocity_limits_to_be_removed = unreachable_velocity_limits(vel_limit=upper_velocity_limit,
-                                                                    acc_limit=upper_acc_limit,
-                                                                    jerk_limit=upper_jerk_limit,
-                                                                    dt=self.dt,
-                                                                    ph=self.prediction_horizon)
-        for i, remove_vel_limit in enumerate(velocity_limits_to_be_removed):
-            if remove_vel_limit:
-                ub[i] = np.inf
-        velocity_limits_to_be_removed = unreachable_velocity_limits(vel_limit=-lower_velocity_limit,
-                                                                    acc_limit=-lower_acc_limit,
-                                                                    jerk_limit=-lower_jerk_limit,
-                                                                    dt=self.dt,
-                                                                    ph=self.prediction_horizon)
-        for i, remove_vel_limit in enumerate(velocity_limits_to_be_removed):
-            if remove_vel_limit:
-                lb[i] = -np.inf
+        unlimited_vel_profile = no_vel_limit_vel_profile(acc_limit=upper_acc_limit,
+                                                         jerk_limit=upper_jerk_limit,
+                                                         dt=self.dt,
+                                                         ph=self.prediction_horizon)
+        for i in range(self.prediction_horizon):
+            ub[i] = cas.if_less(ub[i], unlimited_vel_profile[i], ub[i], np.inf)
+        unlimited_vel_profile = no_vel_limit_vel_profile(acc_limit=-lower_acc_limit,
+                                                         jerk_limit=-lower_jerk_limit,
+                                                         dt=self.dt,
+                                                         ph=self.prediction_horizon)
+        for i in range(self.prediction_horizon):
+            lb[i] = cas.if_less(-lb[i], unlimited_vel_profile[i], lb[i], -np.inf)
         return lb, ub
 
     @profile
@@ -1228,7 +1224,7 @@ class QPProblemBuilder:
             logging.loginfo('start position not found in state')
             start_pos = 0
         ts = np.array([(i + 1) * sample_period for i in range(self.prediction_horizon)])
-        filtered_x = self.p_xdot.filter(like=f'{joint_name}', axis=0)
+        filtered_x = self.p_xdot.filter(like=f'/{joint_name}/', axis=0)
         vel_end = self.prediction_horizon - self.order + 1
         acc_end = vel_end + self.prediction_horizon - self.order + 2
         velocities = filtered_x[:vel_end].values

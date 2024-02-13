@@ -125,8 +125,8 @@ class QPSolverGurobi(QPSWIFTFormatter):
         nlb_relaxed = nlb.copy()
         ub_relaxed = ub.copy()
         if self.num_slack_variables > 0:
-            lb_non_slack_without_inf = np.where(self.lb_inf_filter[:self.num_non_slack_variables])[0].shape[0]
-            ub_non_slack_without_inf = np.where(self.ub_inf_filter[:self.num_non_slack_variables])[0].shape[0]
+            lb_non_slack_without_inf = np.where(self.static_lb_finite_filter[:self.num_non_slack_variables])[0].shape[0]
+            ub_non_slack_without_inf = np.where(self.static_ub_finite_filter[:self.num_non_slack_variables])[0].shape[0]
             nlb_relaxed[lb_non_slack_without_inf:] += self.retry_added_slack
             ub_relaxed[ub_non_slack_without_inf:] += self.retry_added_slack
         else:
@@ -141,8 +141,8 @@ class QPSolverGurobi(QPSWIFTFormatter):
             self.retries_with_relaxed_constraints += 1
             raise e
         eps = 1e-4
-        self.lb_filter = self.lb_inf_filter[self.weight_filter]
-        self.ub_filter = self.ub_inf_filter[self.weight_filter]
+        self.lb_filter = self.static_lb_finite_filter[self.weight_filter]
+        self.ub_filter = self.static_ub_finite_filter[self.weight_filter]
         lower_violations = xdot_full[self.lb_filter] < - nlb - eps
         upper_violations = xdot_full[self.ub_filter] > ub + eps
         self.lb_filter[self.lb_filter] = lower_violations
@@ -154,3 +154,59 @@ class QPSolverGurobi(QPSWIFTFormatter):
         nlb_relaxed[lower_violations] += self.retry_added_slack
         ub_relaxed[upper_violations] += self.retry_added_slack
         return self.lb_filter, nlb_relaxed, self.ub_filter, ub_relaxed
+
+    def lb_ub_with_inf(self, nlb: np.ndarray, ub: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        lb_with_inf = (np.ones(self.static_lb_finite_filter.shape) * -np.inf)
+        ub_with_inf = (np.ones(self.static_ub_finite_filter.shape) * np.inf)
+        lb_with_inf[self.weight_filter & self.static_lb_finite_filter] = -nlb
+        ub_with_inf[self.weight_filter & self.static_ub_finite_filter] = ub
+        lb_with_inf = lb_with_inf[self.weight_filter]
+        ub_with_inf = ub_with_inf[self.weight_filter]
+        return lb_with_inf, ub_with_inf
+
+    @profile
+    def apply_filters(self):
+        self.weights = self.weights[self.weight_filter]
+        self.g = self.g[self.weight_filter]
+        self.nlb = self.nlb[self.weight_filter[self.static_lb_finite_filter]]
+        self.ub = self.ub[self.weight_filter[self.static_ub_finite_filter]]
+        if self.num_filtered_eq_constraints > 0:
+            self.E = self.E[self.bE_filter, :][:, self.weight_filter]
+        else:
+            # when no eq constraints were filtered, we can just cut off at the end, because that section is always all 0
+            self.E = self.E[:, :np.count_nonzero(self.weight_filter)]
+        self.bE = self.bE[self.bE_filter]
+        if len(self.nA_A.shape) > 1 and self.nA_A.shape[0] * self.nA_A.shape[1] > 0:
+            self.nA_A = self.nA_A[:, self.weight_filter][self.bA_filter, :]
+        self.nlbA_ubA = self.nlbA_ubA[self.bA_filter]
+        if self.compute_nI_I:
+            # for constraints, both rows and columns are filtered, so I can start with weights dims
+            # then only the rows need to be filtered for inf lb/ub
+            self.nAi_Ai = self._direct_limit_model(self.weights.shape[0], self.nAi_Ai_filter, True)
+
+
+    @profile
+    def update_filters(self):
+        self.weight_filter = self.weights != 0
+        self.weight_filter[:-self.num_slack_variables] = True
+        slack_part = self.weight_filter[-(self.num_eq_slack_variables + self.num_neq_slack_variables):]
+        bE_part = slack_part[:self.num_eq_slack_variables]
+        self.bA_part = slack_part[self.num_eq_slack_variables:]
+
+        self.bE_filter = np.ones(self.E.shape[0], dtype=bool)
+        self.num_filtered_eq_constraints = np.count_nonzero(np.invert(bE_part))
+        if self.num_filtered_eq_constraints > 0:
+            self.bE_filter[-len(bE_part):] = bE_part
+
+        # self.num_filtered_neq_constraints = np.count_nonzero(np.invert(self.bA_part))
+        self.nlbA_filter_half = np.ones(self.num_neq_constraints, dtype=bool)
+        self.ubA_filter_half = np.ones(self.num_neq_constraints, dtype=bool)
+        if len(self.bA_part) > 0:
+            self.nlbA_filter_half[-len(self.bA_part):] = self.bA_part
+            self.ubA_filter_half[-len(self.bA_part):] = self.bA_part
+            self.nlbA_filter_half = self.nlbA_filter_half[self.nlbA_finite_filter]
+            self.ubA_filter_half = self.ubA_filter_half[self.ubA_finite_filter]
+        self.bA_filter = np.concatenate((self.nlbA_filter_half, self.ubA_filter_half))
+        if self.compute_nI_I:
+            self.nAi_Ai_filter = np.concatenate((self.static_lb_finite_filter[self.weight_filter],
+                                                 self.static_ub_finite_filter[self.weight_filter]))

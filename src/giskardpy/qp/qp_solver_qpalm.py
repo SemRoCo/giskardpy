@@ -195,7 +195,7 @@ class QPSolverQPalm(QPSolver):
         self.retries_with_relaxed_constraints -= 1
         if self.retries_with_relaxed_constraints <= 0:
             raise HardConstraintsViolatedException('Out of retries with relaxed hard constraints.')
-        lb_filter, lbA_relaxed, ub_filter, ubA_relaxed = self.compute_violated_constraints(
+        lb_filter, lbA_relaxed, ub_filter, ubA_relaxed, relaxed_qp_data = self.compute_violated_constraints(
             self.lb[self.b_zero_inf_filter_view],
             self.ub[self.b_zero_inf_filter_view])
         if np.any(lb_filter) or np.any(ub_filter):
@@ -203,8 +203,10 @@ class QPSolverQPalm(QPSolver):
             self.lb_bE_lbA = lbA_relaxed
             self.ub_bE_ubA = ubA_relaxed
             return self.problem_data_to_qp_format()
-        self.retries_with_relaxed_constraints += 1
-        raise InfeasibleException('')
+        # relaxing makes it solvable, without actually violating any of the old constraints
+        return relaxed_qp_data
+        # self.retries_with_relaxed_constraints += 1
+        # raise InfeasibleException('')
 
     @profile
     def compute_violated_constraints(self, filtered_lb: np.ndarray, filtered_ub: np.ndarray):
@@ -215,9 +217,9 @@ class QPSolverQPalm(QPSolver):
         ub_relaxed[-num_constraints_not_filtered:] += self.retry_added_slack
         try:
             H, g, A, lbA, ubA = self.problem_data_to_qp_format()
-            lbA_relaxed = np.concatenate([lb_relaxed, lbA[lb_relaxed.shape[0]:]])
-            ubA_relaxed = np.concatenate([ub_relaxed, ubA[ub_relaxed.shape[0]:]])
-            xdot_full = self.solver_call(H=H, g=g, A=A, lbA=lbA_relaxed, ubA=ubA_relaxed)
+            all_lbA_relaxed = np.concatenate([lb_relaxed, lbA[lb_relaxed.shape[0]:]])
+            all_ubA_relaxed = np.concatenate([ub_relaxed, ubA[ub_relaxed.shape[0]:]])
+            xdot_full = self.solver_call(H=H, g=g, A=A, lbA=all_lbA_relaxed, ubA=all_ubA_relaxed)
         except QPSolverException as e:
             self.retries_with_relaxed_constraints += 1
             raise e
@@ -230,9 +232,11 @@ class QPSolverQPalm(QPSolver):
         ub_relaxed[-num_constraints_not_filtered:] -= self.retry_added_slack
         lb_relaxed[lower_violations[self.b_inf_filter[self.b_zero_filter]]] -= self.retry_added_slack
         ub_relaxed[upper_violations[self.b_inf_filter[self.b_zero_filter]]] += self.retry_added_slack
+        lbA_relaxed = all_lbA_relaxed.copy()
+        ubA_relaxed = all_ubA_relaxed.copy()
         lbA_relaxed[:lb_relaxed.shape[0]] = lb_relaxed
         ubA_relaxed[:ub_relaxed.shape[0]] = ub_relaxed
-        return lower_violations, lbA_relaxed, upper_violations, ubA_relaxed
+        return lower_violations, lbA_relaxed, upper_violations, ubA_relaxed, (H, g, A, all_lbA_relaxed, all_ubA_relaxed)
 
     @profile
     def problem_data_to_qp_format(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:

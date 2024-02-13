@@ -35,7 +35,7 @@ class QPSolverQPSwift(QPSWIFTFormatter):
         'OUTPUT': 1,  # 0 = sol; 1 = sol + basicInfo; 2 = sol + basicInfo + advInfo
         # 'MAXITER': 100,  # 0 < MAXITER < 200; default 100. maximum number of iterations needed
         # 'ABSTOL': 9e-4,  # 0 < ABSTOL < 1; default 1e-6. absolute tolerance
-        'RELTOL': 3.5e-5,  # 0 < RELTOL < 1; default 1e-6. relative tolerance
+        'RELTOL': 3.e-5,  # 0 < RELTOL < 1; default 1e-6. relative tolerance
         # 'SIGMA': 0.01,  # default 100. maximum centering allowed
         # 'VERBOSE': 1  # 0 = no print; 1 = print
     }
@@ -156,6 +156,7 @@ class QPSolverQPSwift(QPSWIFTFormatter):
         nlb_relaxed = nlb.copy()
         ub_relaxed = ub.copy()
         if self.num_slack_variables > 0:
+            # increase slack limit for constraints that are not inf or have 0 weight
             lb_filter = self.weight_filter & self.static_lb_finite_filter
             lb_filter[self.static_lb_finite_filter] &= self.nlb_secondary_finite_filter
             lb_filter = lb_filter[:self.num_non_slack_variables]
@@ -178,16 +179,23 @@ class QPSolverQPSwift(QPSWIFTFormatter):
             self.retries_with_relaxed_constraints += 1
             raise e
         eps = 1e-4
-        self.lb_filter = self.static_lb_finite_filter[self.weight_filter]
-        self.ub_filter = self.static_ub_finite_filter[self.weight_filter]
+        self.lb_filter = self.static_lb_finite_filter.copy()  # all static finites
+        self.lb_filter[self.lb_filter] &= self.nlb_secondary_finite_filter  # all static and dynamic finites
+        self.lb_filter = self.lb_filter[self.weight_filter]  # remove 0 weights
+
+        self.ub_filter = self.static_ub_finite_filter.copy()
+        self.ub_filter[self.ub_filter] &= self.ub_secondary_finite_filter
+        self.ub_filter = self.ub_filter[self.weight_filter]
+
+        # %% check which constraints are violated in general
         lower_violations = xdot_full[self.lb_filter] < - nlb - eps
         upper_violations = xdot_full[self.ub_filter] > ub + eps
         self.lb_filter[self.lb_filter] = lower_violations
         self.ub_filter[self.ub_filter] = upper_violations
-        self.lb_filter[:self.num_non_slack_variables] = False
-        self.ub_filter[:self.num_non_slack_variables] = False
+        # revert previous relaxations
         nlb_relaxed[lb_non_slack_without_inf:] -= self.retry_added_slack
         ub_relaxed[ub_non_slack_without_inf:] -= self.retry_added_slack
+        # add relaxations only to constraints that where violated
         nlb_relaxed[lower_violations] += self.retry_added_slack
         ub_relaxed[upper_violations] += self.retry_added_slack
         return self.lb_filter, nlb_relaxed, self.ub_filter, ub_relaxed

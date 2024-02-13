@@ -163,7 +163,8 @@ class PR2TestWrapper(GiskardTestWrapper):
                               collision_avoidance_config=PR2CollisionAvoidance(drive_joint_name=drive_joint_name),
                               behavior_tree_config=StandAloneBTConfig(debug_mode=True,
                                                                       simulation_max_hz=None),
-                              qp_controller_config=QPControllerConfig(qp_solver=SupportedQPSolver.qpalm))
+                              # qp_controller_config=QPControllerConfig(qp_solver=SupportedQPSolver.qpSWIFT))
+                              qp_controller_config=QPControllerConfig())
         super().__init__(giskard)
         self.robot = god_map.world.groups[self.robot_name]
 

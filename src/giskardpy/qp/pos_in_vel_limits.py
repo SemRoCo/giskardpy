@@ -71,7 +71,7 @@ def compute_projected_vel_profile(current_vel, current_acc, target_vel_profile, 
     return cas.Expression(vel_profile), acc_profile, jerk_profile
 
 
-def unreachable_velocity_limits(vel_limit: float, acc_limit: float, jerk_limit: float, dt: float, ph: int) \
+def no_vel_limit_vel_profile(acc_limit: float, jerk_limit: float, dt: float, ph: int) \
         -> List[float]:
     vel_profile = [0, 0]  # because last two vel are always 0
     vel = 0

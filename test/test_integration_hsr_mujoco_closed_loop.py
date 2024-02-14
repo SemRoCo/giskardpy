@@ -10,7 +10,7 @@ from std_srvs.srv import Trigger
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
 from giskardpy.configs.iai_robots.hsr import HSRCollisionAvoidanceConfig, WorldWithHSRConfig, HSRStandaloneInterface \
-    , HSRMujocoVelocityInterface
+    , HSRMujocoVelocityInterface, HSRVelocityInterface
 from giskardpy.configs.qp_controller_config import QPControllerConfig, SupportedQPSolver
 from giskardpy.configs.behavior_tree_config import StandAloneBTConfig, ClosedLoopBTConfig
 from giskardpy.configs.giskard import Giskard
@@ -102,6 +102,11 @@ class HSRTestWrapperMujoco(HSRTestWrapper):
                           robot_interface_config=HSRMujocoVelocityInterface(),
                           behavior_tree_config=ClosedLoopBTConfig(debug_mode=True),
                           qp_controller_config=QPControllerConfig(max_trajectory_length=200))
+        # real hsr closed loop config
+        # giskard = Giskard(world_config=WorldWithHSRConfig(),
+        #                   collision_avoidance_config=HSRCollisionAvoidanceConfig(),
+        #                   robot_interface_config=HSRVelocityInterface(),
+        #                   behavior_tree_config=ClosedLoopBTConfig())
         super().__init__(giskard)
 
     def reset_base(self):
@@ -627,3 +632,15 @@ class TestActionGoals:
         zero_pose.motion_goals.add_motion_goal(motion_goal_class='PutDown',
                                                name='putdown')
         zero_pose.execute()
+
+    def test_hand_cam_servo(self, zero_pose: HSRTestWrapperMujoco):
+        optical_axis = Vector3Stamped()
+        optical_axis.header.frame_id = 'hand_palm_link'
+        optical_axis.vector.z = 1
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class='HandCamServoGoal',
+                                               name='hnadcamservo',
+                                               root_link='map',
+                                               cam_link='hand_palm_link',
+                                               optical_axis=optical_axis,
+                                               transform_from_image_coordinates=True)
+        zero_pose.execute(add_local_minimum_reached=False)

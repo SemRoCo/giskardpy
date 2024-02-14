@@ -129,6 +129,7 @@ class PouringAdaptiveTilt(Goal):
         self.add_monitor(nominal_monitor)
         nominal_error = cas.rotational_error(root_R_tip, root_R_tip_desired)
         nominal_monitor.expression = (cas.less(nominal_error, 0.1))
+        god_map.debug_expression_manager.add_debug_expression('isTilted error', nominal_error)
         nominal_task.start_condition = pos_monitor
         nominal_task.end_condition = nominal_monitor
         self.pos_task.end_condition = nominal_monitor
@@ -154,6 +155,7 @@ class PouringAdaptiveTilt(Goal):
             stop_to_small = cas.logic_any(
                 cas.Expression([cas.if_less(angle, 0.1, 0, 1), cas.if_greater(angle_a, 0, 1, 0)]))
         tip_R_tip_a = cas.RotationMatrix().from_axis_angle(tip_V_tilt_axis, angle_a)
+        # tip_R_tip_a = tip_R_tip_a.dot(cas.RotationMatrix.from_axis_angle(cas.Vector3([1, 0, 0]), 0.5))
         root_R_tip_desired_a = root_R_tip.dot(tip_R_tip_a)
         # TODO: look into slerp again. Is that necessary here?
         # TODO: Try this with quaternions instead!
@@ -191,18 +193,18 @@ class PouringAdaptiveTilt(Goal):
         #                                                     'tipr6a', 'tipr7a', 'tipr8a', 'tipr9a'
         #                                                     ])
         adaptive_task.start_condition = nominal_monitor
-        adaptive_task.add_equality_constraint(reference_velocity=self.max_vel,
-                                              equality_bound=0 - exp,
-                                              weight=self.weight,
-                                              task_expression=exp)
-        # TODO: why do i need this second constraint for the pot frame not to rotate around  the z-axis of world?
-        #       The rotation matrix constraint above is probably underdefined. test if expanding that constraint helps.
-        #       But prob not ideal as the goal is relative to the current rotation, therefore it can shift.
-        #       The two dot product exps are good anchor points.
-        adaptive_task.add_equality_constraint(reference_velocity=self.max_vel,
-                                              equality_bound=0 - exp2,
-                                              weight=self.weight,
-                                              task_expression=exp2)
+        # adaptive_task.add_equality_constraint(reference_velocity=self.max_vel,
+        #                                       equality_bound=0 - exp,
+        #                                       weight=self.weight,
+        #                                       task_expression=exp)
+        # # TODO: why do i need this second constraint for the pot frame not to rotate around  the z-axis of world?
+        # #       The rotation matrix constraint above is probably underdefined. test if expanding that constraint helps.
+        # #       But prob not ideal as the goal is relative to the current rotation, therefore it can shift.
+        # #       The two dot product exps are good anchor points.
+        # adaptive_task.add_equality_constraint(reference_velocity=self.max_vel,
+        #                                       equality_bound=0 - exp2,
+        #                                       weight=self.weight,
+        #                                       task_expression=exp2)
 
         # Todo: make it smooth and nice to look at, tilt back when adapting the position
         adapt_pos_task = self.create_and_add_task('adaptPosition')
@@ -212,7 +214,7 @@ class PouringAdaptiveTilt(Goal):
         is_y = symbol_manager.get_symbol(f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\'].move_y')
         is_y_back = symbol_manager.get_symbol(f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\'].move_y_back')
         root_V_adapt = cas.Vector3([0.02 * is_x - 0.02 * is_x_back,
-                                    0.01 * is_y - 0.01 * is_y_back,
+                                    0.02 * is_y - 0.02 * is_y_back,
                                     0
                                     ])
         adapt_pos_task.add_equality_constraint_vector(reference_velocities=[self.max_vel] * 3,
@@ -530,5 +532,93 @@ class CloseGripper(Goal):
                     self.effort = effort
                 else:
                     self.effort = 0
-        #Todo: this still publishes after the goal is finished. Is there a destructor that could be used to stop the subscriber?
+        # Todo: this still publishes after the goal is finished. Is there a destructor that could be used to stop the subscriber?
         self.pub.publish(self.msg)
+
+
+class HandCamServoGoal(Goal):
+    """
+    This goal should move the hand camera of a robot around and should therefore be combined with feedback from the same.
+    Todo:
+        - move cam up/down left/right from vector in image coordinates (rostopic)
+        - rotate cam around view axis given angle (rostopic)
+        - move cam along view axis until distance feedback is below threshold (rostopic)
+    """
+
+    def __init__(self, name: str, cam_link: str, root_link: str, distance_threshold: float = 0.1,
+                 start_pose: PoseStamped = None, max_vel: float = 0.3, weight=WEIGHT_COLLISION_AVOIDANCE,
+                 optical_axis: Vector3Stamped = None,
+                 transform_from_image_coordinates: bool = False,
+                 start_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 end_condition: cas.Expression = cas.TrueSymbol
+                 ):
+        super(HandCamServoGoal, self).__init__(name=name)
+        self.cam_link = god_map.world.search_for_link_name(cam_link, None)
+        self.root_link = god_map.world.search_for_link_name(root_link, None)
+        self.cam_V_movement = Vector3Stamped()
+        self.optical_axis = optical_axis
+        self.optical_axis.header.frame_id = god_map.world.search_for_link_name(optical_axis.header.frame_id, None)
+        self.optical_axis = god_map.world.transform_vector(self.root_link, self.optical_axis)
+        self.root_V_optical_axis = cas.Vector3(self.optical_axis)
+        self.cam_V_optical_axis = cas.Vector3(optical_axis)
+        self.rotation_angle: float = 0.0
+        self.object_distance: float = -100.0
+
+        rospy.Subscriber(name='/hand_cam/movement', data_class=Vector3Stamped, callback=self.movement_callback)
+        rospy.Subscriber(name='/hand_cam/angle', data_class=Float64, callback=self.angle_callback)
+        rospy.Subscriber(name='/hand_cam/distance', data_class=Float64, callback=self.distance_callback)
+
+        # TODO: augment the first task/constraint to include movement forward along the optical axis until object distance < distance_threshold
+        distance = symbol_manager.get_symbol(
+            f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\'].object_distance')
+        move_distance = cas.if_greater(distance, distance_threshold, 1, 0)
+        # TODO: Create task/constraints moving the camera link left/right/up/down.
+        # movement_callback provides a vector that can be used as the error for a position constraint
+        task = self.create_and_add_task()
+        # desired is basically this. copied from the scraping movement. with fixation of the orientation.
+        movement_vector = symbol_manager.get_expr(
+            f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\'].cam_V_movement', input_type_hint=Vector3Stamped)
+        if transform_from_image_coordinates:  # add transformation from image coordinate formate to the tip_link format
+            cam_R_image = cas.RotationMatrix([[0, -1, 0, 0],
+                                              [1, 0, 0, 0],
+                                              [0, 0, 1, 0],
+                                              [0, 0, 0, 1]])
+            movement_vector = cam_R_image.dot(movement_vector)
+        # hard coded that z is the optical axis
+        movement_vector.z = 0.01 * move_distance
+        root_T_cam = god_map.world.compose_fk_expression(self.root_link, self.cam_link)
+        root_R_cam = root_T_cam.to_rotation()
+        task.add_equality_constraint_vector(reference_velocities=[max_vel] * 3,
+                                            equality_bounds=root_R_cam.dot(movement_vector)[:3],
+                                            weights=[weight] * 3,
+                                            task_expression=root_T_cam.to_position()[:3],
+                                            names=['servox', 'servoy', 'servoz'])
+        # tip_R_goal = cas.RotationMatrix(scrape_pose.pose.orientation)
+        # task.add_rotation_goal_constraints(frame_R_current=tip_T_scrape_tip.to_rotation(),
+        #                                             frame_R_goal=tip_R_goal,
+        #                                             current_R_frame_eval=god_map.world.compose_fk_evaluated_expression(
+        #                                                 self.scrape_tip, self.tip_link),
+        #                                             reference_velocity=self.max_vel,
+        #                                             weight=self.weight)
+
+        # TODO: create rotation task/constraint to rotate around the optical axis.
+        #   angle callback provides angle to update rotation matrix for the desired rotation
+        angle = symbol_manager.get_symbol(f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\'].rotation_angle')
+        tip_R_tip_a = cas.RotationMatrix().from_axis_angle(self.cam_V_optical_axis, angle)
+        root_R_tip_desired_a = root_R_cam.dot(tip_R_tip_a)
+        task.add_rotation_goal_constraints(frame_R_current=root_R_cam,
+                                           frame_R_goal=root_R_tip_desired_a,
+                                           current_R_frame_eval=god_map.world.compose_fk_evaluated_expression(
+                                               self.cam_link, self.root_link),
+                                           reference_velocity=max_vel,
+                                           weight=weight)
+
+    def movement_callback(self, data: Vector3Stamped):
+        self.cam_V_movement = data
+
+    def angle_callback(self, data: Float64):
+        self.rotation_angle = data.data
+
+    def distance_callback(self, data: Float64):
+        self.object_distance = data.data

@@ -7,6 +7,7 @@ from giskardpy.tree.behaviors.log_trajectory import LogTrajPlugin
 from giskardpy.tree.behaviors.plot_debug_expressions import PlotDebugExpressions
 from giskardpy.tree.behaviors.plot_goal_gantt_chart import PlotGanttChart
 from giskardpy.tree.behaviors.plot_trajectory import PlotTrajectory
+from giskardpy.tree.behaviors.publish_feedback import PublishFeedback
 from giskardpy.tree.behaviors.reset_joint_state import ResetWorldState
 from giskardpy.tree.behaviors.time import TimePlugin
 from giskardpy.utils.decorators import toggle_on, toggle_off
@@ -17,6 +18,7 @@ class CleanupControlLoop(Sequence):
 
     def __init__(self, name: str = 'clean up control loop'):
         super().__init__(name)
+        self.add_child(PublishFeedback())
         self.add_child(TimePlugin())
         self.add_child(SetZeroVelocity('set zero vel 1'))
         self.add_child(LogTrajPlugin('log post processing'))

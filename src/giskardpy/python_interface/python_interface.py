@@ -28,8 +28,8 @@ from giskardpy.model.utils import make_world_body_box
 from giskardpy.monitors.cartesian_monitors import PoseReached, PositionReached, OrientationReached, PointingAt, \
     VectorsAligned, DistanceToLine
 from giskardpy.monitors.joint_monitors import JointGoalReached
-from giskardpy.monitors.monitors import LocalMinimumReached, TimeAbove, Alternator
-from giskardpy.monitors.payload_monitors import EndMotion, Print, Sleep, CancelMotion, SetMaxTrajectoryLength, \
+from giskardpy.monitors.monitors import LocalMinimumReached, TimeAbove, Alternator, CancelMotion, EndMotion
+from giskardpy.monitors.payload_monitors import Print, Sleep, SetMaxTrajectoryLength, \
     UpdateParentLinkOfGroup, PayloadAlternator
 from giskardpy.utils.utils import kwargs_to_json
 

@@ -1,15 +1,18 @@
 from __future__ import annotations
 
-from enum import IntEnum
+import abc
+from abc import ABC
 from functools import cached_property
-from typing import List, Optional
+from typing import Optional
 
 import numpy as np
 
+import giskard_msgs.msg as giskard_msgs
 import giskardpy.casadi_wrapper as cas
+from giskard_msgs.msg import GiskardError
+from giskardpy.data_types import Derivatives
 from giskardpy.exceptions import GiskardException, MonitorInitalizationException
 from giskardpy.god_map import god_map
-from giskardpy.data_types import Derivatives
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils.utils import string_shortener
 
@@ -43,6 +46,18 @@ class Monitor:
     def set_id(self, new_id: int):
         self._id = new_id
 
+    def to_ros_msg(self) -> giskard_msgs.Monitor:
+        msg = giskard_msgs.Monitor()
+        msg.name = self.name
+        if isinstance(self, EndMotion):
+            msg.monitor_class = EndMotion.__name__
+        elif isinstance(self, CancelMotion):
+            msg.monitor_class = CancelMotion.__name__
+        else:
+            msg.monitor_class = self.__class__.__name__
+        msg.start_condition = god_map.monitor_manager.format_condition(self.start_condition, new_line=' ')
+        return msg
+
     @property
     def id(self) -> int:
         if self._id == -1:
@@ -72,6 +87,65 @@ class Monitor:
 
     def __repr__(self) -> str:
         return self.name
+
+
+class PayloadMonitor(Monitor, ABC):
+    state: bool
+    run_call_in_thread: bool
+
+    def __init__(self, *,
+                 run_call_in_thread: bool,
+                 name: Optional[str] = None,
+                 stay_true: bool = True,
+                 start_condition: cas.Expression = cas.TrueSymbol):
+        """
+        A monitor which executes its __call__ function when start_condition becomes True.
+        Subclass this and implement __init__ and __call__. The __call__ method should change self.state to True when
+        it's done.
+        :param run_call_in_thread: if True, calls __call__ in a separate thread. Use for expensive operations
+        """
+        self.state = False
+        self.run_call_in_thread = run_call_in_thread
+        super().__init__(name=name, start_condition=start_condition, stay_true=stay_true)
+
+    def get_state(self) -> bool:
+        return self.state
+
+    @abc.abstractmethod
+    def __call__(self):
+        pass
+
+
+class EndMotion(PayloadMonitor):
+    def __init__(self,
+                 name: Optional[str] = None,
+                 start_condition: cas.Expression = cas.TrueSymbol, ):
+        super().__init__(name=name, start_condition=start_condition, run_call_in_thread=False)
+
+    def __call__(self):
+        self.state = True
+
+    def get_state(self) -> bool:
+        return self.state
+
+
+class CancelMotion(PayloadMonitor):
+    def __init__(self,
+                 error_message: str,
+                 error_code: int = GiskardError.ERROR,
+                 name: Optional[str] = None,
+                 start_condition: cas.Expression = cas.TrueSymbol, ):
+        super().__init__(name=name, start_condition=start_condition, run_call_in_thread=False)
+        self.error_message = error_message
+        self.error_code = error_code
+
+    @profile
+    def __call__(self):
+        self.state = True
+        raise GiskardException.from_error_code(error_code=self.error_code, error_message=self.error_message)
+
+    def get_state(self) -> bool:
+        return self.state
 
 
 class ExpressionMonitor(Monitor):

@@ -30,7 +30,7 @@ class MotionGoalManager:
 
     def __init__(self):
         self.motion_goals = {}
-        self.tasks = {}
+        self.tasks = OrderedDict()
         self.allowed_motion_goal_types = {}
         self.state_history = []
         for path in god_map.giskard.goal_package_paths:

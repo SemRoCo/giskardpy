@@ -6,8 +6,7 @@ import numpy as np
 from py_trees import Status
 from giskardpy.goals.collision_avoidance import CollisionAvoidance
 from giskardpy.goals.goal import Goal
-from giskardpy.monitors.monitors import Monitor
-from giskardpy.monitors.payload_monitors import PayloadMonitor, EndMotion, CancelMotion
+from giskardpy.monitors.monitors import Monitor, EndMotion, CancelMotion
 from giskardpy.god_map import god_map
 from giskardpy.tasks.task import TaskState
 from giskardpy.tree.behaviors.plugin import GiskardBehavior

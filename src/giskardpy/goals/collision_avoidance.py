@@ -96,6 +96,7 @@ class ExternalCollisionAvoidance(Goal):
         distance_monitor.expression = cas.greater(actual_distance, 50)
         self.add_monitor(distance_monitor)
         task = self.create_and_add_task('stay away')
+        task.plot = False
         task.hold_condition = distance_monitor.get_state_expression()
         task.add_inequality_constraint(reference_velocity=self.max_velocity,
                                        lower_error=lower_limit,
@@ -206,6 +207,7 @@ class SelfCollisionAvoidance(Goal):
         distance_monitor.expression = cas.greater(actual_distance, 50)
         self.add_monitor(distance_monitor)
         task = self.create_and_add_task('stay away')
+        task.plot = False
         task.hold_condition = distance_monitor.get_state_expression()
         task.add_inequality_constraint(reference_velocity=self.max_velocity,
                                        lower_error=lower_limit,

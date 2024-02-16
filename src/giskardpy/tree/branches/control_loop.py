@@ -37,6 +37,7 @@ class ControlLoop(AsyncBehavior):
         name = f'{name}\nmax_hz: {max_hz}'
         super().__init__(name, max_hz=max_hz)
         self.publish_state = success_is_running(PublishState)('publish state 2')
+        self.publish_state.add_publish_feedback()
         self.projection_synchronization = success_is_running(Synchronization)()
         self.check_monitors = CheckMonitors()
         # projection plugins

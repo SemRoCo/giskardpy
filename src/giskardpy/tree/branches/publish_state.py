@@ -4,6 +4,7 @@ from py_trees import Sequence
 
 from giskardpy.tree.behaviors.debug_marker_publisher import DebugMarkerPublisher
 from giskardpy.tree.behaviors.publish_debug_expressions import PublishDebugExpressions
+from giskardpy.tree.behaviors.publish_feedback import PublishFeedback
 from giskardpy.tree.behaviors.publish_joint_states import PublishJointState
 from giskardpy.tree.behaviors.tf_publisher import TfPublishingModes, TFPublisher
 from giskardpy.tree.behaviors.visualization import VisualizationBehavior
@@ -29,6 +30,9 @@ class PublishState(Sequence):
 
     def add_debug_marker_publisher(self):
         self.add_child(DebugMarkerPublisher())
+
+    def add_publish_feedback(self):
+        self.add_child(PublishFeedback())
 
     def add_tf_publisher(self, include_prefix: bool = False, tf_topic: str = 'tf',
                          mode: TfPublishingModes = TfPublishingModes.attached_and_world_objects):

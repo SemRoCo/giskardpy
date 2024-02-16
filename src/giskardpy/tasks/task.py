@@ -3,7 +3,7 @@ from typing import Optional, List, Union, Dict, Callable, Iterable, overload
 
 import numpy as np
 
-import giskard_msgs.msg
+import giskard_msgs.msg as giskard_msgs
 import giskardpy.casadi_wrapper as cas
 from giskardpy.exceptions import GiskardException, GoalInitalizationException, DuplicateNameException
 from giskardpy.god_map import god_map
@@ -15,11 +15,11 @@ from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils.decorators import memoize
 from giskardpy.utils.utils import string_shortener
 
-WEIGHT_MAX = giskard_msgs.msg.Weights.WEIGHT_MAX
-WEIGHT_ABOVE_CA = giskard_msgs.msg.Weights.WEIGHT_ABOVE_CA
-WEIGHT_COLLISION_AVOIDANCE = giskard_msgs.msg.Weights.WEIGHT_COLLISION_AVOIDANCE
-WEIGHT_BELOW_CA = giskard_msgs.msg.Weights.WEIGHT_BELOW_CA
-WEIGHT_MIN = giskard_msgs.msg.Weights.WEIGHT_MIN
+WEIGHT_MAX = giskard_msgs.Weights.WEIGHT_MAX
+WEIGHT_ABOVE_CA = giskard_msgs.Weights.WEIGHT_ABOVE_CA
+WEIGHT_COLLISION_AVOIDANCE = giskard_msgs.Weights.WEIGHT_COLLISION_AVOIDANCE
+WEIGHT_BELOW_CA = giskard_msgs.Weights.WEIGHT_BELOW_CA
+WEIGHT_MIN = giskard_msgs.Weights.WEIGHT_MIN
 
 
 class Task:
@@ -35,8 +35,10 @@ class Task:
     _name: str
     _parent_goal_name: str
     _id: int
+    plot: bool
 
     def __init__(self, parent_goal_name: str, name: Optional[str] = None):
+        self.plot = True
         if name is None:
             self._name = str(self.__class__.__name__)
         else:
@@ -50,6 +52,15 @@ class Task:
         self._end_condition = cas.TrueSymbol
         self.manip_constraints = {}
         self._id = -1
+
+    def to_ros_msg(self) -> giskard_msgs.MotionGoal:
+        msg = giskard_msgs.MotionGoal()
+        msg.name = str(self.name)
+        msg.motion_goal_class = self.__class__.__name__
+        msg.start_condition = god_map.monitor_manager.format_condition(self.start_condition, new_line=' ')
+        msg.hold_condition = god_map.monitor_manager.format_condition(self.hold_condition, new_line=' ')
+        msg.end_condition = god_map.monitor_manager.format_condition(self.end_condition, new_line=' ')
+        return msg
 
     @property
     def start_condition(self) -> cas.Expression:

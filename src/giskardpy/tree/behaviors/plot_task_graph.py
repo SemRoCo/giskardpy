@@ -47,12 +47,44 @@ monitor_state_to_color: Dict[Tuple[TaskState, int], str] = {
 }
 
 
+def format_condition(condition: str) -> str:
+    condition = condition.replace(' and ', '\nand ')
+    condition = condition.replace(' or ', '\nor ')
+    condition = condition.replace('1.0', 'True')
+    condition = condition.replace('0.0', 'False')
+    return condition
+
+def format_monitor_msg(msg: giskard_msgs.Monitor) -> str:
+    start_condition = format_condition(msg.start_condition)
+    return (f'"\'{msg.name}\'\n'
+            f'----------start_condition:----------\n'
+            f'{start_condition}"')
+
+
+def format_task_msg(msg: giskard_msgs.MotionGoal) -> str:
+    start_condition = format_condition(msg.start_condition)
+    hold_condition = format_condition(msg.hold_condition)
+    end_condition = format_condition(msg.end_condition)
+    return (f'"\'{msg.name}\'\n'
+            f'----------start_condition:----------\n'
+            f'{start_condition}\n'
+            f'----------hold_condition:-----------\n'
+            f'{hold_condition}\n'
+            f'-----------end_condition:-----------\n'
+            f'{end_condition}"')
+
+
+def format_msg(msg: Union[giskard_msgs.Monitor, giskard_msgs.MotionGoal]) -> str:
+    if isinstance(msg, giskard_msgs.MotionGoal):
+        return format_task_msg(msg)
+    return format_monitor_msg(msg)
+
+
 def execution_state_to_dot_graph(execution_state: ExecutionState) -> pydot.Dot:
     graph = pydot.Dot(graph_type='digraph')
 
     def add_or_get_node(thing: Union[giskard_msgs.Monitor, giskard_msgs.MotionGoal]):
-        # node_id = thing.formatted_name(quoted=True)
-        node_id = f'"{thing.name}"'
+        node_id = format_msg(thing)
         nodes = graph.get_node(node_id)
         if not nodes:
             if isinstance(thing, giskard_msgs.Monitor):
@@ -75,8 +107,9 @@ def execution_state_to_dot_graph(execution_state: ExecutionState) -> pydot.Dot:
     # Process monitors and their start_condition
     for i, monitor in enumerate(execution_state.monitors):
         monitor_node = add_or_get_node(monitor)
-        monitor_node.obj_dict['attributes']['color'] = monitor_state_to_color[(execution_state.monitor_life_cycle_state[i],
-                                                                               execution_state.monitor_state[i])]
+        monitor_node.obj_dict['attributes']['color'] = monitor_state_to_color[
+            (execution_state.monitor_life_cycle_state[i],
+             execution_state.monitor_state[i])]
         free_symbols = extract_monitor_names_from_condition(monitor.start_condition)
         for sub_monitor_name in free_symbols:
             sub_monitor = search_for_monitor(sub_monitor_name, execution_state)

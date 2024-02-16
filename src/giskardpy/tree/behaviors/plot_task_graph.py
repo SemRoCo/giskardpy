@@ -57,6 +57,7 @@ def format_condition(condition: str) -> str:
 def format_monitor_msg(msg: giskard_msgs.Monitor) -> str:
     start_condition = format_condition(msg.start_condition)
     return (f'"\'{msg.name}\'\n'
+            f'class: {msg.monitor_class}\n'
             f'----------start_condition:----------\n'
             f'{start_condition}"')
 

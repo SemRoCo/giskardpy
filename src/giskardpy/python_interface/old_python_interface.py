@@ -14,8 +14,9 @@ class OldGiskardWrapper(GiskardWrapper):
     def __init__(self, node_name: str = 'giskard'):
         super().__init__(node_name, avoid_name_conflict=True)
 
-    def execute(self, wait: bool = True) -> MoveResult:
-        self.add_default_end_motion_conditions()
+    def execute(self, wait: bool = True, add_default: bool = True) -> MoveResult:
+        if add_default:
+            self.add_default_end_motion_conditions()
         return super().execute(wait)
 
     def projection(self, wait: bool = True) -> MoveResult:

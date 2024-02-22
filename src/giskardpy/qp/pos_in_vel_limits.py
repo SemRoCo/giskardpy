@@ -18,7 +18,7 @@ def shifted_velocity_profile(vel_profile, acc_profile, distance, dt):
         if condition > 0:
             vel_if_cases.append((condition, vel_result))
             acc_if_cases.append((condition, acc_result))
-    vel_if_cases.append((2 * vel_if_cases[-1][0] - vel_if_cases[-2][0], vel_profile))
+    # vel_if_cases.append((2 * vel_if_cases[-1][0] - vel_if_cases[-2][0], vel_profile))
     default_vel_profile = np.full(vel_profile.shape[0], vel_profile[0])
 
     shifted_vel_profile = cas.if_less_eq_cases(distance, vel_if_cases, default_vel_profile)

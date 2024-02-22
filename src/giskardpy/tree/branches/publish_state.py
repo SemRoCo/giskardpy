@@ -56,6 +56,8 @@ class PublishState(Sequence):
                                        publish_debug=publish_debug)
         self.add_child(node)
 
-    def add_joint_state_publisher(self, topic_name: Optional[str] = None, include_prefix: bool = False):
-        node = PublishJointState(include_prefix=include_prefix, topic_name=topic_name)
+    def add_joint_state_publisher(self, topic_name: Optional[str] = None, include_prefix: bool = False,
+                                  only_prismatic_and_revolute: bool = True):
+        node = PublishJointState(include_prefix=include_prefix, topic_name=topic_name,
+                                 only_prismatic_and_revolute=only_prismatic_and_revolute)
         self.add_child(node)

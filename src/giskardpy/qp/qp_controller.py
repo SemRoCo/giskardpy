@@ -19,7 +19,7 @@ from giskardpy.qp.constraint import InequalityConstraint, EqualityConstraint, De
     ManipulabilityConstraint
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.next_command import NextCommands
-from giskardpy.qp.pos_in_vel_limits import b_profile, no_vel_limit_vel_profile
+from giskardpy.qp.pos_in_vel_limits import b_profile, implicit_vel_profile
 from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils import logging
@@ -329,16 +329,16 @@ class FreeVariableBounds(ProblemDataPart):
                 else:
                     raise
         # %% set velocity limits to infinite, that can't be reached due to acc/jerk limits anyway
-        unlimited_vel_profile = no_vel_limit_vel_profile(acc_limit=upper_acc_limit,
-                                                         jerk_limit=upper_jerk_limit,
-                                                         dt=self.dt,
-                                                         ph=self.prediction_horizon)
+        unlimited_vel_profile = implicit_vel_profile(acc_limit=upper_acc_limit,
+                                                     jerk_limit=upper_jerk_limit,
+                                                     dt=self.dt,
+                                                     ph=self.prediction_horizon)
         for i in range(self.prediction_horizon):
             ub[i] = cas.if_less(ub[i], unlimited_vel_profile[i], ub[i], np.inf)
-        unlimited_vel_profile = no_vel_limit_vel_profile(acc_limit=-lower_acc_limit,
-                                                         jerk_limit=-lower_jerk_limit,
-                                                         dt=self.dt,
-                                                         ph=self.prediction_horizon)
+        unlimited_vel_profile = implicit_vel_profile(acc_limit=-lower_acc_limit,
+                                                     jerk_limit=-lower_jerk_limit,
+                                                     dt=self.dt,
+                                                     ph=self.prediction_horizon)
         for i in range(self.prediction_horizon):
             lb[i] = cas.if_less(-lb[i], unlimited_vel_profile[i], lb[i], -np.inf)
         return lb, ub

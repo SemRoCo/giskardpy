@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Optional
 
+from giskardpy.exceptions import SetupException
 from giskardpy.god_map import god_map
 from giskardpy.tree.behaviors.tf_publisher import TfPublishingModes
 from giskardpy.tree.branches.giskard_bt import GiskardBT
@@ -155,15 +156,29 @@ class BehaviorTreeConfig(ABC):
         Publishes joint states for Giskard's internal state.
         """
         god_map.tree.control_loop_branch.publish_state.add_joint_state_publisher(include_prefix=include_prefix,
-                                                                                 topic_name=topic_name)
+                                                                                 topic_name=topic_name,
+                                                                                 only_prismatic_and_revolute=True)
         god_map.tree.wait_for_goal.publish_state.add_joint_state_publisher(include_prefix=include_prefix,
-                                                                           topic_name=topic_name)
+                                                                           topic_name=topic_name,
+                                                                           only_prismatic_and_revolute=True)
+
+    def add_free_variable_publisher(self, topic_name: Optional[str] = None, include_prefix: bool = False):
+        """
+        Publishes joint states for Giskard's internal state.
+        """
+        god_map.tree.control_loop_branch.publish_state.add_joint_state_publisher(include_prefix=include_prefix,
+                                                                                 topic_name=topic_name,
+                                                                                 only_prismatic_and_revolute=False)
+        god_map.tree.wait_for_goal.publish_state.add_joint_state_publisher(include_prefix=include_prefix,
+                                                                           topic_name=topic_name,
+                                                                           only_prismatic_and_revolute=False)
 
 
 class StandAloneBTConfig(BehaviorTreeConfig):
     def __init__(self,
                  debug_mode: bool = False,
                  publish_js: bool = False,
+                 publish_free_variables: bool = False,
                  publish_tf: bool = False,
                  simulation_max_hz: Optional[float] = None):
         """
@@ -179,7 +194,10 @@ class StandAloneBTConfig(BehaviorTreeConfig):
         super().__init__(ControlModes.standalone, simulation_max_hz=simulation_max_hz)
         self.debug_mode = debug_mode
         self.publish_js = publish_js
+        self.publish_free_variables = publish_free_variables
         self.publish_tf = publish_tf
+        if publish_js and publish_free_variables:
+            raise SetupException('publish_js and publish_free_variables cannot be True at the same time.')
 
     def setup(self):
         self.add_visualization_marker_publisher(add_to_sync=True, add_to_control_loop=True)
@@ -194,6 +212,8 @@ class StandAloneBTConfig(BehaviorTreeConfig):
         # self.add_debug_marker_publisher()
         if self.publish_js:
             self.add_js_publisher()
+        if self.publish_free_variables:
+            self.add_free_variable_publisher()
 
 
 class OpenLoopBTConfig(BehaviorTreeConfig):

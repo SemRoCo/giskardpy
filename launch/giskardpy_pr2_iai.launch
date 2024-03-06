@@ -4,7 +4,7 @@
 
   <node pkg="giskardpy" type="joystick_e_stop.py" name="giskard_e_stop" output="screen">
     <rosparam param="button_ids">
-        [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+        [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
     </rosparam>
   </node>
 

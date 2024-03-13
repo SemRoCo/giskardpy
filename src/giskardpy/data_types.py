@@ -76,6 +76,9 @@ class PrefixName:
     def __contains__(self, item):
         return self.long_name.__contains__(item.__str__())
 
+    def encode(self, param: str):
+        return self.long_name.__str__().encode(param)
+
 
 class Derivatives(IntEnum):
     position = 0

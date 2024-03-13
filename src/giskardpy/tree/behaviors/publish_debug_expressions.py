@@ -59,10 +59,10 @@ class PublishDebugExpressions(GiskardBehavior):
                                     msg.name.append(tmp_name)
                                     msg.position.append(value[x])
                     else:
-                        msg.name.append(name)
+                        msg.name.append(str(name))
                         msg.position.append(value.flatten())
                 else:
-                    msg.name.append(name)
+                    msg.name.append(str(name))
                     msg.position.append(value)
 
         if self.publish_lb:

@@ -58,7 +58,7 @@ class PublishFeedback(GiskardBehavior):
             topic_name = '~state'
         super().__init__(name)
         self.cmd_topic = topic_name
-        self.pub = rospy.Publisher(self.cmd_topic, ExecutionState, queue_size=10)
+        self.pub = rospy.Publisher(self.cmd_topic, ExecutionState, queue_size=10, latch=True)
 
     @record_time
     @profile

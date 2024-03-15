@@ -135,4 +135,4 @@ class PublishDebugExpressions(GiskardBehavior):
         qp_controller: QPProblemBuilder = god_map.qp_controller
         msg = self.create_msg(qp_controller)
         self.publisher.publish(msg)
-        return Status.RUNNING
+        return Status.SUCCESS

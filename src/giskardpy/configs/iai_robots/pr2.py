@@ -13,6 +13,9 @@ class WorldWithPR2Config(WorldWithOmniDriveRobot):
         self.set_joint_limits(limit_map={Derivatives.velocity: 2,
                                          Derivatives.jerk: 60},
                               joint_name='head_pan_joint')
+        self.set_joint_limits(limit_map={Derivatives.velocity: 4,
+                                         Derivatives.jerk: 120},
+                              joint_name='head_tilt_joint')
 
 
 class PR2StandaloneInterface(RobotInterfaceConfig):
@@ -145,24 +148,11 @@ class PR2VelocityIAIInterface(RobotInterfaceConfig):
                                            tf_child_frame=self.odom_link_name)
         self.sync_joint_state_topic('/joint_states')
         self.sync_odometry_topic('/robot_pose_ekf/odom_combined', self.drive_joint_name)
-        self.add_joint_velocity_controller(namespaces=[
-            'torso_lift_velocity_controller',
-            'r_upper_arm_roll_velocity_controller',
-            'r_shoulder_pan_velocity_controller',
-            'r_shoulder_lift_velocity_controller',
-            'r_forearm_roll_velocity_controller',
-            'r_elbow_flex_velocity_controller',
-            'r_wrist_flex_velocity_controller',
-            'r_wrist_roll_velocity_controller',
-            'l_upper_arm_roll_velocity_controller',
-            'l_shoulder_pan_velocity_controller',
-            'l_shoulder_lift_velocity_controller',
-            'l_forearm_roll_velocity_controller',
-            'l_elbow_flex_velocity_controller',
-            'l_wrist_flex_velocity_controller',
-            'l_wrist_roll_velocity_controller',
-            'head_pan_velocity_controller',
-            'head_tilt_velocity_controller',
+        self.add_joint_velocity_group_controller(namespace='l_arm_joint_group_velocity_controller')
+        self.add_joint_velocity_group_controller(namespace='r_arm_joint_group_velocity_controller')
+        self.add_joint_position_controller(namespaces=[
+            'head_pan_position_controller',
+            'head_tilt_position_controller',
         ])
 
         self.add_base_cmd_velocity(cmd_vel_topic='/base_controller/command',

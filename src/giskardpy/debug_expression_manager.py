@@ -92,10 +92,10 @@ class DebugExpressionManager:
         for name, value in self.evaluated_debug_expressions.items():
             if isinstance(value, np.ndarray):
                 if len(value.shape) == 2:
-                    p_debug[name] = value.reshape((value.shape[0] * value.shape[1]))
+                    p_debug[str(name)] = value.reshape((value.shape[0] * value.shape[1]))
                 else:
-                    p_debug[name] = value
+                    p_debug[str(name)] = value
             else:
-                p_debug[name] = np.array(value)
+                p_debug[str(name)] = np.array(value)
         self.p_debug = pd.DataFrame.from_dict(p_debug, orient='index').sort_index()
         return self.p_debug

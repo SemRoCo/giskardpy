@@ -1358,6 +1358,7 @@ class QPProblemBuilder:
 
         else:
             self.p_xdot = None
+        self.p_debug = god_map.debug_expression_manager.to_pandas()
 
     def _print_iis(self):
         result = self.qp_solver.analyze_infeasibility()

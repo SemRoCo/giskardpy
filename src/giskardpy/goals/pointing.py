@@ -3,6 +3,7 @@ from __future__ import division
 from typing import Optional, List
 
 from geometry_msgs.msg import Vector3Stamped, PointStamped
+from std_msgs.msg import ColorRGBA
 
 import giskardpy.utils.tfwrapper as tf
 import giskardpy.casadi_wrapper as cas
@@ -63,6 +64,7 @@ class Pointing(Goal):
                                                     f'.root_P_goal_point',
                                                     input_type_hint=PointStamped,
                                                     output_type_hint=cas.Point3)
+        root_P_goal_point.reference_frame = self.root
         tip_V_pointing_axis = cas.Vector3(self.tip_V_pointing_axis)
 
         root_V_goal_axis = root_P_goal_point - root_T_tip.to_position()
@@ -73,8 +75,12 @@ class Pointing(Goal):
         # self.add_debug_expr('goal_point', root_P_goal_point)
         # self.add_debug_expr('root_V_pointing_axis', root_V_pointing_axis)
         # self.add_debug_expr('root_V_goal_axis', root_V_goal_axis)
-        god_map.debug_expression_manager.add_debug_expression('goal_point', root_P_goal_point)
-        god_map.debug_expression_manager.add_debug_expression('root_V_pointing_axis', root_V_pointing_axis)
+        god_map.debug_expression_manager.add_debug_expression('root_V_pointing_axis',
+                                                              root_V_pointing_axis,
+                                                              color=ColorRGBA(r=1, g=0, b=0, a=1))
+        god_map.debug_expression_manager.add_debug_expression('goal_point',
+                                                              root_P_goal_point,
+                                                              color=ColorRGBA(r=0, g=0, b=1, a=1))
         task = self.create_and_add_task('pointing')
         task.add_vector_goal_constraints(frame_V_current=root_V_pointing_axis,
                                          frame_V_goal=root_V_goal_axis,

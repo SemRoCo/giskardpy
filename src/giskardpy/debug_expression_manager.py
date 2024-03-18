@@ -1,8 +1,10 @@
 import traceback
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 import numpy as np
 import pandas as pd
+from std_msgs.msg import ColorRGBA
+
 import giskardpy.casadi_wrapper as cas
 from giskardpy.data_types import JointStates
 from giskardpy.god_map import god_map
@@ -22,7 +24,8 @@ class DebugExpressionManager:
         self.debug_expressions = {}
         self._debug_trajectory = Trajectory()
 
-    def add_debug_expression(self, name: str, expression: cas.Expression):
+    def add_debug_expression(self, name: str, expression: cas.Expression, color: Optional[ColorRGBA] = None):
+        expression.color = color
         self.debug_expressions[PrefixName(name, prefix='')] = expression
 
     @property

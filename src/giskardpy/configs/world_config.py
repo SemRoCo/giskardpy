@@ -275,12 +275,12 @@ class WorldWithOmniDriveRobot(WorldConfig):
                                   child_link_name=root_link_name,
                                   translation_limits={
                                       Derivatives.velocity: 0.2,
-                                      Derivatives.acceleration: np.inf,
+                                      Derivatives.acceleration: 1,
                                       Derivatives.jerk: 5,
                                   },
                                   rotation_limits={
                                       Derivatives.velocity: 0.2,
-                                      Derivatives.acceleration: np.inf,
+                                      Derivatives.acceleration: 1,
                                       Derivatives.jerk: 5
                                   },
                                   robot_group_name=self.robot_group_name)

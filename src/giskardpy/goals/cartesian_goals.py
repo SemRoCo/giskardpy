@@ -452,7 +452,6 @@ class TranslationVelocityLimit(Goal):
         self.max_velocity = max_velocity
 
         r_P_c = god_map.world.compose_fk_expression(self.root_link, self.tip_link).to_position()
-        # self.add_debug_expr('limit', -self.max_velocity)
         task = self.create_and_add_task('limit translation vel')
         if not self.hard:
             task.add_translational_velocity_limit(frame_P_current=r_P_c,

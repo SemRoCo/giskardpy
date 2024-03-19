@@ -274,14 +274,14 @@ class WorldWithOmniDriveRobot(WorldConfig):
                                   parent_link_name=self.odom_link_name,
                                   child_link_name=root_link_name,
                                   translation_limits={
-                                      Derivatives.velocity: 0.1,
+                                      Derivatives.velocity: 0.2,
                                       Derivatives.acceleration: np.inf,
-                                      Derivatives.jerk: 3,
+                                      Derivatives.jerk: 5,
                                   },
                                   rotation_limits={
-                                      Derivatives.velocity: 0.1,
+                                      Derivatives.velocity: 0.2,
                                       Derivatives.acceleration: np.inf,
-                                      Derivatives.jerk: 3
+                                      Derivatives.jerk: 5
                                   },
                                   robot_group_name=self.robot_group_name)
         self.set_joint_limits(limit_map={Derivatives.velocity: 3,
@@ -320,7 +320,7 @@ class WorldWithDiffDriveRobot(WorldConfig):
                                                parent_link_name=self.odom_link_name,
                                                child_link_name=root_link_name,
                                                translation_limits={
-                                                   Derivatives.velocity: 0.4,
+                                                   Derivatives.velocity: 0.2,
                                                    Derivatives.acceleration: 1,
                                                    Derivatives.jerk: 5,
                                                },

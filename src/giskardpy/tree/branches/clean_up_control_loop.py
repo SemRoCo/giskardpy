@@ -10,6 +10,7 @@ from giskardpy.tree.behaviors.plot_trajectory import PlotTrajectory
 from giskardpy.tree.behaviors.publish_feedback import PublishFeedback
 from giskardpy.tree.behaviors.reset_joint_state import ResetWorldState
 from giskardpy.tree.behaviors.time import TimePlugin
+from giskardpy.tree.decorators import failure_is_success
 from giskardpy.utils.decorators import toggle_on, toggle_off
 
 
@@ -24,7 +25,7 @@ class CleanupControlLoop(Sequence):
         self.add_child(LogTrajPlugin('log post processing'))
         self.add_child(GoalCleanUp('clean up goals'))
         self.add_child(DeleteMonitors())
-        self.reset_world_state = ResetWorldState()
+        self.reset_world_state = failure_is_success(ResetWorldState)()
         self.remove_reset_world_state()
 
     def add_plot_trajectory(self, normalize_position: bool = False, wait: bool = False):

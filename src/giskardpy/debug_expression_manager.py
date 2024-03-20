@@ -25,7 +25,8 @@ class DebugExpressionManager:
         self._debug_trajectory = Trajectory()
 
     def add_debug_expression(self, name: str, expression: cas.Expression, color: Optional[ColorRGBA] = None):
-        expression.color = color
+        if isinstance(expression, cas.Symbol_):
+            expression.color = color
         self.debug_expressions[PrefixName(name, prefix='')] = expression
 
     @property

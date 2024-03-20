@@ -9,7 +9,12 @@ from numpy import pi
 from std_srvs.srv import Trigger
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
-from giskardpy.configs.iai_robots.hsr import HSR_MujocoRealtime
+from giskardpy.configs.behavior_tree_config import StandAloneBTConfig, ClosedLoopBTConfig
+from giskardpy.configs.giskard import Giskard
+from giskardpy.configs.iai_robots.hsr import WorldWithHSRConfig, HSRCollisionAvoidanceConfig, HSRStandaloneInterface, \
+    HSRMujocoVelocityInterface
+from giskardpy.configs.qp_controller_config import QPControllerConfig
+from giskardpy.god_map import god_map
 from giskardpy.utils.utils import launch_launchfile
 from utils_for_tests import compare_poses, GiskardTestWrapper
 
@@ -26,20 +31,23 @@ class HSRTestWrapper(GiskardTestWrapper):
     }
     better_pose = default_pose
 
-    def __init__(self, config=None):
+    def __init__(self, giskard=None):
         self.tip = 'hand_gripper_tool_frame'
-        self.robot_name = 'hsr'
-        if config is None:
-            config = HSR_MujocoRealtime
+        if giskard is None:
+            giskard = Giskard(world_config=WorldWithHSRConfig(),
+                              collision_avoidance_config=HSRCollisionAvoidanceConfig(),
+                              robot_interface_config=HSRMujocoVelocityInterface(),
+                              behavior_tree_config=ClosedLoopBTConfig(debug_mode=True),
+                              qp_controller_config=QPControllerConfig())
+        super().__init__(giskard)
         self.gripper_group = 'gripper'
         # self.r_gripper = rospy.ServiceProxy('r_gripper_simulator/set_joint_states', SetJointState)
         # self.l_gripper = rospy.ServiceProxy('l_gripper_simulator/set_joint_states', SetJointState)
         self.odom_root = 'odom'
-        super().__init__(config)
-        self.robot = self.world.groups[self.robot_name]
+        self.robot = god_map.world.groups[self.robot_name]
 
     def move_base(self, goal_pose):
-        self.set_cart_goal(goal_pose, tip_link='base_footprint', root_link=self.world.root_link_name)
+        self.set_cart_goal(goal_pose, tip_link='base_footprint', root_link=god_map.world.root_link_name)
         self.plan_and_execute()
 
     def open_gripper(self):
@@ -57,10 +65,7 @@ class HSRTestWrapper(GiskardTestWrapper):
         p = PoseStamped()
         p.header.frame_id = 'map'
         p.pose.orientation.w = 1
-        if self.is_standalone():
-            self.teleport_base(p)
-        else:
-            self.move_base(p)
+        self.move_base(p)
 
     def reset(self):
         self.clear_world()
@@ -74,35 +79,6 @@ class HSRTestWrapper(GiskardTestWrapper):
         self.set_seed_odometry(base_pose=goal_pose, group_name=group_name)
         self.allow_all_collisions()
         self.plan_and_execute()
-
-
-class HSRTestWrapperMujoco(HSRTestWrapper):
-    def __init__(self):
-        # self.r_gripper = rospy.ServiceProxy('r_gripper_simulator/set_joint_states', SetJointState)
-        # self.l_gripper = rospy.ServiceProxy('l_gripper_simulator/set_joint_states', SetJointState)
-        self.mujoco_reset = rospy.ServiceProxy('mujoco/reset', Trigger)
-        self.odom_root = 'odom'
-        super().__init__()
-
-    def reset_base(self):
-        p = PoseStamped()
-        p.header.frame_id = 'map'
-        p.pose.orientation.w = 1
-        self.move_base(p)
-
-    def teleport_base(self, goal_pose, group_name: Optional[str] = None):
-        self.move_base(goal_pose)
-
-    def set_localization(self, map_T_odom: PoseStamped):
-        pass
-        # super(HSRTestWrapper, self).set_localization(map_T_odom)
-
-    def reset(self):
-        # self.mujoco_reset()
-        super().reset()
-
-    def command_gripper(self, width):
-        pass
 
 
 @pytest.fixture(scope='module')
@@ -231,7 +207,7 @@ class TestCartGoals:
         pose.header.frame_id = kitchen_setup.default_root
         pose.pose.orientation.w = 1
         kitchen_setup.add_box_to_world(name=box1_name,
-                                       size=(1,1,1),
+                                       size=(1, 1, 1),
                                        pose=pose,
                                        parent_link='hand_palm_link',
                                        parent_link_group='hsrb')
@@ -377,7 +353,6 @@ class TestCollisionAvoidanceGoals:
         current_state = zero_pose.world.state.to_position_dict()
         current_state = {k.short_name: v for k, v in current_state.items()}
         zero_pose.compare_joint_state(current_state, zero_pose.default_pose)
-
 
     def test_self_collision_avoidance(self, zero_pose: HSRTestWrapper):
         r_goal = PoseStamped()

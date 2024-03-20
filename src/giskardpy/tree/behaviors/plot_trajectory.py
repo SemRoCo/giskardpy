@@ -1,3 +1,4 @@
+import traceback
 from threading import Thread
 
 from py_trees import Status
@@ -34,6 +35,7 @@ class PlotTrajectory(GiskardBehavior):
                                            normalize_position=self.normalize_position,
                                            **self.kwargs)
             except Exception as e:
+                traceback.print_exc()
                 logwarn(e)
                 logwarn('failed to save trajectory.pdf')
 

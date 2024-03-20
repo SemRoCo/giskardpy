@@ -1,6 +1,9 @@
 <launch>
+    <arg name="debug_mode" default="False" />
 
-    <node pkg="giskardpy" type="iai_hsr_real_time.py" name="giskard" output="screen"/>
+    <node pkg="giskardpy" type="iai_hsr_real_time.py" name="giskard" output="screen">
+        <param name="debug_mode" value="$(arg debug_mode)" />
+    </node>
 
     <node pkg="giskardpy" type="joystick_e_stop.py" name="giskard_e_stop" output="screen">
         <remap from="/joy" to="/hsrb/joy"/>

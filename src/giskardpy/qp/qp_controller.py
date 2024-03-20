@@ -1149,26 +1149,16 @@ class QPProblemBuilder:
         return self.qp_solver.free_symbols_str
 
     def save_all_pandas(self, folder_name: Optional[str] = None):
-        if hasattr(self, 'p_xdot') and self.p_xdot is not None:
-            save_pandas(
-                [self.p_weights, self.p_lb, self.p_ub,
-                 self.p_E, self.p_bE,
-                 self.p_A, self.p_lbA, self.p_ubA,
-                 god_map.debug_expression_manager.to_pandas(), self.p_xdot],
-                ['weights', 'lb', 'ub', 'E', 'bE', 'A', 'lbA', 'ubA', 'debug', 'xdot'],
-                god_map.giskard.tmp_folder,
-                god_map.time,
-                folder_name)
-        else:
-            save_pandas(
-                [self.p_weights, self.p_lb, self.p_ub,
-                 self.p_E, self.p_bE,
-                 self.p_A, self.p_lbA, self.p_ubA,
-                 god_map.debug_expression_manager.to_pandas()],
-                ['weights', 'lb', 'ub', 'E', 'bE', 'A', 'lbA', 'ubA', 'debug'],
-                god_map.giskard.tmp_folder,
-                god_map.time,
-                folder_name)
+        self._create_debug_pandas(self.qp_solver)
+        save_pandas(
+            [self.p_weights, self.p_b,
+             self.p_E, self.p_bE,
+             self.p_A, self.p_lbA, self.p_ubA,
+             god_map.debug_expression_manager.to_pandas(), self.p_xdot],
+            ['weights', 'b', 'E', 'bE', 'A', 'lbA', 'ubA', 'debug'],
+            god_map.giskard.tmp_folder,
+            god_map.time,
+            folder_name)
 
     def _print_pandas_array(self, array):
         import pandas as pd

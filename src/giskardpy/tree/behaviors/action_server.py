@@ -2,6 +2,7 @@ from queue import Queue, Empty
 from typing import Any
 
 import actionlib
+import rosnode
 import rospy
 from py_trees import Blackboard
 
@@ -9,6 +10,7 @@ from giskard_msgs.msg import MoveGoal
 from giskard_msgs.msg import MoveResult
 from giskardpy.exceptions import GiskardException
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
+from giskardpy.utils import logging
 from giskardpy.utils.decorators import record_time
 
 
@@ -37,6 +39,13 @@ class ActionServerHandler:
         result_cb()
         self.goal_msg = None
         self.result_msg = None
+
+    def is_client_alive(self) -> bool:
+        client_name = self._as.current_goal.goal.goal_id.id.split('-')[0]
+        alive = rosnode.rosnode_ping(client_name, max_count=1)
+        if not alive:
+            logging.logerr(f'Client {client_name} has died.')
+        return alive
 
     def accept_goal(self) -> None:
         try:

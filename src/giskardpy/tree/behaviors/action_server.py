@@ -49,7 +49,7 @@ class ActionServerHandler:
     @profile
     def ping_client(self, time):
         client_name = self._as.current_goal.goal.goal_id.id.split('-')[0]
-        self.client_alive = rosnode.rosnode_ping(client_name)
+        self.client_alive = rosnode.rosnode_ping(client_name, max_count=1)
         if not self.client_alive:
             logging.logerr(f'Lost connection to Client "{client_name}".')
             self.client_alive_checker.shutdown()

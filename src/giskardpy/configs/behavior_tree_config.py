@@ -179,7 +179,8 @@ class StandAloneBTConfig(BehaviorTreeConfig):
                  debug_mode: bool = False,
                  publish_js: bool = False,
                  publish_free_variables: bool = False,
-                 publish_tf: bool = False,
+                 publish_tf: bool = True,
+                 include_prefix: bool = False,
                  simulation_max_hz: Optional[float] = None):
         """
         The default behavior tree for Giskard in standalone mode. Make sure to set up the robot interface accordingly.
@@ -187,7 +188,9 @@ class StandAloneBTConfig(BehaviorTreeConfig):
         :param publish_js: publish current world state.
         :param publish_tf: publish all link poses in tf.
         :param simulation_max_hz: if not None, will limit the frequency of the simulation.
+        :param include_prefix: whether to include the robot name prefix when publishing joint states or tf
         """
+        self.include_prefix = include_prefix
         if god_map.is_in_github_workflow():
             debug_mode = False
             simulation_max_hz = None
@@ -202,7 +205,7 @@ class StandAloneBTConfig(BehaviorTreeConfig):
     def setup(self):
         self.add_visualization_marker_publisher(add_to_sync=True, add_to_control_loop=True)
         if self.publish_tf:
-            self.add_tf_publisher(include_prefix=True, mode=TfPublishingModes.all)
+            self.add_tf_publisher(include_prefix=self.include_prefix, mode=TfPublishingModes.all)
         self.add_gantt_chart_plotter()
         self.add_goal_graph_plotter()
         if self.debug_mode:
@@ -211,7 +214,7 @@ class StandAloneBTConfig(BehaviorTreeConfig):
             self.add_debug_marker_publisher()
         # self.add_debug_marker_publisher()
         if self.publish_js:
-            self.add_js_publisher()
+            self.add_js_publisher(include_prefix=self.include_prefix)
         if self.publish_free_variables:
             self.add_free_variable_publisher()
 

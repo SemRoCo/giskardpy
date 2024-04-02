@@ -6,6 +6,7 @@ from giskardpy.god_map import god_map
 from giskardpy.tree.behaviors.tf_publisher import TfPublishingModes
 from giskardpy.tree.branches.giskard_bt import GiskardBT
 from giskardpy.tree.control_modes import ControlModes
+from giskardpy.utils.utils import is_running_in_pytest
 
 
 class BehaviorTreeConfig(ABC):
@@ -191,9 +192,12 @@ class StandAloneBTConfig(BehaviorTreeConfig):
         :param include_prefix: whether to include the robot name prefix when publishing joint states or tf
         """
         self.include_prefix = include_prefix
-        if god_map.is_in_github_workflow():
-            debug_mode = False
-            simulation_max_hz = None
+        if is_running_in_pytest():
+            publish_tf = False
+            publish_js = False
+            if god_map.is_in_github_workflow():
+                debug_mode = False
+                simulation_max_hz = None
         super().__init__(ControlModes.standalone, simulation_max_hz=simulation_max_hz)
         self.debug_mode = debug_mode
         self.publish_js = publish_js

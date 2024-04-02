@@ -133,7 +133,7 @@ class PouringAdaptiveTilt(Goal):
         self.add_monitor(nominal_monitor)
         nominal_error = cas.rotational_error(root_R_tip, root_R_tip_desired)
         nominal_monitor.expression = (cas.less(nominal_error, 0.1))
-        god_map.debug_expression_manager.add_debug_expression('isTilted error', nominal_error)
+        # god_map.debug_expression_manager.add_debug_expression('isTilted error', nominal_error)
         nominal_task.start_condition = pos_monitor
         nominal_task.end_condition = nominal_monitor
         self.pos_task.end_condition = nominal_monitor
@@ -148,7 +148,7 @@ class PouringAdaptiveTilt(Goal):
         angle = cas.rotational_error(root_R_tip, root_R_tip_desired_pre)
         # TODO: how can the speed of a rotation be controlled from the outside?
         if self.tilt_angle < 0:
-            angle_a = -0.03 * is_forward + 1 * is_backward
+            angle_a = -0.02 * is_forward + 0.5 * is_backward
             stop_to_large = cas.logic_any(
                 cas.Expression([cas.if_greater(angle, 3, 0, 1), cas.if_greater(angle_a, 0, 1, 0)]))
             stop_to_small = cas.if_less(angle, 0.1, 0, 1)
@@ -163,9 +163,9 @@ class PouringAdaptiveTilt(Goal):
         # rotation around z axis
         is_rot_1 = symbol_manager.get_symbol(f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\'].z_rot_1')
         is_rot_2 = symbol_manager.get_symbol(f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\'].z_rot_2')
-        angle_z = -0.01 * is_rot_1 + 0.01 * is_rot_2
+        angle_z = -0.03 * is_rot_1 + 0.03 * is_rot_2
         tip_R_tip2 = cas.RotationMatrix().from_axis_angle(cas.Vector3([0, 0, 1]), angle_z)
-        root_R_tip_desired_a = root_R_tip.dot(tip_R_tip_a)  # .dot(tip_R_tip2)
+        root_R_tip_desired_a = root_R_tip.dot(tip_R_tip_a).dot(tip_R_tip2)
         # TODO: look into slerp again. Is that necessary here?
         # TODO: Try this with quaternions instead!
         adaptive_task.add_rotation_goal_constraints(frame_R_current=root_R_tip,
@@ -224,9 +224,9 @@ class PouringAdaptiveTilt(Goal):
         is_y_back = symbol_manager.get_symbol(f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\'].move_y_back')
         is_up = symbol_manager.get_symbol(f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\'].up')
         is_down = symbol_manager.get_symbol(f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\'].down')
-        root_V_adapt = cas.Vector3([0.02 * is_x - 0.02 * is_x_back,
-                                    0.02 * is_y - 0.02 * is_y_back,
-                                    0.02 * is_up - 0.02 * is_down,
+        root_V_adapt = cas.Vector3([0.002 * is_x - 0.002 * is_x_back,
+                                    0.002 * is_y - 0.002 * is_y_back,
+                                    0.01 * is_up - 0.01 * is_down,
                                     ])
         adapt_pos_task.add_equality_constraint_vector(reference_velocities=[self.max_vel] * 3,
                                                       equality_bounds=root_V_adapt[:3],
@@ -252,6 +252,16 @@ class PouringAdaptiveTilt(Goal):
         adaptive_task.end_condition = external_end_monitor
         adapt_pos_task.end_condition = external_end_monitor
         # self.pos_task.add_to_end_monitor(external_end_monitor)
+        god_map.debug_expression_manager.add_debug_expression('increase', is_forward)
+        god_map.debug_expression_manager.add_debug_expression('decrease', is_backward)
+        god_map.debug_expression_manager.add_debug_expression('moveForward', is_x)
+        god_map.debug_expression_manager.add_debug_expression('moveBack', is_x_back)
+        god_map.debug_expression_manager.add_debug_expression('moveLeft', is_y)
+        god_map.debug_expression_manager.add_debug_expression('moveRight', is_y_back)
+        god_map.debug_expression_manager.add_debug_expression('up', is_up)
+        god_map.debug_expression_manager.add_debug_expression('down', is_down)
+        god_map.debug_expression_manager.add_debug_expression('rot1', is_rot_1)
+        god_map.debug_expression_manager.add_debug_expression('rot2', is_rot_2)
 
     def callback(self, action_string: String):
         self.action_string = action_string.data
@@ -276,7 +286,7 @@ class PouringAdaptiveTilt(Goal):
         self.down = False
         if 'moveForward' in action_string.data:
             self.move_x = True
-        if 'moveBackward' in action_string.data:
+        if 'moveBack' in action_string.data:
             self.move_x_back = True
         if 'moveLeft' in action_string.data:
             self.move_y = True
@@ -294,7 +304,7 @@ class PouringAdaptiveTilt(Goal):
         elif 'clockwise' in action_string.data:
             self.z_rot_2 = True
 
-        if '{}' in action_string.data:
+        if '{}' in action_string.data or action_string.data == '':
             self.stop_counter += 1
             if self.stop_counter > 10:
                 self.stop = 1
@@ -696,18 +706,18 @@ class PouringAdaptiveTilt2(Goal):
                                                     weight=self.weight * stop_to_large * stop_to_small)
 
         adaptive_task.start_condition = nominal_monitor
-        adaptive_task.add_equality_constraint(reference_velocity=self.max_vel,
-                                              equality_bound=0 - exp,
-                                              weight=self.weight,
-                                              task_expression=exp)
+        # adaptive_task.add_equality_constraint(reference_velocity=self.max_vel,
+        #                                       equality_bound=0 - exp,
+        #                                       weight=self.weight,
+        #                                       task_expression=exp)
         # # TODO: why do i need this second constraint for the pot frame not to rotate around  the z-axis of world?
         # #       The rotation matrix constraint above is probably underdefined. test if expanding that constraint helps.
         # #       But prob not ideal as the goal is relative to the current rotation, therefore it can shift.
         # #       The two dot product exps are good anchor points.
-        adaptive_task.add_equality_constraint(reference_velocity=self.max_vel,
-                                              equality_bound=0 - exp2,
-                                              weight=self.weight,
-                                              task_expression=exp2)
+        # adaptive_task.add_equality_constraint(reference_velocity=self.max_vel,
+        #                                       equality_bound=0 - exp2,
+        #                                       weight=self.weight,
+        #                                       task_expression=exp2)
 
         # Todo: make it smooth and nice to look at, tilt back when adapting the position
         adapt_pos_task = self.create_and_add_task('adaptPosition')

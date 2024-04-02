@@ -41,7 +41,7 @@ class HSRTestWrapper(GiskardTestWrapper):
                               collision_avoidance_config=HSRCollisionAvoidanceConfig(),
                               robot_interface_config=HSRStandaloneInterface(),
                               behavior_tree_config=StandAloneBTConfig(debug_mode=True),
-                              qp_controller_config=QPControllerConfig(qp_solver=SupportedQPSolver.gurobi))
+                              qp_controller_config=QPControllerConfig(qp_solver=SupportedQPSolver.qpSWIFT))
         self.gripper_group = 'gripper'
         # self.r_gripper = rospy.ServiceProxy('r_gripper_simulator/set_joint_states', SetJointState)
         # self.l_gripper = rospy.ServiceProxy('l_gripper_simulator/set_joint_states', SetJointState)
@@ -101,7 +101,8 @@ class HSRTestWrapperMujoco(HSRTestWrapper):
                           collision_avoidance_config=HSRCollisionAvoidanceConfig(),
                           robot_interface_config=HSRMujocoVelocityInterface(),
                           behavior_tree_config=ClosedLoopBTConfig(debug_mode=True),
-                          qp_controller_config=QPControllerConfig(max_trajectory_length=200))
+                          qp_controller_config=QPControllerConfig(max_trajectory_length=200,
+                                                                  qp_solver=SupportedQPSolver.qpSWIFT))
         # real hsr closed loop config
         # giskard = Giskard(world_config=WorldWithHSRConfig(),
         #                   collision_avoidance_config=HSRCollisionAvoidanceConfig(),
@@ -526,13 +527,28 @@ class TestActionGoals:
         zero_pose.execute()
 
         zero_pose.motion_goals.add_motion_goal(motion_goal_class=CloseGripper.__name__,
-                                               name='closeGripper')
+                                               name='closeGripper', effort=-220)
         zero_pose.allow_all_collisions()
         zero_pose.execute()
 
-        goal_pose.pose.position.x = 1.95
-        goal_pose.pose.position.y = -0.4
-        goal_pose.pose.position.z = 0.49
+        cup_pose = PoseStamped()
+        cup_pose.header.frame_id = 'free_cup'
+        cup_pose.pose.position = Point(0, 0, 0)
+        cup_pose.pose.orientation.w = 1
+
+        # add a new object at the pose of the pot and attach it to the right tip
+        zero_pose.add_box('cup1', (0.07, 0.07, 0.28), pose=cup_pose, parent_link='hand_palm_link')
+        cup_pose.header.frame_id = 'free_cup2'
+        zero_pose.add_box('cup2', (0.07, 0.07, 0.18), pose=cup_pose, parent_link='map')
+
+        # goal_pose.pose.position.x = 1.85
+        # goal_pose.pose.position.y = -0.7
+        # goal_pose.pose.position.z = 0.54
+        # goal_pose.pose.position.x = 1.75
+        # goal_pose.pose.position.y = -0.4
+        # goal_pose.pose.position.z = 0.6
+        goal_pose.header.frame_id = 'cup2'
+        goal_pose.pose.position = Point(-0.3, 0.2, 0.3)
         # goal_pose.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 0, 1, 0],
         #                                                                  [0, -1, 0, 0],
         #                                                                  [1, 0, 0, 0],
@@ -540,15 +556,16 @@ class TestActionGoals:
         tilt_axis = Vector3Stamped()
         tilt_axis.header.frame_id = 'hand_palm_link'
         tilt_axis.vector.z = 1
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class=PouringAdaptiveTilt.__name__,
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class='PouringAdaptiveTilt',
                                                name='pouring',
                                                tip='hand_palm_link',
                                                root='map',
-                                               tilt_angle=1,
+                                               tilt_angle=0.3,
                                                pouring_pose=goal_pose,
                                                tilt_axis=tilt_axis,
-                                               pre_tilt=True)
+                                               pre_tilt=False)
         zero_pose.allow_all_collisions()
+        zero_pose.avoid_collision(0.01, 'cup1', 'cup2')
         zero_pose.execute(add_local_minimum_reached=False)
 
         goal_pose.pose.position.x = 1.93
@@ -644,3 +661,102 @@ class TestActionGoals:
                                                optical_axis=optical_axis,
                                                transform_from_image_coordinates=True)
         zero_pose.execute(add_local_minimum_reached=False)
+
+    def test_abhijit(self, zero_pose):
+        def openGripper():
+            zero_pose.motion_goals.add_motion_goal(motion_goal_class=CloseGripper.__name__,
+                                                   name='openGripper',
+                                                   as_open=True,
+                                                   velocity_threshold=100,
+                                                   effort_threshold=1,
+                                                   effort=100)
+            zero_pose.allow_all_collisions()
+            zero_pose.execute()
+
+        def closeGripper():
+            zero_pose.motion_goals.add_motion_goal(motion_goal_class=CloseGripper.__name__,
+                                                   name='closeGripper')
+            zero_pose.allow_all_collisions()
+            zero_pose.execute()
+
+        def align_to(side: str, axis_align_to_z: Vector3Stamped, object_frame: str, control_frame: str,
+                     axis_align_to_x: Vector3Stamped = None, distance=0.3, height_offset=0.0, second_distance=0.0):
+            # TODO: add a tilt method with angle and velocity parametrization
+            goal_normal = Vector3Stamped()
+            goal_normal.header.frame_id = object_frame
+            goal_normal.vector.z = 1
+            zero_pose.motion_goals.add_align_planes(goal_normal, control_frame, axis_align_to_z, 'map')
+            if second_axis:
+                second_goal_normal = Vector3Stamped()
+                second_goal_normal.header.frame_id = object_frame
+                second_goal_normal.vector.x = 1
+                zero_pose.motion_goals.add_align_planes(second_goal_normal, control_frame, axis_align_to_x, 'map')
+
+            goal_position = PointStamped()
+            goal_position.header.frame_id = object_frame
+            if side == 'front':
+                goal_position.point.x = -distance
+                goal_position.point.y = second_distance
+                goal_position.point.z = height_offset
+            elif side == 'left':
+                goal_position.point.x = second_distance
+                goal_position.point.y = distance
+                goal_position.point.z = height_offset
+            elif side == 'right':
+                goal_position.point.x = second_distance
+                goal_position.point.y = -distance
+                goal_position.point.z = height_offset
+            zero_pose.motion_goals.add_cartesian_position(goal_position, control_frame, 'map')
+            zero_pose.execute()
+
+        def tilt(angle: float, velocity: float, rotation_axis: Vector3Stamped, controlled_frame: str):
+            goal_pose = PoseStamped()
+            goal_pose.header.frame_id = controlled_frame
+            goal_pose.pose.orientation = Quaternion(
+                *quaternion_about_axis(angle, [rotation_axis.vector.x, rotation_axis.vector.y, rotation_axis.vector.z]))
+            zero_pose.motion_goals.add_cartesian_pose(goal_pose, controlled_frame, 'map')
+            zero_pose.motion_goals.add_limit_cartesian_velocity(tip_link=controlled_frame, root_link='map',
+                                                                max_angular_velocity=velocity)
+            zero_pose.execute()
+
+        upright_axis = Vector3Stamped()
+        upright_axis.header.frame_id = 'hand_palm_link'
+        upright_axis.vector.x = 1
+
+        second_axis = Vector3Stamped()
+        second_axis.header.frame_id = 'hand_palm_link'
+        second_axis.vector.z = 1
+
+        # Here starts the control
+        openGripper()
+
+        align_to('front', axis_align_to_z=upright_axis, object_frame='free_cup', control_frame='hand_palm_link',
+                 axis_align_to_x=second_axis, distance=0.04)
+
+        closeGripper()
+
+        #############move to random position################
+        goal_pose = PoseStamped()
+        goal_pose.header.frame_id = 'map'
+        goal_pose.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 0, 1, 0],
+                                                                         [0, -1, 0, 0],
+                                                                         [1, 0, 0, 0],
+                                                                         [0, 0, 0, 1]]))
+        goal_pose.pose.position.x = 1.7
+        goal_pose.pose.position.y = -0.4
+        goal_pose.pose.position.z = 0.7
+        zero_pose.set_cart_goal(goal_pose, 'hand_palm_link', 'map')
+        zero_pose.allow_all_collisions()
+        zero_pose.execute()
+        #############################
+
+        # align_to('front', axis_align_to_z=upright_axis, object_frame='free_cup2', control_frame='hand_palm_link',
+        #          axis_align_to_x=second_axis, distance=0.3, height_offset=0.2)
+
+        align_to('left', axis_align_to_z=upright_axis, object_frame='free_cup2', control_frame='hand_palm_link',
+                 axis_align_to_x=second_axis, distance=0.13, height_offset=0.2)
+
+        rotation_axis = Vector3Stamped()
+        rotation_axis.header.frame_id = 'hand_palm_link'
+        rotation_axis.vector.z = 1
+        tilt(angle=1.7, velocity=1.0, rotation_axis=rotation_axis, controlled_frame='hand_palm_link')

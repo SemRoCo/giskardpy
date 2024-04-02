@@ -599,6 +599,8 @@ class TestPouring:
                                                                  [0, 1, 0, 0],
                                                                  [0, 0, 0, 1]]))
         zero_pose.set_cart_goal(p, tip_link, 'map')
+        # p.pose.position = Point(1.7, -0.4, 0.8)
+        # zero_pose.set_cart_goal(p, zero_pose.r_tip, 'map')
         zero_pose.execute()
 
         p.pose.position = Point(1.78, -0.2, 0.6)
@@ -631,7 +633,7 @@ class TestPouring:
         pot_pose.pose.orientation.w = 1
 
         # add a new object at the pose of the pot and attach it to the right tip
-        zero_pose.add_box('dummy', (0.1, 0.1, 0.1), pose=pot_pose, parent_link=tip_link)
+        zero_pose.add_box('dummy', (0.1, 0.1, 0.01), pose=pot_pose, parent_link=tip_link)
 
         pot_pose = PoseStamped()
         pot_pose.header.frame_id = 'map'
@@ -652,7 +654,7 @@ class TestPouring:
 
         p2 = PoseStamped()
         p2.header.frame_id = 'dummy'
-        p2.pose.position = Point(-0.01, 0.03, 0.07)
+        p2.pose.position = Point(-0.02, 0.07, 0.06)
         p2.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 0, 1, 0],
                                                                   [1, 0, 0, 0],
                                                                   [0, 1, 0, 0],
@@ -679,8 +681,10 @@ class TestPouring:
         #                                        root_link='torso_lift_link',
         #                                        tip_link='r_gripper_tool_frame'
         #                                        )
-        zero_pose.allow_all_collisions()
-        zero_pose.execute(add_local_minimum_reached=True)
+        # zero_pose.allow_all_collisions()
+        # zero_pose.avoid_collision(0.01, zero_pose.r_gripper_group, zero_pose.l_gripper_group)
+        zero_pose.allow_collision(zero_pose.r_gripper_group, 'dummy')
+        zero_pose.execute(add_local_minimum_reached=False)
 
     def test_pour_pot(self, zero_pose: PR2TestWrapper):
         p = PoseStamped()
@@ -721,6 +725,14 @@ class TestPouring:
         zero_pose.allow_all_collisions()
         zero_pose.set_cart_goal(p, zero_pose.r_tip, 'map')
         zero_pose.set_cart_goal(p2, zero_pose.l_tip, 'map')
+        # zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulability.__name__,
+        #                                        root_link='torso_lift_link',
+        #                                        tip_link='r_gripper_tool_frame',
+        #                                        gain=50)
+        # zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulability.__name__,
+        #                                        root_link='torso_lift_link',
+        #                                        tip_link='l_gripper_tool_frame',
+        #                                        gain=50)
         zero_pose.execute()
         ###################################################
         p.pose.position = Point(0, -0.15, h)
@@ -728,6 +740,12 @@ class TestPouring:
         zero_pose.allow_all_collisions()
         zero_pose.set_cart_goal(p, zero_pose.r_tip, 'map')
         zero_pose.set_cart_goal(p2, zero_pose.l_tip, 'map')
+        # zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulability.__name__,
+        #                                        root_link='torso_lift_link',
+        #                                        tip_link='r_gripper_tool_frame')
+        # zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulability.__name__,
+        #                                        root_link='torso_lift_link',
+        #                                        tip_link='l_gripper_tool_frame')
         zero_pose.execute()
         ###################################################
         zero_pose.motion_goals.add_motion_goal(motion_goal_class=CloseGripper.__name__,
@@ -784,7 +802,8 @@ class TestPouring:
         tilt_axis = Vector3Stamped()
         tilt_axis.header.frame_id = 'dummy'
         tilt_axis.vector.y = 2 / math.sqrt(5)
-        tilt_axis.vector.x = 1 / math.sqrt(5)
+        tilt_axis.vector.x = -1 / math.sqrt(5)
+        # tilt_axis.vector.y = 1
         zero_pose.motion_goals.add_motion_goal(motion_goal_class=PouringAdaptiveTilt.__name__,
                                                name='pouring',
                                                tip='dummy',
@@ -799,6 +818,14 @@ class TestPouring:
         zero_pose.set_cart_goal(l_pose, zero_pose.l_tip, zero_pose.r_tip, add_monitor=False)
         zero_pose.allow_all_collisions()
         # zero_pose.set_avoid_joint_limits_goal()
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulability.__name__,
+                                               root_link='torso_lift_link',
+                                               tip_link='r_gripper_tool_frame',
+                                               gain=3)
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulability.__name__,
+                                               root_link='torso_lift_link',
+                                               tip_link='l_gripper_tool_frame',
+                                               gain=3)
         zero_pose.execute(add_local_minimum_reached=False)
 
     def test_pour_two_cups(self, zero_pose: PR2TestWrapper):
@@ -826,7 +853,7 @@ class TestPouring:
                                                                          [0, 1, 0, 0],
                                                                          [0, 0, 1, 0],
                                                                          [0, 0, 0, 1]]))
-        goal_pose.pose.position.x = 2.02
+        goal_pose.pose.position.x = 2.015
         goal_pose.pose.position.y = -0.2
         goal_pose.pose.position.z = 0.5
 
@@ -862,6 +889,16 @@ class TestPouring:
                                                effort=-180)
         zero_pose.execute()
 
+        cup_pose = PoseStamped()
+        cup_pose.header.frame_id = 'free_cup'
+        cup_pose.pose.position = Point(0, 0, 0)
+        cup_pose.pose.orientation.w = 1
+
+        # add a new object at the pose of the pot and attach it to the right tip
+        zero_pose.add_box('cup1', (0.07, 0.07, 0.18), pose=cup_pose, parent_link=zero_pose.l_tip)
+        cup_pose.header.frame_id = 'free_cup2'
+        zero_pose.add_box('cup2', (0.07, 0.07, 0.18), pose=cup_pose, parent_link='map')
+
         goal_pose = PoseStamped()
         goal_pose.header.frame_id = 'map'
         goal_pose.pose.orientation = Quaternion(*quaternion_from_matrix([[1, 0, 0, 0],
@@ -876,7 +913,7 @@ class TestPouring:
         goal_pose2 = PoseStamped()
         goal_pose2.header.frame_id = 'map'
         goal_pose2.pose.orientation = Quaternion(*quaternion_about_axis(-np.pi / 4, [1, 0, 0]))
-        goal_pose2.pose.position.x = 2
+        goal_pose2.pose.position.x = 2.01
         goal_pose2.pose.position.y = -0.6
         goal_pose2.pose.position.z = 0.7
 
@@ -893,7 +930,7 @@ class TestPouring:
                                                                          [0, 0, 0, 1]]))
         goal_pose.pose.position.x = 2
         goal_pose.pose.position.y = -0.4
-        goal_pose.pose.position.z = 0.8
+        goal_pose.pose.position.z = 0.7
         tilt_axis = Vector3Stamped()
         tilt_axis.header.frame_id = zero_pose.l_tip
         tilt_axis.vector.x = 1
@@ -901,11 +938,12 @@ class TestPouring:
                                                name='pouring',
                                                tip=zero_pose.l_tip,
                                                root='map',
-                                               tilt_angle=1,
+                                               tilt_angle=0.5,
                                                pouring_pose=goal_pose,
                                                tilt_axis=tilt_axis,
                                                pre_tilt=True)
         zero_pose.allow_all_collisions()
+        zero_pose.avoid_collision(0.01, zero_pose.l_gripper_group, 'cup2')
         # zero_pose.set_cart_goal(goal_pose2, zero_pose.r_tip, 'map', add_monitor=False)
         zero_pose.execute(add_local_minimum_reached=False)
 

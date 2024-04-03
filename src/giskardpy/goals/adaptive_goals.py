@@ -795,7 +795,7 @@ class CloseGripper(Goal):
                  hold_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.TrueSymbol):
         super().__init__(name)
-        self.pub = rospy.Publisher(pub_topic, Float64, queue_size=1)
+        self.pub = rospy.Publisher(pub_topic, Float64, queue_size=1, latch=True)
         self.effort = 0
         self.velocity_threshold = velocity_threshold
         self.alibi_joint_name = alibi_joint_name
@@ -821,6 +821,8 @@ class CloseGripper(Goal):
         self.task.end_condition = monitor
         # god_map.debug_expression_manager.add_debug_expression('monitor', effort)
         # self.pub.publish(self.msg)
+        self.published = False
+        self.pub.publish(self.msg)
 
     def callback(self, joints: JointState):
         for name, effort, velocity in zip(joints.name, joints.effort, joints.velocity):
@@ -830,7 +832,9 @@ class CloseGripper(Goal):
                 else:
                     self.effort = 0
         # Todo: this still publishes after the goal is finished. Is there a destructor that could be used to stop the subscriber?
-        self.pub.publish(self.msg)
+        if not self.published:
+            self.pub.publish(self.msg)
+            self.published = True
 
 
 class HandCamServoGoal(Goal):

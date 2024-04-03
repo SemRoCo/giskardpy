@@ -76,6 +76,7 @@ class PouringAction(Goal):
                              'keep_upright': 0,
                              'rotate_left': 0,
                              'rotate_right': 0}
+        self.velocity_command = self.max_vel
         self.all_commands_empty = deepcopy(self.all_commands)
         self.sub = rospy.Subscriber(state_topic, String, self.cb, queue_size=10)
 
@@ -94,14 +95,16 @@ class PouringAction(Goal):
             f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\'].all_commands[\'right\']')
         is_down = symbol_manager.get_symbol(
             f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\'].all_commands[\'down\']')
+        velocity_command = symbol_manager.get_symbol(
+            f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\'].velocity_command')
 
         task_movement = self.create_and_add_task('movement')
         is_translation = cas.min(1, is_forward + is_left + is_up + is_backward + is_right + is_down)
         task_movement.add_equality_constraint_vector(reference_velocities=[self.max_vel] * 3,
                                                      equality_bounds=[
-                                                         self.max_vel * is_forward + self.max_vel * -1 * is_backward,
-                                                         self.max_vel * is_left + self.max_vel * -1 * is_right,
-                                                         self.max_vel * is_up + self.max_vel * -1 * is_down],
+                                                         velocity_command * is_forward + velocity_command * -1 * is_backward,
+                                                         velocity_command * is_left + velocity_command * -1 * is_right,
+                                                         velocity_command * is_up + velocity_command * -1 * is_down],
                                                      weights=[self.weight * is_translation] * 3,
                                                      task_expression=root_P_tip[:3],
                                                      names=['forward-back', 'left-right', 'up-down'])
@@ -122,7 +125,7 @@ class PouringAction(Goal):
         # Todo: I might have to save a reference pose when the pouring starts to define rotation around that
         root_R_tip = god_map.world.compose_fk_expression(self.root_link, self.tip_link).to_rotation()
         tip_R_tip = cas.RotationMatrix()
-        angle = -0.5 * is_tilt_left + 0.5 * is_tilt_right
+        angle = -velocity_command * is_tilt_left + velocity_command * is_tilt_right
         tip_R_tip[0, 0] = cas.cos(angle)
         tip_R_tip[1, 0] = cas.sin(angle)
         tip_R_tip[0, 1] = -cas.sin(angle)
@@ -161,7 +164,7 @@ class PouringAction(Goal):
         base_link = god_map.world.search_for_link_name('base_footprint')
         root_R_base = god_map.world.compose_fk_expression(self.root_link, base_link).to_rotation()
         base_R_base = cas.RotationMatrix()
-        angle = 0.5 * is_rotate_left - 0.5 * is_rotate_right
+        angle = velocity_command * is_rotate_left - velocity_command * is_rotate_right
         base_R_base[0, 0] = cas.cos(angle)
         base_R_base[1, 0] = cas.sin(angle)
         base_R_base[0, 1] = -cas.sin(angle)
@@ -187,6 +190,11 @@ class PouringAction(Goal):
             self.all_commands = deepcopy(self.all_commands_empty)
             return
         keys = data.data.split(';')
+        try:
+            self.velocity_command = float(keys[-1])
+            keys.pop()
+        except ValueError:
+            self.velocity_command = self.max_vel
         commands = [self.map_key_command[key] for key in keys]
         self.all_commands = deepcopy(self.all_commands_empty)
         for command in commands:

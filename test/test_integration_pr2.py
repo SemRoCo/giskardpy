@@ -12,7 +12,7 @@ import rospy
 from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, PointStamped, QuaternionStamped, Pose
 from numpy import pi
 from shape_msgs.msg import SolidPrimitive
-from tf.transformations import quaternion_from_matrix, quaternion_about_axis
+from tf.transformations import quaternion_from_matrix, quaternion_about_axis, quaternion_matrix, rotation_matrix
 
 import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import WorldBody, CollisionEntry, WorldGoal, GiskardError
@@ -1602,6 +1602,282 @@ class TestConstraints:
         kitchen_setup.allow_all_collisions()
         kitchen_setup.plan_and_execute()
         kitchen_setup.set_env_state({'sink_area_dish_washer_door_joint': 0})
+
+    def test_push_open_dishwasher(self, kitchen_setup: PR2TestWrapper):
+        p = PoseStamped()
+        p.header.frame_id = 'map'
+        p.pose.orientation.w = 1
+        p.pose.position.x = 0.5
+        p.pose.position.y = 0.2
+        kitchen_setup.teleport_base(p)
+
+        hand = kitchen_setup.r_tip
+        door_obj = "door"
+        goal_angle = np.pi / 4
+        handle_frame_id = 'sink_area_dish_washer_door_handle'
+        handle_name = 'sink_area_dish_washer_door_handle'
+        door_name = 'sink_area_dish_washer_door'
+        door_joint = 'sink_area_dish_washer_door_joint'
+        kitchen_setup.register_group(door_obj, kitchen_setup.default_env_name,
+                                     door_name)  # root link of the objects to avoid collision
+        root_Pose_door = kitchen_setup.world.compute_fk_pose('map', door_name)  # door pose b4 rotation
+        door_Pose_root = kitchen_setup.world.compute_fk_pose('sink_area_dish_washer_door', 'map')
+        bar_axis = Vector3Stamped()
+        bar_axis.header.frame_id = handle_frame_id
+        bar_axis.vector.y = 1
+
+        bar_center = PointStamped()
+        bar_center.header.frame_id = handle_frame_id
+
+        tip_grasp_axis = Vector3Stamped()
+        tip_grasp_axis.header.frame_id = hand
+        tip_grasp_axis.vector.z = 1
+
+        kitchen_setup.set_grasp_bar_goal(root_link=kitchen_setup.default_root,
+                                         tip_link=hand,
+                                         tip_grasp_axis=tip_grasp_axis,
+                                         bar_center=bar_center,
+                                         bar_axis=bar_axis,
+                                         bar_length=.3)
+
+        # kitchen_setup.allow_collision([], 'kitchen', [handle_name])
+        # kitchen_setup.allow_all_collisions()
+
+        x_gripper = Vector3Stamped()
+        x_gripper.header.frame_id = hand
+        x_gripper.vector.x = 1
+
+        x_goal = Vector3Stamped()
+        x_goal.header.frame_id = handle_frame_id
+        x_goal.vector.x = -1
+        kitchen_setup.set_align_planes_goal(tip_link=hand,
+                                            tip_normal=x_gripper,
+                                            goal_normal=x_goal)
+        # kitchen_setup.allow_all_collisions()
+        kitchen_setup.plan_and_execute()
+
+        kitchen_setup.set_open_container_goal(tip_link=hand,
+                                              environment_link=handle_name,
+                                              goal_joint_state=goal_angle)
+
+        # kitchen_setup.allow_all_collisions()
+        kitchen_setup.allow_collision(group1=kitchen_setup.default_env_name, group2=kitchen_setup.r_gripper_group)
+        kitchen_setup.plan_and_execute()
+        kitchen_setup.set_env_state({'sink_area_dish_washer_door_joint': goal_angle})
+        print("world state ", kitchen_setup.world.state.to_position_dict())
+        tip_grasp_axis = Vector3Stamped()
+        tip_grasp_axis.header.frame_id = hand
+        tip_grasp_axis.vector.y = 1
+
+        object_rotation_axis = Vector3Stamped()
+        object_rotation_axis.header.frame_id = door_name
+        object_rotation_axis.vector.z = 1
+        print("root_P_door b4 rot", root_Pose_door)
+        print("root_P_door after rot", kitchen_setup.world.compute_fk_pose('map', 'sink_area_dish_washer_door'))
+        ### Testingg
+        root_Pose_door = kitchen_setup.world.compute_fk_pose('map', 'sink_area_dish_washer_door')
+        door_Pose_root = kitchen_setup.world.compute_fk_pose('sink_area_dish_washer_door', 'map')
+        door_T_root = quaternion_matrix(np.array([door_Pose_root.pose.orientation.x,
+                                                  door_Pose_root.pose.orientation.y,
+                                                  door_Pose_root.pose.orientation.z,
+                                                  door_Pose_root.pose.orientation.w]))
+        door_T_root[:, 3] = np.array([door_Pose_root.pose.position.x, door_Pose_root.pose.position.y,
+                                      door_Pose_root.pose.position.z, 1])
+
+        root_T_door = np.linalg.inv(door_T_root)
+
+        root_Pose_intermediate_pt = PoseStamped()
+        root_Pose_intermediate_pt.header.frame_id = 'map'
+        root_Pose_intermediate_pt.pose.position.x = root_Pose_door.pose.position.x
+        root_Pose_intermediate_pt.pose.position.y = root_Pose_door.pose.position.y
+        root_Pose_intermediate_pt.pose.position.z = root_Pose_door.pose.position.z + 0.565
+
+        ### 1. get the rotated pose
+        root_P_goal = np.dot(root_T_door, np.array([root_Pose_intermediate_pt.pose.position.x,
+                                                    root_Pose_intermediate_pt.pose.position.y,
+                                                    root_Pose_intermediate_pt.pose.position.z,
+                                                    1]))
+        print("goal _point : ", root_P_goal)
+        ### 2
+        door_P_goal = np.dot(door_T_root, root_P_goal)
+
+        ### half unrotate??
+        r = rotation_matrix(goal_angle / 2, -1 * np.array([object_rotation_axis.vector.x,
+                                                           object_rotation_axis.vector.y,
+                                                           object_rotation_axis.vector.z]))
+
+        door_P_r_goal = np.dot(r, door_P_goal)
+
+        ## back to root
+        root_P_r_goal = np.dot(root_T_door, door_P_r_goal)
+        print("unrotated_pt :", root_P_r_goal)
+
+        print("door_pose_root :", door_Pose_root)
+        root_P_intermediate_pt = np.array([[root_Pose_intermediate_pt.pose.position.x,
+                                            root_Pose_intermediate_pt.pose.position.y,
+                                            root_Pose_intermediate_pt.pose.position.z,
+                                            1]])
+        door_P_intermediate_pt = np.dot(door_T_root, root_P_intermediate_pt.T)
+        print("door_P_intermediate_pt : ", door_P_intermediate_pt)
+        rot_mat = rotation_matrix(goal_angle / 2, np.array([object_rotation_axis.vector.x,
+                                                            object_rotation_axis.vector.y,
+                                                            object_rotation_axis.vector.z]))
+        door_P_rotated_pt = np.dot(rot_mat, door_P_intermediate_pt)
+        print("door_P_rotated_pt : ", door_P_rotated_pt)
+        root_P_rotated_pt = np.dot(root_T_door, door_P_rotated_pt)
+
+        print("root_P_rotated_pt : ", root_P_rotated_pt)
+
+        kitchen_setup.set_align_to_push_door_goal(root_link=kitchen_setup.default_root,
+                                                  tip_link=hand,
+                                                  door_object=door_name,
+                                                  door_height=0.565,
+                                                  # door_pose_before_rotation=root_Pose_door,
+                                                  object_joint_name=door_joint,
+                                                  # door_length=0.42,
+                                                  tip_gripper_axis=tip_grasp_axis,
+                                                  object_rotation_axis=object_rotation_axis)
+
+        kitchen_setup.plan_and_execute()
+        object_normal = Vector3Stamped()
+        object_normal.header.frame_id = door_name
+        object_normal.vector.x = 1
+
+        # # # close the gripper
+        kitchen_setup.set_env_state({'r_gripper_l_finger_joint': 0.0})
+
+        # # dishwasher dimensions - 0.0200, 0.5950, 1.365
+        # # from rviz length = 0.42, height = 0.565
+        # # C-------D
+        # # |       |
+        # # A-------B
+        # # lOW HEIGHT - 0.263 , Max LENGTH - 0.38  Min LENGTH - 0.0222, max height - 0.65
+        # A = np.array([[1.285, 0.42328, 0.3703]])
+        # B = np.array([[1.285, 0.0167, 0.3703]])
+        # C = np.array([[1.285, 0.4238, 0.6]])
+        # D = np.array([[1.285, 0.0167, 0.6]])
+
+        # # l = A[0, 1] - B[0, 1]
+        # # h = C[0, 2] - A[0, 2]
+
+        # ab = B - A
+        # ac = C - A
+        # n = np.cross(ab, ac)
+        # n_unit = n / np.linalg.norm(n)
+        #### starts here
+        hand_pose = kitchen_setup.world.compute_fk_pose('map', hand)
+        P = np.array([[hand_pose.pose.position.x, hand_pose.pose.position.y, hand_pose.pose.position.z]])
+        door_height = 0.7
+        door_length = 0.42
+
+        min_y = 1 / 4
+        max_y = 3 / 4
+        min_z = -1 / 2
+        max_z = 1 / 2
+
+        A = np.array([[root_Pose_door.pose.position.x, root_Pose_door.pose.position.y + door_length * max_y,
+                       root_Pose_door.pose.position.z + door_height * min_z]])
+
+        B = np.array([[root_Pose_door.pose.position.x, root_Pose_door.pose.position.y + door_length * min_y,
+                       root_Pose_door.pose.position.z + door_height * min_z]])
+
+        C = np.array([[root_Pose_door.pose.position.x, root_Pose_door.pose.position.y + door_length * max_y,
+                       root_Pose_door.pose.position.z + door_height * max_z]])
+
+        ab = B - A
+        ac = C - A
+        ap = P - A
+        ab_len = np.linalg.norm(ab)
+        ac_len = np.linalg.norm(ac)
+        ab_unit = ab / ab_len
+        ac_unit = ac / ac_len
+
+        proj_pt = np.matmul(np.vstack((ab_unit, ac_unit)).reshape(2, 3), ap.reshape(3, 1))
+        proj_pt_scaled = [proj_pt[0] / ab_len, proj_pt[1] / ac_len]
+        proj_pt_scaled = np.clip(proj_pt_scaled, 0.0, 1.0)
+        nearest = A + proj_pt_scaled[0] * ab + proj_pt_scaled[1] * ac
+
+        # # Projection
+        # p = hand_array - np.dot(hand_array - A, n_unit.T) * n_unit
+        # print("before clipping ", p)
+        # p[0, 1] = np.clip(p[0, 1], B[0, 1], A[0, 1])
+        # p[0, 2] = np.clip(p[0, 2], A[0, 2], C[0, 2])
+
+        point_m_p = np.hstack((nearest, np.ones((1, 1))))
+        print("computed point", point_m_p)
+
+        # # compute point_door_p
+        tf_m_d = quaternion_matrix(np.array([root_Pose_door.pose.orientation.x, root_Pose_door.pose.orientation.y,
+                                             root_Pose_door.pose.orientation.z, root_Pose_door.pose.orientation.w]))
+        tf_m_d[:, 3] = np.hstack((np.array([[root_Pose_door.pose.position.x, root_Pose_door.pose.position.y,
+                                             root_Pose_door.pose.position.z]]), np.ones((1, 1))))
+
+        tf_d_m = np.linalg.inv(tf_m_d)
+        point_door_p = np.matmul(tf_d_m, point_m_p.T)
+        print("point d_p: ", point_door_p)
+
+        # # 2. rotate the point
+        rot_door = rotation_matrix(goal_angle, np.array([0, 0, 1]))  # z is the axis of rotation in the local frame
+        point_rotated_door_p = np.matmul(rot_door, point_door_p)
+        print("rotated point", point_rotated_door_p)
+
+        # # 3. compute point_rotated_m_p
+        print("shapes: ", tf_m_d.shape, point_rotated_door_p.shape)
+        point_rotated_m_p = np.matmul(tf_m_d, point_rotated_door_p)
+        print("point_rotated_m_p", point_rotated_m_p[0], point_rotated_m_p[1], point_rotated_m_p[2])
+        # # 4. compute the goal pose
+
+        desired_pose = PoseStamped()
+        desired_pose.header.frame_id = 'map'
+        desired_pose.pose.position.x = point_rotated_m_p[0, 0]  # 1.285*np.cos(np.pi/4)
+        desired_pose.pose.position.y = point_rotated_m_p[1, 0]
+        desired_pose.pose.position.z = point_rotated_m_p[2, 0]  # 0.6*np.sin(np.pi/4)
+        hand_pose_orientation = hand_pose.pose.orientation
+        desired_pose.pose.orientation = Quaternion(hand_pose_orientation.x, hand_pose_orientation.y,
+                                                   hand_pose_orientation.z, hand_pose_orientation.w)
+
+        root_V_object_rotation_axis = Vector3Stamped()
+        root_V_object_rotation_axis.header.frame_id = "map"
+        root_V_object_rotation_axis.vector.y = -1
+
+        kitchen_setup.set_pre_push_door_goal(root_link=kitchen_setup.default_root,
+                                             tip_link=hand,
+                                             door_object=door_name,
+                                             door_height=0.565,
+                                             door_length=0.42,
+                                             tip_gripper_axis=tip_grasp_axis,
+                                             root_V_object_rotation_axis=root_V_object_rotation_axis,
+                                             object_joint_name=door_joint,
+                                             root_V_object_normal=object_normal)
+
+        kitchen_setup.allow_collision(group1=door_obj, group2=kitchen_setup.r_gripper_group)
+        kitchen_setup.plan_and_execute()
+
+        # kitchen_setup.set_cart_goal(desired_pose, tip_link=hand, root_link='map')
+        # kitchen_setup.allow_collision(group1=door_obj, group2=kitchen_setup.r_gripper_group)
+        # kitchen_setup.plan_and_execute()
+        hand_pose_now = kitchen_setup.world.compute_fk_pose('map', hand)
+        pose_to_push_down = PoseStamped()
+        pose_to_push_down.header.frame_id = hand_pose_now.header.frame_id
+        pose_to_push_down.pose.position.x = hand_pose_now.pose.position.x
+        pose_to_push_down.pose.position.y = hand_pose_now.pose.position.y
+        pose_to_push_down.pose.position.z = hand_pose.pose.position.z - 0.15
+        pose_to_push_down.pose.orientation = hand_pose.pose.orientation
+
+         # kitchen_setup.set_json_goal('CartesianPose',
+        #                             root_link='map',
+        #                             tip_link=hand,
+        #                             goal_pose=pose_to_push_down)
+
+        # Qn to Simon: There is a minor difference compared to the normal drawer scenario, here the robot tip does not have to move
+        # with the handle. The force applied by the gripper can just move the object further
+        # (if the force is sufficient)
+        kitchen_setup.set_open_container_goal(tip_link=hand,
+                                              environment_link=handle_name,
+                                              goal_joint_state=1.3217)
+
+        kitchen_setup.allow_collision(group1=door_obj, group2=kitchen_setup.r_gripper_group)
+        kitchen_setup.plan_and_execute()
 
     def test_align_planes1(self, zero_pose: PR2TestWrapper):
         x_gripper = Vector3Stamped()

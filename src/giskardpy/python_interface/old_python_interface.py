@@ -499,6 +499,58 @@ class OldGiskardWrapper(GiskardWrapper):
                                              goal_joint_state=goal_joint_state,
                                              weight=weight)
 
+    def set_align_to_push_door_goal(self,
+                                    root_link: str,
+                                    tip_link: str,
+                                    door_object: str,
+                                    door_height: float,
+                                    object_joint_name: str,
+                                    tip_gripper_axis: Vector3Stamped,
+                                    object_rotation_axis: Vector3Stamped,
+                                    weight: float = WEIGHT_BELOW_CA):
+        """
+        Aligns the tip_link with the door_object to push it open. Only works if the door object is part of the urdf.
+        The door has to be open a little before aligning.
+        : param root_link: root link of the kinematic chain
+        : param tip_link: end effector
+        : param door object: name of the object to be pushed
+        : param door_height: height of the door
+        : param object_joint_name: name of the joint that rotates
+        : param tip_gripper_axis: axis of the tip_link that will be aligned along the door rotation axis
+        : param object_rotation_axis: door rotation axis w.r.t root
+        """
+        self.motion_goals.add_align_to_push_door(root_link=root_link,
+                                                 tip_link=tip_link,
+                                                 door_object=door_object,
+                                                 door_height=door_height,
+                                                 object_joint_name=object_joint_name,
+                                                 tip_gripper_axis=tip_gripper_axis,
+                                                 object_rotation_axis=object_rotation_axis,
+                                                 weight=weight)
+
+    def set_pre_push_door_goal(self,
+                           root_link: str,
+                           tip_link: str,
+                           door_object: str,
+                           door_height: float,
+                           door_length: float,
+                           tip_gripper_axis: Vector3Stamped,
+                           root_V_object_rotation_axis: Vector3Stamped,
+                           # normal is along x axis, plane is located along y-z axis
+                           root_V_object_normal: Vector3Stamped,
+                           object_joint_name: str,):
+        """
+        Positions the gripper in contact with the door before pushing to open.
+        : param root_link: root link of the kinematic chain
+        : param tip_link: end effector
+        : param door object: name of the object to be pushed
+        : param door_height: height of the door
+        : param door_length: length of the door
+        : param tip_gripper_axis: axis of the tip_link that will be aligned along the door rotation axis
+        : param root_V_object_rotation_axis: door rotation axis w.r.t root
+        : param root_V_object_normal: door normal w.r.t root
+        """
+
     def set_close_container_goal(self,
                                  tip_link: str,
                                  environment_link: str,

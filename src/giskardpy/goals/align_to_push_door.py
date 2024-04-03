@@ -8,14 +8,14 @@ from giskardpy import casadi_wrapper as cas
 from giskardpy.goals.goal import Goal
 from giskardpy.god_map import god_map
 from giskardpy.monitors.monitors import ExpressionMonitor
-from giskardpy.tasks.task import WEIGHT_BELOW_CA, Task
+from giskardpy.tasks.task import WEIGHT_BELOW_CA
 from giskardpy.utils import tfwrapper as tf
 
 
 class AlignToPushDoor(Goal):
     # start condition - door is open a little bit
     # hold condition - door is open a little bit
-    # end condition - gripper is inside the gap between the open door and the dishwasher
+    # end condition - gripper is in the gap between the open door and the dishwasher
     def __init__(self,
                  root_link: str,
                  tip_link: str,
@@ -130,4 +130,5 @@ class AlignToPushDoor(Goal):
                                                        weight=self.weight)
 
         align_to_push_task.start_condition = door_opened_monitor
-        align_to_push_task.end_condition = tip_aligned_monitor
+        # align_to_push_task.end_condition = tip_aligned_monitor
+        self.connect_monitors_to_all_tasks(start_condition, hold_condition, end_condition)

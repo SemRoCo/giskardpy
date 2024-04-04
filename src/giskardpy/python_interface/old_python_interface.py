@@ -789,7 +789,7 @@ class OldGiskardWrapper(GiskardWrapper):
         :param root_link_group_name: Name of the group root_link_name belongs to
         :return: WorldResult
         """
-        return self.register_group(new_group_name=new_group_name,
+        return self.world.register_group(new_group_name=new_group_name,
                                    root_link_name=root_link_name,
                                    root_link_group_name=root_link_group_name)
 

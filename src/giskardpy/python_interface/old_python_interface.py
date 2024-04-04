@@ -507,6 +507,8 @@ class OldGiskardWrapper(GiskardWrapper):
                                     object_joint_name: str,
                                     tip_gripper_axis: Vector3Stamped,
                                     object_rotation_axis: Vector3Stamped,
+                                    tip_group: Optional[str] = None,
+                                    root_group: Optional[str] = None,
                                     weight: float = WEIGHT_BELOW_CA):
         """
         Aligns the tip_link with the door_object to push it open. Only works if the door object is part of the urdf.
@@ -526,19 +528,24 @@ class OldGiskardWrapper(GiskardWrapper):
                                                  object_joint_name=object_joint_name,
                                                  tip_gripper_axis=tip_gripper_axis,
                                                  object_rotation_axis=object_rotation_axis,
+                                                 tip_group=tip_group,
+                                                 root_group=root_group,
                                                  weight=weight)
 
     def set_pre_push_door_goal(self,
-                           root_link: str,
-                           tip_link: str,
-                           door_object: str,
-                           door_height: float,
-                           door_length: float,
-                           tip_gripper_axis: Vector3Stamped,
-                           root_V_object_rotation_axis: Vector3Stamped,
-                           # normal is along x axis, plane is located along y-z axis
-                           root_V_object_normal: Vector3Stamped,
-                           object_joint_name: str,):
+                               root_link: str,
+                               tip_link: str,
+                               door_object: str,
+                               door_height: float,
+                               door_length: float,
+                               tip_gripper_axis: Vector3Stamped,
+                               root_V_object_rotation_axis: Vector3Stamped,
+                               # normal is along x axis, plane is located along y-z axis
+                               root_V_object_normal: Vector3Stamped,
+                               object_joint_name: str,
+                               reference_linear_velocity: Optional[float] = None,
+                               reference_angular_velocity: Optional[float] = None,
+                               weight: float = WEIGHT_ABOVE_CA):
         """
         Positions the gripper in contact with the door before pushing to open.
         : param root_link: root link of the kinematic chain
@@ -550,6 +557,18 @@ class OldGiskardWrapper(GiskardWrapper):
         : param root_V_object_rotation_axis: door rotation axis w.r.t root
         : param root_V_object_normal: door normal w.r.t root
         """
+        self.motion_goals.add_pre_push_door(root_link=root_link,
+                                            tip_link=tip_link,
+                                            door_object=door_object,
+                                            door_height=door_height,
+                                            door_length=door_length,
+                                            tip_gripper_axis=tip_gripper_axis,
+                                            root_V_object_rotation_axis=root_V_object_rotation_axis,
+                                            root_V_object_normal=root_V_object_normal,
+                                            object_joint_name=object_joint_name,
+                                            reference_linear_velocity=reference_linear_velocity,
+                                            reference_angular_velocity=reference_angular_velocity,
+                                            weight=weight)
 
     def set_close_container_goal(self,
                                  tip_link: str,

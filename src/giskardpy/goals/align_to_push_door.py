@@ -26,8 +26,8 @@ class AlignToPushDoor(Goal):
                  object_joint_name: str,
                  tip_gripper_axis: Vector3Stamped,
                  object_rotation_axis: Vector3Stamped,
-                 root_group: str,
-                 tip_group: str,
+                 root_group: Optional[str] = None,
+                 tip_group: Optional[str] = None,
                  reference_linear_velocity: float = 0.1,
                  reference_angular_velocity: float = 0.5,
                  weight: float = WEIGHT_BELOW_CA,
@@ -38,11 +38,11 @@ class AlignToPushDoor(Goal):
         """
         The objective is to reach an intermediate point before pushing the door
         """
-        self.root = god_map.search_for_link_name(root_link, root_group)
-        self.tip = god_map.search_for_link_name(tip_link, tip_group)
-        self.door_object = god_map.search_for_link_name(door_object)
+        self.root = god_map.world.search_for_link_name(root_link, root_group)
+        self.tip = god_map.world.search_for_link_name(tip_link, tip_group)
+        self.door_object = god_map.world.search_for_link_name(door_object)
         self.object_joint_angle = \
-            god_map.state.to_position_dict()[god_map.search_for_joint_name(object_joint_name)]
+            god_map.world.state.to_position_dict()[god_map.world.search_for_joint_name(object_joint_name)]
 
         tip_gripper_axis.header.frame_id = self.tip
         tip_gripper_axis.vector = tf.normalize(tip_gripper_axis.vector)
@@ -72,19 +72,19 @@ class AlignToPushDoor(Goal):
         super().__init__(name=name)
 
         root_T_tip = god_map.world.compose_fk_expression(self.root, self.tip)
-        root_T_object = god_map.world.compose_fk_expression(self.root, self.door_object)
+        root_T_object_expr = god_map.world.compose_fk_expression(self.root, self.door_object)
         object_V_object_rotation_axis = cas.Vector3(self.object_rotation_axis)
         tip_V_tip_grasp_axis = cas.Vector3(self.tip_gripper_axis)
-        root_V_object_rotation_axis = cas.dot(root_T_object, object_V_object_rotation_axis)
+        root_V_object_rotation_axis = cas.dot(root_T_object_expr, object_V_object_rotation_axis)
         root_V_tip_grasp_axis = cas.dot(root_T_tip, tip_V_tip_grasp_axis)
 
-        root_P_object = god_map.world.compute_fk_pose(self.root, self.door_object)
+        root_T_object = god_map.world.compute_fk_pose(self.root, self.door_object)
 
         root_P_intermediate_point = PointStamped()
         root_P_intermediate_point.header.frame_id = self.root
-        root_P_intermediate_point.point.x = root_P_object.pose.position.x
-        root_P_intermediate_point.point.y = root_P_object.pose.position.y
-        root_P_intermediate_point.point.z = root_P_object.pose.position.z + self.door_height
+        root_P_intermediate_point.point.x = root_T_object.pose.position.x
+        root_P_intermediate_point.point.y = root_T_object.pose.position.y
+        root_P_intermediate_point.point.z = root_T_object.pose.position.z + self.door_height
 
         door_T_root = god_map.world.compute_fk_pose(self.door_object, self.root)
 
@@ -105,7 +105,7 @@ class AlignToPushDoor(Goal):
 
         door_P_rotated_point = cas.dot(rot_mat, cas.Point3(door_P_intermediate_point))
 
-        root_P_rotated_point = cas.dot(cas.TransMatrix(root_T_object), cas.Point3(door_P_rotated_point))
+        root_P_rotated_point = cas.dot(cas.TransMatrix(root_T_object_expr), cas.Point3(door_P_rotated_point))
 
         god_map.debug_expression_manager.add_debug_expression('goal_point', cas.Point3(root_P_rotated_point),
                                                               color=ColorRGBA(0, 0.5, 0.5, 1))

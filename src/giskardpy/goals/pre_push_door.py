@@ -8,6 +8,7 @@ from giskardpy import casadi_wrapper as cas
 from giskardpy.goals.goal import Goal
 from giskardpy.god_map import god_map
 from giskardpy.monitors.monitors import ExpressionMonitor
+from giskardpy.symbol_manager import symbol_manager
 from giskardpy.tasks.task import WEIGHT_BELOW_CA
 from giskardpy.utils import tfwrapper as tf
 
@@ -37,11 +38,11 @@ class PrePushDoor(Goal):
         """
             The objective is to push the object until desired rotation is reached
         """
-        self.root = god_map.search_for_link_name(root_link, root_group)
-        self.tip = god_map.search_for_link_name(tip_link, tip_group)
-        self.door_object = god_map.search_for_link_name(door_object)
+        self.root = god_map.world.search_for_link_name(root_link, root_group)
+        self.tip = god_map.world.search_for_link_name(tip_link, tip_group)
+        self.door_object = god_map.world.search_for_link_name(door_object)
         self.object_joint_angle = \
-            god_map.state.to_position_dict()[god_map.search_for_joint_name(object_joint_name)]
+            god_map.world.state.to_position_dict()[god_map.world.search_for_joint_name(object_joint_name)]
 
         tip_gripper_axis.header.frame_id = self.tip
         tip_gripper_axis.vector = tf.normalize(tip_gripper_axis.vector)
@@ -80,6 +81,7 @@ class PrePushDoor(Goal):
         root_P_bottom_left = PointStamped()  # A
         root_P_bottom_right = PointStamped()  # B
         root_P_top_left = PointStamped()  # C
+        door_P_bottom_left = PointStamped()
 
         min_y = 0
         max_y = 0
@@ -147,30 +149,38 @@ class PrePushDoor(Goal):
         god_map.debug_expression_manager.add_debug_expression('B', cas.Point3(root_P_bottom_right))
         god_map.debug_expression_manager.add_debug_expression('C', cas.Point3(root_P_top_left))
 
-        d1 = root_V_object_normal.vector.x(root_P_tip.point.x - root_T_door.pose.position.x) + \
-            root_V_object_normal.vector.y(root_P_tip.point.y - root_T_door.pose.position.y) + \
-            root_V_object_normal.vector.z(root_P_tip.point.z - root_T_door.pose.position.z)
+        door_P_bottom_left.header.frame_id = self.door_object
+        door_P_bottom_left.point.y = self.door_length * max_y
+        door_P_bottom_left.point.z = self.door_height * min_z
 
-        root_P_door = cas.Point3([root_T_door.pose.position.x, root_T_door.pose.position.y,
-                                  root_T_door.pose.position.z])
-        root_P_rotated_door = cas.dot(cas.TransMatrix(root_T_door), root_P_door)
-        d2 = root_V_object_normal.vector.x(root_P_tip.point.x - root_P_rotated_door.x) + \
-            root_V_object_normal.vector.y(root_P_tip.point.y - root_P_rotated_door.y) + \
-            root_V_object_normal.vector.z(root_P_tip.point.z - root_P_rotated_door.z)
+        door_P_bottom_left_rotated = cas.dot(rot_mat, cas.Point3(door_P_bottom_left))
+        root_P_bottom_left_rotated = cas.dot(cas.TransMatrix(root_T_door), cas.Point3(door_P_bottom_left_rotated))
+        root_P_tip = cas.Point3(root_P_tip)
+        root_V_object_normal = cas.Vector3(root_V_object_normal)
 
-        d = root_V_object_normal.vector.x * (root_T_door.pose.position.x - root_P_rotated_door.x) + \
-            root_V_object_normal.vector.y * (root_T_door.pose.position.y - root_P_rotated_door.y) + \
-            root_V_object_normal.vector.z * (root_T_door.pose.position.z - root_P_rotated_door.z)
+        root_P_bottom_left = cas.Point3(root_P_bottom_left)
+
+        d1 = cas.abs(root_V_object_normal.x * (root_P_tip.x - root_P_bottom_left_rotated.x) + \
+                     root_V_object_normal.y * (root_P_tip.y - root_P_bottom_left_rotated.y) + \
+                     root_V_object_normal.z * (root_P_tip.z - root_P_bottom_left_rotated.z))
+
+        d2 = cas.abs(root_V_object_normal.x * (root_P_tip.x - root_P_bottom_left.x) + \
+                     root_V_object_normal.y * (root_P_tip.y - root_P_bottom_left.y) + \
+                     root_V_object_normal.z * (root_P_tip.z - root_P_bottom_left.z))
+
+        d = cas.abs(root_V_object_normal.x * (root_P_bottom_left_rotated.x - root_P_bottom_left.x) + \
+                    root_V_object_normal.y * (root_P_bottom_left_rotated.y - root_P_bottom_left.y) + \
+                    root_V_object_normal.z * (root_P_bottom_left_rotated.z - root_P_bottom_left.z))
 
         # check if the tip point is between the two planes. this is to make sure if the points are aligned
         # above the door
-        gripper_aligned = cas.equal(abs(d1)+abs(d2), abs(d))
+        gripper_aligned = cas.equal(d1 + d2, d)
         gripper_aligned_monitor = ExpressionMonitor(name='gripper aligned', stay_true=True,
                                                     start_condition=start_condition)
         self.add_monitor(gripper_aligned_monitor)
         gripper_aligned_monitor.expression = gripper_aligned
 
-        push_door_task = self.create_and_add_task('push door')
+        push_door_task = self.create_and_add_task('pre push door')
         push_door_task.add_point_goal_constraints(frame_P_current=root_T_tip.to_position(),
                                                   frame_P_goal=cas.Point3(root_P_rotated_point),
                                                   reference_velocity=self.reference_linear_velocity,

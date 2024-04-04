@@ -16,6 +16,7 @@ from giskard_msgs.srv import GetGroupNamesResponse, GetGroupInfoResponse
 from giskardpy.data_types import goal_parameter
 from giskardpy.exceptions import DuplicateNameException, UnknownGroupException
 from giskardpy.goals.align_planes import AlignPlanes
+from giskardpy.goals.align_to_push_door import AlignToPushDoor
 from giskardpy.goals.cartesian_goals import CartesianPose, DiffDriveBaseGoal, CartesianVelocityLimit, \
     CartesianOrientation, CartesianPoseStraight, CartesianPosition, CartesianPositionStraight
 from giskardpy.goals.collision_avoidance import CollisionAvoidance
@@ -23,6 +24,7 @@ from giskardpy.goals.grasp_bar import GraspBar
 from giskardpy.goals.joint_goals import JointPositionList, AvoidJointLimits, SetSeedConfiguration, SetOdometry
 from giskardpy.goals.open_close import Close, Open
 from giskardpy.goals.pointing import Pointing
+from giskardpy.goals.pre_push_door import PrePushDoor
 from giskardpy.goals.set_prediction_horizon import SetPredictionHorizon
 from giskardpy.model.utils import make_world_body_box
 from giskardpy.monitors.cartesian_monitors import PoseReached, PositionReached, OrientationReached, PointingAt, \
@@ -661,6 +663,99 @@ class MotionGoalWrapper:
                              goal_joint_state=goal_joint_state,
                              weight=weight,
                              name=name,
+                             start_condition=start_condition,
+                             hold_condition=hold_condition,
+                             end_condition=end_condition)
+
+    def add_align_to_push_door(self,
+                               root_link: str,
+                               tip_link: str,
+                               door_object: str,
+                               door_height: float,
+                               object_joint_name: str,
+                               tip_gripper_axis: Vector3Stamped,
+                               object_rotation_axis: Vector3Stamped,
+                               weight: float,
+                               tip_group: Optional[str] = None,
+                               root_group: Optional[str] = None,
+                               name: Optional[str] = None,
+                               start_condition: str = '',
+                               hold_condition: str = '',
+                               end_condition: str = ''):
+        """
+        Aligns the tip_link with the door_object to push it open. Only works if the door object is part of the urdf.
+        The door has to be open a little before aligning.
+        : param root_link: root link of the kinematic chain
+        : param tip_link: end effector
+        : param door object: name of the object to be pushed
+        : param door_height: height of the door
+        : param object_joint_name: name of the joint that rotates
+        : param tip_gripper_axis: axis of the tip_link that will be aligned along the door rotation axis
+        : param object_rotation_axis: door rotation axis w.r.t root
+        """
+        self.add_motion_goal(motion_goal_class=AlignToPushDoor.__name__,
+                             root_link=root_link,
+                             tip_link=tip_link,
+                             door_object=door_object,
+                             door_height=door_height,
+                             object_joint_name=object_joint_name,
+                             tip_gripper_axis=tip_gripper_axis,
+                             object_rotation_axis=object_rotation_axis,
+                             tip_group=tip_group,
+                             root_group=root_group,
+                             weight=weight,
+                             name=name,
+                             start_condition=start_condition,
+                             hold_condition=hold_condition,
+                             end_condition=end_condition)
+
+    def add_pre_push_door(self,
+                          root_link: str,
+                          tip_link: str,
+                          door_object: str,
+                          door_height: float,
+                          door_length: float,
+                          tip_gripper_axis: Vector3Stamped,
+                          root_V_object_rotation_axis: Vector3Stamped,
+                          # normal is along x axis, plane is located along y-z axis
+                          root_V_object_normal: Vector3Stamped,
+                          object_joint_name: str,
+                          weight: float,
+                          tip_group: Optional[str] = None,
+                          root_group: Optional[str] = None,
+                          reference_linear_velocity: Optional[float] = None,
+                          reference_angular_velocity: Optional[float] = None,
+                          name: Optional[str] = None,
+                          start_condition: str = '',
+                          hold_condition: str = '',
+                          end_condition: str = ''):
+        """
+        Positions the gripper in contact with the door before pushing to open.
+        : param root_link: root link of the kinematic chain
+        : param tip_link: end effector
+        : param door object: name of the object to be pushed
+        : param door_height: height of the door
+        : param door_length: length of the door
+        : param tip_gripper_axis: axis of the tip_link that will be aligned along the door rotation axis
+        : param root_V_object_rotation_axis: door rotation axis w.r.t root
+        : param root_V_object_normal: door normal w.r.t root
+        """
+        self.add_motion_goal(motion_goal_class=PrePushDoor.__name__,
+                             root_link=root_link,
+                             tip_link=tip_link,
+                             door_object=door_object,
+                             door_height=door_height,
+                             door_length=door_length,
+                             tip_gripper_axis=tip_gripper_axis,
+                             root_V_object_rotation_axis=root_V_object_rotation_axis,
+                             root_V_object_normal=root_V_object_normal,
+                             object_joint_name=object_joint_name,
+                             tip_group=tip_group,
+                             root_group=root_group,
+                             weight=weight,
+                             name=name,
+                             reference_linear_velocity=reference_linear_velocity,
+                             reference_angular_velocity=reference_angular_velocity,
                              start_condition=start_condition,
                              hold_condition=hold_condition,
                              end_condition=end_condition)

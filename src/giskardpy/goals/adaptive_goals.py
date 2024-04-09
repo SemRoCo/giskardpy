@@ -915,6 +915,8 @@ class HandCamServoGoal(Goal):
 
     def movement_callback(self, data: Vector3Stamped):
         self.cam_V_movement = data
+        self.cam_V_movement.vector.x = self.cam_V_movement.vector.x * 0.01
+        self.cam_V_movement.vector.y = self.cam_V_movement.vector.y * 0.01
 
     def angle_callback(self, data: Float64):
         self.rotation_angle = data.data

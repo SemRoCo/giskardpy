@@ -672,6 +672,7 @@ class MotionGoalWrapper:
                                tip_link: str,
                                door_object: str,
                                door_height: float,
+                               door_length: float,
                                object_joint_name: str,
                                tip_gripper_axis: Vector3Stamped,
                                object_rotation_axis: Vector3Stamped,
@@ -698,6 +699,7 @@ class MotionGoalWrapper:
                              tip_link=tip_link,
                              door_object=door_object,
                              door_height=door_height,
+                             door_length=door_length,
                              object_joint_name=object_joint_name,
                              tip_gripper_axis=tip_gripper_axis,
                              object_rotation_axis=object_rotation_axis,
@@ -717,7 +719,6 @@ class MotionGoalWrapper:
                           door_length: float,
                           tip_gripper_axis: Vector3Stamped,
                           root_V_object_rotation_axis: Vector3Stamped,
-                          # normal is along x axis, plane is located along y-z axis
                           root_V_object_normal: Vector3Stamped,
                           object_joint_name: str,
                           weight: float,

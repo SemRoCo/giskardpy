@@ -6,6 +6,9 @@ from giskardpy.monitors.monitors import ExpressionMonitor
 from giskardpy.tasks.task import Task
 from giskardpy.god_map import god_map
 from giskardpy.symbol_manager import symbol_manager
+from giskardpy.monitors.payload_monitors import ManipulabilityMonitor
+from geometry_msgs.msg import PointStamped, PoseStamped
+from giskardpy.utils.expression_definition_utils import transform_msg_and_turn_to_expr
 
 
 class MaxManipulability(Goal):
@@ -13,7 +16,7 @@ class MaxManipulability(Goal):
                  name: Optional[str] = None,
                  optimize_rotational_dofs=False,
                  monitor_threshold: float = 0.01,
-                 prediction_horizon: int = 5,
+                 prediction_horizon: int = 7,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.TrueSymbol):
@@ -25,7 +28,8 @@ class MaxManipulability(Goal):
 
         results = god_map.world.compute_split_chain(self.root_link, self.tip_link, True, True, False, False)
         if len(results[0]) > 0 and len(results[1]) > 0 and len(results[2]) > 0:
-            raise Exception('tip link and root link are in different branches of the kinematic chain of Maximize Manipulability Goal')
+            raise Exception(
+                'tip link and root link are in different branches of the kinematic chain of Maximize Manipulability Goal')
         elif len(results[0]) > 0:
             raise Exception('tip link is below root link in kinematic chain of Maximize Manipulability Goal')
         for joint in results[2]:
@@ -45,13 +49,19 @@ class MaxManipulability(Goal):
                                                       prediction_horizon=prediction_horizon)
         m = symbol_manager.get_symbol(f'god_map.qp_controller.manipulability_indexes[0]')
         old_m = symbol_manager.get_symbol(f'god_map.qp_controller.manipulability_indexes[1]')
-        god_map.debug_expression_manager.add_debug_expression('mIndex_percentualDifference',
-                                                              1 - cas.min(cas.save_division(old_m, m), 1))
         percentual_diff = 1 - cas.min(cas.save_division(old_m, m), 1)
-        monitor = ExpressionMonitor(name=f'manipMonitor{tip_link}')
+        # monitor = ExpressionMonitor(name=f'manipMonitor{tip_link}')
+        monitor = ManipulabilityMonitor(name=f'manipMonitor{tip_link}')
         self.add_monitor(monitor)
-        monitor.expression = cas.less(percentual_diff, monitor_threshold)
+        # monitor.expression = cas.less(percentual_diff, monitor_threshold)
         task.end_condition = monitor
+        god_map.debug_expression_manager.add_debug_expression('percentualDiff', percentual_diff)
+        god_map.debug_expression_manager.add_debug_expression('OldmMnitorValue',
+                                                              cas.less(percentual_diff, monitor_threshold))
+        god_map.debug_expression_manager.add_debug_expression('monitorValue', symbol_manager.get_symbol(
+            f'god_map.monitor_manager.payload_monitors[-1].state'))
+        god_map.debug_expression_manager.add_debug_expression('start', 1)
+        god_map.debug_expression_manager.add_debug_expression('mIndex', m)
 
     """
     This goal maximizes the manipulability of the kinematic chain between root_link and tip_link.

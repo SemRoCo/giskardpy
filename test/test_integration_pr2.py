@@ -4380,16 +4380,33 @@ class TestWeightScaling:
                                                root_link='map',
                                                tip_link='l_gripper_tool_frame',
                                                tip_goal=tip_goal,
-                                               gain=100000)
+                                               gain=100000,
+                                               arm_joints=['head_pan_joint',
+                                                           'head_tilt_joint',
+                                                           'r_upper_arm_roll_joint',
+                                                           'r_shoulder_pan_joint',
+                                                           'r_shoulder_lift_joint',
+                                                           'r_forearm_roll_joint',
+                                                           'r_elbow_flex_joint',
+                                                           'r_wrist_flex_joint',
+                                                           'r_wrist_roll_joint',
+                                                           'l_upper_arm_roll_joint',
+                                                           'l_shoulder_pan_joint',
+                                                           'l_shoulder_lift_joint',
+                                                           'l_forearm_roll_joint',
+                                                           'l_elbow_flex_joint',
+                                                           'l_wrist_flex_joint',
+                                                           'l_wrist_roll_joint'],
+                                               base_joints=['brumbrum'])
         zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulability.__name__,
                                                root_link='torso_lift_link',
                                                tip_link='l_gripper_tool_frame',
-                                               gain=2,
+                                               gain=1,
                                                name='manip1')
         zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulability.__name__,
                                                root_link='torso_lift_link',
                                                tip_link='r_gripper_tool_frame',
-                                               gain=2,
+                                               gain=1,
                                                name='manip2')
         zero_pose.add_default_end_motion_conditions()
         zero_pose.allow_all_collisions()

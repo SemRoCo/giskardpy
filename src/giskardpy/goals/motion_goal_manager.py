@@ -13,12 +13,13 @@ from giskardpy.goals.goal import Goal
 import giskard_msgs.msg as giskard_msgs
 from giskardpy.god_map import god_map
 from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint, \
-    ManipulabilityConstraint, WeightTransitionConstraint
+    ManipulabilityConstraint
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.tasks.task import Task
 from giskardpy.utils import logging
 from giskardpy.utils.utils import get_all_classes_in_package, convert_dictionary_to_ros_message, \
     json_str_to_kwargs, ImmutableDict
+from giskardpy.qp.weight_gain import QuadraticWeightGain
 
 
 class MotionGoalManager:
@@ -254,19 +255,19 @@ class MotionGoalManager:
             Dict[str, InequalityConstraint],
             Dict[str, DerivativeInequalityConstraint],
             Dict[str, ManipulabilityConstraint],
-            Dict[str, WeightTransitionConstraint]]:
+            Dict[str, QuadraticWeightGain]]:
         eq_constraints = ImmutableDict()
         neq_constraints = ImmutableDict()
         derivative_constraints = ImmutableDict()
         manip_constraints = ImmutableDict()
-        weight_scaling_constraint = ImmutableDict()
+        quadratic_weight_gains = ImmutableDict()
         for goal_name, goal in list(self.motion_goals.items()):
             try:
                 new_eq_constraints = OrderedDict()
                 new_neq_constraints = OrderedDict()
                 new_derivative_constraints = OrderedDict()
                 new_manip_constraints = OrderedDict()
-                new_weight_scaling_constraints = OrderedDict()
+                new_quadratic_weight_gains = OrderedDict()
                 for task in goal.tasks:
                     for constraint in task.get_eq_constraints():
                         new_eq_constraints[constraint.name] = constraint
@@ -276,22 +277,22 @@ class MotionGoalManager:
                         new_derivative_constraints[constraint.name] = constraint
                     for constraint in task.get_manipulability_constraint():
                         new_manip_constraints[constraint.name] = constraint
-                    for constraint in task.get_weight_scaling_constraint():
-                        new_weight_scaling_constraints[constraint.name] = constraint
+                    for gain in task.get_quadratic_gains():
+                        new_quadratic_weight_gains[gain.name] = gain
             except Exception as e:
                 raise GoalInitalizationException(str(e))
             eq_constraints.update(new_eq_constraints)
             neq_constraints.update(new_neq_constraints)
             derivative_constraints.update(new_derivative_constraints)
             manip_constraints.update(new_manip_constraints)
-            weight_scaling_constraint.update(new_weight_scaling_constraints)
+            quadratic_weight_gains.update(new_quadratic_weight_gains)
             # logging.loginfo(f'{goal_name} added {len(_constraints)+len(_vel_constraints)} constraints.')
         god_map.eq_constraints = eq_constraints
         god_map.neq_constraints = neq_constraints
         god_map.derivative_constraints = derivative_constraints
         god_map.manip_constraints = manip_constraints
-        god_map.weight_scaling_constraints = weight_scaling_constraint
-        return eq_constraints, neq_constraints, derivative_constraints, manip_constraints, weight_scaling_constraint
+        god_map.quadratic_weight_gains = quadratic_weight_gains
+        return eq_constraints, neq_constraints, derivative_constraints, manip_constraints, quadratic_weight_gains
 
     def replace_jsons_with_ros_messages(self, d):
         if isinstance(d, list):

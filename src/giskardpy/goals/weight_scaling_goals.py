@@ -1,10 +1,11 @@
-from typing import Optional
+from typing import Optional, List
 
 from giskardpy import casadi_wrapper as cas
 from giskardpy.goals.goal import Goal
 from giskardpy.god_map import god_map
 from geometry_msgs.msg import PointStamped
 from giskardpy.utils.expression_definition_utils import transform_msg_and_turn_to_expr
+from giskardpy.data_types import Derivatives
 
 
 class BaseArmWeightScaling(Goal):
@@ -14,10 +15,13 @@ class BaseArmWeightScaling(Goal):
     all other constraints instead of arm movements. When the expression decreases this relation changes to favor
     arm movements instead of base movements.
     """
+
     def __init__(self,
                  root_link: str,
                  tip_link: str,
                  tip_goal: PointStamped,
+                 arm_joints: List[str],
+                 base_joints: List[str],
                  gain: float = 100000,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
@@ -33,6 +37,22 @@ class BaseArmWeightScaling(Goal):
         root_P_tip = god_map.world.compose_fk_expression(self.root_link, self.tip_link).to_position()
         root_P_goal = transform_msg_and_turn_to_expr(self.root_link, tip_goal, cas.TrueSymbol)
         scaling_exp = root_P_goal - root_P_tip
-        task.add_weight_scaling_constraint_vector(gain=gain,
-                                                     scaling_expressions=scaling_exp[:3],
-                                                     names=['scaling1', 'scaling2', 'scaling3'])
+
+        free_variables = []
+        gains = {}
+        for name in arm_joints:
+            vs = god_map.world.joints[god_map.world.search_for_joint_name(name)].free_variables
+            for v in vs:
+                free_variables.append(v.name)
+                v_gain = gain * cas.norm(scaling_exp / v.get_upper_limit(Derivatives.velocity))
+                gains[v.name] = v_gain
+        for name in base_joints:
+            vs = god_map.world.joints[god_map.world.search_for_joint_name(name)].free_variables
+            for v in vs:
+                free_variables.append(v.name)
+                v_gain = gain * cas.save_division(1, cas.norm(scaling_exp / v.get_upper_limit(Derivatives.velocity)))
+                gains[v.name] = v_gain
+
+        task.add_quadratic_weight_gain('baseToArmScaling',
+                                       free_variable_names=free_variables,
+                                       gains=gains)

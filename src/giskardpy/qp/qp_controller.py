@@ -16,7 +16,7 @@ from giskardpy.exceptions import HardConstraintsViolatedException, QPSolverExcep
 from giskardpy.god_map import god_map
 from giskardpy.data_types import Derivatives
 from giskardpy.qp.constraint import InequalityConstraint, EqualityConstraint, DerivativeInequalityConstraint, \
-    ManipulabilityConstraint
+    ManipulabilityConstraint, WeightTransitionConstraint
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.next_command import NextCommands
 from giskardpy.qp.pos_in_vel_limits import b_profile
@@ -178,9 +178,11 @@ class Weights(ProblemDataPart):
         return (cas.abs(current_position + x_offset - limit) * a) ** exp, x_offset
 
     @profile
-    def construct_expression(self) -> Union[cas.Expression, Tuple[cas.Expression, cas.Expression]]:
+    def construct_expression(self, weight_scaling_constraints: [WeightTransitionConstraint] = None) -> Union[
+        cas.Expression, Tuple[cas.Expression, cas.Expression]]:
         components = []
-        components.extend(self.free_variable_weights_expression())
+        components.extend(
+            self.free_variable_weights_expression(weight_scaling_constraints=weight_scaling_constraints))
         components.append(self.equality_weight_expressions())
         components.extend(self.derivative_weight_expressions())
         components.append(self.inequality_weight_expressions())
@@ -190,9 +192,16 @@ class Weights(ProblemDataPart):
         return cas.Expression(weights), linear_weights
 
     @profile
-    def free_variable_weights_expression(self) -> List[defaultdict]:
+    def free_variable_weights_expression(self, weight_scaling_constraints: [WeightTransitionConstraint] = None) -> \
+            List[defaultdict]:
         params = []
         weights = defaultdict(dict)  # maps order to joints
+
+        bounds, gain = None, None
+        if weight_scaling_constraints is not None and len(weight_scaling_constraints) > 0:
+            bounds = cas.vstack([x.scaling_expression for x in weight_scaling_constraints])
+            gain = sum([x.gain for x in weight_scaling_constraints]) / len(weight_scaling_constraints)
+
         for t in range(self.prediction_horizon):
             for v in self.free_variables:
                 for derivative in Derivatives.range(Derivatives.velocity, self.max_derivative):
@@ -200,7 +209,26 @@ class Weights(ProblemDataPart):
                         continue
                     normalized_weight = v.normalized_weight(t, derivative, self.prediction_horizon,
                                                             evaluated=self.evaluated)
-                    weights[derivative][f't{t:03}/{v.position_name}/{derivative}'] = normalized_weight
+                    if bounds and gain:
+                        # start with a low gain for base joints an increase it
+                        # while the bounds/ scaling expression decrease
+                        if 'brumbrum' in v.name:
+                            weights[derivative][
+                                f't{t:03}/{v.position_name}/{derivative}'] = gain * normalized_weight * cas.save_division(
+                                1, cas.norm(bounds / v.get_upper_limit(Derivatives.velocity)))
+                        # the head weight scaling is kept to the standard values
+                        # TODO: Why does adding the head like this influence the base weight values?
+                        # if 'head' in v.name:
+                        #     weights[derivative][f't{t:03}/{v.position_name}/{derivative}'] = normalized_weight
+                        # all other joints should include the arm joints. \
+                        # They start with a high weight and decrease with the bounds/scaling_expression
+                        else:
+                            weights[derivative][
+                                f't{t:03}/{v.position_name}/{derivative}'] = gain * normalized_weight * cas.norm(
+                                bounds / v.get_upper_limit(Derivatives.velocity))
+                    else:
+                        # This is the normal weight when not weight_scaling_constraints are present
+                        weights[derivative][f't{t:03}/{v.position_name}/{derivative}'] = normalized_weight
         for _, weight in sorted(weights.items()):
             params.append(weight)
         return params
@@ -1008,6 +1036,7 @@ class QPProblemBuilder:
                  inequality_constraints: List[InequalityConstraint] = None,
                  derivative_constraints: List[DerivativeInequalityConstraint] = None,
                  manipulability_constraints: List[ManipulabilityConstraint] = None,
+                 weight_scaling_constraints: List[WeightTransitionConstraint] = None,
                  retries_with_relaxed_constraints: int = 0,
                  retry_added_slack: float = 100,
                  retry_weight_factor: float = 100):
@@ -1016,6 +1045,7 @@ class QPProblemBuilder:
         self.inequality_constraints = []
         self.derivative_constraints = []
         self.manipulability_constraints = []
+        self.weight_scaling_constraints = []
         self.prediction_horizon = prediction_horizon
         self.retries_with_relaxed_constraints = retries_with_relaxed_constraints
         self.retry_added_slack = retry_added_slack
@@ -1031,6 +1061,8 @@ class QPProblemBuilder:
             self.add_derivative_constraints(derivative_constraints)
         if manipulability_constraints is not None:
             self.add_manipulability_constraints(manipulability_constraints)
+        if weight_scaling_constraints is not None:
+            self.add_weight_scaling_constraints(weight_scaling_constraints)
 
         if solver_id is not None:
             self.qp_solver_class = available_solvers[solver_id]
@@ -1079,6 +1111,12 @@ class QPProblemBuilder:
         duplicates = set([x for x in l if l.count(x) > 1])
         assert duplicates == set(), f'there are multiple manipulability constraints with the same name: {duplicates}'
 
+    def add_weight_scaling_constraints(self, constraints: List[WeightTransitionConstraint]):
+        self.weight_scaling_constraints.extend(list(sorted(constraints, key=lambda x: x.name)))
+        l = [x.name for x in constraints]
+        duplicates = set([x for x in l if l.count(x) > 1])
+        assert duplicates == set(), f'there are multiple weight transition constraints with the same name: {duplicates}'
+
     def add_derivative_constraints(self, constraints: List[DerivativeInequalityConstraint]):
         self.derivative_constraints.extend(list(sorted(constraints, key=lambda x: x.name)))
         l = [x.name for x in constraints]
@@ -1117,7 +1155,7 @@ class QPProblemBuilder:
         self.inequality_model = InequalityModel(**kwargs)
         self.inequality_bounds = InequalityBounds(default_limits=default_limits, **kwargs)
 
-        weights, g = self.weights.construct_expression()
+        weights, g = self.weights.construct_expression(self.weight_scaling_constraints)
         lb, ub = self.free_variable_bounds.construct_expression()
         A, A_slack = self.inequality_model.construct_expression()
         lbA, ubA = self.inequality_bounds.construct_expression()

@@ -161,9 +161,9 @@ class PR2TestWrapper(GiskardTestWrapper):
             giskard = Giskard(world_config=WorldWithPR2Config(drive_joint_name=drive_joint_name),
                               robot_interface_config=PR2StandaloneInterface(drive_joint_name=drive_joint_name),
                               collision_avoidance_config=PR2CollisionAvoidance(drive_joint_name=drive_joint_name),
-                              behavior_tree_config=StandAloneBTConfig(debug_mode=True,
-                                                                      simulation_max_hz=None),
-                              qp_controller_config=QPControllerConfig())
+                              behavior_tree_config=StandAloneBTConfig(debug_mode=False,
+                                                                      simulation_max_hz=30),
+                              qp_controller_config=QPControllerConfig(qp_solver=SupportedQPSolver.gurobi))
         super().__init__(giskard)
         self.robot = god_map.world.groups[self.robot_name]
 
@@ -4306,6 +4306,94 @@ class TestManipulability:
                                                root_link='torso_lift_link',
                                                tip_link='l_gripper_tool_frame')
         zero_pose.execute(add_local_minimum_reached=True)
+
+
+class TestWeightScaling:
+    def test_weight_scaling1(self, zero_pose):
+        js = {
+            # 'torso_lift_joint': 0.2999225173357618,
+            'head_pan_joint': 0.041880780651479044,
+            'head_tilt_joint': -0.37,
+            'r_upper_arm_roll_joint': -0.9487714747527726,
+            'r_shoulder_pan_joint': -1.0047307505973626,
+            'r_shoulder_lift_joint': 0.48736790658811985,
+            'r_forearm_roll_joint': -14.895833882874182,
+            'r_elbow_flex_joint': -1.392377908925028,
+            'r_wrist_flex_joint': -0.4548695149411013,
+            'r_wrist_roll_joint': 0.11426798984097819,
+            'l_upper_arm_roll_joint': 1.7383062350263658,
+            'l_shoulder_pan_joint': 1.8799810286792007,
+            'l_shoulder_lift_joint': 0.011627231224188975,
+            'l_forearm_roll_joint': 312.67276414458695,
+            'l_elbow_flex_joint': -2.0300928925694675,
+            'l_wrist_flex_joint': -0.10014623223021513,
+            'l_wrist_roll_joint': -6.062015047706399,
+        }
+        zero_pose.set_joint_goal(js)
+        zero_pose.allow_all_collisions()
+        zero_pose.execute()
+
+        goal_pose = PoseStamped()
+        goal_pose.header.frame_id = 'map'
+        goal_pose.pose.orientation = Quaternion(*quaternion_from_matrix([[1, 0, 0, 0],
+                                                                         [0, 1, 0, 0],
+                                                                         [0, 0, 1, 0],
+                                                                         [0, 0, 0, 1]]))
+        goal_pose.pose.position.x = 2.01
+        goal_pose.pose.position.y = -0.2
+        goal_pose.pose.position.z = 0.5
+
+        goal_pose2 = deepcopy(goal_pose)
+        goal_pose2.pose.position.y = -0.6
+        goal_pose2.pose.position.z = 0.7
+        goal_pose2.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 0, 1, 0],
+                                                                          [0, 1, 0, 0],
+                                                                          [-1, 0, 0, 0],
+                                                                          [0, 0, 0, 1]]))
+
+        zero_pose.set_cart_goal(goal_pose, 'l_gripper_tool_frame', 'map')
+        zero_pose.set_cart_goal(goal_pose2, 'r_gripper_tool_frame', 'map')
+
+        goal_point = PointStamped()
+        goal_point.header.frame_id = goal_pose.header.frame_id
+        goal_point.point = goal_pose.pose.position
+        pointing_axis = Vector3Stamped()
+        pointing_axis.header.frame_id = 'head_mount_kinect_rgb_optical_frame'
+        pointing_axis.vector.z = 1
+        zero_pose.motion_goals.add_pointing(goal_point, 'head_mount_kinect_rgb_optical_frame', pointing_axis, 'map')
+
+        x_base = Vector3Stamped()
+        x_base.header.frame_id = 'base_link'
+        x_base.vector.x = 1
+        x_goal = Vector3Stamped()
+        x_goal.header.frame_id = 'map'
+        x_goal.vector.x = 1
+        zero_pose.set_align_planes_goal(tip_link='base_link',
+                                        root_link='map',
+                                        tip_normal=x_base,
+                                        goal_normal=x_goal)
+
+        tip_goal = PointStamped()
+        tip_goal.header.frame_id = 'map'
+        tip_goal.point = goal_pose.pose.position
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class='BaseArmWeightScaling',
+                                               root_link='map',
+                                               tip_link='l_gripper_tool_frame',
+                                               tip_goal=tip_goal,
+                                               gain=100000)
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulability.__name__,
+                                               root_link='torso_lift_link',
+                                               tip_link='l_gripper_tool_frame',
+                                               gain=2,
+                                               name='manip1')
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulability.__name__,
+                                               root_link='torso_lift_link',
+                                               tip_link='r_gripper_tool_frame',
+                                               gain=2,
+                                               name='manip2')
+        zero_pose.add_default_end_motion_conditions()
+        zero_pose.allow_all_collisions()
+        zero_pose.execute()
 
 # kernprof -lv py.test -s test/test_integration_pr2.py
 # time: [1-9][1-9]*.[1-9]* s

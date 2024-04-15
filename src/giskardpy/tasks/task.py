@@ -10,7 +10,7 @@ from giskardpy.god_map import god_map
 from giskardpy.monitors.monitors import ExpressionMonitor, Monitor
 from giskardpy.data_types import Derivatives, PrefixName, TaskState
 from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint, \
-    ManipulabilityConstraint, Constraint
+    ManipulabilityConstraint, Constraint, WeightTransitionConstraint
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils.decorators import memoize
 from giskardpy.utils.utils import string_shortener
@@ -49,6 +49,7 @@ class Task:
         self._hold_condition = cas.FalseSymbol
         self._end_condition = cas.TrueSymbol
         self.manip_constraints = {}
+        self.weight_scaling_constraints = {}
         self._id = -1
 
     @property
@@ -126,6 +127,9 @@ class Task:
     def get_manipulability_constraint(self) -> List[ManipulabilityConstraint]:
         return list(self.manip_constraints.values())
 
+    def get_weight_scaling_constraint(self) -> List[WeightTransitionConstraint]:
+        return list(self.weight_scaling_constraints.values())
+
     def get_state_expression(self) -> cas.Symbol:
         return symbol_manager.get_symbol(f'god_map.motion_goal_manager.task_state[{self.id}]')
 
@@ -153,6 +157,29 @@ class Task:
             constraint.quadratic_weight *= is_running
             output_constraints.append(constraint)
         return output_constraints
+
+    def add_weight_scaling_constraint(self, gain: float, scaling_expression: cas.symbol_expr, name: str = None):
+        if scaling_expression.shape != (1, 1):
+            raise GoalInitalizationException(f'scaling_expression must have shape (1, 1), has {scaling_expression.shape}')
+        name = name or f'{len(self.weight_scaling_constraints)}'
+        constraint = WeightTransitionConstraint(name=name,
+                                                parent_task_name=self.name,
+                                                scaling_expression=scaling_expression,
+                                                gain=gain)
+        self.weight_scaling_constraints[constraint.name] = constraint
+
+    def add_weight_scaling_constraint_vector(self,
+                                                scaling_expressions: Union[
+                                                    cas.Expression, cas.Vector3, cas.Point3, List[cas.symbol_expr]],
+                                                names: List[str],
+                                                gain: float):
+        if len(scaling_expressions) != len(names):
+            raise GoalInitalizationException('All parameters must have the same length.')
+        for i in range(len(scaling_expressions)):
+            name_suffix = names[i] if names else None
+            self.add_weight_scaling_constraint(name=name_suffix,
+                                                  scaling_expression=scaling_expressions[i],
+                                                  gain=gain)
 
     def add_manipulability_constraint(self,
                                       task_expression: cas.symbol_expr,

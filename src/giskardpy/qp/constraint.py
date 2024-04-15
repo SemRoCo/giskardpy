@@ -192,3 +192,14 @@ class ManipulabilityConstraint(Constraint):
 
     def __str__(self):
         return self.name
+
+
+class WeightTransitionConstraint(Constraint):
+    def __init__(self,
+                 name: str,
+                 parent_task_name: PrefixName,
+                 scaling_expression: cas.Expression,
+                 gain: float = 100000):
+        super().__init__(name, parent_task_name)
+        self.gain = gain
+        self.scaling_expression = scaling_expression

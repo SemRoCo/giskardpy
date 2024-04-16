@@ -1620,7 +1620,7 @@ class TestConstraints:
         door_joint = 'sink_area_dish_washer_door_joint'
         kitchen_setup.register_group(door_obj, kitchen_setup.default_env_name,
                                      door_name)  # root link of the objects to avoid collision
-        kitchen_setup.set_env_state({'sink_area_dish_washer_door_joint': 0})
+        kitchen_setup.set_env_state({'sink_area_dish_washer_door_joint': np.pi/8})
         tip_grasp_axis = Vector3Stamped()
         tip_grasp_axis.header.frame_id = hand
         tip_grasp_axis.vector.y = 1
@@ -1639,44 +1639,40 @@ class TestConstraints:
                                                   object_rotation_axis=object_rotation_axis)
 
         kitchen_setup.plan_and_execute()
-        # if result.error.code == GiskardError.SUCCESS:
-        #     object_normal = Vector3Stamped()
-        #     object_normal.header.frame_id = door_name
-        #     object_normal.vector.x = 1
-        #
-        #     # # # close the gripper
-        #     kitchen_setup.set_joint_goal(goal_state={'r_gripper_l_finger_joint': 0.0})
-        #
-        #     root_V_object_rotation_axis = Vector3Stamped()
-        #     root_V_object_rotation_axis.header.frame_id = "map"
-        #     root_V_object_rotation_axis.vector.y = -1
-        #
-        #     kitchen_setup.set_pre_push_door_goal(root_link=kitchen_setup.default_root,
-        #                                          tip_link=hand,
-        #                                          door_object=door_name,
-        #                                          door_height=0.6,
-        #                                          door_length=0.49,
-        #                                          tip_gripper_axis=tip_grasp_axis,
-        #                                          root_V_object_rotation_axis=root_V_object_rotation_axis,
-        #                                          object_joint_name=door_joint,
-        #                                          root_V_object_normal=object_normal)
-        #
-        #     kitchen_setup.allow_collision(group1=door_obj, group2=kitchen_setup.r_gripper_group)
-        #     kitchen_setup.plan_and_execute()
-        #
-        #     # Qn to Simon: There is a minor difference compared to the normal drawer scenario, here the robot tip does not have to move
-        #     # with the handle. The force applied by the gripper can just move the object further
-        #     # (if the force is sufficient)
-        #     right_forearm = 'r_forearm'
-        #     kitchen_setup.register_group(right_forearm,
-        #                                  root_link_group_name=kitchen_setup.robot_name,
-        #                                  root_link_name='r_forearm_link')
-        #     kitchen_setup.set_open_container_goal(tip_link=hand,
-        #                                           environment_link=handle_name,
-        #                                           goal_joint_state=1.3217)
-        #
-        #     kitchen_setup.allow_collision(group1=door_obj, group2=right_forearm)
-        #     kitchen_setup.plan_and_execute()
+        object_normal = Vector3Stamped()
+        object_normal.header.frame_id = door_name
+        object_normal.vector.x = 1
+
+        # # # close the gripper
+        kitchen_setup.set_joint_goal(goal_state={'r_gripper_l_finger_joint': 0.0})
+
+        root_V_object_rotation_axis = Vector3Stamped()
+        root_V_object_rotation_axis.header.frame_id = "map"
+        root_V_object_rotation_axis.vector.y = -1
+
+        kitchen_setup.set_pre_push_door_goal(root_link=kitchen_setup.default_root,
+                                             tip_link=hand,
+                                             door_object=door_name,
+                                             door_height=0.6,
+                                             door_length=0.49,
+                                             door_depth=0.02,
+                                             tip_gripper_axis=tip_grasp_axis,
+                                             root_V_object_rotation_axis=root_V_object_rotation_axis,
+                                             object_joint_name=door_joint)
+
+        kitchen_setup.allow_collision(group1=door_obj, group2=kitchen_setup.r_gripper_group)
+        kitchen_setup.plan_and_execute()
+
+        right_forearm = 'r_forearm'
+        kitchen_setup.register_group(right_forearm,
+                                     root_link_group_name=kitchen_setup.robot_name,
+                                     root_link_name='r_forearm_link')
+        kitchen_setup.set_open_container_goal(tip_link=hand,
+                                              environment_link=handle_name,
+                                              goal_joint_state=1.3217)
+
+        kitchen_setup.allow_collision(group1=door_obj, group2=right_forearm)
+        kitchen_setup.plan_and_execute()
 
     def test_align_planes1(self, zero_pose: PR2TestWrapper):
         x_gripper = Vector3Stamped()

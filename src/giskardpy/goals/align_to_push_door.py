@@ -83,9 +83,10 @@ class AlignToPushDoor(Goal):
         root_P_intermediate_point.point.y = root_T_door.pose.position.y
         root_P_intermediate_point.point.z = root_T_door.pose.position.z
         if root_V_object_rotation_axis.y == 1:
-            root_P_intermediate_point.point.z = root_P_intermediate_point.point.z + self.door_height
+            # 3/4 of the height as the tip has to be a little further inside the object
+            root_P_intermediate_point.point.z = root_P_intermediate_point.point.z + self.door_height*3/4
         elif root_V_object_rotation_axis.z == 1:
-            root_P_intermediate_point.point.y = root_P_intermediate_point.point.y + self.door_length
+            root_P_intermediate_point.point.y = root_P_intermediate_point.point.y + self.door_length*3/4
 
         # point w.r.t door
         door_P_intermediate_point = cas.dot(cas.TransMatrix(door_T_root), cas.Point3(root_P_intermediate_point))
@@ -99,39 +100,26 @@ class AlignToPushDoor(Goal):
         root_P_top = cas.dot(cas.TransMatrix(root_T_door_expr), cas.Point3(door_rotated_P_top))
 
         minimum_angle_to_push_door = 0.349
-        # door_open = self.object_joint_angle >= minimum_angle_to_push_door
         door_open = cas.greater_equal(self.object_joint_angle, minimum_angle_to_push_door)
 
-        try:
-            if symbol_manager.evaluate_expr(expr=door_open):
-                god_map.debug_expression_manager.add_debug_expression('goal_point', cas.Point3(root_P_top),
-                                                                      color=ColorRGBA(0, 0.5, 0.5, 1))
+        if symbol_manager.evaluate_expr(expr=door_open):
+            god_map.debug_expression_manager.add_debug_expression('goal_point', cas.Point3(root_P_top),
+                                                                  color=ColorRGBA(0, 0.5, 0.5, 1))
 
-                god_map.debug_expression_manager.add_debug_expression('root_V_grasp_axis', root_V_tip_grasp_axis)
-                god_map.debug_expression_manager.add_debug_expression('root_V_object_axis', root_V_object_rotation_axis)
-                align_to_push_task = self.create_and_add_task('align_to_push_door')
-                align_to_push_task.add_point_goal_constraints(frame_P_current=root_T_tip.to_position(),
-                                                              frame_P_goal=cas.Point3(root_P_top),
-                                                              reference_velocity=self.reference_linear_velocity,
-                                                              weight=self.weight)
+            god_map.debug_expression_manager.add_debug_expression('root_V_grasp_axis', root_V_tip_grasp_axis)
+            god_map.debug_expression_manager.add_debug_expression('root_V_object_axis', root_V_object_rotation_axis)
+            align_to_push_task = self.create_and_add_task('align_to_push_door')
+            align_to_push_task.add_point_goal_constraints(frame_P_current=root_T_tip.to_position(),
+                                                          frame_P_goal=cas.Point3(root_P_top),
+                                                          reference_velocity=self.reference_linear_velocity,
+                                                          weight=self.weight)
 
-                align_to_push_task.add_vector_goal_constraints(frame_V_current=cas.Vector3(root_V_tip_grasp_axis),
-                                                               frame_V_goal=cas.Vector3(root_V_object_rotation_axis),
-                                                               reference_velocity=self.reference_angular_velocity,
-                                                               weight=self.weight)
+            align_to_push_task.add_vector_goal_constraints(frame_V_current=cas.Vector3(root_V_tip_grasp_axis),
+                                                           frame_V_goal=cas.Vector3(root_V_object_rotation_axis),
+                                                           reference_velocity=self.reference_angular_velocity,
+                                                           weight=self.weight)
 
-                # align_to_push_task.start_condition = door_opened_monitor
-                # align_to_push_task.end_condition = tip_aligned_monitor
-                self.connect_monitors_to_all_tasks(start_condition, hold_condition, end_condition)
-            else:
-                raise GoalInitalizationException('Goal cant be initialized')
-
-        except GoalInitalizationException as e:
-            logging.loginfo(f'{str(e)}.Failed to initialise {self.__class__.__name__} goal as '
-                            f'the door is not open')
-
-        # door_opened_monitor = ExpressionMonitor(name='door opened', stay_true=True, start_condition=start_condition)
-        # self.add_monitor(door_opened_monitor)
-        # door_opened_monitor.expression = door_open
-
-
+            self.connect_monitors_to_all_tasks(start_condition, hold_condition, end_condition)
+        else:
+            raise GoalInitalizationException(f'Goal cant be initialized. Failed to initialise {self.__class__.__name__}'
+                                             'goal as the door is not open')

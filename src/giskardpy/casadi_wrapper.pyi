@@ -834,8 +834,8 @@ def distance_point_to_line_segment(frame_P_current: Point3, frame_P_line_start: 
 def distance_point_to_line(frame_P_point: Point3, frame_P_line_point: Point3, frame_V_line_direction: Vector3) \
     -> Expression: ...
 
-def distance_point_to_rectangular_surface(frame_P_current: Point3, frame_P_bottom_left: Point3,
-                                          frame_P_bottom_right: Point3, frame_P_top_left: Point3)-> \
+def distance_point_to_plane(frame_P_current: Point3, frame_P_bottom_left: Point3,
+                                          frame_P_bottom_right: Point3, frame_P_top_left: Point3) -> \
         Tuple[Expression, Point3]: ...
 
 def angle_between_vector(v1: Vector3, v2: Vector3) -> Expression: ...

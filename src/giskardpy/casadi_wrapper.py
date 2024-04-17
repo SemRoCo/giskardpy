@@ -1996,22 +1996,15 @@ def distance_point_to_line(frame_P_point, frame_P_line_point, frame_V_line_direc
     return distance
 
 
-def distance_point_to_plane(frame_P_current, frame_P_bottom_left, frame_P_bottom_right, frame_P_top_left) \
-        -> tuple[Expression, Point3]:
-    frame_P_current = Point3(frame_P_current)
-    frame_P_bottom_left = Point3(frame_P_bottom_left)
-    frame_P_bottom_right = Point3(frame_P_bottom_right)
-    frame_P_top_left = Point3(frame_P_top_left)
-
+def distance_point_to_plane(frame_P_current, frame_P_bottom_left, frame_P_bottom_right, frame_P_top_left):
     ab = frame_P_bottom_right - frame_P_bottom_left
     ac = frame_P_top_left - frame_P_bottom_left
 
     normal = cross(ab, ac)
     d = normal.dot(frame_P_bottom_left)
-    unit_normal = normal / norm(normal)
-
-    unit_normal.scale(d)
-    nearest = frame_P_current + unit_normal
+    normal.scale(1)
+    normal.scale(d)
+    nearest = frame_P_current + normal
     return norm(nearest-frame_P_current), nearest
 
 

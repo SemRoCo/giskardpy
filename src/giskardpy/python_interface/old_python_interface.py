@@ -505,9 +505,7 @@ class OldGiskardWrapper(GiskardWrapper):
                                     door_object: str,
                                     door_height: float,
                                     door_length: float,
-                                    object_joint_name: str,
                                     tip_gripper_axis: Vector3Stamped,
-                                    object_rotation_axis: Vector3Stamped,
                                     tip_group: Optional[str] = None,
                                     root_group: Optional[str] = None,
                                     weight: float = WEIGHT_BELOW_CA):
@@ -527,9 +525,7 @@ class OldGiskardWrapper(GiskardWrapper):
                                                  door_object=door_object,
                                                  door_height=door_height,
                                                  door_length=door_length,
-                                                 object_joint_name=object_joint_name,
                                                  tip_gripper_axis=tip_gripper_axis,
-                                                 object_rotation_axis=object_rotation_axis,
                                                  tip_group=tip_group,
                                                  root_group=root_group,
                                                  weight=weight)
@@ -542,9 +538,6 @@ class OldGiskardWrapper(GiskardWrapper):
                                door_length: float,
                                door_depth: float,
                                tip_gripper_axis: Vector3Stamped,
-                               root_V_object_rotation_axis: Vector3Stamped,
-                               # normal is along x axis, plane is located along y-z axis
-                               object_joint_name: str,
                                reference_linear_velocity: Optional[float] = None,
                                reference_angular_velocity: Optional[float] = None,
                                weight: float = WEIGHT_ABOVE_CA):
@@ -566,8 +559,6 @@ class OldGiskardWrapper(GiskardWrapper):
                                             door_length=door_length,
                                             door_depth=door_depth,
                                             tip_gripper_axis=tip_gripper_axis,
-                                            root_V_object_rotation_axis=root_V_object_rotation_axis,
-                                            object_joint_name=object_joint_name,
                                             reference_linear_velocity=reference_linear_velocity,
                                             reference_angular_velocity=reference_angular_velocity,
                                             weight=weight)

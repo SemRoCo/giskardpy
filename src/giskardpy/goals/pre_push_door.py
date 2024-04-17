@@ -18,8 +18,6 @@ class PrePushDoor(Goal):
                  door_length: float,
                  door_depth: float,
                  tip_gripper_axis: Vector3Stamped,
-                 root_V_object_rotation_axis: Vector3Stamped,
-                 object_joint_name: str,
                  root_group: Optional[str] = None,
                  tip_group: Optional[str] = None,
                  reference_linear_velocity: float = 0.1,
@@ -35,23 +33,19 @@ class PrePushDoor(Goal):
         self.root = god_map.world.search_for_link_name(root_link, root_group)
         self.tip = god_map.world.search_for_link_name(tip_link, tip_group)
         self.door_object = god_map.world.search_for_link_name(door_object)
-        self.object_joint_angle = \
-            god_map.world.state.to_position_dict()[god_map.world.search_for_joint_name(object_joint_name)]
+        object_joint_name = god_map.world.get_movable_parent_joint(self.door_object)
+        object_joint_angle = god_map.world.state[object_joint_name].position
 
         tip_gripper_axis.header.frame_id = self.tip
         tip_gripper_axis.vector = tf.normalize(tip_gripper_axis.vector)
-        root_V_object_rotation_axis.header.frame_id = self.root
-        root_V_object_rotation_axis.vector = tf.normalize(root_V_object_rotation_axis.vector)
+        object_V_object_rotation_axis = cas.Vector3(god_map.world.get_joint(object_joint_name).axis)
 
         self.tip_gripper_axis = tip_gripper_axis
-        self.object_rotation_axis = root_V_object_rotation_axis
         self.root_P_door_object = PointStamped()
         self.root_P_door_object.header.frame_id = self.root
-
         self.door_height = door_height
         self.door_length = door_length
         self.door_depth = door_depth
-
         self.reference_linear_velocity = reference_linear_velocity
         self.reference_angular_velocity = reference_angular_velocity
         self.weight = weight
@@ -61,48 +55,33 @@ class PrePushDoor(Goal):
         super().__init__(name)
 
         root_T_tip = god_map.world.compose_fk_expression(self.root, self.tip)
-
-        root_P_bottom_left = PointStamped()  # A
-        root_P_bottom_right = PointStamped()  # B
-        root_P_top_left = PointStamped()  # C
-
         root_T_door = god_map.world.compute_fk_pose(self.root, self.door_object)
-        root_P_bottom_left.header.frame_id = self.root
-        root_P_bottom_left.point.x = root_T_door.pose.position.x + self.door_depth
-        root_P_bottom_left.point.y = root_T_door.pose.position.y + self.door_length/2
-        root_P_bottom_left.point.z = root_T_door.pose.position.z
+        root_P_bottom_right = cas.Point3(root_T_door.pose.position)  # B
+        root_P_bottom_left = cas.Point3(root_T_door.pose.position)  # A
+        root_P_top_left = cas.Point3(root_T_door.pose.position)  # C
 
-        root_P_bottom_right.header.frame_id = self.root
-        root_P_bottom_right.point.x = root_T_door.pose.position.x + self.door_depth
-        root_P_bottom_right.point.y = root_T_door.pose.position.y
-        root_P_bottom_right.point.z = root_T_door.pose.position.z
+        root_P_bottom_left[0] += self.door_depth
+        root_P_bottom_left[1] += self.door_length / 2
 
-        root_P_top_left.header.frame_id = self.root
-        root_P_top_left.point.x = root_T_door.pose.position.x + self.door_depth
-        root_P_top_left.point.y = root_T_door.pose.position.y + self.door_length/2
-        root_P_top_left.point.z = root_T_door.pose.position.z + self.door_height/2
+        root_P_bottom_right[0] += self.door_depth
+
+        root_P_top_left[0] += self.door_depth
+        root_P_top_left[1] += self.door_length / 2
+        root_P_top_left[2] += self.door_height / 2
 
         root_Pose_tip = god_map.world.compute_fk_pose(self.root, self.tip)
-        root_P_tip = PointStamped()
-        root_P_tip.header.frame_id = self.root
-        root_P_tip.point.x = root_Pose_tip.pose.position.x
-        root_P_tip.point.y = root_Pose_tip.pose.position.y
-        root_P_tip.point.z = root_Pose_tip.pose.position.z
-        dist, root_P_nearest = cas.distance_point_to_plane(cas.Point3(root_P_tip),
-                                                           cas.Point3(root_P_bottom_left),
-                                                           cas.Point3(root_P_bottom_right),
-                                                           cas.Point3(root_P_top_left))
+        root_P_tip = cas.Point3(root_Pose_tip.pose.position)
+        dist, root_P_nearest = cas.distance_point_to_plane(root_P_tip,
+                                                           root_P_bottom_left,
+                                                           root_P_bottom_right,
+                                                           root_P_top_left)
 
         door_T_root = god_map.world.compute_fk_pose(self.door_object, self.root)
         door_P_nearest = cas.dot(cas.TransMatrix(door_T_root), root_P_nearest)
 
-        root_V_object_rotation_axis = cas.Vector3(self.object_rotation_axis)
-        object_V_object_rotation_axis = cas.dot(cas.TransMatrix(door_T_root), root_V_object_rotation_axis)
-
-        rot_mat = cas.RotationMatrix.from_axis_angle(cas.Vector3(object_V_object_rotation_axis),
-                                                     self.object_joint_angle)
-        door_rotated_P_nearest = cas.dot(cas.TransMatrix(rot_mat), door_P_nearest)
-
+        door_rotated_R_door = cas.RotationMatrix.from_axis_angle(object_V_object_rotation_axis,
+                                                                 object_joint_angle)
+        door_rotated_P_nearest = cas.dot(cas.TransMatrix(door_rotated_R_door), door_P_nearest)
         root_P_nearest_in_rotated_door = cas.dot(cas.TransMatrix(root_T_door), cas.Point3(door_rotated_P_nearest))
 
         god_map.debug_expression_manager.add_debug_expression('goal_point_on_plane',

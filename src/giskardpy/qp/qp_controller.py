@@ -212,12 +212,10 @@ class Weights(ProblemDataPart):
                         continue
                     normalized_weight = v.normalized_weight(t, derivative, self.prediction_horizon,
                                                             evaluated=self.evaluated)
-                    if len(quadratic_weight_gains) > 0 and v.name in quadratic_weight_gains[0].gains.keys():
-                        weights[derivative][f't{t:03}/{v.position_name}/{derivative}'] = normalized_weight * \
-                                                                                         quadratic_weight_gains[
-                                                                                             0].gains[v.name]
-                    else:
-                        weights[derivative][f't{t:03}/{v.position_name}/{derivative}'] = normalized_weight
+                    weights[derivative][f't{t:03}/{v.position_name}/{derivative}'] = normalized_weight
+                    for q_gain in quadratic_weight_gains:
+                        if v.name in q_gain.gains.keys():
+                            weights[derivative][f't{t:03}/{v.position_name}/{derivative}'] *= quadratic_weight_gains[0].gains[v.name]
         for _, weight in sorted(weights.items()):
             params.append(weight)
         return params

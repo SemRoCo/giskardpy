@@ -6,6 +6,7 @@ from giskardpy.god_map import god_map
 from geometry_msgs.msg import PointStamped
 from giskardpy.utils.expression_definition_utils import transform_msg_and_turn_to_expr
 from giskardpy.data_types import Derivatives
+from giskardpy.tasks.task import WEIGHT_ABOVE_CA
 
 
 class BaseArmWeightScaling(Goal):
@@ -50,7 +51,7 @@ class BaseArmWeightScaling(Goal):
         for name in base_joints:
             vs = god_map.world.joints[god_map.world.search_for_joint_name(name)].free_variables
             for v in vs:
-                v_gain = gain * cas.save_division(1, cas.norm(scaling_exp / v.get_upper_limit(Derivatives.velocity)))
+                v_gain = gain / 100 * cas.save_division(1, cas.norm(scaling_exp / v.get_upper_limit(Derivatives.velocity)))
                 gains[v.name] = v_gain
                 base_v = v
 

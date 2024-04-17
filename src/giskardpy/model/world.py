@@ -167,6 +167,7 @@ class WorldTree(WorldTreeInterface):
     _default_limits: Dict[Derivatives, float]
     _default_weights: Dict[Derivatives, float]
     _root_link_name: PrefixName = None
+    _controlled_joints: List[PrefixName]
 
     def __init__(self):
         self.default_link_color = ColorRGBA(1, 1, 1, 0.75)
@@ -175,6 +176,7 @@ class WorldTree(WorldTreeInterface):
         self.fast_all_fks = None
         self._state_version = 0
         self._model_version = 0
+        self._controlled_joints = []
         self._clear()
 
     @property
@@ -260,9 +262,9 @@ class WorldTree(WorldTreeInterface):
         """
         returns a symbol that refers to the given joint
         """
-        if not god_map.world.has_joint(joint_name):
+        if not self.has_joint(joint_name):
             raise KeyError(f'World doesn\'t have joint named: {joint_name}.')
-        joint = god_map.world.joints[joint_name]
+        joint = self.joints[joint_name]
         if isinstance(joint, OneDofJoint):
             return joint.get_symbol(derivative)
         raise TypeError(f'get_joint_position_symbol is only supported for OneDofJoint, not {type(joint)}')
@@ -566,8 +568,7 @@ class WorldTree(WorldTreeInterface):
         self.virtual_free_variables[name] = free_variable
         return free_variable
 
-    def update_state(self, next_commands: NextCommands, dt: float):
-        max_derivative = god_map.qp_controller_config.max_derivative
+    def update_state(self, next_commands: NextCommands, dt: float, max_derivative: Derivatives) -> None:
         for free_variable_name, command in next_commands.free_variable_data.items():
             self.state[free_variable_name][:max_derivative] += command * dt
             self.state[free_variable_name][max_derivative] = command[-1]
@@ -892,7 +893,7 @@ class WorldTree(WorldTreeInterface):
         """
         self._clear()
         with self.modify_world():
-            god_map.world_config.setup()
+            god_map.world_config.setup()  # todo
 
     def _add_joint_and_create_child(self, joint: Joint):
         self._raise_if_joint_exists(joint.name)
@@ -1057,12 +1058,13 @@ class WorldTree(WorldTreeInterface):
 
     @property
     def controlled_joints(self) -> List[PrefixName]:
-        try:
-            return god_map.controlled_joints
-        except AttributeError:
-            return []
+        return self._controlled_joints
 
-    def register_controlled_joints(self, controlled_joints: List[PrefixName]):
+    @controlled_joints.setter
+    def controlled_joints(self, value: List[PrefixName]):
+        self._controlled_joints = value
+
+    def register_controlled_joints(self, controlled_joints: List[PrefixName]) -> None:
         """
         Flag these joints as controlled.
         """
@@ -1075,7 +1077,7 @@ class WorldTree(WorldTreeInterface):
         if unknown_joints:
             raise UnknownGroupException(f'Trying to register unknown joints: \'{unknown_joints}\'')
         old_controlled_joints.update(new_controlled_joints)
-        god_map.controlled_joints = list(sorted(old_controlled_joints))
+        self.controlled_joints = list(sorted(old_controlled_joints))
 
     @memoize
     def get_controlled_parent_joint_of_link(self, link_name: PrefixName) -> PrefixName:
@@ -1213,7 +1215,7 @@ class WorldTree(WorldTreeInterface):
 
     def get_fk_velocity(self, root: PrefixName, tip: PrefixName) -> w.Expression:
         # FIXME, only use symbols of fk expr?
-        r_T_t = god_map.world.compose_fk_expression(root, tip)
+        r_T_t = self.compose_fk_expression(root, tip)
         r_R_t = r_T_t.to_rotation()
         axis, angle = r_R_t.to_axis_angle()
         r_R_t_axis_angle = axis * angle
@@ -1305,17 +1307,11 @@ class WorldTree(WorldTreeInterface):
             def compile_fks(self):
                 all_fks = w.vstack([self.fks[link_name] for link_name in self.world.link_names_as_set])
                 collision_fks = []
-                # collision_ids = []
                 for link_name in sorted(self.world.link_names_with_collisions):
                     if link_name == self.world.root_link_name:
                         continue
-                    # link = god_map.get_world().links[link_name]
-                    # for collision_id, geometry in enumerate(link.collisions):
-                    #     link_name_with_id = link.name_with_collision_id(collision_id)
                     collision_fks.append(self.fks[link_name])
-                    # collision_ids.append(link_name_with_id)
                 collision_fks = w.vstack(collision_fks)
-                # self.collision_link_order = list(collision_ids)
                 params = set()
                 params.update(all_fks.free_symbols())
                 params.update(collision_fks.free_symbols())
@@ -1323,7 +1319,7 @@ class WorldTree(WorldTreeInterface):
                 self.str_params = [str(v) for v in params]
                 self.fast_all_fks = all_fks.compile(parameters=params)
                 self.fast_collision_fks = collision_fks.compile(parameters=params)
-                self.idx_start = {link_name: i * 4 for i, link_name in enumerate(god_map.world.link_names_as_set)}
+                self.idx_start = {link_name: i * 4 for i, link_name in enumerate(self.world.link_names_as_set)}
 
             @profile
             def recompute(self):
@@ -1333,11 +1329,11 @@ class WorldTree(WorldTreeInterface):
             @memoize
             @profile
             def compute_fk_np(self, root: PrefixName, tip: PrefixName) -> np.ndarray:
-                if root == god_map.world.root_link_name:
+                if root == self.world.root_link_name:
                     map_T_root = np.eye(4)
                 else:
                     map_T_root = self.fks[self.idx_start[root]:self.idx_start[root] + 4]
-                if tip == god_map.world.root_link_name:
+                if tip == self.world.root_link_name:
                     map_T_tip = np.eye(4)
                 else:
                     map_T_tip = self.fks[self.idx_start[tip]:self.idx_start[tip] + 4]
@@ -1539,7 +1535,7 @@ class WorldTree(WorldTreeInterface):
     def has_link_visuals(self, link_name: PrefixName) -> bool:
         return self.links[link_name].has_visuals()
 
-    def save_graph_pdf(self):
+    def save_graph_pdf(self, folder_name: str) -> None:
         import pydot
         def joint_type_to_color(joint):
             color = 'lightgrey'
@@ -1585,7 +1581,7 @@ class WorldTree(WorldTreeInterface):
             world_graph.add_edge(child_edge)
             parent_edge = pydot.Edge(str(joint.parent_link_name), str(joint_name))
             world_graph.add_edge(parent_edge)
-        file_name = f'{god_map.giskard.tmp_folder}/world_tree.pdf'
+        file_name = f'{folder_name}/world_tree.pdf'
         world_graph.write_pdf(file_name)
 
 
@@ -1629,7 +1625,7 @@ class WorldBranch(WorldTreeInterface):
 
     @cached_property
     def controlled_joints(self) -> List[PrefixName]:
-        return [j for j in god_map.controlled_joints if j in self.joint_names_as_set]
+        return [j for j in god_map.world.controlled_joints if j in self.joint_names_as_set]
 
     @property
     def parent_link_of_root(self) -> PrefixName:

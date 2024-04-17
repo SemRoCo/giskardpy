@@ -211,7 +211,7 @@ class TestCartGoals:
                                        pose=pose,
                                        parent_link='hand_palm_link',
                                        parent_link_group='hsrb')
-        kitchen_setup.world.save_graph_pdf()
+        kitchen_setup.world.save_graph_pdf(god_map.giskard.tmp_folder)
 
     def test_move_base(self, zero_pose: HSRTestWrapper):
         map_T_odom = PoseStamped()

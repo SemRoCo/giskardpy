@@ -68,7 +68,6 @@ class GodMap:
     fill_trajectory_velocity_values: bool
     ros_visualizer: ROSMsgVisualization
     free_variables: List[FreeVariable]
-    controlled_joints: List[Joint]
 
     def is_goal_msg_type_execute(self):
         return self.move_action_server.goal_msg.type in [MoveGoal.EXECUTE]

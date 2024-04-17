@@ -30,6 +30,6 @@ class RealKinSimPlugin(GiskardBehavior):
             #     logging.logwarn(f'dt is larger than sample period of the MPC! '
             #                     f'{dt:.5f} > {god_map.qp_controller_config.sample_period}. ')
             dt = god_map.qp_controller_config.sample_period
-        god_map.world.update_state(next_cmds, dt)
+        god_map.world.update_state(next_cmds, dt, max_derivative=god_map.qp_controller_config.max_derivative)
         self.last_time = next_time
         return Status.RUNNING

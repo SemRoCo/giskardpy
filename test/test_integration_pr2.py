@@ -2236,7 +2236,7 @@ class TestCartGoals:
 class TestWorldManipulation:
 
     def test_save_graph_pdf(self, kitchen_setup):
-        god_map.world.save_graph_pdf()
+        god_map.world.save_graph_pdf(god_map.giskard.tmp_folder)
 
     def test_dye_group(self, kitchen_setup: PR2TestWrapper):
         old_color = god_map.world.groups[kitchen_setup.robot_name].get_link('base_link').collisions[0].color

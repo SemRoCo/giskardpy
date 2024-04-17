@@ -3,7 +3,7 @@ from typing import List, Union, Optional, Callable
 
 import giskardpy.casadi_wrapper as cas
 from giskardpy.god_map import god_map
-from giskardpy.data_types import Derivatives, PrefixName
+from giskardpy.data_types.data_types import Derivatives, PrefixName
 
 DebugConstraint = namedtuple('debug', ['expr'])
 

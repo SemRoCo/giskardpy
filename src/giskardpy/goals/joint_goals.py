@@ -12,7 +12,7 @@ from giskardpy.exceptions import MotionBuildingException, GoalInitalizationExcep
 from giskardpy.goals.goal import Goal, NonMotionGoal
 from giskardpy.tasks.task import WEIGHT_BELOW_CA, Task
 from giskardpy.model.joints import OmniDrive, DiffDrive, OmniDrivePR22, OneDofJoint
-from giskardpy.data_types import PrefixName, Derivatives
+from giskardpy.data_types.data_types import PrefixName, Derivatives
 from giskardpy.utils.expression_definition_utils import transform_msg
 from giskardpy.utils.math import axis_angle_from_quaternion
 

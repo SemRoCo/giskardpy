@@ -7,7 +7,7 @@ from sensor_msgs.msg import JointState
 from py_trees import Status
 
 from giskard_msgs.msg import ExecutionState
-from giskardpy.data_types import TaskState
+from giskardpy.data_types.data_types import TaskState
 from giskardpy.god_map import god_map
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.decorators import catch_and_raise_to_blackboard, record_time

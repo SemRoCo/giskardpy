@@ -9,7 +9,7 @@ from std_msgs.msg import ColorRGBA
 from tf.transformations import rotation_from_matrix
 
 from giskardpy import casadi_wrapper as cas
-from giskardpy.data_types import Derivatives
+from giskardpy.data_types.data_types import Derivatives
 from giskardpy.goals.goal import Goal
 from giskardpy.god_map import god_map
 from giskardpy.model.joints import DiffDrive

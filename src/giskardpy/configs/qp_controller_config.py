@@ -4,7 +4,7 @@ from collections import defaultdict
 from enum import IntEnum
 from typing import Optional
 
-from giskardpy.data_types import Derivatives
+from giskardpy.data_types.data_types import Derivatives
 
 
 class SupportedQPSolver(IntEnum):

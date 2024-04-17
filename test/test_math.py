@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 import giskardpy.utils.math as giskard_math
-from giskardpy.data_types import Derivatives
+from giskardpy.data_types.data_types import Derivatives
 
 
 class TestMath(unittest.TestCase):

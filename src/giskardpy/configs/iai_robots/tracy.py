@@ -4,7 +4,7 @@ from giskardpy.configs.collision_avoidance_config import LoadSelfCollisionMatrix
 from giskardpy.configs.robot_interface_config import RobotInterfaceConfig, StandAloneRobotInterfaceConfig
 from giskardpy.configs.world_config import WorldWithFixedRobot
 from giskardpy.model.collision_world_syncer import CollisionCheckerLib
-from giskardpy.data_types import Derivatives
+from giskardpy.data_types.data_types import Derivatives
 
 
 class TracyWorldConfig(WorldWithFixedRobot):

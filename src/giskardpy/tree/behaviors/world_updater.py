@@ -8,7 +8,7 @@ from visualization_msgs.msg import MarkerArray
 from giskard_msgs.msg import WorldResult, WorldGoal, GiskardError
 from giskard_msgs.srv import GetGroupNamesResponse, GetGroupNamesRequest, GetGroupInfoResponse, GetGroupInfoRequest, \
     DyeGroupResponse, GetGroupNames, GetGroupInfo, DyeGroup, DyeGroupRequest
-from giskardpy.data_types import JointStates
+from giskardpy.data_types.data_types import JointStates
 from giskardpy.exceptions import UnknownGroupException, \
     GiskardException, TransformException
 from giskardpy.god_map import god_map

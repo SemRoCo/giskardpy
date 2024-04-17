@@ -2,7 +2,7 @@ import rospy
 from py_trees import Status
 from std_msgs.msg import Float64MultiArray
 
-from giskardpy.data_types import KeyDefaultDict
+from giskardpy.data_types.data_types import KeyDefaultDict
 from giskardpy.god_map import god_map
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.decorators import catch_and_raise_to_blackboard, record_time

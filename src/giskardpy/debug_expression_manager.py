@@ -6,10 +6,10 @@ import pandas as pd
 from std_msgs.msg import ColorRGBA
 
 import giskardpy.casadi_wrapper as cas
-from giskardpy.data_types import JointStates
+from giskardpy.data_types.data_types import JointStates
 from giskardpy.god_map import god_map
 from giskardpy.model.trajectory import Trajectory
-from giskardpy.data_types import PrefixName
+from giskardpy.data_types.data_types import PrefixName
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils import logging
 

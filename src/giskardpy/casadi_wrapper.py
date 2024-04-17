@@ -9,7 +9,7 @@ import numpy as np
 import geometry_msgs.msg as geometry_msgs
 import rospy
 from scipy import sparse as sp
-from giskardpy.data_types import PrefixName, Derivatives
+from giskardpy.data_types.data_types import PrefixName, Derivatives
 from giskardpy.utils import logging
 
 builtin_max = builtins.max

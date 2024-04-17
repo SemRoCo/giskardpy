@@ -1,14 +1,13 @@
 from typing import Dict, Callable, Type, Optional, overload, Union
 
 from giskardpy.exceptions import GiskardException
-from giskardpy.god_map import god_map
 import numpy as np
 from geometry_msgs.msg import PoseStamped, Pose, PointStamped, Point, Vector3Stamped, Vector3, QuaternionStamped, \
     Quaternion
 
 import giskardpy.casadi_wrapper as cas
 from giskardpy.utils.singleton import SingletonMeta
-
+from giskardpy.god_map import god_map  # has to be here for resolving symbols
 
 class SymbolManager(metaclass=SingletonMeta):
     symbol_str_to_lambda: Dict[str, Callable[[], float]]

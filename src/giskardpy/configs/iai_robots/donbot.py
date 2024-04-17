@@ -3,7 +3,7 @@ import numpy as np
 from giskardpy.configs.collision_avoidance_config import CollisionAvoidanceConfig
 from giskardpy.configs.robot_interface_config import RobotInterfaceConfig, StandAloneRobotInterfaceConfig
 from giskardpy.configs.world_config import WorldConfig
-from giskardpy.data_types import Derivatives
+from giskardpy.data_types.data_types import Derivatives
 
 
 class WorldWithBoxyBaseConfig(WorldConfig):

@@ -6,7 +6,7 @@ from py_trees import Status
 
 import giskard_msgs.msg as giskard_msgs
 from giskard_msgs.msg import ExecutionState
-from giskardpy.data_types import TaskState
+from giskardpy.data_types.data_types import TaskState
 from giskardpy.god_map import god_map
 from giskardpy.monitors.monitors import EndMotion, CancelMotion
 from giskardpy.tree.behaviors.plugin import GiskardBehavior

@@ -17,9 +17,9 @@ from tf2_msgs.msg import TFMessage
 
 import giskardpy.utils.math as mymath
 from giskard_msgs.msg import WorldBody
-from giskardpy import casadi_wrapper as w
+from giskardpy import casadi_wrapper as cas
 from giskardpy.casadi_wrapper import CompiledFunction
-from giskardpy.data_types import JointStates
+from giskardpy.data_types.data_types import JointStates
 from giskardpy.exceptions import DuplicateNameException, UnknownGroupException, UnknownLinkException, \
     WorldException, GiskardException, UnknownJointException, CorruptURDFException
 from giskardpy.god_map import god_map
@@ -27,8 +27,8 @@ from giskardpy.model.joints import Joint, FixedJoint, PrismaticJoint, RevoluteJo
     urdf_to_joint, VirtualFreeVariables, MovableJoint, Joint6DOF, OneDofJoint
 from giskardpy.model.links import Link, MeshGeometry
 from giskardpy.model.utils import hacky_urdf_parser_fix
-from giskardpy.data_types import PrefixName, Derivatives, derivative_joint_map, derivative_map
-from giskardpy.data_types import my_string
+from giskardpy.data_types.data_types import PrefixName, Derivatives, derivative_joint_map, derivative_map
+from giskardpy.data_types.data_types import my_string
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.next_command import NextCommands
 from giskardpy.symbol_manager import symbol_manager
@@ -258,7 +258,7 @@ class WorldTree(WorldTreeInterface):
         """
         return self.joints[self.search_for_joint_name(joint_name, group_name)]
 
-    def get_one_dof_joint_symbol(self, joint_name: PrefixName, derivative: Derivatives) -> Union[w.Symbol, float]:
+    def get_one_dof_joint_symbol(self, joint_name: PrefixName, derivative: Derivatives) -> Union[cas.Symbol, float]:
         """
         returns a symbol that refers to the given joint
         """
@@ -582,7 +582,7 @@ class WorldTree(WorldTreeInterface):
                  urdf: str,
                  group_name: Optional[str] = None,
                  parent_link_name: Optional[PrefixName] = None,
-                 pose: Optional[w.TransMatrix] = None,
+                 pose: Optional[cas.TransMatrix] = None,
                  actuated: bool = False):
         """
         Add a urdf to the world at parent_link_name and create a SubWorldTree named group_name for it.
@@ -664,7 +664,7 @@ class WorldTree(WorldTreeInterface):
         self.register_group(group_name, urdf_root_link_name_prefixed, actuated=actuated)
 
     def _add_fixed_joint(self, parent_link: Link, child_link: Link, joint_name: str = None,
-                         transform: Optional[w.TransMatrix] = None):
+                         transform: Optional[cas.TransMatrix] = None):
         self._raise_if_link_does_not_exist(parent_link.name)
         self._raise_if_link_does_not_exist(child_link.name)
         if joint_name is None:
@@ -866,7 +866,7 @@ class WorldTree(WorldTreeInterface):
             self.add_urdf(urdf=msg.urdf,
                           parent_link_name=parent_link_name,
                           group_name=group_name,
-                          pose=w.TransMatrix(pose))
+                          pose=cas.TransMatrix(pose))
         else:
             link = Link.from_world_body(link_name=PrefixName(group_name, group_name), msg=msg,
                                         color=self.default_link_color)
@@ -973,7 +973,7 @@ class WorldTree(WorldTreeInterface):
         new_parent_link = self.links[new_parent_link_name]
 
         if isinstance(joint, FixedJoint):
-            fk = w.TransMatrix(self.compute_fk_np(new_parent_link_name, joint.child_link_name))
+            fk = cas.TransMatrix(self.compute_fk_np(new_parent_link_name, joint.child_link_name))
             joint.parent_link_name = new_parent_link_name
             joint.parent_T_child = fk
         elif isinstance(joint, Joint6DOF):
@@ -1192,14 +1192,14 @@ class WorldTree(WorldTreeInterface):
 
     @copy_memoize
     @profile
-    def compose_fk_expression(self, root_link: PrefixName, tip_link: PrefixName) -> w.TransMatrix:
+    def compose_fk_expression(self, root_link: PrefixName, tip_link: PrefixName) -> cas.TransMatrix:
         """
         Multiplies all transformation matrices in the chain between root_link and tip_link
         :param root_link:
         :param tip_link:
         :return: 4x4 homogenous transformation matrix
         """
-        fk = w.TransMatrix()
+        fk = cas.TransMatrix()
         root_chain, _, tip_chain = self.compute_split_chain(root_link, tip_link, add_joints=True, add_links=False,
                                                             add_fixed_joints=True, add_non_controlled_joints=True)
         for joint_name in root_chain:
@@ -1213,20 +1213,20 @@ class WorldTree(WorldTreeInterface):
         fk.child_frame = tip_link
         return fk
 
-    def get_fk_velocity(self, root: PrefixName, tip: PrefixName) -> w.Expression:
+    def get_fk_velocity(self, root: PrefixName, tip: PrefixName) -> cas.Expression:
         # FIXME, only use symbols of fk expr?
         r_T_t = self.compose_fk_expression(root, tip)
         r_R_t = r_T_t.to_rotation()
         axis, angle = r_R_t.to_axis_angle()
         r_R_t_axis_angle = axis * angle
         r_P_t = r_T_t.to_position()
-        fk = w.Expression([r_P_t[0],
+        fk = cas.Expression([r_P_t[0],
                            r_P_t[1],
                            r_P_t[2],
                            r_R_t_axis_angle[0],
                            r_R_t_axis_angle[1],
                            r_R_t_axis_angle[2]])
-        return w.total_derivative(fk,
+        return cas.total_derivative(fk,
                                   self.joint_position_symbols,
                                   self.joint_velocity_symbols)
 
@@ -1294,7 +1294,7 @@ class WorldTree(WorldTreeInterface):
 
             def __init__(self, world: WorldTree):
                 self.world = world
-                self.fks = {self.world.root_link_name: w.TransMatrix()}
+                self.fks = {self.world.root_link_name: cas.TransMatrix()}
 
             @profile
             def joint_call(self, joint_name: my_string) -> bool:
@@ -1305,13 +1305,13 @@ class WorldTree(WorldTreeInterface):
 
             @profile
             def compile_fks(self):
-                all_fks = w.vstack([self.fks[link_name] for link_name in self.world.link_names_as_set])
+                all_fks = cas.vstack([self.fks[link_name] for link_name in self.world.link_names_as_set])
                 collision_fks = []
                 for link_name in sorted(self.world.link_names_with_collisions):
                     if link_name == self.world.root_link_name:
                         continue
                     collision_fks.append(self.fks[link_name])
-                collision_fks = w.vstack(collision_fks)
+                collision_fks = cas.vstack(collision_fks)
                 params = set()
                 params.update(all_fks.free_symbols())
                 params.update(collision_fks.free_symbols())
@@ -1355,9 +1355,9 @@ class WorldTree(WorldTreeInterface):
         return self._fk_computer.compute_fk_np(root, tip)
 
     @profile
-    def compose_fk_evaluated_expression(self, root: PrefixName, tip: PrefixName) -> w.TransMatrix:
-        result: w.TransMatrix = symbol_manager.get_expr(f'god_map.world.compute_fk_np(\'{root}\', \'{tip}\')',
-                                                        output_type_hint=w.TransMatrix)
+    def compose_fk_evaluated_expression(self, root: PrefixName, tip: PrefixName) -> cas.TransMatrix:
+        result: cas.TransMatrix = symbol_manager.get_expr(f'god_map.world.compute_fk_np(\'{root}\', \'{tip}\')',
+                                                        output_type_hint=cas.TransMatrix)
         result.reference_frame = root
         result.child_frame = tip
         return result
@@ -1387,7 +1387,7 @@ class WorldTree(WorldTreeInterface):
         self.joints[joint.name] = joint
 
     def joint_limit_expr(self, joint_name: PrefixName, order: Derivatives) \
-            -> Tuple[Optional[w.symbol_expr_float], Optional[w.symbol_expr_float]]:
+            -> Tuple[Optional[cas.symbol_expr_float], Optional[cas.symbol_expr_float]]:
         return self.joints[joint_name].get_limit_expressions(order)
 
     @overload
@@ -1456,7 +1456,7 @@ class WorldTree(WorldTreeInterface):
         return result
 
     def compute_joint_limits(self, joint_name: PrefixName, order: Derivatives) \
-            -> Tuple[Optional[w.symbol_expr_float], Optional[w.symbol_expr_float]]:
+            -> Tuple[Optional[cas.symbol_expr_float], Optional[cas.symbol_expr_float]]:
         try:
             lower_limit, upper_limit = self.joint_limit_expr(joint_name, order)
         except KeyError:

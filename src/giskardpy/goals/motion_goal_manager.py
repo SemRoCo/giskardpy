@@ -5,7 +5,7 @@ from typing import List, Dict, Tuple
 import giskardpy.casadi_wrapper as cas
 import numpy as np
 
-from giskardpy.data_types import PrefixName, TaskState
+from giskardpy.data_types.data_types import PrefixName, TaskState
 from giskardpy.exceptions import UnknownGoalException, GiskardException, GoalInitalizationException, \
     DuplicateNameException
 from giskardpy.goals.collision_avoidance import ExternalCollisionAvoidance, SelfCollisionAvoidance

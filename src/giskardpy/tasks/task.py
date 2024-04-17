@@ -8,7 +8,7 @@ import giskardpy.casadi_wrapper as cas
 from giskardpy.exceptions import GiskardException, GoalInitalizationException, DuplicateNameException
 from giskardpy.god_map import god_map
 from giskardpy.monitors.monitors import ExpressionMonitor, Monitor
-from giskardpy.data_types import Derivatives, PrefixName, TaskState
+from giskardpy.data_types.data_types import Derivatives, PrefixName, TaskState
 from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint, \
     ManipulabilityConstraint, Constraint
 from giskardpy.symbol_manager import symbol_manager

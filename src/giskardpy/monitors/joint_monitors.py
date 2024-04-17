@@ -3,7 +3,7 @@ from typing import List, Dict, Optional
 import giskardpy.casadi_wrapper as cas
 from giskardpy.monitors.monitors import ExpressionMonitor, Monitor
 from giskardpy.god_map import god_map
-from giskardpy.data_types import Derivatives
+from giskardpy.data_types.data_types import Derivatives
 
 
 class JointGoalReached(ExpressionMonitor):

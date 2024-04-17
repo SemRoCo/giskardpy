@@ -35,7 +35,7 @@ from sensor_msgs.msg import JointState
 from visualization_msgs.msg import Marker, MarkerArray
 
 from giskardpy.god_map import god_map
-from giskardpy.data_types import PrefixName
+from giskardpy.data_types.data_types import PrefixName
 from giskardpy.utils import logging
 
 

@@ -4,7 +4,7 @@ from py_trees import Status
 
 from giskardpy.god_map import god_map
 from giskardpy.model.joints import Joint6DOF
-from giskardpy.data_types import PrefixName
+from giskardpy.data_types.data_types import PrefixName
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.math import compare_poses
 from giskardpy.utils.tfwrapper import lookup_pose, msg_to_homogeneous_matrix

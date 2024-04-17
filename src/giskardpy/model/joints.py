@@ -9,8 +9,8 @@ import urdf_parser_py.urdf as up
 from geometry_msgs.msg import Pose
 
 import giskardpy.casadi_wrapper as w
-from giskardpy.data_types import JointStates
-from giskardpy.data_types import derivative_map, PrefixName, Derivatives
+from giskardpy.data_types.data_types import JointStates
+from giskardpy.data_types.data_types import derivative_map, PrefixName, Derivatives
 from giskardpy.god_map import god_map
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.symbol_manager import symbol_manager

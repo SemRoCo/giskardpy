@@ -13,7 +13,7 @@ from giskardpy.utils.utils import string_shortener
 import giskardpy.casadi_wrapper as cas
 from giskardpy.exceptions import GoalInitalizationException
 from giskardpy.model.joints import OneDofJoint
-from giskardpy.data_types import PrefixName, Derivatives
+from giskardpy.data_types.data_types import PrefixName, Derivatives
 from giskardpy.qp.constraint import InequalityConstraint, EqualityConstraint, DerivativeInequalityConstraint, \
     ManipulabilityConstraint
 import giskardpy.casadi_wrapper as cas

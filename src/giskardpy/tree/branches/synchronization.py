@@ -3,7 +3,7 @@ from typing import List
 from py_trees import Sequence, Status
 
 from giskardpy.god_map import god_map
-from giskardpy.data_types import PrefixName
+from giskardpy.data_types.data_types import PrefixName
 from giskardpy.tree.behaviors.collision_scene_updater import CollisionSceneUpdater
 from giskardpy.tree.behaviors.notify_state_change import NotifyStateChange
 from giskardpy.tree.behaviors.plugin import GiskardBehavior

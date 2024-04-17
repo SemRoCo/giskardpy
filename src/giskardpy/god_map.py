@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from giskardpy.model.trajectory import Trajectory
     from giskardpy.qp.qp_controller import QPProblemBuilder
     from giskardpy.configs.qp_controller_config import QPControllerConfig
-    from giskardpy.data_types import Derivatives, PrefixName
+    from giskardpy.data_types.data_types import Derivatives, PrefixName
     from giskardpy.configs.giskard import Giskard
     from giskardpy.goals.motion_goal_manager import MotionGoalManager
     from giskardpy.debug_expression_manager import DebugExpressionManager

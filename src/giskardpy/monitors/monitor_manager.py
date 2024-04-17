@@ -9,7 +9,7 @@ import numpy as np
 import giskard_msgs.msg as giskard_msgs
 import giskardpy.casadi_wrapper as cas
 from giskardpy.casadi_wrapper import CompiledFunction
-from giskardpy.data_types import TaskState
+from giskardpy.data_types.data_types import TaskState
 from giskardpy.exceptions import GiskardException, MonitorInitalizationException, UnknownMonitorException
 from giskardpy.god_map import god_map
 from giskardpy.monitors.monitors import ExpressionMonitor, Monitor

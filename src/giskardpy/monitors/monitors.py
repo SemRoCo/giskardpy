@@ -10,7 +10,7 @@ import numpy as np
 import giskard_msgs.msg as giskard_msgs
 import giskardpy.casadi_wrapper as cas
 from giskard_msgs.msg import GiskardError
-from giskardpy.data_types import Derivatives
+from giskardpy.data_types.data_types import Derivatives
 from giskardpy.exceptions import GiskardException, MonitorInitalizationException
 from giskardpy.god_map import god_map
 from giskardpy.symbol_manager import symbol_manager

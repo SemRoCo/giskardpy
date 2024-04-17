@@ -14,7 +14,7 @@ from giskardpy.configs.iai_robots.tiago import TiagoStandaloneInterface, TiagoCo
 from giskardpy.configs.world_config import WorldWithDiffDriveRobot
 from giskardpy.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
 from giskardpy.god_map import god_map
-from giskardpy.data_types import PrefixName
+from giskardpy.data_types.data_types import PrefixName
 from giskardpy.utils.utils import launch_launchfile
 from utils_for_tests import GiskardTestWrapper
 

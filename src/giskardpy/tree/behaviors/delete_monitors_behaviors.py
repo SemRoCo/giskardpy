@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 
 from py_trees import Status
 
-from giskardpy.data_types import TaskState
+from giskardpy.data_types.data_types import TaskState
 from giskardpy.god_map import god_map
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 

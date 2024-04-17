@@ -1,6 +1,6 @@
 from typing import List
 
-from giskardpy.data_types import PrefixName
+from giskardpy.data_types.data_types import PrefixName
 from giskardpy.tree.behaviors.joint_group_vel_controller_publisher import JointGroupVelController
 from giskardpy.tree.behaviors.joint_pos_controller_publisher import JointPosController
 from giskardpy.tree.behaviors.joint_vel_controller_publisher import JointVelController

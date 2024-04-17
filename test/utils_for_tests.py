@@ -24,13 +24,13 @@ from giskard_msgs.msg import CollisionEntry, MoveResult, MoveGoal, WorldResult, 
 from giskard_msgs.srv import DyeGroupResponse
 from giskardpy.configs.giskard import Giskard
 from giskardpy.configs.qp_controller_config import SupportedQPSolver
-from giskardpy.data_types import KeyDefaultDict
+from giskardpy.data_types.data_types import KeyDefaultDict
 from giskardpy.exceptions import UnknownGroupException
 from giskardpy.goals.diff_drive_goals import DiffDriveTangentialToPoint, KeepHandInWorkspace
 from giskardpy.god_map import god_map
 from giskardpy.model.collision_world_syncer import Collisions, Collision
 from giskardpy.model.joints import OneDofJoint, OmniDrive, DiffDrive
-from giskardpy.data_types import PrefixName, Derivatives
+from giskardpy.data_types.data_types import PrefixName, Derivatives
 from giskardpy.monitors.payload_monitors import UpdateParentLinkOfGroup
 from giskardpy.python_interface.old_python_interface import OldGiskardWrapper
 from giskardpy.qp.free_variable import FreeVariable

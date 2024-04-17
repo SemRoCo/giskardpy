@@ -1614,10 +1614,8 @@ class TestConstraints:
 
         hand = kitchen_setup.r_tip
         door_obj = "door"
-        goal_angle = np.pi / 4
         handle_name = 'sink_area_dish_washer_door_handle'
         door_name = 'sink_area_dish_washer_door'
-        door_joint = 'sink_area_dish_washer_door_joint'
         kitchen_setup.register_group(door_obj, kitchen_setup.default_env_name,
                                      door_name)  # root link of the objects to avoid collision
         kitchen_setup.set_env_state({'sink_area_dish_washer_door_joint': np.pi/8})
@@ -1625,30 +1623,16 @@ class TestConstraints:
         tip_grasp_axis.header.frame_id = hand
         tip_grasp_axis.vector.y = 1
 
-        object_rotation_axis = Vector3Stamped()
-        object_rotation_axis.header.frame_id = door_name
-        object_rotation_axis.vector.z = 1
-
         kitchen_setup.set_align_to_push_door_goal(root_link=kitchen_setup.default_root,
                                                   tip_link=hand,
                                                   door_object=door_name,
                                                   door_height=0.6,
-                                                  object_joint_name=door_joint,
                                                   door_length=0.49,
-                                                  tip_gripper_axis=tip_grasp_axis,
-                                                  object_rotation_axis=object_rotation_axis)
-
+                                                  tip_gripper_axis=tip_grasp_axis)
         kitchen_setup.plan_and_execute()
-        object_normal = Vector3Stamped()
-        object_normal.header.frame_id = door_name
-        object_normal.vector.x = 1
 
         # # # close the gripper
         kitchen_setup.set_joint_goal(goal_state={'r_gripper_l_finger_joint': 0.0})
-
-        root_V_object_rotation_axis = Vector3Stamped()
-        root_V_object_rotation_axis.header.frame_id = "map"
-        root_V_object_rotation_axis.vector.y = -1
 
         kitchen_setup.set_pre_push_door_goal(root_link=kitchen_setup.default_root,
                                              tip_link=hand,
@@ -1656,12 +1640,14 @@ class TestConstraints:
                                              door_height=0.6,
                                              door_length=0.49,
                                              door_depth=0.02,
-                                             tip_gripper_axis=tip_grasp_axis,
-                                             root_V_object_rotation_axis=root_V_object_rotation_axis,
-                                             object_joint_name=door_joint)
+                                             tip_gripper_axis=tip_grasp_axis)
 
         kitchen_setup.allow_collision(group1=door_obj, group2=kitchen_setup.r_gripper_group)
         kitchen_setup.plan_and_execute()
+
+        kitchen_setup.check_cpi_leq(["pr2/r_gripper_tool_frame", "iai_kitchen/sink_area_dish_washer_door"],
+                                    distance_threshold=0.001,
+                                    check_self=False)
 
         right_forearm = 'r_forearm'
         kitchen_setup.register_group(right_forearm,

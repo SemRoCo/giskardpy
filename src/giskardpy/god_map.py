@@ -13,8 +13,7 @@ if TYPE_CHECKING:
     from giskardpy.tree.branches.giskard_bt import GiskardBT
     from giskardpy.model.joints import Joint
     from giskardpy.model.ros_msg_visualization import ROSMsgVisualization
-    from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint, \
-        ManipulabilityConstraint
+    from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint
     from giskardpy.qp.free_variable import FreeVariable
     from giskardpy.qp.next_command import NextCommands
     from giskardpy.model.trajectory import Trajectory
@@ -64,7 +63,6 @@ class GodMap:
     eq_constraints: Dict[str, EqualityConstraint]
     neq_constraints: Dict[str, InequalityConstraint]
     derivative_constraints: Dict[str, DerivativeInequalityConstraint]
-    manip_constraints: Dict[str, ManipulabilityConstraint]
     quadratic_weight_gains: Dict[str, QuadraticWeightGain]
     linear_weight_gains: Dict[str, LinearWeightGain]
     hack: float

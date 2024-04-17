@@ -15,8 +15,7 @@ from giskardpy.exceptions import HardConstraintsViolatedException, QPSolverExcep
     VelocityLimitUnreachableException
 from giskardpy.god_map import god_map
 from giskardpy.data_types import Derivatives
-from giskardpy.qp.constraint import InequalityConstraint, EqualityConstraint, DerivativeInequalityConstraint, \
-    ManipulabilityConstraint
+from giskardpy.qp.constraint import InequalityConstraint, EqualityConstraint, DerivativeInequalityConstraint
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.next_command import NextCommands
 from giskardpy.qp.pos_in_vel_limits import b_profile
@@ -1015,7 +1014,6 @@ class QPProblemBuilder:
     inequality_bounds: InequalityBounds
     qp_solver: QPSolver
     prediction_horizon: int = None
-    manipulability_indexes: np.ndarray = np.array([0.0, 0.0])
 
     def __init__(self,
                  sample_period: float,
@@ -1025,7 +1023,6 @@ class QPProblemBuilder:
                  equality_constraints: List[EqualityConstraint] = None,
                  inequality_constraints: List[InequalityConstraint] = None,
                  derivative_constraints: List[DerivativeInequalityConstraint] = None,
-                 manipulability_constraints: List[ManipulabilityConstraint] = None,
                  quadratic_weight_gains: List[QuadraticWeightGain] = None,
                  linear_weight_gains: List[LinearWeightGain] = None,
                  retries_with_relaxed_constraints: int = 0,
@@ -1035,7 +1032,6 @@ class QPProblemBuilder:
         self.equality_constraints = []
         self.inequality_constraints = []
         self.derivative_constraints = []
-        self.manipulability_constraints = []
         self.quadratic_weight_gains = []
         self.linear_weight_gains = []
         self.prediction_horizon = prediction_horizon
@@ -1051,8 +1047,6 @@ class QPProblemBuilder:
             self.add_equality_constraints(equality_constraints)
         if derivative_constraints is not None:
             self.add_derivative_constraints(derivative_constraints)
-        if manipulability_constraints is not None:
-            self.add_manipulability_constraints(manipulability_constraints)
         if quadratic_weight_gains is not None:
             self.add_quadratic_weight_gains(quadratic_weight_gains)
         if linear_weight_gains is not None:
@@ -1098,12 +1092,6 @@ class QPProblemBuilder:
         for c in self.equality_constraints:
             c.control_horizon = min(c.control_horizon, self.prediction_horizon)
             self.check_control_horizon(c)
-
-    def add_manipulability_constraints(self, constraints: List[ManipulabilityConstraint]):
-        self.manipulability_constraints.extend(list(sorted(constraints, key=lambda x: x.name)))
-        l = [x.name for x in constraints]
-        duplicates = set([x for x in l if l.count(x) > 1])
-        assert duplicates == set(), f'there are multiple manipulability constraints with the same name: {duplicates}'
 
     def add_quadratic_weight_gains(self, gains: List[QuadraticWeightGain]):
         self.quadratic_weight_gains.extend(list(sorted(gains, key=lambda x: x.name)))

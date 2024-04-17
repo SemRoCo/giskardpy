@@ -16,7 +16,6 @@ from giskardpy.configs.behavior_tree_config import StandAloneBTConfig, ClosedLoo
 from giskardpy.configs.giskard import Giskard
 from giskardpy.utils.utils import launch_launchfile
 from utils_for_tests import compare_poses, GiskardTestWrapper
-from giskardpy.goals.manipulability_goals import MaxManipulability
 import giskardpy.utils.tfwrapper as tf
 from giskardpy.goals.action_goals import PouringAction
 from giskardpy.goals.adaptive_goals import CloseGripper, PouringAdaptiveTilt
@@ -496,7 +495,7 @@ class TestAddObject:
 
 class TestActionGoals:
     def test_pouring_action(self, zero_pose):
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class='PouringAction2',
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class='PouringAction',
                                                tip_link='hand_palm_link',
                                                root_link='map')
         zero_pose.execute(add_local_minimum_reached=False)

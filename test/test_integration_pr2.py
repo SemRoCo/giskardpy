@@ -39,7 +39,6 @@ from giskardpy.utils.utils import launch_launchfile, suppress_stderr, resolve_ro
 from giskardpy.utils.math import compare_points
 from utils_for_tests import compare_poses, publish_marker_vector, \
     GiskardTestWrapper, pr2_urdf
-from giskardpy.goals.manipulability_goals import MaxManipulability
 
 # scopes = ['module', 'class', 'function']
 pocky_pose = {'r_elbow_flex_joint': -1.29610152504,
@@ -4284,7 +4283,7 @@ class TestManipulability:
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.allow_all_collisions()
         zero_pose.set_cart_goal(p, zero_pose.r_tip, 'map')
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulability.__name__,
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class='MaxManipulabilityLinWeight',
                                                root_link='torso_lift_link',
                                                tip_link='r_gripper_tool_frame')
         zero_pose.plan_and_execute()
@@ -4297,16 +4296,14 @@ class TestManipulability:
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.allow_all_collisions()
         zero_pose.set_cart_goal(p, zero_pose.r_tip, 'map')
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulability.__name__,
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class='MaxManipulabilityLinWeight',
                                                root_link='torso_lift_link',
-                                               tip_link='r_gripper_tool_frame',
-                                               optimize_rotational_dofs=False)
+                                               tip_link='r_gripper_tool_frame')
         p.pose.position = Point(1, 0.1, 0)
         zero_pose.set_cart_goal(p, zero_pose.l_tip, 'map')
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulability.__name__,
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class='MaxManipulabilityLinWeight',
                                                root_link='torso_lift_link',
-                                               tip_link='l_gripper_tool_frame',
-                                               optimize_rotational_dofs=False)
+                                               tip_link='l_gripper_tool_frame')
         zero_pose.execute(add_local_minimum_reached=True)
 
 

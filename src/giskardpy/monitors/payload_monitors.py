@@ -193,28 +193,6 @@ class PayloadAlternator(PayloadMonitor):
         self.state = np.floor(god_map.time) % self.mod == 0
 
 
-class ManipulabilityMonitor(PayloadMonitor):
-    def __init__(self,
-                 name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol):
-        super().__init__(name=name, stay_true=False, start_condition=start_condition, run_call_in_thread=False)
-        self.first_edge = False
-        self.first_down = False
-
-    def __call__(self):
-        m = god_map.qp_controller.manipulability_indexes[0]
-        m_old = god_map.qp_controller.manipulability_indexes[1]
-        if m == 0:
-            m = 0.0001
-        percentual_diff = 1 - min(m_old / m, 1)
-        if percentual_diff < 0.01 and not self.first_edge:
-            self.first_edge = True
-        if percentual_diff > 0.01 and self.first_edge:
-            self.first_down = True
-        if percentual_diff < 0.01 and self.first_down:
-            self.state = True
-
-
 class CloseGripper(PayloadMonitor):
     def __init__(self,
                  name: Optional[str] = None,

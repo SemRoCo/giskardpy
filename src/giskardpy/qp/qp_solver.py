@@ -218,24 +218,6 @@ class QPSolver(ABC):
         :return: weights, g, lb, ub, E, bE, A, lbA, ubA, weight_filter, bE_filter, bA_filter
         """
 
-    @profile
-    def init_manipulability_variables(self, constraint_jacobian, grad_traces):
-        self.use_manipulability = False
-        if constraint_jacobian:
-            self.JJT_f = constraint_jacobian.dot(constraint_jacobian.T).compile(self.free_symbols)
-            self.pred_horizon = god_map.manip_constraints[list(god_map.manip_constraints)[0]].prediction_horizon
-            self.use_manipulability = True
-            self.manip_gain = god_map.manip_constraints[list(god_map.manip_constraints)[0]].gain
-            self.det_symbol = cas.Symbol('det')
-            self.m_symbolic = cas.sqrt(self.det_symbol)
-            self.grad_traces_augmented = cas.vstack([cas.vstack(grad_traces)] * self.pred_horizon) * -self.manip_gain
-
-    @profile
-    def calc_det_of_jjt_manipulability(self, substitutions):
-        if self.use_manipulability:
-            self.JJT = self.JJT_f.fast_call(substitutions)
-            self.det = np.linalg.det(self.JJT)
-
 
 class QPSWIFTFormatter(QPSolver):
     sparse: bool = True
@@ -298,26 +280,13 @@ class QPSWIFTFormatter(QPSolver):
         self.E_f = combined_E.compile(parameters=self.free_symbols, sparse=self.sparse)
         self.nA_A_f = nA_A.compile(parameters=self.free_symbols, sparse=self.sparse)
 
-        self.init_manipulability_variables(constraint_jacobian, grad_traces)
-
-        if self.use_manipulability:
-            self.combined_vector_f = cas.StackedCompiledFunction([weights,
-                                                                  g,
-                                                                  nlb_without_inf,
-                                                                  ub_without_inf,
-                                                                  bE,
-                                                                  nlbA_ubA,
-                                                                  self.grad_traces_augmented * self.m_symbolic,
-                                                                  self.m_symbolic],
-                                                                 parameters=self.free_symbols + [self.det_symbol.s])
-        else:
-            self.combined_vector_f = cas.StackedCompiledFunction([weights,
-                                                                  g,
-                                                                  nlb_without_inf,
-                                                                  ub_without_inf,
-                                                                  bE,
-                                                                  nlbA_ubA],
-                                                                 parameters=self.free_symbols)
+        self.combined_vector_f = cas.StackedCompiledFunction([weights,
+                                                              g,
+                                                              nlb_without_inf,
+                                                              ub_without_inf,
+                                                              bE,
+                                                              nlbA_ubA],
+                                                             parameters=self.free_symbols)
 
         self.free_symbols_str = [str(x) for x in self.free_symbols]
 
@@ -328,16 +297,8 @@ class QPSWIFTFormatter(QPSolver):
     def evaluate_functions(self, substitutions):
         self.nA_A = self.nA_A_f.fast_call(substitutions)
         self.E = self.E_f.fast_call(substitutions)
-        if self.use_manipulability:
-            self.calc_det_of_jjt_manipulability(substitutions)
-            self.weights, self.g, self.nlb, self.ub, self.bE, self.nlbA_ubA, m_grad, m = self.combined_vector_f.fast_call(
-                np.append(substitutions, self.det))
-            self.g[:len(m_grad)] = m_grad
-            god_map.qp_controller.manipulability_indexes[1] = god_map.qp_controller.manipulability_indexes[0]
-            god_map.qp_controller.manipulability_indexes[0] = m
-        else:
-            self.weights, self.g, self.nlb, self.ub, self.bE, self.nlbA_ubA = self.combined_vector_f.fast_call(
-                substitutions)
+        self.weights, self.g, self.nlb, self.ub, self.bE, self.nlbA_ubA = self.combined_vector_f.fast_call(
+            substitutions)
 
     @profile
     def problem_data_to_qp_format(self) \

@@ -80,27 +80,11 @@ class QPSolverQPalm(QPSolver):
         len_lb_be_lba_end = weights.shape[0] + lb.shape[0] + bE.shape[0] + lbA.shape[0]
         len_ub_be_uba_end = len_lb_be_lba_end + ub.shape[0] + bE.shape[0] + ubA.shape[0]
 
-        self.init_manipulability_variables(constraint_jacobian, grad_traces)
-        if self.use_manipulability:
-            self.combined_vector_f = cas.StackedCompiledFunction(expressions=[weights,
-                                                                              lb,
-                                                                              bE,
-                                                                              lbA,
-                                                                              ub,
-                                                                              bE,
-                                                                              ubA,
-                                                                              self.grad_traces_augmented * self.m_symbolic,
-                                                                              self.m_symbolic],
-                                                                 parameters=free_symbols + [self.det_symbol.s],
-                                                                 additional_views=[
-                                                                     slice(weights.shape[0], len_lb_be_lba_end),
-                                                                     slice(len_lb_be_lba_end, len_ub_be_uba_end)])
-        else:
-            self.combined_vector_f = cas.StackedCompiledFunction(expressions=[weights, lb, bE, lbA, ub, bE, ubA],
-                                                                 parameters=free_symbols,
-                                                                 additional_views=[
-                                                                     slice(weights.shape[0], len_lb_be_lba_end),
-                                                                     slice(len_lb_be_lba_end, len_ub_be_uba_end)])
+        self.combined_vector_f = cas.StackedCompiledFunction(expressions=[weights, lb, bE, lbA, ub, bE, ubA],
+                                                             parameters=free_symbols,
+                                                             additional_views=[
+                                                                 slice(weights.shape[0], len_lb_be_lba_end),
+                                                                 slice(len_lb_be_lba_end, len_ub_be_uba_end)])
 
         self.A_f = combined_A.compile(parameters=free_symbols, sparse=self.sparse)
 
@@ -111,18 +95,10 @@ class QPSolverQPalm(QPSolver):
 
     @profile
     def evaluate_functions(self, substitutions: np.ndarray):
-        if self.use_manipulability:
-            self.calc_det_of_jjt_manipulability(substitutions)
-            self.weights, self.lb, self.bE, self.lbA, self.ub, _, self.ubA, m_grad, m, self.lb_bE_lbA, self.ub_bE_ubA = self.combined_vector_f.fast_call(
-                np.append(substitutions, self.det))
-            self.g = np.zeros(self.weights.shape)
-            self.g[:len(m_grad)] = m_grad
-            god_map.qp_controller.manipulability_indexes[1] = god_map.qp_controller.manipulability_indexes[0]
-            god_map.qp_controller.manipulability_indexes[0] = m
-        else:
-            self.weights, self.lb, self.bE, self.lbA, self.ub, _, self.ubA, self.lb_bE_lbA, self.ub_bE_ubA = self.combined_vector_f.fast_call(
-                substitutions)
-            self.g = np.zeros(self.weights.shape)
+
+        self.weights, self.lb, self.bE, self.lbA, self.ub, _, self.ubA, self.lb_bE_lbA, self.ub_bE_ubA = self.combined_vector_f.fast_call(
+            substitutions)
+        self.g = np.zeros(self.weights.shape)
 
         self.A = self.A_f.fast_call(substitutions)
 

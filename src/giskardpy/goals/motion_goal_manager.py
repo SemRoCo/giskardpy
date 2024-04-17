@@ -12,8 +12,7 @@ from giskardpy.goals.collision_avoidance import ExternalCollisionAvoidance, Self
 from giskardpy.goals.goal import Goal
 import giskard_msgs.msg as giskard_msgs
 from giskardpy.god_map import god_map
-from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint, \
-    ManipulabilityConstraint
+from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.tasks.task import Task
 from giskardpy.utils import logging
@@ -255,13 +254,11 @@ class MotionGoalManager:
             -> Tuple[Dict[str, EqualityConstraint],
             Dict[str, InequalityConstraint],
             Dict[str, DerivativeInequalityConstraint],
-            Dict[str, ManipulabilityConstraint],
             Dict[str, QuadraticWeightGain],
             Dict[str, LinearWeightGain]]:
         eq_constraints = ImmutableDict()
         neq_constraints = ImmutableDict()
         derivative_constraints = ImmutableDict()
-        manip_constraints = ImmutableDict()
         quadratic_weight_gains = ImmutableDict()
         linear_weight_gains = ImmutableDict()
         for goal_name, goal in list(self.motion_goals.items()):
@@ -269,7 +266,6 @@ class MotionGoalManager:
                 new_eq_constraints = OrderedDict()
                 new_neq_constraints = OrderedDict()
                 new_derivative_constraints = OrderedDict()
-                new_manip_constraints = OrderedDict()
                 new_quadratic_weight_gains = OrderedDict()
                 new_linear_weight_gains = OrderedDict()
                 for task in goal.tasks:
@@ -279,8 +275,6 @@ class MotionGoalManager:
                         new_neq_constraints[constraint.name] = constraint
                     for constraint in task.get_derivative_constraints():
                         new_derivative_constraints[constraint.name] = constraint
-                    for constraint in task.get_manipulability_constraint():
-                        new_manip_constraints[constraint.name] = constraint
                     for gain in task.get_quadratic_gains():
                         new_quadratic_weight_gains[gain.name] = gain
                     for gain in task.get_linear_gains():
@@ -290,17 +284,15 @@ class MotionGoalManager:
             eq_constraints.update(new_eq_constraints)
             neq_constraints.update(new_neq_constraints)
             derivative_constraints.update(new_derivative_constraints)
-            manip_constraints.update(new_manip_constraints)
             quadratic_weight_gains.update(new_quadratic_weight_gains)
             linear_weight_gains.update(new_linear_weight_gains)
             # logging.loginfo(f'{goal_name} added {len(_constraints)+len(_vel_constraints)} constraints.')
         god_map.eq_constraints = eq_constraints
         god_map.neq_constraints = neq_constraints
         god_map.derivative_constraints = derivative_constraints
-        god_map.manip_constraints = manip_constraints
         god_map.quadratic_weight_gains = quadratic_weight_gains
         god_map.linear_weight_gains = linear_weight_gains
-        return eq_constraints, neq_constraints, derivative_constraints, manip_constraints, quadratic_weight_gains, linear_weight_gains
+        return eq_constraints, neq_constraints, derivative_constraints, quadratic_weight_gains, linear_weight_gains
 
     def replace_jsons_with_ros_messages(self, d):
         if isinstance(d, list):

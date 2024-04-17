@@ -63,6 +63,10 @@ class BaseArmWeightScaling(Goal):
 
 
 class MaxManipulabilityLinWeight(Goal):
+    """
+       This goal maximizes the manipulability of the kinematic chain between root_link and tip_link.
+       This chain should only include rotational joint and no linear joints i.e. torso lift joints or odometry joints.
+       """
     def __init__(self,
                  root_link: str,
                  tip_link: str,
@@ -79,6 +83,16 @@ class MaxManipulabilityLinWeight(Goal):
             name = f'{self.__class__.__name__}/{self.root_link}/{self.tip_link}'
         super().__init__(name)
 
+        results = god_map.world.compute_split_chain(self.root_link, self.tip_link, True, True, False, False)
+        if len(results[0]) > 0 and len(results[1]) > 0 and len(results[2]) > 0:
+            raise Exception(
+                'tip link and root link are in different branches of the kinematic chain of Maximize Manipulability Goal')
+        elif len(results[0]) > 0:
+            raise Exception('tip link is below root link in kinematic chain of Maximize Manipulability Goal')
+        for joint in results[2]:
+            if 'joint' in joint and not god_map.world.is_joint_rotational(joint):
+                raise Exception('Non rotational joint in kinematic chain of Maximize Manipulability Goal')
+
         task = self.create_and_add_task('MaxManipulability')
         root_P_tip = god_map.world.compose_fk_expression(self.root_link, self.tip_link).to_position()[:3]
 
@@ -92,6 +106,13 @@ class MaxManipulabilityLinWeight(Goal):
             trace = cas.trace(product)
             grad_traces[symbol.name()] = trace * m * -gain
         task.add_linear_weight_gain(name, gains=grad_traces)
+
+        # m = symbol_manager.get_symbol(f'god_map.qp_controller.manipulability_indexes[0]')
+        # old_m = symbol_manager.get_symbol(f'god_map.qp_controller.manipulability_indexes[1]')
+        # percentual_diff = 1 - cas.min(cas.save_division(old_m, m), 1)
+        # # monitor = ExpressionMonitor(name=f'manipMonitor{tip_link}')
+        # monitor = ManipulabilityMonitor(name=f'manipMonitor{tip_link}')
+        # self.add_monitor(monitor)
 
 
 

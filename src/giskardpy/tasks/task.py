@@ -1,5 +1,5 @@
 from enum import IntEnum
-from typing import Optional, List, Union, Dict, Callable, Iterable, overload
+from typing import Optional, List, Union, Dict, Callable, Iterable, overload, DefaultDict
 
 import numpy as np
 
@@ -14,6 +14,7 @@ from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils.decorators import memoize
 from giskardpy.utils.utils import string_shortener
 from giskardpy.qp.weight_gain import QuadraticWeightGain, LinearWeightGain
+from giskardpy.qp.free_variable import FreeVariable
 
 WEIGHT_MAX = giskard_msgs.msg.Weights.WEIGHT_MAX
 WEIGHT_ABOVE_CA = giskard_msgs.msg.Weights.WEIGHT_ABOVE_CA
@@ -159,12 +160,12 @@ class Task:
             output_constraints.append(constraint)
         return output_constraints
 
-    def add_quadratic_weight_gain(self, name: str, gains: Dict[str, cas.Expression]):
+    def add_quadratic_weight_gain(self, name: str, gains: DefaultDict[Derivatives, Dict[FreeVariable, float]]):
         q_gain = QuadraticWeightGain(name=name,
                                      gains=gains)
         self.quadratic_gains.append(q_gain)
 
-    def add_linear_weight_gain(self, name: str, gains: Dict[str, cas.Expression]):
+    def add_linear_weight_gain(self, name: str, gains: DefaultDict[Derivatives, Dict[FreeVariable, float]]):
         q_gain = LinearWeightGain(name=name,
                                   gains=gains)
         self.linear_weight_gains.append(q_gain)

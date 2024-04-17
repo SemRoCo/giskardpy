@@ -4340,11 +4340,11 @@ class TestWeightScaling:
                                                                          [0, 0, 0, 1]]))
         goal_pose.pose.position.x = 2.01
         goal_pose.pose.position.y = -0.2
-        goal_pose.pose.position.z = 0.5
+        goal_pose.pose.position.z = 0.7
 
         goal_pose2 = deepcopy(goal_pose)
         goal_pose2.pose.position.y = -0.6
-        goal_pose2.pose.position.z = 0.7
+        goal_pose2.pose.position.z = 0.8
         goal_pose2.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 0, 1, 0],
                                                                           [0, 1, 0, 0],
                                                                           [-1, 0, 0, 0],
@@ -4380,23 +4380,24 @@ class TestWeightScaling:
                                                tip_link='l_gripper_tool_frame',
                                                tip_goal=tip_goal,
                                                gain=100000,
-                                               arm_joints=['torso_lift_joint',
-                                                           'head_pan_joint',
-                                                           'head_tilt_joint',
-                                                           'r_upper_arm_roll_joint',
-                                                           'r_shoulder_pan_joint',
-                                                           'r_shoulder_lift_joint',
-                                                           'r_forearm_roll_joint',
-                                                           'r_elbow_flex_joint',
-                                                           'r_wrist_flex_joint',
-                                                           'r_wrist_roll_joint',
-                                                           'l_upper_arm_roll_joint',
-                                                           'l_shoulder_pan_joint',
-                                                           'l_shoulder_lift_joint',
-                                                           'l_forearm_roll_joint',
-                                                           'l_elbow_flex_joint',
-                                                           'l_wrist_flex_joint',
-                                                           'l_wrist_roll_joint'],
+                                               arm_joints=[
+                                                   'torso_lift_joint',
+                                                   # 'head_pan_joint',
+                                                   # 'head_tilt_joint',
+                                                   'r_upper_arm_roll_joint',
+                                                   'r_shoulder_pan_joint',
+                                                   'r_shoulder_lift_joint',
+                                                   'r_forearm_roll_joint',
+                                                   'r_elbow_flex_joint',
+                                                   'r_wrist_flex_joint',
+                                                   'r_wrist_roll_joint',
+                                                   'l_upper_arm_roll_joint',
+                                                   'l_shoulder_pan_joint',
+                                                   'l_shoulder_lift_joint',
+                                                   'l_forearm_roll_joint',
+                                                   'l_elbow_flex_joint',
+                                                   'l_wrist_flex_joint',
+                                                   'l_wrist_roll_joint'],
                                                base_joints=['brumbrum'])
         zero_pose.motion_goals.add_motion_goal(motion_goal_class='MaxManipulabilityLinWeight',
                                                root_link='torso_lift_link',

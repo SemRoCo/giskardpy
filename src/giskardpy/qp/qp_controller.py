@@ -214,8 +214,8 @@ class Weights(ProblemDataPart):
                                                             evaluated=self.evaluated)
                     weights[derivative][f't{t:03}/{v.position_name}/{derivative}'] = normalized_weight
                     for q_gain in quadratic_weight_gains:
-                        if v.name in q_gain.gains.keys():
-                            weights[derivative][f't{t:03}/{v.position_name}/{derivative}'] *= quadratic_weight_gains[0].gains[v.name]
+                        if v in q_gain.gains[derivative].keys():
+                            weights[derivative][f't{t:03}/{v.position_name}/{derivative}'] *= quadratic_weight_gains[0].gains[derivative][v]
         for _, weight in sorted(weights.items()):
             params.append(weight)
         return params
@@ -252,8 +252,8 @@ class Weights(ProblemDataPart):
                             continue
                         weights[derivative][f't{t:03}/{v.position_name}/{derivative}'] = 0
                         for l_gains in linear_weight_gains:
-                            if str(v) in l_gains.gains.keys():
-                                weights[derivative][f't{t:03}/{v.position_name}/{derivative}'] += l_gains.gains[str(v)]
+                            if v in l_gains.gains[derivative].keys():
+                                weights[derivative][f't{t:03}/{v.position_name}/{derivative}'] += l_gains.gains[derivative][v]
             for _, weight in sorted(weights.items()):
                 params.append(weight)
             return params

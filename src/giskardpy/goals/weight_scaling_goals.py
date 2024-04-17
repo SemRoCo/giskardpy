@@ -73,6 +73,7 @@ class MaxManipulabilityLinWeight(Goal):
                  gain: float = 0.5,
                  name: Optional[str] = None,
                  prediction_horizon: int = 7,
+                 m_threshold: float = 0.16,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.TrueSymbol
@@ -104,15 +105,11 @@ class MaxManipulabilityLinWeight(Goal):
             J_dq = cas.total_derivative(J, [symbol], [1])
             product = cas.matrix_inverse(JJT).dot(J_dq).dot(J.T)
             trace = cas.trace(product)
-            grad_traces[symbol.name()] = trace * m * -gain
+            grad_traces[symbol.name()] = cas.if_greater(m, m_threshold, 0, trace * m * -gain)
         task.add_linear_weight_gain(name, gains=grad_traces)
 
-        # m = symbol_manager.get_symbol(f'god_map.qp_controller.manipulability_indexes[0]')
-        # old_m = symbol_manager.get_symbol(f'god_map.qp_controller.manipulability_indexes[1]')
-        # percentual_diff = 1 - cas.min(cas.save_division(old_m, m), 1)
-        # # monitor = ExpressionMonitor(name=f'manipMonitor{tip_link}')
-        # monitor = ManipulabilityMonitor(name=f'manipMonitor{tip_link}')
-        # self.add_monitor(monitor)
+        god_map.debug_expression_manager.add_debug_expression(f'mIndex{self.tip_link}', m)
+
 
 
 

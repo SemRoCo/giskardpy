@@ -17,12 +17,17 @@ class WeightGain:
         return str(self._name)
 
 
+class LinearWeightGain(WeightGain):
+    def __init__(self,
+                 name: str,
+                 gains: Dict[str, cas.Expression]):
+        super().__init__(name)
+        self.gains = gains
+
+
 class QuadraticWeightGain(WeightGain):
     def __init__(self,
                  name: str,
-                 free_variable_names: List[str],
                  gains: Dict[str, cas.Expression]):
         super().__init__(name)
-        self.free_variable_names = free_variable_names
         self.gains = gains
-

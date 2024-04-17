@@ -4299,12 +4299,14 @@ class TestManipulability:
         zero_pose.set_cart_goal(p, zero_pose.r_tip, 'map')
         zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulability.__name__,
                                                root_link='torso_lift_link',
-                                               tip_link='r_gripper_tool_frame')
+                                               tip_link='r_gripper_tool_frame',
+                                               optimize_rotational_dofs=False)
         p.pose.position = Point(1, 0.1, 0)
         zero_pose.set_cart_goal(p, zero_pose.l_tip, 'map')
         zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulability.__name__,
                                                root_link='torso_lift_link',
-                                               tip_link='l_gripper_tool_frame')
+                                               tip_link='l_gripper_tool_frame',
+                                               optimize_rotational_dofs=False)
         zero_pose.execute(add_local_minimum_reached=True)
 
 
@@ -4381,7 +4383,8 @@ class TestWeightScaling:
                                                tip_link='l_gripper_tool_frame',
                                                tip_goal=tip_goal,
                                                gain=100000,
-                                               arm_joints=['head_pan_joint',
+                                               arm_joints=['torso_lift_joint',
+                                                           'head_pan_joint',
                                                            'head_tilt_joint',
                                                            'r_upper_arm_roll_joint',
                                                            'r_shoulder_pan_joint',
@@ -4398,19 +4401,46 @@ class TestWeightScaling:
                                                            'l_wrist_flex_joint',
                                                            'l_wrist_roll_joint'],
                                                base_joints=['brumbrum'])
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulability.__name__,
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class='MaxManipulabilityLinWeight',
                                                root_link='torso_lift_link',
-                                               tip_link='l_gripper_tool_frame',
-                                               gain=1,
-                                               name='manip1')
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulability.__name__,
+                                               tip_link='r_gripper_tool_frame')
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class='MaxManipulabilityLinWeight',
                                                root_link='torso_lift_link',
-                                               tip_link='r_gripper_tool_frame',
-                                               gain=1,
-                                               name='manip2')
+                                               tip_link='l_gripper_tool_frame')
         zero_pose.add_default_end_motion_conditions()
         zero_pose.allow_all_collisions()
         zero_pose.execute()
+
+    def test_manip(self, zero_pose: PR2TestWrapper):
+        p = PoseStamped()
+        p.header.stamp = rospy.get_rostime()
+        p.header.frame_id = 'map'
+        p.pose.position = Point(0.8, -0.3, 1)
+        p.pose.orientation = Quaternion(0, 0, 0, 1)
+        zero_pose.allow_all_collisions()
+        zero_pose.set_cart_goal(p, zero_pose.r_tip, 'map')
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class='MaxManipulabilityLinWeight',
+                                               root_link='torso_lift_link',
+                                               tip_link='r_gripper_tool_frame')
+        zero_pose.plan_and_execute()
+
+    def test_manip2(self, zero_pose: PR2TestWrapper):
+        p = PoseStamped()
+        p.header.stamp = rospy.get_rostime()
+        p.header.frame_id = zero_pose.r_tip
+        p.pose.position = Point(1, -0.5, 0)
+        p.pose.orientation = Quaternion(0, 0, 0, 1)
+        zero_pose.allow_all_collisions()
+        zero_pose.set_cart_goal(p, zero_pose.r_tip, 'map')
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class='MaxManipulabilityLinWeight',
+                                               root_link='torso_lift_link',
+                                               tip_link='r_gripper_tool_frame')
+        p.pose.position = Point(1, 0.1, 0)
+        zero_pose.set_cart_goal(p, zero_pose.l_tip, 'map')
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class='MaxManipulabilityLinWeight',
+                                               root_link='torso_lift_link',
+                                               tip_link='l_gripper_tool_frame')
+        zero_pose.plan_and_execute()
 
 # kernprof -lv py.test -s test/test_integration_pr2.py
 # time: [1-9][1-9]*.[1-9]* s

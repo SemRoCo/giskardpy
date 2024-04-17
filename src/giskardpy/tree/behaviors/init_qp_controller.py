@@ -17,7 +17,7 @@ class InitQPController(GiskardBehavior):
     @record_time
     @profile
     def update(self):
-        eq_constraints, neq_constraints, derivative_constraints, manip_constraints, quadratic_weight_gains = god_map.motion_goal_manager.get_constraints_from_goals()
+        eq_constraints, neq_constraints, derivative_constraints, manip_constraints, quadratic_weight_gains, linear_weight_gains = god_map.motion_goal_manager.get_constraints_from_goals()
         free_variables = self.get_active_free_symbols(eq_constraints, neq_constraints, derivative_constraints)
 
         qp_controller = QPProblemBuilder(
@@ -27,6 +27,7 @@ class InitQPController(GiskardBehavior):
             derivative_constraints=list(derivative_constraints.values()),
             manipulability_constraints=list(manip_constraints.values()),
             quadratic_weight_gains=list(quadratic_weight_gains.values()),
+            linear_weight_gains=list(linear_weight_gains.values()),
             sample_period=god_map.qp_controller_config.sample_period,
             prediction_horizon=god_map.qp_controller_config.prediction_horizon,
             solver_id=god_map.qp_controller_config.qp_solver,

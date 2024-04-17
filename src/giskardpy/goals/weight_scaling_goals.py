@@ -38,21 +38,60 @@ class BaseArmWeightScaling(Goal):
         root_P_goal = transform_msg_and_turn_to_expr(self.root_link, tip_goal, cas.TrueSymbol)
         scaling_exp = root_P_goal - root_P_tip
 
-        free_variables = []
         gains = {}
+        arm_v = None
         for name in arm_joints:
             vs = god_map.world.joints[god_map.world.search_for_joint_name(name)].free_variables
             for v in vs:
-                free_variables.append(v.name)
                 v_gain = gain * cas.norm(scaling_exp / v.get_upper_limit(Derivatives.velocity))
                 gains[v.name] = v_gain
+                arm_v = v
+        base_v = None
         for name in base_joints:
             vs = god_map.world.joints[god_map.world.search_for_joint_name(name)].free_variables
             for v in vs:
-                free_variables.append(v.name)
                 v_gain = gain * cas.save_division(1, cas.norm(scaling_exp / v.get_upper_limit(Derivatives.velocity)))
                 gains[v.name] = v_gain
+                base_v = v
 
+        god_map.debug_expression_manager.add_debug_expression('base_scaling', gain * cas.save_division(1, cas.norm(scaling_exp / base_v.get_upper_limit(Derivatives.velocity))))
+        god_map.debug_expression_manager.add_debug_expression('arm_scaling', gain * cas.norm(scaling_exp / arm_v.get_upper_limit(Derivatives.velocity)))
+        god_map.debug_expression_manager.add_debug_expression('norm', cas.norm(scaling_exp))
+        god_map.debug_expression_manager.add_debug_expression('division', 1 / cas.norm(scaling_exp))
         task.add_quadratic_weight_gain('baseToArmScaling',
-                                       free_variable_names=free_variables,
                                        gains=gains)
+
+
+class MaxManipulabilityLinWeight(Goal):
+    def __init__(self,
+                 root_link: str,
+                 tip_link: str,
+                 gain: float = 0.5,
+                 name: Optional[str] = None,
+                 prediction_horizon: int = 7,
+                 start_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 end_condition: cas.Expression = cas.TrueSymbol
+                 ):
+        self.root_link = god_map.world.search_for_link_name(root_link, None)
+        self.tip_link = god_map.world.search_for_link_name(tip_link, None)
+        if name is None:
+            name = f'{self.__class__.__name__}/{self.root_link}/{self.tip_link}'
+        super().__init__(name)
+
+        task = self.create_and_add_task('MaxManipulability')
+        root_P_tip = god_map.world.compose_fk_expression(self.root_link, self.tip_link).to_position()[:3]
+
+        J = cas.jacobian(root_P_tip, root_P_tip.free_symbols())
+        JJT = J.dot(J.T)
+        grad_traces = {}
+        m = cas.sqrt(cas.det(JJT))
+        for symbol in root_P_tip.free_symbols():
+            J_dq = cas.total_derivative(J, [symbol], [1])
+            product = cas.matrix_inverse(JJT).dot(J_dq).dot(J.T)
+            trace = cas.trace(product)
+            grad_traces[symbol.name()] = trace * m * -gain
+        task.add_linear_weight_gain(name, gains=grad_traces)
+
+
+

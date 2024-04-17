@@ -14,7 +14,7 @@ from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, De
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils.decorators import memoize
 from giskardpy.utils.utils import string_shortener
-from giskardpy.qp.weight_gain import QuadraticWeightGain
+from giskardpy.qp.weight_gain import QuadraticWeightGain, LinearWeightGain
 
 WEIGHT_MAX = giskard_msgs.msg.Weights.WEIGHT_MAX
 WEIGHT_ABOVE_CA = giskard_msgs.msg.Weights.WEIGHT_ABOVE_CA
@@ -51,6 +51,7 @@ class Task:
         self._end_condition = cas.TrueSymbol
         self.manip_constraints = {}
         self.quadratic_gains = []
+        self.linear_weight_gains = []
         self._id = -1
 
     @property
@@ -131,6 +132,9 @@ class Task:
     def get_quadratic_gains(self) -> List[QuadraticWeightGain]:
         return self.quadratic_gains
 
+    def get_linear_gains(self) -> List[LinearWeightGain]:
+        return self.linear_weight_gains
+
     def get_state_expression(self) -> cas.Symbol:
         return symbol_manager.get_symbol(f'god_map.motion_goal_manager.task_state[{self.id}]')
 
@@ -159,11 +163,15 @@ class Task:
             output_constraints.append(constraint)
         return output_constraints
 
-    def add_quadratic_weight_gain(self, name: str, free_variable_names: List[str], gains: Dict[str, cas.Expression]):
+    def add_quadratic_weight_gain(self, name: str, gains: Dict[str, cas.Expression]):
         q_gain = QuadraticWeightGain(name=name,
-                                     free_variable_names=free_variable_names,
                                      gains=gains)
         self.quadratic_gains.append(q_gain)
+
+    def add_linear_weight_gain(self, name: str, gains: Dict[str, cas.Expression]):
+        q_gain = LinearWeightGain(name=name,
+                                  gains=gains)
+        self.linear_weight_gains.append(q_gain)
 
     def add_manipulability_constraint(self,
                                       task_expression: cas.symbol_expr,

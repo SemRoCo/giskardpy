@@ -30,7 +30,7 @@ if TYPE_CHECKING:
     from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer, CollisionCheckerLib, \
         CollisionAvoidanceGroupThresholds, Collisions
     from giskardpy.model.world import WorldTree
-    from giskardpy.qp.weight_gain import QuadraticWeightGain
+    from giskardpy.qp.weight_gain import QuadraticWeightGain, LinearWeightGain
 
 
 class GodMap:
@@ -66,6 +66,7 @@ class GodMap:
     derivative_constraints: Dict[str, DerivativeInequalityConstraint]
     manip_constraints: Dict[str, ManipulabilityConstraint]
     quadratic_weight_gains: Dict[str, QuadraticWeightGain]
+    linear_weight_gains: Dict[str, LinearWeightGain]
     hack: float
     fill_trajectory_velocity_values: bool
     ros_visualizer: ROSMsgVisualization

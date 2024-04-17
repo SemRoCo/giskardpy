@@ -2204,3 +2204,7 @@ def is_false(expr):
         return (expr == FalseSymbol).evaluate()
     except Exception as e:
         return False
+
+
+def det(expr):
+    return Expression(ca.det(expr.s))

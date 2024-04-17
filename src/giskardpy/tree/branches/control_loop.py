@@ -37,6 +37,7 @@ class ControlLoop(AsyncBehavior):
         name = f'{name}\nmax_hz: {max_hz}'
         super().__init__(name, max_hz=max_hz)
         self.publish_state = success_is_running(PublishState)('publish state 2')
+        self.publish_state.add_publish_feedback()
         self.projection_synchronization = success_is_running(Synchronization)()
         self.check_monitors = CheckMonitors()
         # projection plugins
@@ -80,6 +81,7 @@ class ControlLoop(AsyncBehavior):
         self.remove_child(self.projection_synchronization)
         self.remove_child(self.time)
         self.remove_child(self.kin_sim)
+        self.publish_state.remove_visualization_marker_behavior()
 
     def remove_closed_loop_behaviors(self):
         self.remove_child(self.closed_loop_synchronization)
@@ -88,6 +90,7 @@ class ControlLoop(AsyncBehavior):
         self.remove_child(self.send_controls)
 
     def add_projection_behaviors(self):
+        self.publish_state.add_visualization_marker_behavior()
         self.insert_child(self.projection_synchronization, 1)
         self.insert_child(self.time, -2)
         self.insert_child(self.kin_sim, -2)

@@ -264,3 +264,43 @@ class JointPositionList(Goal):
                                          task_expression=current)
 
         self.connect_monitors_to_all_tasks(start_condition, hold_condition, end_condition)
+
+
+class JointSignWave(Goal):
+    def __init__(self, name: str, joint_name: str,
+                 frequency: float,
+                 amp_percentage: float,
+                 start_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 end_condition: cas.Expression = cas.TrueSymbol):
+        super().__init__(name=name, start_condition=start_condition, hold_condition=hold_condition,
+                         end_condition=end_condition)
+        joint_name = god_map.world.search_for_joint_name(joint_name)
+        t = self.create_and_add_task('task')
+        joint_symbol = self.get_joint_position_symbol(joint_name)
+        min_, max_ = god_map.world.compute_joint_limits(joint_name, Derivatives.position)
+        _, max_vel = god_map.world.compute_joint_limits(joint_name, Derivatives.velocity)
+        center = (max_ + min_) / 2
+        goal_position = center + cas.sin(symbol_manager.time * 2 * cas.pi * (frequency)) * (max_ - center) * amp_percentage
+        t.add_position_constraint(expr_current=joint_symbol,
+                                  expr_goal=goal_position,
+                                  reference_velocity=max_vel,
+                                  weight=WEIGHT_BELOW_CA)
+        god_map.debug_expression_manager.add_debug_expression('goal', goal_position)
+        self.connect_monitors_to_all_tasks(start_condition, hold_condition, end_condition)
+
+
+class UnlimitedJointGoal(Goal):
+    def __init__(self, name: str, joint_name: str, goal_position: float,
+                 start_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.FalseSymbol, end_condition: cas.Expression = cas.TrueSymbol):
+        super().__init__(name=name, start_condition=start_condition, hold_condition=hold_condition,
+                         end_condition=end_condition)
+        joint_name = god_map.world.search_for_joint_name(joint_name)
+        t = self.create_and_add_task('task')
+        joint_symbol = self.get_joint_position_symbol(joint_name)
+        t.add_position_constraint(expr_current=joint_symbol,
+                                  expr_goal=goal_position,
+                                  reference_velocity=2,
+                                  weight=WEIGHT_BELOW_CA)
+        self.connect_monitors_to_all_tasks(start_condition, hold_condition, end_condition)

@@ -689,7 +689,7 @@ class TestJointGoals:
     def test_joint_goals_at_limits(self, zero_pose: TiagoTestWrapper):
         js1 = {
             'arm_right_5_joint': 3,
-            # 'arm_left_5_joint': -3
+            'arm_left_5_joint': -3
         }
         # zero_pose.set_seed_configuration(start_state)
         zero_pose.set_joint_goal(js1, add_monitor=False, weight=WEIGHT_ABOVE_CA)

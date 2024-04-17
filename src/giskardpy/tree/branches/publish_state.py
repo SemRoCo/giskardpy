@@ -4,6 +4,7 @@ from py_trees import Sequence
 
 from giskardpy.tree.behaviors.debug_marker_publisher import DebugMarkerPublisher
 from giskardpy.tree.behaviors.publish_debug_expressions import PublishDebugExpressions
+from giskardpy.tree.behaviors.publish_feedback import PublishFeedback
 from giskardpy.tree.behaviors.publish_joint_states import PublishJointState
 from giskardpy.tree.behaviors.tf_publisher import TfPublishingModes, TFPublisher
 from giskardpy.tree.behaviors.visualization import VisualizationBehavior
@@ -30,6 +31,9 @@ class PublishState(Sequence):
     def add_debug_marker_publisher(self):
         self.add_child(DebugMarkerPublisher())
 
+    def add_publish_feedback(self):
+        self.add_child(PublishFeedback())
+
     def add_tf_publisher(self, include_prefix: bool = False, tf_topic: str = 'tf',
                          mode: TfPublishingModes = TfPublishingModes.attached_and_world_objects):
         node = TFPublisher('publish tf', mode=mode, tf_topic=tf_topic, include_prefix=include_prefix)
@@ -52,6 +56,8 @@ class PublishState(Sequence):
                                        publish_debug=publish_debug)
         self.add_child(node)
 
-    def add_joint_state_publisher(self, topic_name: Optional[str] = None, include_prefix: bool = False):
-        node = PublishJointState(include_prefix=include_prefix, topic_name=topic_name)
+    def add_joint_state_publisher(self, topic_name: Optional[str] = None, include_prefix: bool = False,
+                                  only_prismatic_and_revolute: bool = True):
+        node = PublishJointState(include_prefix=include_prefix, topic_name=topic_name,
+                                 only_prismatic_and_revolute=only_prismatic_and_revolute)
         self.add_child(node)

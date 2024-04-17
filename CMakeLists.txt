@@ -169,7 +169,9 @@ catkin_install_python(PROGRAMS
 	scripts/iai_robots/hsr/hsr_standalone.py
 	scripts/iai_robots/hsr/iai_hsr.py
 	scripts/iai_robots/hsr/iai_hsr_real_time.py
+	scripts/iai_robots/hsr/iai_hsr_mujoco.py
 	scripts/iai_robots/pr2/iai_pr2.py
+	scripts/iai_robots/pr2/iai_pr2_vel_controllers.py
 	scripts/iai_robots/pr2/pr2_mujoco.py
 	scripts/iai_robots/pr2/pr2_mujoco_vel.py
 	scripts/iai_robots/pr2/pr2_standalone.py

@@ -14,8 +14,9 @@ class OldGiskardWrapper(GiskardWrapper):
     def __init__(self, node_name: str = 'giskard'):
         super().__init__(node_name, avoid_name_conflict=True)
 
-    def execute(self, wait: bool = True) -> MoveResult:
-        self.add_default_end_motion_conditions()
+    def execute(self, wait: bool = True, add_default: bool = True) -> MoveResult:
+        if add_default:
+            self.add_default_end_motion_conditions()
         return super().execute(wait)
 
     def projection(self, wait: bool = True) -> MoveResult:
@@ -788,7 +789,7 @@ class OldGiskardWrapper(GiskardWrapper):
         :param root_link_group_name: Name of the group root_link_name belongs to
         :return: WorldResult
         """
-        return self.register_group(new_group_name=new_group_name,
+        return self.world.register_group(new_group_name=new_group_name,
                                    root_link_name=root_link_name,
                                    root_link_group_name=root_link_group_name)
 

@@ -18,7 +18,7 @@ from giskardpy.data_types import Derivatives
 from giskardpy.qp.constraint import InequalityConstraint, EqualityConstraint, DerivativeInequalityConstraint
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.next_command import NextCommands
-from giskardpy.qp.pos_in_vel_limits import b_profile
+from giskardpy.qp.pos_in_vel_limits import b_profile, implicit_vel_profile
 from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils import logging
@@ -298,6 +298,7 @@ class FreeVariableBounds(ProblemDataPart):
                          max_derivative=max_derivative)
         self.evaluated = True
 
+    @profile
     def velocity_limit(self, v: FreeVariable):
         current_position = v.get_symbol(Derivatives.position)
         lower_velocity_limit = v.get_lower_limit(Derivatives.velocity, evaluated=True)
@@ -310,6 +311,15 @@ class FreeVariableBounds(ProblemDataPart):
         lower_jerk_limit = v.get_lower_limit(Derivatives.jerk, evaluated=True)
         upper_jerk_limit = v.get_upper_limit(Derivatives.jerk, evaluated=True)
 
+        max_reachable_vel = giskard_math.max_velocity_from_horizon_and_jerk(self.prediction_horizon,
+                                                                            upper_jerk_limit, self.dt)
+        if max_reachable_vel < upper_velocity_limit:
+            error_msg = f'Free variable "{v.name}" can\'t reach velocity limit of "{upper_velocity_limit}". ' \
+                        f'Maximum reachable with prediction horizon = "{self.prediction_horizon}", ' \
+                        f'jerk limit = "{upper_jerk_limit}" and dt = "{self.dt}" is "{max_reachable_vel}".'
+            logging.logerr(error_msg)
+            raise VelocityLimitUnreachableException(error_msg)
+
         if not v.has_position_limits():
             lb = cas.Expression([lower_velocity_limit] * self.prediction_horizon
                                 + [lower_acc_limit] * self.prediction_horizon
@@ -317,33 +327,44 @@ class FreeVariableBounds(ProblemDataPart):
             ub = cas.Expression([upper_velocity_limit] * self.prediction_horizon
                                 + [upper_acc_limit] * self.prediction_horizon
                                 + [upper_jerk_limit] * self.prediction_horizon)
-            return lb, ub
+        else:
+            lower_limit = v.get_lower_limit(Derivatives.position, evaluated=True)
+            upper_limit = v.get_upper_limit(Derivatives.position, evaluated=True)
 
-        lower_limit = v.get_lower_limit(Derivatives.position, evaluated=True)
-        upper_limit = v.get_upper_limit(Derivatives.position, evaluated=True)
-
-        try:
-            lb, ub = b_profile(current_pos=current_position,
-                               current_vel=current_vel,
-                               current_acc=current_acc,
-                               pos_limits=(lower_limit, upper_limit),
-                               vel_limits=(lower_velocity_limit, upper_velocity_limit),
-                               acc_limits=(lower_acc_limit, upper_acc_limit),
-                               jerk_limits=(lower_jerk_limit, upper_jerk_limit),
-                               dt=self.dt,
-                               ph=self.prediction_horizon)
-        except InfeasibleException as e:
-            max_reachable_vel = giskard_math.max_velocity_from_horizon_and_jerk(self.prediction_horizon,
-                                                                                upper_jerk_limit, self.dt)
-            if max_reachable_vel < upper_velocity_limit:
-                error_msg = f'Free variable "{v.name}" can\'t reach velocity limit of "{upper_velocity_limit}". ' \
-                            f'Maximum reachable with prediction horizon = "{self.prediction_horizon}", ' \
-                            f'jerk limit = "{upper_jerk_limit}" and dt = "{self.dt}" is "{max_reachable_vel}".'
-                logging.logerr(error_msg)
-                raise VelocityLimitUnreachableException(error_msg)
-            else:
-                raise
-
+            try:
+                lb, ub = b_profile(current_pos=current_position,
+                                   current_vel=current_vel,
+                                   current_acc=current_acc,
+                                   pos_limits=(lower_limit, upper_limit),
+                                   vel_limits=(lower_velocity_limit, upper_velocity_limit),
+                                   acc_limits=(lower_acc_limit, upper_acc_limit),
+                                   jerk_limits=(lower_jerk_limit, upper_jerk_limit),
+                                   dt=self.dt,
+                                   ph=self.prediction_horizon)
+            except InfeasibleException as e:
+                max_reachable_vel = giskard_math.max_velocity_from_horizon_and_jerk(self.prediction_horizon,
+                                                                                    upper_jerk_limit, self.dt)
+                if max_reachable_vel < upper_velocity_limit:
+                    error_msg = f'Free variable "{v.name}" can\'t reach velocity limit of "{upper_velocity_limit}". ' \
+                                f'Maximum reachable with prediction horizon = "{self.prediction_horizon}", ' \
+                                f'jerk limit = "{upper_jerk_limit}" and dt = "{self.dt}" is "{max_reachable_vel}".'
+                    logging.logerr(error_msg)
+                    raise VelocityLimitUnreachableException(error_msg)
+                else:
+                    raise
+        # %% set velocity limits to infinite, that can't be reached due to acc/jerk limits anyway
+        unlimited_vel_profile = implicit_vel_profile(acc_limit=upper_acc_limit,
+                                                     jerk_limit=upper_jerk_limit,
+                                                     dt=self.dt,
+                                                     ph=self.prediction_horizon)
+        for i in range(self.prediction_horizon):
+            ub[i] = cas.if_less(ub[i], unlimited_vel_profile[i], ub[i], np.inf)
+        unlimited_vel_profile = implicit_vel_profile(acc_limit=-lower_acc_limit,
+                                                     jerk_limit=-lower_jerk_limit,
+                                                     dt=self.dt,
+                                                     ph=self.prediction_horizon)
+        for i in range(self.prediction_horizon):
+            lb[i] = cas.if_less(-lb[i], unlimited_vel_profile[i], lb[i], -np.inf)
         return lb, ub
 
     @profile
@@ -626,35 +647,21 @@ class EqualityModel(ProblemDataPart):
     @profile
     def derivative_link_model(self) -> cas.Expression:
         """
-        |   t1   |   t2   |   t3   |   t1   |   t2   |   t3   |   t1   |   t2   |   t3   | prediction horizon
-        |v1 v2 v3|v1 v2 v3|v1 v2 v3|a1 a2 a3|a1 a2 a3|a1 a2 a3|j1 j2 j3|j1 j2 j3|j1 j2 j3| free variables / slack
-        |--------------------------------------------------------------------------------|
-        | 1      |        |        |-sp     |        |        |        |        |        | # v_n - a_n * dt = last vel
-        |    1   |        |        |   -sp  |        |        |        |        |        | = last velocity
-        |       1|        |        |     -sp|        |        |        |        |        |
-        |--------------------------------------------------------------------------------|
-        |-1      | 1      |        |        |-sp     |        |        |        |        | # -v_c + v_n - a_n * dt = 0
-        |   -1   |    1   |        |        |   -sp  |        |        |        |        | = 0
-        |      -1|       1|        |        |     -sp|        |        |        |        |
-        |--------------------------------------------------------------------------------|
-        |        |-1      | 1      |        |        |-sp     |        |        |        | # -v_c + v_n - a_n * dt = 0
-        |        |   -1   |    1   |        |        |   -sp  |        |        |        | = 0
-        |        |      -1|       1|        |        |     -sp|        |        |        |
-        |================================================================================|
-        |        |        |        | 1      |        |        |-sp     |        |        | # a_n - j_n * dt = last acc
-        |        |        |        |    1   |        |        |   -sp  |        |        | = last acceleration
-        |        |        |        |       1|        |        |     -sp|        |        |
-        |--------------------------------------------------------------------------------|
-        |        |        |        |-1      | 1      |        |        |-sp     |        | # -a_c + a_n - j_n * dt = 0
-        |        |        |        |   -1   |    1   |        |        |   -sp  |        | = 0
-        |        |        |        |      -1|       1|        |        |     -sp|        |
-        |--------------------------------------------------------------------------------|
-        |        |        |        |        |-1      | 1      |        |        |-sp     | # -a_c + a_n - j_n * dt = 0
-        |        |        |        |        |   -1   |    1   |        |        |   -sp  | = 0
-        |        |        |        |        |      -1|       1|        |        |     -sp|
-        |--------------------------------------------------------------------------------|
-        x_n - xd_n * dt = x_c
-        - x_c + x_n - xd_n * dt = 0
+        Layout for prediction horizon 5
+        Slots are matrices of |controlled variables| x |controlled variables|
+        | vt0 | vt1 | vt2 | at0 | at1 | at2 | at3 | jt0 | jt1 | jt2 | jt3 | jt4 |
+        |-----------------------------------------------------------------------|
+        |  1  |     |     | -dt |     |     |     |     |     |     |     |     | last_v =  vt0 - at0*dt
+        | -1  |  1  |     |     | -dt |     |     |     |     |     |     |     |      0 = -vt0 + vt1 - at1 * dt
+        |     | -1  |  1  |     |     | -dt |     |     |     |     |     |     |      0 = -vt1 + vt2 - at2 * dt
+        |     |     | -1  |     |     |     | -dt |     |     |     |     |     |      0 = -vt2 + vt3 - at3 * dt
+        |=======================================================================|
+        |     |     |     |  1  |     |     |     | -dt |     |     |     |     | last_a =  at0 - jt0*dt
+        |     |     |     | -1  |  1  |     |     |     | -dt |     |     |     |      0 = -at0 + at1 - jt1 * dt
+        |     |     |     |     | -1  |  1  |     |     |     | -dt |     |     |      0 = -at1 + at2 - jt2 * dt
+        |     |     |     |     |     | -1  |  1  |     |     |     | -dt |     |      0 = -at2 + at3 - jt3 * dt
+        |     |     |     |     |     |     | -1  |     |     |     |     | -dt |      0 = -at3 + at4 - jt4 * dt
+        |-----------------------------------------------------------------------|
         """
         num_rows = self.number_of_free_variables * self.prediction_horizon * (self.max_derivative - 1)
         num_columns = self.number_of_free_variables * self.prediction_horizon * self.max_derivative
@@ -1164,26 +1171,16 @@ class QPProblemBuilder:
         return self.qp_solver.free_symbols_str
 
     def save_all_pandas(self, folder_name: Optional[str] = None):
-        if hasattr(self, 'p_xdot') and self.p_xdot is not None:
-            save_pandas(
-                [self.p_weights, self.p_lb, self.p_ub,
-                 self.p_E, self.p_bE,
-                 self.p_A, self.p_lbA, self.p_ubA,
-                 god_map.debug_expression_manager.to_pandas(), self.p_xdot],
-                ['weights', 'lb', 'ub', 'E', 'bE', 'A', 'lbA', 'ubA', 'debug', 'xdot'],
-                god_map.giskard.tmp_folder,
-                god_map.time,
-                folder_name)
-        else:
-            save_pandas(
-                [self.p_weights, self.p_lb, self.p_ub,
-                 self.p_E, self.p_bE,
-                 self.p_A, self.p_lbA, self.p_ubA,
-                 god_map.debug_expression_manager.to_pandas()],
-                ['weights', 'lb', 'ub', 'E', 'bE', 'A', 'lbA', 'ubA', 'debug'],
-                god_map.giskard.tmp_folder,
-                god_map.time,
-                folder_name)
+        self._create_debug_pandas(self.qp_solver)
+        save_pandas(
+            [self.p_weights, self.p_b,
+             self.p_E, self.p_bE,
+             self.p_A, self.p_lbA, self.p_ubA,
+             god_map.debug_expression_manager.to_pandas(), self.p_xdot],
+            ['weights', 'b', 'E', 'bE', 'A', 'lbA', 'ubA', 'debug'],
+            god_map.giskard.tmp_folder,
+            god_map.time,
+            folder_name)
 
     def _print_pandas_array(self, array):
         import pandas as pd
@@ -1248,7 +1245,7 @@ class QPProblemBuilder:
             logging.loginfo('start position not found in state')
             start_pos = 0
         ts = np.array([(i + 1) * sample_period for i in range(self.prediction_horizon)])
-        filtered_x = self.p_xdot.filter(like=f'{joint_name}', axis=0)
+        filtered_x = self.p_xdot.filter(like=f'/{joint_name}/', axis=0)
         vel_end = self.prediction_horizon - self.order + 1
         acc_end = vel_end + self.prediction_horizon - self.order + 2
         velocities = filtered_x[:vel_end].values
@@ -1372,6 +1369,7 @@ class QPProblemBuilder:
 
         else:
             self.p_xdot = None
+        self.p_debug = god_map.debug_expression_manager.to_pandas()
 
     def _print_iis(self):
         result = self.qp_solver.analyze_infeasibility()

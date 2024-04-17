@@ -5,6 +5,7 @@ from typing import Optional
 import numpy as np
 from geometry_msgs.msg import PointStamped, PoseStamped, QuaternionStamped
 from geometry_msgs.msg import Vector3Stamped
+from std_msgs.msg import ColorRGBA
 from tf.transformations import rotation_from_matrix
 
 from giskardpy import casadi_wrapper as cas
@@ -55,6 +56,10 @@ class CartesianPosition(Goal):
                                         frame_P_current=r_P_c,
                                         reference_velocity=self.reference_velocity,
                                         weight=self.weight)
+        god_map.debug_expression_manager.add_debug_expression(f'{self.name}/current_point', r_P_c,
+                                                              color=ColorRGBA(r=1, g=0, b=0, a=1))
+        god_map.debug_expression_manager.add_debug_expression(f'{self.name}/goal_point', root_P_goal,
+                                                              color=ColorRGBA(r=0, g=0, b=1, a=1))
         self.connect_monitors_to_all_tasks(start_condition=start_condition, hold_condition=hold_condition,
                                            end_condition=end_condition)
 
@@ -74,7 +79,8 @@ class CartesianOrientation(Goal):
                  absolute: bool = False,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.TrueSymbol):
+                 end_condition: cas.Expression = cas.TrueSymbol,
+                 point_of_debug_matrix: Optional[PointStamped] = None):
         """
         See CartesianPose.
         """
@@ -89,11 +95,13 @@ class CartesianOrientation(Goal):
         self.weight = weight
 
         if absolute:
-            root_R_goal = transform_msg_and_turn_to_expr(self.root_link, goal_orientation, cas.TrueSymbol)
+            update_condition = cas.TrueSymbol
         else:
-            root_R_goal = transform_msg_and_turn_to_expr(self.root_link, goal_orientation, start_condition)
+            update_condition = start_condition
+        root_R_goal = transform_msg_and_turn_to_expr(self.root_link, goal_orientation, update_condition)
 
-        r_R_c = god_map.world.compose_fk_expression(self.root_link, self.tip_link).to_rotation()
+        r_T_c = god_map.world.compose_fk_expression(self.root_link, self.tip_link)
+        r_R_c = r_T_c.to_rotation()
         c_R_r_eval = god_map.world.compose_fk_evaluated_expression(self.tip_link, self.root_link).to_rotation()
 
         task = self.create_and_add_task()
@@ -102,6 +110,13 @@ class CartesianOrientation(Goal):
                                            current_R_frame_eval=c_R_r_eval,
                                            reference_velocity=self.reference_velocity,
                                            weight=self.weight)
+        if point_of_debug_matrix is None:
+            point = r_T_c.to_position()
+        else:
+            point = transform_msg_and_turn_to_expr(self.root_link, point_of_debug_matrix, update_condition)
+        debug_trans_matrix = cas.TransMatrix.from_point_rotation_matrix(point=point,
+                                                                        rotation_matrix=root_R_goal)
+        god_map.debug_expression_manager.add_debug_expression(f'{self.name}/goal_orientation', debug_trans_matrix)
         self.connect_monitors_to_all_tasks(start_condition, hold_condition, end_condition)
 
 
@@ -171,7 +186,10 @@ class CartesianPositionStraight(Goal):
                                             names=['line/x',
                                                    'line/y',
                                                    'line/z'])
-
+        god_map.debug_expression_manager.add_debug_expression(f'{self.name}/current_point', root_P_tip,
+                                                              color=ColorRGBA(r=1, g=0, b=0, a=1))
+        god_map.debug_expression_manager.add_debug_expression(f'{self.name}/goal_point', root_P_goal,
+                                                              color=ColorRGBA(r=0, g=0, b=1, a=1))
         self.connect_monitors_to_all_tasks(start_condition, hold_condition, end_condition)
 
 
@@ -244,7 +262,8 @@ class CartesianPose(Goal):
                                                           absolute=absolute,
                                                           start_condition=start_condition,
                                                           hold_condition=hold_condition,
-                                                          end_condition=end_condition))
+                                                          end_condition=end_condition,
+                                                          point_of_debug_matrix=goal_point))
 
 
 class DiffDriveBaseGoal(Goal):
@@ -421,7 +440,8 @@ class CartesianPoseStraight(Goal):
                                                           weight=weight,
                                                           start_condition=start_condition,
                                                           hold_condition=hold_condition,
-                                                          end_condition=end_condition))
+                                                          end_condition=end_condition,
+                                                          point_of_debug_matrix=goal_point))
 
 
 class TranslationVelocityLimit(Goal):
@@ -443,7 +463,6 @@ class TranslationVelocityLimit(Goal):
         self.max_velocity = max_velocity
 
         r_P_c = god_map.world.compose_fk_expression(self.root_link, self.tip_link).to_position()
-        # self.add_debug_expr('limit', -self.max_velocity)
         task = self.create_and_add_task('limit translation vel')
         if not self.hard:
             task.add_translational_velocity_limit(frame_P_current=r_P_c,

@@ -121,7 +121,7 @@ class MonitorManager:
                 return monitor
         raise GiskardException('No monitor found.')
 
-    def format_condition(self, condition: cas.Expression) -> str:
+    def format_condition(self, condition: cas.Expression, new_line: str = '\n') -> str:
         """
         Takes a logical expression, replaces the state symbols with monitor names and formats it nicely.
         """
@@ -130,8 +130,8 @@ class MonitorManager:
             return str(cas.is_true(condition))
         condition = str(condition)
         state_to_monitor_map = {str(x): f'\'{self.get_monitor_from_state_expr(x).name}\'' for x in free_symbols}
-        state_to_monitor_map['&&'] = '\nand '
-        state_to_monitor_map['||'] = '\nor '
+        state_to_monitor_map['&&'] = f'{new_line}and '
+        state_to_monitor_map['||'] = f'{new_line}or '
         state_to_monitor_map['!'] = 'not '
         for state_str, monitor_name in state_to_monitor_map.items():
             condition = condition.replace(state_str, monitor_name)

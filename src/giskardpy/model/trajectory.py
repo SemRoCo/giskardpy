@@ -106,9 +106,12 @@ class Trajectory:
                     data[derivative][free_variable].append(state)
         for derivative, d_data in data.items():
             for free_variable, trajectory in d_data.items():
-                d_data[free_variable] = np.array(trajectory)
+                d_data[free_variable] = np.array(trajectory, dtype=float)
+                if (free_variable in god_map.world.free_variables
+                        and not god_map.world.free_variables[free_variable].has_position_limits()):
+                    normalize_position = True
                 if normalize_position and derivative == Derivatives.position:
-                    d_data[free_variable] -= (d_data[free_variable].max() + d_data[free_variable].min()) / 2
+                    d_data[free_variable] -= (d_data[free_variable].max() + d_data[free_variable].min()) / 2.
         if filter_0_vel:
             for free_variable, trajectory in list(data[Derivatives.velocity].items()):
                 if abs(trajectory.max() - trajectory.min()) < 1e-5:

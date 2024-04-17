@@ -5,42 +5,13 @@ from typing import List, Optional, Dict, Tuple
 
 import numpy as np
 import rospy
-from std_msgs.msg import Float64
-from sensor_msgs.msg import JointState
 
 from giskard_msgs.msg import MoveResult, GiskardError
 from giskardpy.exceptions import GiskardException, MonitorInitalizationException
-from giskardpy.monitors.monitors import Monitor
+from giskardpy.monitors.monitors import Monitor, PayloadMonitor, CancelMotion
 from giskardpy.god_map import god_map
 from giskardpy.utils import logging
 import giskardpy.casadi_wrapper as cas
-
-
-class PayloadMonitor(Monitor, ABC):
-    state: bool
-    run_call_in_thread: bool
-
-    def __init__(self, *,
-                 run_call_in_thread: bool,
-                 name: Optional[str] = None,
-                 stay_true: bool = True,
-                 start_condition: cas.Expression = cas.TrueSymbol):
-        """
-        A monitor which executes its __call__ function when start_condition becomes True.
-        Subclass this and implement __init__ and __call__. The __call__ method should change self.state to True when
-        it's done.
-        :param run_call_in_thread: if True, calls __call__ in a separate thread. Use for expensive operations
-        """
-        self.state = False
-        self.run_call_in_thread = run_call_in_thread
-        super().__init__(name=name, start_condition=start_condition, stay_true=stay_true)
-
-    def get_state(self) -> bool:
-        return self.state
-
-    @abc.abstractmethod
-    def __call__(self):
-        pass
 
 
 class WorldUpdatePayloadMonitor(PayloadMonitor):
@@ -61,45 +32,13 @@ class WorldUpdatePayloadMonitor(PayloadMonitor):
         self.state = True
 
 
-class EndMotion(PayloadMonitor):
-    def __init__(self,
-                 name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol,):
-        super().__init__(name=name, start_condition=start_condition, run_call_in_thread=False)
-
-    def __call__(self):
-        self.state = True
-
-    def get_state(self) -> bool:
-        return self.state
-
-
-class CancelMotion(PayloadMonitor):
-    def __init__(self,
-                 error_message: str,
-                 error_code: int = GiskardError.ERROR,
-                 name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol,):
-        super().__init__(name=name, start_condition=start_condition, run_call_in_thread=False)
-        self.error_message = error_message
-        self.error_code = error_code
-
-    @profile
-    def __call__(self):
-        self.state = True
-        raise GiskardException.from_error_code(error_code=self.error_code, error_message=self.error_message)
-
-    def get_state(self) -> bool:
-        return self.state
-
-
 class SetMaxTrajectoryLength(CancelMotion):
     new_length: float
 
     def __init__(self,
                  new_length: Optional[float] = None,
                  name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol,):
+                 start_condition: cas.Expression = cas.TrueSymbol, ):
         if not (start_condition == cas.TrueSymbol).evaluate():
             raise MonitorInitalizationException(f'Cannot set start_condition for {SetMaxTrajectoryLength.__name__}')
         if new_length is None:
@@ -191,63 +130,3 @@ class PayloadAlternator(PayloadMonitor):
 
     def __call__(self):
         self.state = np.floor(god_map.time) % self.mod == 0
-
-
-class CloseGripper(PayloadMonitor):
-    def __init__(self,
-                 name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 effort: int = -180,
-                 pub_topic='hsrb4s/hand_motor_joint_velocity_controller/command',
-                 joint_state_topic='hsrb4s/joint_states',
-                 velocity_threshold=0.1,
-                 effort_threshold=-1,
-                 joint_name='hand_motor_joint',
-                 as_open=False,
-                 motion_goal_name=None
-                 ):
-        super().__init__(name=name, start_condition=start_condition, run_call_in_thread=False, stay_true=False)
-        self.pub = rospy.Publisher(pub_topic, Float64, queue_size=1)
-        self.effort = 0
-        self.velocity_threshold = velocity_threshold
-        rospy.Subscriber(joint_state_topic, JointState, self.callback)
-        self.joint_name = joint_name
-        self.effort_threshold = effort_threshold
-        self.effort_cmd = effort
-        self.as_open = as_open
-        self.msg = Float64()
-        self.msg.data = effort
-        self.motion_goal_name = motion_goal_name
-        self.msg_e = Float64()
-        self.msg_e.data = 0
-        if self.as_open:
-            self.cmd = 'putdown'
-        else:
-            self.cmd = 'pickup'
-        self.stopped = False
-
-    def __call__(self, *args, **kwargs):
-        # read motion goal state from the godmap to publish zero once
-        is_active = god_map.motion_goal_manager.motion_goals[self.motion_goal_name].all_commands[self.cmd]
-        if is_active:
-            self.pub.publish(self.msg)
-            self.stopped = False
-        elif self.as_open and not is_active and not self.stopped:
-            self.pub.publish(self.msg_e)
-            self.stopped = True
-
-        if not self.as_open and self.effort < self.effort_threshold:
-            self.state = True
-        elif self.as_open and self.effort > self.effort_threshold:
-            self.state = True
-        else:
-            self.state = False
-
-    def callback(self, joints: JointState):
-        for name, effort, velocity in zip(joints.name, joints.effort, joints.velocity):
-            if self.joint_name in name:
-                if abs(velocity) < self.velocity_threshold:
-                    self.effort = effort
-                else:
-                    self.effort = 0
-        # self.pub.publish(self.msg)

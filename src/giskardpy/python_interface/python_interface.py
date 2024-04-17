@@ -28,10 +28,10 @@ from giskardpy.model.utils import make_world_body_box
 from giskardpy.monitors.cartesian_monitors import PoseReached, PositionReached, OrientationReached, PointingAt, \
     VectorsAligned, DistanceToLine
 from giskardpy.monitors.joint_monitors import JointGoalReached
-from giskardpy.monitors.monitors import LocalMinimumReached, TimeAbove, Alternator
-from giskardpy.monitors.payload_monitors import EndMotion, Print, Sleep, CancelMotion, SetMaxTrajectoryLength, \
+from giskardpy.monitors.monitors import LocalMinimumReached, TimeAbove, Alternator, CancelMotion, EndMotion
+from giskardpy.monitors.payload_monitors import Print, Sleep, SetMaxTrajectoryLength, \
     UpdateParentLinkOfGroup, PayloadAlternator
-from giskardpy.utils.utils import kwargs_to_json
+from giskardpy.utils.utils import kwargs_to_json, get_all_classes_in_package
 
 
 class WorldWrapper:
@@ -1045,7 +1045,11 @@ class MonitorWrapper:
         return self._monitors
 
     def get_anded_monitor_names(self) -> str:
-        return ' and '.join(f'\'{monitor.name}\'' for monitor in self._monitors)
+        non_cancel_monitors = []
+        for monitor in self._monitors:
+            if monitor.monitor_class not in get_all_classes_in_package('giskardpy.monitors', CancelMotion):
+                non_cancel_monitors.append(f'\'{monitor.name}\'')
+        return ' and '.join(non_cancel_monitors)
 
     def reset(self):
         self._monitors = []

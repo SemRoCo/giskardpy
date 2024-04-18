@@ -22,7 +22,7 @@ from giskardpy.data_types import JointStates
 from giskardpy.god_map import god_map
 from giskardpy.tasks.task import WEIGHT_BELOW_CA
 from test_integration_pr2 import PR2TestWrapper, TestJointGoals, pocky_pose
-
+from giskardpy.goals.weight_scaling_goals import MaxManipulabilityLinWeight
 
 class PR2TestWrapperMujoco(PR2TestWrapper):
     better_pose = {'r_shoulder_pan_joint': -1.7125,
@@ -602,7 +602,7 @@ class TestManipulability:
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.allow_all_collisions()
         zero_pose.set_cart_goal(p, zero_pose.r_tip, 'map')
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class='MaxManipulabilityLinWeight',
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulabilityLinWeight.__name__,
                                                root_link='torso_lift_link',
                                                tip_link='r_gripper_tool_frame',
                                                gain=1)

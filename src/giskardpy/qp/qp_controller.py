@@ -215,7 +215,7 @@ class Weights(ProblemDataPart):
                     weights[derivative][f't{t:03}/{v.position_name}/{derivative}'] = normalized_weight
                     for q_gain in quadratic_weight_gains:
                         if v in q_gain.gains[derivative].keys():
-                            weights[derivative][f't{t:03}/{v.position_name}/{derivative}'] *= quadratic_weight_gains[0].gains[derivative][v]
+                            weights[derivative][f't{t:03}/{v.position_name}/{derivative}'] *= q_gain.gains[derivative][v]
         for _, weight in sorted(weights.items()):
             params.append(weight)
         return params
@@ -1157,8 +1157,7 @@ class QPProblemBuilder:
 
         qp_solver = solver_class(weights=weights, g=g, lb=lb, ub=ub,
                                  E=E, E_slack=E_slack, bE=bE,
-                                 A=A, A_slack=A_slack, lbA=lbA, ubA=ubA,
-                                 constraint_jacobian=None, grad_traces=None
+                                 A=A, A_slack=A_slack, lbA=lbA, ubA=ubA
                                  )
         # self.goal_reached_checks.compile(qp_solver.free_symbols)
         logging.loginfo('Done compiling controller:')

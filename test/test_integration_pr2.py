@@ -39,6 +39,7 @@ from giskardpy.utils.utils import launch_launchfile, suppress_stderr, resolve_ro
 from giskardpy.utils.math import compare_points
 from utils_for_tests import compare_poses, publish_marker_vector, \
     GiskardTestWrapper, pr2_urdf
+from giskardpy.goals.weight_scaling_goals import MaxManipulabilityLinWeight, BaseArmWeightScaling
 
 # scopes = ['module', 'class', 'function']
 pocky_pose = {'r_elbow_flex_joint': -1.29610152504,
@@ -4307,7 +4308,7 @@ class TestManipulability:
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.allow_all_collisions()
         zero_pose.set_cart_goal(p, zero_pose.r_tip, 'map')
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class='MaxManipulabilityLinWeight',
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulabilityLinWeight.__name__,
                                                root_link='torso_lift_link',
                                                tip_link='r_gripper_tool_frame')
         zero_pose.plan_and_execute()
@@ -4320,12 +4321,12 @@ class TestManipulability:
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.allow_all_collisions()
         zero_pose.set_cart_goal(p, zero_pose.r_tip, 'map')
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class='MaxManipulabilityLinWeight',
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulabilityLinWeight.__name__,
                                                root_link='torso_lift_link',
                                                tip_link='r_gripper_tool_frame')
         p.pose.position = Point(1, 0.1, 0)
         zero_pose.set_cart_goal(p, zero_pose.l_tip, 'map')
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class='MaxManipulabilityLinWeight',
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulabilityLinWeight.__name__,
                                                root_link='torso_lift_link',
                                                tip_link='l_gripper_tool_frame')
         zero_pose.execute(add_local_minimum_reached=True)
@@ -4399,7 +4400,7 @@ class TestWeightScaling:
         tip_goal = PointStamped()
         tip_goal.header.frame_id = 'map'
         tip_goal.point = goal_pose.pose.position
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class='BaseArmWeightScaling',
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class=BaseArmWeightScaling.__name__,
                                                root_link='map',
                                                tip_link='l_gripper_tool_frame',
                                                tip_goal=tip_goal,
@@ -4423,10 +4424,10 @@ class TestWeightScaling:
                                                    'l_wrist_flex_joint',
                                                    'l_wrist_roll_joint'],
                                                base_joints=['brumbrum'])
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class='MaxManipulabilityLinWeight',
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulabilityLinWeight.__name__,
                                                root_link='torso_lift_link',
                                                tip_link='r_gripper_tool_frame')
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class='MaxManipulabilityLinWeight',
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulabilityLinWeight.__name__,
                                                root_link='torso_lift_link',
                                                tip_link='l_gripper_tool_frame')
         zero_pose.add_default_end_motion_conditions()
@@ -4441,7 +4442,7 @@ class TestWeightScaling:
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.allow_all_collisions()
         zero_pose.set_cart_goal(p, zero_pose.r_tip, 'map')
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class='MaxManipulabilityLinWeight',
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulabilityLinWeight.__name__,
                                                root_link='torso_lift_link',
                                                tip_link='r_gripper_tool_frame')
         zero_pose.plan_and_execute()
@@ -4454,12 +4455,12 @@ class TestWeightScaling:
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.allow_all_collisions()
         zero_pose.set_cart_goal(p, zero_pose.r_tip, 'map')
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class='MaxManipulabilityLinWeight',
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulabilityLinWeight.__name__,
                                                root_link='torso_lift_link',
                                                tip_link='r_gripper_tool_frame')
         p.pose.position = Point(1, 0.1, 0)
         zero_pose.set_cart_goal(p, zero_pose.l_tip, 'map')
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class='MaxManipulabilityLinWeight',
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulabilityLinWeight.__name__,
                                                root_link='torso_lift_link',
                                                tip_link='l_gripper_tool_frame')
         zero_pose.plan_and_execute()

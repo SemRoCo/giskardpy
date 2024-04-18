@@ -4454,6 +4454,7 @@ class TestWeightScaling:
                    0] >= m_threshold
 
     def test_manip2(self, zero_pose: PR2TestWrapper):
+        m_threshold = 0.16
         p = PoseStamped()
         p.header.stamp = rospy.get_rostime()
         p.header.frame_id = zero_pose.r_tip

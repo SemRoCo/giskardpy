@@ -2,6 +2,7 @@ from typing import Tuple, Union, Dict, List, Type, Optional
 
 import numpy as np
 from geometry_msgs.msg import Quaternion, Point
+from tf.transformations import euler_matrix
 
 from giskardpy.data_types.data_types import Derivatives
 from giskardpy.qp.qp_solver import QPSolver
@@ -92,7 +93,7 @@ def rotation_matrix_from_rpy(roll: float, pitch: float, yaw: float) -> np.ndarra
                    [np.sin(yaw), np.cos(yaw), 0, 0],
                    [0, 0, 1, 0],
                    [0, 0, 0, 1]])
-    return np.dot(rz, ry, rx)
+    return np.dot(np.dot(rz, ry), rx)
 
 
 def rotation_matrix_from_quaternion(x: float, y: float, z: float, w: float) -> np.ndarray:

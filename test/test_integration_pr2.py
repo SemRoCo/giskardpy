@@ -161,8 +161,8 @@ class PR2TestWrapper(GiskardTestWrapper):
             giskard = Giskard(world_config=WorldWithPR2Config(drive_joint_name=drive_joint_name),
                               robot_interface_config=PR2StandaloneInterface(drive_joint_name=drive_joint_name),
                               collision_avoidance_config=PR2CollisionAvoidance(drive_joint_name=drive_joint_name,
-                                                                               collision_checker=CollisionCheckerLib.none),
-                                                                               # ),
+                                                                               # collision_checker=CollisionCheckerLib.none),
+                                                                               ),
                               behavior_tree_config=StandAloneBTConfig(debug_mode=True,
                                                                       simulation_max_hz=None),
                               # qp_controller_config=QPControllerConfig(qp_solver=SupportedQPSolver.gurobi))

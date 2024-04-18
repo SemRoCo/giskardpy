@@ -4433,6 +4433,8 @@ class TestWeightScaling:
         zero_pose.add_default_end_motion_conditions()
         zero_pose.allow_all_collisions()
         zero_pose.execute()
+        assert god_map.debug_expression_manager.evaluated_debug_expressions['arm_scaling'][0] * 1000 < \
+               god_map.debug_expression_manager.evaluated_debug_expressions['base_scaling'][0]
 
     def test_manip(self, zero_pose: PR2TestWrapper):
         p = PoseStamped()
@@ -4442,10 +4444,14 @@ class TestWeightScaling:
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.allow_all_collisions()
         zero_pose.set_cart_goal(p, zero_pose.r_tip, 'map')
+        m_threshold = 0.16
         zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulabilityLinWeight.__name__,
                                                root_link='torso_lift_link',
-                                               tip_link='r_gripper_tool_frame')
+                                               tip_link=zero_pose.r_tip,
+                                               m_threshold=m_threshold)
         zero_pose.plan_and_execute()
+        assert god_map.debug_expression_manager.evaluated_debug_expressions[f'mIndex{zero_pose.r_tip}'][
+                   0] >= m_threshold
 
     def test_manip2(self, zero_pose: PR2TestWrapper):
         p = PoseStamped()
@@ -4457,13 +4463,19 @@ class TestWeightScaling:
         zero_pose.set_cart_goal(p, zero_pose.r_tip, 'map')
         zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulabilityLinWeight.__name__,
                                                root_link='torso_lift_link',
-                                               tip_link='r_gripper_tool_frame')
+                                               tip_link=zero_pose.r_tip,
+                                               m_threshold=m_threshold)
         p.pose.position = Point(1, 0.1, 0)
         zero_pose.set_cart_goal(p, zero_pose.l_tip, 'map')
         zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulabilityLinWeight.__name__,
                                                root_link='torso_lift_link',
-                                               tip_link='l_gripper_tool_frame')
+                                               tip_link=zero_pose.l_tip,
+                                               m_threshold=m_threshold)
         zero_pose.plan_and_execute()
+        assert god_map.debug_expression_manager.evaluated_debug_expressions[f'mIndex{zero_pose.r_tip}'][
+                   0] >= m_threshold
+        assert god_map.debug_expression_manager.evaluated_debug_expressions[f'mIndex{zero_pose.l_tip}'][
+                   0] >= m_threshold
 
 # kernprof -lv py.test -s test/test_integration_pr2.py
 # time: [1-9][1-9]*.[1-9]* s

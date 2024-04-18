@@ -112,7 +112,7 @@ class MaxManipulabilityLinWeight(Goal):
             grad_traces[Derivatives.jerk][v] = cas.if_greater(m, m_threshold, 0, trace * m * -gain)
         task.add_linear_weight_gain(name, gains=grad_traces)
 
-        god_map.debug_expression_manager.add_debug_expression(f'mIndex{self.tip_link}', m)
+        god_map.debug_expression_manager.add_debug_expression(f'mIndex{tip_link}', m)
 
     def get_free_variable(self, symbol):
         for f in god_map.world.free_variables:

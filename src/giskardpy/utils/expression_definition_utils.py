@@ -44,7 +44,8 @@ def transform_msg(target_frame, msg, tf_timeout=1):
             msg.header.frame_id = god_map.world.search_for_link_name(msg.header.frame_id)
         except UnknownGroupException:
             pass
-        return god_map.world.transform_msg(target_frame, msg)
+        cas_object = cas.GeometricType.from_ros1_msg(msg)
+        return god_map.world.transform(target_frame, cas_object)
     except KeyError:
         return tf.transform_msg(target_frame, msg, timeout=tf_timeout)
 

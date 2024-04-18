@@ -57,7 +57,7 @@ class TFPublisher(GiskardBehavior):
                         robot_links = set(god_map.world.groups[robot_name].link_names_as_set)
                     attached_links = robot_links - self.original_links
                     if attached_links:
-                        get_fk = god_map.world.compute_fk_pose
+                        get_fk = god_map.world.compute_fk
                         for link_name in attached_links:
                             parent_link_name = god_map.world.get_parent_link_of_link(link_name)
                             fk = get_fk(parent_link_name, link_name)
@@ -73,7 +73,7 @@ class TFPublisher(GiskardBehavior):
                         continue
                     if len(group.joints) > 0:
                         continue
-                    get_fk = god_map.world.compute_fk_pose
+                    get_fk = god_map.world.compute_fk
                     fk = get_fk(god_map.world.root_link_name, group.root_link_name)
                     tf = self.make_transform(fk.header.frame_id, str(group.root_link_name), fk.pose)
                     tf_msg.transforms.append(tf)

@@ -21,7 +21,7 @@ from giskardpy.god_map import god_map
 from giskardpy.tasks.task import WEIGHT_BELOW_CA
 from test_integration_pr2 import PR2TestWrapper, TestJointGoals, pocky_pose
 from giskardpy.goals.manipulability_goals import MaxManipulability
-
+import giskardpy.middleware_interfaces.ros1.msg_converter as msg_converter
 
 class PR2TestWrapperMujoco(PR2TestWrapper):
     better_pose = {'r_shoulder_pan_joint': -1.7125,
@@ -332,7 +332,7 @@ class TestWorldManipulation:
         object_name = kitchen_setup.default_env_name
         kitchen_setup.set_env_state({'sink_area_left_middle_drawer_main_joint': joint_goal})
         joint_state = rospy.wait_for_message('/kitchen/joint_states', JointState, rospy.Duration(1))
-        joint_state = JointStates.from_msg(joint_state)
+        joint_state = msg_converter.ros_joint_state_to_giskard_joint_state(joint_state)
         assert joint_state['sink_area_left_middle_drawer_main_joint'].position == joint_goal
         kitchen_setup.clear_world()
         assert god_map.tree.wait_for_goal.synchronization._number_of_synchronisation_behaviors() == 1
@@ -354,7 +354,7 @@ class TestWorldManipulation:
         kitchen_setup.wait_heartbeats(1)
         assert god_map.tree.wait_for_goal.synchronization._number_of_synchronisation_behaviors() == 2
         joint_state = kitchen_setup.get_group_info(object_name).joint_state
-        joint_state = JointStates.from_msg(joint_state)
+        joint_state = msg_converter.ros_joint_state_to_giskard_joint_state(joint_state)
         assert joint_state['iai_kitchen/sink_area_left_middle_drawer_main_joint'].position == joint_goal
 
         joint_goal = 0.1
@@ -369,7 +369,7 @@ class TestWorldManipulation:
         kitchen_setup.wait_heartbeats(1)
         assert god_map.tree.wait_for_goal.synchronization._number_of_synchronisation_behaviors() == 2
         joint_state = kitchen_setup.get_group_info(object_name).joint_state
-        joint_state = JointStates.from_msg(joint_state)
+        joint_state = msg_converter.ros_joint_state_to_giskard_joint_state(joint_state)
         assert joint_state['iai_kitchen/sink_area_left_middle_drawer_main_joint'].position == joint_goal
 
 

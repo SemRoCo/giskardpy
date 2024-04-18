@@ -46,6 +46,6 @@ class GiskardBehavior(Behaviour):
 
     def transform_msg(self, target_frame, msg, timeout=1):
         try:
-            return god_map.world.transform_msg(target_frame, msg)
+            return god_map.world.transform(target_frame, msg)
         except KeyError as e:
             return tf.transform_msg(target_frame, msg, timeout=timeout)

@@ -17,6 +17,7 @@ from giskardpy.model.world import WorldBranch
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.utils import logging
 from giskardpy.utils.utils import resolve_ros_iris
+import giskardpy.middleware_interfaces.ros1.msg_converter as msg_converter
 
 np.random.seed(1337)
 
@@ -737,8 +738,9 @@ class CollisionWorldSynchronizer:
                     self.self_collision_matrix[key] = DisableCollisionReason.Unknown
 
     def get_map_T_geometry(self, link_name: PrefixName, collision_id: int = 0) -> Pose:
-        return god_map.world.compute_fk_pose_with_collision_offset(god_map.world.root_link_name, link_name,
-                                                                   collision_id).pose
+        map_T_geometry = god_map.world.compute_fk_with_collision_offset(god_map.world.root_link_name, link_name,
+                                                                        collision_id)
+        return msg_converter.to_ros_message(map_T_geometry).pose
 
     def set_joint_state_to_zero(self) -> None:
         for free_variable in god_map.world.free_variables:

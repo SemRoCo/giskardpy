@@ -2,27 +2,21 @@ from collections import defaultdict
 from typing import Dict, Tuple, DefaultDict, List, Set, Optional, Iterable
 
 import betterpybullet as bpb
-import numpy as np
-from betterpybullet import ClosestPair
-from betterpybullet import ContactPoint
-from geometry_msgs.msg import PoseStamped, Quaternion, Pose
-from sortedcontainers import SortedDict
+from geometry_msgs.msg import Pose
 
 from giskardpy.configs.collision_avoidance_config import CollisionCheckerLib
 from giskardpy.god_map import god_map
-from giskardpy.model.bpb_wrapper import create_cube_shape, create_object, create_sphere_shape, create_cylinder_shape, \
-    load_convex_mesh_shape, create_shape_from_link, to_giskard_collision
-from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer, Collision, Collisions
-from giskardpy.model.links import BoxGeometry, SphereGeometry, CylinderGeometry, MeshGeometry, Link
+from giskardpy.model.bpb_wrapper import create_shape_from_link, to_giskard_collision
+from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer, Collisions
+from giskardpy.model.links import Link
 from giskardpy.data_types.data_types import PrefixName
 from giskardpy.utils import logging
-from giskardpy.utils.tfwrapper import np_to_pose
 
 
 class BetterPyBulletSyncer(CollisionWorldSynchronizer):
     collision_checker_id = CollisionCheckerLib.bpb
 
-    def __init__(self,):
+    def __init__(self, ):
         self.kw = bpb.KineverseWorld()
         self.object_name_to_id: Dict[PrefixName, bpb.CollisionObject] = {}
         self.query: Optional[DefaultDict[PrefixName, Set[Tuple[bpb.CollisionObject, float]]]] = None
@@ -41,9 +35,11 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
 
     @profile
     def cut_off_distances_to_query(self, cut_off_distances: Dict[Tuple[PrefixName, PrefixName], float],
-                                   buffer: float = 0.05) -> DefaultDict[PrefixName, Set[Tuple[bpb.CollisionObject, float]]]:
+                                   buffer: float = 0.05) -> DefaultDict[
+        PrefixName, Set[Tuple[bpb.CollisionObject, float]]]:
         if self.query is None:
-            self.query = {(self.object_name_to_id[a], self.object_name_to_id[b]): v + buffer for (a, b), v in cut_off_distances.items()}
+            self.query = {(self.object_name_to_id[a], self.object_name_to_id[b]): v + buffer for (a, b), v in
+                          cut_off_distances.items()}
         return self.query
 
     @profile
@@ -67,7 +63,8 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
             self.collision_matrix = {}
         self.sync()
         collisions = self.check_collisions(buffer=0.0)
-        colliding_combinations = {(c.original_link_a, c.original_link_b, c.contact_distance) for c in collisions.all_collisions
+        colliding_combinations = {(c.original_link_a, c.original_link_b, c.contact_distance) for c in
+                                  collisions.all_collisions
                                   if c.contact_distance <= distance}
         return colliding_combinations
 

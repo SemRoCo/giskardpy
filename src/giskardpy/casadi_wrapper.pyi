@@ -46,7 +46,7 @@ class CompiledFunction:
 
 
 class Symbol_:
-    s: ca.SX
+    s: Union[ca.SX, np.ndarray]
 
     @property
     def shape(self) -> Tuple[int, int]: ...
@@ -59,7 +59,7 @@ class Symbol_:
 
     def free_symbols(self) -> List[ca.SX]: ...
 
-    def evaluate(self) -> Union[float, np.ndarray]: ...
+    def to_np(self) -> Union[float, np.ndarray]: ...
 
     def compile(self, parameters: Optional[List[Symbol]] = None, sparse: bool = False) -> CompiledFunction: ...
 
@@ -199,8 +199,7 @@ class Expression(Symbol_):
     def reshape(self, new_shape: Tuple[int, int]) -> Expression: ...
 
 
-class Point3(Symbol_):
-    reference_frame: Optional[PrefixName]
+class Point3(Symbol_, GeometricType):
 
     @property
     def x(self) -> Expression: ...
@@ -280,8 +279,7 @@ class Point3(Symbol_):
     def dot(self, other: Vector3) -> Expression: ...
 
 
-class Vector3(Symbol_):
-    reference_frame: Optional[PrefixName]
+class Vector3(Symbol_, GeometricType):
     vis_frame: Optional[PrefixName]
 
     @property
@@ -375,9 +373,16 @@ class Vector3(Symbol_):
 TrueSymbol: Expression
 FalseSymbol: Expression
 
-
-class TransMatrix(Symbol_):
+class GeometricType:
     reference_frame: Optional[PrefixName]
+
+    @classmethod
+    def from_ros1_msg(cls, msg) -> GeometricType: ...
+
+    def to_ros1_msg(self): ...
+
+
+class TransMatrix(Symbol_, GeometricType):
     child_frame: Optional[PrefixName]
 
     def __init__(self, data: Optional[Union[TransMatrix,
@@ -420,9 +425,10 @@ class TransMatrix(Symbol_):
 
     def inverse(self) -> TransMatrix: ...
 
+    def evaluate(self) -> TransMatrix: ...
 
-class RotationMatrix(Symbol_):
-    reference_frame: Optional[PrefixName]
+
+class RotationMatrix(Symbol_, GeometricType):
     def __init__(self, data: Optional[Union[TransMatrix,
                                             RotationMatrix,
                                             Expression,
@@ -480,7 +486,7 @@ class RotationMatrix(Symbol_):
     def T(self) -> RotationMatrix: ...
 
 
-class Quaternion(Symbol_):
+class Quaternion(Symbol_, GeometricType):
     @property
     def x(self) -> Expression: ...
     @x.setter

@@ -125,9 +125,9 @@ class ProcessWorldUpdate(GiskardBehavior):
             global_pose = transform_pose(target_frame=god_map.world.root_link_name, pose=req.pose, timeout=0.5)
         except:
             req.pose.header.frame_id = god_map.world.search_for_link_name(req.pose.header.frame_id)
-            global_pose = god_map.world.transform_msg(god_map.world.root_link_name, req.pose)
+            global_pose = god_map.world.transform(god_map.world.root_link_name, req.pose)
 
-        global_pose = god_map.world.transform_msg(req.parent_link, global_pose).pose
+        global_pose = god_map.world.transform(req.parent_link, global_pose).pose
         god_map.world.add_world_body(group_name=req.group_name,
                                      msg=world_body,
                                      pose=global_pose,
@@ -148,7 +148,7 @@ class ProcessWorldUpdate(GiskardBehavior):
             raise UnknownGroupException(f'Can\'t update pose of unknown group: \'{req.group_name}\'')
         group = god_map.world.groups[req.group_name]
         joint_name = group.root_link.parent_joint_name
-        pose = god_map.world.transform_msg(god_map.world.joints[joint_name].parent_link_name, req.pose).pose
+        pose = god_map.world.transform(god_map.world.joints[joint_name].parent_link_name, req.pose).pose
         god_map.world.joints[joint_name].update_transform(pose)
         god_map.world.notify_state_change()
 

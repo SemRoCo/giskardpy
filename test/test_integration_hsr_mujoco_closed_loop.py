@@ -107,7 +107,7 @@ class TestJointGoals:
     def test_mimic_joints(self, zero_pose: HSRTestWrapper):
         arm_lift_joint = zero_pose.world.search_for_joint_name('arm_lift_joint')
         zero_pose.open_gripper()
-        hand_T_finger_current = zero_pose.world.compute_fk_pose('hand_palm_link', 'hand_l_distal_link')
+        hand_T_finger_current = zero_pose.world.compute_fk('hand_palm_link', 'hand_l_distal_link')
         hand_T_finger_expected = PoseStamped()
         hand_T_finger_expected.header.frame_id = 'hand_palm_link'
         hand_T_finger_expected.pose.position.x = -0.01675
@@ -133,7 +133,7 @@ class TestJointGoals:
         base_T_torso.pose.orientation.y = 0
         base_T_torso.pose.orientation.z = 0
         base_T_torso.pose.orientation.w = 1
-        base_T_torso2 = zero_pose.world.compute_fk_pose('base_footprint', 'torso_lift_link')
+        base_T_torso2 = zero_pose.world.compute_fk('base_footprint', 'torso_lift_link')
         compare_poses(base_T_torso2.pose, base_T_torso.pose)
 
     def test_mimic_joints2(self, zero_pose: HSRTestWrapper):
@@ -159,7 +159,7 @@ class TestJointGoals:
         base_T_torso.pose.orientation.y = 0
         base_T_torso.pose.orientation.z = 0
         base_T_torso.pose.orientation.w = 1
-        base_T_torso2 = zero_pose.world.compute_fk_pose('base_footprint', 'torso_lift_link')
+        base_T_torso2 = zero_pose.world.compute_fk('base_footprint', 'torso_lift_link')
         compare_poses(base_T_torso2.pose, base_T_torso.pose)
 
     def test_mimic_joints3(self, zero_pose: HSRTestWrapper):
@@ -183,7 +183,7 @@ class TestJointGoals:
         base_T_torso.pose.orientation.y = 0
         base_T_torso.pose.orientation.z = 0
         base_T_torso.pose.orientation.w = 1
-        base_T_torso2 = zero_pose.world.compute_fk_pose('base_footprint', 'torso_lift_link')
+        base_T_torso2 = zero_pose.world.compute_fk('base_footprint', 'torso_lift_link')
         compare_poses(base_T_torso2.pose, base_T_torso.pose)
 
     def test_mimic_joints4(self, zero_pose: HSRTestWrapper):

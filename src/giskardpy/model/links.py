@@ -5,24 +5,20 @@ from typing import List, Optional
 
 import numpy as np
 import urdf_parser_py.urdf as up
-from geometry_msgs.msg import Pose
-from std_msgs.msg import ColorRGBA
-from tf.transformations import euler_matrix
-from visualization_msgs.msg import Marker, MarkerArray
 
 from giskard_msgs.msg import WorldBody
 from giskardpy.exceptions import CorruptShapeException, CorruptMeshException
 from giskardpy.model.utils import cube_volume, cube_surface, sphere_volume, cylinder_volume, cylinder_surface
-from giskardpy.data_types.data_types import PrefixName
+from giskardpy.data_types.data_types import PrefixName, ColorRGBA
 from giskardpy.data_types.data_types import my_string
-from giskardpy.utils.tfwrapper import np_to_pose
+from giskardpy.utils.math import rotation_matrix_from_rpy
 from giskardpy.utils.utils import resolve_ros_iris, get_file_hash
-from giskardpy.utils.decorators import memoize, copy_memoize
 import giskardpy.casadi_wrapper as w
 
 
 class LinkGeometry:
     link_T_geometry: w.TransMatrix
+    color: ColorRGBA
 
     def __init__(self, link_T_geometry: np.ndarray, color: ColorRGBA = None):
         if color is None:
@@ -40,7 +36,7 @@ class LinkGeometry:
         if urdf_thing.origin is None:
             link_T_geometry = np.eye(4)
         else:
-            link_T_geometry = euler_matrix(*urdf_thing.origin.rpy)
+            link_T_geometry = rotation_matrix_from_rpy(*urdf_thing.origin.rpy)
             link_T_geometry[0, 3] = urdf_thing.origin.xyz[0]
             link_T_geometry[1, 3] = urdf_thing.origin.xyz[1]
             link_T_geometry[2, 3] = urdf_thing.origin.xyz[2]
@@ -101,11 +97,6 @@ class LinkGeometry:
             raise CorruptShapeException(f'World body type {msg.type} not supported')
         return geometry
 
-    def as_visualization_marker(self, *args, **kwargs) -> Marker:
-        marker = Marker()
-        marker.color = self.color
-        return marker
-
     def is_big(self, volume_threshold: float = 1.001e-6, surface_threshold: float = 0.00061) -> bool:
         return False
 
@@ -140,19 +131,6 @@ class MeshGeometry(LinkGeometry):
     def to_hash(self) -> str:
         return get_file_hash(self.file_name_absolute)
 
-    def as_visualization_marker(self, use_decomposed_meshes, *args, **kwargs) -> Marker:
-        marker = super().as_visualization_marker()
-        marker.type = Marker.MESH_RESOURCE
-        if use_decomposed_meshes:
-            marker.mesh_resource = 'file://' + self.collision_file_name_absolute
-        else:
-            marker.mesh_resource = 'file://' + self.file_name_absolute
-        marker.scale.x = self.scale[0]
-        marker.scale.y = self.scale[1]
-        marker.scale.z = self.scale[2]
-        marker.mesh_use_embedded_materials = False
-        return marker
-
     def as_urdf(self):
         return up.Mesh(self.file_name_ros_iris, self.scale)
 
@@ -169,14 +147,6 @@ class BoxGeometry(LinkGeometry):
 
     def to_hash(self) -> str:
         return f'box{self.depth}{self.width}{self.height}'
-
-    def as_visualization_marker(self, *args, **kwargs):
-        marker = super().as_visualization_marker()
-        marker.type = Marker.CUBE
-        marker.scale.x = self.depth
-        marker.scale.y = self.width
-        marker.scale.z = self.height
-        return marker
 
     def as_urdf(self):
         return up.Box([self.depth, self.width, self.height])
@@ -195,14 +165,6 @@ class CylinderGeometry(LinkGeometry):
     def to_hash(self) -> str:
         return f'cylinder{self.height}{self.radius}'
 
-    def as_visualization_marker(self, *args, **kwargs):
-        marker = super().as_visualization_marker()
-        marker.type = Marker.CYLINDER
-        marker.scale.x = self.radius * 2
-        marker.scale.y = self.radius * 2
-        marker.scale.z = self.height
-        return marker
-
     def as_urdf(self):
         return up.Cylinder(self.radius, self.height)
 
@@ -218,14 +180,6 @@ class SphereGeometry(LinkGeometry):
 
     def to_hash(self) -> str:
         return f'sphere{self.radius}'
-
-    def as_visualization_marker(self, *args, **kwargs):
-        marker = super().as_visualization_marker()
-        marker.type = Marker.SPHERE
-        marker.scale.x = self.radius * 2
-        marker.scale.y = self.radius * 2
-        marker.scale.z = self.radius * 2
-        return marker
 
     def as_urdf(self):
         return up.Sphere(self.radius)
@@ -259,9 +213,6 @@ class Link:
                 del f
         except:
             pass
-
-    def reset_cache(self):
-        self._clear_memo(self.collision_visualization_markers)
 
     def name_with_collision_id(self, collision_id):
         if collision_id > len(self.collisions):
@@ -297,14 +248,6 @@ class Link:
         if self.has_collisions():
             for collision in self.collisions:
                 collision.color = color
-
-    @memoize
-    def collision_visualization_markers(self, *args, **kwargs):
-        markers = MarkerArray()
-        for collision in self.collisions:
-            marker = collision.as_visualization_marker(*args, **kwargs)
-            markers.markers.append(marker)
-        return markers
 
     def as_urdf(self):
         r = up.Robot(self.name)

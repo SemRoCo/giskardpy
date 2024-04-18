@@ -71,17 +71,17 @@ class TestExpression(unittest.TestCase):
         w.Expression([w.ca.SX(1), w.ca.SX.sym('muh')])
         m = w.Expression(np.eye(4))
         m = w.Expression(m)
-        np.testing.assert_array_almost_equal(m.evaluate(), np.eye(4))
+        np.testing.assert_array_almost_equal(m.to_np(), np.eye(4))
         m = w.Expression(w.ca.SX(np.eye(4)))
-        np.testing.assert_array_almost_equal(m.evaluate(), np.eye(4))
+        np.testing.assert_array_almost_equal(m.to_np(), np.eye(4))
         m = w.Expression([1, 1])
-        np.testing.assert_array_almost_equal(m.evaluate(), [[1], [1]])
+        np.testing.assert_array_almost_equal(m.to_np(), [[1], [1]])
         m = w.Expression([np.array([1, 1])])
-        np.testing.assert_array_almost_equal(m.evaluate(), [[1, 1]])
+        np.testing.assert_array_almost_equal(m.to_np(), [[1, 1]])
         m = w.Expression(1)
-        assert m.evaluate() == 1
+        assert m.to_np() == 1
         m = w.Expression([[1, 1], [2, 2]])
-        np.testing.assert_array_almost_equal(m.evaluate(), [[1, 1], [2, 2]])
+        np.testing.assert_array_almost_equal(m.to_np(), [[1, 1], [2, 2]])
         m = w.Expression([])
         assert m.shape[0] == m.shape[1] == 0
         m = w.Expression()
@@ -93,7 +93,7 @@ class TestExpression(unittest.TestCase):
         filter_ = np.zeros(16, dtype=bool)
         filter_[3] = True
         filter_[5] = True
-        actual = e[filter_].evaluate()
+        actual = e[filter_].to_np()
         expected = e_np[filter_]
         assert np.all(actual.T[0] == expected)
 
@@ -104,7 +104,7 @@ class TestExpression(unittest.TestCase):
         filter_ = np.zeros(4, dtype=bool)
         filter_[1] = True
         filter_[2] = True
-        actual = e[filter_].evaluate()
+        actual = e[filter_].to_np()
         expected = e_np[filter_]
         np.testing.assert_array_almost_equal(actual, expected)
 
@@ -180,7 +180,7 @@ class TestExpression(unittest.TestCase):
             r_np = f(e1_np, e2_np)
             r_cas = f(e1_cas, e2_cas)
             assert isinstance(r_cas, w.Expression)
-            r_cas = r_cas.evaluate()
+            r_cas = r_cas.to_np()
             np.all(r_np == r_cas)
 
     def test_logic_and(self):
@@ -220,7 +220,7 @@ class TestExpression(unittest.TestCase):
         e2 = w.Expression([1, 1, -1, 3])
         gt_result = e1 < e2
         assert isinstance(gt_result, w.Expression)
-        assert w.logic_all(gt_result == w.Expression([0, 0, 0, 1])).evaluate()
+        assert w.logic_all(gt_result == w.Expression([0, 0, 0, 1])).to_np()
 
 
 class TestRotationMatrix(unittest.TestCase):
@@ -229,11 +229,13 @@ class TestRotationMatrix(unittest.TestCase):
         pass
 
     def test_create_RotationMatrix(self):
+        s = w.Symbol('s')
+        r = w.RotationMatrix.from_rpy(1, 2, s)
         r = w.RotationMatrix.from_rpy(1, 2, 3)
         assert isinstance(r, w.RotationMatrix)
         t = w.TransMatrix.from_xyz_rpy(1, 2, 3)
         r = w.RotationMatrix(t)
-        assert t[0, 3].evaluate() == 1
+        assert t[0, 3].to_np() == 1
 
     @given(quaternion())
     def test_from_quaternion(self, q):
@@ -307,7 +309,7 @@ class TestPoint3(unittest.TestCase):
     @given(vector(3))
     def test_norm(self, v):
         p = w.Point3(v)
-        actual = p.norm().evaluate()
+        actual = p.norm().to_np()
         expected = np.linalg.norm(v)
         self.assertAlmostEqual(actual, expected)
 
@@ -384,7 +386,7 @@ class TestVector3(unittest.TestCase):
     def test_norm(self, v):
         expected = np.linalg.norm(v)
         v = w.Vector3(v)
-        actual = v.norm().evaluate()
+        actual = v.norm().to_np()
         self.assertAlmostEqual(actual, expected)
 
     @given(vector(3), float_no_nan_no_inf(), vector(3))
@@ -426,6 +428,12 @@ class TestTransformationMatrix(unittest.TestCase):
         r2[2, 3] = z
         self.assertTrue(np.isclose(r1, r2).all(), msg=f'{r1} != {r2}')
 
+    def test_dot(self):
+        s = w.Symbol('x')
+        m1 = w.TransMatrix()
+        m2 = w.TransMatrix.from_xyz_rpy(x=s)
+        m1.dot(m2)
+
     def test_TransformationMatrix(self):
         f = w.TransMatrix.from_xyz_rpy(1, 2, 3)
         assert isinstance(f, w.TransMatrix)
@@ -442,9 +450,9 @@ class TestTransformationMatrix(unittest.TestCase):
         data = [[i + (j * x_dim) for j in range(y_dim)] for i in range(x_dim)]
         if x_dim != 4 or y_dim != 4:
             with self.assertRaises(ValueError):
-                m = w.TransMatrix(data).evaluate()
+                m = w.TransMatrix(data).to_np()
         else:
-            m = w.TransMatrix(data).evaluate()
+            m = w.TransMatrix(data).to_np()
             self.assertEqual(float(m[3, 0]), 0)
             self.assertEqual(float(m[3, 1]), 0)
             self.assertEqual(float(m[3, 2]), 0)
@@ -525,7 +533,7 @@ class TestTransformationMatrix(unittest.TestCase):
                                                       w.RotationMatrix.from_quaternion(q)).to_position()
         r2 = [x, y, z, 1]
         for i, e in enumerate(r2):
-            self.assertAlmostEqual(r1[i].evaluate(), e)
+            self.assertAlmostEqual(r1[i].to_np(), e)
 
     @given(float_no_nan_no_inf(),
            float_no_nan_no_inf(),
@@ -689,10 +697,10 @@ class TestCASWrapper(unittest.TestCase):
         assert isinstance(e + s, w.Expression)
         assert isinstance(s + v, w.Vector3)
         assert isinstance(v + s, w.Vector3)
-        assert (s + v)[3].evaluate() == 0 == (v + s)[3].evaluate()
+        assert (s + v)[3].to_np() == 0 == (v + s)[3].to_np()
         assert isinstance(s + p, w.Point3)
         assert isinstance(p + s, w.Point3)
-        assert (s + p)[3].evaluate() == 1 == (p + s)[3].evaluate()
+        assert (s + p)[3].to_np() == 1 == (p + s)[3].to_np()
         with self.assertRaises(TypeError):
             s + t
         with self.assertRaises(TypeError):
@@ -713,10 +721,10 @@ class TestCASWrapper(unittest.TestCase):
         assert isinstance(e + e, w.Expression)
         assert isinstance(e + v, w.Vector3)
         assert isinstance(v + e, w.Vector3)
-        assert (e + v)[3].evaluate() == 0 == (v + e)[3].evaluate()
+        assert (e + v)[3].to_np() == 0 == (v + e)[3].to_np()
         assert isinstance(e + p, w.Point3)
         assert isinstance(p + e, w.Point3)
-        assert (e + p)[3].evaluate() == 1 == (p + e)[3].evaluate()
+        assert (e + p)[3].to_np() == 1 == (p + e)[3].to_np()
         with self.assertRaises(TypeError):
             e + t
         with self.assertRaises(TypeError):
@@ -731,10 +739,10 @@ class TestCASWrapper(unittest.TestCase):
             q + e
         # Vector3
         assert isinstance(v + v, w.Vector3)
-        assert (v + v)[3].evaluate() == 0
+        assert (v + v)[3].to_np() == 0
         assert isinstance(v + p, w.Point3)
         assert isinstance(p + v, w.Point3)
-        assert (v + p)[3].evaluate() == 1 == (p + v)[3].evaluate()
+        assert (v + p)[3].to_np() == 1 == (p + v)[3].to_np()
         with self.assertRaises(TypeError):
             v + t
         with self.assertRaises(TypeError):
@@ -821,10 +829,10 @@ class TestCASWrapper(unittest.TestCase):
         assert isinstance(e - s, w.Expression)
         assert isinstance(s - v, w.Vector3)
         assert isinstance(v - s, w.Vector3)
-        assert (s - v)[3].evaluate() == 0 == (v - s)[3].evaluate()
+        assert (s - v)[3].to_np() == 0 == (v - s)[3].to_np()
         assert isinstance(s - p, w.Point3)
         assert isinstance(p - s, w.Point3)
-        assert (s - p)[3].evaluate() == 1 == (p - s)[3].evaluate()
+        assert (s - p)[3].to_np() == 1 == (p - s)[3].to_np()
         with self.assertRaises(TypeError):
             s - t
         with self.assertRaises(TypeError):
@@ -841,10 +849,10 @@ class TestCASWrapper(unittest.TestCase):
         assert isinstance(e - e, w.Expression)
         assert isinstance(e - v, w.Vector3)
         assert isinstance(v - e, w.Vector3)
-        assert (e - v)[3].evaluate() == 0 == (v - e)[3].evaluate()
+        assert (e - v)[3].to_np() == 0 == (v - e)[3].to_np()
         assert isinstance(e - p, w.Point3)
         assert isinstance(p - e, w.Point3)
-        assert (e - p)[3].evaluate() == 1 == (p - e)[3].evaluate()
+        assert (e - p)[3].to_np() == 1 == (p - e)[3].to_np()
         with self.assertRaises(TypeError):
             e - t
         with self.assertRaises(TypeError):
@@ -859,10 +867,10 @@ class TestCASWrapper(unittest.TestCase):
             q - e
         # Vector3
         assert isinstance(v - v, w.Vector3)
-        assert (v - v)[3].evaluate() == 0
+        assert (v - v)[3].to_np() == 0
         assert isinstance(v - p, w.Point3)
         assert isinstance(p - v, w.Point3)
-        assert (v - p)[3].evaluate() == 1 == (p - v)[3].evaluate()
+        assert (v - p)[3].to_np() == 1 == (p - v)[3].to_np()
         with self.assertRaises(TypeError):
             v - t
         with self.assertRaises(TypeError):
@@ -877,7 +885,7 @@ class TestCASWrapper(unittest.TestCase):
             q - v
         # Point3
         assert isinstance(p - p, w.Vector3)
-        assert (p - p)[3].evaluate() == 0
+        assert (p - p)[3].to_np() == 0
         with self.assertRaises(TypeError):
             p - t
         with self.assertRaises(TypeError):
@@ -973,10 +981,10 @@ class TestCASWrapper(unittest.TestCase):
             assert isinstance(fn(e, s), w.Expression)
             assert isinstance(fn(s, v), w.Vector3)
             assert isinstance(fn(v, s), w.Vector3)
-            assert (fn(s, v))[3].evaluate() == 0 == (fn(v, s))[3].evaluate()
+            assert (fn(s, v))[3].to_np() == 0 == (fn(v, s))[3].to_np()
             assert isinstance(fn(s, p), w.Point3)
             assert isinstance(fn(p, s), w.Point3)
-            assert (fn(s, p))[3].evaluate() == 1 == (fn(p, s))[3].evaluate()
+            assert (fn(s, p))[3].to_np() == 1 == (fn(p, s))[3].to_np()
             with self.assertRaises(TypeError):
                 fn(s, t)
             with self.assertRaises(TypeError):
@@ -993,10 +1001,10 @@ class TestCASWrapper(unittest.TestCase):
             assert isinstance(fn(e, e), w.Expression)
             assert isinstance(fn(e, v), w.Vector3)
             assert isinstance(fn(v, e), w.Vector3)
-            assert (fn(e, v))[3].evaluate() == 0 == (fn(v, e))[3].evaluate()
+            assert (fn(e, v))[3].to_np() == 0 == (fn(v, e))[3].to_np()
             assert isinstance(fn(e, p), w.Point3)
             assert isinstance(fn(p, e), w.Point3)
-            assert (fn(e, p))[3].evaluate() == 1 == (fn(p, e))[3].evaluate()
+            assert (fn(e, p))[3].to_np() == 1 == (fn(p, e))[3].to_np()
             with self.assertRaises(TypeError):
                 fn(e, t)
             with self.assertRaises(TypeError):
@@ -1340,7 +1348,7 @@ class TestCASWrapper(unittest.TestCase):
         m = np.eye(4)
         m1 = w.Expression(m)
         e = w.vstack([m1, m1])
-        r1 = e.evaluate()
+        r1 = e.to_np()
         r2 = np.vstack([m, m])
         np.testing.assert_array_almost_equal(r1, r2)
 
@@ -1348,7 +1356,7 @@ class TestCASWrapper(unittest.TestCase):
         m = np.eye(0)
         m1 = w.Expression(m)
         e = w.vstack([m1, m1])
-        r1 = e.evaluate()
+        r1 = e.to_np()
         r2 = np.vstack([m, m])
         np.testing.assert_array_almost_equal(r1, r2)
 
@@ -1356,7 +1364,7 @@ class TestCASWrapper(unittest.TestCase):
         m = np.eye(4)
         m1 = w.Expression(m)
         e = w.hstack([m1, m1])
-        r1 = e.evaluate()
+        r1 = e.to_np()
         r2 = np.hstack([m, m])
         np.testing.assert_array_almost_equal(r1, r2)
 
@@ -1364,7 +1372,7 @@ class TestCASWrapper(unittest.TestCase):
         m = np.eye(0)
         m1 = w.Expression(m)
         e = w.hstack([m1, m1])
-        r1 = e.evaluate()
+        r1 = e.to_np()
         r2 = np.hstack([m, m])
         np.testing.assert_array_almost_equal(r1, r2)
 
@@ -1376,7 +1384,7 @@ class TestCASWrapper(unittest.TestCase):
         m2_e = w.Expression(m2_np)
         m3_e = w.Expression(m3_np)
         e = w.diag_stack([m1_e, m2_e, m3_e])
-        r1 = e.evaluate()
+        r1 = e.to_np()
         combined_matrix = np.zeros((4 + 2 + 5, 4 + 5 + 3))
         row_counter = 0
         column_counter = 0
@@ -1856,7 +1864,7 @@ class TestCASWrapper(unittest.TestCase):
                 prev_acc = None
                 jerk_step = jerk_limit * dt
                 while abs(integral) < abs(current_vel):
-                    acc_cap = cas2.acc_cap(current_vel - integral, jerk_limit, dt).evaluate()
+                    acc_cap = cas2.acc_cap(current_vel - integral, jerk_limit, dt).to_np()
                     # if abs(acc_cap) <= jerk_step:
                     #     acc_cap = np.sign(current_vel) * (current_vel - integral) / dt
                     integral += np.sign(current_vel) * acc_cap * dt
@@ -1934,8 +1942,8 @@ class TestCASWrapper(unittest.TestCase):
             except Exception as e:
                 print(f'{p_c}, {v_c}, {a_c}, {p_center}, {p_range}, {v_b}, {j_b}, {ph}, {dt}')
                 raise
-            lb = lb.evaluate()
-            ub = ub.evaluate()
+            lb = lb.to_np()
+            ub = ub.to_np()
             b = np.hstack((lb, ub))
             lower_limits = (
                 tuple(lb.T[0][:ph].tolist()),

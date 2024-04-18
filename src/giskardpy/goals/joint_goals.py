@@ -13,7 +13,7 @@ from giskardpy.goals.goal import Goal, NonMotionGoal
 from giskardpy.tasks.task import WEIGHT_BELOW_CA, Task
 from giskardpy.model.joints import OmniDrive, DiffDrive, OmniDrivePR22, OneDofJoint
 from giskardpy.data_types.data_types import PrefixName, Derivatives
-from giskardpy.utils.expression_definition_utils import transform_msg
+from giskardpy.utils.expression_definition_utils import transform_msg, transform_msg_and_turn_to_expr
 from giskardpy.utils.math import axis_angle_from_quaternion
 
 
@@ -66,13 +66,15 @@ class SetOdometry(NonMotionGoal):
         brumbrum_joint = god_map.world.joints[brumbrum_joint_name]
         if not isinstance(brumbrum_joint, (OmniDrive, DiffDrive, OmniDrivePR22)):
             raise GoalInitalizationException(f'Group {group_name} has no odometry joint.')
-        base_pose = transform_msg(brumbrum_joint.parent_link_name, base_pose).pose
-        god_map.world.state[brumbrum_joint.x.name].position = base_pose.position.x
-        god_map.world.state[brumbrum_joint.y.name].position = base_pose.position.y
-        axis, angle = axis_angle_from_quaternion(base_pose.orientation.x,
-                                                 base_pose.orientation.y,
-                                                 base_pose.orientation.z,
-                                                 base_pose.orientation.w)
+        base_pose = transform_msg_and_turn_to_expr(brumbrum_joint.parent_link_name, base_pose, condition=start_condition)
+        position = base_pose.to_position().to_np()
+        orientation = base_pose.to_rotation().to_quaternion().to_np()
+        god_map.world.state[brumbrum_joint.x.name].position = position[0]
+        god_map.world.state[brumbrum_joint.y.name].position = position[1]
+        axis, angle = axis_angle_from_quaternion(orientation[0],
+                                                 orientation[1],
+                                                 orientation[2],
+                                                 orientation[3])
         if axis[-1] < 0:
             angle = -angle
         if isinstance(brumbrum_joint, OmniDrivePR22):

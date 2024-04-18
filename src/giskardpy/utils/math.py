@@ -2,7 +2,6 @@ from typing import Tuple, Union, Dict, List, Type, Optional
 
 import numpy as np
 from geometry_msgs.msg import Quaternion, Point
-from tf.transformations import quaternion_multiply, quaternion_conjugate, quaternion_matrix, quaternion_from_matrix
 
 from giskardpy.data_types.data_types import Derivatives
 from giskardpy.qp.qp_solver import QPSolver
@@ -10,15 +9,27 @@ from giskardpy.qp.qp_solver_qpalm import QPSolverQPalm
 from giskardpy.utils.decorators import memoize
 
 
-def qv_mult(quaternion, vector):
+def quaternion_multiply(quaternion1: np.ndarray, quaternion0: np.ndarray) -> np.ndarray:
+    x0, y0, z0, w0 = quaternion0
+    x1, y1, z1, w1 = quaternion1
+    return np.array((
+        x1 * w0 + y1 * z0 - z1 * y0 + w1 * x0,
+        -x1 * z0 + y1 * w0 + z1 * x0 + w1 * y0,
+        x1 * y0 - y1 * x0 + z1 * w0 + w1 * z0,
+        -x1 * x0 - y1 * y0 - z1 * z0 + w1 * w0), dtype=np.float64)
+
+
+def quaternion_conjugate(quaternion: np.ndarray) -> np.ndarray:
+    return np.array((-quaternion[0], -quaternion[1],
+                     -quaternion[2], quaternion[3]), dtype=np.float64)
+
+
+def qv_mult(quaternion: np.ndarray, vector: np.ndarray) -> np.ndarray:
     """
     Transforms a vector by a quaternion
     :param quaternion: Quaternion
-    :type quaternion: list
     :param vector: vector
-    :type vector: list
     :return: transformed vector
-    :type: list
     """
     q = quaternion
     v = [vector[0], vector[1], vector[2], 0]
@@ -36,7 +47,7 @@ def quaternion_from_axis_angle(axis: np.ndarray, angle: float) -> np.ndarray:
 _EPS = np.finfo(float).eps * 4.0
 
 
-def rpy_from_matrix(rotation_matrix):
+def rpy_from_matrix(rotation_matrix: np.ndarray) -> Tuple[float, float, float]:
     """
     :param rotation_matrix: 4x4 Matrix
     :type rotation_matrix: Matrix
@@ -59,19 +70,15 @@ def rpy_from_matrix(rotation_matrix):
     return roll, pitch, yaw
 
 
-def rpy_from_quaternion(qx, qy, qz, qw):
-    return rpy_from_matrix(quaternion_matrix([qx, qy, qz, qw]))
+def rpy_from_quaternion(qx: float, qy: float, qz: float, qw: float) -> Tuple[float, float, float]:
+    return rpy_from_matrix(rotation_matrix_from_quaternion(qx, qy, qz, qw))
 
 
-def rotation_matrix_from_rpy(roll, pitch, yaw):
+def rotation_matrix_from_rpy(roll: float, pitch: float, yaw: float) -> np.ndarray:
     """
     Conversion of roll, pitch, yaw to 4x4 rotation matrix according to:
     https://github.com/orocos/orocos_kinematics_dynamics/blob/master/orocos_kdl/src/frames.cpp#L167
-    :type roll: Union[float, Symbol]
-    :type pitch: Union[float, Symbol]
-    :type yaw: Union[float, Symbol]
     :return: 4x4 Matrix
-    :rtype: Matrix
     """
     rx = np.array([[1, 0, 0, 0],
                    [0, np.cos(roll), -np.sin(roll), 0],
@@ -88,16 +95,11 @@ def rotation_matrix_from_rpy(roll, pitch, yaw):
     return np.dot(rz, ry, rx)
 
 
-def rotation_matrix_from_quaternion(x, y, z, w):
+def rotation_matrix_from_quaternion(x: float, y: float, z: float, w: float) -> np.ndarray:
     """
     Unit quaternion to 4x4 rotation matrix according to:
     https://github.com/orocos/orocos_kinematics_dynamics/blob/master/orocos_kdl/src/frames.cpp#L167
-    :type x: Union[float, Symbol]
-    :type y: Union[float, Symbol]
-    :type z: Union[float, Symbol]
-    :type w: Union[float, Symbol]
     :return: 4x4 Matrix
-    :rtype: Matrix
     """
     x2 = x * x
     y2 = y * y
@@ -109,8 +111,36 @@ def rotation_matrix_from_quaternion(x, y, z, w):
                      [0, 0, 0, 1]])
 
 
-def quaternion_from_rpy(roll, pitch, yaw):
-    return quaternion_from_matrix(rotation_matrix_from_rpy(roll, pitch, yaw))
+def quaternion_from_rpy(roll: float, pitch: float, yaw: float) -> np.ndarray:
+    return quaternion_from_rotation_matrix(rotation_matrix_from_rpy(roll, pitch, yaw))
+
+
+def quaternion_from_rotation_matrix(matrix: np.ndarray) -> np.ndarray:
+    """
+    :param matrix: 4x4 Matrix
+    :return: array length 4
+    """
+    q = np.empty((4,), dtype=np.float64)
+    M = np.array(matrix, dtype=np.float64, copy=False)[:4, :4]
+    t = np.trace(M)
+    if t > M[3, 3]:
+        q[3] = t
+        q[2] = M[1, 0] - M[0, 1]
+        q[1] = M[0, 2] - M[2, 0]
+        q[0] = M[2, 1] - M[1, 2]
+    else:
+        i, j, k = 0, 1, 2
+        if M[1, 1] > M[0, 0]:
+            i, j, k = 1, 2, 0
+        if M[2, 2] > M[i, i]:
+            i, j, k = 2, 0, 1
+        t = M[i, i] - (M[j, j] + M[k, k]) + M[3, 3]
+        q[i] = t
+        q[j] = M[i, j] + M[j, i]
+        q[k] = M[k, i] + M[i, k]
+        q[3] = M[k, j] - M[j, k]
+    q *= 0.5 / np.sqrt(t * M[3, 3])
+    return q
 
 
 def axis_angle_from_quaternion(x: float, y: float, z: float, w: float) -> Tuple[np.ndarray, float]:
@@ -279,16 +309,14 @@ def mpc_velocity_integral3(limits: Dict[Derivatives, float], dt: float, ph: int)
     return (i1 + i2) / 2
 
 
-def limit(a, lower_limit, upper_limit):
+def limit(a: float, lower_limit: float, upper_limit: float) -> float:
     return max(lower_limit, min(upper_limit, a))
 
 
-def inverse_frame(f1_T_f2):
+def inverse_frame(f1_T_f2: np.ndarray) -> np.ndarray:
     """
     :param f1_T_f2: 4x4 Matrix
-    :type f1_T_f2: Matrix
     :return: f2_T_f1
-    :rtype: Matrix
     """
     f2_T_f1 = np.eye(4)
     f2_T_f1[:3, :3] = f1_T_f2[:3, :3].T
@@ -296,16 +324,15 @@ def inverse_frame(f1_T_f2):
     return f2_T_f1
 
 
-def angle_between_vector(v1, v2):
+def angle_between_vector(v1: np.ndarray, v2: np.ndarray) -> float:
     """
-    :type v1: Vector3
-    :type v2: Vector3
-    :rtype: float
+    :param v1: vector length 3
+    :param v2: vector length 3
     """
     return np.arccos(np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2)))
 
 
-def normalize(v):
+def normalize(v: np.ndarray) -> np.ndarray:
     return v / np.linalg.norm(v)
 
 
@@ -357,7 +384,12 @@ def compare_orientations(actual_orientation: Union[Quaternion, np.ndarray],
         np.testing.assert_almost_equal(q1[3], -q2[3], decimal=decimal)
 
 
-def my_cross(v1, v2):
+def my_cross(v1: np.ndarray, v2: np.ndarray) -> np.ndarray:
+    """
+    :param v1: vector length 3 or 4
+    :param v2: vector length 3 or 4
+    :return: cross product vector length 3
+    """
     return np.cross(v1[:-1], v2[:-1])
 
 

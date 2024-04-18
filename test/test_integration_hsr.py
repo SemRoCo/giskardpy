@@ -109,7 +109,7 @@ class TestJointGoals:
     def test_mimic_joints(self, zero_pose: HSRTestWrapper):
         arm_lift_joint = god_map.world.search_for_joint_name('arm_lift_joint')
         zero_pose.open_gripper()
-        hand_T_finger_current = god_map.world.compute_fk_pose('hand_palm_link', 'hand_l_distal_link')
+        hand_T_finger_current = god_map.world.compute_fk('hand_palm_link', 'hand_l_distal_link')
         hand_T_finger_expected = PoseStamped()
         hand_T_finger_expected.header.frame_id = 'hand_palm_link'
         hand_T_finger_expected.pose.position.x = -0.01675
@@ -135,7 +135,7 @@ class TestJointGoals:
         base_T_torso.pose.orientation.y = 0
         base_T_torso.pose.orientation.z = 0
         base_T_torso.pose.orientation.w = 1
-        base_T_torso2 = god_map.world.compute_fk_pose('base_footprint', 'torso_lift_link')
+        base_T_torso2 = god_map.world.compute_fk('base_footprint', 'torso_lift_link')
         compare_poses(base_T_torso2.pose, base_T_torso.pose)
 
     def test_mimic_joints2(self, zero_pose: HSRTestWrapper):
@@ -161,7 +161,7 @@ class TestJointGoals:
         base_T_torso.pose.orientation.y = 0
         base_T_torso.pose.orientation.z = 0
         base_T_torso.pose.orientation.w = 1
-        base_T_torso2 = god_map.world.compute_fk_pose('base_footprint', 'torso_lift_link')
+        base_T_torso2 = god_map.world.compute_fk('base_footprint', 'torso_lift_link')
         compare_poses(base_T_torso2.pose, base_T_torso.pose)
 
     def test_mimic_joints3(self, zero_pose: HSRTestWrapper):
@@ -185,7 +185,7 @@ class TestJointGoals:
         base_T_torso.pose.orientation.y = 0
         base_T_torso.pose.orientation.z = 0
         base_T_torso.pose.orientation.w = 1
-        base_T_torso2 = god_map.world.compute_fk_pose('base_footprint', 'torso_lift_link')
+        base_T_torso2 = god_map.world.compute_fk('base_footprint', 'torso_lift_link')
         compare_poses(base_T_torso2.pose, base_T_torso.pose)
 
     def test_mimic_joints4(self, zero_pose: HSRTestWrapper):
@@ -323,7 +323,7 @@ class TestConstraints:
         kitchen_setup.allow_all_collisions()
         # kitchen_setup.add_json_goal('AvoidJointLimits', percentage=10)
         kitchen_setup.execute()
-        current_pose = god_map.world.compute_fk_pose(root='map', tip=kitchen_setup.tip)
+        current_pose = god_map.world.compute_fk(root='map', tip=kitchen_setup.tip)
 
         kitchen_setup.set_open_container_goal(tip_link=kitchen_setup.tip,
                                               environment_link=handle_name,

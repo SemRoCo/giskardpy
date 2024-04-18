@@ -282,7 +282,7 @@ class CollisionAvoidanceHint(Goal):
                                                     god_map.world.links[self.link_b].name,
                                                     spring_threshold)
 
-        self.avoidance_hint = god_map.world.transform_msg(self.root_link, avoidance_hint)
+        self.avoidance_hint = god_map.world.transform(self.root_link, avoidance_hint)
         self.avoidance_hint.vector = tf.normalize(self.avoidance_hint.vector)
 
         self.max_velocity = max_linear_velocity

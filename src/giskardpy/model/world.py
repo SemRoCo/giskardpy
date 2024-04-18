@@ -11,15 +11,13 @@ from xml.etree.ElementTree import ParseError
 
 import numpy as np
 import urdf_parser_py.urdf as up
-from geometry_msgs.msg import PoseStamped, Pose, PointStamped, Point, Vector3Stamped, Vector3, QuaternionStamped
-from std_msgs.msg import ColorRGBA
 from tf2_msgs.msg import TFMessage
 
 import giskardpy.utils.math as mymath
 from giskard_msgs.msg import WorldBody
 from giskardpy import casadi_wrapper as cas
 from giskardpy.casadi_wrapper import CompiledFunction
-from giskardpy.data_types.data_types import JointStates
+from giskardpy.data_types.data_types import JointStates, ColorRGBA
 from giskardpy.exceptions import DuplicateNameException, UnknownGroupException, UnknownLinkException, \
     WorldException, GiskardException, UnknownJointException, CorruptURDFException
 from giskardpy.god_map import god_map
@@ -334,8 +332,8 @@ class WorldTree(WorldTreeInterface):
         If you have changed the state of the world, call this function to trigger necessary events and increase
         the state version.
         """
-        clear_memo(self.compute_fk_pose)
-        clear_memo(self.compute_fk_pose_with_collision_offset)
+        clear_memo(self.compute_fk)
+        clear_memo(self.compute_fk_with_collision_offset)
         self._recompute_fks()
         self._state_version += 1
 
@@ -609,20 +607,10 @@ class WorldTree(WorldTreeInterface):
                                             prefix=group_name,
                                             color=self.default_link_color)
             self._add_link(urdf_root_link)
-            pose_msg = Pose()
-            position = pose.to_position().evaluate()
-            orientation = pose.to_rotation().to_quaternion().evaluate()
-            pose_msg.position.x = position[0][0]
-            pose_msg.position.y = position[1][0]
-            pose_msg.position.z = position[2][0]
-            pose_msg.orientation.x = orientation[0][0]
-            pose_msg.orientation.y = orientation[1][0]
-            pose_msg.orientation.z = orientation[2][0]
-            pose_msg.orientation.w = orientation[3][0]
             joint = Joint6DOF(name=PrefixName(group_name, self.connection_prefix),
                               parent_link_name=parent_link_name,
                               child_link_name=urdf_root_link.name)
-            joint.update_transform(pose_msg)
+            joint.update_transform(pose)
             self._add_joint(joint)
         else:
             urdf_root_link = Link(urdf_root_link_name_prefixed)
@@ -848,7 +836,7 @@ class WorldTree(WorldTreeInterface):
     def add_world_body(self,
                        group_name: str,
                        msg: WorldBody,
-                       pose: Pose,
+                       pose: cas.TransMatrix,
                        parent_link_name: PrefixName):
         """
         Add a WorldBody to the world.
@@ -866,7 +854,7 @@ class WorldTree(WorldTreeInterface):
             self.add_urdf(urdf=msg.urdf,
                           parent_link_name=parent_link_name,
                           group_name=group_name,
-                          pose=cas.TransMatrix(pose))
+                          pose=pose)
         else:
             link = Link.from_world_body(link_name=PrefixName(group_name, group_name), msg=msg,
                                         color=self.default_link_color)
@@ -977,7 +965,7 @@ class WorldTree(WorldTreeInterface):
             joint.parent_link_name = new_parent_link_name
             joint.parent_T_child = fk
         elif isinstance(joint, Joint6DOF):
-            pose = self.compute_fk_pose(new_parent_link_name, joint.child_link_name)
+            pose = self.compute_fk(new_parent_link_name, joint.child_link_name)
             joint.parent_link_name = new_parent_link_name
             joint.update_transform(pose.pose)
         else:
@@ -1221,51 +1209,40 @@ class WorldTree(WorldTreeInterface):
         r_R_t_axis_angle = axis * angle
         r_P_t = r_T_t.to_position()
         fk = cas.Expression([r_P_t[0],
-                           r_P_t[1],
-                           r_P_t[2],
-                           r_R_t_axis_angle[0],
-                           r_R_t_axis_angle[1],
-                           r_R_t_axis_angle[2]])
+                             r_P_t[1],
+                             r_P_t[2],
+                             r_R_t_axis_angle[0],
+                             r_R_t_axis_angle[1],
+                             r_R_t_axis_angle[2]])
         return cas.total_derivative(fk,
-                                  self.joint_position_symbols,
-                                  self.joint_velocity_symbols)
+                                    self.joint_position_symbols,
+                                    self.joint_velocity_symbols)
 
     @memoize
-    def compute_fk_pose(self, root: my_string, tip: my_string) -> PoseStamped:
+    def compute_fk(self, root: my_string, tip: my_string) -> cas.TransMatrix:
         root = self.search_for_link_name(root)
         tip = self.search_for_link_name(tip)
-        homo_m = self.compute_fk_np(root, tip)
-        p = PoseStamped()
-        p.header.frame_id = str(root)
-        p.pose = homo_matrix_to_pose(homo_m)
-        return p
+        return cas.TransMatrix(self.compute_fk_np(root, tip))
 
-    def compute_fk_point(self, root: my_string, tip: my_string) -> PointStamped:
-        root_T_tip = self.compute_fk_pose(root, tip)
-        root_P_tip = PointStamped()
-        root_P_tip.header = root_T_tip.header
-        root_P_tip.point = root_T_tip.pose.position
-        return root_P_tip
+    def compute_fk_point(self, root: my_string, tip: my_string) -> cas.Point3:
+        return self.compute_fk(root=root, tip=tip).to_position()
 
     @memoize
-    def compute_fk_pose_with_collision_offset(self, root: PrefixName, tip: PrefixName,
-                                              collision_id: int) -> PoseStamped:
-        root_T_tip = self.compute_fk_np(root, tip)
+    def compute_fk_with_collision_offset(self, root: PrefixName, tip: PrefixName,
+                                         collision_id: int) -> cas.TransMatrix:
+        root_T_tip = self.compute_fk(root, tip)
         tip_link = self.links[tip]
-        root_T_tip = root_T_tip.dot(tip_link.collisions[collision_id].link_T_geometry.evaluate())
-        p = PoseStamped()
-        p.header.frame_id = str(root)
-        p.pose = homo_matrix_to_pose(root_T_tip)
-        return p
+        return root_T_tip.dot(tip_link.collisions[collision_id].link_T_geometry)
 
     @profile
     def as_tf_msg(self, include_prefix: bool) -> TFMessage:
         """
         Create a tfmessage for the whole world tree.
         """
+        # fixme
         tf_msg = TFMessage()
         for joint_name, joint in self.joints.items():
-            p_T_c = self.compute_fk_pose(root=joint.parent_link_name, tip=joint.child_link_name)
+            p_T_c = self.compute_fk(root=joint.parent_link_name, tip=joint.child_link_name)
             if include_prefix:
                 parent_link_name = joint.parent_link_name
                 child_link_name = joint.child_link_name
@@ -1357,7 +1334,7 @@ class WorldTree(WorldTreeInterface):
     @profile
     def compose_fk_evaluated_expression(self, root: PrefixName, tip: PrefixName) -> cas.TransMatrix:
         result: cas.TransMatrix = symbol_manager.get_expr(f'god_map.world.compute_fk_np(\'{root}\', \'{tip}\')',
-                                                        output_type_hint=cas.TransMatrix)
+                                                          output_type_hint=cas.TransMatrix)
         result.reference_frame = root
         result.child_frame = tip
         return result
@@ -1391,69 +1368,33 @@ class WorldTree(WorldTreeInterface):
         return self.joints[joint_name].get_limit_expressions(order)
 
     @overload
-    def transform_msg(self, target_frame: PrefixName, msg: PointStamped) -> PointStamped:
+    def transform(self, target_frame: PrefixName, msg: cas.Point3) -> cas.Point3:
         ...
 
     @overload
-    def transform_msg(self, target_frame: PrefixName, msg: PoseStamped) -> PoseStamped:
+    def transform(self, target_frame: PrefixName, msg: cas.TransMatrix) -> cas.TransMatrix:
         ...
 
     @overload
-    def transform_msg(self, target_frame: PrefixName, msg: Vector3Stamped) -> Vector3Stamped:
+    def transform(self, target_frame: PrefixName, msg: cas.Vector3) -> cas.Vector3:
         ...
 
     @overload
-    def transform_msg(self, target_frame: PrefixName, msg: QuaternionStamped) -> QuaternionStamped:
+    def transform(self, target_frame: PrefixName, msg: cas.Quaternion) -> cas.Quaternion:
         ...
 
-    def transform_msg(self, target_frame, msg):
-        if isinstance(msg, PoseStamped):
-            return self.transform_pose(target_frame, msg)
-        elif isinstance(msg, PointStamped):
-            return self.transform_point(target_frame, msg)
-        elif isinstance(msg, Vector3Stamped):
-            return self.transform_vector(target_frame, msg)
-        elif isinstance(msg, QuaternionStamped):
-            return self.transform_quaternion(target_frame, msg)
+    @overload
+    def transform(self, target_frame: PrefixName, msg: cas.RotationMatrix) -> cas.RotationMatrix:
+        ...
+
+    def transform(self, target_frame, msg):
+        target_frame_T_reference_frame = self.compute_fk(root=target_frame, tip=msg.reference_frame)
+        if isinstance(msg, cas.Quaternion):
+            reference_frame_R = msg.to_rotation_matrix()
+            target_frame_R = target_frame_T_reference_frame.dot(reference_frame_R)
+            return target_frame_R.to_quaternion()
         else:
-            raise NotImplementedError(f'World can\'t transform message of type \'{type(msg)}\'')
-
-    def transform_pose(self, target_frame: PrefixName, pose: PoseStamped) -> PoseStamped:
-        f_T_p = msg_to_homogeneous_matrix(pose.pose)
-        t_T_f = self.compute_fk_np(target_frame, pose.header.frame_id)
-        t_T_p = np.dot(t_T_f, f_T_p)
-        result = PoseStamped()
-        result.header.frame_id = target_frame
-        result.pose = np_to_pose(t_T_p)
-        return result
-
-    def transform_quaternion(self, target_frame: PrefixName, quaternion: QuaternionStamped) -> QuaternionStamped:
-        p = PoseStamped()
-        p.header = quaternion.header
-        p.pose.orientation = quaternion.quaternion
-        new_pose = self.transform_pose(target_frame, p)
-        new_quaternion = QuaternionStamped()
-        new_quaternion.header = new_pose.header
-        new_quaternion.quaternion = new_pose.pose.orientation
-        return new_quaternion
-
-    def transform_point(self, target_frame: PrefixName, point: PointStamped) -> PointStamped:
-        f_P_p = msg_to_homogeneous_matrix(point)
-        t_T_f = self.compute_fk_np(target_frame, point.header.frame_id)
-        t_P_p = np.dot(t_T_f, f_P_p)
-        result = PointStamped()
-        result.header.frame_id = target_frame
-        result.point = Point(*t_P_p[:3])
-        return result
-
-    def transform_vector(self, target_frame: PrefixName, vector: Vector3Stamped) -> Vector3Stamped:
-        f_V_p = msg_to_homogeneous_matrix(vector)
-        t_T_f = self.compute_fk_np(target_frame, vector.header.frame_id)
-        t_V_p = np.dot(t_T_f, f_V_p)
-        result = Vector3Stamped()
-        result.header.frame_id = target_frame
-        result.vector = Vector3(*t_V_p[:3])
-        return result
+            return target_frame_T_reference_frame.dot(msg)
 
     def compute_joint_limits(self, joint_name: PrefixName, order: Derivatives) \
             -> Tuple[Optional[cas.symbol_expr_float], Optional[cas.symbol_expr_float]]:
@@ -1661,8 +1602,8 @@ class WorldBranch(WorldTreeInterface):
         return unmovable_links
 
     @property
-    def base_pose(self) -> Pose:
-        return god_map.world.compute_fk_pose(god_map.world.root_link_name, self.root_link_name).pose
+    def base_pose(self) -> cas.TransMatrix:
+        return god_map.world.compute_fk(god_map.world.root_link_name, self.root_link_name)
 
     @property
     def state(self) -> JointStates:
@@ -1733,12 +1674,12 @@ class WorldBranch(WorldTreeInterface):
 
         return helper(self.root_link)
 
-    def compute_fk_pose(self, root: PrefixName, tip: PrefixName) -> PoseStamped:
-        return god_map.world.compute_fk_pose(root, tip)
+    def compute_fk_pose(self, root: PrefixName, tip: PrefixName) -> cas.TransMatrix:
+        return god_map.world.compute_fk(root, tip)
 
     def compute_fk_pose_with_collision_offset(self, root: PrefixName, tip: PrefixName, collision_id: int) \
-            -> PoseStamped:
-        return god_map.world.compute_fk_pose_with_collision_offset(root, tip, collision_id)
+            -> cas.TransMatrix:
+        return god_map.world.compute_fk_with_collision_offset(root, tip, collision_id)
 
     def is_link_controlled(self, link_name: PrefixName) -> bool:
         return god_map.world.is_link_controlled(link_name)

@@ -1,6 +1,7 @@
 from giskardpy.configs.giskard import CollisionAvoidanceConfig, RobotInterfaceConfig
 from giskardpy.configs.world_config import WorldWithOmniDriveRobot
 from giskardpy.data_types.data_types import Derivatives
+from giskardpy.model.collision_world_syncer import CollisionCheckerLib
 
 
 class WorldWithPR2Config(WorldWithOmniDriveRobot):
@@ -160,8 +161,9 @@ class PR2VelocityIAIInterface(RobotInterfaceConfig):
 
 
 class PR2CollisionAvoidance(CollisionAvoidanceConfig):
-    def __init__(self, drive_joint_name: str = 'brumbrum'):
-        super().__init__()
+    def __init__(self, drive_joint_name: str = 'brumbrum',
+                 collision_checker: CollisionCheckerLib = CollisionCheckerLib.bpb):
+        super().__init__(collision_checker=collision_checker)
         self.drive_joint_name = drive_joint_name
 
     def setup(self):

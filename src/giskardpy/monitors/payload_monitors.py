@@ -39,7 +39,7 @@ class SetMaxTrajectoryLength(CancelMotion):
                  new_length: Optional[float] = None,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol, ):
-        if not (start_condition == cas.TrueSymbol).evaluate():
+        if not (start_condition == cas.TrueSymbol).to_np():
             raise MonitorInitalizationException(f'Cannot set start_condition for {SetMaxTrajectoryLength.__name__}')
         if new_length is None:
             self.new_length = god_map.qp_controller_config.max_trajectory_length

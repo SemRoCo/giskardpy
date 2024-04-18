@@ -29,7 +29,7 @@ from giskardpy.goals.set_prediction_horizon import SetQPSolver
 from giskardpy.goals.tracebot import InsertCylinder
 from giskardpy.god_map import god_map
 from giskardpy.model.better_pybullet_syncer import BetterPyBulletSyncer
-from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
+from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer, CollisionCheckerLib
 from giskardpy.model.utils import make_world_body_box, hacky_urdf_parser_fix
 from giskardpy.model.world import WorldTree
 from giskardpy.data_types.data_types import PrefixName
@@ -160,7 +160,9 @@ class PR2TestWrapper(GiskardTestWrapper):
         if giskard is None:
             giskard = Giskard(world_config=WorldWithPR2Config(drive_joint_name=drive_joint_name),
                               robot_interface_config=PR2StandaloneInterface(drive_joint_name=drive_joint_name),
-                              collision_avoidance_config=PR2CollisionAvoidance(drive_joint_name=drive_joint_name),
+                              collision_avoidance_config=PR2CollisionAvoidance(drive_joint_name=drive_joint_name,
+                                                                               collision_checker=CollisionCheckerLib.none),
+                                                                               # ),
                               behavior_tree_config=StandAloneBTConfig(debug_mode=True,
                                                                       simulation_max_hz=None),
                               # qp_controller_config=QPControllerConfig(qp_solver=SupportedQPSolver.gurobi))
@@ -517,7 +519,7 @@ class TestMonitors:
         zero_pose.monitors.add_end_motion(start_condition=' and '.join([end_monitor, monitor2]))
         zero_pose.set_max_traj_length(30)
         zero_pose.execute(add_local_minimum_reached=False)
-        current_pose = god_map.world.compute_fk_pose(root=root_link, tip=tip_link)
+        current_pose = god_map.world.compute_fk(root=root_link, tip=tip_link)
         np.testing.assert_almost_equal(current_pose.pose.position.x, 1, decimal=2)
         np.testing.assert_almost_equal(current_pose.pose.position.y, 1, decimal=2)
 
@@ -565,7 +567,7 @@ class TestMonitors:
         zero_pose.set_max_traj_length(30)
         zero_pose.execute(add_local_minimum_reached=False)
 
-        current_pose = god_map.world.compute_fk_pose(root=root_link, tip=tip_link)
+        current_pose = god_map.world.compute_fk(root=root_link, tip=tip_link)
         np.testing.assert_almost_equal(current_pose.pose.position.x, 0, decimal=2)
         np.testing.assert_almost_equal(current_pose.pose.position.y, 1, decimal=2)
 
@@ -929,7 +931,7 @@ class TestMonitors:
         zero_pose.monitors.add_max_trajectory_length(120)
         zero_pose.execute(add_local_minimum_reached=False)
         assert god_map.trajectory.length_in_seconds > 6
-        current_pose = god_map.world.compute_fk_pose(root='map', tip='base_footprint')
+        current_pose = god_map.world.compute_fk(root='map', tip='base_footprint')
         compare_poses(current_pose.pose, base_goal.pose)
 
     def test_hold_monitors(self, zero_pose: PR2TestWrapper):
@@ -996,7 +998,7 @@ class TestMonitors:
                                                tip_link='base_footprint')
         zero_pose.allow_all_collisions()
         zero_pose.plan_and_execute()
-        current_pose = god_map.world.compute_fk_pose(root='map', tip='base_footprint')
+        current_pose = god_map.world.compute_fk(root='map', tip='base_footprint')
         np.testing.assert_almost_equal(current_pose.pose.position.x, 1, decimal=2)
         np.testing.assert_almost_equal(current_pose.pose.position.y, 1, decimal=2)
 
@@ -1197,7 +1199,7 @@ class TestConstraints:
                                 tip_group=zero_pose.robot_name,
                                 goal_pose=p)
         zero_pose.plan_and_execute()
-        new_pose = god_map.world.compute_fk_pose('map', tip)
+        new_pose = god_map.world.compute_fk('map', tip)
         compare_points(expected.pose.position, new_pose.pose.position)
 
     def test_JointVelocityRevolute(self, zero_pose: PR2TestWrapper):
@@ -1259,7 +1261,7 @@ class TestConstraints:
         goal_position.pose.position.z = 1
         goal_position.pose.orientation.w = 1
 
-        start_pose = god_map.world.compute_fk_pose('map', zero_pose.l_tip)
+        start_pose = god_map.world.compute_fk('map', zero_pose.l_tip)
         map_T_goal_position = zero_pose.transform_msg('map', goal_position)
 
         object_pose = PoseStamped()
@@ -1289,7 +1291,7 @@ class TestConstraints:
         goal_position.pose.position.z = 1
         goal_position.pose.orientation.w = 1
 
-        start_pose = god_map.world.compute_fk_pose('map', better_pose.l_tip)
+        start_pose = god_map.world.compute_fk('map', better_pose.l_tip)
         map_T_goal_position = better_pose.transform_msg('map', goal_position)
 
         object_pose = PoseStamped()
@@ -2048,7 +2050,7 @@ class TestCartGoals:
         r_goal = PoseStamped()
         r_goal.header.frame_id = zero_pose.r_tip
         r_goal.pose.orientation.w = 1
-        expected_pose = god_map.world.compute_fk_pose(zero_pose.default_root, zero_pose.r_tip)
+        expected_pose = god_map.world.compute_fk(zero_pose.default_root, zero_pose.r_tip)
         expected_pose.header.stamp = rospy.Time()
         zero_pose.set_cart_goal(r_goal, zero_pose.r_tip, zero_pose.default_root)
         zero_pose.set_joint_goal(js)
@@ -2331,7 +2333,7 @@ class TestWorldManipulation:
         p.pose.orientation = Quaternion(0., 0., 0.47942554, 0.87758256)
         zero_pose.add_box_to_world(pocky, (0.1, 0.02, 0.02), pose=p)
         zero_pose.update_parent_link_of_group(pocky, parent_link=zero_pose.r_tip)
-        relative_pose = zero_pose.robot.compute_fk_pose(zero_pose.r_tip, pocky).pose
+        relative_pose = zero_pose.robot.compute_fk(zero_pose.r_tip, pocky).pose
         compare_poses(p.pose, relative_pose)
 
     def test_add_box_twice(self, zero_pose: PR2TestWrapper):
@@ -2495,7 +2497,7 @@ class TestWorldManipulation:
         old_p.pose.orientation = Quaternion(0., 0., 0.47942554, 0.87758256)
         zero_pose.add_box_to_world(pocky, (0.1, 0.02, 0.02), pose=old_p)
         zero_pose.update_parent_link_of_group(pocky, parent_link=zero_pose.r_tip)
-        relative_pose = zero_pose.robot.compute_fk_pose(zero_pose.r_tip, pocky).pose
+        relative_pose = zero_pose.robot.compute_fk(zero_pose.r_tip, pocky).pose
         compare_poses(old_p.pose, relative_pose)
 
         p = PoseStamped()
@@ -2914,7 +2916,7 @@ class TestCollisionAvoidanceGoals:
         zero_pose.set_cart_goal(p, pocky, zero_pose.default_root)
         p = zero_pose.transform_msg(zero_pose.default_root, p)
         zero_pose.plan_and_execute()
-        p2 = god_map.world.compute_fk_pose(zero_pose.default_root, pocky)
+        p2 = god_map.world.compute_fk(zero_pose.default_root, pocky)
         compare_poses(p2.pose, p.pose)
         zero_pose.detach_group(pocky)
         p = PoseStamped()
@@ -3771,7 +3773,7 @@ class TestCollisionAvoidanceGoals:
         r_goal.pose.orientation.w = 1
         kitchen_setup.set_cart_goal(r_goal, kitchen_setup.l_tip, tray_name)
 
-        tray_goal = god_map.world.compute_fk_pose('base_footprint', tray_name)
+        tray_goal = god_map.world.compute_fk('base_footprint', tray_name)
         tray_goal.pose.position.y = 0
         tray_goal.pose.orientation = Quaternion(*quaternion_from_matrix([[-1, 0, 0, 0],
                                                                          [0, -1, 0, 0],
@@ -3796,7 +3798,7 @@ class TestCollisionAvoidanceGoals:
         r_goal.pose.orientation.w = 1
         kitchen_setup.set_cart_goal(r_goal, kitchen_setup.l_tip, tray_name)
 
-        expected_pose = god_map.world.compute_fk_pose(tray_name, kitchen_setup.l_tip)
+        expected_pose = god_map.world.compute_fk(tray_name, kitchen_setup.l_tip)
         expected_pose.header.stamp = rospy.Time()
 
         tray_goal = PoseStamped()
@@ -3939,11 +3941,11 @@ class TestWorld:
                                    pose=pose,
                                    parent_link_name=world_setup.root_link_name)
         new_parent_link_name = world_setup.search_for_link_name('r_gripper_tool_frame')
-        old_fk = world_setup.compute_fk_pose(world_setup.root_link_name, box_name)
+        old_fk = world_setup.compute_fk(world_setup.root_link_name, box_name)
 
         world_setup.move_group(box_name, new_parent_link_name)
 
-        new_fk = world_setup.compute_fk_pose(world_setup.root_link_name, box_name)
+        new_fk = world_setup.compute_fk(world_setup.root_link_name, box_name)
         assert world_setup.search_for_link_name(box_name) in world_setup.groups[
             world_setup.robot_names[0]].link_names_as_set
         assert world_setup.get_parent_link_of_link(world_setup.search_for_link_name(box_name)) == new_parent_link_name

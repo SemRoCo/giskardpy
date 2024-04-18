@@ -41,7 +41,7 @@ class Open(Goal):
         self.tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
         self.handle_link = god_map.world.search_for_link_name(environment_link, environment_group)
         self.joint_name = god_map.world.get_movable_parent_joint(self.handle_link)
-        self.handle_T_tip = god_map.world.compute_fk_pose(self.handle_link, self.tip_link)
+        self.handle_T_tip = god_map.world.compute_fk(self.handle_link, self.tip_link)
         if name is None:
             name = f'{self.__class__.__name__}'
         super().__init__(name)
@@ -57,7 +57,7 @@ class Open(Goal):
             handle_T_tip = god_map.monitor_manager.register_expression_updater(handle_T_tip,
                                                                                start_condition)
         else:
-            handle_T_tip = cas.TransMatrix(god_map.world.compute_fk_pose(self.handle_link, self.tip_link))
+            handle_T_tip = cas.TransMatrix(god_map.world.compute_fk(self.handle_link, self.tip_link))
 
         # %% position
         r_P_c = god_map.world.compose_fk_expression(self.handle_link, self.tip_link).to_position()

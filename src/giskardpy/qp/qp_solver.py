@@ -103,7 +103,7 @@ class QPSolver(ABC):
         for i in range(len(casadi_array)):
             expr = casadi_array[i]
             if cas.is_constant(expr):
-                finite_filter.append(np.isfinite(casadi_array[i].evaluate()))
+                finite_filter.append(np.isfinite(casadi_array[i].to_np()))
             else:
                 finite_filter.append(True)
         finite_filter = np.array(finite_filter)

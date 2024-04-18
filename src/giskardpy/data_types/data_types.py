@@ -9,7 +9,7 @@ import genpy
 import numpy as np
 from geometry_msgs.msg import PoseStamped, PointStamped, Vector3Stamped, QuaternionStamped
 from sensor_msgs.msg import JointState
-
+import std_msgs.msg as std_msgs
 
 class PrefixName:
     primary_separator = '/'
@@ -78,6 +78,16 @@ class PrefixName:
 
     def encode(self, param: str):
         return self.long_name.__str__().encode(param)
+
+
+class ColorRGBA:
+    r: float
+    g: float
+    b: float
+    a: float
+
+    def __init__(self, r: float, g: float, b: float, a: float):
+        self.r, self.g, self.b, self.a = r, g, b, a
 
 
 class Derivatives(IntEnum):
@@ -241,21 +251,6 @@ class JointStates(defaultdict, Dict[K, V], Generic[K, V]):
             else:
                 raise KeyError(f'{key} is not of type {PrefixName}')
         super().__setitem__(key, value)
-
-    @classmethod
-    def from_msg(cls, msg: JointState, prefix: Optional[str] = None) -> JointStates:
-        self = cls()
-        for i, joint_name in enumerate(msg.name):
-            joint_name = PrefixName(joint_name, prefix)
-            sjs = _JointState(position=msg.position[i],
-                              velocity=0,
-                              acceleration=0,
-                              jerk=0,
-                              snap=0,
-                              crackle=0,
-                              pop=0)
-            self[joint_name] = sjs
-        return self
 
     def __deepcopy__(self, memodict={}):
         new_js = JointStates()

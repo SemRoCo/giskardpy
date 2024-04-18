@@ -105,7 +105,6 @@ def _operation_type_error(arg1, operation, arg2):
 
 
 class Symbol_:
-    s: ca.SX
 
     def __str__(self):
         return str(self.s)
@@ -141,7 +140,7 @@ class Symbol_:
     def free_symbols(self):
         return free_symbols(self.s)
 
-    def evaluate(self):
+    def to_np(self):
         if self.shape[0] == self.shape[1] == 0:
             return np.eye(0)
         elif self.s.shape[0] * self.s.shape[1] <= 1:
@@ -487,7 +486,23 @@ TrueSymbol = Expression(True)
 FalseSymbol = Expression(False)
 
 
-class TransMatrix(Symbol_):
+class GeometricType:
+
+    @classmethod
+    def from_ros1_msg(cls, msg):
+        if isinstance(msg, geometry_msgs.PoseStamped):
+            return TransMatrix(msg)
+        elif isinstance(msg, geometry_msgs.QuaternionStamped):
+            return RotationMatrix(msg)
+        elif isinstance(msg, geometry_msgs.PointStamped):
+            return Point3(msg)
+        elif isinstance(msg, Vector3):
+            return Vector3(msg)
+        else:
+            raise ValueError(f'Cannot convert {type(msg)} to casadi object')
+
+
+class TransMatrix(Symbol_, GeometricType):
     @profile
     def __init__(self, data=None, sanity_check=True):
         try:
@@ -595,7 +610,7 @@ class TransMatrix(Symbol_):
         return RotationMatrix(self)
 
 
-class RotationMatrix(Symbol_):
+class RotationMatrix(Symbol_, GeometricType):
     @profile
     def __init__(self, data=None, sanity_check=True):
         if hasattr(data, 'reference_frame'):
@@ -817,7 +832,7 @@ class RotationMatrix(Symbol_):
         return self.s.T
 
 
-class Point3(Symbol_):
+class Point3(Symbol_, GeometricType):
     @profile
     def __init__(self, data=None):
         try:
@@ -984,7 +999,7 @@ class Point3(Symbol_):
         raise _operation_type_error(self, 'dot', other)
 
 
-class Vector3(Symbol_):
+class Vector3(Symbol_, GeometricType):
     @profile
     def __init__(self, data=None):
         point = Point3(data)
@@ -1141,7 +1156,7 @@ class Vector3(Symbol_):
         self.s = (save_division(self, self.norm()) * a).s
 
 
-class Quaternion(Symbol_):
+class Quaternion(Symbol_, GeometricType):
     def __init__(self, data=None):
         if data is None:
             data = (0, 0, 0, 1)
@@ -2201,16 +2216,17 @@ def gradient(ex, arg):
 
 def is_true(expr):
     try:
-        return (expr == TrueSymbol).evaluate()
+        return (expr == TrueSymbol).to_np()
     except Exception as e:
         return False
 
 
 def is_false(expr):
     try:
-        return (expr == FalseSymbol).evaluate()
+        return (expr == FalseSymbol).to_np()
     except Exception as e:
         return False
+
 
 def is_constant(expr):
     return len(expr.free_symbols()) == 0

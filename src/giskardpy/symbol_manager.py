@@ -9,6 +9,7 @@ import giskardpy.casadi_wrapper as cas
 from giskardpy.utils.singleton import SingletonMeta
 from giskardpy.god_map import god_map  # has to be here for resolving symbols
 
+
 class SymbolManager(metaclass=SingletonMeta):
     symbol_str_to_lambda: Dict[str, Callable[[], float]]
     symbol_str_to_symbol: Dict[str, cas.Symbol]
@@ -58,7 +59,7 @@ class SymbolManager(metaclass=SingletonMeta):
             return expr
         f = expr.compile()
         if len(f.str_params) == 0:
-            return expr.evaluate()
+            return expr.to_np()
         result = f.fast_call(self.resolve_symbols(f.str_params))
         if len(result) == 1:
             return result[0]

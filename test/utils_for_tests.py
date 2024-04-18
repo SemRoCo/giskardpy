@@ -266,7 +266,7 @@ class GiskardTestWrapper(OldGiskardWrapper):
             req.transform.rotation = map_T_odom.pose.orientation
             assert self.set_localization_srv(req).success
             self.wait_heartbeats(15)
-            p2 = god_map.world.compute_fk_pose(god_map.world.root_link_name, self.odom_root)
+            p2 = god_map.world.compute_fk(god_map.world.root_link_name, self.odom_root)
             compare_poses(p2.pose, map_T_odom.pose)
 
     def transform_msg(self, target_frame, msg, timeout=1):
@@ -282,7 +282,7 @@ class GiskardTestWrapper(OldGiskardWrapper):
                 result_msg.header.frame_id = god_map.world.search_for_link_name(result_msg.header.frame_id)
             except UnknownGroupException:
                 pass
-            return god_map.world.transform_msg(target_frame, result_msg)
+            return god_map.world.transform(target_frame, result_msg)
 
     def wait_heartbeats(self, number=2):
         behavior_tree = god_map.tree
@@ -526,9 +526,9 @@ class GiskardTestWrapper(OldGiskardWrapper):
                 lower_limit = free_variable.get_lower_limit(Derivatives.position)
                 upper_limit = free_variable.get_upper_limit(Derivatives.position)
                 if not isinstance(lower_limit, float):
-                    lower_limit = lower_limit.evaluate()
+                    lower_limit = lower_limit.to_np()
                 if not isinstance(upper_limit, float):
-                    upper_limit = upper_limit.evaluate()
+                    upper_limit = upper_limit.to_np()
                 current_position = god_map.world.state[free_variable.name].position
                 assert lower_limit - eps <= current_position <= upper_limit + eps, \
                     f'joint limit of {free_variable.name} is violated {lower_limit} <= {current_position} <= {upper_limit}'

@@ -1,9 +1,9 @@
 from time import time
-from typing import Dict, Optional
+from typing import Optional
 
 from py_trees import Behaviour, Blackboard
 
-import giskardpy.utils.tfwrapper as tf
+import giskardpy.middleware_interfaces.ros1.tfwrapper as tf
 from giskardpy.god_map import god_map
 from giskardpy.utils.utils import has_blackboard_exception, get_blackboard_exception, clear_blackboard_exception
 

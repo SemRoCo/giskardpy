@@ -11,11 +11,10 @@ from giskard_msgs.msg import GiskardError
 from giskardpy.configs.behavior_tree_config import StandAloneBTConfig
 from giskardpy.configs.giskard import Giskard
 from giskardpy.configs.iai_robots.hsr import HSRCollisionAvoidanceConfig, WorldWithHSRConfig, HSRStandaloneInterface
-from giskardpy.configs.qp_controller_config import QPControllerConfig, SupportedQPSolver
+from giskardpy.configs.qp_controller_config import QPControllerConfig
 from giskardpy.god_map import god_map
 from giskardpy.utils.utils import launch_launchfile
 from utils_for_tests import compare_poses, GiskardTestWrapper
-import giskardpy.utils.tfwrapper as tf
 
 
 class HSRTestWrapper(GiskardTestWrapper):

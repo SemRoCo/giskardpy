@@ -1,11 +1,11 @@
-from typing import List, Optional
+from typing import Optional
 
 from geometry_msgs.msg import PointStamped, QuaternionStamped, PoseStamped, Vector3Stamped
 
 import giskardpy.casadi_wrapper as cas
-from giskardpy.monitors.monitors import ExpressionMonitor, Monitor
+from giskardpy.monitors.monitors import ExpressionMonitor
 from giskardpy.god_map import god_map
-import giskardpy.utils.tfwrapper as tf
+import giskardpy.middleware_interfaces.ros1.tfwrapper as tf
 from giskardpy.utils.expression_definition_utils import transform_msg, transform_msg_and_turn_to_expr
 
 

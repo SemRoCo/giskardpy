@@ -1,9 +1,8 @@
 import pytest
 import rospy
-from geometry_msgs.msg import PoseStamped, Quaternion
-from tf.transformations import quaternion_about_axis
+from geometry_msgs.msg import PoseStamped
 
-import giskardpy.utils.tfwrapper as tf
+import giskardpy.middleware_interfaces.ros1.tfwrapper as tf
 from giskardpy.god_map import god_map
 from giskardpy.model.joints import OneDofJoint
 from giskardpy.utils import logging

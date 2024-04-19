@@ -6,7 +6,7 @@ import rospy
 from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, PointStamped
 from tf.transformations import quaternion_about_axis, quaternion_matrix, rotation_from_matrix
 
-import giskardpy.utils.tfwrapper as tf
+import giskardpy.middleware_interfaces.ros1.tfwrapper as tf
 from giskard_msgs.msg import GiskardError
 from giskardpy.configs.behavior_tree_config import StandAloneBTConfig
 from giskardpy.configs.iai_robots.donbot import WorldWithBoxyBaseConfig, DonbotCollisionAvoidanceConfig, DonbotStandaloneInterfaceConfig

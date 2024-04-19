@@ -1,16 +1,15 @@
 from __future__ import division
 
-from typing import Optional, List
+from typing import Optional
 
 from geometry_msgs.msg import Vector3Stamped, PointStamped
 from std_msgs.msg import ColorRGBA
 
-import giskardpy.utils.tfwrapper as tf
+import giskardpy.middleware_interfaces.ros1.tfwrapper as tf
 import giskardpy.casadi_wrapper as cas
 from giskardpy.goals.goal import Goal
-from giskardpy.monitors.monitors import ExpressionMonitor
 from giskardpy.symbol_manager import symbol_manager
-from giskardpy.tasks.task import WEIGHT_BELOW_CA, Task
+from giskardpy.tasks.task import WEIGHT_BELOW_CA
 from giskardpy.god_map import god_map
 from giskardpy.utils.expression_definition_utils import transform_msg
 from giskardpy.utils.logging import logwarn

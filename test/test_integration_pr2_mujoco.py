@@ -1,4 +1,3 @@
-from copy import deepcopy
 from typing import Optional
 
 import numpy as np
@@ -8,14 +7,13 @@ from geometry_msgs.msg import PoseStamped, Point, Quaternion
 from std_srvs.srv import Trigger
 from tf.transformations import quaternion_about_axis
 
-import giskardpy.utils.tfwrapper as tf
-from giskard_msgs.msg import MoveResult, MoveGoal, GiskardError
+import giskardpy.middleware_interfaces.ros1.tfwrapper as tf
+from giskard_msgs.msg import MoveGoal, GiskardError
 from giskardpy.configs.behavior_tree_config import OpenLoopBTConfig
 from giskardpy.configs.giskard import Giskard
 from giskardpy.configs.iai_robots.pr2 import PR2CollisionAvoidance, PR2JointTrajServerMujocoInterface, \
     WorldWithPR2Config
 from giskardpy.configs.qp_controller_config import QPControllerConfig
-from giskardpy.configs.world_config import WorldWithOmniDriveRobot
 from test_integration_pr2 import PR2TestWrapper, TestJointGoals, pocky_pose
 
 

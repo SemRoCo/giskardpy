@@ -17,7 +17,7 @@ from giskardpy.tree.behaviors.action_server import ActionServerHandler
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
 from giskardpy.utils.decorators import record_time
-from giskardpy.utils.tfwrapper import transform_pose
+from giskardpy.middleware_interfaces.ros1.tfwrapper import transform_pose
 
 
 class ProcessWorldUpdate(GiskardBehavior):

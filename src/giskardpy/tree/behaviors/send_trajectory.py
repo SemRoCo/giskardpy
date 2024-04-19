@@ -26,6 +26,7 @@ from control_msgs.msg import FollowJointTrajectoryAction, FollowJointTrajectoryG
     JointTolerance
 from py_trees_ros.actions import ActionClient
 
+import giskardpy.middleware_interfaces.ros1.msg_converter as msg_converter
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
 from giskardpy.utils.logging import loginfo
@@ -107,10 +108,11 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
         fill_velocity_values = god_map.fill_trajectory_velocity_values
         if fill_velocity_values is None:
             fill_velocity_values = self.fill_velocity_values
-        goal.trajectory = trajectory.to_msg(god_map.qp_controller_config.sample_period,
-                                            start_time,
-                                            self.controlled_joints,
-                                            fill_velocity_values)
+        goal.trajectory = msg_converter.trajectory_to_ros_trajectory(trajectory,
+                                                                     god_map.qp_controller_config.sample_period,
+                                                                     start_time,
+                                                                     self.controlled_joints,
+                                                                     fill_velocity_values)
 
         if self.path_tolerance is not None:
             for i, joint_name in enumerate(goal.trajectory.joint_names):

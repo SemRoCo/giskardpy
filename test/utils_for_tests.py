@@ -19,7 +19,7 @@ from std_msgs.msg import ColorRGBA
 from tf2_py import LookupException, ExtrapolationException
 from visualization_msgs.msg import Marker
 
-import giskardpy.utils.tfwrapper as tf
+import giskardpy.middleware_interfaces.ros1.tfwrapper as tf
 from giskard_msgs.msg import CollisionEntry, MoveResult, MoveGoal, WorldResult, GiskardError
 from giskard_msgs.srv import DyeGroupResponse
 from giskardpy.configs.giskard import Giskard

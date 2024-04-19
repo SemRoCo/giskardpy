@@ -11,7 +11,6 @@ from xml.etree.ElementTree import ParseError
 
 import numpy as np
 import urdf_parser_py.urdf as up
-from tf2_msgs.msg import TFMessage
 
 import giskardpy.utils.math as mymath
 from giskard_msgs.msg import WorldBody
@@ -19,19 +18,18 @@ from giskardpy import casadi_wrapper as cas
 from giskardpy.casadi_wrapper import CompiledFunction
 from giskardpy.data_types.data_types import JointStates, ColorRGBA
 from giskardpy.exceptions import DuplicateNameException, UnknownGroupException, UnknownLinkException, \
-    WorldException, GiskardException, UnknownJointException, CorruptURDFException
+    WorldException, UnknownJointException, CorruptURDFException
 from giskardpy.god_map import god_map
 from giskardpy.model.joints import Joint, FixedJoint, PrismaticJoint, RevoluteJoint, OmniDrive, DiffDrive, \
     urdf_to_joint, VirtualFreeVariables, MovableJoint, Joint6DOF, OneDofJoint
-from giskardpy.model.links import Link, MeshGeometry
+from giskardpy.model.links import Link
 from giskardpy.model.utils import hacky_urdf_parser_fix
-from giskardpy.data_types.data_types import PrefixName, Derivatives, derivative_joint_map, derivative_map
+from giskardpy.data_types.data_types import PrefixName, Derivatives, derivative_map
 from giskardpy.data_types.data_types import my_string
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.next_command import NextCommands
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils import logging
-from giskardpy.utils.tfwrapper import homo_matrix_to_pose, np_to_pose, msg_to_homogeneous_matrix, make_transform
 from giskardpy.utils.utils import suppress_stderr, clear_cached_properties
 from giskardpy.utils.decorators import memoize, copy_memoize, clear_memo
 
@@ -1233,28 +1231,6 @@ class WorldTree(WorldTreeInterface):
         root_T_tip = self.compute_fk(root, tip)
         tip_link = self.links[tip]
         return root_T_tip.dot(tip_link.collisions[collision_id].link_T_geometry)
-
-    @profile
-    def as_tf_msg(self, include_prefix: bool) -> TFMessage:
-        """
-        Create a tfmessage for the whole world tree.
-        """
-        # fixme
-        tf_msg = TFMessage()
-        for joint_name, joint in self.joints.items():
-            p_T_c = self.compute_fk(root=joint.parent_link_name, tip=joint.child_link_name)
-            if include_prefix:
-                parent_link_name = joint.parent_link_name
-                child_link_name = joint.child_link_name
-            else:
-                parent_link_name = joint.parent_link_name.short_name
-                child_link_name = joint.child_link_name.short_name
-            p_T_c = make_transform(parent_frame=parent_link_name,
-                                   child_frame=child_link_name,
-                                   pose=p_T_c.pose,
-                                   normalize_quaternion=False)
-            tf_msg.transforms.append(p_T_c)
-        return tf_msg
 
     @profile
     def compute_all_collision_fks(self):

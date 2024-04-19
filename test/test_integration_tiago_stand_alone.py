@@ -6,7 +6,7 @@ import pytest
 from geometry_msgs.msg import PoseStamped, Quaternion, Point, PointStamped, Vector3Stamped
 from tf.transformations import quaternion_about_axis, quaternion_from_matrix
 
-import giskardpy.utils.tfwrapper as tf
+import giskardpy.middleware_interfaces.ros1.tfwrapper as tf
 from giskardpy.configs.behavior_tree_config import StandAloneBTConfig
 from giskardpy.configs.giskard import Giskard
 from giskardpy.configs.qp_controller_config import QPControllerConfig

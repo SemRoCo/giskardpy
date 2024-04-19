@@ -2,12 +2,12 @@ from collections import defaultdict
 from copy import deepcopy
 from typing import Dict, Optional, List
 import giskardpy.casadi_wrapper as cas
-import giskardpy.utils.tfwrapper as tf
+import giskardpy.middleware_interfaces.ros1.tfwrapper as tf
 from giskard_msgs.msg import CollisionEntry
 from giskardpy.goals.goal import Goal
 from giskardpy.monitors.monitors import ExpressionMonitor
 from giskardpy.monitors.payload_monitors import CollisionMatrixUpdater
-from giskardpy.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE, Task
+from giskardpy.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE
 from giskardpy.god_map import god_map
 from giskardpy.data_types.data_types import my_string
 from giskardpy.symbol_manager import symbol_manager

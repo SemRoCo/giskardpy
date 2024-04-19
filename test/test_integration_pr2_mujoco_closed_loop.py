@@ -10,16 +10,15 @@ from sensor_msgs.msg import JointState
 from std_srvs.srv import Trigger
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
-import giskardpy.utils.tfwrapper as tf
-from giskard_msgs.msg import MoveResult, MoveGoal, GiskardError
+import giskardpy.middleware_interfaces.ros1.tfwrapper as tf
+from giskard_msgs.msg import MoveGoal, GiskardError
 from giskardpy.configs.behavior_tree_config import ClosedLoopBTConfig
 from giskardpy.configs.giskard import Giskard
 from giskardpy.configs.iai_robots.pr2 import PR2CollisionAvoidance, PR2VelocityMujocoInterface, WorldWithPR2Config
-from giskardpy.configs.qp_controller_config import QPControllerConfig, SupportedQPSolver
-from giskardpy.data_types.data_types import JointStates
+from giskardpy.configs.qp_controller_config import QPControllerConfig
 from giskardpy.god_map import god_map
 from giskardpy.tasks.task import WEIGHT_BELOW_CA
-from test_integration_pr2 import PR2TestWrapper, TestJointGoals, pocky_pose
+from test_integration_pr2 import PR2TestWrapper, TestJointGoals
 from giskardpy.goals.manipulability_goals import MaxManipulability
 import giskardpy.middleware_interfaces.ros1.msg_converter as msg_converter
 

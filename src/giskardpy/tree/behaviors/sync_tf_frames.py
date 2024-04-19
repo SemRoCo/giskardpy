@@ -1,13 +1,11 @@
-from typing import List, Tuple, Dict, Optional
-import giskardpy.casadi_wrapper as w
+from typing import Tuple, Dict, Optional
 from py_trees import Status
 
 from giskardpy.god_map import god_map
 from giskardpy.model.joints import Joint6DOF
 from giskardpy.data_types.data_types import PrefixName
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
-from giskardpy.utils.math import compare_poses
-from giskardpy.utils.tfwrapper import lookup_pose, msg_to_homogeneous_matrix
+from giskardpy.middleware_interfaces.ros1.tfwrapper import lookup_pose
 from giskardpy.utils.decorators import catch_and_raise_to_blackboard, record_time
 
 

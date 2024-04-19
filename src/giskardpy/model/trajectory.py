@@ -4,17 +4,14 @@ import os
 from collections import OrderedDict, defaultdict
 from itertools import product
 from threading import Lock
-from typing import List, Union, Dict, Tuple
+from typing import Dict, Tuple
 import numpy as np
 import matplotlib.colors as mcolors
 import pylab as plt
-import rospy
 from sortedcontainers import SortedDict
-from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
 from giskardpy.data_types.data_types import JointStates
 from giskardpy.god_map import god_map
-from giskardpy.model.joints import Joint, OmniDrive, MovableJoint
 from giskardpy.data_types.data_types import PrefixName, Derivatives
 from giskardpy.utils import logging
 from giskardpy.utils.utils import cm_to_inch
@@ -65,33 +62,6 @@ class Trajectory:
 
     def values(self):
         return self._points.values()
-
-    def to_msg(self, sample_period: float, start_time: Union[rospy.Duration, float], joints: List[MovableJoint],
-               fill_velocity_values: bool = True) -> JointTrajectory:
-        if isinstance(start_time, (int, float)):
-            start_time = rospy.Duration(start_time)
-        trajectory_msg = JointTrajectory()
-        trajectory_msg.header.stamp = start_time
-        trajectory_msg.joint_names = []
-        for i, (time, traj_point) in enumerate(self.items()):
-            p = JointTrajectoryPoint()
-            p.time_from_start = rospy.Duration(time * sample_period)
-            for joint in joints:
-                free_variables = joint.get_free_variable_names()
-                for free_variable in free_variables:
-                    if free_variable in traj_point:
-                        if i == 0:
-                            joint_name = free_variable
-                            if isinstance(joint_name, PrefixName):
-                                joint_name = joint_name.short_name
-                            trajectory_msg.joint_names.append(joint_name)
-                        p.positions.append(traj_point[free_variable].position)
-                        if fill_velocity_values:
-                            p.velocities.append(traj_point[free_variable].velocity)
-                    else:
-                        raise NotImplementedError('generated traj does not contain all joints')
-            trajectory_msg.points.append(p)
-        return trajectory_msg
 
     @property
     def length_in_seconds(self) -> float:

@@ -8,8 +8,8 @@ from tf2_msgs.msg import TFMessage
 from giskardpy.god_map import god_map
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.decorators import record_time
-from giskardpy.utils.tfwrapper import normalize_quaternion_msg
-
+from giskardpy.middleware_interfaces.ros1.tfwrapper import normalize_quaternion_msg
+import giskardpy.middleware_interfaces.ros1.msg_converter as msg_converter
 
 class TfPublishingModes(Enum):
     nothing = 0
@@ -49,7 +49,7 @@ class TFPublisher(GiskardBehavior):
     def update(self):
         try:
             if self.mode == TfPublishingModes.all:
-                self.tf_pub.publish(god_map.world.as_tf_msg(self.include_prefix))
+                self.tf_pub.publish(msg_converter.world_to_tf_message(god_map.world, self.include_prefix))
             else:
                 tf_msg = TFMessage()
                 if self.mode in [TfPublishingModes.attached_objects, TfPublishingModes.attached_and_world_objects]:

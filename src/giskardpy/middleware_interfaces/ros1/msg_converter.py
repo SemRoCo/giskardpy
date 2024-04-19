@@ -1,4 +1,5 @@
-from typing import Optional, Union, List
+import json
+from typing import Optional, Union, List, Dict, Any
 
 import rospy
 
@@ -13,10 +14,15 @@ import tf2_msgs.msg as tf2_msgs
 import giskard_msgs.msg as giskard_msgs
 from giskardpy.data_types.data_types import JointStates, PrefixName, _JointState, ColorRGBA
 from giskardpy.exceptions import GiskardException, CorruptShapeException
+from giskardpy.model.collision_world_syncer import CollisionEntry
 from giskardpy.model.joints import MovableJoint
 from giskardpy.model.links import LinkGeometry, Link, SphereGeometry, CylinderGeometry, BoxGeometry, MeshGeometry
 from giskardpy.model.trajectory import Trajectory
 from giskardpy.model.world import WorldTree
+
+from rospy_message_converter.message_converter import \
+    convert_ros_message_to_dictionary as original_convert_ros_message_to_dictionary, \
+    convert_dictionary_to_ros_message as original_convert_dictionary_to_ros_message
 
 
 # %% to ros
@@ -111,6 +117,7 @@ def trans_matrix_to_pose_stamped(data: cas.TransMatrix) -> geometry_msgs.PoseSta
                                                              orientation[2][0], orientation[3][0])
     return pose_stamped
 
+
 def point3_to_point_stamped(data: cas.Point3) -> geometry_msgs.PointStamped:
     point_stamped = geometry_msgs.PointStamped()
     point_stamped.header.frame_id = str(data.reference_frame)
@@ -179,12 +186,40 @@ def world_to_tf_message(world: WorldTree, include_prefix: bool) -> tf2_msgs.TFMe
     return tf_msg
 
 
+def json_str_to_kwargs(json_str: str, world: WorldTree) -> Dict[str, Any]:
+    d = json.loads(json_str)
+    return json_to_kwargs(d, world)
+
+
+def json_to_kwargs(d: dict, world: WorldTree) -> Dict[str, Any]:
+    if isinstance(d, list):
+        for i, element in enumerate(d):
+            d[i] = json_to_kwargs(element, world)
+
+    if isinstance(d, dict):
+        if 'message_type' in d:
+            d = convert_dictionary_to_ros_message(d)
+        else:
+            for key, value in d.copy().items():
+                d[key] = json_to_kwargs(value, world)
+    if isinstance(d, rospy.Message):
+        return convert_ros_msg_to_giskard_obj(d, world)
+    return d
+
+
+def convert_dictionary_to_ros_message(json):
+    # maybe somehow search for message that fits to structure of json?
+    return original_convert_dictionary_to_ros_message(json['message_type'], json['message'])
+
+
 # %% from ros
 def convert_ros_msg_to_giskard_obj(msg, world: WorldTree):
     if isinstance(msg, sensor_msgs.JointState):
         return ros_joint_state_to_giskard_joint_state(msg)
     elif isinstance(msg, geometry_msgs.PoseStamped):
         return pose_stamped_to_trans_matrix(msg, world)
+    elif isinstance(msg, giskard_msgs.CollisionEntry):
+        return collision_entry_msg_to_giskard(msg)
     else:
         raise ValueError(f'Can\'t convert msg of type \'{type(msg)}\'')
 
@@ -253,3 +288,7 @@ def pose_stamped_to_trans_matrix(msg: geometry_msgs.PoseStamped, world: WorldTre
                                                         rotation_matrix=R,
                                                         reference_frame=world.search_for_link_name(msg.header.frame_id))
     return result
+
+
+def collision_entry_msg_to_giskard(msg: giskard_msgs.CollisionEntry) -> CollisionEntry:
+    return CollisionEntry(msg.type, msg.distance, msg.group1, msg.group2)

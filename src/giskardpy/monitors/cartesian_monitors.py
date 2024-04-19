@@ -1,18 +1,14 @@
 from typing import Optional
 
-from geometry_msgs.msg import PointStamped, QuaternionStamped, PoseStamped, Vector3Stamped
-
 import giskardpy.casadi_wrapper as cas
 from giskardpy.monitors.monitors import ExpressionMonitor
 from giskardpy.god_map import god_map
-import giskardpy.middleware_interfaces.ros1.tfwrapper as tf
-from giskardpy.utils.expression_definition_utils import transform_msg, transform_msg_and_turn_to_expr
 
 
 class PoseReached(ExpressionMonitor):
     def __init__(self,
                  root_link: str, tip_link: str,
-                 goal_pose: PoseStamped,
+                 goal_pose: cas.TransMatrix,
                  root_group: Optional[str] = None,
                  tip_group: Optional[str] = None,
                  position_threshold: float = 0.01,
@@ -24,10 +20,12 @@ class PoseReached(ExpressionMonitor):
         super().__init__(name=name, stay_true=stay_true, start_condition=start_condition)
         root_link = god_map.world.search_for_link_name(root_link, root_group)
         tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
-        if absolute:
-            root_T_goal = transform_msg_and_turn_to_expr(root_link, goal_pose, cas.TrueSymbol)
+        if absolute or cas.is_true(start_condition):
+            root_T_goal = god_map.world.transform(root_link, goal_pose)
         else:
-            root_T_goal = transform_msg_and_turn_to_expr(root_link, goal_pose, start_condition)
+            root_T_x = god_map.world.compose_fk_expression(root_link, goal_pose.reference_frame)
+            root_T_goal = root_T_x.dot(goal_pose)
+            root_T_goal = god_map.monitor_manager.register_expression_updater(root_T_goal, start_condition)
 
         # %% position error
         r_P_g = root_T_goal.to_position()
@@ -48,7 +46,7 @@ class PositionReached(ExpressionMonitor):
     def __init__(self,
                  root_link: str,
                  tip_link: str,
-                 goal_point: PointStamped,
+                 goal_point: cas.Point3,
                  root_group: Optional[str] = None,
                  tip_group: Optional[str] = None,
                  threshold: float = 0.01,
@@ -59,14 +57,15 @@ class PositionReached(ExpressionMonitor):
         super().__init__(name=name, stay_true=stay_true, start_condition=start_condition)
         root_link = god_map.world.search_for_link_name(root_link, root_group)
         tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
-
-        if absolute:
-            r_P_g = transform_msg_and_turn_to_expr(root_link, goal_point, cas.TrueSymbol)
+        if absolute or cas.is_true(start_condition):
+            root_P_goal = god_map.world.transform(root_link, goal_point)
         else:
-            r_P_g = transform_msg_and_turn_to_expr(root_link, goal_point, start_condition)
+            root_P_x = god_map.world.compose_fk_expression(root_link, goal_point.reference_frame)
+            root_P_goal = root_P_x.dot(goal_point)
+            root_P_goal = god_map.monitor_manager.register_expression_updater(root_P_goal, start_condition)
 
         r_P_c = god_map.world.compose_fk_expression(root_link, tip_link).to_position()
-        distance_to_goal = cas.euclidean_distance(r_P_g, r_P_c)
+        distance_to_goal = cas.euclidean_distance(root_P_goal, r_P_c)
         self.expression = cas.less(distance_to_goal, threshold)
 
 
@@ -74,7 +73,7 @@ class OrientationReached(ExpressionMonitor):
     def __init__(self,
                  root_link: str,
                  tip_link: str,
-                 goal_orientation: QuaternionStamped,
+                 goal_orientation: cas.RotationMatrix,
                  root_group: Optional[str] = None,
                  tip_group: Optional[str] = None,
                  threshold: float = 0.01,
@@ -86,10 +85,12 @@ class OrientationReached(ExpressionMonitor):
         root_link = god_map.world.search_for_link_name(root_link, root_group)
         tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
 
-        if absolute:
-            r_R_g = transform_msg_and_turn_to_expr(root_link, goal_orientation, cas.TrueSymbol)
+        if absolute or cas.is_true(start_condition):
+            r_R_g = god_map.world.transform(root_link, goal_orientation)
         else:
-            r_R_g = transform_msg_and_turn_to_expr(root_link, goal_orientation, start_condition)
+            root_T_x = god_map.world.compose_fk_expression(root_link, goal_orientation.reference_frame)
+            root_R_goal = root_T_x.dot(goal_orientation)
+            r_R_g = god_map.monitor_manager.register_expression_updater(root_R_goal, start_condition)
 
         r_R_c = god_map.world.compose_fk_expression(root_link, tip_link).to_rotation()
         rotation_error = cas.rotational_error(r_R_c, r_R_g)
@@ -99,11 +100,11 @@ class OrientationReached(ExpressionMonitor):
 class PointingAt(ExpressionMonitor):
     def __init__(self,
                  tip_link: str,
-                 goal_point: PointStamped,
+                 goal_point: cas.Point3,
                  root_link: str,
+                 pointing_axis: cas.Vector3,
                  tip_group: Optional[str] = None,
                  root_group: Optional[str] = None,
-                 pointing_axis: Vector3Stamped = None,
                  threshold: float = 0.01,
                  name: Optional[str] = None,
                  stay_true: bool = True,
@@ -111,18 +112,16 @@ class PointingAt(ExpressionMonitor):
         super().__init__(name=name, stay_true=stay_true, start_condition=start_condition)
         self.root = god_map.world.search_for_link_name(root_link, root_group)
         self.tip = god_map.world.search_for_link_name(tip_link, tip_group)
-        self.root_P_goal_point = transform_msg(self.root, goal_point)
+        self.root_P_goal_point = god_map.world.transform(self.root, goal_point)
 
-        tip_V_pointing_axis = transform_msg(self.tip, pointing_axis)
-        tip_V_pointing_axis.vector = tf.normalize(tip_V_pointing_axis.vector)
+        tip_V_pointing_axis = god_map.world.transform(self.tip, pointing_axis)
+        tip_V_pointing_axis.scale(1)
         root_T_tip = god_map.world.compose_fk_expression(self.root, self.tip)
         root_P_tip = root_T_tip.to_position()
-        root_P_goal_point = cas.Point3(self.root_P_goal_point)
-        tip_V_pointing_axis = cas.Vector3(tip_V_pointing_axis)
 
         root_V_pointing_axis = root_T_tip.dot(tip_V_pointing_axis)
         root_V_pointing_axis.vis_frame = self.tip
-        distance = cas.distance_point_to_line(frame_P_point=root_P_goal_point,
+        distance = cas.distance_point_to_line(frame_P_point=self.root_P_goal_point,
                                               frame_P_line_point=root_P_tip,
                                               frame_V_line_direction=root_V_pointing_axis)
         expr = cas.less(cas.abs(distance), threshold)
@@ -133,8 +132,8 @@ class VectorsAligned(ExpressionMonitor):
     def __init__(self,
                  root_link: str,
                  tip_link: str,
-                 goal_normal: Vector3Stamped,
-                 tip_normal: Vector3Stamped,
+                 goal_normal: cas.Vector3,
+                 tip_normal: cas.Vector3,
                  root_group: Optional[str] = None,
                  tip_group: Optional[str] = None,
                  threshold: float = 0.01,
@@ -145,17 +144,15 @@ class VectorsAligned(ExpressionMonitor):
         self.root = god_map.world.search_for_link_name(root_link, root_group)
         self.tip = god_map.world.search_for_link_name(tip_link, tip_group)
 
-        self.tip_V_tip_normal = transform_msg(self.tip, tip_normal)
-        self.tip_V_tip_normal.vector = tf.normalize(self.tip_V_tip_normal.vector)
+        self.tip_V_tip_normal = god_map.world.transform(self.tip, tip_normal)
+        self.tip_V_tip_normal.vector.scale(1)
 
-        self.root_V_root_normal = transform_msg(self.root, goal_normal)
-        self.root_V_root_normal.vector = tf.normalize(self.root_V_root_normal.vector)
+        self.root_V_root_normal = god_map.world.transform(self.root, goal_normal)
+        self.root_V_root_normal.vector.scale(1)
 
-        tip_V_tip_normal = cas.Vector3(self.tip_V_tip_normal)
         root_R_tip = god_map.world.compose_fk_expression(self.root, self.tip).to_rotation()
-        root_V_tip_normal = root_R_tip.dot(tip_V_tip_normal)
-        root_V_root_normal = cas.Vector3(self.root_V_root_normal)
-        error = cas.angle_between_vector(root_V_tip_normal, root_V_root_normal)
+        root_V_tip_normal = root_R_tip.dot(self.tip_V_tip_normal)
+        error = cas.angle_between_vector(root_V_tip_normal, self.root_V_root_normal)
         expr = cas.less(error, threshold)
         self.expression = expr
 
@@ -164,8 +161,8 @@ class DistanceToLine(ExpressionMonitor):
     def __init__(self,
                  root_link: str,
                  tip_link: str,
-                 center_point: PointStamped,
-                 line_axis: Vector3Stamped,
+                 center_point: cas.Point3,
+                 line_axis: cas.Vector3,
                  line_length: float,
                  root_group: Optional[str] = None,
                  tip_group: Optional[str] = None,
@@ -178,11 +175,9 @@ class DistanceToLine(ExpressionMonitor):
         self.tip = god_map.world.search_for_link_name(tip_link, tip_group)
 
         root_P_current = god_map.world.compose_fk_expression(self.root, self.tip).to_position()
-        root_V_line_axis = transform_msg(self.root, line_axis)
-        root_V_line_axis = cas.Vector3(root_V_line_axis)
+        root_V_line_axis = god_map.world.transform(self.root, line_axis)
         root_V_line_axis.scale(1)
-        root_P_center = transform_msg(self.root, center_point)
-        root_P_center = cas.Point3(root_P_center)
+        root_P_center = god_map.world.transform(self.root, center_point)
         root_P_line_start = root_P_center + root_V_line_axis * (line_length / 2)
         root_P_line_end = root_P_center - root_V_line_axis * (line_length / 2)
 

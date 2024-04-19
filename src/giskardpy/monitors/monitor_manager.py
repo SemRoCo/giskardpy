@@ -12,11 +12,12 @@ from giskardpy.casadi_wrapper import CompiledFunction
 from giskardpy.data_types.data_types import TaskState
 from giskardpy.exceptions import GiskardException, MonitorInitalizationException, UnknownMonitorException
 from giskardpy.god_map import god_map
+from giskardpy.middleware_interfaces.ros1.msg_converter import json_str_to_kwargs
 from giskardpy.monitors.monitors import ExpressionMonitor, Monitor
 from giskardpy.monitors.payload_monitors import PayloadMonitor, CancelMotion
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils import logging
-from giskardpy.utils.utils import get_all_classes_in_package, json_str_to_kwargs
+from giskardpy.utils.utils import get_all_classes_in_package
 
 
 def flipped_to_one(a: np.ndarray, b: np.ndarray) -> np.ndarray:
@@ -315,7 +316,7 @@ class MonitorManager:
             except KeyError:
                 raise UnknownMonitorException(f'unknown monitor type: \'{monitor_msg.monitor_class}\'.')
             try:
-                kwargs = json_str_to_kwargs(monitor_msg.kwargs)
+                kwargs = json_str_to_kwargs(monitor_msg.kwargs, god_map.world)
                 start_condition = self.logic_str_to_expr(monitor_msg.start_condition, default=cas.TrueSymbol)
                 monitor = C(name=monitor_msg.name,
                             start_condition=start_condition,

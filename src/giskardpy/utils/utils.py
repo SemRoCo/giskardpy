@@ -17,7 +17,6 @@ from collections import OrderedDict
 from contextlib import contextmanager
 from functools import cached_property
 from typing import Type, Optional, Dict, Any, List, Union, Tuple
-
 import numpy as np
 import roslaunch
 import rospkg
@@ -411,11 +410,6 @@ def replace_prefix_name_with_str(d: dict) -> dict:
     return new_d
 
 
-def convert_dictionary_to_ros_message(json):
-    # maybe somehow search for message that fits to structure of json?
-    return original_convert_dictionary_to_ros_message(json['message_type'], json['message'])
-
-
 def trajectory_to_np(tj, joint_names):
     """
     :type tj: Trajectory
@@ -475,24 +469,6 @@ def split_pose_stamped(pose: PoseStamped) -> Tuple[PointStamped, QuaternionStamp
     return point, quaternion
 
 
-def json_str_to_kwargs(json_str: str) -> Dict[str, Any]:
-    d = json.loads(json_str)
-    return json_to_kwargs(d)
-
-
-def json_to_kwargs(d: dict) -> Dict[str, Any]:
-    if isinstance(d, list):
-        for i, element in enumerate(d):
-            d[i] = json_to_kwargs(element)
-
-    if isinstance(d, dict):
-        if 'message_type' in d:
-            d = convert_dictionary_to_ros_message(d)
-        else:
-            for key, value in d.copy().items():
-                d[key] = json_to_kwargs(value)
-
-    return d
 
 
 def kwargs_to_json(kwargs: Dict[str, Any]) -> str:

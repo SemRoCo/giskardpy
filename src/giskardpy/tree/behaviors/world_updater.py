@@ -191,7 +191,6 @@ class ProcessWorldUpdate(GiskardBehavior):
         if name not in god_map.world.groups:
             raise UnknownGroupException(f'Can not remove unknown group: {name}.')
         god_map.world.delete_group(name)
-        god_map.world.cleanup_unused_free_variable()
         god_map.tree.wait_for_goal.synchronization.remove_group_behaviors(name)
         logging.loginfo(f'Deleted \'{name}\'.')
 

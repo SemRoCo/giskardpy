@@ -12,13 +12,13 @@ from giskardpy.goals.collision_avoidance import ExternalCollisionAvoidance, Self
 from giskardpy.goals.goal import Goal
 import giskard_msgs.msg as giskard_msgs
 from giskardpy.god_map import god_map
+from giskardpy.middleware_interfaces.ros1.msg_converter import convert_dictionary_to_ros_message
 from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint, \
     ManipulabilityConstraint
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.tasks.task import Task
 from giskardpy.utils import logging
-from giskardpy.utils.utils import get_all_classes_in_package, convert_dictionary_to_ros_message, \
-    json_str_to_kwargs, ImmutableDict
+from giskardpy.utils.utils import get_all_classes_in_package, ImmutableDict
 
 
 class MotionGoalManager:
@@ -35,39 +35,6 @@ class MotionGoalManager:
         self.state_history = []
         for path in god_map.giskard.goal_package_paths:
             self.allowed_motion_goal_types.update(get_all_classes_in_package(path, Goal))
-
-    @profile
-    def parse_motion_goals(self, motion_goals: List[giskard_msgs.MotionGoal]):
-        for motion_goal in motion_goals:
-            try:
-                logging.loginfo(
-                    f'Adding motion goal of type: \'{motion_goal.motion_goal_class}\' named: \'{motion_goal.name}\'')
-                C = self.allowed_motion_goal_types[motion_goal.motion_goal_class]
-            except KeyError:
-                raise UnknownGoalException(f'unknown constraint {motion_goal.motion_goal_class}.')
-            try:
-                params = json_str_to_kwargs(motion_goal.kwargs)
-                if motion_goal.name == '':
-                    motion_goal.name = None
-                start_condition = god_map.monitor_manager.logic_str_to_expr(motion_goal.start_condition,
-                                                                            default=cas.TrueSymbol)
-                hold_condition = god_map.monitor_manager.logic_str_to_expr(motion_goal.hold_condition,
-                                                                           default=cas.FalseSymbol)
-                end_condition = god_map.monitor_manager.logic_str_to_expr(motion_goal.end_condition,
-                                                                          default=cas.TrueSymbol)
-                c: Goal = C(name=motion_goal.name,
-                            start_condition=start_condition,
-                            hold_condition=hold_condition,
-                            end_condition=end_condition,
-                            **params)
-                self.add_motion_goal(c)
-            except Exception as e:
-                traceback.print_exc()
-                error_msg = f'Initialization of \'{C.__name__}\' constraint failed: \n {e} \n'
-                if not isinstance(e, GiskardException):
-                    raise GoalInitalizationException(error_msg)
-                raise e
-        self.init_task_state()
 
     def init_task_state(self):
         self.task_state = np.zeros(len(self.tasks))

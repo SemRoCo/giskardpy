@@ -3,8 +3,8 @@ from copy import deepcopy
 from typing import Dict, Optional, List
 import giskardpy.casadi_wrapper as cas
 import giskardpy.middleware_interfaces.ros1.tfwrapper as tf
-from giskard_msgs.msg import CollisionEntry
 from giskardpy.goals.goal import Goal
+from giskardpy.model.collision_world_syncer import CollisionEntry
 from giskardpy.monitors.monitors import ExpressionMonitor
 from giskardpy.monitors.payload_monitors import CollisionMatrixUpdater
 from giskardpy.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE

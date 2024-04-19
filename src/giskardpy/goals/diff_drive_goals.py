@@ -9,7 +9,6 @@ import giskardpy.casadi_wrapper as cas
 from giskardpy.goals.goal import Goal
 from giskardpy.tasks.task import WEIGHT_ABOVE_CA
 from giskardpy.god_map import god_map
-from giskardpy.utils.expression_definition_utils import transform_msg
 
 
 class DiffDriveTangentialToPoint(Goal):
@@ -27,7 +26,7 @@ class DiffDriveTangentialToPoint(Goal):
         if name is None:
             name = f'{self.__class__.__name__}/{self.root}/{self.tip}'
         super().__init__(name)
-        self.goal_point = transform_msg(god_map.world.root_link_name, goal_point)
+        self.goal_point = god_map.world.transform(god_map.world.root_link_name, goal_point)
         self.goal_point.point.z = 0
         self.weight = weight
         self.drive = drive

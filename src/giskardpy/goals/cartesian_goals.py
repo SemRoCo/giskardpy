@@ -16,7 +16,6 @@ from giskardpy.model.joints import DiffDrive
 from giskardpy.monitors.monitors import ExpressionMonitor
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
-from giskardpy.utils.expression_definition_utils import transform_msg_and_turn_to_expr, transform_msg
 from giskardpy.middleware_interfaces.ros1.tfwrapper import normalize
 from giskardpy.utils.utils import split_pose_stamped
 
@@ -24,7 +23,10 @@ from giskardpy.utils.utils import split_pose_stamped
 class CartesianPosition(Goal):
     default_reference_velocity = 0.2
 
-    def __init__(self, root_link: str, tip_link: str, goal_point: PointStamped,
+    def __init__(self,
+                 root_link: str,
+                 tip_link: str,
+                 goal_point: cas.Point3,
                  root_group: Optional[str] = None,
                  tip_group: Optional[str] = None,
                  reference_velocity: Optional[float] = None,
@@ -46,10 +48,12 @@ class CartesianPosition(Goal):
             reference_velocity = self.default_reference_velocity
         self.reference_velocity = reference_velocity
         self.weight = weight
-        if absolute:
-            root_P_goal = transform_msg_and_turn_to_expr(self.root_link, goal_point, cas.TrueSymbol)
+        if absolute or cas.is_true(start_condition):
+            root_P_goal = god_map.world.transform(self.root_link, goal_point)
         else:
-            root_P_goal = transform_msg_and_turn_to_expr(self.root_link, goal_point, start_condition)
+            root_T_x = god_map.world.compose_fk_expression(self.root_link, goal_point.reference_frame)
+            root_P_goal = root_T_x.dot(goal_point)
+            root_P_goal = god_map.monitor_manager.register_expression_updater(root_P_goal, start_condition)
         r_P_c = god_map.world.compose_fk_expression(self.root_link, self.tip_link).to_position()
         task = self.create_and_add_task()
         task.add_point_goal_constraints(frame_P_goal=root_P_goal,
@@ -70,7 +74,7 @@ class CartesianOrientation(Goal):
     def __init__(self,
                  root_link: str,
                  tip_link: str,
-                 goal_orientation: QuaternionStamped,
+                 goal_orientation: cas.RotationMatrix,
                  root_group: Optional[str] = None,
                  tip_group: Optional[str] = None,
                  reference_velocity: Optional[float] = None,
@@ -80,7 +84,7 @@ class CartesianOrientation(Goal):
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.TrueSymbol,
-                 point_of_debug_matrix: Optional[PointStamped] = None):
+                 point_of_debug_matrix: Optional[cas.Point3] = None):
         """
         See CartesianPose.
         """
@@ -94,11 +98,12 @@ class CartesianOrientation(Goal):
         self.reference_velocity = reference_velocity
         self.weight = weight
 
-        if absolute:
-            update_condition = cas.TrueSymbol
+        if absolute or cas.is_true(start_condition):
+            root_R_goal = god_map.world.transform(self.root_link, goal_orientation)
         else:
-            update_condition = start_condition
-        root_R_goal = transform_msg_and_turn_to_expr(self.root_link, goal_orientation, update_condition)
+            root_T_x = god_map.world.compose_fk_expression(self.root_link, goal_orientation.reference_frame)
+            root_R_goal = root_T_x.dot(goal_orientation)
+            root_R_goal = god_map.monitor_manager.register_expression_updater(root_R_goal, start_condition)
 
         r_T_c = god_map.world.compose_fk_expression(self.root_link, self.tip_link)
         r_R_c = r_T_c.to_rotation()
@@ -113,7 +118,12 @@ class CartesianOrientation(Goal):
         if point_of_debug_matrix is None:
             point = r_T_c.to_position()
         else:
-            point = transform_msg_and_turn_to_expr(self.root_link, point_of_debug_matrix, update_condition)
+            if absolute or cas.is_true(start_condition):
+                point = point_of_debug_matrix
+            else:
+                root_T_x = god_map.world.compose_fk_expression(self.root_link, point_of_debug_matrix.reference_frame)
+                point = root_T_x.dot(point_of_debug_matrix)
+                point = god_map.monitor_manager.register_expression_updater(point, start_condition)
         debug_trans_matrix = cas.TransMatrix.from_point_rotation_matrix(point=point,
                                                                         rotation_matrix=root_R_goal)
         god_map.debug_expression_manager.add_debug_expression(f'{self.name}/goal_orientation', debug_trans_matrix)
@@ -124,7 +134,7 @@ class CartesianPositionStraight(Goal):
     def __init__(self,
                  root_link: str,
                  tip_link: str,
-                 goal_point: PointStamped,
+                 goal_point: cas.Point3,
                  root_group: Optional[str] = None,
                  tip_group: Optional[str] = None,
                  reference_velocity: Optional[float] = None,
@@ -143,15 +153,16 @@ class CartesianPositionStraight(Goal):
         self.weight = weight
         self.root_link = god_map.world.search_for_link_name(root_link, root_group)
         self.tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
-        if absolute:
-            self.goal_point = transform_msg_and_turn_to_expr(self.root_link, goal_point, cas.TrueSymbol)
+        if absolute or cas.is_true(start_condition):
+            root_P_goal = god_map.world.transform(self.root_link, goal_point)
         else:
-            self.goal_point = transform_msg_and_turn_to_expr(self.root_link, goal_point, start_condition)
+            root_T_x = god_map.world.compose_fk_expression(self.root_link, goal_point.reference_frame)
+            root_P_goal = root_T_x.dot(goal_point)
+            root_P_goal = god_map.monitor_manager.register_expression_updater(root_P_goal, start_condition)
         if name is None:
             name = f'{self.__class__.__name__}/{self.root_link}/{self.tip_link}'
         super().__init__(name)
 
-        root_P_goal = cas.Point3(self.goal_point)
         root_P_tip = god_map.world.compose_fk_expression(self.root_link, self.tip_link).to_position()
         t_T_r = god_map.world.compose_fk_expression(self.tip_link, self.root_link)
         tip_P_goal = t_T_r.dot(root_P_goal)
@@ -197,7 +208,7 @@ class CartesianPose(Goal):
     def __init__(self,
                  root_link: str,
                  tip_link: str,
-                 goal_pose: PoseStamped,
+                 goal_pose: cas.TransMatrix,
                  root_group: Optional[str] = None,
                  tip_group: Optional[str] = None,
                  reference_linear_velocity: Optional[float] = None,
@@ -236,11 +247,9 @@ class CartesianPose(Goal):
             reference_angular_velocity = CartesianOrientation.default_reference_velocity
         self.weight = weight
 
-        goal_point, goal_quaternion = split_pose_stamped(goal_pose)
-
         self.add_constraints_of_goal(CartesianPosition(root_link=root_link,
                                                        tip_link=tip_link,
-                                                       goal_point=goal_point,
+                                                       goal_point=goal_pose.to_position(),
                                                        root_group=root_group,
                                                        tip_group=tip_group,
                                                        reference_velocity=reference_linear_velocity,
@@ -253,7 +262,7 @@ class CartesianPose(Goal):
 
         self.add_constraints_of_goal(CartesianOrientation(root_link=root_link,
                                                           tip_link=tip_link,
-                                                          goal_orientation=goal_quaternion,
+                                                          goal_orientation=goal_pose.to_rotation(),
                                                           root_group=root_group,
                                                           tip_group=tip_group,
                                                           reference_velocity=reference_angular_velocity,
@@ -263,15 +272,23 @@ class CartesianPose(Goal):
                                                           start_condition=start_condition,
                                                           hold_condition=hold_condition,
                                                           end_condition=end_condition,
-                                                          point_of_debug_matrix=goal_point))
+                                                          point_of_debug_matrix=goal_pose.to_position()))
 
 
 class DiffDriveBaseGoal(Goal):
 
-    def __init__(self, root_link: str, tip_link: str, goal_pose: PoseStamped, max_linear_velocity: float = 0.1,
-                 max_angular_velocity: float = 0.5, weight: float = WEIGHT_ABOVE_CA, pointing_axis=None,
-                 root_group: Optional[str] = None, tip_group: Optional[str] = None,
-                 always_forward: bool = False, name: Optional[str] = None,
+    def __init__(self,
+                 root_link: str,
+                 tip_link: str,
+                 goal_pose: cas.TransMatrix,
+                 max_linear_velocity: float = 0.1,
+                 max_angular_velocity: float = 0.5,
+                 weight: float = WEIGHT_ABOVE_CA,
+                 pointing_axis=None,
+                 root_group: Optional[str] = None,
+                 tip_group: Optional[str] = None,
+                 always_forward: bool = False,
+                 name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.TrueSymbol):
@@ -303,24 +320,24 @@ class DiffDriveBaseGoal(Goal):
         if name is None:
             name = f'{self.__class__.__name__}/{self.map}/{self.base_footprint}'
         super().__init__(name)
-        self.goal_pose = transform_msg(self.map, goal_pose)
-        self.goal_pose.pose.position.z = 0
+        self.goal_pose = god_map.world.transform(self.map, goal_pose)
+        self.goal_pose.z = 0
         diff_drive_joints = [v for k, v in god_map.world.joints.items() if isinstance(v, DiffDrive)]
         assert len(diff_drive_joints) == 1
         self.joint: DiffDrive = diff_drive_joints[0]
         self.odom = self.joint.parent_link_name
 
         if pointing_axis is not None:
-            self.base_footprint_V_pointing_axis = transform_msg(self.base_footprint, pointing_axis)
-            self.base_footprint_V_pointing_axis.vector = normalize(self.base_footprint_V_pointing_axis.vector)
+            self.base_footprint_V_pointing_axis = god_map.world.transform(self.base_footprint, pointing_axis)
+            self.base_footprint_V_pointing_axis.scale(1)
         else:
-            self.base_footprint_V_pointing_axis = Vector3Stamped()
-            self.base_footprint_V_pointing_axis.header.frame_id = self.base_footprint
-            self.base_footprint_V_pointing_axis.vector.z = 1
+            self.base_footprint_V_pointing_axis = cas.Vector3()
+            self.base_footprint_V_pointing_axis.reference_frame = self.base_footprint
+            self.base_footprint_V_pointing_axis.z = 1
 
-        map_T_base_current = cas.TransMatrix(god_map.world.compute_fk_np(self.map, self.base_footprint))
-        map_T_odom_current = god_map.world.compute_fk_np(self.map, self.odom)
-        map_odom_angle, _, _ = rotation_from_matrix(map_T_odom_current)
+        map_T_base_current = god_map.world.compute_fk(self.map, self.base_footprint)
+        map_T_odom_current = god_map.world.compute_fk(self.map, self.odom)
+        map_odom_angle, _ = map_T_odom_current.to_rotation().to_axis_angle()
         map_R_base_current = map_T_base_current.to_rotation()
         axis_start, angle_start = map_R_base_current.to_axis_angle()
         angle_start = cas.if_greater_zero(axis_start[2], angle_start, -angle_start)
@@ -328,7 +345,7 @@ class DiffDriveBaseGoal(Goal):
         map_T_base_footprint = god_map.world.compose_fk_expression(self.map, self.base_footprint)
         map_P_base_footprint = map_T_base_footprint.to_position()
         # map_R_base_footprint = map_T_base_footprint.to_rotation()
-        map_T_base_footprint_goal = cas.TransMatrix(self.goal_pose)
+        map_T_base_footprint_goal = self.goal_pose
         map_P_base_footprint_goal = map_T_base_footprint_goal.to_position()
         map_R_base_footprint_goal = map_T_base_footprint_goal.to_rotation()
 
@@ -399,7 +416,10 @@ class DiffDriveBaseGoal(Goal):
 
 
 class CartesianPoseStraight(Goal):
-    def __init__(self, root_link: str, tip_link: str, goal_pose: PoseStamped,
+    def __init__(self,
+                 root_link: str,
+                 tip_link: str,
+                 goal_pose: cas.TransMatrix,
                  root_group: Optional[str] = None,
                  tip_group: Optional[str] = None,
                  reference_linear_velocity: Optional[float] = None,
@@ -418,12 +438,11 @@ class CartesianPoseStraight(Goal):
         if name is None:
             name = f'{self.__class__.__name__}/{self.root_link}/{self.tip_link}'
         super().__init__(name)
-        goal_point, goal_orientation = split_pose_stamped(goal_pose)
         self.add_constraints_of_goal(CartesianPositionStraight(root_link=root_link,
                                                                root_group=root_group,
                                                                tip_link=tip_link,
                                                                tip_group=tip_group,
-                                                               goal_point=goal_point,
+                                                               goal_point=goal_pose.to_position(),
                                                                reference_velocity=reference_linear_velocity,
                                                                weight=weight,
                                                                absolute=absolute,
@@ -434,14 +453,14 @@ class CartesianPoseStraight(Goal):
                                                           root_group=root_group,
                                                           tip_link=tip_link,
                                                           tip_group=tip_group,
-                                                          goal_orientation=goal_orientation,
+                                                          goal_orientation=goal_pose.to_rotation(),
                                                           reference_velocity=reference_angular_velocity,
                                                           absolute=absolute,
                                                           weight=weight,
                                                           start_condition=start_condition,
                                                           hold_condition=hold_condition,
                                                           end_condition=end_condition,
-                                                          point_of_debug_matrix=goal_point))
+                                                          point_of_debug_matrix=goal_pose.to_position()))
 
 
 class TranslationVelocityLimit(Goal):
@@ -565,8 +584,8 @@ class CartesianVelocityLimit(Goal):
 
 class RelativePositionSequence(Goal):
     def __init__(self,
-                 goal1: PointStamped,
-                 goal2: PointStamped,
+                 goal1: cas.Point3,
+                 goal2: cas.Point3,
                  root_link: str,
                  tip_link: str,
                  name: Optional[str] = None,
@@ -581,12 +600,13 @@ class RelativePositionSequence(Goal):
         if name is None:
             name = f'{self.__class__.__name__}/{self.root_link}/{self.tip_link}'
         super().__init__(name)
-        self.root_P_goal1 = transform_msg(self.root_link, goal1)
-        self.tip_P_goal2 = transform_msg(self.tip_link, goal2)
+        self.root_P_goal1 = god_map.world.transform(self.root_link, goal1)
+        self.tip_P_goal2 = god_map.world.transform(self.tip_link, goal2)
         self.max_velocity = 0.1
         self.weight = WEIGHT_BELOW_CA
 
-        root_P_current = god_map.world.compose_fk_expression(self.root_link, self.tip_link).to_position()
+        root_T_tip = god_map.world.compose_fk_expression(self.root_link, self.tip_link)
+        root_P_current = root_T_tip.to_position()
 
         root_P_goal1 = cas.Point3(self.root_P_goal1)
 
@@ -600,9 +620,9 @@ class RelativePositionSequence(Goal):
                                            stay_true=True)
         self.add_monitor(error2_monitor)
 
-        root_P_goal2_cached = transform_msg_and_turn_to_expr(self.root_link,
-                                                             self.tip_P_goal2,
-                                                             error1_monitor.get_state_expression())
+        root_T_goal2_cached = root_T_tip.dot(self.tip_P_goal2)
+        root_P_goal2_cached = god_map.monitor_manager.register_expression_updater(root_T_goal2_cached,
+                                                                                  error1_monitor.get_state_expression())
 
         error2 = cas.euclidean_distance(root_P_goal2_cached, root_P_current)
         error2_monitor.expression = cas.less(cas.abs(error2), 0.01)

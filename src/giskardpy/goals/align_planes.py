@@ -8,7 +8,6 @@ import giskardpy.casadi_wrapper as cas
 from giskardpy.goals.goal import Goal
 from giskardpy.tasks.task import WEIGHT_ABOVE_CA
 from giskardpy.god_map import god_map
-from giskardpy.utils.expression_definition_utils import transform_msg
 from giskardpy.utils.logging import logwarn
 
 
@@ -46,10 +45,10 @@ class AlignPlanes(Goal):
         self.reference_velocity = reference_velocity
         self.weight = weight
 
-        self.tip_V_tip_normal = transform_msg(self.tip, tip_normal)
+        self.tip_V_tip_normal = god_map.world.transform(self.tip, tip_normal)
         self.tip_V_tip_normal.vector = tf.normalize(self.tip_V_tip_normal.vector)
 
-        self.root_V_root_normal = transform_msg(self.root, goal_normal)
+        self.root_V_root_normal = god_map.world.transform(self.root, goal_normal)
         self.root_V_root_normal.vector = tf.normalize(self.root_V_root_normal.vector)
 
         if name is None:

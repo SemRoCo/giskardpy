@@ -2,18 +2,14 @@ from __future__ import division
 
 from typing import Dict, Optional, List
 
-from geometry_msgs.msg import PoseStamped
-
 from giskardpy import casadi_wrapper as cas
-from giskardpy.monitors.monitors import ExpressionMonitor
 from giskardpy.god_map import god_map
 from giskardpy.symbol_manager import symbol_manager
-from giskardpy.exceptions import MotionBuildingException, GoalInitalizationException
+from giskardpy.exceptions import GoalInitalizationException
 from giskardpy.goals.goal import Goal, NonMotionGoal
-from giskardpy.tasks.task import WEIGHT_BELOW_CA, Task
+from giskardpy.tasks.task import WEIGHT_BELOW_CA
 from giskardpy.model.joints import OmniDrive, DiffDrive, OmniDrivePR22, OneDofJoint
 from giskardpy.data_types.data_types import PrefixName, Derivatives
-from giskardpy.utils.expression_definition_utils import transform_msg, transform_msg_and_turn_to_expr
 from giskardpy.utils.math import axis_angle_from_quaternion
 
 
@@ -51,7 +47,7 @@ class SetSeedConfiguration(NonMotionGoal):
 class SetOdometry(NonMotionGoal):
     def __init__(self,
                  group_name: str,
-                 base_pose: PoseStamped,
+                 base_pose: cas.TransMatrix,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
@@ -66,7 +62,7 @@ class SetOdometry(NonMotionGoal):
         brumbrum_joint = god_map.world.joints[brumbrum_joint_name]
         if not isinstance(brumbrum_joint, (OmniDrive, DiffDrive, OmniDrivePR22)):
             raise GoalInitalizationException(f'Group {group_name} has no odometry joint.')
-        base_pose = transform_msg_and_turn_to_expr(brumbrum_joint.parent_link_name, base_pose, condition=start_condition)
+        base_pose = god_map.world.transform(brumbrum_joint.parent_link_name, base_pose)
         position = base_pose.to_position().to_np()
         orientation = base_pose.to_rotation().to_quaternion().to_np()
         god_map.world.state[brumbrum_joint.x.name].position = position[0]

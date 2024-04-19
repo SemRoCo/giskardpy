@@ -1005,6 +1005,7 @@ class WorldTree(WorldTreeInterface):
         Delete every link and joint from link_name downward, including the link.
         """
         self.delete_branch_at_joint(self.links[link_name].parent_joint_name)
+        self.cleanup_unused_free_variable()
 
     @modifies_world
     @profile
@@ -1347,23 +1348,23 @@ class WorldTree(WorldTreeInterface):
         return self.joints[joint_name].get_limit_expressions(order)
 
     @overload
-    def transform(self, target_frame: PrefixName, msg: cas.Point3) -> cas.Point3:
+    def transform(self, target_frame: PrefixName, geometric_cas_object: cas.Point3) -> cas.Point3:
         ...
 
     @overload
-    def transform(self, target_frame: PrefixName, msg: cas.TransMatrix) -> cas.TransMatrix:
+    def transform(self, target_frame: PrefixName, geometric_cas_object: cas.TransMatrix) -> cas.TransMatrix:
         ...
 
     @overload
-    def transform(self, target_frame: PrefixName, msg: cas.Vector3) -> cas.Vector3:
+    def transform(self, target_frame: PrefixName, geometric_cas_object: cas.Vector3) -> cas.Vector3:
         ...
 
     @overload
-    def transform(self, target_frame: PrefixName, msg: cas.Quaternion) -> cas.Quaternion:
+    def transform(self, target_frame: PrefixName, geometric_cas_object: cas.Quaternion) -> cas.Quaternion:
         ...
 
     @overload
-    def transform(self, target_frame: PrefixName, msg: cas.RotationMatrix) -> cas.RotationMatrix:
+    def transform(self, target_frame: PrefixName, geometric_cas_object: cas.RotationMatrix) -> cas.RotationMatrix:
         ...
 
     def transform(self, target_frame, geometric_cas_object):

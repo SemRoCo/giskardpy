@@ -2,23 +2,20 @@ from __future__ import division
 
 from typing import Optional
 
-from geometry_msgs.msg import Vector3Stamped, PointStamped
-
 import giskardpy.middleware_interfaces.ros1.tfwrapper as tf
 import giskardpy.casadi_wrapper as cas
 from giskardpy.goals.goal import Goal
 from giskardpy.tasks.task import WEIGHT_ABOVE_CA
 from giskardpy.god_map import god_map
-from giskardpy.utils.expression_definition_utils import transform_msg
 
 
 class GraspBar(Goal):
     def __init__(self,
                  root_link: str,
                  tip_link: str,
-                 tip_grasp_axis: Vector3Stamped,
-                 bar_center: PointStamped,
-                 bar_axis: Vector3Stamped,
+                 tip_grasp_axis: cas.Vector3,
+                 bar_center: cas.Point3,
+                 bar_axis: cas.Vector3,
                  bar_length: float,
                  root_group: Optional[str] = None,
                  tip_group: Optional[str] = None,
@@ -28,8 +25,7 @@ class GraspBar(Goal):
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.TrueSymbol
-                 ):
+                 end_condition: cas.Expression = cas.TrueSymbol):
         """
         Like a CartesianPose but with more freedom.
         tip_link is allowed to be at any point along bar_axis, that is without bar_center +/- bar_length.
@@ -52,12 +48,12 @@ class GraspBar(Goal):
             name = f'{self.__class__.__name__}/{self.root}/{self.tip}'
         super().__init__(name)
 
-        bar_center = transform_msg(self.root, bar_center)
+        bar_center = god_map.world.transform(self.root, bar_center)
 
-        tip_grasp_axis = transform_msg(self.tip, tip_grasp_axis)
+        tip_grasp_axis = god_map.world.transform(self.tip, tip_grasp_axis)
         tip_grasp_axis.vector = tf.normalize(tip_grasp_axis.vector)
 
-        bar_axis = transform_msg(self.root, bar_axis)
+        bar_axis = god_map.world.transform(self.root, bar_axis)
         bar_axis.vector = tf.normalize(bar_axis.vector)
 
         self.bar_axis = bar_axis
@@ -69,9 +65,9 @@ class GraspBar(Goal):
         self.weight = weight
 
 
-        root_V_bar_axis = cas.Vector3(self.bar_axis)
-        tip_V_tip_grasp_axis = cas.Vector3(self.tip_grasp_axis)
-        root_P_bar_center = cas.Point3(self.bar_center)
+        root_V_bar_axis = self.bar_axis
+        tip_V_tip_grasp_axis = self.tip_grasp_axis
+        root_P_bar_center = self.bar_center
 
         root_T_tip = god_map.world.compose_fk_expression(self.root, self.tip)
         root_V_tip_normal = cas.dot(root_T_tip, tip_V_tip_grasp_axis)

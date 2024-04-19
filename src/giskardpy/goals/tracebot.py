@@ -10,15 +10,14 @@ from giskardpy.goals.goal import Goal
 from giskardpy.tasks.task import WEIGHT_ABOVE_CA
 from giskardpy.monitors.monitors import ExpressionMonitor
 from giskardpy.god_map import god_map
-from giskardpy.utils.expression_definition_utils import transform_msg
 
 
 class InsertCylinder(Goal):
     def __init__(self,
                  cylinder_name: str,
-                 hole_point: PointStamped,
+                 hole_point: cas.Point3,
                  cylinder_height: Optional[float] = None,
-                 up: Vector3Stamped = None,
+                 up: Optional[cas.Vector3] = None,
                  pre_grasp_height: float = 0.1,
                  tilt: float = np.pi / 10,
                  get_straight_after: float = 0.02,
@@ -39,12 +38,11 @@ class InsertCylinder(Goal):
             self.cylinder_height = cylinder_height
         self.tilt = tilt
         self.pre_grasp_height = pre_grasp_height
-        self.root_P_hole = transform_msg(self.root, hole_point)
+        self.root_P_hole = god_map.world.transform(self.root, hole_point)
         if up is None:
-            up = Vector3Stamped()
-            up.header.frame_id = self.root
-            up.vector.z = 1
-        self.root_V_up = transform_msg(self.root, up)
+            up = cas.Vector3((0, 0, 1))
+            up.reference_frame = self.root
+        self.root_V_up = god_map.world.transform(self.root, up)
 
         self.weight = WEIGHT_ABOVE_CA
 

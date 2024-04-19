@@ -11,18 +11,17 @@ from giskardpy.goals.goal import Goal
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.tasks.task import WEIGHT_BELOW_CA
 from giskardpy.god_map import god_map
-from giskardpy.utils.expression_definition_utils import transform_msg
 from giskardpy.utils.logging import logwarn
 
 
 class Pointing(Goal):
     def __init__(self,
                  tip_link: str,
-                 goal_point: PointStamped,
+                 goal_point: cas.Point3,
                  root_link: str,
+                 pointing_axis: cas.Vector3,
                  tip_group: Optional[str] = None,
                  root_group: Optional[str] = None,
-                 pointing_axis: Vector3Stamped = None,
                  max_velocity: float = 0.3,
                  weight: float = WEIGHT_BELOW_CA,
                  name: Optional[str] = None,
@@ -44,19 +43,13 @@ class Pointing(Goal):
         self.max_velocity = max_velocity
         self.root = god_map.world.search_for_link_name(root_link, root_group)
         self.tip = god_map.world.search_for_link_name(tip_link, tip_group)
-        self.root_P_goal_point = transform_msg(self.root, goal_point)
+        self.root_P_goal_point = god_map.world.transform(self.root, goal_point)
         if name is None:
             name = f'{self.__class__.__name__}/{self.root}/{self.tip}'
         super().__init__(name)
 
-        if pointing_axis is not None:
-            self.tip_V_pointing_axis = transform_msg(self.tip, pointing_axis)
-            self.tip_V_pointing_axis.vector = tf.normalize(self.tip_V_pointing_axis.vector)
-        else:
-            logwarn(f'Deprecated warning: Please set pointing_axis.')
-            self.tip_V_pointing_axis = Vector3Stamped()
-            self.tip_V_pointing_axis.header.frame_id = self.tip
-            self.tip_V_pointing_axis.vector.z = 1
+        self.tip_V_pointing_axis = god_map.world.transform(self.tip, pointing_axis)
+        self.tip_V_pointing_axis.scale(1)
 
         root_T_tip = god_map.world.compose_fk_expression(self.root, self.tip)
         root_P_goal_point = symbol_manager.get_expr(f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\']'

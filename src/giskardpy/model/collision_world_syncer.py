@@ -9,7 +9,6 @@ import numpy as np
 from geometry_msgs.msg import Pose
 from lxml import etree
 
-from giskard_msgs.msg import CollisionEntry
 from giskardpy.data_types.data_types import my_string, Derivatives, PrefixName
 from giskardpy.exceptions import UnknownGroupException, UnknownLinkException
 from giskardpy.god_map import god_map
@@ -25,6 +24,19 @@ np.random.seed(1337)
 class CollisionCheckerLib(Enum):
     none = -1
     bpb = 1
+
+
+class CollisionEntry:
+    AVOID_COLLISION = 0
+    ALLOW_COLLISION = 1
+    ALL = ''
+    type_: int
+    distance: float
+    group1: str
+    group2: str
+
+    def __init__(self, type_: int = 0, distance: float = -1, group1: str = '', group2: str = ''):
+        self.type_, self.distance, self.group1, self.group2 = type_, distance, group1, group2
 
 
 class CollisionAvoidanceThresholds:
@@ -885,7 +897,7 @@ class CollisionWorldSynchronizer:
                             else:
                                 collision_matrix[collision_matrix_key] = collision_entry.distance
                     else:
-                        raise AttributeError(f'Invalid collision entry type: {collision_entry.type}')
+                        raise AttributeError(f'Invalid collision entry type: {collision_entry.type_}')
         return collision_matrix
 
     def set_collision_matrix(self, collision_matrix):
@@ -910,17 +922,17 @@ class CollisionWorldSynchronizer:
         else:
             # put an avoid all at the front
             ce = CollisionEntry()
-            ce.type = CollisionEntry.AVOID_COLLISION
+            ce.type_ = CollisionEntry.AVOID_COLLISION
             ce.distance = -1
             collision_goals.insert(0, ce)
 
         return collision_goals
 
     def is_avoid_collision(self, collision_entry: CollisionEntry) -> bool:
-        return collision_entry.type == CollisionEntry.AVOID_COLLISION
+        return collision_entry.type_ == CollisionEntry.AVOID_COLLISION
 
     def is_allow_collision(self, collision_entry: CollisionEntry) -> bool:
-        return collision_entry.type == CollisionEntry.ALLOW_COLLISION
+        return collision_entry.type_ == CollisionEntry.ALLOW_COLLISION
 
     def is_avoid_all_self_collision(self, collision_entry: CollisionEntry) -> bool:
         return self.is_avoid_collision(collision_entry) \

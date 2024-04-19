@@ -7,6 +7,7 @@ from std_msgs.msg import ColorRGBA
 from giskardpy import casadi_wrapper as cas
 from giskardpy.goals.goal import Goal
 from giskardpy.god_map import god_map
+from giskardpy.symbol_manager import symbol_manager
 from giskardpy.tasks.task import WEIGHT_BELOW_CA
 from giskardpy.utils import tfwrapper as tf
 from giskardpy.exceptions import GoalInitalizationException
@@ -33,7 +34,6 @@ class AlignToPushDoor(Goal):
         """
         The objective is to reach an intermediate point before pushing the door
         """
-        # ToDo: How to get the joint axis
         self.root = god_map.world.search_for_link_name(root_link, root_group)
         self.tip = god_map.world.search_for_link_name(tip_link, tip_group)
         self.door_object = god_map.world.search_for_link_name(door_object)
@@ -50,6 +50,7 @@ class AlignToPushDoor(Goal):
         tip_gripper_axis.vector = tf.normalize(tip_gripper_axis.vector)
         self.tip_gripper_axis = tip_gripper_axis
         object_V_object_rotation_axis = cas.Vector3(god_map.world.get_joint(object_joint_name).axis)
+        joint_limit = god_map.world.compute_joint_limits(object_joint_name, 0)
 
         if name is None:
             name = f'{self.__class__.__name__}/{self.root}/{self.tip}'
@@ -64,6 +65,7 @@ class AlignToPushDoor(Goal):
         door_T_root = god_map.world.compute_fk_pose(self.door_object, self.root)
 
         root_P_intermediate_point = cas.Point3(root_T_door.pose.position)
+
         if root_V_object_rotation_axis.y == 1:
             # 3/4 of the height as the tip has to be a little further inside the object
             root_P_intermediate_point[2] = root_P_intermediate_point[2] + self.door_height*3/4
@@ -81,7 +83,7 @@ class AlignToPushDoor(Goal):
         door_rotated_P_top = cas.dot(door_rotated_T_door, door_P_intermediate_point)
         root_P_top = cas.dot(cas.TransMatrix(root_T_door_expr), door_rotated_P_top)
 
-        minimum_angle_to_push_door = 0.349
+        minimum_angle_to_push_door = joint_limit[1]/4
 
         if object_joint_angle >= minimum_angle_to_push_door:
             god_map.debug_expression_manager.add_debug_expression('goal_point', root_P_top,

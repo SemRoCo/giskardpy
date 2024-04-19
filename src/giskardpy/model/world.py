@@ -965,7 +965,7 @@ class WorldTree(WorldTreeInterface):
         elif isinstance(joint, Joint6DOF):
             pose = self.compute_fk(new_parent_link_name, joint.child_link_name)
             joint.parent_link_name = new_parent_link_name
-            joint.update_transform(pose.pose)
+            joint.update_transform(pose)
         else:
             raise NotImplementedError('Can only change fixed joints and TFJoints')
 
@@ -1220,7 +1220,10 @@ class WorldTree(WorldTreeInterface):
     def compute_fk(self, root: my_string, tip: my_string) -> cas.TransMatrix:
         root = self.search_for_link_name(root)
         tip = self.search_for_link_name(tip)
-        return cas.TransMatrix(self.compute_fk_np(root, tip))
+        result = cas.TransMatrix(self.compute_fk_np(root, tip))
+        result.reference_frame = root
+        result.child_frame = tip
+        return result
 
     def compute_fk_point(self, root: my_string, tip: my_string) -> cas.Point3:
         return self.compute_fk(root=root, tip=tip).to_position()

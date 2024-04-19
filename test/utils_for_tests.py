@@ -884,7 +884,7 @@ class GiskardTestWrapper(OldGiskardWrapper):
                                                    parent_link_group=parent_link_group)
         self.wait_heartbeats()
         assert r.error.code == expected_response, \
-            f'Got: \'{error_code_to_name(r.error.code)}\', ' \
+            f'Got: \'{error_code_to_name(r.error.code)}\' ({r.error.msg}), ' \
             f'expected: \'{error_code_to_name(expected_response)}.\''
         if r.error.code == GiskardError.SUCCESS:
             self.check_add_object_result(response=r,

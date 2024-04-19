@@ -9,9 +9,9 @@ from giskardpy.qp.free_variable import FreeVariable
 
 class WeightGain:
     _name: str
-    gains: DefaultDict[Derivatives, Dict[FreeVariable, float]]
+    gains: List[DefaultDict[Derivatives, Dict[FreeVariable, float]]]
 
-    def __init__(self, name: str, gains: DefaultDict[Derivatives, Dict[FreeVariable, float]]):
+    def __init__(self, name: str, gains: List[DefaultDict[Derivatives, Dict[FreeVariable, float]]]):
         self._name = name
         self.gains = gains
 
@@ -23,12 +23,12 @@ class WeightGain:
 class LinearWeightGain(WeightGain):
     def __init__(self,
                  name: str,
-                 gains: DefaultDict[Derivatives, Dict[FreeVariable, float]]):
+                 gains: List[DefaultDict[Derivatives, Dict[FreeVariable, float]]]):
         super().__init__(name, gains)
 
 
 class QuadraticWeightGain(WeightGain):
     def __init__(self,
                  name: str,
-                 gains: DefaultDict[Derivatives, Dict[FreeVariable, float]]):
+                 gains: List[DefaultDict[Derivatives, Dict[FreeVariable, float]]]):
         super().__init__(name, gains)

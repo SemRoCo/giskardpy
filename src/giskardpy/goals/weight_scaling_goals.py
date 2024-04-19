@@ -40,32 +40,35 @@ class BaseArmWeightScaling(Goal):
         root_P_goal = transform_msg_and_turn_to_expr(self.root_link, tip_goal, cas.TrueSymbol)
         scaling_exp = root_P_goal - root_P_tip
 
-        gains = defaultdict(dict)
-        arm_v = None
-        for name in arm_joints:
-            vs = god_map.world.joints[god_map.world.search_for_joint_name(name)].free_variables
-            for v in vs:
-                v_gain = gain * cas.norm(scaling_exp / v.get_upper_limit(Derivatives.velocity))
-                arm_v = v
-                gains[Derivatives.velocity][v] = v_gain
-                gains[Derivatives.acceleration][v] = v_gain
-                gains[Derivatives.jerk][v] = v_gain
-        base_v = None
-        for name in base_joints:
-            vs = god_map.world.joints[god_map.world.search_for_joint_name(name)].free_variables
-            for v in vs:
-                v_gain = gain / 100 * cas.save_division(1, cas.norm(scaling_exp / v.get_upper_limit(Derivatives.velocity)))
-                base_v = v
-                gains[Derivatives.velocity][v] = v_gain
-                gains[Derivatives.acceleration][v] = v_gain
-                gains[Derivatives.jerk][v] = v_gain
+        list_gains = []
+        for t in range(god_map.qp_controller_config.prediction_horizon):
+            gains = defaultdict(dict)
+            arm_v = None
+            for name in arm_joints:
+                vs = god_map.world.joints[god_map.world.search_for_joint_name(name)].free_variables
+                for v in vs:
+                    v_gain = gain * cas.norm(scaling_exp / v.get_upper_limit(Derivatives.velocity))
+                    arm_v = v
+                    gains[Derivatives.velocity][v] = v_gain
+                    gains[Derivatives.acceleration][v] = v_gain
+                    gains[Derivatives.jerk][v] = v_gain
+            base_v = None
+            for name in base_joints:
+                vs = god_map.world.joints[god_map.world.search_for_joint_name(name)].free_variables
+                for v in vs:
+                    v_gain = gain / 100 * cas.save_division(1, cas.norm(scaling_exp / v.get_upper_limit(Derivatives.velocity)))
+                    base_v = v
+                    gains[Derivatives.velocity][v] = v_gain
+                    gains[Derivatives.acceleration][v] = v_gain
+                    gains[Derivatives.jerk][v] = v_gain
+            list_gains.append(gains)
 
         god_map.debug_expression_manager.add_debug_expression('base_scaling', gain * cas.save_division(1, cas.norm(scaling_exp / base_v.get_upper_limit(Derivatives.velocity))))
         god_map.debug_expression_manager.add_debug_expression('arm_scaling', gain * cas.norm(scaling_exp / arm_v.get_upper_limit(Derivatives.velocity)))
         god_map.debug_expression_manager.add_debug_expression('norm', cas.norm(scaling_exp))
         god_map.debug_expression_manager.add_debug_expression('division', 1 / cas.norm(scaling_exp))
         task.add_quadratic_weight_gain('baseToArmScaling',
-                                       gains=gains)
+                                       gains=list_gains)
 
 
 class MaxManipulabilityLinWeight(Goal):
@@ -78,7 +81,7 @@ class MaxManipulabilityLinWeight(Goal):
                  tip_link: str,
                  gain: float = 0.5,
                  name: Optional[str] = None,
-                 prediction_horizon: int = 7,
+                 prediction_horizon: int = 9,
                  m_threshold: float = 0.16,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
@@ -100,17 +103,20 @@ class MaxManipulabilityLinWeight(Goal):
 
         J = cas.jacobian(root_P_tip, root_P_tip.free_symbols())
         JJT = J.dot(J.T)
-        grad_traces = defaultdict(dict)
         m = cas.sqrt(cas.det(JJT))
-        for symbol in root_P_tip.free_symbols():
-            J_dq = cas.total_derivative(J, [symbol], [1])
-            product = cas.matrix_inverse(JJT).dot(J_dq).dot(J.T)
-            trace = cas.trace(product)
-            v = self.get_free_variable(symbol)
-            grad_traces[Derivatives.velocity][v] = cas.if_greater(m, m_threshold, 0, trace * m * -gain)
-            grad_traces[Derivatives.acceleration][v] = cas.if_greater(m, m_threshold, 0, trace * m * -gain)
-            grad_traces[Derivatives.jerk][v] = cas.if_greater(m, m_threshold, 0, trace * m * -gain)
-        task.add_linear_weight_gain(name, gains=grad_traces)
+        list_gains = []
+        for t in range(prediction_horizon):
+            gains = defaultdict(dict)
+            for symbol in root_P_tip.free_symbols():
+                J_dq = cas.total_derivative(J, [symbol], [1])
+                product = cas.matrix_inverse(JJT).dot(J_dq).dot(J.T)
+                trace = cas.trace(product)
+                v = self.get_free_variable(symbol)
+                gains[Derivatives.velocity][v] = cas.if_greater(m, m_threshold, 0, trace * m * -gain)
+                gains[Derivatives.acceleration][v] = cas.if_greater(m, m_threshold, 0, trace * m * -gain)
+                gains[Derivatives.jerk][v] = cas.if_greater(m, m_threshold, 0, trace * m * -gain)
+            list_gains.append(gains)
+        task.add_linear_weight_gain(name, gains=list_gains)
 
         god_map.debug_expression_manager.add_debug_expression(f'mIndex{tip_link}', m)
 

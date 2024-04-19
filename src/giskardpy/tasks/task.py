@@ -171,12 +171,12 @@ class Task:
             output_constraints.append(constraint)
         return output_constraints
 
-    def add_quadratic_weight_gain(self, name: str, gains: DefaultDict[Derivatives, Dict[FreeVariable, float]]):
+    def add_quadratic_weight_gain(self, name: str, gains: List[DefaultDict[Derivatives, Dict[FreeVariable, float]]]):
         q_gain = QuadraticWeightGain(name=name,
                                      gains=gains)
         self.quadratic_gains.append(q_gain)
 
-    def add_linear_weight_gain(self, name: str, gains: DefaultDict[Derivatives, Dict[FreeVariable, float]]):
+    def add_linear_weight_gain(self, name: str, gains: List[DefaultDict[Derivatives, Dict[FreeVariable, float]]]):
         q_gain = LinearWeightGain(name=name,
                                   gains=gains)
         self.linear_weight_gains.append(q_gain)

@@ -1,10 +1,8 @@
 from typing import Optional, List
 
 import numpy as np
-from geometry_msgs.msg import QuaternionStamped, PointStamped, PoseStamped, Vector3Stamped
 import giskardpy.casadi_wrapper as cas
 from giskardpy.goals.goal import NonMotionGoal, Goal
-from giskardpy.monitors.monitors import ExpressionMonitor
 from giskardpy.god_map import god_map
 from giskardpy.symbol_manager import symbol_manager
 
@@ -18,35 +16,19 @@ class DebugGoal(NonMotionGoal):
         if name is None:
             name = self.__class__.__name__
         super().__init__(name=name)
-        q = QuaternionStamped()
-        q.header.frame_id = god_map.world.root_link_name
-        q.quaternion.w = 1
-        q = cas.Quaternion(q)
+        q = cas.Quaternion(reference_frame=god_map.world.root_link_name)
         god_map.debug_expression_manager.add_debug_expression('q', q)
 
-        p = PointStamped()
-        p.header.frame_id = god_map.world.root_link_name
-        p.point.x = 1
-        p = cas.Point3(p)
+        p = cas.Point3((1, 0, 0), reference_frame=god_map.world.root_link_name)
         god_map.debug_expression_manager.add_debug_expression('p', p)
 
-        pose = PoseStamped()
-        pose.header.frame_id = god_map.world.root_link_name
-        pose.pose.position.y = 1
-        pose.pose.orientation.w = 1
-        pose = cas.TransMatrix(pose)
+        pose = cas.TransMatrix.from_xyz_rpy(y=1, reference_frame=god_map.world.root_link_name)
         god_map.debug_expression_manager.add_debug_expression('pose', pose)
 
-        v = Vector3Stamped()
-        v.header.frame_id = god_map.world.root_link_name
-        v.vector.x = 1
-        v = cas.Vector3(v)
+        v = cas.Vector3((1, 0, 0), reference_frame=god_map.world.root_link_name)
         god_map.debug_expression_manager.add_debug_expression('v', v)
 
-        r = QuaternionStamped()
-        r.header.frame_id = god_map.world.root_link_name
-        r.quaternion.w = 1
-        r = cas.RotationMatrix(r)
+        r = cas.Quaternion(reference_frame=god_map.world.root_link_name).to_rotation_matrix()
         god_map.debug_expression_manager.add_debug_expression('r', r)
 
         e1 = cas.Expression(np.eye(3))

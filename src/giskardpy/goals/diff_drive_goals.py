@@ -2,9 +2,6 @@ from __future__ import division
 
 from typing import Optional
 
-from geometry_msgs.msg import Vector3Stamped, PointStamped
-
-import giskardpy.middleware_interfaces.ros1.tfwrapper as tf
 import giskardpy.casadi_wrapper as cas
 from giskardpy.goals.goal import Goal
 from giskardpy.tasks.task import WEIGHT_ABOVE_CA
@@ -13,7 +10,9 @@ from giskardpy.god_map import god_map
 
 class DiffDriveTangentialToPoint(Goal):
 
-    def __init__(self, goal_point: PointStamped, forward: Optional[Vector3Stamped] = None,
+    def __init__(self,
+                 goal_point: cas.Point3,
+                 forward: Optional[cas.Vector3] = None,
                  group_name: Optional[str] = None,
                  reference_velocity: float = 0.5, weight: bool = WEIGHT_ABOVE_CA, drive: bool = False,
                  name: Optional[str] = None,
@@ -31,12 +30,11 @@ class DiffDriveTangentialToPoint(Goal):
         self.weight = weight
         self.drive = drive
         if forward is not None:
-            self.tip_V_pointing_axis = tf.transform_vector(self.tip, forward)
-            self.tip_V_pointing_axis.vector = tf.normalize(self.tip_V_pointing_axis.vector)
+            self.tip_V_pointing_axis = god_map.world.transform(self.tip, forward)
+            self.tip_V_pointing_axis.scale(1)
         else:
-            self.tip_V_pointing_axis = Vector3Stamped()
-            self.tip_V_pointing_axis.header.frame_id = self.tip
-            self.tip_V_pointing_axis.vector.x = 1
+            self.tip_V_pointing_axis = cas.Vector3((1, 0, 0))
+            self.tip_V_pointing_axis.reference_frame = self.tip
 
         map_P_center = cas.Point3(self.goal_point)
         map_T_base = god_map.world.compose_fk_expression(self.root, self.tip)
@@ -71,59 +69,12 @@ class DiffDriveTangentialToPoint(Goal):
                                          name='/rot')
 
 
-class PointingDiffDriveEEF(Goal):
-    def __init__(self, base_tip, base_root, eef_tip, eef_root, pointing_axis=None, max_velocity=0.3,
-                 weight=WEIGHT_ABOVE_CA, name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.TrueSymbol
-                 ):
-        self.weight = weight
-        self.max_velocity = max_velocity
-        self.base_tip = base_tip
-        self.base_root = base_root
-        self.eef_tip = eef_tip
-        self.eef_root = eef_root
-        if name is None:
-            name = f'{self.__class__.name}/{self.eef_root}/{self.eef_tip}'
-        super().__init__(name)
-
-        if pointing_axis is not None:
-            self.tip_V_pointing_axis = tf.transform_vector(self.base_tip, pointing_axis)
-            self.tip_V_pointing_axis.vector = tf.normalize(self.tip_V_pointing_axis.vector)
-        else:
-            self.tip_V_pointing_axis = Vector3Stamped()
-            self.tip_V_pointing_axis.header.frame_id = self.base_tip
-            self.tip_V_pointing_axis.vector.x = 1
-
-    def make_constraints(self):
-        fk_vel = self.get_fk_velocity(self.eef_root, self.eef_tip)
-        eef_root_V_eef_tip = cas.Vector3((fk_vel[0], fk_vel[1], 0))
-        eef_root_V_eef_tip_normed = cas.scale(eef_root_V_eef_tip, 1)
-        base_root_T_eef_root = god_map.world.compose_fk_expression(self.base_root, self.eef_root)
-        base_root_V_eef_tip = cas.dot(base_root_T_eef_root, eef_root_V_eef_tip_normed)
-
-        tip_V_pointing_axis = cas.Vector3(self.tip_V_pointing_axis)
-        base_root_T_base_tip = god_map.world.compose_fk_expression(self.base_root, self.base_tip)
-        base_root_V_pointing_axis = cas.dot(base_root_T_base_tip, tip_V_pointing_axis)
-
-        # weight = cas.if_less_eq(distance, 0.05, WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA)
-        # weight = WEIGHT_BELOW_CA
-        # self.add_debug_expr('fk_vel/x', fk_vel[0])
-        # self.add_debug_expr('fk_vel/y', fk_vel[1])
-        # self.add_debug_vector('base_root_V_eef_tip', base_root_V_eef_tip)
-        # self.add_debug_vector('eef_root_V_eef_tip', eef_root_V_eef_tip)
-        # self.add_debug_vector('base_root_V_pointing_axis', base_root_V_pointing_axis)
-        weight = WEIGHT_ABOVE_CA * cas.norm(eef_root_V_eef_tip_normed)
-
-        self.add_vector_goal_constraints(frame_V_current=base_root_V_pointing_axis,
-                                         frame_V_goal=base_root_V_eef_tip,
-                                         reference_velocity=self.max_velocity,
-                                         weight=weight)
-
-
 class KeepHandInWorkspace(Goal):
-    def __init__(self, tip_link, base_footprint=None, map_frame=None, pointing_axis=None, max_velocity=0.3,
+    def __init__(self,
+                 tip_link: str,
+                 base_footprint=None,
+                 map_frame=None,
+                 pointing_axis=None, max_velocity=0.3,
                  group_name: Optional[str] = None, weight=WEIGHT_ABOVE_CA, name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
@@ -144,12 +95,11 @@ class KeepHandInWorkspace(Goal):
         super().__init__(name)
 
         if pointing_axis is not None:
-            self.map_V_pointing_axis = tf.transform_vector(self.base_footprint, pointing_axis)
-            self.map_V_pointing_axis.vector = tf.normalize(self.map_V_pointing_axis.vector)
+            self.map_V_pointing_axis = god_map.world.transform(self.base_footprint, pointing_axis)
+            self.map_V_pointing_axis.scale(1)
         else:
-            self.map_V_pointing_axis = Vector3Stamped()
-            self.map_V_pointing_axis.header.frame_id = self.map_frame
-            self.map_V_pointing_axis.vector.x = 1
+            self.map_V_pointing_axis = cas.Vector3((1, 0, 0))
+            self.map_V_pointing_axis.reference_frame = self.map_frame
 
         weight = WEIGHT_ABOVE_CA
         base_footprint_V_pointing_axis = cas.Vector3(self.map_V_pointing_axis)

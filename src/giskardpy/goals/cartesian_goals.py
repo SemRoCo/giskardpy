@@ -3,21 +3,15 @@ from __future__ import division
 from typing import Optional
 
 import numpy as np
-from geometry_msgs.msg import PointStamped, PoseStamped, QuaternionStamped
-from geometry_msgs.msg import Vector3Stamped
-from std_msgs.msg import ColorRGBA
-from tf.transformations import rotation_from_matrix
 
 from giskardpy import casadi_wrapper as cas
-from giskardpy.data_types.data_types import Derivatives
+from giskardpy.data_types.data_types import Derivatives, ColorRGBA
 from giskardpy.goals.goal import Goal
 from giskardpy.god_map import god_map
 from giskardpy.model.joints import DiffDrive
 from giskardpy.monitors.monitors import ExpressionMonitor
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
-from giskardpy.middleware_interfaces.ros1.tfwrapper import normalize
-from giskardpy.utils.utils import split_pose_stamped
 
 
 class CartesianPosition(Goal):
@@ -311,9 +305,8 @@ class DiffDriveBaseGoal(Goal):
         self.max_linear_velocity = max_linear_velocity
         self.max_angular_velocity = max_angular_velocity
         if pointing_axis is None:
-            pointing_axis = Vector3Stamped()
-            pointing_axis.header.frame_id = tip_link
-            pointing_axis.vector.x = 1
+            pointing_axis = cas.Vector3((1, 0, 0))
+            pointing_axis.reference_frame = tip_link
         self.weight = weight
         self.map = god_map.world.search_for_link_name(root_link, root_group)
         self.base_footprint = god_map.world.search_for_link_name(tip_link, tip_group)

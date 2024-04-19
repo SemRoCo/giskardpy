@@ -2,7 +2,6 @@ from collections import defaultdict
 from copy import deepcopy
 from typing import Dict, Optional, List
 import giskardpy.casadi_wrapper as cas
-import giskardpy.middleware_interfaces.ros1.tfwrapper as tf
 from giskardpy.goals.goal import Goal
 from giskardpy.model.collision_world_syncer import CollisionEntry
 from giskardpy.monitors.monitors import ExpressionMonitor
@@ -283,7 +282,7 @@ class CollisionAvoidanceHint(Goal):
                                                     spring_threshold)
 
         self.avoidance_hint = god_map.world.transform(self.root_link, avoidance_hint)
-        self.avoidance_hint.vector = tf.normalize(self.avoidance_hint.vector)
+        self.avoidance_hint.scale(1)
 
         self.max_velocity = max_linear_velocity
         self.threshold = max_threshold

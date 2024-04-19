@@ -21,7 +21,6 @@ from giskardpy.configs.giskard import Giskard
 from giskardpy.configs.iai_robots.pr2 import PR2CollisionAvoidance, PR2StandaloneInterface, WorldWithPR2Config
 from giskardpy.configs.qp_controller_config import SupportedQPSolver, QPControllerConfig
 from giskardpy.goals.cartesian_goals import RelativePositionSequence
-from giskardpy.goals.caster import Circle, Wave
 from giskardpy.goals.collision_avoidance import CollisionAvoidanceHint
 from giskardpy.goals.goals_tests import DebugGoal, CannotResolveSymbol
 from giskardpy.goals.joint_goals import JointVelocityLimit, UnlimitedJointGoal
@@ -1889,19 +1888,6 @@ class TestMoveBaseGoals:
         zero_pose.allow_all_collisions()
         zero_pose.move_base(base_goal)
 
-    def test_circle(self, zero_pose: PR2TestWrapper):
-        center = PointStamped()
-        center.header.frame_id = zero_pose.default_root
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class=Circle.__name__,
-                                               center=center,
-                                               radius=0.5,
-                                               tip_link='base_footprint',
-                                               scale=0.1)
-        # zero_pose.set_json_goal('PR2CasterConstraints')
-        zero_pose.set_max_traj_length(new_length=60)
-        zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute()
-
     def test_stay_put(self, zero_pose: PR2TestWrapper):
         base_goal = PoseStamped()
         base_goal.header.frame_id = zero_pose.default_root
@@ -1918,18 +1904,6 @@ class TestMoveBaseGoals:
         base_goal.pose.orientation.w = 1
         zero_pose.allow_all_collisions()
         zero_pose.move_base(base_goal)
-
-    def test_wave(self, zero_pose: PR2TestWrapper):
-        center = PointStamped()
-        center.header.frame_id = zero_pose.default_root
-        zero_pose.allow_all_collisions()
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class=Wave.__name__,
-                                               center=center,
-                                               radius=0.05,
-                                               tip_link='base_footprint',
-                                               scale=2)
-        zero_pose.set_joint_goal(zero_pose.better_pose, add_monitor=False)
-        zero_pose.plan_and_execute()
 
     def test_forward_1cm(self, zero_pose: PR2TestWrapper):
         base_goal = PoseStamped()

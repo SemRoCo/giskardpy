@@ -504,33 +504,20 @@ class GeometricType:
 
 class TransMatrix(Symbol_, GeometricType):
     @profile
-    def __init__(self, data=None, sanity_check=True):
-        try:
-            self.reference_frame = data.reference_frame
-        except AttributeError:
-            self.reference_frame = None
-        try:
-            self.child_frame = data.child_frame
-        except AttributeError:
-            self.child_frame = None
-        if isinstance(data, (geometry_msgs.Pose, geometry_msgs.PoseStamped)):
-            if isinstance(data, geometry_msgs.PoseStamped):
-                self.reference_frame = data.header.frame_id
-                data = data.pose
-            if isinstance(data, geometry_msgs.Pose):
-                r = RotationMatrix(data.orientation)
-                self.s = r.s
-                self.s[0, 3] = data.position.x
-                self.s[1, 3] = data.position.y
-                self.s[2, 3] = data.position.z
-                return
-        elif data is None:
+    def __init__(self, data=None, reference_frame=None, child_frame=None, sanity_check=True):
+        self.reference_frame = reference_frame
+        self.child_frame = child_frame
+        if data is None:
             self.s = ca.SX.eye(4)
             return
         elif isinstance(data, ca.SX):
             self.s = data
         elif isinstance(data, (Expression, RotationMatrix, TransMatrix)):
             self.s = copy(data.s)
+            if isinstance(data, RotationMatrix):
+                self.reference_frame = self.reference_frame or data.reference_frame
+            if isinstance(data, TransMatrix):
+                self.child_frame = self.child_frame or data.child_frame
         else:
             self.s = copy(Expression(data).s)
         if sanity_check:
@@ -566,16 +553,15 @@ class TransMatrix(Symbol_, GeometricType):
         self[2, 3] = value
 
     @classmethod
-    def from_point_rotation_matrix(cls, point=None, rotation_matrix=None, reference_frame=None):
+    def from_point_rotation_matrix(cls, point=None, rotation_matrix=None, reference_frame=None, child_frame=None):
         if rotation_matrix is None:
-            a_T_b = cls()
+            a_T_b = cls(reference_frame=reference_frame, child_frame=child_frame)
         else:
-            a_T_b = cls(rotation_matrix, sanity_check=False)
+            a_T_b = cls(rotation_matrix, reference_frame=reference_frame, child_frame=child_frame, sanity_check=False)
         if point is not None:
             a_T_b[0, 3] = point.x
             a_T_b[1, 3] = point.y
             a_T_b[2, 3] = point.z
-        a_T_b.reference_frame = reference_frame
         return a_T_b
 
     @profile
@@ -583,41 +569,37 @@ class TransMatrix(Symbol_, GeometricType):
         if isinstance(other, (Vector3, Point3, RotationMatrix, TransMatrix)):
             result = ca.mtimes(self.s, other.s)
             if isinstance(other, Vector3):
-                result = Vector3(result)
-                result.reference_frame = self.reference_frame
+                result = Vector3(result, reference_frame=self.reference_frame)
                 return result
             if isinstance(other, Point3):
-                result = Point3(result)
-                result.reference_frame = self.reference_frame
+                result = Point3(result, reference_frame=self.reference_frame)
                 return result
             if isinstance(other, RotationMatrix):
-                result = RotationMatrix(result, sanity_check=False)
-                result.reference_frame = self.reference_frame
+                result = RotationMatrix(result, reference_frame=self.reference_frame, sanity_check=False)
                 return result
             if isinstance(other, TransMatrix):
-                result = TransMatrix(result, sanity_check=False)
-                result.reference_frame = self.reference_frame
-                result.child_frame = other.child_frame
+                result = TransMatrix(result, reference_frame=self.reference_frame, child_frame=other.child_frame,
+                                     sanity_check=False)
                 return result
         raise _operation_type_error(self, 'dot', other)
 
     @profile
     def inverse(self):
-        inv = TransMatrix()
+        inv = TransMatrix(child_frame=self.reference_frame, reference_frame=self.child_frame)
         inv[:3, :3] = self[:3, :3].T
         inv[:3, 3] = dot(-inv[:3, :3], self[:3, 3])
         return inv
 
     @classmethod
     @profile
-    def from_xyz_rpy(cls, x=None, y=None, z=None, roll=None, pitch=None, yaw=None):
+    def from_xyz_rpy(cls, x=None, y=None, z=None, roll=None, pitch=None, yaw=None, reference_frame=None,
+                     child_frame=None):
         p = Point3.from_xyz(x, y, z)
         r = RotationMatrix.from_rpy(roll, pitch, yaw)
-        return cls.from_point_rotation_matrix(p, r)
+        return cls.from_point_rotation_matrix(p, r, reference_frame=reference_frame, child_frame=child_frame)
 
     def to_position(self):
-        result = Point3(self[:4, 3:])
-        result.reference_frame = self.reference_frame
+        result = Point3(self[:4, 3:], reference_frame=self.reference_frame)
         return result
 
     def to_translation(self):
@@ -628,8 +610,7 @@ class TransMatrix(Symbol_, GeometricType):
         r[0, 3] = self[0, 3]
         r[1, 3] = self[1, 3]
         r[2, 3] = self[2, 3]
-        r.reference_frame = self.reference_frame
-        return TransMatrix(r)
+        return TransMatrix(r, reference_frame=self.reference_frame, child_frame=None)
 
     def to_rotation(self):
         return RotationMatrix(self)
@@ -637,21 +618,18 @@ class TransMatrix(Symbol_, GeometricType):
 
 class RotationMatrix(Symbol_, GeometricType):
     @profile
-    def __init__(self, data=None, sanity_check=True):
-        if hasattr(data, 'reference_frame'):
-            self.reference_frame = data.reference_frame
-        else:
-            self.reference_frame = None
+    def __init__(self, data=None, reference_frame=None, child_frame=None, sanity_check=True):
+        self.reference_frame = reference_frame
+        self.child_frame = child_frame
         if isinstance(data, ca.SX):
             self.s = data
-        elif isinstance(data, (geometry_msgs.Quaternion, geometry_msgs.QuaternionStamped)):
-            if isinstance(data, geometry_msgs.QuaternionStamped):
-                self.reference_frame = data.header.frame_id
-                data = data.quaternion
-            if isinstance(data, geometry_msgs.Quaternion):
-                self.s = self.__quaternion_to_rotation_matrix(Quaternion(data)).s
         elif isinstance(data, Quaternion):
             self.s = self.__quaternion_to_rotation_matrix(data).s
+            self.reference_frame = self.reference_frame or data.reference_frame
+        elif isinstance(data, (RotationMatrix, TransMatrix)):
+            self.s = copy(data.s)
+            self.reference_frame = data.reference_frame
+            self.child_frame = child_frame
         elif data is None:
             self.s = ca.SX.eye(4)
             return
@@ -671,7 +649,7 @@ class RotationMatrix(Symbol_, GeometricType):
 
     @classmethod
     @profile
-    def from_axis_angle(cls, axis, angle):
+    def from_axis_angle(cls, axis, angle, reference_frame=None):
         """
         Conversion of unit axis and angle to 4x4 rotation matrix according to:
         https://www.euclideanspace.com/maths/geometry/rotations/conversions/angleToMatrix/index.htm
@@ -700,7 +678,7 @@ class RotationMatrix(Symbol_, GeometricType):
         s[2, 0] = -m_st[1] + m_vt_0_ax[1]
         s[2, 1] = m_st[0] + m_vt_1_2
         s[2, 2] = ct__m_vt__axis[2]
-        return cls(s, sanity_check=False)
+        return cls(s, reference_frame=reference_frame, sanity_check=False)
 
     @classmethod
     def __quaternion_to_rotation_matrix(cls, q):
@@ -719,7 +697,8 @@ class RotationMatrix(Symbol_, GeometricType):
         return cls([[w2 + x2 - y2 - z2, 2 * x * y - 2 * w * z, 2 * x * z + 2 * w * y, 0],
                     [2 * x * y + 2 * w * z, w2 - x2 + y2 - z2, 2 * y * z - 2 * w * x, 0],
                     [2 * x * z - 2 * w * y, 2 * y * z + 2 * w * x, w2 - x2 - y2 + z2, 0],
-                    [0, 0, 0, 1]])
+                    [0, 0, 0, 1]],
+                   reference_frame=q.reference_frame)
 
     @classmethod
     def from_quaternion(cls, q):
@@ -758,7 +737,7 @@ class RotationMatrix(Symbol_, GeometricType):
             return angle
 
     @classmethod
-    def from_vectors(cls, x=None, y=None, z=None):
+    def from_vectors(cls, x=None, y=None, z=None, reference_frame=None):
         if x is not None:
             x.scale(1)
         if y is not None:
@@ -779,13 +758,14 @@ class RotationMatrix(Symbol_, GeometricType):
         R = cls([[x[0], y[0], z[0], 0],
                  [x[1], y[1], z[1], 0],
                  [x[2], y[2], z[2], 0],
-                 [0, 0, 0, 1]])
+                 [0, 0, 0, 1]],
+                reference_frame=reference_frame)
         R.normalize()
         return R
 
     @classmethod
     @profile
-    def from_rpy(cls, roll=None, pitch=None, yaw=None):
+    def from_rpy(cls, roll=None, pitch=None, yaw=None, reference_frame=None):
         """
         Conversion of roll, pitch, yaw to 4x4 rotation matrix according to:
         https://github.com/orocos/orocos_kinematics_dynamics/blob/master/orocos_kdl/src/frames.cpp#L167
@@ -816,10 +796,10 @@ class RotationMatrix(Symbol_, GeometricType):
         s[2, 0] = -ca.sin(pitch)
         s[2, 1] = ca.cos(pitch) * ca.sin(roll)
         s[2, 2] = ca.cos(pitch) * ca.cos(roll)
-        return cls(s, sanity_check=False)
+        return cls(s, reference_frame=reference_frame, sanity_check=False)
 
     def inverse(self):
-        return RotationMatrix(self.T)
+        return self.T
 
     def to_rpy(self):
         """
@@ -854,28 +834,19 @@ class RotationMatrix(Symbol_, GeometricType):
 
     @property
     def T(self):
-        return self.s.T
+        return RotationMatrix(self.s.T, reference_frame=self.reference_frame)
 
 
 class Point3(Symbol_, GeometricType):
     @profile
-    def __init__(self, data=None):
-        try:
-            self.reference_frame = data.reference_frame
-        except AttributeError:
-            self.reference_frame = None
+    def __init__(self, data=None, reference_frame=None):
+        self.reference_frame = reference_frame
         if data is None:
             self.s = ca.SX([0, 0, 0, 1])
             return
-        if isinstance(data, rospy.Message):
-            if isinstance(data, geometry_msgs.PointStamped):
-                self.reference_frame = data.header.frame_id
-                data = data.point
-            if isinstance(data, geometry_msgs.Vector3Stamped):
-                self.reference_frame = data.header.frame_id
-                data = data.vector
-            if isinstance(data, (Point3, Vector3, geometry_msgs.Point, geometry_msgs.Vector3)):
-                self.s = ca.SX([data.x, data.y, data.z, 1])
+        if isinstance(data, (Point3, Vector3)):
+            self.reference_frame = self.reference_frame or data.reference_frame
+            self.s = ca.SX([data.x, data.y, data.z, 1])
         elif isinstance(data, Symbol_):
             self.s = ca.SX([0, 0, 0, 1])
             self[0] = data.s[0]
@@ -888,11 +859,11 @@ class Point3(Symbol_, GeometricType):
             self[2] = data[2]
 
     @classmethod
-    def from_xyz(cls, x=None, y=None, z=None):
+    def from_xyz(cls, x=None, y=None, z=None, reference_frame=None):
         x = 0 if x is None else x
         y = 0 if y is None else y
         z = 0 if z is None else z
-        return cls((x, y, z))
+        return cls((x, y, z), reference_frame=reference_frame)
 
     def norm(self):
         return norm(self)
@@ -1026,19 +997,19 @@ class Point3(Symbol_, GeometricType):
 
 class Vector3(Symbol_, GeometricType):
     @profile
-    def __init__(self, data=None):
-        point = Point3(data)
+    def __init__(self, data=None, reference_frame=None):
+        point = Point3(data, reference_frame=reference_frame)
         self.s = point.s
         self.reference_frame = point.reference_frame
         self.vis_frame = self.reference_frame
         self[3] = 0
 
     @classmethod
-    def from_xyz(cls, x=None, y=None, z=None):
+    def from_xyz(cls, x=None, y=None, z=None, reference_frame=None):
         x = 0 if x is None else x
         y = 0 if y is None else y
         z = 0 if z is None else z
-        return cls((x, y, z))
+        return cls((x, y, z), reference_frame=reference_frame)
 
     @property
     def x(self):
@@ -1182,27 +1153,19 @@ class Vector3(Symbol_, GeometricType):
 
 
 class Quaternion(Symbol_, GeometricType):
-    def __init__(self, data=None):
+    def __init__(self, data=None, reference_frame=None):
+        self.reference_frame = reference_frame
         if data is None:
             data = (0, 0, 0, 1)
-        if isinstance(data, geometry_msgs.QuaternionStamped):
-            data = data.quaternion
-        if isinstance(data, (Point3, Vector3, geometry_msgs.Quaternion)):
-            x, y, z, w = data.x, data.y, data.z, data.w
-        else:
-            x, y, z, w = data[0], data[1], data[2], data[3]
         self.s = ca.SX(4, 1)
-        self[0] = x
-        self[1] = y
-        self[2] = z
-        self[3] = w
+        self[0], self[1], self[2], self[3] = data[0], data[1], data[2], data[3]
 
     def __neg__(self):
         return Quaternion(self.s.__neg__())
 
     @classmethod
-    def from_xyzw(cls, x, y, z, w):
-        return cls((x, y, z, w))
+    def from_xyzw(cls, x, y, z, w, reference_frame=None):
+        return cls((x, y, z, w), reference_frame=reference_frame)
 
     @property
     def x(self):
@@ -1237,15 +1200,16 @@ class Quaternion(Symbol_, GeometricType):
         self[3] = value
 
     @classmethod
-    def from_axis_angle(cls, axis, angle):
+    def from_axis_angle(cls, axis, angle, reference_frame=None):
         half_angle = angle / 2
         return cls((axis[0] * sin(half_angle),
                     axis[1] * sin(half_angle),
                     axis[2] * sin(half_angle),
-                    cos(half_angle)))
+                    cos(half_angle)),
+                   reference_frame=reference_frame)
 
     @classmethod
-    def from_rpy(cls, roll, pitch, yaw):
+    def from_rpy(cls, roll, pitch, yaw, reference_frame=None):
         roll = Expression(roll).s
         pitch = Expression(pitch).s
         yaw = Expression(yaw).s
@@ -1270,7 +1234,7 @@ class Quaternion(Symbol_, GeometricType):
         z = c_pitch * cs - s_pitch * sc
         w = c_pitch * cc + s_pitch * ss
 
-        return cls((x, y, z, w))
+        return cls((x, y, z, w), reference_frame=reference_frame)
 
     @classmethod
     def from_rotation_matrix(cls, r):
@@ -1320,7 +1284,7 @@ class Quaternion(Symbol_, GeometricType):
         q[3] = if_greater_zero(if0, t, m_k_j - m_j_k)
 
         q *= 0.5 / sqrt(t * r[3, 3])
-        return cls(q)
+        return cls(q, reference_frame=r.reference_frame)
 
     def conjugate(self):
         return Quaternion((-self[0], -self[1], -self[2], self[3]))
@@ -1329,7 +1293,8 @@ class Quaternion(Symbol_, GeometricType):
         return Quaternion((self.x * q.w + self.y * q.z - self.z * q.y + self.w * q.x,
                            -self.x * q.z + self.y * q.w + self.z * q.x + self.w * q.y,
                            self.x * q.y - self.y * q.x + self.z * q.w + self.w * q.z,
-                           -self.x * q.x - self.y * q.y - self.z * q.z + self.w * q.w))
+                           -self.x * q.x - self.y * q.y - self.z * q.z + self.w * q.w),
+                          reference_frame=self.reference_frame)
 
     def diff(self, q):
         """
@@ -1355,7 +1320,7 @@ class Quaternion(Symbol_, GeometricType):
         x = if_eq_zero(w2, 0, self.x / m)
         y = if_eq_zero(w2, 0, self.y / m)
         z = if_eq_zero(w2, 1, self.z / m)
-        return Vector3((x, y, z)), angle
+        return Vector3((x, y, z), reference_frame=self.reference_frame), angle
 
     def to_rotation_matrix(self):
         return RotationMatrix.from_quaternion(self)

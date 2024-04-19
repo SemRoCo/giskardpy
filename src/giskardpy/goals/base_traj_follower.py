@@ -3,7 +3,6 @@ from __future__ import division
 from typing import Optional, List
 
 import numpy as np
-# import matplotlib.pyplot as plt
 import rospy
 from geometry_msgs.msg import PointStamped, Vector3, Point
 from sensor_msgs.msg import LaserScan
@@ -25,7 +24,7 @@ from giskardpy.symbol_manager import symbol_manager
 
 class BaseTrajFollower(Goal):
     def __init__(self,
-                 joint_name: my_string,
+                 joint_name: PrefixName,
                  track_only_velocity: bool = False,
                  weight: float = WEIGHT_ABOVE_CA,
                  start_condition: cas.Expression = cas.TrueSymbol,

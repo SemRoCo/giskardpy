@@ -186,17 +186,16 @@ class Joint6DOF(Joint):
                                        self.qw.get_symbol(Derivatives.position))).to_rotation_matrix()
         self.parent_T_child = cas.TransMatrix.from_point_rotation_matrix(parent_P_child, parent_R_child)
 
-    def update_transform(self, new_child_T_parent: cas.TransMatrix):
-        new_child_T_parent = new_child_T_parent.to_np()
-        position = new_child_T_parent.to_position()
-        orientation = new_child_T_parent.to_rotation().to_quaternion()
-        god_map.world.state[self.x.name].position = position.x
-        god_map.world.state[self.y.name].position = position.y
-        god_map.world.state[self.z.name].position = position.z
-        god_map.world.state[self.qx.name].position = orientation.x
-        god_map.world.state[self.qy.name].position = orientation.y
-        god_map.world.state[self.qz.name].position = orientation.z
-        god_map.world.state[self.qw.name].position = orientation.w
+    def update_transform(self, parent_T_child: cas.TransMatrix):
+        position = parent_T_child.to_position().to_np()
+        orientation = parent_T_child.to_rotation().to_quaternion().to_np()
+        god_map.world.state[self.x.name].position = position[0]
+        god_map.world.state[self.y.name].position = position[1]
+        god_map.world.state[self.z.name].position = position[2]
+        god_map.world.state[self.qx.name].position = orientation[0]
+        god_map.world.state[self.qy.name].position = orientation[1]
+        god_map.world.state[self.qz.name].position = orientation[2]
+        god_map.world.state[self.qw.name].position = orientation[3]
 
 
 class OneDofJoint(MovableJoint):

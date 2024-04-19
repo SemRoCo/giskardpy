@@ -10,8 +10,9 @@ import sensor_msgs.msg as sensor_msgs
 import trajectory_msgs.msg as trajectory_msgs
 import tf2_msgs.msg as tf2_msgs
 
-from giskardpy.data_types.data_types import JointStates, PrefixName, _JointState
-from giskardpy.exceptions import GiskardException
+import giskard_msgs.msg as giskard_msgs
+from giskardpy.data_types.data_types import JointStates, PrefixName, _JointState, ColorRGBA
+from giskardpy.exceptions import GiskardException, CorruptShapeException
 from giskardpy.model.joints import MovableJoint
 from giskardpy.model.links import LinkGeometry, Link, SphereGeometry, CylinderGeometry, BoxGeometry, MeshGeometry
 from giskardpy.model.trajectory import Trajectory
@@ -22,6 +23,8 @@ from giskardpy.model.world import WorldTree
 def to_ros_message(data):
     if isinstance(data, cas.TransMatrix):
         return trans_matrix_to_pose_stamped(data)
+    if isinstance(data, cas.Point3):
+        return point3_to_point_stamped(data)
 
 
 def to_visualization_marker(data):
@@ -100,13 +103,20 @@ def color_rgba_to_ros_msg(data) -> std_msgs.ColorRGBA:
 
 def trans_matrix_to_pose_stamped(data: cas.TransMatrix) -> geometry_msgs.PoseStamped:
     pose_stamped = geometry_msgs.PoseStamped()
-    pose_stamped.header.frame_id = data.reference_frame
+    pose_stamped.header.frame_id = str(data.reference_frame)
     position = data.to_position().to_np()
     orientation = data.to_rotation().to_quaternion().to_np()
     pose_stamped.pose.position = geometry_msgs.Point(position[0][0], position[1][0], position[2][0])
     pose_stamped.pose.orientation = geometry_msgs.Quaternion(orientation[0][0], orientation[1][0],
                                                              orientation[2][0], orientation[3][0])
     return pose_stamped
+
+def point3_to_point_stamped(data: cas.Point3) -> geometry_msgs.PointStamped:
+    point_stamped = geometry_msgs.PointStamped()
+    point_stamped.header.frame_id = str(data.reference_frame)
+    position = data.to_np()
+    point_stamped.point = geometry_msgs.Point(position[0][0], position[1][0], position[2][0])
+    return point_stamped
 
 
 def trans_matrix_to_transform_stamped(data: cas.TransMatrix) -> geometry_msgs.TransformStamped:
@@ -170,9 +180,13 @@ def world_to_tf_message(world: WorldTree, include_prefix: bool) -> tf2_msgs.TFMe
 
 
 # %% from ros
-def convert_ros_msg(msg):
+def convert_ros_msg_to_giskard_obj(msg, world: WorldTree):
     if isinstance(msg, sensor_msgs.JointState):
         return ros_joint_state_to_giskard_joint_state(msg)
+    elif isinstance(msg, geometry_msgs.PoseStamped):
+        return pose_stamped_to_trans_matrix(msg, world)
+    else:
+        raise ValueError(f'Can\'t convert msg of type \'{type(msg)}\'')
 
 
 def ros_joint_state_to_giskard_joint_state(msg: sensor_msgs.JointState, prefix: Optional[str] = None) -> JointStates:
@@ -188,3 +202,54 @@ def ros_joint_state_to_giskard_joint_state(msg: sensor_msgs.JointState, prefix: 
                           pop=0)
         js[joint_name] = sjs
     return js
+
+
+def world_body_to_link(link_name: PrefixName, msg: giskard_msgs.WorldBody, color: ColorRGBA) -> Link:
+    link = Link(link_name)
+    geometry = world_body_to_geometry(msg=msg, color=color)
+    link.collisions.append(geometry)
+    link.visuals.append(geometry)
+    return link
+
+
+def world_body_to_geometry(msg: giskard_msgs.WorldBody, color: ColorRGBA) -> LinkGeometry:
+    if msg.type == msg.URDF_BODY:
+        raise NotImplementedError()
+    elif msg.type == msg.PRIMITIVE_BODY:
+        if msg.shape.type == msg.shape.BOX:
+            geometry = BoxGeometry(link_T_geometry=cas.TransMatrix(),
+                                   depth=msg.shape.dimensions[msg.shape.BOX_X],
+                                   width=msg.shape.dimensions[msg.shape.BOX_Y],
+                                   height=msg.shape.dimensions[msg.shape.BOX_Z],
+                                   color=color)
+        elif msg.shape.type == msg.shape.CYLINDER:
+            geometry = CylinderGeometry(link_T_geometry=cas.TransMatrix(),
+                                        height=msg.shape.dimensions[msg.shape.CYLINDER_HEIGHT],
+                                        radius=msg.shape.dimensions[msg.shape.CYLINDER_RADIUS],
+                                        color=color)
+        elif msg.shape.type == msg.shape.SPHERE:
+            geometry = SphereGeometry(link_T_geometry=cas.TransMatrix(),
+                                      radius=msg.shape.dimensions[msg.shape.SPHERE_RADIUS],
+                                      color=color)
+        else:
+            raise CorruptShapeException(f'Primitive shape of type {msg.shape.type} not supported.')
+    elif msg.type == msg.MESH_BODY:
+        if msg.scale.x == 0 or msg.scale.y == 0 or msg.scale.z == 0:
+            raise CorruptShapeException(f'Scale of mesh contains 0: {msg.scale}')
+        geometry = MeshGeometry(link_T_geometry=cas.TransMatrix(),
+                                file_name=msg.mesh,
+                                scale=[msg.scale.x, msg.scale.y, msg.scale.z],
+                                color=color)
+    else:
+        raise CorruptShapeException(f'World body type {msg.type} not supported')
+    return geometry
+
+
+def pose_stamped_to_trans_matrix(msg: geometry_msgs.PoseStamped, world: WorldTree) -> cas.TransMatrix:
+    p = cas.Point3.from_xyz(msg.pose.position.x, msg.pose.position.y, msg.pose.position.z)
+    R = cas.Quaternion.from_xyzw(msg.pose.orientation.x, msg.pose.orientation.y,
+                                 msg.pose.orientation.z, msg.pose.orientation.w).to_rotation_matrix()
+    result = cas.TransMatrix.from_point_rotation_matrix(point=p,
+                                                        rotation_matrix=R,
+                                                        reference_frame=world.search_for_link_name(msg.header.frame_id))
+    return result

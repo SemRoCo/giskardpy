@@ -183,7 +183,7 @@ class WorldConfig(ABC):
         If you need a virtual link during your world building.
         """
         link = Link(link_name)
-        god_map.world._add_link(link)
+        god_map.world.add_link(link)
 
     def add_omni_drive_joint(self,
                              name: str,

@@ -3,29 +3,27 @@ from __future__ import annotations
 import os
 from typing import List, Optional
 
-import numpy as np
 import urdf_parser_py.urdf as up
 
 from giskard_msgs.msg import WorldBody
-from giskardpy.exceptions import CorruptShapeException, CorruptMeshException
+from giskardpy.exceptions import CorruptMeshException
 from giskardpy.model.utils import cube_volume, cube_surface, sphere_volume, cylinder_volume, cylinder_surface
 from giskardpy.data_types.data_types import PrefixName, ColorRGBA
 from giskardpy.data_types.data_types import my_string
-from giskardpy.utils.math import rotation_matrix_from_rpy
 from giskardpy.utils.utils import resolve_ros_iris, get_file_hash
-import giskardpy.casadi_wrapper as w
+import giskardpy.casadi_wrapper as cas
 
 
 class LinkGeometry:
-    link_T_geometry: w.TransMatrix
+    link_T_geometry: cas.TransMatrix
     color: ColorRGBA
 
-    def __init__(self, link_T_geometry: np.ndarray, color: ColorRGBA = None):
+    def __init__(self, link_T_geometry: cas.TransMatrix, color: ColorRGBA = None):
         if color is None:
             self.color = ColorRGBA(20 / 255, 27.1 / 255, 80 / 255, 0.2)
         else:
             self.color = color
-        self.link_T_geometry = w.TransMatrix(link_T_geometry)
+        self.link_T_geometry = link_T_geometry
 
     def to_hash(self) -> str:
         return ''
@@ -34,9 +32,9 @@ class LinkGeometry:
     def from_urdf(cls, urdf_thing, color) -> LinkGeometry:
         urdf_geometry = urdf_thing.geometry
         if urdf_thing.origin is None:
-            link_T_geometry = np.eye(4)
+            link_T_geometry = cas.TransMatrix()
         else:
-            link_T_geometry = rotation_matrix_from_rpy(*urdf_thing.origin.rpy)
+            link_T_geometry = cas.RotationMatrix.from_rpy(*urdf_thing.origin.rpy)
             link_T_geometry[0, 3] = urdf_thing.origin.xyz[0]
             link_T_geometry[1, 3] = urdf_thing.origin.xyz[1]
             link_T_geometry[2, 3] = urdf_thing.origin.xyz[2]
@@ -64,45 +62,12 @@ class LinkGeometry:
             raise NotImplementedError(f'{type(urdf_geometry)} geometry is not supported')
         return geometry
 
-    @classmethod
-    def from_world_body(cls, msg: WorldBody, color: ColorRGBA) -> LinkGeometry:
-        if msg.type == msg.URDF_BODY:
-            raise NotImplementedError()
-        elif msg.type == msg.PRIMITIVE_BODY:
-            if msg.shape.type == msg.shape.BOX:
-                geometry = BoxGeometry(link_T_geometry=np.eye(4),
-                                       depth=msg.shape.dimensions[msg.shape.BOX_X],
-                                       width=msg.shape.dimensions[msg.shape.BOX_Y],
-                                       height=msg.shape.dimensions[msg.shape.BOX_Z],
-                                       color=color)
-            elif msg.shape.type == msg.shape.CYLINDER:
-                geometry = CylinderGeometry(link_T_geometry=np.eye(4),
-                                            height=msg.shape.dimensions[msg.shape.CYLINDER_HEIGHT],
-                                            radius=msg.shape.dimensions[msg.shape.CYLINDER_RADIUS],
-                                            color=color)
-            elif msg.shape.type == msg.shape.SPHERE:
-                geometry = SphereGeometry(link_T_geometry=np.eye(4),
-                                          radius=msg.shape.dimensions[msg.shape.SPHERE_RADIUS],
-                                          color=color)
-            else:
-                raise CorruptShapeException(f'Primitive shape of type {msg.shape.type} not supported.')
-        elif msg.type == msg.MESH_BODY:
-            if msg.scale.x == 0 or msg.scale.y == 0 or msg.scale.z == 0:
-                raise CorruptShapeException(f'Scale of mesh contains 0: {msg.scale}')
-            geometry = MeshGeometry(link_T_geometry=np.eye(4),
-                                    file_name=msg.mesh,
-                                    scale=[msg.scale.x, msg.scale.y, msg.scale.z],
-                                    color=color)
-        else:
-            raise CorruptShapeException(f'World body type {msg.type} not supported')
-        return geometry
-
     def is_big(self, volume_threshold: float = 1.001e-6, surface_threshold: float = 0.00061) -> bool:
         return False
 
 
 class MeshGeometry(LinkGeometry):
-    def __init__(self, link_T_geometry: np.ndarray, file_name: str, color: ColorRGBA, scale=None):
+    def __init__(self, link_T_geometry: cas.TransMatrix, file_name: str, color: ColorRGBA, scale=None):
         super().__init__(link_T_geometry, color)
         self._file_name_ros_iris = file_name
         self.set_collision_file_name(self.file_name_absolute)
@@ -139,7 +104,7 @@ class MeshGeometry(LinkGeometry):
 
 
 class BoxGeometry(LinkGeometry):
-    def __init__(self, link_T_geometry, depth, width, height, color):
+    def __init__(self, link_T_geometry: cas.TransMatrix, depth: float, width: float, height: float, color: ColorRGBA):
         super().__init__(link_T_geometry, color)
         self.depth = depth
         self.width = width
@@ -174,7 +139,7 @@ class CylinderGeometry(LinkGeometry):
 
 
 class SphereGeometry(LinkGeometry):
-    def __init__(self, link_T_geometry, radius, color):
+    def __init__(self, link_T_geometry: cas.TransMatrix, radius: float, color: ColorRGBA):
         super().__init__(link_T_geometry, color)
         self.radius = radius
 

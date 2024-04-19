@@ -542,7 +542,7 @@ class TransMatrix(Symbol_, GeometricType):
             self[3, 3] = 1
 
     @classmethod
-    def from_point_rotation_matrix(cls, point=None, rotation_matrix=None):
+    def from_point_rotation_matrix(cls, point=None, rotation_matrix=None, reference_frame=None):
         if rotation_matrix is None:
             a_T_b = cls()
         else:
@@ -551,6 +551,7 @@ class TransMatrix(Symbol_, GeometricType):
             a_T_b[0, 3] = point.x
             a_T_b[1, 3] = point.y
             a_T_b[2, 3] = point.z
+        a_T_b.reference_frame = reference_frame
         return a_T_b
 
     @profile

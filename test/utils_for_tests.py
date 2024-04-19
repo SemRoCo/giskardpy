@@ -10,7 +10,7 @@ import hypothesis.strategies as st
 import numpy as np
 import rospy
 from angles import shortest_angular_distance
-from geometry_msgs.msg import PoseStamped, Point, PointStamped
+from geometry_msgs.msg import PoseStamped, Point, PointStamped, Quaternion, Pose
 from hypothesis import assume
 from hypothesis.strategies import composite
 from numpy import pi
@@ -20,6 +20,7 @@ from tf2_py import LookupException, ExtrapolationException
 from visualization_msgs.msg import Marker
 
 import giskardpy.middleware_interfaces.ros1.tfwrapper as tf
+import giskardpy.casadi_wrapper as cas
 from giskard_msgs.msg import CollisionEntry, MoveResult, MoveGoal, WorldResult, GiskardError
 from giskard_msgs.srv import DyeGroupResponse
 from giskardpy.configs.giskard import Giskard
@@ -37,9 +38,9 @@ from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.qp_controller import available_solvers
 from giskardpy.tasks.task import WEIGHT_ABOVE_CA
 from giskardpy.utils import logging, utils
-from giskardpy.utils.math import compare_poses
 from giskardpy.utils.ros_timer import Timer
 from giskardpy.utils.utils import resolve_ros_iris, position_dict_to_joint_states
+import giskardpy.middleware_interfaces.ros1.msg_converter as msg_converter
 
 BIG_NUMBER = 1e100
 SMALL_NUMBER = 1e-100
@@ -115,6 +116,60 @@ def rnd_joint_state2(draw, joint_limits):
 @composite
 def pr2_joint_state(draw):
     pass
+
+
+def compare_poses(actual_pose: Union[cas.TransMatrix, Pose], desired_pose: Union[cas.TransMatrix, Pose],
+                  decimal: int = 2) -> None:
+    if isinstance(actual_pose, cas.TransMatrix):
+        actual_pose = msg_converter.to_ros_message(actual_pose).pose
+    if isinstance(desired_pose, cas.TransMatrix):
+        desired_pose = msg_converter.to_ros_message(desired_pose).pose
+    compare_points(actual_point=actual_pose.position,
+                   desired_point=desired_pose.position,
+                   decimal=decimal)
+    compare_orientations(actual_orientation=actual_pose.orientation,
+                         desired_orientation=desired_pose.orientation,
+                         decimal=decimal)
+
+
+def compare_points(actual_point: Union[cas.Point3, Point], desired_point: Union[cas.Point3, Point],
+                   decimal: int = 2) -> None:
+    if isinstance(actual_point, cas.Point3):
+        actual_point = msg_converter.to_ros_message(actual_point).point
+    if isinstance(desired_point, cas.Point3):
+        desired_point = msg_converter.to_ros_message(desired_point).point
+    np.testing.assert_almost_equal(actual_point.x, desired_point.x, decimal=decimal)
+    np.testing.assert_almost_equal(actual_point.y, desired_point.y, decimal=decimal)
+    np.testing.assert_almost_equal(actual_point.z, desired_point.z, decimal=decimal)
+
+
+def compare_orientations(actual_orientation: Union[Quaternion, np.ndarray],
+                         desired_orientation: Union[Quaternion, np.ndarray],
+                         decimal: int = 2) -> None:
+    if isinstance(actual_orientation, Quaternion):
+        q1 = np.array([actual_orientation.x,
+                       actual_orientation.y,
+                       actual_orientation.z,
+                       actual_orientation.w])
+    else:
+        q1 = actual_orientation
+    if isinstance(desired_orientation, Quaternion):
+        q2 = np.array([desired_orientation.x,
+                       desired_orientation.y,
+                       desired_orientation.z,
+                       desired_orientation.w])
+    else:
+        q2 = desired_orientation
+    try:
+        np.testing.assert_almost_equal(q1[0], q2[0], decimal=decimal)
+        np.testing.assert_almost_equal(q1[1], q2[1], decimal=decimal)
+        np.testing.assert_almost_equal(q1[2], q2[2], decimal=decimal)
+        np.testing.assert_almost_equal(q1[3], q2[3], decimal=decimal)
+    except:
+        np.testing.assert_almost_equal(q1[0], -q2[0], decimal=decimal)
+        np.testing.assert_almost_equal(q1[1], -q2[1], decimal=decimal)
+        np.testing.assert_almost_equal(q1[2], -q2[2], decimal=decimal)
+        np.testing.assert_almost_equal(q1[3], -q2[3], decimal=decimal)
 
 
 def pr2_urdf():
@@ -282,7 +337,9 @@ class GiskardTestWrapper(OldGiskardWrapper):
                 result_msg.header.frame_id = god_map.world.search_for_link_name(result_msg.header.frame_id)
             except UnknownGroupException:
                 pass
-            return god_map.world.transform(target_frame, result_msg)
+            giskard_obj = msg_converter.convert_ros_msg_to_giskard_obj(result_msg, god_map.world)
+            transformed_giskard_obj = god_map.world.transform(target_frame, giskard_obj)
+            return msg_converter.to_ros_message(transformed_giskard_obj)
 
     def wait_heartbeats(self, number=2):
         behavior_tree = god_map.tree

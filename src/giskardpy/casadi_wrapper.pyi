@@ -421,7 +421,8 @@ class TransMatrix(Symbol_, GeometricType):
     @classmethod
     def from_point_rotation_matrix(cls,
                                    point: Optional[Point3] = None,
-                                   rotation_matrix: Optional[RotationMatrix] = None) -> TransMatrix: ...
+                                   rotation_matrix: Optional[RotationMatrix] = None,
+                                   reference_frame: Optional[PrefixName] = None) -> TransMatrix: ...
 
     def inverse(self) -> TransMatrix: ...
 

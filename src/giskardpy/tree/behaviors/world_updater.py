@@ -8,16 +8,18 @@ from visualization_msgs.msg import MarkerArray
 from giskard_msgs.msg import WorldResult, WorldGoal, GiskardError
 from giskard_msgs.srv import GetGroupNamesResponse, GetGroupNamesRequest, GetGroupInfoResponse, GetGroupInfoRequest, \
     DyeGroupResponse, GetGroupNames, GetGroupInfo, DyeGroup, DyeGroupRequest
-from giskardpy.data_types.data_types import JointStates
+from giskardpy.data_types.data_types import JointStates, PrefixName
 from giskardpy.exceptions import UnknownGroupException, \
-    GiskardException, TransformException
+    GiskardException, TransformException, DuplicateNameException
 from giskardpy.god_map import god_map
+from giskardpy.model.joints import Joint6DOF
 from giskardpy.model.world import WorldBranch
 from giskardpy.tree.behaviors.action_server import ActionServerHandler
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
 from giskardpy.utils.decorators import record_time
 from giskardpy.middleware_interfaces.ros1.tfwrapper import transform_pose
+import giskardpy.middleware_interfaces.ros1.msg_converter as msg_converter
 
 
 class ProcessWorldUpdate(GiskardBehavior):
@@ -103,8 +105,7 @@ class ProcessWorldUpdate(GiskardBehavior):
             res.controlled_joints = [str(j.short_name) for j in group.controlled_joints]
             res.links = list(sorted(str(x.short_name) for x in group.link_names_as_set))
             res.child_groups = list(sorted(str(x) for x in group.groups.keys()))
-            res.root_link_pose.pose = group.base_pose
-            res.root_link_pose.header.frame_id = str(god_map.world.root_link_name)
+            res.root_link_pose = msg_converter.trans_matrix_to_pose_stamped(group.base_pose)
             for key, value in group.state.items():
                 res.joint_state.name.append(str(key))
                 res.joint_state.position.append(value.position)
@@ -116,27 +117,46 @@ class ProcessWorldUpdate(GiskardBehavior):
         return res
 
     @profile
-    def add_object(self, req: WorldGoal):
-        req.parent_link = god_map.world.search_for_link_name(req.parent_link, req.parent_link_group)
+    def add_object(self, req: WorldGoal) -> None:
+        group_name = req.group_name
+        if group_name in god_map.world.groups:
+            raise DuplicateNameException(f'Group with name \'{req.group_name}\' already exists.')
+        parent_link = god_map.world.search_for_link_name(req.parent_link, req.parent_link_group)
         world_body = req.body
+        pose = req.pose
+
         if req.pose.header.frame_id == '':
             raise TransformException('Frame_id in pose is not set.')
         try:
-            global_pose = transform_pose(target_frame=god_map.world.root_link_name, pose=req.pose, timeout=0.5)
+            # first try to transform to map using tf to deal with time stamps
+            pose = transform_pose(target_frame=god_map.world.root_link_name, pose=req.pose, timeout=0.5)
         except:
-            req.pose.header.frame_id = god_map.world.search_for_link_name(req.pose.header.frame_id)
-            global_pose = god_map.world.transform(god_map.world.root_link_name, req.pose)
-
-        global_pose = god_map.world.transform(req.parent_link, global_pose).pose
-        god_map.world.add_world_body(group_name=req.group_name,
-                                     msg=world_body,
-                                     pose=global_pose,
-                                     parent_link_name=req.parent_link)
+            # tf is not available, just ignore this step
+            pass
+        with god_map.world.modify_world() as world:
+            pose = msg_converter.pose_stamped_to_trans_matrix(pose, world)
+            parent_link_T_group_root_link = world.transform(parent_link, pose)
+            if world_body.type == world_body.URDF_BODY:
+                world.add_urdf(urdf=world_body.urdf,
+                               parent_link_name=parent_link,
+                               group_name=group_name,
+                               pose=parent_link_T_group_root_link)
+            else:
+                link = msg_converter.world_body_to_link(link_name=PrefixName(group_name, group_name),
+                                                        msg=world_body,
+                                                        color=god_map.world.default_link_color)
+                god_map.world.add_link(link)
+                joint = Joint6DOF(name=PrefixName(group_name, god_map.world.connection_prefix),
+                                  parent_link_name=parent_link,
+                                  child_link_name=link.name)
+                joint.update_transform(parent_link_T_group_root_link)
+                god_map.world._link_joint_to_links(joint)
+                god_map.world.register_group(group_name, link.name)
         # SUB-CASE: If it is an articulated object, open up a joint state subscriber
-        logging.loginfo(f'Attached object \'{req.group_name}\' at \'{req.parent_link}\'.')
+        logging.loginfo(f'Attached object \'{group_name}\' at \'{parent_link}\'.')
         if world_body.joint_state_topic:
             god_map.tree.wait_for_goal.synchronization.sync_joint_state_topic(
-                group_name=req.group_name,
+                group_name=group_name,
                 topic_name=world_body.joint_state_topic)
         # FIXME also keep track of base pose
         if world_body.tf_root_link_name:

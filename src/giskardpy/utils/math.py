@@ -337,54 +337,6 @@ def normalize(v: np.ndarray) -> np.ndarray:
     return v / np.linalg.norm(v)
 
 
-def compare_poses(actual_pose, desired_pose, decimal=2):
-    """
-    :type actual_pose: Pose
-    :type desired_pose: Pose
-    """
-    compare_points(actual_point=actual_pose.position,
-                   desired_point=desired_pose.position,
-                   decimal=decimal)
-    compare_orientations(actual_orientation=actual_pose.orientation,
-                         desired_orientation=desired_pose.orientation,
-                         decimal=decimal)
-
-
-def compare_points(actual_point: Point, desired_point: Point, decimal: float = 2):
-    np.testing.assert_almost_equal(actual_point.x, desired_point.x, decimal=decimal)
-    np.testing.assert_almost_equal(actual_point.y, desired_point.y, decimal=decimal)
-    np.testing.assert_almost_equal(actual_point.z, desired_point.z, decimal=decimal)
-
-
-def compare_orientations(actual_orientation: Union[Quaternion, np.ndarray],
-                         desired_orientation: Union[Quaternion, np.ndarray],
-                         decimal: float = 2):
-    if isinstance(actual_orientation, Quaternion):
-        q1 = np.array([actual_orientation.x,
-                       actual_orientation.y,
-                       actual_orientation.z,
-                       actual_orientation.w])
-    else:
-        q1 = actual_orientation
-    if isinstance(desired_orientation, Quaternion):
-        q2 = np.array([desired_orientation.x,
-                       desired_orientation.y,
-                       desired_orientation.z,
-                       desired_orientation.w])
-    else:
-        q2 = desired_orientation
-    try:
-        np.testing.assert_almost_equal(q1[0], q2[0], decimal=decimal)
-        np.testing.assert_almost_equal(q1[1], q2[1], decimal=decimal)
-        np.testing.assert_almost_equal(q1[2], q2[2], decimal=decimal)
-        np.testing.assert_almost_equal(q1[3], q2[3], decimal=decimal)
-    except:
-        np.testing.assert_almost_equal(q1[0], -q2[0], decimal=decimal)
-        np.testing.assert_almost_equal(q1[1], -q2[1], decimal=decimal)
-        np.testing.assert_almost_equal(q1[2], -q2[2], decimal=decimal)
-        np.testing.assert_almost_equal(q1[3], -q2[3], decimal=decimal)
-
-
 def my_cross(v1: np.ndarray, v2: np.ndarray) -> np.ndarray:
     """
     :param v1: vector length 3 or 4

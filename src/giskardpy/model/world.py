@@ -604,7 +604,7 @@ class WorldTree(WorldTreeInterface):
             urdf_root_link = Link.from_urdf(urdf_link=urdf_link,
                                             prefix=group_name,
                                             color=self.default_link_color)
-            self._add_link(urdf_root_link)
+            self.add_link(urdf_root_link)
             joint = Joint6DOF(name=PrefixName(group_name, self.connection_prefix),
                               parent_link_name=parent_link_name,
                               child_link_name=urdf_root_link.name)
@@ -612,7 +612,7 @@ class WorldTree(WorldTreeInterface):
             self._add_joint(joint)
         else:
             urdf_root_link = Link(urdf_root_link_name_prefixed)
-            self._add_link(urdf_root_link)
+            self.add_link(urdf_root_link)
             # urdf_root_link = self.links[urdf_root_link_name]
 
         def helper(urdf, parent_link):
@@ -624,7 +624,7 @@ class WorldTree(WorldTreeInterface):
                 child_link = Link.from_urdf(urdf_link=urdf_link,
                                             prefix=group_name,
                                             color=self.default_link_color)
-                self._add_link(child_link)
+                self.add_link(child_link)
 
                 urdf_joint: up.Joint = urdf.joint_map[child_joint_name]
 
@@ -856,7 +856,7 @@ class WorldTree(WorldTreeInterface):
         else:
             link = Link.from_world_body(link_name=PrefixName(group_name, group_name), msg=msg,
                                         color=self.default_link_color)
-            self._add_link(link)
+            self.add_link(link)
             joint = Joint6DOF(name=PrefixName(group_name, self.connection_prefix),
                               parent_link_name=parent_link_name,
                               child_link_name=link.name)
@@ -885,7 +885,7 @@ class WorldTree(WorldTreeInterface):
         self._raise_if_joint_exists(joint.name)
         self._raise_if_link_exists(joint.child_link_name)
         child_link = Link(joint.child_link_name)
-        self._add_link(child_link)
+        self.add_link(child_link)
         self._link_joint_to_links(joint)
 
     def _link_joint_to_links(self, joint: Joint):
@@ -927,7 +927,7 @@ class WorldTree(WorldTreeInterface):
             raise WorldException(f'Found multiple orphaned links: {orphans}.')
         self._root_link_name = orphans[0]
 
-    def _raise_if_link_does_not_exist(self, link_name: my_string):
+    def _raise_if_link_does_not_exist(self, link_name: PrefixName):
         if link_name not in self.links:
             raise UnknownLinkException(f'Link \'{link_name}\' does not exist.')
 
@@ -1331,7 +1331,7 @@ class WorldTree(WorldTreeInterface):
             chain2 = [x for x in chain2 if x not in joints_to_be_assumed_fixed]
         return not chain1 and not connection and not chain2
 
-    def _add_link(self, link: Link) -> None:
+    def add_link(self, link: Link) -> None:
         self._raise_if_link_exists(link.name)
         self.links[link.name] = link
 
@@ -1363,14 +1363,14 @@ class WorldTree(WorldTreeInterface):
     def transform(self, target_frame: PrefixName, msg: cas.RotationMatrix) -> cas.RotationMatrix:
         ...
 
-    def transform(self, target_frame, msg):
-        target_frame_T_reference_frame = self.compute_fk(root=target_frame, tip=msg.reference_frame)
-        if isinstance(msg, cas.Quaternion):
-            reference_frame_R = msg.to_rotation_matrix()
+    def transform(self, target_frame, geometric_cas_object):
+        target_frame_T_reference_frame = self.compute_fk(root=target_frame, tip=geometric_cas_object.reference_frame)
+        if isinstance(geometric_cas_object, cas.Quaternion):
+            reference_frame_R = geometric_cas_object.to_rotation_matrix()
             target_frame_R = target_frame_T_reference_frame.dot(reference_frame_R)
             return target_frame_R.to_quaternion()
         else:
-            return target_frame_T_reference_frame.dot(msg)
+            return target_frame_T_reference_frame.dot(geometric_cas_object)
 
     def compute_joint_limits(self, joint_name: PrefixName, order: Derivatives) \
             -> Tuple[Optional[cas.symbol_expr_float], Optional[cas.symbol_expr_float]]:

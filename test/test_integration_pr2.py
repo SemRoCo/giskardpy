@@ -37,7 +37,7 @@ from giskardpy.python_interface.old_python_interface import OldGiskardWrapper
 from giskardpy.utils.utils import launch_launchfile, suppress_stderr, resolve_ros_iris
 from utils_for_tests import compare_poses, publish_marker_vector, \
     GiskardTestWrapper, pr2_urdf, compare_points
-from giskardpy.goals.manipulability_goals import MaxManipulability
+from giskardpy.goals.weight_scaling_goals import MaxManipulabilityLinWeight, BaseArmWeightScaling
 
 # scopes = ['module', 'class', 'function']
 pocky_pose = {'r_elbow_flex_joint': -1.29610152504,
@@ -4283,7 +4283,7 @@ class TestManipulability:
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.allow_all_collisions()
         zero_pose.set_cart_goal(p, zero_pose.r_tip, 'map')
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulability.__name__,
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulabilityLinWeight.__name__,
                                                root_link='torso_lift_link',
                                                tip_link='r_gripper_tool_frame')
         zero_pose.plan_and_execute()
@@ -4296,15 +4296,162 @@ class TestManipulability:
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.allow_all_collisions()
         zero_pose.set_cart_goal(p, zero_pose.r_tip, 'map')
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulability.__name__,
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulabilityLinWeight.__name__,
                                                root_link='torso_lift_link',
                                                tip_link='r_gripper_tool_frame')
         p.pose.position = Point(1, 0.1, 0)
         zero_pose.set_cart_goal(p, zero_pose.l_tip, 'map')
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulability.__name__,
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulabilityLinWeight.__name__,
                                                root_link='torso_lift_link',
                                                tip_link='l_gripper_tool_frame')
         zero_pose.execute(add_local_minimum_reached=True)
+
+
+class TestWeightScaling:
+    def test_weight_scaling1(self, zero_pose):
+        js = {
+            # 'torso_lift_joint': 0.2999225173357618,
+            'head_pan_joint': 0.041880780651479044,
+            'head_tilt_joint': -0.37,
+            'r_upper_arm_roll_joint': -0.9487714747527726,
+            'r_shoulder_pan_joint': -1.0047307505973626,
+            'r_shoulder_lift_joint': 0.48736790658811985,
+            'r_forearm_roll_joint': -14.895833882874182,
+            'r_elbow_flex_joint': -1.392377908925028,
+            'r_wrist_flex_joint': -0.4548695149411013,
+            'r_wrist_roll_joint': 0.11426798984097819,
+            'l_upper_arm_roll_joint': 1.7383062350263658,
+            'l_shoulder_pan_joint': 1.8799810286792007,
+            'l_shoulder_lift_joint': 0.011627231224188975,
+            'l_forearm_roll_joint': 312.67276414458695,
+            'l_elbow_flex_joint': -2.0300928925694675,
+            'l_wrist_flex_joint': -0.10014623223021513,
+            'l_wrist_roll_joint': -6.062015047706399,
+        }
+        zero_pose.set_joint_goal(js)
+        zero_pose.allow_all_collisions()
+        zero_pose.execute()
+
+        goal_pose = PoseStamped()
+        goal_pose.header.frame_id = 'map'
+        goal_pose.pose.orientation = Quaternion(*quaternion_from_matrix([[1, 0, 0, 0],
+                                                                         [0, 1, 0, 0],
+                                                                         [0, 0, 1, 0],
+                                                                         [0, 0, 0, 1]]))
+        goal_pose.pose.position.x = 2.01
+        goal_pose.pose.position.y = -0.2
+        goal_pose.pose.position.z = 0.7
+
+        goal_pose2 = deepcopy(goal_pose)
+        goal_pose2.pose.position.y = -0.6
+        goal_pose2.pose.position.z = 0.8
+        goal_pose2.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 0, 1, 0],
+                                                                          [0, 1, 0, 0],
+                                                                          [-1, 0, 0, 0],
+                                                                          [0, 0, 0, 1]]))
+
+        zero_pose.set_cart_goal(goal_pose, 'l_gripper_tool_frame', 'map')
+        zero_pose.set_cart_goal(goal_pose2, 'r_gripper_tool_frame', 'map')
+
+        goal_point = PointStamped()
+        goal_point.header.frame_id = goal_pose.header.frame_id
+        goal_point.point = goal_pose.pose.position
+        pointing_axis = Vector3Stamped()
+        pointing_axis.header.frame_id = 'head_mount_kinect_rgb_optical_frame'
+        pointing_axis.vector.z = 1
+        zero_pose.motion_goals.add_pointing(goal_point, 'head_mount_kinect_rgb_optical_frame', pointing_axis, 'map')
+
+        x_base = Vector3Stamped()
+        x_base.header.frame_id = 'base_link'
+        x_base.vector.x = 1
+        x_goal = Vector3Stamped()
+        x_goal.header.frame_id = 'map'
+        x_goal.vector.x = 1
+        zero_pose.set_align_planes_goal(tip_link='base_link',
+                                        root_link='map',
+                                        tip_normal=x_base,
+                                        goal_normal=x_goal)
+
+        tip_goal = PointStamped()
+        tip_goal.header.frame_id = 'map'
+        tip_goal.point = goal_pose.pose.position
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class=BaseArmWeightScaling.__name__,
+                                               root_link='map',
+                                               tip_link='l_gripper_tool_frame',
+                                               tip_goal=tip_goal,
+                                               gain=100000,
+                                               arm_joints=[
+                                                   'torso_lift_joint',
+                                                   # 'head_pan_joint',
+                                                   # 'head_tilt_joint',
+                                                   'r_upper_arm_roll_joint',
+                                                   'r_shoulder_pan_joint',
+                                                   'r_shoulder_lift_joint',
+                                                   'r_forearm_roll_joint',
+                                                   'r_elbow_flex_joint',
+                                                   'r_wrist_flex_joint',
+                                                   'r_wrist_roll_joint',
+                                                   'l_upper_arm_roll_joint',
+                                                   'l_shoulder_pan_joint',
+                                                   'l_shoulder_lift_joint',
+                                                   'l_forearm_roll_joint',
+                                                   'l_elbow_flex_joint',
+                                                   'l_wrist_flex_joint',
+                                                   'l_wrist_roll_joint'],
+                                               base_joints=['brumbrum'])
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulabilityLinWeight.__name__,
+                                               root_link='torso_lift_link',
+                                               tip_link='r_gripper_tool_frame')
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulabilityLinWeight.__name__,
+                                               root_link='torso_lift_link',
+                                               tip_link='l_gripper_tool_frame')
+        zero_pose.add_default_end_motion_conditions()
+        zero_pose.allow_all_collisions()
+        zero_pose.execute()
+        assert god_map.debug_expression_manager.evaluated_debug_expressions['arm_scaling'][0] * 1000 < \
+               god_map.debug_expression_manager.evaluated_debug_expressions['base_scaling'][0]
+
+    def test_manip(self, zero_pose: PR2TestWrapper):
+        p = PoseStamped()
+        p.header.stamp = rospy.get_rostime()
+        p.header.frame_id = 'map'
+        p.pose.position = Point(0.8, -0.3, 1)
+        p.pose.orientation = Quaternion(0, 0, 0, 1)
+        zero_pose.allow_all_collisions()
+        zero_pose.set_cart_goal(p, zero_pose.r_tip, 'map')
+        m_threshold = 0.16
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulabilityLinWeight.__name__,
+                                               root_link='torso_lift_link',
+                                               tip_link=zero_pose.r_tip,
+                                               m_threshold=m_threshold)
+        zero_pose.plan_and_execute()
+        assert god_map.debug_expression_manager.evaluated_debug_expressions[f'mIndex{zero_pose.r_tip}'][
+                   0] >= m_threshold
+
+    def test_manip2(self, zero_pose: PR2TestWrapper):
+        m_threshold = 0.16
+        p = PoseStamped()
+        p.header.stamp = rospy.get_rostime()
+        p.header.frame_id = zero_pose.r_tip
+        p.pose.position = Point(1, -0.5, 0)
+        p.pose.orientation = Quaternion(0, 0, 0, 1)
+        zero_pose.allow_all_collisions()
+        zero_pose.set_cart_goal(p, zero_pose.r_tip, 'map')
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulabilityLinWeight.__name__,
+                                               root_link='torso_lift_link',
+                                               tip_link=zero_pose.r_tip,
+                                               m_threshold=m_threshold)
+        p.pose.position = Point(1, 0.1, 0)
+        zero_pose.set_cart_goal(p, zero_pose.l_tip, 'map')
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulabilityLinWeight.__name__,
+                                               root_link='torso_lift_link',
+                                               tip_link=zero_pose.l_tip,
+                                               m_threshold=m_threshold)
+        zero_pose.plan_and_execute()
+        assert god_map.debug_expression_manager.evaluated_debug_expressions[f'mIndex{zero_pose.r_tip}'][
+                   0] >= m_threshold
+        assert god_map.debug_expression_manager.evaluated_debug_expressions[f'mIndex{zero_pose.l_tip}'][
+                   0] >= m_threshold
 
 # kernprof -lv py.test -s test/test_integration_pr2.py
 # time: [1-9][1-9]*.[1-9]* s

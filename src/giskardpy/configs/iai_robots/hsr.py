@@ -16,12 +16,14 @@ class WorldWithHSRConfig(WorldConfig):
                  map_name: str = 'map',
                  localization_joint_name: str = 'localization',
                  odom_link_name: str = 'odom',
-                 drive_joint_name: str = 'brumbrum'):
+                 drive_joint_name: str = 'brumbrum',
+                 description_name: str = 'robot_description'):
         super().__init__()
         self.map_name = map_name
         self.localization_joint_name = localization_joint_name
         self.odom_link_name = odom_link_name
         self.drive_joint_name = drive_joint_name
+        self.robot_description_name = description_name
 
     def setup(self):
         self.set_default_color(1, 1, 1, 1)
@@ -32,7 +34,7 @@ class WorldWithHSRConfig(WorldConfig):
         self.add_6dof_joint(parent_link=self.map_name, child_link=self.odom_link_name,
                             joint_name=self.localization_joint_name)
         self.add_empty_link(self.odom_link_name)
-        self.add_robot_from_parameter_server()
+        self.add_robot_from_parameter_server(parameter_name=self.robot_description_name)
         root_link_name = self.get_root_link_of_group(self.robot_group_name)
         self.add_omni_drive_joint(parent_link_name=self.odom_link_name,
                                   child_link_name=root_link_name,

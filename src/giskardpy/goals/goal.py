@@ -11,6 +11,7 @@ from giskardpy.tasks.task import Task
 from giskardpy.utils.utils import string_shortener
 from giskardpy.exceptions import GoalInitalizationException
 from giskardpy.model.joints import OneDofJoint
+from giskardpy.qp.constraint import InequalityConstraint, EqualityConstraint, DerivativeInequalityConstraint
 from giskardpy.data_types.data_types import PrefixName, Derivatives
 import giskardpy.casadi_wrapper as cas
 

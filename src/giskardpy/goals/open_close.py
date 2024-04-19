@@ -23,8 +23,7 @@ class Open(Goal):
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.TrueSymbol
-                 ):
+                 end_condition: cas.Expression = cas.TrueSymbol):
         """
         Open a container in an environment.
         Only works with the environment was added as urdf.

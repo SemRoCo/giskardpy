@@ -139,6 +139,7 @@ class SymbolManager(metaclass=SingletonMeta):
                                     will be ignored if input_type_hint is a ROS message.
         :return:
         """
+        # TODO remove geo deps here
         if input_type_hint is None:
             try:
                 data = eval(variable_ref_str)

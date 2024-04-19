@@ -2,7 +2,6 @@ from __future__ import division
 
 from typing import Optional
 
-import giskardpy.middleware_interfaces.ros1.tfwrapper as tf
 import giskardpy.casadi_wrapper as cas
 from giskardpy.goals.goal import Goal
 from giskardpy.tasks.task import WEIGHT_ABOVE_CA
@@ -51,10 +50,10 @@ class GraspBar(Goal):
         bar_center = god_map.world.transform(self.root, bar_center)
 
         tip_grasp_axis = god_map.world.transform(self.tip, tip_grasp_axis)
-        tip_grasp_axis.vector = tf.normalize(tip_grasp_axis.vector)
+        tip_grasp_axis.scale(1)
 
         bar_axis = god_map.world.transform(self.root, bar_axis)
-        bar_axis.vector = tf.normalize(bar_axis.vector)
+        bar_axis.scale(1)
 
         self.bar_axis = bar_axis
         self.tip_grasp_axis = tip_grasp_axis

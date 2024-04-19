@@ -1,5 +1,5 @@
 from enum import IntEnum
-from typing import Optional, List, Union, Dict, Callable, Iterable, overload
+from typing import Optional, List, Union, Dict, Callable, Iterable, overload, DefaultDict
 
 import numpy as np
 
@@ -9,11 +9,12 @@ from giskardpy.exceptions import GiskardException, GoalInitalizationException, D
 from giskardpy.god_map import god_map
 from giskardpy.monitors.monitors import ExpressionMonitor, Monitor
 from giskardpy.data_types import Derivatives, PrefixName, TaskState
-from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint, \
-    ManipulabilityConstraint, Constraint
+from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint, Constraint
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils.decorators import memoize
 from giskardpy.utils.utils import string_shortener
+from giskardpy.qp.weight_gain import QuadraticWeightGain, LinearWeightGain
+from giskardpy.qp.free_variable import FreeVariable
 
 WEIGHT_MAX = giskard_msgs.Weights.WEIGHT_MAX
 WEIGHT_ABOVE_CA = giskard_msgs.Weights.WEIGHT_ABOVE_CA
@@ -51,6 +52,8 @@ class Task:
         self._hold_condition = cas.FalseSymbol
         self._end_condition = cas.TrueSymbol
         self.manip_constraints = {}
+        self.quadratic_gains = []
+        self.linear_weight_gains = []
         self._id = -1
 
     def to_ros_msg(self) -> giskard_msgs.MotionGoal:
@@ -134,8 +137,11 @@ class Task:
     def get_derivative_constraints(self) -> List[DerivativeInequalityConstraint]:
         return self._apply_monitors_to_constraints(self.derivative_constraints.values())
 
-    def get_manipulability_constraint(self) -> List[ManipulabilityConstraint]:
-        return list(self.manip_constraints.values())
+    def get_quadratic_gains(self) -> List[QuadraticWeightGain]:
+        return self.quadratic_gains
+
+    def get_linear_gains(self) -> List[LinearWeightGain]:
+        return self.linear_weight_gains
 
     def get_state_expression(self) -> cas.Symbol:
         return symbol_manager.get_symbol(f'god_map.motion_goal_manager.task_state[{self.id}]')
@@ -165,35 +171,15 @@ class Task:
             output_constraints.append(constraint)
         return output_constraints
 
-    def add_manipulability_constraint(self,
-                                      task_expression: cas.symbol_expr,
-                                      gain: float,
-                                      prediction_horizon: int,
-                                      name: str = None):
-        if task_expression.shape != (1, 1):
-            raise GoalInitalizationException(f'expression must have shape (1, 1), has {task_expression.shape}')
-        name = name or f'{len(self.manip_constraints)}'
-        constraint = ManipulabilityConstraint(name=name,
-                                              parent_task_name=self.name,
-                                              expression=task_expression,
-                                              gain=gain,
-                                              prediction_horizon=prediction_horizon)
-        self.manip_constraints[constraint.name] = constraint
+    def add_quadratic_weight_gain(self, name: str, gains: List[DefaultDict[Derivatives, Dict[FreeVariable, float]]]):
+        q_gain = QuadraticWeightGain(name=name,
+                                     gains=gains)
+        self.quadratic_gains.append(q_gain)
 
-    def add_manipulability_constraint_vector(self,
-                                             task_expressions: Union[
-                                                 cas.Expression, cas.Vector3, cas.Point3, List[cas.symbol_expr]],
-                                             names: List[str],
-                                             gain: float,
-                                             prediction_horizon: int):
-        if len(task_expressions) != len(names):
-            raise GoalInitalizationException('All parameters must have the same length.')
-        for i in range(len(task_expressions)):
-            name_suffix = names[i] if names else None
-            self.add_manipulability_constraint(name=name_suffix,
-                                               task_expression=task_expressions[i],
-                                               gain=gain,
-                                               prediction_horizon=prediction_horizon)
+    def add_linear_weight_gain(self, name: str, gains: List[DefaultDict[Derivatives, Dict[FreeVariable, float]]]):
+        q_gain = LinearWeightGain(name=name,
+                                  gains=gains)
+        self.linear_weight_gains.append(q_gain)
 
     def add_equality_constraint(self,
                                 reference_velocity: cas.symbol_expr_float,

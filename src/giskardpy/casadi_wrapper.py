@@ -2214,3 +2214,7 @@ def is_false(expr):
 
 def is_constant(expr):
     return len(expr.free_symbols()) == 0
+
+
+def det(expr):
+    return Expression(ca.det(expr.s))

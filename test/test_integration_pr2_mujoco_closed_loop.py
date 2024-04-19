@@ -1,14 +1,16 @@
+import math
 from copy import deepcopy
 from typing import Optional
 
 import numpy as np
 from numpy import pi
 import pytest
+import math
 import rospy
 from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, PointStamped
 from sensor_msgs.msg import JointState
 from std_srvs.srv import Trigger
-from tf.transformations import quaternion_from_matrix, quaternion_about_axis
+from tf.transformations import quaternion_from_matrix, quaternion_about_axis, quaternion_multiply
 
 import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import MoveResult, MoveGoal, GiskardError
@@ -20,8 +22,7 @@ from giskardpy.data_types import JointStates
 from giskardpy.god_map import god_map
 from giskardpy.tasks.task import WEIGHT_BELOW_CA
 from test_integration_pr2 import PR2TestWrapper, TestJointGoals, pocky_pose
-from giskardpy.goals.manipulability_goals import MaxManipulability
-
+from giskardpy.goals.weight_scaling_goals import MaxManipulabilityLinWeight
 
 class PR2TestWrapperMujoco(PR2TestWrapper):
     better_pose = {'r_shoulder_pan_joint': -1.7125,
@@ -59,8 +60,8 @@ class PR2TestWrapperMujoco(PR2TestWrapper):
         giskard = Giskard(world_config=WorldWithPR2Config(),
                           collision_avoidance_config=PR2CollisionAvoidance(),
                           robot_interface_config=PR2VelocityMujocoInterface(),
-                          behavior_tree_config=ClosedLoopBTConfig(debug_mode=True, control_loop_max_hz=100),
-                          qp_controller_config=QPControllerConfig())
+                          behavior_tree_config=ClosedLoopBTConfig(debug_mode=True, control_loop_max_hz=50),
+                          qp_controller_config=QPControllerConfig(qp_solver=SupportedQPSolver.gurobi))
         super().__init__(giskard)
 
     def reset_base(self):
@@ -571,16 +572,51 @@ class TestActionServerEvents:
 
 class TestManipulability:
     def test_manip1(self, zero_pose: PR2TestWrapper):
+        # js = {
+        #     # 'torso_lift_joint': 0.2999225173357618,
+        #     'head_pan_joint': 0.041880780651479044,
+        #     'head_tilt_joint': -0.37,
+        #     'r_upper_arm_roll_joint': -0.9487714747527726,
+        #     'r_shoulder_pan_joint': -1.0047307505973626,
+        #     'r_shoulder_lift_joint': 0.48736790658811985,
+        #     'r_forearm_roll_joint': -14.895833882874182,
+        #     'r_elbow_flex_joint': -1.392377908925028,
+        #     'r_wrist_flex_joint': -0.4548695149411013,
+        #     'r_wrist_roll_joint': 0.11426798984097819,
+        #     'l_upper_arm_roll_joint': 1.7383062350263658,
+        #     'l_shoulder_pan_joint': 1.8799810286792007,
+        #     'l_shoulder_lift_joint': 0.011627231224188975,
+        #     'l_forearm_roll_joint': 312.67276414458695,
+        #     'l_elbow_flex_joint': -2.0300928925694675,
+        #     'l_wrist_flex_joint': -0.10014623223021513,
+        #     'l_wrist_roll_joint': -6.062015047706399,
+        # }
+        # zero_pose.set_joint_goal(js)
+        # zero_pose.allow_all_collisions()
+        # zero_pose.plan_and_execute()
+
         p = PoseStamped()
         p.header.stamp = rospy.get_rostime()
         p.header.frame_id = 'map'
-        p.pose.position = Point(0.8, -0.3, 1)
+        p.pose.position = Point(2, -0.3, 1.3)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.allow_all_collisions()
         zero_pose.set_cart_goal(p, zero_pose.r_tip, 'map')
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulability.__name__,
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulabilityLinWeight.__name__,
                                                root_link='torso_lift_link',
-                                               tip_link='r_gripper_tool_frame')
+                                               tip_link='r_gripper_tool_frame',
+                                               gain=1)
+        x_base = Vector3Stamped()
+        x_base.header.frame_id = 'base_link'
+        x_base.vector.x = 1
+
+        x_goal = Vector3Stamped()
+        x_goal.header.frame_id = 'map'
+        x_goal.vector.x = 1
+        zero_pose.set_align_planes_goal(tip_link='base_link',
+                                        root_link='map',
+                                        tip_normal=x_base,
+                                        goal_normal=x_goal)
         zero_pose.plan_and_execute()
 
 # kernprof -lv py.test -s test/test_integration_pr2.py

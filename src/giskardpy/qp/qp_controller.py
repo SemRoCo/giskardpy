@@ -15,8 +15,7 @@ from giskardpy.exceptions import HardConstraintsViolatedException, QPSolverExcep
     VelocityLimitUnreachableException
 from giskardpy.god_map import god_map
 from giskardpy.data_types import Derivatives
-from giskardpy.qp.constraint import InequalityConstraint, EqualityConstraint, DerivativeInequalityConstraint, \
-    ManipulabilityConstraint
+from giskardpy.qp.constraint import InequalityConstraint, EqualityConstraint, DerivativeInequalityConstraint
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.next_command import NextCommands
 from giskardpy.qp.pos_in_vel_limits import b_profile, implicit_vel_profile
@@ -26,6 +25,7 @@ from giskardpy.utils import logging
 from giskardpy.utils.utils import create_path, get_all_classes_in_package
 from giskardpy.utils.decorators import memoize
 import giskardpy.utils.math as giskard_math
+from giskardpy.qp.weight_gain import QuadraticWeightGain, LinearWeightGain
 
 # used for saving pandas in the same folder every time within a run
 date_str = datetime.datetime.now().strftime('%Yy-%mm-%dd--%Hh-%Mm-%Ss')
@@ -178,19 +178,31 @@ class Weights(ProblemDataPart):
         return (cas.abs(current_position + x_offset - limit) * a) ** exp, x_offset
 
     @profile
-    def construct_expression(self) -> Union[cas.Expression, Tuple[cas.Expression, cas.Expression]]:
+    def construct_expression(self, quadratic_weight_gains: List[QuadraticWeightGain] = None,
+                             linear_weight_gains: List[LinearWeightGain] = None) -> Union[
+        cas.Expression, Tuple[cas.Expression, cas.Expression]]:
         components = []
-        components.extend(self.free_variable_weights_expression())
+        components.extend(
+            self.free_variable_weights_expression(quadratic_weight_gains=quadratic_weight_gains))
         components.append(self.equality_weight_expressions())
         components.extend(self.derivative_weight_expressions())
         components.append(self.inequality_weight_expressions())
         weights, _ = self._sorter(*components)
         weights = cas.Expression(weights)
-        linear_weights = cas.zeros(*weights.shape)
+        linear_weights = self.linear_weights_expression(linear_weight_gains=linear_weight_gains)
+        if linear_weights is None:
+            linear_weights = cas.zeros(*weights.shape)
+        else:
+            # as of now linear weights are only added for joints, therefore equality-, derivative- and inequality
+            # weights are missing. Here the missing weights are filled in with zeroes.
+            linear_weights, _ = self._sorter(*linear_weights)
+            linear_weights = cas.Expression(linear_weights)
+            linear_weights = cas.vstack([linear_weights] + [cas.Expression(0)] * (weights.shape[0] - linear_weights.shape[0]))
         return cas.Expression(weights), linear_weights
 
     @profile
-    def free_variable_weights_expression(self) -> List[defaultdict]:
+    def free_variable_weights_expression(self, quadratic_weight_gains: List[QuadraticWeightGain] = None) -> \
+            List[defaultdict]:
         params = []
         weights = defaultdict(dict)  # maps order to joints
         for t in range(self.prediction_horizon):
@@ -201,6 +213,9 @@ class Weights(ProblemDataPart):
                     normalized_weight = v.normalized_weight(t, derivative, self.prediction_horizon,
                                                             evaluated=self.evaluated)
                     weights[derivative][f't{t:03}/{v.position_name}/{derivative}'] = normalized_weight
+                    for q_gain in quadratic_weight_gains:
+                        if t < len(q_gain.gains) and v in q_gain.gains[t][derivative].keys():
+                            weights[derivative][f't{t:03}/{v.position_name}/{derivative}'] *= q_gain.gains[t][derivative][v]
         for _, weight in sorted(weights.items()):
             params.append(weight)
         return params
@@ -226,23 +241,23 @@ class Weights(ProblemDataPart):
         return error_slack_weights
 
     @profile
-    def linear_weights_expression(self, manip_expressions: List[ManipulabilityConstraint]):
-        if len(manip_expressions) == 0:
-            return None, None
-
-        stacked_exp = cas.vstack([x.expression for x in manip_expressions])
-
-        J = cas.jacobian(stacked_exp, self.get_free_variable_symbols(Derivatives.position))
-
-        grad_traces = []
-        for symbol in self.get_free_variable_symbols(Derivatives.position):
-            JJt = J.dot(J.T)
-            J_dq = cas.total_derivative(J, [symbol], [1])
-            product = cas.matrix_inverse(JJt).dot(J_dq).dot(J.T)
-            trace = cas.trace(product)
-            grad_traces.append(trace)
-
-        return J, grad_traces
+    def linear_weights_expression(self, linear_weight_gains: List[LinearWeightGain] = None):
+        if len(linear_weight_gains) > 0:
+            params = []
+            weights = defaultdict(dict)  # maps order to joints
+            for t in range(self.prediction_horizon):
+                for v in self.free_variables:
+                    for derivative in Derivatives.range(Derivatives.velocity, self.max_derivative):
+                        if t >= self.prediction_horizon - (self.max_derivative - derivative):
+                            continue
+                        weights[derivative][f't{t:03}/{v.position_name}/{derivative}'] = 0
+                        for l_gain in linear_weight_gains:
+                            if t < len(l_gain.gains) and v in l_gain.gains[t][derivative].keys():
+                                weights[derivative][f't{t:03}/{v.position_name}/{derivative}'] += l_gain.gains[t][derivative][v]
+            for _, weight in sorted(weights.items()):
+                params.append(weight)
+            return params
+        return None
 
     def get_free_variable_symbols(self, order: Derivatives) -> List[cas.Symbol]:
         return self._sorter({v.position_name: v.get_symbol(order) for v in self.free_variables})[0]
@@ -1004,7 +1019,6 @@ class QPProblemBuilder:
     inequality_bounds: InequalityBounds
     qp_solver: QPSolver
     prediction_horizon: int = None
-    manipulability_indexes: np.ndarray = np.array([0.0, 0.0])
 
     def __init__(self,
                  sample_period: float,
@@ -1014,7 +1028,8 @@ class QPProblemBuilder:
                  equality_constraints: List[EqualityConstraint] = None,
                  inequality_constraints: List[InequalityConstraint] = None,
                  derivative_constraints: List[DerivativeInequalityConstraint] = None,
-                 manipulability_constraints: List[ManipulabilityConstraint] = None,
+                 quadratic_weight_gains: List[QuadraticWeightGain] = None,
+                 linear_weight_gains: List[LinearWeightGain] = None,
                  retries_with_relaxed_constraints: int = 0,
                  retry_added_slack: float = 100,
                  retry_weight_factor: float = 100):
@@ -1022,7 +1037,8 @@ class QPProblemBuilder:
         self.equality_constraints = []
         self.inequality_constraints = []
         self.derivative_constraints = []
-        self.manipulability_constraints = []
+        self.quadratic_weight_gains = []
+        self.linear_weight_gains = []
         self.prediction_horizon = prediction_horizon
         self.retries_with_relaxed_constraints = retries_with_relaxed_constraints
         self.retry_added_slack = retry_added_slack
@@ -1036,8 +1052,10 @@ class QPProblemBuilder:
             self.add_equality_constraints(equality_constraints)
         if derivative_constraints is not None:
             self.add_derivative_constraints(derivative_constraints)
-        if manipulability_constraints is not None:
-            self.add_manipulability_constraints(manipulability_constraints)
+        if quadratic_weight_gains is not None:
+            self.add_quadratic_weight_gains(quadratic_weight_gains)
+        if linear_weight_gains is not None:
+            self.add_linear_weight_gains(linear_weight_gains)
 
         if solver_id is not None:
             self.qp_solver_class = available_solvers[solver_id]
@@ -1080,11 +1098,17 @@ class QPProblemBuilder:
             c.control_horizon = min(c.control_horizon, self.prediction_horizon)
             self.check_control_horizon(c)
 
-    def add_manipulability_constraints(self, constraints: List[ManipulabilityConstraint]):
-        self.manipulability_constraints.extend(list(sorted(constraints, key=lambda x: x.name)))
-        l = [x.name for x in constraints]
+    def add_quadratic_weight_gains(self, gains: List[QuadraticWeightGain]):
+        self.quadratic_weight_gains.extend(list(sorted(gains, key=lambda x: x.name)))
+        l = [x.name for x in gains]
         duplicates = set([x for x in l if l.count(x) > 1])
-        assert duplicates == set(), f'there are multiple manipulability constraints with the same name: {duplicates}'
+        assert duplicates == set(), f'there are multiple quadratic weight gains with the same name: {duplicates}'
+
+    def add_linear_weight_gains(self, gains: List[LinearWeightGain]):
+        self.linear_weight_gains.extend(list(sorted(gains, key=lambda x: x.name)))
+        l = [x.name for x in gains]
+        duplicates = set([x for x in l if l.count(x) > 1])
+        assert duplicates == set(), f'there are multiple linear weight gains with the same name: {duplicates}'
 
     def add_derivative_constraints(self, constraints: List[DerivativeInequalityConstraint]):
         self.derivative_constraints.extend(list(sorted(constraints, key=lambda x: x.name)))
@@ -1124,19 +1148,16 @@ class QPProblemBuilder:
         self.inequality_model = InequalityModel(**kwargs)
         self.inequality_bounds = InequalityBounds(default_limits=default_limits, **kwargs)
 
-        weights, g = self.weights.construct_expression()
+        weights, g = self.weights.construct_expression(self.quadratic_weight_gains, self.linear_weight_gains)
         lb, ub = self.free_variable_bounds.construct_expression()
         A, A_slack = self.inequality_model.construct_expression()
         lbA, ubA = self.inequality_bounds.construct_expression()
         E, E_slack = self.equality_model.construct_expression()
         bE = self.equality_bounds.construct_expression()
-        J, grad_traces = self.weights.linear_weights_expression(
-            manip_expressions=self.manipulability_constraints)
 
         qp_solver = solver_class(weights=weights, g=g, lb=lb, ub=ub,
                                  E=E, E_slack=E_slack, bE=bE,
-                                 A=A, A_slack=A_slack, lbA=lbA, ubA=ubA,
-                                 constraint_jacobian=J, grad_traces=grad_traces
+                                 A=A, A_slack=A_slack, lbA=lbA, ubA=ubA
                                  )
         # self.goal_reached_checks.compile(qp_solver.free_symbols)
         logging.loginfo('Done compiling controller:')

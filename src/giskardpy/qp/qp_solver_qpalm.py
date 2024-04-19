@@ -79,7 +79,7 @@ class QPSolverQPalm(QPSolver):
         len_lb_be_lba_end = weights.shape[0] + lb.shape[0] + bE.shape[0] + lbA.shape[0]
         len_ub_be_uba_end = len_lb_be_lba_end + ub.shape[0] + bE.shape[0] + ubA.shape[0]
 
-        self.combined_vector_f = cas.StackedCompiledFunction(expressions=[weights, lb, bE, lbA, ub, bE, ubA],
+        self.combined_vector_f = cas.StackedCompiledFunction(expressions=[weights, lb, bE, lbA, ub, bE, ubA, g],
                                                              parameters=free_symbols,
                                                              additional_views=[
                                                                  slice(weights.shape[0], len_lb_be_lba_end),
@@ -95,10 +95,8 @@ class QPSolverQPalm(QPSolver):
     @profile
     def evaluate_functions(self, substitutions: np.ndarray):
 
-        self.weights, self.lb, self.bE, self.lbA, self.ub, _, self.ubA, self.lb_bE_lbA, self.ub_bE_ubA = self.combined_vector_f.fast_call(
+        self.weights, self.lb, self.bE, self.lbA, self.ub, _, self.ubA, self.g, self.lb_bE_lbA, self.ub_bE_ubA = self.combined_vector_f.fast_call(
             substitutions)
-        self.g = np.zeros(self.weights.shape)
-
         self.A = self.A_f.fast_call(substitutions)
 
     @profile

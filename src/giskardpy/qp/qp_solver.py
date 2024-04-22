@@ -1,20 +1,16 @@
 import abc
 from abc import ABC
-from collections import defaultdict
 from functools import wraps
 from time import time
-from typing import Tuple, List, Iterable, Optional, Sequence, Union, Dict
+from typing import Tuple, List, Optional, Union, Dict
 import scipy.sparse as sp
 import numpy as np
 
 import giskardpy.casadi_wrapper as cas
 from giskardpy.configs.qp_controller_config import SupportedQPSolver
-from giskardpy.exceptions import HardConstraintsViolatedException, InfeasibleException, QPSolverException
+from giskardpy.data_types.exceptions import HardConstraintsViolatedException, InfeasibleException, QPSolverException
 from giskardpy.utils import logging
 from giskardpy.utils.decorators import memoize
-from giskardpy.god_map import god_map
-from visualization_msgs.msg import MarkerArray, Marker
-import rospy
 
 from giskardpy.utils.utils import is_running_in_pytest
 

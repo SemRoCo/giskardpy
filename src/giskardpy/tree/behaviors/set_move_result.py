@@ -1,12 +1,11 @@
 from py_trees import Status
 
 from giskard_msgs.msg import MoveResult
-from giskardpy.exceptions import *
+from giskardpy.data_types.exceptions import *
 from giskardpy.goals.collision_avoidance import CollisionAvoidance
 from giskardpy.goals.goal import NonMotionGoal
 from giskardpy.god_map import god_map
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
-from giskardpy.tree.control_modes import ControlModes
 from giskardpy.utils import logging
 from giskardpy.utils.decorators import record_time
 import giskardpy.middleware_interfaces.ros1.msg_converter as msg_converter

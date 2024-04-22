@@ -1,6 +1,6 @@
 from py_trees import Status
 
-from giskardpy.exceptions import PreemptedException
+from giskardpy.data_types.exceptions import PreemptedException
 from giskardpy.tree.behaviors.action_server import ActionServerHandler
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging

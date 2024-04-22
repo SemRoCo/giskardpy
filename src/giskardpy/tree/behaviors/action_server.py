@@ -5,10 +5,7 @@ import actionlib
 import rosnode
 import rospy
 
-from giskard_msgs.msg import MoveGoal
-from giskard_msgs.msg import MoveResult
-from giskardpy.exceptions import GiskardException
-from giskardpy.tree.behaviors.plugin import GiskardBehavior
+from giskardpy.data_types.exceptions import GiskardException
 from giskardpy.utils import logging
 from giskardpy.utils.decorators import record_time
 

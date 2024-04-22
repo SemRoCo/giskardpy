@@ -1,5 +1,5 @@
 from collections import defaultdict
-from typing import Iterable, Tuple, Dict
+from typing import Tuple, Dict
 
 import gurobipy
 import numpy as np
@@ -8,8 +8,8 @@ from gurobipy.gurobipy import GurobiError
 from scipy import sparse
 
 from giskardpy.configs.qp_controller_config import SupportedQPSolver
-from giskardpy.exceptions import QPSolverException, InfeasibleException, HardConstraintsViolatedException
-from giskardpy.qp.qp_solver import record_solver_call_time, QPSWIFTFormatter
+from giskardpy.data_types.exceptions import QPSolverException, InfeasibleException
+from giskardpy.qp.qp_solver import QPSWIFTFormatter
 from giskardpy.utils import logging
 
 gurobipy.setParam(gurobipy.GRB.Param.LogToConsole, False)

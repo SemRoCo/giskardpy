@@ -2,16 +2,15 @@ from __future__ import annotations
 
 import abc
 from abc import ABC
-from typing import Optional, Tuple, Dict, List, Union
+from typing import List, Union
 
 from giskardpy.monitors.monitors import ExpressionMonitor, Monitor
 from giskardpy.god_map import god_map
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.tasks.task import Task
 from giskardpy.utils.utils import string_shortener
-from giskardpy.exceptions import GoalInitalizationException
+from giskardpy.data_types.exceptions import GoalInitalizationException
 from giskardpy.model.joints import OneDofJoint
-from giskardpy.qp.constraint import InequalityConstraint, EqualityConstraint, DerivativeInequalityConstraint
 from giskardpy.data_types.data_types import PrefixName, Derivatives
 import giskardpy.casadi_wrapper as cas
 

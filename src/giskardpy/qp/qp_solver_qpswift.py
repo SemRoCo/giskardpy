@@ -1,18 +1,14 @@
-import abc
 from collections import defaultdict
 from enum import IntEnum
-from typing import Tuple, Iterable, List, Union, Optional, Dict
+from typing import Tuple, Dict
 
 import numpy as np
 
 from giskardpy.configs.qp_controller_config import SupportedQPSolver
-from giskardpy.exceptions import QPSolverException, InfeasibleException, HardConstraintsViolatedException
-from giskardpy.qp.qp_solver import QPSolver, record_solver_call_time, QPSWIFTFormatter
+from giskardpy.data_types.exceptions import QPSolverException, InfeasibleException
+from giskardpy.qp.qp_solver import QPSWIFTFormatter
 import qpSWIFT
-import giskardpy.casadi_wrapper as cas
 import scipy.sparse as sp
-
-from giskardpy.utils.decorators import record_time
 
 
 class QPSWIFTExitFlags(IntEnum):

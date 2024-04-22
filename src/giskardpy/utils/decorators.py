@@ -2,33 +2,16 @@ from __future__ import division
 
 # I only do this, because otherwise test/test_integration_pr2.py::TestWorldManipulation::test_unsupported_options
 # fails on github actions
-import urdf_parser_py.urdf as up
 
-import errno
-import inspect
-import json
-import os
-import pkgutil
-import sys
 import traceback
-from collections import OrderedDict, defaultdict
-from contextlib import contextmanager
+from collections import defaultdict
 from copy import deepcopy
-from functools import wraps
 from time import time
-from typing import Type, Optional, Dict, TypeVar, Callable
+from typing import Callable
 
-import numpy as np
-import roslaunch
-import rospkg
-import rospy
-import trimesh
-from genpy import Message
-from geometry_msgs.msg import PointStamped, Point, Vector3Stamped, Vector3, Pose, PoseStamped, QuaternionStamped, \
-    Quaternion
-from py_trees import Status, Blackboard
+from py_trees import Status
 
-from giskardpy.exceptions import DontPrintStackTrace
+from giskardpy.data_types.exceptions import DontPrintStackTrace
 from giskardpy.utils.utils import has_blackboard_exception, raise_to_blackboard
 
 from functools import wraps

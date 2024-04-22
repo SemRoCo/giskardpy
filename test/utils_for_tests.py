@@ -26,7 +26,7 @@ from giskard_msgs.srv import DyeGroupResponse
 from giskardpy.configs.giskard import Giskard
 from giskardpy.configs.qp_controller_config import SupportedQPSolver
 from giskardpy.data_types.data_types import KeyDefaultDict
-from giskardpy.exceptions import UnknownGroupException
+from giskardpy.data_types.exceptions import UnknownGroupException
 from giskardpy.goals.diff_drive_goals import DiffDriveTangentialToPoint, KeepHandInWorkspace
 from giskardpy.god_map import god_map
 from giskardpy.model.collision_world_syncer import Collisions, Collision, CollisionEntry

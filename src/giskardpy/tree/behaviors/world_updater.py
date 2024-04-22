@@ -9,7 +9,7 @@ from giskard_msgs.msg import WorldResult, WorldGoal, GiskardError
 from giskard_msgs.srv import GetGroupNamesResponse, GetGroupNamesRequest, GetGroupInfoResponse, GetGroupInfoRequest, \
     DyeGroupResponse, GetGroupNames, GetGroupInfo, DyeGroup, DyeGroupRequest
 from giskardpy.data_types.data_types import JointStates, PrefixName
-from giskardpy.exceptions import UnknownGroupException, \
+from giskardpy.data_types.exceptions import UnknownGroupException, \
     GiskardException, TransformException, DuplicateNameException
 from giskardpy.god_map import god_map
 from giskardpy.model.joints import Joint6DOF

@@ -13,7 +13,8 @@ import tf2_msgs.msg as tf2_msgs
 
 import giskard_msgs.msg as giskard_msgs
 from giskardpy.data_types.data_types import JointStates, PrefixName, _JointState, ColorRGBA
-from giskardpy.exceptions import GiskardException, CorruptShapeException
+from giskardpy.data_types.exceptions import GiskardException, CorruptShapeException
+from giskardpy.god_map import god_map
 from giskardpy.model.collision_world_syncer import CollisionEntry
 from giskardpy.model.joints import MovableJoint
 from giskardpy.model.links import LinkGeometry, Link, SphereGeometry, CylinderGeometry, BoxGeometry, MeshGeometry
@@ -21,9 +22,14 @@ from giskardpy.model.trajectory import Trajectory
 from giskardpy.model.world import WorldTree
 
 from rospy_message_converter.message_converter import \
-    convert_ros_message_to_dictionary as original_convert_ros_message_to_dictionary, \
     convert_dictionary_to_ros_message as original_convert_dictionary_to_ros_message
 
+from giskardpy.monitors.monitors import EndMotion, CancelMotion, Monitor
+from giskardpy.tasks.task import Task
+
+
+# TODO probably needs some consistency check
+# 1. weights are same as in message
 
 # %% to ros
 def to_ros_message(data):
@@ -210,6 +216,29 @@ def json_to_kwargs(d: dict, world: WorldTree) -> Dict[str, Any]:
 def convert_dictionary_to_ros_message(json):
     # maybe somehow search for message that fits to structure of json?
     return original_convert_dictionary_to_ros_message(json['message_type'], json['message'])
+
+
+def monitor_to_ros_msg(monitor: Monitor) -> giskard_msgs.Monitor:
+    msg = giskard_msgs.Monitor()
+    msg.name = monitor.name
+    if isinstance(monitor, EndMotion):
+        msg.monitor_class = EndMotion.__name__
+    elif isinstance(monitor, CancelMotion):
+        msg.monitor_class = CancelMotion.__name__
+    else:
+        msg.monitor_class = monitor.__class__.__name__
+    msg.start_condition = god_map.monitor_manager.format_condition(monitor.start_condition, new_line=' ')
+    return msg
+
+
+def task_to_ros_msg(task: Task) -> giskard_msgs.MotionGoal:
+    msg = giskard_msgs.MotionGoal()
+    msg.name = str(task.name)
+    msg.motion_goal_class = task.__class__.__name__
+    msg.start_condition = god_map.monitor_manager.format_condition(task.start_condition, new_line=' ')
+    msg.hold_condition = god_map.monitor_manager.format_condition(task.hold_condition, new_line=' ')
+    msg.end_condition = god_map.monitor_manager.format_condition(task.end_condition, new_line=' ')
+    return msg
 
 
 # %% from ros

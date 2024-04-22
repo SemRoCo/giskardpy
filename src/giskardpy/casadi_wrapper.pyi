@@ -137,6 +137,7 @@ class Expression(Symbol_):
     def __init__(self, data: Optional[Union[Symbol,
                                             Expression,
                                             float,
+                                            Vector3, Point3, TransMatrix, RotationMatrix, Quaternion,
                                             Iterable[symbol_expr_float],
                                             Iterable[Iterable[symbol_expr_float]],
                                             np.ndarray]] = None): ...

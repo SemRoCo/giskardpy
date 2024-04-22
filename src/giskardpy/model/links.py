@@ -6,7 +6,7 @@ from typing import List, Optional
 import urdf_parser_py.urdf as up
 
 from giskard_msgs.msg import WorldBody
-from giskardpy.exceptions import CorruptMeshException
+from giskardpy.data_types.exceptions import CorruptMeshException
 from giskardpy.model.utils import cube_volume, cube_surface, sphere_volume, cylinder_volume, cylinder_surface
 from giskardpy.data_types.data_types import PrefixName, ColorRGBA
 from giskardpy.data_types.data_types import my_string

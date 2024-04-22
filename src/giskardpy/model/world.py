@@ -17,7 +17,7 @@ from giskard_msgs.msg import WorldBody
 from giskardpy import casadi_wrapper as cas
 from giskardpy.casadi_wrapper import CompiledFunction
 from giskardpy.data_types.data_types import JointStates, ColorRGBA
-from giskardpy.exceptions import DuplicateNameException, UnknownGroupException, UnknownLinkException, \
+from giskardpy.data_types.exceptions import DuplicateNameException, UnknownGroupException, UnknownLinkException, \
     WorldException, UnknownJointException, CorruptURDFException
 from giskardpy.god_map import god_map
 from giskardpy.model.joints import Joint, FixedJoint, PrismaticJoint, RevoluteJoint, OmniDrive, DiffDrive, \

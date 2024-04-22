@@ -5,7 +5,7 @@ from typing import Dict, Optional, List
 from giskardpy import casadi_wrapper as cas
 from giskardpy.god_map import god_map
 from giskardpy.symbol_manager import symbol_manager
-from giskardpy.exceptions import GoalInitalizationException
+from giskardpy.data_types.exceptions import GoalInitalizationException
 from giskardpy.goals.goal import Goal, NonMotionGoal
 from giskardpy.tasks.task import WEIGHT_BELOW_CA
 from giskardpy.model.joints import OmniDrive, DiffDrive, OmniDrivePR22, OneDofJoint

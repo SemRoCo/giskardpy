@@ -6,7 +6,7 @@ from typing import Optional, List, Dict
 from giskardpy.god_map import god_map
 from giskardpy.tree.branches.giskard_bt import GiskardBT
 from giskardpy.tree.control_modes import ControlModes
-from giskardpy.exceptions import GiskardException, SetupException
+from giskardpy.data_types.exceptions import SetupException
 from giskardpy.model.world import WorldTree
 from giskardpy.data_types.data_types import my_string, PrefixName, Derivatives
 

@@ -4,12 +4,12 @@ from typing import List
 from py_trees import Status
 
 from giskard_msgs.msg import MoveGoal
-from giskardpy.exceptions import InvalidGoalException, UnknownGoalException, GiskardException, \
-    GoalInitalizationException
+from giskardpy.data_types.exceptions import InvalidGoalException, UnknownGoalException, GiskardException, \
+    GoalInitalizationException, UnknownMonitorException, MonitorInitalizationException
 from giskardpy.goals.base_traj_follower import BaseTrajFollower
 from giskardpy.goals.goal import Goal
 from giskardpy.middleware_interfaces.ros1.msg_converter import json_str_to_kwargs
-from giskardpy.monitors.monitors import TimeAbove, LocalMinimumReached, EndMotion
+from giskardpy.monitors.monitors import TimeAbove, LocalMinimumReached, EndMotion, ExpressionMonitor, PayloadMonitor
 from giskardpy.god_map import god_map
 from giskardpy.model.joints import OmniDrive, DiffDrive
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
@@ -42,7 +42,7 @@ class ParseActionGoal(GiskardBehavior):
         loginfo(f'Parsing goal #{god_map.move_action_server.goal_id} message.')
         self.sanity_check(move_goal)
         try:
-            god_map.monitor_manager.parse_monitors(move_goal.monitors)
+            self.parse_monitors(move_goal.monitors)
             self.parse_motion_goals(move_goal.goals)
         except AttributeError:
             traceback.print_exc()
@@ -53,6 +53,32 @@ class ParseActionGoal(GiskardBehavior):
         #     god_map.motion_goal_manager.parse_collision_entries(move_goal.collisions)
         loginfo('Done parsing goal message.')
         return Status.SUCCESS
+
+    @profile
+    def parse_monitors(self, monitor_msgs: List[giskard_msgs.Monitor]):
+        for monitor_msg in monitor_msgs:
+            try:
+                logging.loginfo(f'Adding monitor of type: \'{monitor_msg.monitor_class}\'')
+                C = god_map.monitor_manager.allowed_monitor_types[monitor_msg.monitor_class]
+            except KeyError:
+                raise UnknownMonitorException(f'unknown monitor type: \'{monitor_msg.monitor_class}\'.')
+            try:
+                kwargs = json_str_to_kwargs(monitor_msg.kwargs, god_map.world)
+                start_condition = god_map.monitor_manager.logic_str_to_expr(monitor_msg.start_condition,
+                                                                            default=cas.TrueSymbol)
+                monitor = C(name=monitor_msg.name,
+                            start_condition=start_condition,
+                            **kwargs)
+                if isinstance(monitor, ExpressionMonitor):
+                    god_map.monitor_manager.add_expression_monitor(monitor)
+                elif isinstance(monitor, PayloadMonitor):
+                    god_map.monitor_manager.add_payload_monitor(monitor)
+            except Exception as e:
+                traceback.print_exc()
+                error_msg = f'Initialization of \'{C.__name__}\' monitor failed: \n {e} \n'
+                if not isinstance(e, GiskardException):
+                    raise MonitorInitalizationException(error_msg)
+                raise e
 
     @profile
     def parse_motion_goals(self, motion_goals: List[giskard_msgs.MotionGoal]):

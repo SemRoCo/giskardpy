@@ -1,7 +1,7 @@
 import cplex
 import numpy as np
 
-from giskardpy.exceptions import QPSolverException, InfeasibleException
+from giskardpy.data_types.exceptions import QPSolverException, InfeasibleException
 from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.utils import logging
 

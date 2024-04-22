@@ -1,7 +1,7 @@
 import unittest
 
 from giskard_msgs.msg import GiskardError
-from giskardpy.exceptions import GiskardException
+from giskardpy.data_types.exceptions import GiskardException
 
 error_codes = {value: name for name, value in vars(GiskardError).items() if isinstance(value, (int, float))}
 

@@ -2,7 +2,7 @@ import numpy as np
 import quadprog
 
 from giskardpy.configs.qp_controller_config import SupportedQPSolver
-from giskardpy.exceptions import InfeasibleException
+from giskardpy.data_types.exceptions import InfeasibleException
 from giskardpy.qp.qp_solver import QPSolver
 
 

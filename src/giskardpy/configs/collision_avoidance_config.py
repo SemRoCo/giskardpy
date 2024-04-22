@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import abc
-from typing import Dict, Optional, List, Union, DefaultDict, Tuple
+from typing import Optional, List
 
-from giskardpy.exceptions import SetupException
+from giskardpy.data_types.exceptions import SetupException
 from giskardpy.god_map import god_map
-from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer, CollisionAvoidanceGroupThresholds, \
-    CollisionCheckerLib, CollisionAvoidanceThresholds
+from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer, CollisionCheckerLib, CollisionAvoidanceThresholds
 from giskardpy.model.world import WorldTree
 from giskardpy.data_types.data_types import PrefixName
 from giskardpy.utils import logging

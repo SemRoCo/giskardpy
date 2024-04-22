@@ -6,8 +6,6 @@ import rospy
 from py_trees_ros.trees import BehaviourTree
 from py_trees import Chooser, common
 from py_trees import Selector, Sequence
-from giskard_msgs.msg import MoveAction
-from giskardpy.exceptions import GiskardException
 from giskardpy.god_map import god_map
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.tree.behaviors.send_result import SendResult

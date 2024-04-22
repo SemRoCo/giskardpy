@@ -1,15 +1,14 @@
 from collections import defaultdict
 from enum import IntEnum
-from typing import Tuple, List, Dict
+from typing import Tuple, Dict
 
 import numpy as np
 import qpalm
 from scipy import sparse as sp
 
 from giskardpy.configs.qp_controller_config import SupportedQPSolver
-from giskardpy.exceptions import QPSolverException, InfeasibleException, HardConstraintsViolatedException
+from giskardpy.data_types.exceptions import QPSolverException, InfeasibleException, HardConstraintsViolatedException
 from giskardpy.qp.qp_solver import QPSolver
-from giskardpy.god_map import god_map
 
 import giskardpy.casadi_wrapper as cas
 

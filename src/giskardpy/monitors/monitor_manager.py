@@ -1,33 +1,19 @@
 import ast
-import traceback
 from collections import OrderedDict
 from functools import cached_property
 from typing import List, Tuple, Dict, Optional, Callable, Union, Iterable
 
 import numpy as np
 
-import giskard_msgs.msg as giskard_msgs
 import giskardpy.casadi_wrapper as cas
 from giskardpy.casadi_wrapper import CompiledFunction
 from giskardpy.data_types.data_types import TaskState
-from giskardpy.exceptions import GiskardException, MonitorInitalizationException, UnknownMonitorException
+from giskardpy.data_types.exceptions import GiskardException, MonitorInitalizationException
 from giskardpy.god_map import god_map
-from giskardpy.middleware_interfaces.ros1.msg_converter import json_str_to_kwargs
 from giskardpy.monitors.monitors import ExpressionMonitor, Monitor
 from giskardpy.monitors.payload_monitors import PayloadMonitor, CancelMotion
 from giskardpy.symbol_manager import symbol_manager
-from giskardpy.utils import logging
 from giskardpy.utils.utils import get_all_classes_in_package
-
-
-def flipped_to_one(a: np.ndarray, b: np.ndarray) -> np.ndarray:
-    """
-    0, 0 -> 0
-    0, 1 -> 1
-    1, 0 -> 0
-    1, 1 -> 0
-    """
-    return np.logical_and(np.logical_not(a), np.logical_or(a, b))
 
 
 def monitor_list_to_monitor_name_tuple(monitors: Iterable[Union[str, ExpressionMonitor]]) -> Tuple[str, ...]:
@@ -306,28 +292,3 @@ class MonitorManager:
     @profile
     def search_for_monitors(self, monitor_names: List[str]) -> List[Monitor]:
         return [self.get_monitor(monitor_name) for monitor_name in monitor_names]
-
-    @profile
-    def parse_monitors(self, monitor_msgs: List[giskard_msgs.Monitor]):
-        for monitor_msg in monitor_msgs:
-            try:
-                logging.loginfo(f'Adding monitor of type: \'{monitor_msg.monitor_class}\'')
-                C = self.allowed_monitor_types[monitor_msg.monitor_class]
-            except KeyError:
-                raise UnknownMonitorException(f'unknown monitor type: \'{monitor_msg.monitor_class}\'.')
-            try:
-                kwargs = json_str_to_kwargs(monitor_msg.kwargs, god_map.world)
-                start_condition = self.logic_str_to_expr(monitor_msg.start_condition, default=cas.TrueSymbol)
-                monitor = C(name=monitor_msg.name,
-                            start_condition=start_condition,
-                            **kwargs)
-                if isinstance(monitor, ExpressionMonitor):
-                    self.add_expression_monitor(monitor)
-                elif isinstance(monitor, PayloadMonitor):
-                    self.add_payload_monitor(monitor)
-            except Exception as e:
-                traceback.print_exc()
-                error_msg = f'Initialization of \'{C.__name__}\' monitor failed: \n {e} \n'
-                if not isinstance(e, GiskardException):
-                    raise MonitorInitalizationException(error_msg)
-                raise e

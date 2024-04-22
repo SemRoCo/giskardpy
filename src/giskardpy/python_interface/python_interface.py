@@ -14,7 +14,7 @@ from giskard_msgs.srv import DyeGroupRequest, DyeGroup, GetGroupInfoRequest, Dye
 from giskard_msgs.srv import GetGroupInfo, GetGroupNames
 from giskard_msgs.srv import GetGroupNamesResponse, GetGroupInfoResponse
 from giskardpy.data_types.data_types import goal_parameter
-from giskardpy.exceptions import DuplicateNameException, UnknownGroupException
+from giskardpy.data_types.exceptions import DuplicateNameException, UnknownGroupException
 from giskardpy.goals.align_planes import AlignPlanes
 from giskardpy.goals.cartesian_goals import CartesianPose, DiffDriveBaseGoal, CartesianVelocityLimit, \
     CartesianOrientation, CartesianPoseStraight, CartesianPosition, CartesianPositionStraight
@@ -30,7 +30,7 @@ from giskardpy.monitors.cartesian_monitors import PoseReached, PositionReached, 
 from giskardpy.monitors.joint_monitors import JointGoalReached
 from giskardpy.monitors.monitors import LocalMinimumReached, TimeAbove, Alternator, CancelMotion, EndMotion
 from giskardpy.monitors.payload_monitors import Print, Sleep, SetMaxTrajectoryLength, \
-    UpdateParentLinkOfGroup, PayloadAlternator
+    PayloadAlternator
 from giskardpy.utils.utils import kwargs_to_json, get_all_classes_in_package
 
 

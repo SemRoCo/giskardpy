@@ -7,11 +7,9 @@ from typing import Optional
 
 import numpy as np
 
-import giskard_msgs.msg as giskard_msgs
 import giskardpy.casadi_wrapper as cas
-from giskard_msgs.msg import GiskardError
 from giskardpy.data_types.data_types import Derivatives
-from giskardpy.exceptions import GiskardException, MonitorInitalizationException
+from giskardpy.data_types.exceptions import GiskardException, MonitorInitalizationException
 from giskardpy.god_map import god_map
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils.utils import string_shortener
@@ -45,18 +43,6 @@ class Monitor:
 
     def set_id(self, new_id: int):
         self._id = new_id
-
-    def to_ros_msg(self) -> giskard_msgs.Monitor:
-        msg = giskard_msgs.Monitor()
-        msg.name = self.name
-        if isinstance(self, EndMotion):
-            msg.monitor_class = EndMotion.__name__
-        elif isinstance(self, CancelMotion):
-            msg.monitor_class = CancelMotion.__name__
-        else:
-            msg.monitor_class = self.__class__.__name__
-        msg.start_condition = god_map.monitor_manager.format_condition(self.start_condition, new_line=' ')
-        return msg
 
     @property
     def id(self) -> int:
@@ -132,9 +118,9 @@ class EndMotion(PayloadMonitor):
 class CancelMotion(PayloadMonitor):
     def __init__(self,
                  error_message: str,
-                 error_code: int = GiskardError.ERROR,
+                 error_code: int = GiskardException,
                  name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol, ):
+                 start_condition: cas.Expression = cas.TrueSymbol):
         super().__init__(name=name, start_condition=start_condition, run_call_in_thread=False)
         self.error_message = error_message
         self.error_code = error_code
@@ -142,7 +128,7 @@ class CancelMotion(PayloadMonitor):
     @profile
     def __call__(self):
         self.state = True
-        raise GiskardException.from_error_code(error_code=self.error_code, error_message=self.error_message)
+        raise GiskardException(error_message=self.error_message)
 
     def get_state(self) -> bool:
         return self.state

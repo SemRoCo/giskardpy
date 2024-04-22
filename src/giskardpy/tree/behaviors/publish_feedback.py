@@ -1,6 +1,6 @@
 from copy import deepcopy
 from typing import Optional
-
+import giskardpy.middleware_interfaces.ros1.msg_converter as msg_converter
 import numpy as np
 import rospy
 from sensor_msgs.msg import JointState
@@ -19,8 +19,8 @@ def giskard_state_to_execution_state() -> ExecutionState:
     msg = ExecutionState()
     msg.header.stamp = rospy.Time.now()
     msg.goal_id = god_map.move_action_server.goal_id
-    msg.monitors = [m.to_ros_msg() for m in god_map.monitor_manager.monitors if m.plot]
-    msg.tasks = [t.to_ros_msg() for t in god_map.motion_goal_manager.tasks.values() if t.plot]
+    msg.monitors = [msg_converter.monitor_to_ros_msg(m) for m in god_map.monitor_manager.monitors if m.plot]
+    msg.tasks = [msg_converter.task_to_ros_msg(t) for t in god_map.motion_goal_manager.tasks.values() if t.plot]
     try:
         msg.monitor_state = god_map.monitor_manager.state_history[-1][1][0][monitor_filter].tolist()
         msg.monitor_life_cycle_state = god_map.monitor_manager.state_history[-1][1][1][monitor_filter].tolist()

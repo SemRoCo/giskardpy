@@ -2,11 +2,8 @@ from typing import List, Dict, Any
 
 import control_msgs
 from actionlib import SimpleActionClient
-from rospy import ROSException
-from rostopic import ROSTopicException
-from sensor_msgs.msg import JointState
 
-from giskardpy.exceptions import ExecutionException, FollowJointTrajectory_INVALID_JOINTS, \
+from giskardpy.data_types.exceptions import ExecutionException, FollowJointTrajectory_INVALID_JOINTS, \
     FollowJointTrajectory_INVALID_GOAL, FollowJointTrajectory_OLD_HEADER_TIMESTAMP, \
     FollowJointTrajectory_PATH_TOLERANCE_VIOLATED, FollowJointTrajectory_GOAL_TOLERANCE_VIOLATED, \
     ExecutionTimeoutException, ExecutionSucceededPrematurely, ExecutionPreemptedException
@@ -20,7 +17,6 @@ except ImportError:
     pass
 import py_trees
 import rospy
-import rostopic
 from actionlib_msgs.msg import GoalStatus
 from control_msgs.msg import FollowJointTrajectoryAction, FollowJointTrajectoryGoal, FollowJointTrajectoryResult, \
     JointTolerance

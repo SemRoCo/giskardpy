@@ -1,14 +1,13 @@
 import abc
-from abc import ABC
 from threading import Lock
-from typing import List, Optional, Dict, Tuple
+from typing import Optional, Dict, Tuple
 
 import numpy as np
 import rospy
 
-from giskard_msgs.msg import MoveResult, GiskardError
-from giskardpy.exceptions import GiskardException, MonitorInitalizationException
-from giskardpy.monitors.monitors import Monitor, PayloadMonitor, CancelMotion
+from giskard_msgs.msg import GiskardError
+from giskardpy.data_types.exceptions import MonitorInitalizationException
+from giskardpy.monitors.monitors import PayloadMonitor, CancelMotion
 from giskardpy.god_map import god_map
 from giskardpy.utils import logging
 import giskardpy.casadi_wrapper as cas

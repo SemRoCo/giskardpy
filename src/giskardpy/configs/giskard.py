@@ -8,7 +8,7 @@ from giskardpy.configs.collision_avoidance_config import CollisionAvoidanceConfi
 from giskardpy.configs.qp_controller_config import QPControllerConfig
 from giskardpy.configs.robot_interface_config import RobotInterfaceConfig
 from giskardpy.configs.world_config import WorldConfig
-from giskardpy.exceptions import GiskardException, SetupException
+from giskardpy.data_types.exceptions import GiskardException, SetupException
 from giskardpy.goals.goal import Goal
 from giskardpy.monitors.monitors import Monitor
 from giskardpy.utils import logging

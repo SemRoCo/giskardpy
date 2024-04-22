@@ -3,10 +3,7 @@ from typing import overload, TYPE_CHECKING
 
 from geometry_msgs.msg import PoseStamped, PointStamped, Vector3Stamped, QuaternionStamped
 
-from giskardpy.exceptions import UnknownGroupException
 from giskardpy.god_map import god_map
-from giskardpy.data_types.data_types import my_string, PrefixName
-import giskardpy.middleware_interfaces.ros1.tfwrapper as tf
 import giskardpy.casadi_wrapper as cas
 
 if TYPE_CHECKING:

@@ -10,7 +10,7 @@ from geometry_msgs.msg import Pose
 from lxml import etree
 
 from giskardpy.data_types.data_types import my_string, Derivatives, PrefixName
-from giskardpy.exceptions import UnknownGroupException, UnknownLinkException
+from giskardpy.data_types.exceptions import UnknownGroupException, UnknownLinkException
 from giskardpy.god_map import god_map
 from giskardpy.model.world import WorldBranch
 from giskardpy.qp.free_variable import FreeVariable

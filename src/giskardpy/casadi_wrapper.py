@@ -846,12 +846,10 @@ class Point3(Symbol_, GeometricType):
             return
         if isinstance(data, (Point3, Vector3)):
             self.reference_frame = self.reference_frame or data.reference_frame
-            self.s = ca.SX([data.x, data.y, data.z, 1])
-        elif isinstance(data, Symbol_):
             self.s = ca.SX([0, 0, 0, 1])
-            self[0] = data.s[0]
-            self[1] = data.s[1]
-            self[2] = data.s[2]
+            self.s[0] = data.x.s
+            self.s[1] = data.y.s
+            self.s[2] = data.z.s
         else:
             self.s = ca.SX([0, 0, 0, 1])
             self[0] = data[0]

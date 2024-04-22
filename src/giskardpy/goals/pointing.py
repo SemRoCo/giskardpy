@@ -2,6 +2,8 @@ from __future__ import division
 
 from typing import Optional
 
+import numpy as np
+
 import giskardpy.casadi_wrapper as cas
 from giskardpy.data_types.data_types import ColorRGBA
 from giskardpy.goals.goal import Goal
@@ -39,7 +41,7 @@ class Pointing(Goal):
         self.max_velocity = max_velocity
         self.root = god_map.world.search_for_link_name(root_link, root_group)
         self.tip = god_map.world.search_for_link_name(tip_link, tip_group)
-        self.root_P_goal_point = god_map.world.transform(self.root, goal_point)
+        self.root_P_goal_point = god_map.world.transform(self.root, goal_point).to_np()
         if name is None:
             name = f'{self.__class__.__name__}/{self.root}/{self.tip}'
         super().__init__(name)
@@ -50,7 +52,7 @@ class Pointing(Goal):
         root_T_tip = god_map.world.compose_fk_expression(self.root, self.tip)
         root_P_goal_point = symbol_manager.get_expr(f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\']'
                                                     f'.root_P_goal_point',
-                                                    input_type_hint=PointStamped,
+                                                    input_type_hint=np.ndarray,
                                                     output_type_hint=cas.Point3)
         root_P_goal_point.reference_frame = self.root
         tip_V_pointing_axis = cas.Vector3(self.tip_V_pointing_axis)

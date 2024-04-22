@@ -1,6 +1,5 @@
 from typing import Optional
 
-import giskardpy.middleware_interfaces.ros1.tfwrapper as tf
 import giskardpy.casadi_wrapper as cas
 from giskardpy.data_types.data_types import ColorRGBA
 from giskardpy.goals.goal import Goal

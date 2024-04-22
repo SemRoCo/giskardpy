@@ -1,8 +1,6 @@
 from typing import Dict, Callable, Type, Optional, overload, Union
 from giskardpy.data_types.exceptions import GiskardException
 import numpy as np
-from geometry_msgs.msg import PoseStamped, Pose, PointStamped, Point, Vector3Stamped, Vector3, QuaternionStamped, \
-    Quaternion
 
 import giskardpy.casadi_wrapper as cas
 from giskardpy.utils.singleton import SingletonMeta
@@ -68,13 +66,6 @@ class SymbolManager(metaclass=SingletonMeta):
     @overload
     def get_expr(self,
                  expr: str,
-                 input_type_hint: Union[Type[Point], Type[PointStamped]] = None,
-                 output_type_hint: type(None) = None) -> cas.Point3:
-        ...
-
-    @overload
-    def get_expr(self,
-                 expr: str,
                  input_type_hint: Optional[Union[list, tuple, np.ndarray]] = None,
                  output_type_hint: Type[cas.Point3] = None) -> cas.Point3:
         ...
@@ -82,29 +73,8 @@ class SymbolManager(metaclass=SingletonMeta):
     @overload
     def get_expr(self,
                  expr: str,
-                 input_type_hint: Union[Type[Vector3], Type[Vector3Stamped]] = None,
-                 output_type_hint: type(None) = None) -> cas.Vector3:
-        ...
-
-    @overload
-    def get_expr(self,
-                 expr: str,
                  input_type_hint: Optional[Union[list, tuple, np.ndarray]] = None,
                  output_type_hint: Type[cas.Vector3] = None) -> cas.Vector3:
-        ...
-
-    @overload
-    def get_expr(self,
-                 expr: str,
-                 input_type_hint: Union[Type[Quaternion], Type[QuaternionStamped]] = None,
-                 output_type_hint: Optional[Type[cas.RotationMatrix]] = None) -> cas.RotationMatrix:
-        ...
-
-    @overload
-    def get_expr(self,
-                 expr: str,
-                 input_type_hint: Union[Type[Quaternion], Type[QuaternionStamped]] = None,
-                 output_type_hint: Type[cas.Quaternion] = None) -> cas.Quaternion:
         ...
 
     @overload
@@ -161,52 +131,7 @@ class SymbolManager(metaclass=SingletonMeta):
             raise ValueError(f'If input_type_hint is [list, tuple, np.ndarray], please specify output_type_hint out of'
                              f'[cas.TransMatrix, cas.Point3, cas.Vector3, cas.Quaternion, cas.RotationMatrix]')
 
-        if input_type_hint == PointStamped:
-            return self._point_msg_to_point3(f'{variable_ref_str}.point')
-        if input_type_hint == Point:
-            return self._point_msg_to_point3(variable_ref_str)
-        if input_type_hint == Vector3Stamped:
-            return self._vector_msg_to_vector3(f'{variable_ref_str}.vector')
-        if input_type_hint == Vector3:
-            return self._vector_msg_to_vector3(variable_ref_str)
-        if input_type_hint == QuaternionStamped:
-            variable_ref_str += 'quaternion'
-            input_type_hint = Quaternion
-        if input_type_hint == Quaternion:
-            if output_type_hint == cas.Quaternion:
-                return self._quaternion_msg_to_quaternion(variable_ref_str)
-            else:
-                return self._quaternion_msg_to_rotation(variable_ref_str)
-        if input_type_hint == PoseStamped:
-            return self._pose_to_transmatrix(f'{variable_ref_str}.pose')
-        if input_type_hint == Pose:
-            return self._pose_to_transmatrix(variable_ref_str)
-
         raise NotImplementedError(f'to_expr not implemented for type {input_type_hint}.')
-
-    def _quaternion_msg_to_rotation(self, variable_ref_str: str) -> cas.RotationMatrix:
-        return self._quaternion_msg_to_quaternion(variable_ref_str).to_rotation_matrix()
-
-    def _quaternion_msg_to_quaternion(self, variable_ref_str: str) -> cas.Quaternion:
-        return cas.Quaternion((self.get_symbol(variable_ref_str + '.x'),
-                               self.get_symbol(variable_ref_str + '.y'),
-                               self.get_symbol(variable_ref_str + '.z'),
-                               self.get_symbol(variable_ref_str + '.w')))
-
-    def _point_msg_to_point3(self, variable_ref_str: str) -> cas.Point3:
-        return cas.Point3((self.get_symbol(variable_ref_str + '.x'),
-                           self.get_symbol(variable_ref_str + '.y'),
-                           self.get_symbol(variable_ref_str + '.z')))
-
-    def _vector_msg_to_vector3(self, variable_ref_str: str) -> cas.Vector3:
-        return cas.Vector3((self.get_symbol(variable_ref_str + '.x'),
-                            self.get_symbol(variable_ref_str + '.y'),
-                            self.get_symbol(variable_ref_str + '.z')))
-
-    def _pose_to_transmatrix(self, variable_ref_str: str) -> cas.TransMatrix:
-        p = self._point_msg_to_point3(f'{variable_ref_str}.position')
-        r = self._quaternion_msg_to_rotation(f'{variable_ref_str}.orientation')
-        return cas.TransMatrix.from_point_rotation_matrix(p, r)
 
     def _list_to_transmatrix(self, variable_ref_str: str) -> cas.TransMatrix:
         return cas.TransMatrix(

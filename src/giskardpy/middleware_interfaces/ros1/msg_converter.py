@@ -247,6 +247,12 @@ def convert_ros_msg_to_giskard_obj(msg, world: WorldTree):
         return ros_joint_state_to_giskard_joint_state(msg)
     elif isinstance(msg, geometry_msgs.PoseStamped):
         return pose_stamped_to_trans_matrix(msg, world)
+    elif isinstance(msg, geometry_msgs.PointStamped):
+        return point_stamped_to_point3(msg, world)
+    elif isinstance(msg, geometry_msgs.Vector3Stamped):
+        return vector_stamped_to_vector3(msg, world)
+    elif isinstance(msg, geometry_msgs.QuaternionStamped):
+        return quaternion_stamped_to_quaternion(msg, world)
     elif isinstance(msg, giskard_msgs.CollisionEntry):
         return collision_entry_msg_to_giskard(msg)
     else:
@@ -317,6 +323,21 @@ def pose_stamped_to_trans_matrix(msg: geometry_msgs.PoseStamped, world: WorldTre
                                                         rotation_matrix=R,
                                                         reference_frame=world.search_for_link_name(msg.header.frame_id))
     return result
+
+
+def point_stamped_to_point3(msg: geometry_msgs.PointStamped, world: WorldTree) -> cas.Point3:
+    return cas.Point3.from_xyz(msg.point.x, msg.point.y, msg.point.z,
+                               reference_frame=world.search_for_link_name(msg.header.frame_id))
+
+
+def vector_stamped_to_vector3(msg: geometry_msgs.Vector3Stamped, world: WorldTree) -> cas.Vector3:
+    return cas.Vector3.from_xyz(msg.vector.x, msg.vector.y, msg.vector.z,
+                                reference_frame=world.search_for_link_name(msg.header.frame_id))
+
+
+def quaternion_stamped_to_quaternion(msg: geometry_msgs.QuaternionStamped, world: WorldTree) -> cas.RotationMatrix:
+    return cas.Quaternion((msg.quaternion.x, msg.quaternion.y, msg.quaternion.z, msg.quaternion.w),
+                          reference_frame=world.search_for_link_name(msg.header.frame_id)).to_rotation_matrix()
 
 
 def collision_entry_msg_to_giskard(msg: giskard_msgs.CollisionEntry) -> CollisionEntry:

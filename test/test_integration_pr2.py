@@ -27,6 +27,7 @@ from giskardpy.goals.joint_goals import JointVelocityLimit, UnlimitedJointGoal
 from giskardpy.goals.set_prediction_horizon import SetQPSolver
 from giskardpy.goals.tracebot import InsertCylinder
 from giskardpy.god_map import god_map
+from giskardpy.middleware_interfaces.ros1 import msg_converter
 from giskardpy.model.better_pybullet_syncer import BetterPyBulletSyncer
 from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
 from giskardpy.model.utils import make_world_body_box, hacky_urdf_parser_fix
@@ -1418,6 +1419,7 @@ class TestConstraints:
 
         tip = 'head_mount_kinect_rgb_link'
         goal_point = god_map.world.compute_fk_point(root='map', tip='iai_kitchen/iai_fridge_door_handle')
+        goal_point = msg_converter.to_ros_message(goal_point)
         goal_point.header.stamp = rospy.Time()
         pointing_axis = Vector3Stamped()
         pointing_axis.header.frame_id = tip
@@ -1451,6 +1453,7 @@ class TestConstraints:
         rospy.loginfo("Starting looking")
         tip = 'head_mount_kinect_rgb_link'
         goal_point = god_map.world.compute_fk_point('map', kitchen_setup.r_tip)
+        goal_point = msg_converter.point3_to_point_stamped(goal_point)
         goal_point.header.stamp = rospy.Time()
         pointing_axis = Vector3Stamped()
         pointing_axis.header.frame_id = tip

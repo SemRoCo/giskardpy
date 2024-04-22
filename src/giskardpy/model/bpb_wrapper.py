@@ -8,7 +8,7 @@ from giskardpy.god_map import god_map
 from giskardpy.model.collision_world_syncer import Collision
 from giskardpy.model.links import Link, LinkGeometry, BoxGeometry, SphereGeometry, CylinderGeometry, MeshGeometry
 from giskardpy.data_types.data_types import PrefixName
-from giskardpy.middleware_interfaces.ros1 import logging
+from giskardpy.middleware import logging
 from giskardpy.utils.utils import resolve_ros_iris, to_tmp_path, write_to_tmp, suppress_stdout
 
 CollisionObject = pb.CollisionObject

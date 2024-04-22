@@ -7,7 +7,7 @@ from geometry_msgs.msg import PoseStamped, Point, Quaternion
 from std_srvs.srv import Trigger
 from tf.transformations import quaternion_about_axis
 
-import giskardpy.middleware_interfaces.ros1.tfwrapper as tf
+import giskardpy.middleware.ros1.tfwrapper as tf
 from giskard_msgs.msg import MoveGoal, GiskardError
 from giskardpy.configs.behavior_tree_config import OpenLoopBTConfig
 from giskardpy.configs.giskard import Giskard

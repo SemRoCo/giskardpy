@@ -3,7 +3,7 @@ from typing import Union, Optional
 from giskardpy.configs.qp_controller_config import SupportedQPSolver
 from giskardpy.goals.goal import NonMotionGoal
 from giskardpy.god_map import god_map
-from giskardpy.middleware_interfaces.ros1 import logging
+from giskardpy.middleware import logging
 import giskardpy.casadi_wrapper as cas
 
 

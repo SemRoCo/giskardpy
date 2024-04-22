@@ -3,7 +3,7 @@ from typing import Optional
 
 from py_trees import Behaviour, Blackboard
 
-import giskardpy.middleware_interfaces.ros1.tfwrapper as tf
+import giskardpy.middleware.ros1.tfwrapper as tf
 from giskardpy.god_map import god_map
 from giskardpy.tree.blackboard_utils import has_blackboard_exception, get_blackboard_exception, \
     clear_blackboard_exception

@@ -13,7 +13,7 @@ from sortedcontainers import SortedDict
 from giskardpy.data_types.data_types import JointStates
 from giskardpy.god_map import god_map
 from giskardpy.data_types.data_types import PrefixName, Derivatives
-from giskardpy.middleware_interfaces.ros1 import logging
+from giskardpy.middleware import logging
 from giskardpy.utils.utils import cm_to_inch
 
 plot_lock = Lock()

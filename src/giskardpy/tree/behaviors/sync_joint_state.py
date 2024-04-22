@@ -7,10 +7,10 @@ from sensor_msgs.msg import JointState
 from giskardpy.data_types.data_types import JointStates
 from giskardpy.data_types.data_types import PrefixName, Derivatives
 from giskardpy.god_map import god_map
-from giskardpy.middleware_interfaces.ros1.ros1_interface import wait_for_topic_to_appear
+from giskardpy.middleware.ros1.ros1_interface import wait_for_topic_to_appear
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.decorators import record_time
-import giskardpy.middleware_interfaces.ros1.msg_converter as msg_converter
+import giskardpy.middleware.ros1.msg_converter as msg_converter
 
 class SyncJointState(GiskardBehavior):
 

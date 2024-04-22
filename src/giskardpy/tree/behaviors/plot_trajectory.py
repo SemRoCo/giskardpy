@@ -4,9 +4,9 @@ from threading import Thread
 from py_trees import Status
 
 from giskardpy.god_map import god_map
+from giskardpy.middleware import logging
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.decorators import record_time
-from giskardpy.middleware_interfaces.ros1.logging import logwarn
 
 
 class PlotTrajectory(GiskardBehavior):
@@ -36,8 +36,8 @@ class PlotTrajectory(GiskardBehavior):
                                            **self.kwargs)
             except Exception as e:
                 traceback.print_exc()
-                logwarn(e)
-                logwarn('failed to save trajectory.pdf')
+                logging.logwarn(e)
+                logging.logwarn('failed to save trajectory.pdf')
 
     @record_time
     @profile

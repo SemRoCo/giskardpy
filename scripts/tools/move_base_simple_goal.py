@@ -4,7 +4,7 @@ import rospy
 from geometry_msgs.msg import PoseStamped
 
 from giskardpy.python_interface import GiskardWrapper
-from giskardpy.middleware_interfaces.ros1.tfwrapper import init
+from giskardpy.middleware.ros1.tfwrapper import init
 
 def call_back(pose_stamped):
     """

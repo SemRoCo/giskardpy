@@ -8,7 +8,7 @@ from visualization_msgs.msg import MarkerArray, Marker
 
 from giskardpy.god_map import god_map
 from giskardpy.model.collision_world_syncer import Collisions, Collision
-import giskardpy.middleware_interfaces.ros1.msg_converter as msg_converter
+import giskardpy.middleware.ros1.msg_converter as msg_converter
 
 class ROSMsgVisualization:
     red = ColorRGBA(1, 0, 0, 1)

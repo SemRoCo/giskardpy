@@ -7,7 +7,7 @@ from rospy.timer import TimerEvent
 from rospy.timer import sleep
 
 from giskardpy.god_map import god_map
-from giskardpy.middleware_interfaces.ros1 import logging
+from giskardpy.middleware import logging
 from giskardpy.utils.utils import is_running_in_pytest
 
 

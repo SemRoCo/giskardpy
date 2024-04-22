@@ -16,8 +16,8 @@ from functools import cached_property
 from typing import Type, Optional, Dict, Any
 
 from giskardpy.god_map import god_map
-from giskardpy.middleware_interfaces.ros1 import logging
-from giskardpy.middleware_interfaces.ros1.ros1_interface import resolve_ros_iris
+from giskardpy.middleware import logging
+from giskardpy.middleware.ros1.ros1_interface import resolve_ros_iris
 
 
 @contextmanager

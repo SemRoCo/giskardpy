@@ -8,7 +8,7 @@ from geometry_msgs.msg import PoseStamped, Point, Quaternion
 from rospy import ROSException
 from rostopic import ROSTopicException
 
-from giskardpy.middleware_interfaces.ros1 import logging
+from giskardpy.middleware import logging
 
 
 def wait_for_topic_to_appear(topic_name: str, supported_types: List[Type[genpy.Message]]) -> Type[genpy.Message]:

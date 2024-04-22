@@ -19,7 +19,7 @@ from giskardpy.tree.composites.async_composite import AsyncBehavior
 from giskardpy.tree.composites.better_parallel import Parallel
 from giskardpy.tree.control_modes import ControlModes
 from giskardpy.tree.decorators import failure_is_success
-from giskardpy.middleware_interfaces.ros1 import logging
+from giskardpy.middleware import logging
 from giskardpy.utils.decorators import toggle_on, toggle_off
 from giskardpy.utils.utils import create_path
 

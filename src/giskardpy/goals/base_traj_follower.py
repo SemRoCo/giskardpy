@@ -11,11 +11,11 @@ from visualization_msgs.msg import MarkerArray, Marker
 import giskardpy.casadi_wrapper as cas
 from giskardpy.data_types.exceptions import GoalInitalizationException, ExecutionException
 from giskardpy.goals.goal import Goal
+from giskardpy.middleware import logging
 from giskardpy.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE
 from giskardpy.god_map import god_map
 from giskardpy.model.joints import OmniDrive, OmniDrivePR22
 from giskardpy.data_types.data_types import Derivatives, PrefixName
-from giskardpy.middleware_interfaces.ros1 import logging
 from giskardpy.utils.decorators import memoize_with_counter, clear_memo
 from giskardpy.tree.blackboard_utils import raise_to_blackboard
 from giskardpy.symbol_manager import symbol_manager

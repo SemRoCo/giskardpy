@@ -16,10 +16,10 @@ from giskardpy.model.joints import Joint6DOF
 from giskardpy.model.world import WorldBranch
 from giskardpy.tree.behaviors.action_server import ActionServerHandler
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
-from giskardpy.middleware_interfaces.ros1 import logging
+from giskardpy.middleware import logging
 from giskardpy.utils.decorators import record_time
-from giskardpy.middleware_interfaces.ros1.tfwrapper import transform_pose
-import giskardpy.middleware_interfaces.ros1.msg_converter as msg_converter
+from giskardpy.middleware.ros1.tfwrapper import transform_pose
+import giskardpy.middleware.ros1.msg_converter as msg_converter
 
 
 class ProcessWorldUpdate(GiskardBehavior):

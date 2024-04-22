@@ -10,7 +10,7 @@ from giskardpy.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE
 from giskardpy.god_map import god_map
 from giskardpy.data_types.data_types import my_string
 from giskardpy.symbol_manager import symbol_manager
-from giskardpy.middleware_interfaces.ros1 import logging
+from giskardpy.middleware import logging
 
 
 class ExternalCollisionAvoidance(Goal):

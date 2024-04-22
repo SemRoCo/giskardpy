@@ -2,10 +2,10 @@ import pytest
 import rospy
 from geometry_msgs.msg import PoseStamped
 
-import giskardpy.middleware_interfaces.ros1.tfwrapper as tf
+import giskardpy.middleware.ros1.tfwrapper as tf
 from giskardpy.god_map import god_map
+from giskardpy.middleware import logging
 from giskardpy.model.joints import OneDofJoint
-from giskardpy.middleware_interfaces.ros1 import logging
 from utils_for_tests import launch_launchfile
 from utils_for_tests import GiskardTestWrapper
 

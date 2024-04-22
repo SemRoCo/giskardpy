@@ -1,4 +1,4 @@
-import giskardpy.middleware_interfaces.ros1.tfwrapper as tf
+import giskardpy.middleware.ros1.tfwrapper as tf
 import pytest
 from geometry_msgs.msg import PoseStamped, PointStamped
 

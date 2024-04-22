@@ -9,7 +9,7 @@ from giskardpy.god_map import god_map
 from giskardpy.tasks.task import WEIGHT_BELOW_CA
 from giskardpy.goals.pointing import Pointing
 import giskardpy.casadi_wrapper as cas
-import giskardpy.middleware_interfaces.ros1.msg_converter as msg_converter
+import giskardpy.middleware.ros1.msg_converter as msg_converter
 
 
 class RealTimePointing(Pointing):

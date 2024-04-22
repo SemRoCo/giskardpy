@@ -4,9 +4,9 @@ import numpy as np
 
 from giskardpy.data_types.data_types import JointStates
 from giskardpy.god_map import god_map
+from giskardpy.middleware import logging
 from giskardpy.model.trajectory import Trajectory
 from giskardpy.tree.behaviors.plot_trajectory import PlotTrajectory
-from giskardpy.middleware_interfaces.ros1.logging import logwarn
 
 plot_lock = Lock()
 
@@ -57,4 +57,4 @@ class PlotDebugExpressions(PlotTrajectory):
                                      **self.kwargs)
             except Exception:
                 traceback.print_exc()
-                logwarn('failed to save debug.pdf')
+                logging.logwarn('failed to save debug.pdf')

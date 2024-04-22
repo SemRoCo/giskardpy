@@ -20,7 +20,7 @@ from std_msgs.msg import ColorRGBA
 from tf2_py import LookupException, ExtrapolationException
 from visualization_msgs.msg import Marker
 
-import giskardpy.middleware_interfaces.ros1.tfwrapper as tf
+import giskardpy.middleware.ros1.tfwrapper as tf
 import giskardpy.casadi_wrapper as cas
 import giskard_msgs.msg as giskard_msgs
 from giskard_msgs.srv import DyeGroupResponse
@@ -30,7 +30,8 @@ from giskardpy.data_types.data_types import KeyDefaultDict
 from giskardpy.data_types.exceptions import UnknownGroupException
 from giskardpy.goals.diff_drive_goals import DiffDriveTangentialToPoint, KeepHandInWorkspace
 from giskardpy.god_map import god_map
-from giskardpy.middleware_interfaces.ros1.ros1_interface import make_pose_from_parts
+from giskardpy.middleware import logging
+from giskardpy.middleware.ros1.ros1_interface import make_pose_from_parts
 from giskardpy.model.collision_world_syncer import Collisions, Collision, CollisionEntry
 from giskardpy.model.joints import OneDofJoint, OmniDrive, DiffDrive
 from giskardpy.data_types.data_types import PrefixName, Derivatives
@@ -39,10 +40,9 @@ from giskardpy.python_interface.old_python_interface import OldGiskardWrapper
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.qp_controller import available_solvers
 from giskardpy.tasks.task import WEIGHT_ABOVE_CA
-from giskardpy.middleware_interfaces.ros1 import logging
 from giskardpy.utils.ros_timer import Timer
 from giskardpy.utils.utils import resolve_ros_iris, suppress_stderr
-import giskardpy.middleware_interfaces.ros1.msg_converter as msg_converter
+import giskardpy.middleware.ros1.msg_converter as msg_converter
 
 BIG_NUMBER = 1e100
 SMALL_NUMBER = 1e-100

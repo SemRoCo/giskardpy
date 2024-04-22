@@ -3,7 +3,7 @@ from py_trees import Status
 
 from giskardpy.god_map import god_map
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
-from giskardpy.middleware_interfaces.ros1 import logging
+from giskardpy.middleware import logging
 
 
 class SetTrackingStartTime(GiskardBehavior):

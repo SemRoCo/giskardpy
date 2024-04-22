@@ -14,9 +14,9 @@ from giskardpy.data_types.exceptions import UnknownGroupException, UnknownLinkEx
 from giskardpy.god_map import god_map
 from giskardpy.model.world import WorldBranch
 from giskardpy.qp.free_variable import FreeVariable
-from giskardpy.middleware_interfaces.ros1 import logging
+from giskardpy.middleware import logging
 from giskardpy.utils.utils import resolve_ros_iris
-import giskardpy.middleware_interfaces.ros1.msg_converter as msg_converter
+import giskardpy.middleware.ros1.msg_converter as msg_converter
 
 np.random.seed(1337)
 

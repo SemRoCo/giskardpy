@@ -6,9 +6,9 @@ from giskardpy.goals.collision_avoidance import CollisionAvoidance
 from giskardpy.goals.goal import NonMotionGoal
 from giskardpy.god_map import god_map
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
-from giskardpy.middleware_interfaces.ros1 import logging
+from giskardpy.middleware import logging
 from giskardpy.utils.decorators import record_time
-import giskardpy.middleware_interfaces.ros1.msg_converter as msg_converter
+import giskardpy.middleware.ros1.msg_converter as msg_converter
 
 
 class SetMoveResult(GiskardBehavior):

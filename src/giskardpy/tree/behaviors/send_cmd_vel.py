@@ -7,11 +7,11 @@ from geometry_msgs.msg import Twist
 from py_trees import Status
 
 from giskardpy.god_map import god_map
-from giskardpy.middleware_interfaces.ros1.ros1_interface import wait_for_topic_to_appear
+from giskardpy.middleware import logging
+from giskardpy.middleware.ros1.ros1_interface import wait_for_topic_to_appear
 from giskardpy.model.joints import OmniDrive, DiffDrive
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.tree.blackboard_utils import catch_and_raise_to_blackboard
-from giskardpy.middleware_interfaces.ros1.logging import loginfo
 
 
 # can be used during closed-loop control, instead of for tracking a trajectory
@@ -44,7 +44,7 @@ class SendCmdVel(GiskardBehavior, ABC):
             joint_name = god_map.world.search_for_joint_name(joint_name)
             self.joint = god_map.world.joints[joint_name]
         god_map.world.register_controlled_joints([self.joint.name])
-        loginfo(f'Received controlled joints from \'{cmd_vel_topic}\'.')
+        logging.loginfo(f'Received controlled joints from \'{cmd_vel_topic}\'.')
 
     def __str__(self):
         return f'{super().__str__()} ({self.cmd_vel_topic})'

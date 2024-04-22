@@ -11,7 +11,7 @@ from giskardpy.configs.world_config import WorldConfig
 from giskardpy.data_types.exceptions import GiskardException, SetupException
 from giskardpy.goals.goal import Goal
 from giskardpy.monitors.monitors import Monitor
-from giskardpy.middleware_interfaces.ros1 import logging
+from giskardpy.middleware import logging
 from giskardpy.utils.utils import resolve_ros_iris, get_all_classes_in_package
 
 

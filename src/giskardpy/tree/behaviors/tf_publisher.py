@@ -8,8 +8,8 @@ from tf2_msgs.msg import TFMessage
 from giskardpy.god_map import god_map
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.decorators import record_time
-from giskardpy.middleware_interfaces.ros1.tfwrapper import normalize_quaternion_msg
-import giskardpy.middleware_interfaces.ros1.msg_converter as msg_converter
+from giskardpy.middleware.ros1.tfwrapper import normalize_quaternion_msg
+import giskardpy.middleware.ros1.msg_converter as msg_converter
 
 class TfPublishingModes(Enum):
     nothing = 0

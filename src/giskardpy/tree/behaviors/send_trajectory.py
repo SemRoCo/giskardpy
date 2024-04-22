@@ -8,7 +8,7 @@ from giskardpy.data_types.exceptions import ExecutionException, FollowJointTraje
     FollowJointTrajectory_PATH_TOLERANCE_VIOLATED, FollowJointTrajectory_GOAL_TOLERANCE_VIOLATED, \
     ExecutionTimeoutException, ExecutionSucceededPrematurely, ExecutionPreemptedException
 from giskardpy.god_map import god_map
-from giskardpy.middleware_interfaces.ros1.ros1_interface import wait_for_topic_to_appear
+from giskardpy.middleware.ros1.ros1_interface import wait_for_topic_to_appear
 from giskardpy.model.joints import OneDofJoint, OmniDrive
 from giskardpy.data_types.data_types import PrefixName, Derivatives
 
@@ -23,10 +23,9 @@ from control_msgs.msg import FollowJointTrajectoryAction, FollowJointTrajectoryG
     JointTolerance
 from py_trees_ros.actions import ActionClient
 
-import giskardpy.middleware_interfaces.ros1.msg_converter as msg_converter
+import giskardpy.middleware.ros1.msg_converter as msg_converter
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
-from giskardpy.middleware_interfaces.ros1 import logging
-from giskardpy.middleware_interfaces.ros1.logging import loginfo
+from giskardpy.middleware import logging
 from giskardpy.tree.blackboard_utils import raise_to_blackboard
 from giskardpy.utils.decorators import record_time
 from giskardpy.tree.blackboard_utils import catch_and_raise_to_blackboard
@@ -91,8 +90,8 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
                              f'that are not known to giskard: {controlled_joint_names}')
         god_map.world.register_controlled_joints(controlled_joint_names)
         controlled_joint_names = [j.name for j in self.controlled_joints]
-        loginfo(f'Successfully connected to \'{self.action_namespace}\'.')
-        loginfo(f'Flagging the following joints as controlled: {controlled_joint_names}.')
+        logging.loginfo(f'Successfully connected to \'{self.action_namespace}\'.')
+        logging.loginfo(f'Flagging the following joints as controlled: {controlled_joint_names}.')
         god_map.world.register_controlled_joints(controlled_joint_names)
 
     @record_time

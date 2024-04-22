@@ -3,9 +3,9 @@ from typing import Optional
 import giskardpy.casadi_wrapper as cas
 from giskardpy.data_types.data_types import ColorRGBA
 from giskardpy.goals.goal import Goal
+from giskardpy.middleware import logging
 from giskardpy.tasks.task import WEIGHT_ABOVE_CA
 from giskardpy.god_map import god_map
-from giskardpy.middleware_interfaces.ros1.logging import logwarn
 
 
 class AlignPlanes(Goal):
@@ -35,7 +35,7 @@ class AlignPlanes(Goal):
         :param weight:
         """
         if 'root_normal' in kwargs:
-            logwarn('Deprecated warning: use goal_normal instead of root_normal')
+            logging.logwarn('Deprecated warning: use goal_normal instead of root_normal')
             goal_normal = kwargs['root_normal']
         self.root = god_map.world.search_for_link_name(root_link, root_group)
         self.tip = god_map.world.search_for_link_name(tip_link, tip_group)

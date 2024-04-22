@@ -11,7 +11,7 @@ from giskardpy.god_map import god_map
 from giskardpy.monitors.monitors import EndMotion, CancelMotion
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.tree.behaviors.publish_feedback import giskard_state_to_execution_state
-from giskardpy.middleware_interfaces.ros1 import logging
+from giskardpy.middleware import logging
 from giskardpy.utils.decorators import record_time
 from giskardpy.tree.blackboard_utils import catch_and_raise_to_blackboard
 from giskardpy.utils.utils import create_path

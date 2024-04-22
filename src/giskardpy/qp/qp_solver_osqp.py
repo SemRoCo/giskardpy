@@ -7,8 +7,7 @@ from giskardpy.data_types.exceptions import QPSolverException, InfeasibleExcepti
 from giskardpy.qp.qp_solver import QPSolver
 import osqp
 
-from giskardpy.middleware_interfaces.ros1 import logging
-from giskardpy.utils.utils import record_time
+from giskardpy.utils.decorators import record_time
 
 
 class QPSolverOSQP(QPSolver):

@@ -3,7 +3,7 @@ import numpy as np
 
 from giskardpy.data_types.exceptions import QPSolverException, InfeasibleException
 from giskardpy.qp.qp_solver import QPSolver
-from giskardpy.middleware_interfaces.ros1 import logging
+from giskardpy.middleware import logging
 
 error_info = {
     # https://www.ibm.com/docs/en/icos/20.1.0?topic=manual-cplexexceptionserror-codes

@@ -9,13 +9,12 @@ from giskardpy.data_types.exceptions import InvalidGoalException, UnknownGoalExc
     GoalInitalizationException, UnknownMonitorException, MonitorInitalizationException
 from giskardpy.goals.base_traj_follower import BaseTrajFollower
 from giskardpy.goals.goal import Goal
-from giskardpy.middleware_interfaces.ros1.msg_converter import json_str_to_kwargs
+from giskardpy.middleware.ros1.msg_converter import json_str_to_kwargs
 from giskardpy.monitors.monitors import TimeAbove, LocalMinimumReached, EndMotion, ExpressionMonitor, PayloadMonitor
 from giskardpy.god_map import god_map
 from giskardpy.model.joints import OmniDrive, DiffDrive
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
-from giskardpy.middleware_interfaces.ros1 import logging
-from giskardpy.middleware_interfaces.ros1.logging import loginfo
+from giskardpy.middleware import logging
 from giskardpy.utils.decorators import record_time
 from giskardpy.tree.blackboard_utils import catch_and_raise_to_blackboard
 import giskardpy.casadi_wrapper as cas
@@ -40,7 +39,7 @@ class ParseActionGoal(GiskardBehavior):
     @profile
     def update(self):
         move_goal = god_map.move_action_server.goal_msg
-        loginfo(f'Parsing goal #{god_map.move_action_server.goal_id} message.')
+        logging.loginfo(f'Parsing goal #{god_map.move_action_server.goal_id} message.')
         self.sanity_check(move_goal)
         try:
             self.parse_monitors(move_goal.monitors)
@@ -52,7 +51,7 @@ class ParseActionGoal(GiskardBehavior):
             raise e
         # if god_map.is_collision_checking_enabled():
         #     god_map.motion_goal_manager.parse_collision_entries(move_goal.collisions)
-        loginfo('Done parsing goal message.')
+        logging.loginfo('Done parsing goal message.')
         return Status.SUCCESS
 
     @profile
@@ -138,7 +137,7 @@ class SetExecutionMode(GiskardBehavior):
     @record_time
     @profile
     def update(self):
-        loginfo(
+        logging.loginfo(
             f'Goal is of type {get_ros_msgs_constant_name_by_value(type(god_map.move_action_server.goal_msg), god_map.move_action_server.goal_msg.type)}')
         if god_map.is_goal_msg_type_projection():
             god_map.tree.switch_to_projection()

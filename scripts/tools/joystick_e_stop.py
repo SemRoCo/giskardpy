@@ -5,7 +5,7 @@ import numpy as np
 
 from giskardpy.python_interface.old_python_interface import OldGiskardWrapper
 
-from giskardpy.middleware_interfaces.ros1 import logging
+from giskardpy.middleware import logging
 
 
 class MUH:

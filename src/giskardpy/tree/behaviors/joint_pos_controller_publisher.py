@@ -5,7 +5,7 @@ from py_trees import Status
 from std_msgs.msg import Float64
 
 from giskardpy.god_map import god_map
-from giskardpy.middleware_interfaces.ros1.ros1_interface import wait_for_topic_to_appear
+from giskardpy.middleware.ros1.ros1_interface import wait_for_topic_to_appear
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.decorators import record_time
 from giskardpy.tree.blackboard_utils import catch_and_raise_to_blackboard

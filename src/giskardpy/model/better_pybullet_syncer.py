@@ -10,7 +10,7 @@ from giskardpy.model.bpb_wrapper import create_shape_from_link, to_giskard_colli
 from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer, Collisions
 from giskardpy.model.links import Link
 from giskardpy.data_types.data_types import PrefixName
-from giskardpy.middleware_interfaces.ros1 import logging
+from giskardpy.middleware import logging
 
 
 class BetterPyBulletSyncer(CollisionWorldSynchronizer):

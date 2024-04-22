@@ -5,7 +5,7 @@ from giskardpy.god_map import god_map
 from giskardpy.model.joints import Joint6DOF
 from giskardpy.data_types.data_types import PrefixName
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
-from giskardpy.middleware_interfaces.ros1.tfwrapper import lookup_pose
+from giskardpy.middleware.ros1.tfwrapper import lookup_pose
 from giskardpy.utils.decorators import record_time
 from giskardpy.tree.blackboard_utils import catch_and_raise_to_blackboard
 

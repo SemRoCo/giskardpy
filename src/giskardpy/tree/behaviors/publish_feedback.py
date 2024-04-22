@@ -1,6 +1,6 @@
 from copy import deepcopy
 from typing import Optional
-import giskardpy.middleware_interfaces.ros1.msg_converter as msg_converter
+import giskardpy.middleware.ros1.msg_converter as msg_converter
 import numpy as np
 import rospy
 from sensor_msgs.msg import JointState

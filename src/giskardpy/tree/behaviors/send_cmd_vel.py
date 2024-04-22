@@ -1,21 +1,17 @@
 from abc import ABC
-from typing import List, Optional
+from typing import Optional
 
 import numpy as np
 import rospy
-import rostopic
 from geometry_msgs.msg import Twist
 from py_trees import Status
-from rospy import ROSException
-from rostopic import ROSTopicException
 
 from giskardpy.god_map import god_map
+from giskardpy.middleware_interfaces.ros1.ros1_interface import wait_for_topic_to_appear
 from giskardpy.model.joints import OmniDrive, DiffDrive
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
-from giskardpy.utils import logging
-from giskardpy.utils.decorators import catch_and_raise_to_blackboard
-from giskardpy.utils.logging import loginfo
-from giskardpy.utils.utils import wait_for_topic_to_appear
+from giskardpy.tree.blackboard_utils import catch_and_raise_to_blackboard
+from giskardpy.middleware_interfaces.ros1.logging import loginfo
 
 
 # can be used during closed-loop control, instead of for tracking a trajectory

@@ -1,7 +1,6 @@
 from collections import defaultdict
 from typing import Dict, Optional, List, Union
-import numpy as np
-import giskardpy.casadi_wrapper as w
+import giskardpy.casadi_wrapper as cas
 from giskardpy.god_map import god_map
 from giskardpy.data_types.data_types import Derivatives, PrefixName
 from giskardpy.symbol_manager import symbol_manager
@@ -36,7 +35,7 @@ class FreeVariable:
                                  Derivatives.jerk: 0.1}
         self.horizon_functions.update(horizon_functions)
 
-    def get_symbol(self, derivative: Derivatives) -> Union[w.Symbol, float]:
+    def get_symbol(self, derivative: Derivatives) -> Union[cas.Symbol, float]:
         try:
             return self._symbols[derivative]
         except KeyError:
@@ -51,9 +50,9 @@ class FreeVariable:
 
     @memoize
     def get_lower_limit(self, derivative: Derivatives, default: bool = False, evaluated: bool = False) \
-            -> Union[w.Expression, float]:
+            -> Union[cas.Expression, float]:
         if not default and derivative in self.default_lower_limits and derivative in self.lower_limits:
-            expr = w.max(self.default_lower_limits[derivative], self.lower_limits[derivative])
+            expr = cas.max(self.default_lower_limits[derivative], self.lower_limits[derivative])
         elif derivative in self.default_lower_limits:
             expr = self.default_lower_limits[derivative]
         elif derivative in self.lower_limits:
@@ -64,17 +63,17 @@ class FreeVariable:
             return float(symbol_manager.evaluate_expr(expr))
         return expr
 
-    def set_lower_limit(self, derivative: Derivatives, limit: Union[w.Expression, float]):
+    def set_lower_limit(self, derivative: Derivatives, limit: Union[cas.Expression, float]):
         self.lower_limits[derivative] = limit
 
-    def set_upper_limit(self, derivative: Derivatives, limit: Union[Union[w.Symbol, float], float]):
+    def set_upper_limit(self, derivative: Derivatives, limit: Union[Union[cas.Symbol, float], float]):
         self.upper_limits[derivative] = limit
 
     @memoize
     def get_upper_limit(self, derivative: Derivatives, default: bool = False, evaluated: bool = False) \
-            -> Union[Union[w.Symbol, float], float]:
+            -> Union[Union[cas.Symbol, float], float]:
         if not default and derivative in self.default_upper_limits and derivative in self.upper_limits:
-            expr = w.min(self.default_upper_limits[derivative], self.upper_limits[derivative])
+            expr = cas.min(self.default_upper_limits[derivative], self.upper_limits[derivative])
         elif derivative in self.default_upper_limits:
             expr = self.default_upper_limits[derivative]
         elif derivative in self.upper_limits:
@@ -108,7 +107,7 @@ class FreeVariable:
     @memoize
     @profile
     def normalized_weight(self, t: int, derivative: Derivatives, prediction_horizon: int,
-                          evaluated: bool = False) -> Union[Union[w.Symbol, float], float]:
+                          evaluated: bool = False) -> Union[Union[cas.Symbol, float], float]:
         weight = self.quadratic_weights[derivative]
         start = weight * self.horizon_functions[derivative]
         a = (weight - start) / prediction_horizon

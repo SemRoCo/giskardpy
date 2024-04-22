@@ -9,7 +9,7 @@ import numpy as np
 import giskardpy.casadi_wrapper as cas
 from giskardpy.configs.qp_controller_config import SupportedQPSolver
 from giskardpy.data_types.exceptions import HardConstraintsViolatedException, InfeasibleException, QPSolverException
-from giskardpy.utils import logging
+from giskardpy.middleware_interfaces.ros1 import logging
 from giskardpy.utils.decorators import memoize
 
 from giskardpy.utils.utils import is_running_in_pytest

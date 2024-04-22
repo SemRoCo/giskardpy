@@ -8,6 +8,7 @@ from giskardpy.data_types.exceptions import ExecutionException, FollowJointTraje
     FollowJointTrajectory_PATH_TOLERANCE_VIOLATED, FollowJointTrajectory_GOAL_TOLERANCE_VIOLATED, \
     ExecutionTimeoutException, ExecutionSucceededPrematurely, ExecutionPreemptedException
 from giskardpy.god_map import god_map
+from giskardpy.middleware_interfaces.ros1.ros1_interface import wait_for_topic_to_appear
 from giskardpy.model.joints import OneDofJoint, OmniDrive
 from giskardpy.data_types.data_types import PrefixName, Derivatives
 
@@ -24,10 +25,11 @@ from py_trees_ros.actions import ActionClient
 
 import giskardpy.middleware_interfaces.ros1.msg_converter as msg_converter
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
-from giskardpy.utils import logging
-from giskardpy.utils.logging import loginfo
-from giskardpy.utils.utils import raise_to_blackboard, wait_for_topic_to_appear
-from giskardpy.utils.decorators import catch_and_raise_to_blackboard, record_time
+from giskardpy.middleware_interfaces.ros1 import logging
+from giskardpy.middleware_interfaces.ros1.logging import loginfo
+from giskardpy.tree.blackboard_utils import raise_to_blackboard
+from giskardpy.utils.decorators import record_time
+from giskardpy.tree.blackboard_utils import catch_and_raise_to_blackboard
 
 
 class SendFollowJointTrajectory(ActionClient, GiskardBehavior):

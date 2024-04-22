@@ -1,16 +1,7 @@
-import sys
-from copy import deepcopy
-
 import cvxpy
-import mosek
 import numpy as np
-import scs
-from qpsolvers import solve_qp
-from scipy import sparse
 
 from giskardpy.qp.qp_solver import QPSolver
-from giskardpy.utils import logging
-from cvxpygen import cpg
 
 
 class QPSolverCVXPY(QPSolver):

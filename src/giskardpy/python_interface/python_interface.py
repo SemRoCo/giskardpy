@@ -24,6 +24,7 @@ from giskardpy.goals.joint_goals import JointPositionList, AvoidJointLimits, Set
 from giskardpy.goals.open_close import Close, Open
 from giskardpy.goals.pointing import Pointing
 from giskardpy.goals.set_prediction_horizon import SetPredictionHorizon
+from giskardpy.middleware_interfaces.ros1.msg_converter import kwargs_to_json
 from giskardpy.model.utils import make_world_body_box
 from giskardpy.monitors.cartesian_monitors import PoseReached, PositionReached, OrientationReached, PointingAt, \
     VectorsAligned, DistanceToLine
@@ -31,7 +32,7 @@ from giskardpy.monitors.joint_monitors import JointGoalReached
 from giskardpy.monitors.monitors import LocalMinimumReached, TimeAbove, Alternator, CancelMotion, EndMotion
 from giskardpy.monitors.payload_monitors import Print, Sleep, SetMaxTrajectoryLength, \
     PayloadAlternator
-from giskardpy.utils.utils import kwargs_to_json, get_all_classes_in_package
+from giskardpy.utils.utils import get_all_classes_in_package
 
 
 class WorldWrapper:

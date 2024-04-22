@@ -8,7 +8,7 @@ from py_trees import Status, Composite
 
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.ros_timer import Rate
-from giskardpy.utils.utils import raise_to_blackboard
+from giskardpy.tree.blackboard_utils import raise_to_blackboard
 
 
 class AsyncBehavior(GiskardBehavior, Composite):

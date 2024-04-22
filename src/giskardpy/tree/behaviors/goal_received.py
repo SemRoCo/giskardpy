@@ -2,7 +2,7 @@ from py_trees import Status
 
 from giskardpy.tree.behaviors.action_server import ActionServerHandler
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
-from giskardpy.utils import logging
+from giskardpy.middleware_interfaces.ros1 import logging
 
 
 class GoalReceived(GiskardBehavior):

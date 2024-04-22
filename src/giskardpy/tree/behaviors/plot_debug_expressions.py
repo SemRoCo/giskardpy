@@ -6,7 +6,7 @@ from giskardpy.data_types.data_types import JointStates
 from giskardpy.god_map import god_map
 from giskardpy.model.trajectory import Trajectory
 from giskardpy.tree.behaviors.plot_trajectory import PlotTrajectory
-from giskardpy.utils.logging import logwarn
+from giskardpy.middleware_interfaces.ros1.logging import logwarn
 
 plot_lock = Lock()
 

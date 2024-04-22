@@ -8,6 +8,7 @@ from typing import Tuple, Optional, List, Dict, Union
 
 import hypothesis.strategies as st
 import numpy as np
+import roslaunch
 import rospy
 from angles import shortest_angular_distance
 from geometry_msgs.msg import PoseStamped, Point, PointStamped, Quaternion, Pose
@@ -29,6 +30,7 @@ from giskardpy.data_types.data_types import KeyDefaultDict
 from giskardpy.data_types.exceptions import UnknownGroupException
 from giskardpy.goals.diff_drive_goals import DiffDriveTangentialToPoint, KeepHandInWorkspace
 from giskardpy.god_map import god_map
+from giskardpy.middleware_interfaces.ros1.ros1_interface import make_pose_from_parts
 from giskardpy.model.collision_world_syncer import Collisions, Collision, CollisionEntry
 from giskardpy.model.joints import OneDofJoint, OmniDrive, DiffDrive
 from giskardpy.data_types.data_types import PrefixName, Derivatives
@@ -37,9 +39,9 @@ from giskardpy.python_interface.old_python_interface import OldGiskardWrapper
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.qp_controller import available_solvers
 from giskardpy.tasks.task import WEIGHT_ABOVE_CA
-from giskardpy.utils import logging, utils
+from giskardpy.middleware_interfaces.ros1 import logging
 from giskardpy.utils.ros_timer import Timer
-from giskardpy.utils.utils import resolve_ros_iris, position_dict_to_joint_states
+from giskardpy.utils.utils import resolve_ros_iris, suppress_stderr
 import giskardpy.middleware_interfaces.ros1.msg_converter as msg_converter
 
 BIG_NUMBER = 1e100
@@ -170,6 +172,20 @@ def compare_orientations(actual_orientation: Union[Quaternion, np.ndarray],
         np.testing.assert_almost_equal(q1[1], -q2[1], decimal=decimal)
         np.testing.assert_almost_equal(q1[2], -q2[2], decimal=decimal)
         np.testing.assert_almost_equal(q1[3], -q2[3], decimal=decimal)
+
+
+def position_dict_to_joint_states(joint_state_dict: Dict[str, float]) -> JointState:
+    """
+    :param joint_state_dict: maps joint_name to position
+    :return: velocity and effort are filled with 0
+    """
+    js = JointState()
+    for k, v in joint_state_dict.items():
+        js.name.append(k)
+        js.position.append(v)
+        js.velocity.append(0)
+        js.effort.append(0)
+    return js
 
 
 def pr2_urdf():
@@ -817,8 +833,8 @@ class GiskardTestWrapper(OldGiskardWrapper):
                                        parent_link_group=parent_link_group,
                                        scale=scale)
         self.wait_heartbeats()
-        pose = utils.make_pose_from_parts(pose=pose, frame_id=pose.header.frame_id,
-                                          position=pose.pose.position, orientation=pose.pose.orientation)
+        pose = make_pose_from_parts(pose=pose, frame_id=pose.header.frame_id,
+                                    position=pose.pose.position, orientation=pose.pose.orientation)
         self.check_add_object_result(response=response,
                                      name=name,
                                      size=None,
@@ -999,6 +1015,16 @@ def publish_marker_sphere(position, frame_id='map', radius=0.05, id_=0):
         pass
 
     pub.publish(m)
+
+
+def launch_launchfile(file_name: str):
+    launch_file = resolve_ros_iris(file_name)
+    uuid = roslaunch.rlutil.get_or_generate_uuid(None, False)
+    roslaunch.configure_logging(uuid)
+    launch = roslaunch.parent.ROSLaunchParent(uuid, [launch_file])
+    with suppress_stderr():
+        launch.start()
+        # launch.shutdown()
 
 
 def publish_marker_vector(start: Point, end: Point, diameter_shaft: float = 0.01, diameter_head: float = 0.02,

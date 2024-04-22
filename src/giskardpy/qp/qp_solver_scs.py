@@ -1,14 +1,8 @@
-import sys
-from copy import deepcopy
-
-import mosek
 import numpy as np
 import scs
-from qpsolvers import solve_qp
 from scipy import sparse
 
 from giskardpy.qp.qp_solver import QPSolver
-from giskardpy.utils import logging
 
 
 class QPSolverSCS(QPSolver):

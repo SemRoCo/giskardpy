@@ -1,11 +1,9 @@
 import rospy
 from py_trees import Status
-from sensor_msgs.msg import JointState
 
 from giskardpy.god_map import god_map
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
-from giskardpy.tree.behaviors.sync_joint_state import SyncJointState
-from giskardpy.utils import logging
+from giskardpy.middleware_interfaces.ros1 import logging
 
 
 class SetTrackingStartTime(GiskardBehavior):

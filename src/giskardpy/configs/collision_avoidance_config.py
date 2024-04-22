@@ -8,7 +8,7 @@ from giskardpy.god_map import god_map
 from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer, CollisionCheckerLib, CollisionAvoidanceThresholds
 from giskardpy.model.world import WorldTree
 from giskardpy.data_types.data_types import PrefixName
-from giskardpy.utils import logging
+from giskardpy.middleware_interfaces.ros1 import logging
 
 
 class CollisionAvoidanceConfig(abc.ABC):

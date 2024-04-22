@@ -10,7 +10,7 @@ from giskardpy.monitors.monitors import Monitor, EndMotion, CancelMotion
 from giskardpy.god_map import god_map
 from giskardpy.tasks.task import TaskState
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
-from giskardpy.utils import logging
+from giskardpy.middleware_interfaces.ros1 import logging
 from giskardpy.utils.decorators import record_time
 from giskardpy.utils.utils import create_path
 

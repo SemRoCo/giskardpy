@@ -9,7 +9,7 @@ from giskardpy.god_map import god_map
 from giskardpy.model.trajectory import Trajectory
 from giskardpy.data_types.data_types import PrefixName
 from giskardpy.symbol_manager import symbol_manager
-from giskardpy.utils import logging
+from giskardpy.middleware_interfaces.ros1 import logging
 
 
 class DebugExpressionManager:

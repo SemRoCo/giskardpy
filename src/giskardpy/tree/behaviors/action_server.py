@@ -6,7 +6,7 @@ import rosnode
 import rospy
 
 from giskardpy.data_types.exceptions import GiskardException
-from giskardpy.utils import logging
+from giskardpy.middleware_interfaces.ros1 import logging
 from giskardpy.utils.decorators import record_time
 
 

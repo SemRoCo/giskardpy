@@ -3,7 +3,6 @@ from __future__ import division
 from typing import Optional
 
 import numpy as np
-from geometry_msgs.msg import Vector3Stamped, PointStamped
 
 from giskardpy import casadi_wrapper as cas
 from giskardpy.goals.goal import Goal

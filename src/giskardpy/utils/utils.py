@@ -1,8 +1,6 @@
 from __future__ import division
 import hashlib
 
-import genpy
-import rostopic
 # I only do this, because otherwise test/test_integration_pr2.py::TestWorldManipulation::test_unsupported_options
 # fails on github actions
 import urdf_parser_py.urdf as up
@@ -13,29 +11,13 @@ import json
 import os
 import pkgutil
 import sys
-from collections import OrderedDict
 from contextlib import contextmanager
 from functools import cached_property
-from typing import Type, Optional, Dict, Any, List, Union, Tuple
-import numpy as np
-import roslaunch
-import rospkg
-import rospy
-from genpy import Message
-from geometry_msgs.msg import PointStamped, Point, Vector3Stamped, Vector3, Pose, PoseStamped, QuaternionStamped, \
-    Quaternion
-from py_trees import Blackboard
-from rospy import ROSException
-from rospy_message_converter.message_converter import \
-    convert_ros_message_to_dictionary as original_convert_ros_message_to_dictionary, \
-    convert_dictionary_to_ros_message as original_convert_dictionary_to_ros_message
-from rostopic import ROSTopicException
-from sensor_msgs.msg import JointState
-from visualization_msgs.msg import Marker, MarkerArray
+from typing import Type, Optional, Dict, Any
 
 from giskardpy.god_map import god_map
-from giskardpy.data_types.data_types import PrefixName
-from giskardpy.utils import logging
+from giskardpy.middleware_interfaces.ros1 import logging
+from giskardpy.middleware_interfaces.ros1.ros1_interface import resolve_ros_iris
 
 
 @contextmanager
@@ -119,23 +101,6 @@ def limits_from_urdf_joint(urdf_joint):
 # CONVERSION FUNCTIONS FOR ROS MESSAGES
 #
 
-def to_joint_state_position_dict(msg):
-    """
-    Converts a ROS message of type sensor_msgs/JointState into a dict that maps name to position
-    :param msg: ROS message to convert.
-    :type msg: JointState
-    :return: Corresponding MultiJointState instance.
-    :rtype: OrderedDict[str, float]
-    """
-    js = OrderedDict()
-    for joint_name, i in sorted(zip(msg.name, range(len(msg.name))), key=lambda x: x[0]):
-        js[joint_name] = msg.position[i]
-    return js
-
-
-def print_joint_state(joint_msg):
-    print_dict(to_joint_state_position_dict(joint_msg))
-
 
 def print_dict(d):
     print('{')
@@ -147,68 +112,6 @@ def print_dict(d):
 def write_dict(d, f):
     json.dump(d, f, sort_keys=True, indent=4, separators=(',', ': '))
     f.write('\n')
-
-
-def position_dict_to_joint_states(joint_state_dict: Dict[str, float]) -> JointState:
-    """
-    :param joint_state_dict: maps joint_name to position
-    :return: velocity and effort are filled with 0
-    """
-    js = JointState()
-    for k, v in joint_state_dict.items():
-        js.name.append(k)
-        js.position.append(v)
-        js.velocity.append(0)
-        js.effort.append(0)
-    return js
-
-
-def dict_to_joint_states(joint_state_dict):
-    """
-    :param joint_state_dict: maps joint_name to position
-    :type joint_state_dict: dict
-    :return: velocity and effort are filled with 0
-    :rtype: JointState
-    """
-    js = JointState()
-    for k, v in sorted(joint_state_dict.items()):
-        js.name.append(k)
-        js.position.append(v.position)
-        js.velocity.append(v.velocity)
-        js.effort.append(0)
-    return js
-
-
-def msg_to_list(thing):
-    """
-    :param thing: ros msg
-    :rtype: list
-    """
-    if isinstance(thing, QuaternionStamped):
-        thing = thing.quaternion
-    if isinstance(thing, Quaternion):
-        return [thing.x,
-                thing.y,
-                thing.z,
-                thing.w]
-    if isinstance(thing, PointStamped):
-        thing = thing.point
-    if isinstance(thing, PoseStamped):
-        thing = thing.pose
-    if isinstance(thing, Vector3Stamped):
-        thing = thing.vector
-    if isinstance(thing, Point) or isinstance(thing, Vector3):
-        return [thing.x,
-                thing.y,
-                thing.z]
-    if isinstance(thing, Pose):
-        return [thing.position.x,
-                thing.position.y,
-                thing.position.z,
-                thing.orientation.x,
-                thing.orientation.y,
-                thing.orientation.z,
-                thing.orientation.w]
 
 
 def create_path(path):
@@ -264,26 +167,6 @@ def resolve_ros_iris_in_urdf(input_urdf):
     return output_urdf
 
 
-rospack = rospkg.RosPack()
-
-
-def resolve_ros_iris(path: str) -> str:
-    """
-    e.g. 'package://giskardpy/data'
-    """
-    if 'package://' in path:
-        split = path.split('package://')
-        prefix = split[0]
-        result = prefix
-        for suffix in split[1:]:
-            package_name, suffix = suffix.split('/', 1)
-            real_path = rospack.get_path(package_name)
-            result += f'{real_path}/{suffix}'
-        return result
-    else:
-        return path
-
-
 def write_to_tmp(file_name: str, file_str: str) -> str:
     """
     Writes a URDF string into a temporary file on disc. Used to deliver URDFs to PyBullet that only loads file.
@@ -330,167 +213,6 @@ def fix_obj(file_name):
             f.write(fixed_obj)
 
 
-def launch_launchfile(file_name: str):
-    launch_file = resolve_ros_iris(file_name)
-    uuid = roslaunch.rlutil.get_or_generate_uuid(None, False)
-    roslaunch.configure_logging(uuid)
-    launch = roslaunch.parent.ROSLaunchParent(uuid, [launch_file])
-    with suppress_stderr():
-        launch.start()
-        # launch.shutdown()
-
-
-blackboard_exception_name = 'exception'
-
-
-def raise_to_blackboard(exception):
-    Blackboard().set(blackboard_exception_name, exception)
-
-
-def has_blackboard_exception():
-    return hasattr(Blackboard(), blackboard_exception_name) \
-        and getattr(Blackboard(), blackboard_exception_name) is not None
-
-
-def get_blackboard_exception():
-    return Blackboard().get(blackboard_exception_name)
-
-
-def clear_blackboard_exception():
-    raise_to_blackboard(None)
-
-
-def make_pose_from_parts(pose, frame_id, position, orientation):
-    if pose is None:
-        pose = PoseStamped()
-        pose.header.stamp = rospy.Time.now()
-        pose.header.frame_id = str(frame_id)
-        pose.pose.position = Point(*(position if position is not None else [0, 0, 0]))
-        pose.pose.orientation = Quaternion(*(orientation if orientation is not None else [0, 0, 0, 1]))
-    return pose
-
-
-def convert_ros_message_to_dictionary(message) -> dict:
-    if isinstance(message, list):
-        for i, element in enumerate(message):
-            message[i] = convert_ros_message_to_dictionary(element)
-    elif isinstance(message, dict):
-        for k, v in message.copy().items():
-            message[k] = convert_ros_message_to_dictionary(v)
-
-    elif isinstance(message, tuple):
-        list_values = list(message)
-        for i, element in enumerate(list_values):
-            list_values[i] = convert_ros_message_to_dictionary(element)
-        message = tuple(list_values)
-
-    elif isinstance(message, Message):
-
-        type_str_parts = str(type(message)).split('.')
-        part1 = type_str_parts[0].split('\'')[1]
-        part2 = type_str_parts[-1].split('\'')[0]
-        message_type = f'{part1}/{part2}'
-        d = {'message_type': message_type,
-             'message': original_convert_ros_message_to_dictionary(message)}
-        return d
-
-    return message
-
-
-def replace_prefix_name_with_str(d: dict) -> dict:
-    new_d = d.copy()
-    for k, v in d.items():
-        if isinstance(k, PrefixName):
-            del new_d[k]
-            new_d[str(k)] = v
-        if isinstance(v, PrefixName):
-            new_d[k] = str(v)
-        if isinstance(v, dict):
-            new_d[k] = replace_prefix_name_with_str(v)
-    return new_d
-
-
-def trajectory_to_np(tj, joint_names):
-    """
-    :type tj: Trajectory
-    :return:
-    """
-    names = list(sorted([i for i in tj._points[0.0].keys() if i in joint_names]))
-    position = []
-    velocity = []
-    times = []
-    for time, point in tj.items():
-        position.append([point[joint_name].position for joint_name in names])
-        velocity.append([point[joint_name].velocity for joint_name in names])
-        times.append(time)
-    position = np.array(position)
-    velocity = np.array(velocity)
-    times = np.array(times)
-    return names, position, velocity, times
-
-
-_pose_publisher = None
-
-
-def publish_pose(pose: PoseStamped):
-    global _pose_publisher
-    if _pose_publisher is None:
-        _pose_publisher = rospy.Publisher('~visualization_marker_array', MarkerArray)
-        rospy.sleep(1)
-    m = Marker()
-    m.header = pose.header
-    m.pose = pose.pose
-    m.action = m.ADD
-    m.type = m.ARROW
-    m.id = 1337
-    m.ns = 'giskard_debug_poses'
-    m.scale.x = 0.1
-    m.scale.y = 0.05
-    m.scale.z = 0.025
-    m.color.r = 1
-    m.color.a = 1
-    ms = MarkerArray()
-    ms.markers.append(m)
-    _pose_publisher.publish(ms)
-
-
-def int_to_bit_list(number: int) -> List[int]:
-    return [2 ** i * int(bit) for i, bit in enumerate(reversed("{0:b}".format(number))) if int(bit) != 0]
-
-
-def split_pose_stamped(pose: PoseStamped) -> Tuple[PointStamped, QuaternionStamped]:
-    point = PointStamped()
-    point.header = pose.header
-    point.point = pose.pose.position
-
-    quaternion = QuaternionStamped()
-    quaternion.header = pose.header
-    quaternion.quaternion = pose.pose.orientation
-    return point, quaternion
-
-
-
-
-def kwargs_to_json(kwargs: Dict[str, Any]) -> str:
-    for k, v in kwargs.copy().items():
-        if v is None:
-            del kwargs[k]
-        else:
-            kwargs[k] = thing_to_json(v)
-    kwargs = replace_prefix_name_with_str(kwargs)
-    return json.dumps(kwargs)
-
-
-def thing_to_json(thing: Any) -> Any:
-    if isinstance(thing, list):
-        return [thing_to_json(x) for x in thing]
-    if isinstance(thing, dict):
-        return {k: thing_to_json(v) for k, v in thing.items()}
-    if isinstance(thing, Message):
-        return convert_ros_message_to_dictionary(thing)
-    return thing
-
-
 def string_shortener(original_str: str, max_lines: int, max_line_length: int) -> str:
     if len(original_str) < max_line_length:
         return original_str
@@ -510,35 +232,6 @@ def string_shortener(original_str: str, max_lines: int, max_line_length: int) ->
         result = result + '...'
 
     return result
-
-
-def wait_for_topic_to_appear(topic_name: str, supported_types: List[Type[genpy.Message]]) -> Type[genpy.Message]:
-    waiting_message = f'Waiting for topic \'{topic_name}\' to appear...'
-    msg_type = None
-    while msg_type is None and not rospy.is_shutdown():
-        logging.loginfo(waiting_message)
-        try:
-            rostopic.get_info_text(topic_name)
-            msg_type, _, _ = rostopic.get_topic_class(topic_name)
-            if msg_type is None:
-                raise ROSTopicException()
-            if msg_type not in supported_types:
-                raise TypeError(f'Topic of type \'{msg_type}\' is not supported. '
-                                f'Must be one of: \'{supported_types}\'')
-            else:
-                logging.loginfo(f'\'{topic_name}\' appeared.')
-                return msg_type
-        except (ROSException, ROSTopicException) as e:
-            rospy.sleep(1)
-
-
-def get_ros_msgs_constant_name_by_value(ros_msg_class: genpy.Message, value: Union[str, int, float]) -> str:
-    for attr_name in dir(ros_msg_class):
-        if not attr_name.startswith('_'):
-            attr_value = getattr(ros_msg_class, attr_name)
-            if attr_value == value:
-                return attr_name
-    raise AttributeError(f'Message type {ros_msg_class} has no constant that matches {value}.')
 
 
 class ImmutableDict(dict):

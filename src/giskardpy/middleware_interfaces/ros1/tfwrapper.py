@@ -15,7 +15,7 @@ from tf2_ros import Buffer, TransformListener
 from visualization_msgs.msg import MarkerArray, Marker
 
 from giskardpy.data_types.data_types import PrefixName
-from giskardpy.utils import logging
+from giskardpy.middleware_interfaces.ros1 import logging
 from giskardpy.utils.decorators import memoize
 
 tfBuffer: Buffer = None

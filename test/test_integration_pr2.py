@@ -35,7 +35,7 @@ from giskardpy.model.world import WorldTree
 from giskardpy.data_types.data_types import PrefixName
 from giskardpy.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE
 from giskardpy.python_interface.old_python_interface import OldGiskardWrapper
-from giskardpy.utils.utils import launch_launchfile, suppress_stderr, resolve_ros_iris
+from utils_for_tests import launch_launchfile, suppress_stderr, resolve_ros_iris
 from utils_for_tests import compare_poses, publish_marker_vector, \
     GiskardTestWrapper, pr2_urdf, compare_points
 from giskardpy.goals.weight_scaling_goals import MaxManipulabilityLinWeight, BaseArmWeightScaling

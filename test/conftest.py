@@ -5,8 +5,8 @@ from geometry_msgs.msg import PoseStamped
 import giskardpy.middleware_interfaces.ros1.tfwrapper as tf
 from giskardpy.god_map import god_map
 from giskardpy.model.joints import OneDofJoint
-from giskardpy.utils import logging
-from giskardpy.utils.utils import launch_launchfile
+from giskardpy.middleware_interfaces.ros1 import logging
+from utils_for_tests import launch_launchfile
 from utils_for_tests import GiskardTestWrapper
 
 

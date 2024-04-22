@@ -8,7 +8,7 @@ from giskardpy.configs.qp_controller_config import QPControllerConfig
 from giskardpy.configs.iai_robots.tracy import TracyStandAloneRobotInterfaceConfig, TracyWorldConfig, \
     TracyCollisionAvoidanceConfig
 from giskardpy.goals.tracebot import InsertCylinder
-from giskardpy.utils.utils import launch_launchfile
+from utils_for_tests import launch_launchfile
 from utils_for_tests import GiskardTestWrapper
 
 

@@ -5,7 +5,7 @@ from giskardpy.data_types.data_types import ColorRGBA
 from giskardpy.goals.goal import Goal
 from giskardpy.tasks.task import WEIGHT_ABOVE_CA
 from giskardpy.god_map import god_map
-from giskardpy.utils.logging import logwarn
+from giskardpy.middleware_interfaces.ros1.logging import logwarn
 
 
 class AlignPlanes(Goal):

@@ -2,6 +2,7 @@ import json
 from typing import Optional, Union, List, Dict, Any
 
 import rospy
+from rospy import Message
 
 import giskardpy.casadi_wrapper as cas
 import geometry_msgs.msg as geometry_msgs
@@ -22,7 +23,8 @@ from giskardpy.model.trajectory import Trajectory
 from giskardpy.model.world import WorldTree
 
 from rospy_message_converter.message_converter import \
-    convert_dictionary_to_ros_message as original_convert_dictionary_to_ros_message
+    convert_dictionary_to_ros_message as original_convert_dictionary_to_ros_message, \
+    convert_ros_message_to_dictionary as original_convert_ros_message_to_dictionary
 
 from giskardpy.monitors.monitors import EndMotion, CancelMotion, Monitor
 from giskardpy.tasks.task import Task
@@ -242,6 +244,67 @@ def task_to_ros_msg(task: Task) -> giskard_msgs.MotionGoal:
 
 
 # %% from ros
+
+def replace_prefix_name_with_str(d: dict) -> dict:
+    new_d = d.copy()
+    for k, v in d.items():
+        if isinstance(k, PrefixName):
+            del new_d[k]
+            new_d[str(k)] = v
+        if isinstance(v, PrefixName):
+            new_d[k] = str(v)
+        if isinstance(v, dict):
+            new_d[k] = replace_prefix_name_with_str(v)
+    return new_d
+
+
+def kwargs_to_json(kwargs: Dict[str, Any]) -> str:
+    for k, v in kwargs.copy().items():
+        if v is None:
+            del kwargs[k]
+        else:
+            kwargs[k] = thing_to_json(v)
+    kwargs = replace_prefix_name_with_str(kwargs)
+    return json.dumps(kwargs)
+
+
+def thing_to_json(thing: Any) -> Any:
+    if isinstance(thing, list):
+        return [thing_to_json(x) for x in thing]
+    if isinstance(thing, dict):
+        return {k: thing_to_json(v) for k, v in thing.items()}
+    if isinstance(thing, Message):
+        return convert_ros_message_to_dictionary(thing)
+    return thing
+
+
+def convert_ros_message_to_dictionary(message) -> dict:
+    if isinstance(message, list):
+        for i, element in enumerate(message):
+            message[i] = convert_ros_message_to_dictionary(element)
+    elif isinstance(message, dict):
+        for k, v in message.copy().items():
+            message[k] = convert_ros_message_to_dictionary(v)
+
+    elif isinstance(message, tuple):
+        list_values = list(message)
+        for i, element in enumerate(list_values):
+            list_values[i] = convert_ros_message_to_dictionary(element)
+        message = tuple(list_values)
+
+    elif isinstance(message, Message):
+
+        type_str_parts = str(type(message)).split('.')
+        part1 = type_str_parts[0].split('\'')[1]
+        part2 = type_str_parts[-1].split('\'')[0]
+        message_type = f'{part1}/{part2}'
+        d = {'message_type': message_type,
+             'message': original_convert_ros_message_to_dictionary(message)}
+        return d
+
+    return message
+
+
 def convert_ros_msg_to_giskard_obj(msg, world: WorldTree):
     if isinstance(msg, sensor_msgs.JointState):
         return ros_joint_state_to_giskard_joint_state(msg)

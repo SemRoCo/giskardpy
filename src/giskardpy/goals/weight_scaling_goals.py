@@ -4,7 +4,6 @@ from giskardpy import casadi_wrapper as cas
 from giskardpy.goals.goal import Goal
 from giskardpy.god_map import god_map
 from giskardpy.data_types.data_types import Derivatives
-from giskardpy.tasks.task import WEIGHT_ABOVE_CA
 from collections import defaultdict
 
 

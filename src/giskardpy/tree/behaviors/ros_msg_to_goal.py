@@ -1,6 +1,7 @@
 import traceback
-from typing import List
+from typing import List, Union
 
+import genpy
 from py_trees import Status
 
 from giskard_msgs.msg import MoveGoal
@@ -13,10 +14,10 @@ from giskardpy.monitors.monitors import TimeAbove, LocalMinimumReached, EndMotio
 from giskardpy.god_map import god_map
 from giskardpy.model.joints import OmniDrive, DiffDrive
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
-from giskardpy.utils import logging
-from giskardpy.utils.logging import loginfo
-from giskardpy.utils.decorators import catch_and_raise_to_blackboard, record_time
-from giskardpy.utils.utils import get_ros_msgs_constant_name_by_value
+from giskardpy.middleware_interfaces.ros1 import logging
+from giskardpy.middleware_interfaces.ros1.logging import loginfo
+from giskardpy.utils.decorators import record_time
+from giskardpy.tree.blackboard_utils import catch_and_raise_to_blackboard
 import giskardpy.casadi_wrapper as cas
 import giskard_msgs.msg as giskard_msgs
 
@@ -116,6 +117,15 @@ class ParseActionGoal(GiskardBehavior):
     def sanity_check(self, move_goal: MoveGoal):
         if not end_motion_in_move_goal(move_goal):
             logging.logwarn(f'No {EndMotion.__name__} monitor.')
+
+
+def get_ros_msgs_constant_name_by_value(ros_msg_class: genpy.Message, value: Union[str, int, float]) -> str:
+    for attr_name in dir(ros_msg_class):
+        if not attr_name.startswith('_'):
+            attr_value = getattr(ros_msg_class, attr_name)
+            if attr_value == value:
+                return attr_name
+    raise AttributeError(f'Message type {ros_msg_class} has no constant that matches {value}.')
 
 
 class SetExecutionMode(GiskardBehavior):

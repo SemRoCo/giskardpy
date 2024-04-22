@@ -3,7 +3,7 @@ import re
 import pkg_resources
 import rospkg
 
-from giskardpy.utils import logging
+from giskardpy.middleware_interfaces.ros1 import logging
 from giskardpy.utils.utils import resolve_ros_iris
 
 r = rospkg.RosPack()

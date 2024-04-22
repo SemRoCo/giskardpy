@@ -3,9 +3,9 @@ from py_trees import Status
 from giskardpy.data_types.exceptions import PreemptedException
 from giskardpy.tree.behaviors.action_server import ActionServerHandler
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
-from giskardpy.utils import logging
+from giskardpy.middleware_interfaces.ros1 import logging
 from giskardpy.utils.decorators import record_time
-from giskardpy.utils.utils import raise_to_blackboard
+from giskardpy.tree.blackboard_utils import raise_to_blackboard
 
 
 class GoalCanceled(GiskardBehavior):

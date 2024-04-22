@@ -21,7 +21,7 @@ from giskardpy.qp.next_command import NextCommands
 from giskardpy.qp.pos_in_vel_limits import b_profile, implicit_vel_profile
 from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.symbol_manager import symbol_manager
-from giskardpy.utils import logging
+from giskardpy.middleware_interfaces.ros1 import logging
 from giskardpy.utils.utils import create_path, get_all_classes_in_package
 from giskardpy.utils.decorators import memoize
 import giskardpy.utils.math as giskard_math

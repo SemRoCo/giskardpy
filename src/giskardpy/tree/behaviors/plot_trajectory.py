@@ -6,7 +6,7 @@ from py_trees import Status
 from giskardpy.god_map import god_map
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.decorators import record_time
-from giskardpy.utils.logging import logwarn
+from giskardpy.middleware_interfaces.ros1.logging import logwarn
 
 
 class PlotTrajectory(GiskardBehavior):

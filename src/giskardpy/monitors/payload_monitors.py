@@ -9,7 +9,7 @@ from giskard_msgs.msg import GiskardError
 from giskardpy.data_types.exceptions import MonitorInitalizationException
 from giskardpy.monitors.monitors import PayloadMonitor, CancelMotion
 from giskardpy.god_map import god_map
-from giskardpy.utils import logging
+from giskardpy.middleware_interfaces.ros1 import logging
 import giskardpy.casadi_wrapper as cas
 
 

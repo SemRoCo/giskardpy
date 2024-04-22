@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections import defaultdict, deque
+from collections import defaultdict, deque, OrderedDict
 from copy import deepcopy
 from enum import IntEnum
 from typing import Optional, Generic, TypeVar, Dict, Union
@@ -259,7 +259,7 @@ class JointStates(defaultdict, Dict[K, V], Generic[K, V]):
         return new_js
 
     def to_position_dict(self) -> Dict[PrefixName, float]:
-        return {k: v.position for k, v in self.items()}
+        return OrderedDict((k, v.position) for k, v in sorted(self.items()))
 
     def pretty_print(self):
         for joint_name, joint_state in sorted(self.items()):

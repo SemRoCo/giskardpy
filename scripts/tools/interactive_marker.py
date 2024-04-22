@@ -16,7 +16,7 @@ from visualization_msgs.msg._InteractiveMarkerFeedback import InteractiveMarkerF
 from visualization_msgs.msg._Marker import Marker
 
 from giskardpy.python_interface.old_python_interface import OldGiskardWrapper
-from giskardpy.utils import logging
+from giskardpy.middleware_interfaces.ros1 import logging
 from giskardpy.utils.math import qv_mult
 
 MARKER_SCALE = 0.15

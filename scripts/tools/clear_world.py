@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import rospy
 from giskardpy.python_interface import GiskardWrapper
-from giskardpy.utils import logging
+from giskardpy.middleware_interfaces.ros1 import logging
 
 if __name__ == '__main__':
     rospy.init_node('clear_world')

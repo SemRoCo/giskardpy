@@ -5,7 +5,8 @@ from py_trees import Behaviour, Blackboard
 
 import giskardpy.middleware_interfaces.ros1.tfwrapper as tf
 from giskardpy.god_map import god_map
-from giskardpy.utils.utils import has_blackboard_exception, get_blackboard_exception, clear_blackboard_exception
+from giskardpy.tree.blackboard_utils import has_blackboard_exception, get_blackboard_exception, \
+    clear_blackboard_exception
 
 
 class GiskardBehavior(Behaviour):

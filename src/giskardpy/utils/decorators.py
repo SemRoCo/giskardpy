@@ -12,10 +12,11 @@ from typing import Callable
 from py_trees import Status
 
 from giskardpy.data_types.exceptions import DontPrintStackTrace
-from giskardpy.utils.utils import has_blackboard_exception, raise_to_blackboard
 
 from functools import wraps
 from typing import Any, TypeVar
+
+from giskardpy.tree.blackboard_utils import has_blackboard_exception, raise_to_blackboard
 
 T = TypeVar("T", bound=Callable)
 
@@ -97,23 +98,6 @@ def copy_memoize(function: T) -> T:
             rv = function(*args, **kwargs)
             memo[key] = rv
             return deepcopy(rv)
-
-    return wrapper
-
-
-def catch_and_raise_to_blackboard(function: T) -> T:
-    @wraps(function)
-    def wrapper(*args, **kwargs):
-        if has_blackboard_exception():
-            return Status.FAILURE
-        try:
-            r = function(*args, **kwargs)
-        except Exception as e:
-            if not isinstance(e, DontPrintStackTrace):
-                traceback.print_exc()
-            raise_to_blackboard(e)
-            return Status.FAILURE
-        return r
 
     return wrapper
 

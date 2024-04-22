@@ -15,9 +15,9 @@ from giskardpy.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA, WEIGHT_COLLIS
 from giskardpy.god_map import god_map
 from giskardpy.model.joints import OmniDrive, OmniDrivePR22
 from giskardpy.data_types.data_types import Derivatives, PrefixName
-from giskardpy.utils import logging
+from giskardpy.middleware_interfaces.ros1 import logging
 from giskardpy.utils.decorators import memoize_with_counter, clear_memo
-from giskardpy.utils.utils import raise_to_blackboard
+from giskardpy.tree.blackboard_utils import raise_to_blackboard
 from giskardpy.symbol_manager import symbol_manager
 
 

@@ -2,15 +2,12 @@ from __future__ import annotations
 
 import builtins
 from copy import copy
-from typing import Union, List, TypeVar
+from typing import Union, TypeVar
 import math
 import casadi as ca  # type: ignore
 import numpy as np
 import geometry_msgs.msg as geometry_msgs
-import rospy
 from scipy import sparse as sp
-from giskardpy.data_types.data_types import PrefixName, Derivatives
-from giskardpy.utils import logging
 
 builtin_max = builtins.max
 builtin_min = builtins.min

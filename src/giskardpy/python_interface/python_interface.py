@@ -88,11 +88,13 @@ class WorldWrapper:
         :param parent_link: Name of the link, the object will get attached to. None = root link of world
         :return: Response message of the service call
         """
+        if isinstance(parent_link, str):
+            parent_link = giskard_msgs.LinkName(name=parent_link)
         req = WorldGoal()
         req.group_name = str(name)
         req.operation = WorldGoal.ADD
         req.body = make_world_body_box(size[0], size[1], size[2])
-        req.parent_link = parent_link
+        req.parent_link = parent_link or giskard_msgs.LinkName()
         req.pose = pose
         return self._send_goal_and_wait(req)
 
@@ -104,6 +106,8 @@ class WorldWrapper:
         """
         See add_box.
         """
+        if isinstance(parent_link, str):
+            parent_link = giskard_msgs.LinkName(name=parent_link)
         world_body = WorldBody()
         world_body.type = WorldBody.PRIMITIVE_BODY
         world_body.shape.type = SolidPrimitive.SPHERE
@@ -127,6 +131,8 @@ class WorldWrapper:
         :param mesh: path to the mesh location, can be ros package path, e.g.,
                         package://giskardpy/test/urdfs/meshes/bowl_21.obj
         """
+        if isinstance(parent_link, str):
+            parent_link = giskard_msgs.LinkName(name=parent_link)
         world_body = WorldBody()
         world_body.type = WorldBody.MESH_BODY
         world_body.mesh = mesh
@@ -150,6 +156,8 @@ class WorldWrapper:
         """
         See add_box.
         """
+        if isinstance(parent_link, str):
+            parent_link = giskard_msgs.LinkName(name=parent_link)
         world_body = WorldBody()
         world_body.type = WorldBody.PRIMITIVE_BODY
         world_body.shape.type = SolidPrimitive.CYLINDER
@@ -175,6 +183,8 @@ class WorldWrapper:
         :param timeout: how long to wait in case Giskard is busy processing a goal.
         :return: result message
         """
+        if isinstance(parent_link, str):
+            parent_link = giskard_msgs.LinkName(name=parent_link)
         req = WorldGoal()
         req.operation = WorldGoal.UPDATE_PARENT_LINK
         req.group_name = str(name)
@@ -205,6 +215,8 @@ class WorldWrapper:
         :param js_topic: Giskard will listen on that topic for joint states and update the urdf accordingly
         :return: response message
         """
+        if isinstance(parent_link, str):
+            parent_link = giskard_msgs.LinkName(name=parent_link)
         js_topic = str(js_topic)
         urdf_body = WorldBody()
         urdf_body.type = WorldBody.URDF_BODY
@@ -271,6 +283,8 @@ class WorldWrapper:
         :param root_link_name: root link of the new group
         :return: WorldResult
         """
+        if isinstance(root_link_name, str):
+            root_link_name = giskard_msgs.LinkName(root_link_name)
         req = WorldGoal()
         req.operation = WorldGoal.REGISTER_GROUP
         req.group_name = new_group_name

@@ -127,15 +127,15 @@ class WorldModelUpdateContextManager:
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_type is None and self.first:
             self.world.context_manager_active = False
-            self.world.notify_model_change()
+            self.world._notify_model_change()
 
 
 def modifies_world(func):
     @wraps(func)
     def wrapper(self: WorldTree, *args, **kwargs):
-        result = func(self, *args, **kwargs)
-        self.notify_model_change()
-        return result
+        with self.modify_world():
+            result = func(self, *args, **kwargs)
+            return result
 
     return wrapper
 
@@ -235,6 +235,7 @@ class WorldTree(WorldTreeInterface):
     def search_for_joint_of_type(self, joint_types: Tuple[Type[Joint]]) -> List[Joint]:
         return [j for j in self.joints.values() if isinstance(j, joint_types)]
 
+    @modifies_world
     def rename_link(self, old_name: PrefixName, new_name: PrefixName):
         if old_name not in self.link_names:
             self._raise_if_link_does_not_exist(old_name)
@@ -352,19 +353,19 @@ class WorldTree(WorldTreeInterface):
             free_variable.reset_cache()
 
     @profile
-    def notify_model_change(self):
+    def _notify_model_change(self):
         """
         Call this function if you have changed the model of the world to trigger necessary events and increase
         the model version number.
         """
         if not self.context_manager_active:
-            self.fix_tree_structure()
+            self._fix_tree_structure()
             self.reset_cache()
             self.init_all_fks()
             self.notify_state_change()
             self._model_version += 1
 
-    def travel_branch(self, link_name: PrefixName, companion: TravelCompanion):
+    def _travel_branch(self, link_name: PrefixName, companion: TravelCompanion):
         """
         Do a depth first search on a branch starting at link_name.
         Use companion to do whatever you want. It link_call and joint_call are called on every link/joint it sees.
@@ -378,14 +379,14 @@ class WorldTree(WorldTreeInterface):
                 if companion.joint_call(child_joint_name):
                     continue
                 child_link_name = self.joints[child_joint_name].child_link_name
-                self.travel_branch(child_link_name, companion)
+                self._travel_branch(child_link_name, companion)
 
-    def search_branch(self,
-                      link_name: PrefixName,
-                      stop_at_joint_when: Optional[Callable[[PrefixName], bool]] = None,
-                      stop_at_link_when: Optional[Callable[[PrefixName], bool]] = None,
-                      collect_joint_when: Optional[Callable[[PrefixName], bool]] = None,
-                      collect_link_when: Optional[Callable[[PrefixName], bool]] = None) -> \
+    def _search_branch(self,
+                       link_name: PrefixName,
+                       stop_at_joint_when: Optional[Callable[[PrefixName], bool]] = None,
+                       stop_at_link_when: Optional[Callable[[PrefixName], bool]] = None,
+                       collect_joint_when: Optional[Callable[[PrefixName], bool]] = None,
+                       collect_link_when: Optional[Callable[[PrefixName], bool]] = None) -> \
             Tuple[List[PrefixName], List[PrefixName]]:
         """
         Do a depth first search starting at link_name.
@@ -435,7 +436,7 @@ class WorldTree(WorldTreeInterface):
                                                  collect_link_when=collect_link_when,
                                                  stop_at_joint_when=stop_at_joint_when,
                                                  stop_at_link_when=stop_at_link_when)
-        self.travel_branch(link_name, companion=collector_companion)
+        self._travel_branch(link_name, companion=collector_companion)
         return collector_companion.collected_link_names, collector_companion.collected_joint_names
 
     @memoize
@@ -459,9 +460,9 @@ class WorldTree(WorldTreeInterface):
             return joint_name not in joints_to_exclude and self.is_joint_controlled(joint_name)
 
         child_link_name = self.joints[joint_name].child_link_name
-        links, joints = self.search_branch(link_name=child_link_name,
-                                           stop_at_joint_when=stopper,
-                                           collect_link_when=self.has_link_collisions)
+        links, joints = self._search_branch(link_name=child_link_name,
+                                            stop_at_joint_when=stopper,
+                                            collect_link_when=self.has_link_collisions)
         return links
 
     def get_siblings_with_collisions(self, joint_name: PrefixName) -> List[PrefixName]:
@@ -480,9 +481,9 @@ class WorldTree(WorldTreeInterface):
             return joint_name == other_joint_name or self.is_joint_controlled(other_joint_name)
 
         child_link_name = self.joints[parent_joint].child_link_name
-        link_names, joint_names = self.search_branch(link_name=child_link_name,
-                                                     stop_at_joint_when=stop_at_joint_when,
-                                                     collect_link_when=self.has_link_collisions)
+        link_names, joint_names = self._search_branch(link_name=child_link_name,
+                                                      stop_at_joint_when=stop_at_joint_when,
+                                                      collect_link_when=self.has_link_collisions)
         return link_names
 
     @modifies_world
@@ -538,6 +539,7 @@ class WorldTree(WorldTreeInterface):
                     group_names.remove(group_name)
         return group_names
 
+    @modifies_world
     def add_free_variable(self,
                           name: PrefixName,
                           lower_limits: derivative_map,
@@ -556,6 +558,7 @@ class WorldTree(WorldTreeInterface):
         self.free_variables[name] = free_variable
         return free_variable
 
+    @modifies_world
     def add_virtual_free_variable(self, name: PrefixName) -> FreeVariable:
         free_variable = FreeVariable(name=name,
                                      lower_limits={},
@@ -609,7 +612,7 @@ class WorldTree(WorldTreeInterface):
                               parent_link_name=parent_link_name,
                               child_link_name=urdf_root_link.name)
             joint.update_transform(pose)
-            self._add_joint(joint)
+            self.add_joint(joint)
         else:
             urdf_root_link = Link(urdf_root_link_name_prefixed)
             self.add_link(urdf_root_link)
@@ -649,8 +652,9 @@ class WorldTree(WorldTreeInterface):
         # else:
         self.register_group(group_name, urdf_root_link_name_prefixed, actuated=actuated)
 
-    def _add_fixed_joint(self, parent_link: Link, child_link: Link, joint_name: str = None,
-                         transform: Optional[cas.TransMatrix] = None):
+    @modifies_world
+    def add_fixed_joint(self, parent_link: Link, child_link: Link, joint_name: str = None,
+                        transform: Optional[cas.TransMatrix] = None):
         self._raise_if_link_does_not_exist(parent_link.name)
         self._raise_if_link_does_not_exist(child_link.name)
         if joint_name is None:
@@ -661,7 +665,8 @@ class WorldTree(WorldTreeInterface):
                                       parent_T_child=transform)
         self._link_joint_to_links(connecting_joint)
 
-    def _replace_joint(self, new_joint: Joint):
+    @modifies_world
+    def replace_joint(self, new_joint: Joint):
         child_link = new_joint.child_link_name
         parent_link = new_joint.parent_link_name
 
@@ -829,41 +834,6 @@ class WorldTree(WorldTreeInterface):
                 return potential_parent_group
         return group_name
 
-    @profile
-    @modifies_world
-    def add_world_body(self,
-                       group_name: str,
-                       msg: WorldBody,
-                       pose: cas.TransMatrix,
-                       parent_link_name: PrefixName):
-        """
-        Add a WorldBody to the world.
-        :param group_name: Name of the SubWorldTree that will be created.
-        :param msg:
-        :param pose: pose of WorldBody relative to parent_link_name
-        :param parent_link_name: where the WorldBody will be attached
-        """
-        if group_name in self.groups:
-            raise DuplicateNameException(f'Group with name \'{group_name}\' already exists')
-        self._raise_if_link_does_not_exist(parent_link_name)
-        if isinstance(parent_link_name, str):
-            parent_link_name = PrefixName(parent_link_name, None)
-        if msg.type == msg.URDF_BODY:
-            self.add_urdf(urdf=msg.urdf,
-                          parent_link_name=parent_link_name,
-                          group_name=group_name,
-                          pose=pose)
-        else:
-            link = Link.from_world_body(link_name=PrefixName(group_name, group_name), msg=msg,
-                                        color=self.default_link_color)
-            self.add_link(link)
-            joint = Joint6DOF(name=PrefixName(group_name, self.connection_prefix),
-                              parent_link_name=parent_link_name,
-                              child_link_name=link.name)
-            joint.update_transform(pose)
-            self._link_joint_to_links(joint)
-            self.register_group(group_name, link.name)
-
     def _clear(self):
         self.state = JointStates()
         self.links = {}
@@ -899,7 +869,7 @@ class WorldTree(WorldTreeInterface):
         assert joint.name not in parent_link.child_joint_names
         parent_link.child_joint_names.append(joint.name)
 
-    def fix_tree_structure(self):
+    def _fix_tree_structure(self):
         for joint in self.joints.values():
             self._raise_if_link_does_not_exist(joint.parent_link_name)
             self._raise_if_link_does_not_exist(joint.child_link_name)
@@ -911,14 +881,14 @@ class WorldTree(WorldTreeInterface):
                 child_link.parent_joint_name = joint.name
             else:
                 assert child_link.parent_joint_name == joint.name
-        self.fix_root_link()
+        self._fix_root_link()
         for link in self.links.values():
             if link != self.root_link:
                 self._raise_if_joint_does_not_exist(link.parent_joint_name)
             for child_joint_name in link.child_joint_names:
                 self._raise_if_joint_does_not_exist(child_joint_name)
 
-    def fix_root_link(self):
+    def _fix_root_link(self):
         orphans = []
         for link_name, link in self.links.items():
             if link.parent_joint_name is None:
@@ -972,7 +942,7 @@ class WorldTree(WorldTreeInterface):
         old_parent_link.child_joint_names.remove(joint_name)
         new_parent_link.child_joint_names.append(joint_name)
 
-    def cleanup_unused_free_variable(self):
+    def _cleanup_unused_free_variable(self):
         used_variables = []
         for joint_name in self.movable_joint_names:
             joint = self.joints[joint_name]
@@ -981,6 +951,7 @@ class WorldTree(WorldTreeInterface):
             if free_variable_name not in used_variables:
                 del self.state[free_variable_name]
 
+    @modifies_world
     def move_group(self, group_name: str, new_parent_link_name: PrefixName):
         """
         Removed the joint connecting group_name to the world and attach it to new_parent_link_name.
@@ -992,6 +963,7 @@ class WorldTree(WorldTreeInterface):
             raise DuplicateNameException(f'\'{group_name}\' is already attached to \'{new_parent_link_name}\'')
         self.move_branch(joint_name, new_parent_link_name)
 
+    @modifies_world
     def delete_group(self, group_name: str):
         """
         Delete the group and all links and joints contained in it.
@@ -1000,12 +972,13 @@ class WorldTree(WorldTreeInterface):
             raise UnknownGroupException(f'Can\'t delete unknown group: \'{group_name}\'')
         self.delete_branch(self.groups[group_name].root_link_name)
 
+    @modifies_world
     def delete_branch(self, link_name: PrefixName):
         """
         Delete every link and joint from link_name downward, including the link.
         """
         self.delete_branch_at_joint(self.links[link_name].parent_joint_name)
-        self.cleanup_unused_free_variable()
+        self._cleanup_unused_free_variable()
 
     @modifies_world
     @profile
@@ -1299,7 +1272,7 @@ class WorldTree(WorldTreeInterface):
                 return root_T_tip
 
         new_fks = ExpressionCompanion(self)
-        self.travel_branch(self.root_link_name, new_fks)
+        self._travel_branch(self.root_link_name, new_fks)
         new_fks.compile_fks()
         self._fk_computer = new_fks
 
@@ -1335,11 +1308,13 @@ class WorldTree(WorldTreeInterface):
             chain2 = [x for x in chain2 if x not in joints_to_be_assumed_fixed]
         return not chain1 and not connection and not chain2
 
+    @modifies_world
     def add_link(self, link: Link) -> None:
         self._raise_if_link_exists(link.name)
         self.links[link.name] = link
 
-    def _add_joint(self, joint: Joint):
+    @modifies_world
+    def add_joint(self, joint: Joint):
         self._raise_if_joint_exists(joint.name)
         self.joints[joint.name] = joint
 
@@ -1562,11 +1537,11 @@ class WorldBranch(WorldTreeInterface):
                 if god_map.world.is_joint_controlled(child_joint_name):
                     continue
                 child_link_name = self.joints[child_joint_name].child_link_name
-                links, joints = god_map.world.search_branch(link_name=child_link_name,
-                                                            stop_at_joint_when=god_map.world.is_joint_controlled,
-                                                            stop_at_link_when=None,
-                                                            collect_joint_when=None,
-                                                            collect_link_when=god_map.world.has_link_collisions)
+                links, joints = god_map.world._search_branch(link_name=child_link_name,
+                                                             stop_at_joint_when=god_map.world.is_joint_controlled,
+                                                             stop_at_link_when=None,
+                                                             collect_joint_when=None,
+                                                             collect_link_when=god_map.world.has_link_collisions)
 
                 direct_children.update(links)
             direct_children.add(link_name)
@@ -1575,10 +1550,10 @@ class WorldBranch(WorldTreeInterface):
         return link_combinations
 
     def get_unmovable_links(self) -> List[PrefixName]:
-        unmovable_links, _ = god_map.world.search_branch(link_name=self.root_link_name,
-                                                         stop_at_joint_when=lambda
+        unmovable_links, _ = god_map.world._search_branch(link_name=self.root_link_name,
+                                                          stop_at_joint_when=lambda
                                                              joint_name: joint_name in self.controlled_joints,
-                                                         collect_link_when=god_map.world.has_link_collisions)
+                                                          collect_link_when=god_map.world.has_link_collisions)
         return unmovable_links
 
     @property

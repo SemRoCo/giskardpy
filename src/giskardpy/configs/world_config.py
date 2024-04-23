@@ -141,7 +141,7 @@ class WorldConfig(ABC):
         joint_name = PrefixName(f'{parent_link}_{child_link}_fixed_joint', None)
         joint = FixedJoint(name=joint_name, parent_link_name=parent_link, child_link_name=child_link,
                            parent_T_child=homogenous_transform)
-        god_map.world._add_joint(joint)
+        god_map.world.add_joint(joint)
 
     def add_diff_drive_joint(self,
                              name: str,
@@ -161,7 +161,7 @@ class WorldConfig(ABC):
                                    name=joint_name,
                                    translation_limits=translation_limits,
                                    rotation_limits=rotation_limits)
-        god_map.world._add_joint(brumbrum_joint)
+        god_map.world.add_joint(brumbrum_joint)
         god_map.world.deregister_group(robot_group_name)
         god_map.world.register_group(robot_group_name, root_link_name=parent_link_name, actuated=True)
 
@@ -176,7 +176,7 @@ class WorldConfig(ABC):
         child_link = PrefixName.from_string(child_link, set_none_if_no_slash=True)
         joint_name = PrefixName.from_string(joint_name, set_none_if_no_slash=True)
         joint = Joint6DOF(name=joint_name, parent_link_name=parent_link, child_link_name=child_link)
-        god_map.world._add_joint(joint)
+        god_map.world.add_joint(joint)
 
     def add_empty_link(self, link_name: my_string):
         """
@@ -215,7 +215,7 @@ class WorldConfig(ABC):
                                    x_name=x_name,
                                    y_name=y_name,
                                    yaw_name=yaw_vel_name)
-        god_map.world._add_joint(brumbrum_joint)
+        god_map.world.add_joint(brumbrum_joint)
         god_map.world.deregister_group(robot_group_name)
         god_map.world.register_group(robot_group_name, root_link_name=parent_link_name, actuated=True)
 

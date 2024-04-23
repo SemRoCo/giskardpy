@@ -4066,18 +4066,18 @@ class TestWorld:
         assert upper_limit == 2.1353981634
 
     def test_search_branch(self, world_setup: WorldTree):
-        result = world_setup.search_branch(world_setup.search_for_link_name('odom_combined'),
-                                           stop_at_joint_when=lambda _: False,
-                                           stop_at_link_when=lambda _: False)
+        result = world_setup._search_branch(world_setup.search_for_link_name('odom_combined'),
+                                            stop_at_joint_when=lambda _: False,
+                                            stop_at_link_when=lambda _: False)
         assert result == ([], [])
-        result = world_setup.search_branch(world_setup.search_for_link_name('odom_combined'),
-                                           stop_at_joint_when=world_setup.is_joint_controlled,
-                                           stop_at_link_when=lambda _: False,
-                                           collect_link_when=world_setup.has_link_collisions)
+        result = world_setup._search_branch(world_setup.search_for_link_name('odom_combined'),
+                                            stop_at_joint_when=world_setup.is_joint_controlled,
+                                            stop_at_link_when=lambda _: False,
+                                            collect_link_when=world_setup.has_link_collisions)
         assert result == ([], [])
-        result = world_setup.search_branch(world_setup.search_for_link_name('base_footprint'),
-                                           stop_at_joint_when=world_setup.is_joint_controlled,
-                                           collect_link_when=world_setup.has_link_collisions)
+        result = world_setup._search_branch(world_setup.search_for_link_name('base_footprint'),
+                                            stop_at_joint_when=world_setup.is_joint_controlled,
+                                            collect_link_when=world_setup.has_link_collisions)
         assert set(result[0]) == {'pr2/base_bellow_link',
                                   'pr2/fl_caster_l_wheel_link',
                                   'pr2/fl_caster_r_wheel_link',
@@ -4092,8 +4092,8 @@ class TestWorld:
                                   'pr2/br_caster_r_wheel_link',
                                   'pr2/br_caster_rotation_link',
                                   'pr2/base_link'}
-        result = world_setup.search_branch(world_setup.search_for_link_name('l_elbow_flex_link'),
-                                           collect_joint_when=world_setup.is_joint_fixed)
+        result = world_setup._search_branch(world_setup.search_for_link_name('l_elbow_flex_link'),
+                                            collect_joint_when=world_setup.is_joint_fixed)
         assert set(result[0]) == set()
         assert set(result[1]) == {'pr2/l_force_torque_adapter_joint',
                                   'pr2/l_force_torque_joint',
@@ -4104,10 +4104,10 @@ class TestWorld:
                                   'pr2/l_gripper_motor_accelerometer_joint',
                                   'pr2/l_gripper_palm_joint',
                                   'pr2/l_gripper_tool_joint'}
-        links, joints = world_setup.search_branch(world_setup.search_for_link_name('r_wrist_roll_link'),
-                                                  stop_at_joint_when=world_setup.is_joint_controlled,
-                                                  collect_link_when=world_setup.has_link_collisions,
-                                                  collect_joint_when=lambda _: True)
+        links, joints = world_setup._search_branch(world_setup.search_for_link_name('r_wrist_roll_link'),
+                                                   stop_at_joint_when=world_setup.is_joint_controlled,
+                                                   collect_link_when=world_setup.has_link_collisions,
+                                                   collect_joint_when=lambda _: True)
         assert set(links) == {'pr2/r_gripper_l_finger_tip_link',
                               'pr2/r_gripper_l_finger_link',
                               'pr2/r_gripper_r_finger_tip_link',
@@ -4125,9 +4125,9 @@ class TestWorld:
                                'pr2/r_gripper_r_finger_joint',
                                'pr2/r_gripper_r_finger_tip_joint',
                                'pr2/r_gripper_joint'}
-        links, joints = world_setup.search_branch(world_setup.search_for_link_name('br_caster_l_wheel_link'),
-                                                  collect_link_when=lambda _: True,
-                                                  collect_joint_when=lambda _: True)
+        links, joints = world_setup._search_branch(world_setup.search_for_link_name('br_caster_l_wheel_link'),
+                                                   collect_link_when=lambda _: True,
+                                                   collect_joint_when=lambda _: True)
         assert links == ['pr2/br_caster_l_wheel_link']
         assert joints == []
 

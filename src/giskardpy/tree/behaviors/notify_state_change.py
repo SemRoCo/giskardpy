@@ -19,5 +19,5 @@ class NotifyModelChange(GiskardBehavior):
     @record_time
     @profile
     def update(self):
-        god_map.world.notify_model_change()
+        god_map.world._notify_model_change()
         return Status.SUCCESS

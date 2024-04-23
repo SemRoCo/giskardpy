@@ -690,16 +690,15 @@ class GiskardTestWrapper(OldGiskardWrapper):
             assert type(e) == expected_error_type
         self.check_add_object_result(name=name,
                                      pose=None,
-                                     parent_link=god_map.world.root_link_name,
-                                     parent_link_group='',
                                      expected_error_type=expected_error_type)
 
     def check_add_object_result(self,
                                 name: str,
                                 pose: Optional[PoseStamped],
-                                parent_link: str,
-                                parent_link_group: str,
+                                parent_link: Optional[giskard_msgs.LinkName] = None,
                                 expected_error_type: Optional[type(Exception)] = None):
+        if isinstance(parent_link, str):
+            parent_link = giskard_msgs.LinkName(name=parent_link)
         if expected_error_type is None:
             assert name in self.world.get_group_names()
             response2 = self.world.get_group_info(name)
@@ -708,17 +707,17 @@ class GiskardTestWrapper(OldGiskardWrapper):
                 o_p = god_map.world.groups[name].base_pose
                 compare_poses(p.pose, o_p)
                 compare_poses(o_p, response2.root_link_pose.pose)
-            if parent_link_group != '':  # check if parent group is consistent
-                robot = self.world.get_group_info(parent_link_group)
+            if parent_link and parent_link.group_name != '':  # check if parent group is consistent
+                robot = self.world.get_group_info(parent_link.group_name)
                 assert name in robot.child_groups
-                short_parent_link = god_map.world.groups[parent_link_group].get_link_short_name_match(parent_link)
+                short_parent_link = god_map.world.groups[parent_link.group_name].get_link_short_name_match(parent_link)
                 assert short_parent_link == god_map.world.get_parent_link_of_link(
                     god_map.world.groups[name].root_link_name)
             else:
-                if parent_link == '':
+                if parent_link is None or parent_link.name == '':
                     parent_link = god_map.world.root_link_name
                 else:
-                    parent_link = god_map.world.search_for_link_name(parent_link)
+                    parent_link = msg_converter.link_name_msg_to_prefix_name(parent_link, god_map.world)
                 if parent_link in god_map.world.robots[0].link_names:
                     object_links = god_map.world.groups[name].link_names
                     for link_a, link_b in god_map.collision_scene.self_collision_matrix:
@@ -736,15 +735,13 @@ class GiskardTestWrapper(OldGiskardWrapper):
                          name: str,
                          size: Tuple[float, float, float],
                          pose: PoseStamped,
-                         parent_link: str = '',
-                         parent_link_group: str = '',
+                         parent_link: Optional[giskard_msgs.LinkName] = None,
                          expected_error_type: Optional[type(Exception)] = None) -> None:
         try:
             response = self.world.add_box(name=name,
                                           size=size,
                                           pose=pose,
-                                          parent_link=parent_link,
-                                          parent_link_group=parent_link_group)
+                                          parent_link=parent_link)
             self.wait_heartbeats()
             assert response.error.type == GiskardError.SUCCESS
         except Exception as e:
@@ -752,7 +749,6 @@ class GiskardTestWrapper(OldGiskardWrapper):
         self.check_add_object_result(name=name,
                                      pose=pose,
                                      parent_link=parent_link,
-                                     parent_link_group=parent_link_group,
                                      expected_error_type=expected_error_type)
 
     def update_group_pose(self, group_name: str, new_pose: PoseStamped,
@@ -771,15 +767,13 @@ class GiskardTestWrapper(OldGiskardWrapper):
                             name: str,
                             radius: float = 1,
                             pose: PoseStamped = None,
-                            parent_link: str = '',
-                            parent_link_group: str = '',
+                            parent_link: Optional[giskard_msgs.LinkName] = None,
                             expected_error_type: Optional[type(Exception)] = None) -> None:
         try:
             response = self.world.add_sphere(name=name,
                                              radius=radius,
                                              pose=pose,
-                                             parent_link=parent_link,
-                                             parent_link_group=parent_link_group)
+                                             parent_link=parent_link)
             self.wait_heartbeats()
             assert response.error.type == GiskardError.SUCCESS
         except Exception as e:
@@ -787,7 +781,6 @@ class GiskardTestWrapper(OldGiskardWrapper):
         self.check_add_object_result(name=name,
                                      pose=pose,
                                      parent_link=parent_link,
-                                     parent_link_group=parent_link_group,
                                      expected_error_type=expected_error_type)
 
     def add_cylinder_to_world(self,
@@ -795,16 +788,14 @@ class GiskardTestWrapper(OldGiskardWrapper):
                               height: float,
                               radius: float,
                               pose: PoseStamped = None,
-                              parent_link: str = '',
-                              parent_link_group: str = '',
+                              parent_link: Optional[giskard_msgs.LinkName] = None,
                               expected_error_type: Optional[type(Exception)] = None) -> None:
         try:
             response = self.world.add_cylinder(name=name,
                                                height=height,
                                                radius=radius,
                                                pose=pose,
-                                               parent_link=parent_link,
-                                               parent_link_group=parent_link_group)
+                                               parent_link=parent_link)
             self.wait_heartbeats()
             assert response.error.type == GiskardError.SUCCESS
         except Exception as e:
@@ -812,15 +803,13 @@ class GiskardTestWrapper(OldGiskardWrapper):
         self.check_add_object_result(name=name,
                                      pose=pose,
                                      parent_link=parent_link,
-                                     parent_link_group=parent_link_group,
                                      expected_error_type=expected_error_type)
 
     def add_mesh_to_world(self,
                           name: str = 'meshy',
                           mesh: str = '',
                           pose: PoseStamped = None,
-                          parent_link: str = '',
-                          parent_link_group: str = '',
+                          parent_link: Optional[giskard_msgs.LinkName] = None,
                           scale: Tuple[float, float, float] = (1, 1, 1),
                           expected_error_type: Optional[type(Exception)] = None) -> None:
         try:
@@ -828,7 +817,6 @@ class GiskardTestWrapper(OldGiskardWrapper):
                                            mesh=mesh,
                                            pose=pose,
                                            parent_link=parent_link,
-                                           parent_link_group=parent_link_group,
                                            scale=scale)
             self.wait_heartbeats()
             assert response.error.type == GiskardError.SUCCESS
@@ -839,15 +827,13 @@ class GiskardTestWrapper(OldGiskardWrapper):
         self.check_add_object_result(name=name,
                                      pose=pose,
                                      parent_link=parent_link,
-                                     parent_link_group=parent_link_group,
                                      expected_error_type=expected_error_type)
 
     def add_urdf_to_world(self,
                           name: str,
                           urdf: str,
                           pose: PoseStamped,
-                          parent_link: str = '',
-                          parent_link_group: str = '',
+                          parent_link: Optional[giskard_msgs.LinkName] = None,
                           js_topic: Optional[str] = '',
                           set_js_topic: Optional[str] = '',
                           expected_error_type: Optional[type(Exception)] = None) -> None:
@@ -856,7 +842,6 @@ class GiskardTestWrapper(OldGiskardWrapper):
                                            urdf=urdf,
                                            pose=pose,
                                            parent_link=parent_link,
-                                           parent_link_group=parent_link_group,
                                            js_topic=js_topic)
             self.wait_heartbeats()
             assert response.error.type == GiskardError.SUCCESS
@@ -865,7 +850,6 @@ class GiskardTestWrapper(OldGiskardWrapper):
         self.check_add_object_result(name=name,
                                      pose=pose,
                                      parent_link=parent_link,
-                                     parent_link_group=parent_link_group,
                                      expected_error_type=expected_error_type)
         if set_js_topic:
             self.env_joint_state_pubs[name] = rospy.Publisher(set_js_topic, JointState, queue_size=10)
@@ -875,8 +859,7 @@ class GiskardTestWrapper(OldGiskardWrapper):
     def monitors_update_parent_link_of_group(self,
                                              start_condition: str,
                                              group_name: str,
-                                             parent_link: str,
-                                             parent_link_group: Optional[str] = '',
+                                             parent_link: giskard_msgs.LinkName,
                                              name: Optional[str] = None) -> str:
         """
         A PayloadMonitor that works like world.update_parent_link_of_group().
@@ -886,24 +869,20 @@ class GiskardTestWrapper(OldGiskardWrapper):
                                          name=name,
                                          start_condition=start_condition,
                                          group_name=group_name,
-                                         parent_link=parent_link,
-                                         parent_link_group=parent_link_group)
+                                         parent_link=parent_link)
 
     def update_parent_link_of_group(self,
                                     name: str,
-                                    parent_link: str = '',
-                                    parent_link_group: str = '',
+                                    parent_link: Optional[Union[str, giskard_msgs.LinkName]] = None,
                                     expected_error_type: Optional[type(Exception)] = None) -> None:
         try:
             r = self.world.update_parent_link_of_group(name=name,
-                                                       parent_link=parent_link,
-                                                       parent_link_group=parent_link_group)
+                                                       parent_link=parent_link)
             self.wait_heartbeats()
             assert r.error.type == GiskardError.SUCCESS
             self.check_add_object_result(name=name,
                                          pose=None,
                                          parent_link=parent_link,
-                                         parent_link_group=parent_link_group,
                                          expected_error_type=expected_error_type)
         except Exception as e:
             assert type(e) == expected_error_type

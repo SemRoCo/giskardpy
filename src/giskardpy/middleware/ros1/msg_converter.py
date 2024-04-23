@@ -13,6 +13,7 @@ import trajectory_msgs.msg as trajectory_msgs
 import tf2_msgs.msg as tf2_msgs
 
 import giskard_msgs.msg as giskard_msgs
+from giskard_msgs.msg import GiskardError
 from giskardpy.data_types.data_types import JointStates, PrefixName, _JointState, ColorRGBA
 from giskardpy.data_types.exceptions import GiskardException, CorruptShapeException
 from giskardpy.god_map import god_map
@@ -28,6 +29,7 @@ from rospy_message_converter.message_converter import \
 
 from giskardpy.monitors.monitors import EndMotion, CancelMotion, Monitor
 from giskardpy.tasks.task import Task
+from giskardpy.utils.utils import get_all_classes_in_package, get_all_classes_in_module
 
 
 # TODO probably needs some consistency check
@@ -243,7 +245,24 @@ def task_to_ros_msg(task: Task) -> giskard_msgs.MotionGoal:
     return msg
 
 
+def exception_to_error_msg(exception: Exception) -> giskard_msgs.GiskardError:
+    error = GiskardError()
+    error.type = exception.__class__.__name__
+    error.msg = str(exception)
+    return error
+
+
 # %% from ros
+
+exception_classes = get_all_classes_in_module(module_name='giskardpy.data_types.exceptions',
+                                               parent_class=GiskardException)
+
+
+def error_msg_to_exception(msg: giskard_msgs.GiskardError) -> Optional[GiskardException]:
+    if msg.type == GiskardError.SUCCESS:
+        return None
+    return exception_classes[msg.type](msg.msg)
+
 
 def replace_prefix_name_with_str(d: dict) -> dict:
     new_d = d.copy()

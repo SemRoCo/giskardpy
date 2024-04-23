@@ -63,16 +63,28 @@ def get_all_classes_in_package(package_name: str, parent_class: Optional[Type] =
     """
     classes = {}
     package = __import__(package_name, fromlist="dummy")
-    for importer, modname, ispkg in pkgutil.iter_modules(package.__path__):
+    for importer, module_name, ispkg in pkgutil.iter_modules(package.__path__):
         try:
-            module = __import__(f'{package.__name__}.{modname}', fromlist="dummy")
+            new_classes = get_all_classes_in_module(f'{package.__name__}.{module_name}', parent_class)
         except Exception as e:
             if not silent:
-                logging.logwarn(f'Failed to load {modname}: {str(e)}')
+                logging.logwarn(f'Failed to load {module_name}: {str(e)}')
             continue
-        for name2, value2 in inspect.getmembers(module, inspect.isclass):
-            if parent_class is None or issubclass(value2, parent_class) and package_name in str(value2):
-                classes[name2] = value2
+        classes.update(new_classes)
+    return classes
+
+
+def get_all_classes_in_module(module_name: str, parent_class: Optional[Type] = None) -> Dict[str, Type]:
+    """
+    :param module_name: e.g. giskardpy.goals
+    :param parent_class: e.g. Goal
+    :return:
+    """
+    classes = {}
+    module = __import__(module_name, fromlist="dummy")
+    for class_name, class_type in inspect.getmembers(module, inspect.isclass):
+        if parent_class is None or issubclass(class_type, parent_class) and module_name in str(class_type):
+            classes[class_name] = class_type
     return classes
 
 

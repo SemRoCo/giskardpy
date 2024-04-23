@@ -118,17 +118,17 @@ class EndMotion(PayloadMonitor):
 class CancelMotion(PayloadMonitor):
     def __init__(self,
                  error_message: str,
-                 error_code: int = GiskardException,
+                 error_type: type(Exception) = GiskardException,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol):
         super().__init__(name=name, start_condition=start_condition, run_call_in_thread=False)
         self.error_message = error_message
-        self.error_code = error_code
+        self.error_type = error_type
 
     @profile
     def __call__(self):
         self.state = True
-        raise GiskardException(error_message=self.error_message)
+        raise self.error_type(self.error_message)
 
     def get_state(self) -> bool:
         return self.state

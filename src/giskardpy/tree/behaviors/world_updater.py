@@ -5,12 +5,12 @@ import rospy
 from py_trees import Status
 from visualization_msgs.msg import MarkerArray
 
-from giskard_msgs.msg import WorldResult, WorldGoal, GiskardError
+from giskard_msgs.msg import WorldResult, WorldGoal
 from giskard_msgs.srv import GetGroupNamesResponse, GetGroupNamesRequest, GetGroupInfoResponse, GetGroupInfoRequest, \
     DyeGroupResponse, GetGroupNames, GetGroupInfo, DyeGroup, DyeGroupRequest
 from giskardpy.data_types.data_types import JointStates, PrefixName
 from giskardpy.data_types.exceptions import UnknownGroupException, \
-    GiskardException, TransformException, DuplicateNameException
+    TransformException, DuplicateNameException, InvalidWorldOperationException
 from giskardpy.god_map import god_map
 from giskardpy.model.joints import Joint6DOF
 from giskardpy.model.world import WorldBranch
@@ -68,12 +68,9 @@ class ProcessWorldUpdate(GiskardBehavior):
             elif req.operation == WorldGoal.REMOVE_ALL:
                 self.clear_world()
             else:
-                result.error.code = GiskardError.INVALID_WORLD_OPERATION
-                result.error.msg = f'Received invalid operation code: {req.operation}'
+                raise InvalidWorldOperationException(f'Received invalid operation code: {req.operation}')
         except Exception as e:
-            if not isinstance(e, GiskardException):
-                e = GiskardException(str(e))
-            result.error = e.to_error_msg()
+            result.error = msg_converter.exception_to_error_msg(e)
         self.action_server.result_msg = result
 
     def dye_group(self, req: DyeGroupRequest):

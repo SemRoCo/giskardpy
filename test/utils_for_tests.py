@@ -496,13 +496,13 @@ class GiskardTestWrapper(OldGiskardWrapper):
     # GENERAL GOAL STUFF ###############################################################################################
     #
 
-    def execute(self, expected_error_code: int = giskard_msgs.GiskardError.SUCCESS, stop_after: float = None,
+    def execute(self, expected_error_type: Optional[type(Exception)] = None, stop_after: float = None,
                 wait: bool = True, add_local_minimum_reached: bool = True) -> giskard_msgs.MoveResult:
         if add_local_minimum_reached:
             self.add_default_end_motion_conditions()
-        return self.send_goal(expected_error_code=expected_error_code, stop_after=stop_after, wait=wait)
+        return self.send_goal(expected_error_type=expected_error_type, stop_after=stop_after, wait=wait)
 
-    def projection(self, expected_error_code: int = giskard_msgs.GiskardError.SUCCESS, wait: bool = True,
+    def projection(self, expected_error_type: Optional[type(Exception)] = None, wait: bool = True,
                    add_local_minimum_reached: bool = True) -> giskard_msgs.MoveResult:
         """
         Plans, but doesn't execute the goal. Useful, if you just want to look at the planning ghost.
@@ -515,7 +515,7 @@ class GiskardTestWrapper(OldGiskardWrapper):
         for key, value in list(last_js.items()):
             if key not in god_map.controlled_joints:
                 del last_js[key]
-        result = self.send_goal(expected_error_code=expected_error_code,
+        result = self.send_goal(expected_error_type=expected_error_type,
                                 goal_type=giskard_msgs.MoveGoal.PROJECTION,
                                 wait=wait)
         new_js = god_map.world.state.to_position_dict()
@@ -525,18 +525,18 @@ class GiskardTestWrapper(OldGiskardWrapper):
         self.compare_joint_state(new_js, last_js)
         return result
 
-    def plan_and_execute(self, expected_error_code: int = giskard_msgs.GiskardError.SUCCESS, stop_after: float = None,
+    def plan_and_execute(self, expected_error_type: Optional[type(Exception)] = None, stop_after: float = None,
                          wait: bool = True) -> giskard_msgs.MoveResult:
-        return self.execute(expected_error_code, stop_after, wait)
+        return self.execute(expected_error_type, stop_after, wait)
 
-    def plan(self, expected_error_codes: int = giskard_msgs.GiskardError.SUCCESS, wait: bool = True,
+    def plan(self, expected_error_type: Optional[type(Exception)] = None, wait: bool = True,
              add_local_minimum_reached: bool = True) -> giskard_msgs.MoveResult:
-        return self.projection(expected_error_code=expected_error_codes,
+        return self.projection(expected_error_type=expected_error_type,
                                wait=wait,
                                add_local_minimum_reached=add_local_minimum_reached)
 
     def send_goal(self,
-                  expected_error_code: int = giskard_msgs.GiskardError.SUCCESS,
+                  expected_error_type: Optional[type(Exception)] = None,
                   goal_type: int = giskard_msgs.MoveGoal.EXECUTE,
                   goal: Optional[giskard_msgs.MoveGoal] = None,
                   stop_after: Optional[float] = None,
@@ -560,11 +560,10 @@ class GiskardTestWrapper(OldGiskardWrapper):
             self.total_time_spend_moving += (len(god_map.trajectory.keys()) *
                                              god_map.qp_controller_config.sample_period)
             logging.logwarn(f'Goal processing took {diff}')
-            error_code = r.error.code
-            error_message = r.error.msg
-            assert error_code == expected_error_code, \
-                f'got: {error_code_to_name(error_code)}, ' \
-                f'expected: {error_code_to_name(expected_error_code)} | error_massage: {error_message}'
+            result_exception = msg_converter.error_msg_to_exception(r.error)
+            assert result_exception == expected_error_type, \
+                f'got: {result_exception}, ' \
+                f'expected: {expected_error_type} | error_massage: {r.error.msg}'
             # self.are_joint_limits_violated()
         finally:
             self.sync_world_with_trajectory()
@@ -641,7 +640,7 @@ class GiskardTestWrapper(OldGiskardWrapper):
         respone = self.world.clear()
         self.wait_heartbeats()
         self.default_env_name = None
-        assert respone.error.code == giskard_msgs.GiskardError.SUCCESS
+        assert respone.error.type == giskard_msgs.GiskardError.SUCCESS
         assert len(god_map.world.groups) == 1
         assert len(self.world.get_group_names()) == 1
         assert self.original_number_of_links == len(god_map.world.links)

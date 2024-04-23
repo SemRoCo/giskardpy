@@ -25,10 +25,8 @@ class SetMoveResult(GiskardBehavior):
         e = self.get_blackboard_exception()
         if e is None:
             move_result = MoveResult()
-        elif isinstance(e, GiskardException):
-            move_result = MoveResult(error=e.to_error_msg())
         else:
-            move_result = MoveResult(error=GiskardException(str(e)).to_error_msg())
+            move_result = MoveResult(error=msg_converter.exception_to_error_msg(e))
 
         if isinstance(e, EmptyProblemException) and god_map.is_standalone():
             motion_goals = god_map.motion_goal_manager.motion_goals.values()
@@ -47,11 +45,11 @@ class SetMoveResult(GiskardBehavior):
                                                                             sample_period=sample_period,
                                                                             start_time=0,
                                                                             joints=joints)
-        if move_result.error.code == GiskardError.PREEMPTED:
+        if isinstance(e, PreemptedException):
             logging.logwarn(f'Goal preempted: \'{move_result.error.msg}\'.')
         else:
             if self.print:
-                if move_result.error.code == GiskardError.SUCCESS:
+                if e is None:
                     logging.loginfo(f'{self.context} succeeded.')
                 else:
                     logging.logwarn(f'{self.context} failed: {move_result.error.msg}.')

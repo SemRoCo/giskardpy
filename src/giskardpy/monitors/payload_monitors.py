@@ -5,8 +5,7 @@ from typing import Optional, Dict, Tuple
 import numpy as np
 import rospy
 
-from giskard_msgs.msg import GiskardError
-from giskardpy.data_types.exceptions import MonitorInitalizationException
+from giskardpy.data_types.exceptions import MonitorInitalizationException, MaxTrajectoryLengthException
 from giskardpy.monitors.monitors import PayloadMonitor, CancelMotion
 from giskardpy.god_map import god_map
 from giskardpy.middleware import logging
@@ -48,7 +47,7 @@ class SetMaxTrajectoryLength(CancelMotion):
         super().__init__(name=name,
                          start_condition=start_condition,
                          error_message=error_message,
-                         error_code=GiskardError.MAX_TRAJECTORY_LENGTH)
+                         error_type=MaxTrajectoryLengthException)
 
     @profile
     def __call__(self):

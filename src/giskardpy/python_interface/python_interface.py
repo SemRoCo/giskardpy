@@ -4,7 +4,6 @@ from typing import Dict, Tuple, Optional, List
 import rospy
 from actionlib import SimpleActionClient
 from geometry_msgs.msg import PoseStamped, Vector3Stamped, PointStamped, QuaternionStamped
-from rospy import ServiceException
 from shape_msgs.msg import SolidPrimitive
 
 import giskard_msgs.msg as giskard_msgs
@@ -14,7 +13,7 @@ from giskard_msgs.srv import DyeGroupRequest, DyeGroup, GetGroupInfoRequest, Dye
 from giskard_msgs.srv import GetGroupInfo, GetGroupNames
 from giskard_msgs.srv import GetGroupNamesResponse, GetGroupInfoResponse
 from giskardpy.data_types.data_types import goal_parameter
-from giskardpy.data_types.exceptions import DuplicateNameException, UnknownGroupException
+from giskardpy.data_types.exceptions import GiskardException, LocalMinimumException
 from giskardpy.goals.align_planes import AlignPlanes
 from giskardpy.goals.cartesian_goals import CartesianPose, DiffDriveBaseGoal, CartesianVelocityLimit, \
     CartesianOrientation, CartesianPoseStraight, CartesianPosition, CartesianPositionStraight
@@ -24,6 +23,7 @@ from giskardpy.goals.joint_goals import JointPositionList, AvoidJointLimits, Set
 from giskardpy.goals.open_close import Close, Open
 from giskardpy.goals.pointing import Pointing
 from giskardpy.goals.set_prediction_horizon import SetPredictionHorizon
+from giskardpy.middleware.ros1 import msg_converter
 from giskardpy.middleware.ros1.msg_converter import kwargs_to_json
 from giskardpy.model.utils import make_world_body_box
 from giskardpy.monitors.cartesian_monitors import PoseReached, PositionReached, OrientationReached, PointingAt, \
@@ -273,11 +273,10 @@ class WorldWrapper:
         req.group_name = group_name
         req.pose = new_pose
         res = self._send_goal_and_wait(req)
-        if res.error.code == GiskardError.SUCCESS:
+        if res.error.type == GiskardError.SUCCESS:
             return res
-        if res.error.code == GiskardError.UNKNOWN_GROUP:
-            raise UnknownGroupException(res.error.msg)
-        raise ServiceException(res.error.msg)
+        else:
+            raise msg_converter.error_msg_to_exception(res.error)
 
     def register_group(self, new_group_name: str, root_link_name: str,
                        root_link_group_name: str) -> WorldResult:
@@ -294,8 +293,8 @@ class WorldWrapper:
         req.parent_link_group = root_link_group_name
         req.parent_link = root_link_name
         res = self._send_goal_and_wait(req)
-        if res.error.code == GiskardError.DUPLICATE_NAME:
-            raise DuplicateNameException(f'Group with name {new_group_name} already exists.')
+        if res.error.type != GiskardError.SUCCESS:
+            raise msg_converter.error_msg_to_exception(res.error)
         return res
 
 
@@ -1294,7 +1293,7 @@ class MonitorWrapper:
     def add_cancel_motion(self,
                           start_condition: str,
                           error_message: str,
-                          error_code: int = GiskardError.ERROR,
+                          error_type: str = GiskardException.__name__,
                           name: Optional[str] = None) -> str:
         """
         Cancels the motion if all start_condition are True and will make Giskard return the specified error code.
@@ -1304,7 +1303,7 @@ class MonitorWrapper:
                                 name=name,
                                 start_condition=start_condition,
                                 error_message=error_message,
-                                error_code=error_code)
+                                error_type=error_type)
 
     def add_max_trajectory_length(self,
                                   max_trajectory_length: Optional[float] = None) -> str:
@@ -1414,7 +1413,7 @@ class GiskardWrapper:
         self.monitors.add_end_motion(start_condition=self.monitors.get_anded_monitor_names())
         self.monitors.add_cancel_motion(start_condition=local_min_reached_monitor_name,
                                         error_message=f'local minimum reached',
-                                        error_code=GiskardError.LOCAL_MINIMUM)
+                                        error_type=LocalMinimumException.__name__)
         if not self.monitors.max_trajectory_length_set:
             self.monitors.add_max_trajectory_length()
         self.monitors.max_trajectory_length_set = False

@@ -2,7 +2,7 @@ from inspect import currentframe, getframeinfo
 
 import rospy
 
-from giskardpy.middleware.interface.interface import Logger
+from giskardpy.middleware.interface.logger import Logger
 
 
 @profile

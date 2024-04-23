@@ -368,7 +368,6 @@ class OmniDrive(MovableJoint, VirtualFreeVariables):
     def update_transform(self, new_parent_T_child: cas.TransMatrix):
         position = new_parent_T_child.to_position()
         roll, pitch, yaw = new_parent_T_child.to_rotation().to_rpy()
-        self.last_msg = JointStates()
         god_map.world.state[self.x.name].position = position.x
         god_map.world.state[self.y.name].position = position.y
         god_map.world.state[self.z.name].position = position.z
@@ -461,7 +460,6 @@ class DiffDrive(MovableJoint, VirtualFreeVariables):
     def update_transform(self, new_parent_T_child: cas.TransMatrix):
         position = new_parent_T_child.to_position()
         roll, pitch, yaw = new_parent_T_child.to_rotation().to_rpy()
-        self.last_msg = JointStates()
         god_map.world.state[self.x.name].position = position.x
         god_map.world.state[self.y.name].position = position.y
         god_map.world.state[self.z.name].position = position.z
@@ -615,7 +613,6 @@ class OmniDrivePR22(MovableJoint, VirtualFreeVariables):
     def update_transform(self, new_parent_T_child: cas.TransMatrix):
         position = new_parent_T_child.to_position()
         roll, pitch, yaw = new_parent_T_child.to_rotation().to_rpy()
-        self.last_msg = JointStates()
         god_map.world.state[self.x.name].position = position.x
         god_map.world.state[self.y.name].position = position.y
         god_map.world.state[self.z.name].position = position.z

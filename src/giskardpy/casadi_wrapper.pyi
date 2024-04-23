@@ -4,10 +4,10 @@ import functools
 from typing import overload, Union, Iterable, Tuple, Optional, Callable, List, Any, Sequence, Dict, TypeVar
 import numpy as np
 import casadi as ca  # type: ignore
-import geometry_msgs.msg as geometry_msgs
 
-from giskardpy.data_types import PrefixName
 from scipy import sparse as sp
+
+from giskardpy.data_types.data_types import PrefixName
 
 all_expressions = Union[Symbol_, Symbol, Expression, Point3, Vector3, RotationMatrix, TransMatrix, Quaternion]
 all_expressions_float = Union[Symbol, Expression, Point3, Vector3, RotationMatrix, TransMatrix, float, Quaternion]
@@ -372,11 +372,6 @@ FalseSymbol: Expression
 
 class GeometricType:
     reference_frame: Optional[PrefixName]
-
-    @classmethod
-    def from_ros1_msg(cls, msg) -> GeometricType: ...
-
-    def to_ros1_msg(self): ...
 
 
 class TransMatrix(Symbol_, GeometricType):

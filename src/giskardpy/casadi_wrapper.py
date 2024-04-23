@@ -6,7 +6,6 @@ from typing import Union, TypeVar
 import math
 import casadi as ca  # type: ignore
 import numpy as np
-import geometry_msgs.msg as geometry_msgs
 from scipy import sparse as sp
 
 builtin_max = builtins.max
@@ -484,19 +483,7 @@ FalseSymbol = Expression(False)
 
 
 class GeometricType:
-
-    @classmethod
-    def from_ros1_msg(cls, msg):
-        if isinstance(msg, geometry_msgs.PoseStamped):
-            return TransMatrix(msg)
-        elif isinstance(msg, geometry_msgs.QuaternionStamped):
-            return RotationMatrix(msg)
-        elif isinstance(msg, geometry_msgs.PointStamped):
-            return Point3(msg)
-        elif isinstance(msg, Vector3):
-            return Vector3(msg)
-        else:
-            raise ValueError(f'Cannot convert {type(msg)} to casadi object')
+    pass
 
 
 class TransMatrix(Symbol_, GeometricType):

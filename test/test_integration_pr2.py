@@ -2394,7 +2394,7 @@ class TestWorldManipulation:
         p.pose.position = Point(0.1, 0, 0)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.add_mesh_to_world(object_name, mesh='package://giskardpy/test/urdfs/meshes/muh.obj', pose=p,
-                                    expected_error_code=GiskardError.CORRUPT_MESH)
+                                    expected_error_type=GiskardError.CORRUPT_MESH)
 
     def test_add_attach_detach_remove_add(self, zero_pose: PR2TestWrapper):
         object_name = 'muh'
@@ -2503,7 +2503,7 @@ class TestWorldManipulation:
         zero_pose.update_parent_link_of_group('muh',
                                               parent_link='',
                                               parent_link_group='',
-                                              expected_response=GiskardError.UNKNOWN_GROUP)
+                                              expected_error_type=GiskardError.UNKNOWN_GROUP)
 
     def test_add_remove_box(self, zero_pose: PR2TestWrapper):
         object_name = 'muh'
@@ -2525,7 +2525,7 @@ class TestWorldManipulation:
         assert zero_pose.world._send_goal_and_wait(req).error.code == GiskardError.INVALID_WORLD_OPERATION
 
     def test_remove_unkown_group(self, zero_pose: PR2TestWrapper):
-        zero_pose.remove_group('muh', expected_response=GiskardError.UNKNOWN_GROUP)
+        zero_pose.remove_group('muh', expected_error_type=GiskardError.UNKNOWN_GROUP)
 
     def test_corrupt_shape_error(self, zero_pose: PR2TestWrapper):
         p = PoseStamped()

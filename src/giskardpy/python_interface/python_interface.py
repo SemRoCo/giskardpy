@@ -67,7 +67,12 @@ class WorldWrapper:
 
     def _send_goal_and_wait(self, goal: WorldGoal) -> WorldResult:
         self._client.send_goal_and_wait(goal)
-        return self._client.get_result()
+        result: WorldResult = self._client.get_result()
+        error = msg_converter.error_msg_to_exception(result.error)
+        if error is not None:
+            raise error
+        else:
+            return result
 
     def add_box(self,
                 name: str,
@@ -272,11 +277,7 @@ class WorldWrapper:
         req.operation = req.UPDATE_POSE
         req.group_name = group_name
         req.pose = new_pose
-        res = self._send_goal_and_wait(req)
-        if res.error.type == GiskardError.SUCCESS:
-            return res
-        else:
-            raise msg_converter.error_msg_to_exception(res.error)
+        return self._send_goal_and_wait(req)
 
     def register_group(self, new_group_name: str, root_link_name: str,
                        root_link_group_name: str) -> WorldResult:
@@ -292,10 +293,7 @@ class WorldWrapper:
         req.group_name = new_group_name
         req.parent_link_group = root_link_group_name
         req.parent_link = root_link_name
-        res = self._send_goal_and_wait(req)
-        if res.error.type != GiskardError.SUCCESS:
-            raise msg_converter.error_msg_to_exception(res.error)
-        return res
+        return self._send_goal_and_wait(req)
 
 
 class MotionGoalWrapper:

@@ -930,7 +930,8 @@ class TestMonitors:
         zero_pose.monitors.add_max_trajectory_length(120)
         zero_pose.execute(add_local_minimum_reached=False)
         assert god_map.trajectory.length_in_seconds > 6
-        current_pose = god_map.world.compute_fk(root='map', tip='base_footprint')
+        current_pose = msg_converter.trans_matrix_to_pose_stamped(god_map.world.compute_fk(root='map',
+                                                                                           tip='base_footprint'))
         compare_poses(current_pose.pose, base_goal.pose)
 
     def test_hold_monitors(self, zero_pose: PR2TestWrapper):

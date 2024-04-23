@@ -1,9 +1,9 @@
 import abc
 from threading import Lock
+from time import sleep
 from typing import Optional, Dict, Tuple
 
 import numpy as np
-import rospy
 
 from giskardpy.data_types.exceptions import MonitorInitalizationException, MaxTrajectoryLengthException
 from giskardpy.monitors.monitors import PayloadMonitor, CancelMotion
@@ -77,7 +77,7 @@ class Sleep(PayloadMonitor):
         super().__init__(name=name, start_condition=start_condition, run_call_in_thread=True)
 
     def __call__(self):
-        rospy.sleep(self.seconds)
+        sleep(self.seconds)
         self.state = True
 
 
@@ -97,7 +97,7 @@ class UpdateParentLinkOfGroup(WorldUpdatePayloadMonitor):
     def apply_world_update(self):
         god_map.world.move_group(group_name=self.group_name,
                                  new_parent_link_name=self.new_parent_link)
-        rospy.sleep(2)
+        sleep(2)
 
 
 class CollisionMatrixUpdater(PayloadMonitor):

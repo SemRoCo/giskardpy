@@ -7,7 +7,6 @@ if TYPE_CHECKING:
     from giskardpy.tree.behaviors.action_server import ActionServerHandler
     from giskardpy.configs.behavior_tree_config import BehaviorTreeConfig
     from giskardpy.tree.branches.giskard_bt import GiskardBT
-    from giskardpy.model.joints import Joint
     from giskardpy.model.ros_msg_visualization import ROSMsgVisualization
     from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint
     from giskardpy.qp.free_variable import FreeVariable

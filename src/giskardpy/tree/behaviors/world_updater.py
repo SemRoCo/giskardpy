@@ -147,8 +147,8 @@ class ProcessWorldUpdate(GiskardBehavior):
                                   parent_link_name=parent_link,
                                   child_link_name=link.name)
                 joint.update_transform(parent_link_T_group_root_link)
-                god_map.world._link_joint_to_links(joint)
-                god_map.world.register_group(group_name, link.name)
+                world.add_joint(joint)
+        world.register_group(group_name, link.name)
         # SUB-CASE: If it is an articulated object, open up a joint state subscriber
         logging.loginfo(f'Attached object \'{group_name}\' at \'{parent_link}\'.')
         if world_body.joint_state_topic:

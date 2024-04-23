@@ -486,7 +486,6 @@ class WorldTree(WorldTreeInterface):
                                                       collect_link_when=self.has_link_collisions)
         return link_names
 
-    @modifies_world
     def register_group(self, name: str, root_link_name: PrefixName, actuated: bool = False):
         """
         Create a new subgroup at root_link_name.
@@ -618,70 +617,48 @@ class WorldTree(WorldTreeInterface):
             self.add_link(urdf_root_link)
             # urdf_root_link = self.links[urdf_root_link_name]
 
-        def helper(urdf, parent_link):
+        def recursive_parser(urdf: up.Robot, parent_link: Link):
             short_name = parent_link.name.short_name
             if short_name not in urdf.child_map:
                 return  # stop because link has no child links
             for child_joint_name, child_link_name in urdf.child_map[short_name]:
+                # add link
                 urdf_link = urdf.link_map[child_link_name]
                 child_link = Link.from_urdf(urdf_link=urdf_link,
                                             prefix=group_name,
                                             color=self.default_link_color)
                 self.add_link(child_link)
 
+                # add joint
                 urdf_joint: up.Joint = urdf.joint_map[child_joint_name]
-
-                joint = urdf_to_joint(urdf_joint, group_name)
+                joint = Joint.from_urdf(urdf_joint, group_name)
                 if not isinstance(joint, FixedJoint):
                     for derivative, limit in self.default_limits.items():
                         joint.free_variable.set_lower_limit(derivative, -limit)
                         joint.free_variable.set_upper_limit(derivative, limit)
+                self.add_joint(joint)
 
-                self._link_joint_to_links(joint)
-                helper(urdf, child_link)
+                recursive_parser(urdf, child_link)
 
         number_of_links_before = len(self.links)
-        helper(parsed_urdf, urdf_root_link)
+        recursive_parser(parsed_urdf, urdf_root_link)
         if number_of_links_before + len(parsed_urdf.links) - 1 != len(self.links):
             # -1 because root link already exists
             raise WorldException(f'Failed to add urdf \'{group_name}\' to world')
 
-        # if add_drive_joint_to_group:
-        #     root_link = self.get_parent_link_of_link(urdf_root_link_name)
-        #     self.register_group(group_name, root_link, actuated=actuated)
-        # else:
         self.register_group(group_name, urdf_root_link_name_prefixed, actuated=actuated)
 
     @modifies_world
-    def add_fixed_joint(self, parent_link: Link, child_link: Link, joint_name: str = None,
-                        transform: Optional[cas.TransMatrix] = None):
+    def add_fixed_joint(self, parent_link: Link, child_link: Link, joint_name: Optional[str] = None,
+                        transform: Optional[cas.TransMatrix] = None) -> None:
         self._raise_if_link_does_not_exist(parent_link.name)
         self._raise_if_link_does_not_exist(child_link.name)
         if joint_name is None:
             joint_name = PrefixName(f'{parent_link.name}_{child_link.name}_fixed_joint', None)
-        connecting_joint = FixedJoint(name=joint_name,
-                                      parent_link_name=parent_link.name,
-                                      child_link_name=child_link.name,
-                                      parent_T_child=transform)
-        self._link_joint_to_links(connecting_joint)
-
-    @modifies_world
-    def replace_joint(self, new_joint: Joint):
-        child_link = new_joint.child_link_name
-        parent_link = new_joint.parent_link_name
-
-        for i, link_or_joint in enumerate(self.compute_chain(parent_link, child_link, add_joints=True, add_links=True,
-                                                             add_fixed_joints=True, add_non_controlled_joints=True)[
-                                          1:-1]):
-            if i == 0:
-                parent_link = self.joints[link_or_joint].parent_link_name
-                self.links[parent_link].child_joint_names.remove(link_or_joint)
-            if i % 2 == 0:
-                del self.joints[link_or_joint]
-            else:
-                del self.links[link_or_joint]
-
-        self._link_joint_to_links(new_joint)
+        self.add_joint(FixedJoint(name=joint_name,
+                                  parent_link_name=parent_link.name,
+                                  child_link_name=child_link.name,
+                                  parent_T_child=transform))
 
     def get_parent_link_of_link(self, link_name: PrefixName) -> PrefixName:
         return self.joints[self.links[link_name].parent_joint_name].parent_link_name
@@ -851,13 +828,6 @@ class WorldTree(WorldTreeInterface):
         with self.modify_world():
             god_map.world_config.setup()  # todo
 
-    def _add_joint_and_create_child(self, joint: Joint):
-        self._raise_if_joint_exists(joint.name)
-        self._raise_if_link_exists(joint.child_link_name)
-        child_link = Link(joint.child_link_name)
-        self.add_link(child_link)
-        self._link_joint_to_links(joint)
-
     def _link_joint_to_links(self, joint: Joint):
         self._raise_if_joint_exists(joint.name)
         self._raise_if_link_does_not_exist(joint.child_link_name)
@@ -869,13 +839,19 @@ class WorldTree(WorldTreeInterface):
         assert joint.name not in parent_link.child_joint_names
         parent_link.child_joint_names.append(joint.name)
 
-    def _fix_tree_structure(self):
+    def _fix_tree_structure(self) -> None:
+        """
+        This function fixes the tree structure based on the parent and child link of joints
+        """
         for joint in self.joints.values():
+            # parent and child link must exist
             self._raise_if_link_does_not_exist(joint.parent_link_name)
             self._raise_if_link_does_not_exist(joint.child_link_name)
+            # add this joint as child joint of parent link
             parent_link = self.links[joint.parent_link_name]
             if joint.name not in parent_link.child_joint_names:
                 parent_link.child_joint_names.append(joint.name)
+            # set this joint as parent joint of child link
             child_link = self.links[joint.child_link_name]
             if child_link.parent_joint_name is None:
                 child_link.parent_joint_name = joint.name
@@ -884,15 +860,19 @@ class WorldTree(WorldTreeInterface):
         self._fix_root_link()
         for link in self.links.values():
             if link != self.root_link:
+                # if not root link, the parent joint has to exist
                 self._raise_if_joint_does_not_exist(link.parent_joint_name)
+            # all child joints have to exist
             for child_joint_name in link.child_joint_names:
                 self._raise_if_joint_does_not_exist(child_joint_name)
 
     def _fix_root_link(self):
+        # search for links with no parent joint
         orphans = []
         for link_name, link in self.links.items():
             if link.parent_joint_name is None:
                 orphans.append(link_name)
+        # if there are multiple links with no parent joints, we have multiple trees
         if len(orphans) > 1:
             raise WorldException(f'Found multiple orphaned links: {orphans}.')
         self._root_link_name = orphans[0]
@@ -1552,7 +1532,7 @@ class WorldBranch(WorldTreeInterface):
     def get_unmovable_links(self) -> List[PrefixName]:
         unmovable_links, _ = god_map.world._search_branch(link_name=self.root_link_name,
                                                           stop_at_joint_when=lambda
-                                                             joint_name: joint_name in self.controlled_joints,
+                                                              joint_name: joint_name in self.controlled_joints,
                                                           collect_link_when=god_map.world.has_link_collisions)
         return unmovable_links
 

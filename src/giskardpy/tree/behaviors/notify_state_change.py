@@ -2,6 +2,7 @@ from py_trees import Status
 
 from giskardpy.god_map import god_map
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
+from giskardpy.tree.blackboard_utils import catch_and_raise_to_blackboard
 from giskardpy.utils.decorators import record_time
 
 
@@ -16,6 +17,7 @@ class NotifyStateChange(GiskardBehavior):
 
 class NotifyModelChange(GiskardBehavior):
 
+    @catch_and_raise_to_blackboard
     @record_time
     @profile
     def update(self):

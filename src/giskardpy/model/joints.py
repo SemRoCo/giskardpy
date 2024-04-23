@@ -140,6 +140,10 @@ class Joint(ABC):
     def __repr__(self):
         return str(self)
 
+    @classmethod
+    def from_urdf(cls, urdf_joint: up.Joint, prefix: str) -> Union[FixedJoint, RevoluteJoint, PrismaticJoint]:
+        return urdf_to_joint(urdf_joint, prefix)
+
 
 class VirtualFreeVariables(ABC):
     @abc.abstractmethod

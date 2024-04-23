@@ -139,9 +139,9 @@ class SetExecutionMode(GiskardBehavior):
     def update(self):
         logging.loginfo(
             f'Goal is of type {get_ros_msgs_constant_name_by_value(type(god_map.move_action_server.goal_msg), god_map.move_action_server.goal_msg.type)}')
-        if god_map.is_goal_msg_type_projection():
+        if god_map.move_action_server.is_goal_msg_type_projection():
             god_map.tree.switch_to_projection()
-        elif god_map.is_goal_msg_type_execute():
+        elif god_map.move_action_server.is_goal_msg_type_execute():
             god_map.tree.switch_to_execution()
         else:
             raise InvalidGoalException(f'Goal of type {god_map.goal_msg.type} is not supported.')

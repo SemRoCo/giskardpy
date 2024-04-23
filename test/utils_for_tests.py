@@ -344,7 +344,7 @@ class GiskardTestWrapper(OldGiskardWrapper):
     def transform_msg(self, target_frame, msg, timeout=1):
         result_msg = deepcopy(msg)
         try:
-            if not god_map.is_standalone():
+            if not god_map.tree.is_standalone():
                 return tf.transform_msg(target_frame, result_msg, timeout=timeout)
             else:
                 raise LookupException('just to trigger except block')
@@ -418,7 +418,7 @@ class GiskardTestWrapper(OldGiskardWrapper):
         # TODO it is strange that I need to kill the services... should be investigated. (:
         god_map.tree.kill_all_services()
         giskarding_time = self.total_time_spend_giskarding
-        if not god_map.is_standalone():
+        if not god_map.tree.is_standalone():
             giskarding_time -= self.total_time_spend_moving
         logging.loginfo(f'total time spend giskarding: {giskarding_time}')
         logging.loginfo(f'total time spend moving: {self.total_time_spend_moving}')
@@ -427,7 +427,7 @@ class GiskardTestWrapper(OldGiskardWrapper):
     def set_env_state(self, joint_state: Dict[str, float], object_name: Optional[str] = None):
         if object_name is None:
             object_name = self.default_env_name
-        if god_map.is_standalone():
+        if god_map.tree.is_standalone():
             self.set_seed_configuration(joint_state)
             self.allow_all_collisions()
             self.plan_and_execute()

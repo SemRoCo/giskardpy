@@ -3,8 +3,6 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING, List, Dict, Tuple
 
-from giskard_msgs.msg import MoveGoal, MoveResult
-
 if TYPE_CHECKING:
     from giskardpy.tree.behaviors.action_server import ActionServerHandler
     from giskardpy.configs.behavior_tree_config import BehaviorTreeConfig
@@ -55,7 +53,6 @@ class GodMap:
     qp_solver_solution: NextCommands
     added_collision_checks: Dict[Tuple[PrefixName, PrefixName], float]
     closest_point: Collisions
-    # collision_matrix: Dict[Tuple[PrefixName, PrefixName], float]
     motion_start_time: float
     eq_constraints: Dict[str, EqualityConstraint]
     neq_constraints: Dict[str, InequalityConstraint]
@@ -66,24 +63,6 @@ class GodMap:
     fill_trajectory_velocity_values: bool
     ros_visualizer: ROSMsgVisualization
     free_variables: List[FreeVariable]
-
-    def is_goal_msg_type_execute(self):
-        return self.move_action_server.goal_msg.type in [MoveGoal.EXECUTE]
-
-    def is_goal_msg_type_projection(self):
-        return MoveGoal.PROJECTION == self.move_action_server.goal_msg.type
-
-    def is_goal_msg_type_undefined(self):
-        return MoveGoal.UNDEFINED == self.move_action_server.goal_msg.type
-
-    def is_closed_loop(self):
-        return self.tree.is_closed_loop()
-
-    def is_standalone(self):
-        return self.tree.is_standalone()
-
-    def is_open_loop(self):
-        return self.tree.is_open_loop()
 
     def is_collision_checking_enabled(self):
         return self.collision_scene.collision_checker_id != self.collision_scene.collision_checker_id.none

@@ -74,7 +74,7 @@ class BehaviorTreeConfig(ABC):
         QP data is streamed and can be visualized in e.g. plotjuggler. Useful for debugging.
         """
         self.add_evaluate_debug_expressions()
-        if god_map.is_open_loop():
+        if god_map.tree.is_open_loop():
             self.tree.execute_traj.base_closed_loop.publish_state.add_qp_data_publisher(
                 publish_lb=publish_lb,
                 publish_ub=publish_ub,
@@ -144,11 +144,11 @@ class BehaviorTreeConfig(ABC):
 
     def add_evaluate_debug_expressions(self):
         self.tree.prepare_control_loop.add_compile_debug_expressions()
-        if god_map.is_closed_loop():
+        if god_map.tree.is_closed_loop():
             self.tree.control_loop_branch.add_evaluate_debug_expressions(log_traj=False)
         else:
             self.tree.control_loop_branch.add_evaluate_debug_expressions(log_traj=True)
-        if god_map.is_open_loop():
+        if god_map.tree.is_open_loop():
             god_map.tree.execute_traj.prepare_base_control.add_compile_debug_expressions()
             god_map.tree.execute_traj.base_closed_loop.add_evaluate_debug_expressions(log_traj=False)
 

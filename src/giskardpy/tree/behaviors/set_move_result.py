@@ -28,7 +28,7 @@ class SetMoveResult(GiskardBehavior):
         else:
             move_result = MoveResult(error=msg_converter.exception_to_error_msg(e))
 
-        if isinstance(e, EmptyProblemException) and god_map.is_standalone():
+        if isinstance(e, EmptyProblemException) and god_map.tree.is_standalone():
             motion_goals = god_map.motion_goal_manager.motion_goals.values()
             non_motion_goals = len([x for x in motion_goals if isinstance(x, NonMotionGoal)])
             collision_avoidance = len([x for x in motion_goals if isinstance(x, CollisionAvoidance)])

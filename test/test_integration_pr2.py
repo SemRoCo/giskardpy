@@ -208,7 +208,7 @@ class PR2TestWrapper(GiskardTestWrapper):
         p = PoseStamped()
         p.header.frame_id = 'map'
         p.pose.orientation.w = 1
-        if god_map.is_standalone():
+        if god_map.tree.is_standalone():
             self.teleport_base(p)
         else:
             self.move_base(p)
@@ -266,7 +266,7 @@ def giskard(request, ros):
 
 @pytest.fixture()
 def pocky_pose_setup(resetted_giskard: PR2TestWrapper) -> PR2TestWrapper:
-    if god_map.is_standalone():
+    if god_map.tree.is_standalone():
         resetted_giskard.set_seed_configuration(pocky_pose)
         resetted_giskard.allow_all_collisions()
     else:
@@ -2352,7 +2352,7 @@ class TestWorldManipulation:
         p.header.frame_id = 'map'
         p.pose.position.x = 1
         p.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0, 0, 1]))
-        if god_map.is_standalone():
+        if god_map.tree.is_standalone():
             js_topic = ''
             set_js_topic = ''
         else:

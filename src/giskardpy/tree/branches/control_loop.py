@@ -73,7 +73,7 @@ class ControlLoop(AsyncBehavior):
 
     @toggle_off('in_projection')
     def switch_to_closed_loop(self):
-        assert god_map.is_closed_loop()
+        assert god_map.tree.is_closed_loop()
         self.remove_projection_behaviors()
         self.add_closed_loop_behaviors()
 

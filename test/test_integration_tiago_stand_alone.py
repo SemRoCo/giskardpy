@@ -130,7 +130,7 @@ class TiagoTestWrapper(GiskardTestWrapper):
         p = PoseStamped()
         p.header.frame_id = 'map'
         p.pose.orientation.w = 1
-        if god_map.is_standalone():
+        if god_map.tree.is_standalone():
             self.teleport_base(p)
         else:
             self.move_base(p)

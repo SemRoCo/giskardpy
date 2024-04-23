@@ -88,7 +88,7 @@ class UpdateParentLinkOfGroup(WorldUpdatePayloadMonitor):
                  parent_link_group: Optional[str] = '',
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol):
-        if not god_map.is_standalone():
+        if not god_map.tree.is_standalone():
             raise MonitorInitalizationException(f'This monitor can only be used in standalone mode.')
         self.group_name = group_name
         self.new_parent_link = god_map.world.search_for_link_name(parent_link, parent_link_group)

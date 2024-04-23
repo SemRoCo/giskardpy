@@ -341,7 +341,7 @@ class TestWorldManipulation:
         p.header.frame_id = 'map'
         p.pose.position.x = 1
         p.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0, 0, 1]))
-        if god_map.is_standalone():
+        if god_map.tree.is_standalone():
             js_topic = ''
             set_js_topic = ''
         else:

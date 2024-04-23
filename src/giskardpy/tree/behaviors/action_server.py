@@ -5,6 +5,7 @@ import actionlib
 import rosnode
 import rospy
 
+from giskard_msgs.msg import MoveGoal
 from giskardpy.data_types.exceptions import GiskardException
 from giskardpy.middleware import logging
 from giskardpy.utils.decorators import record_time
@@ -31,6 +32,15 @@ class ActionServerHandler:
         self._as = actionlib.SimpleActionServer(self.name, action_type,
                                                 execute_cb=self.execute_cb, auto_start=False)
         self._as.start()
+
+    def is_goal_msg_type_execute(self):
+        return self.goal_msg.type in [MoveGoal.EXECUTE]
+
+    def is_goal_msg_type_projection(self):
+        return MoveGoal.PROJECTION == self.goal_msg.type
+
+    def is_goal_msg_type_undefined(self):
+        return MoveGoal.UNDEFINED == self.goal_msg.type
 
     def execute_cb(self, goal) -> None:
         self.goal_queue.put(goal)

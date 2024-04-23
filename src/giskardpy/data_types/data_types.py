@@ -270,6 +270,10 @@ class JointStates(defaultdict, Dict[K, V], Generic[K, V]):
             print(f'\tjerk: {joint_state.jerk}')
 
 
+class ExecutionMode(IntEnum):
+    Execute = 1
+    Projection = 2
+
 class BiDict(dict):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

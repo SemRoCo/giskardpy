@@ -34,10 +34,10 @@ class RosTime(GiskardBehavior):
         super().__init__(name)
 
     @property
-    def start_time(self):
-        return god_map.tracking_start_time
+    def start_time(self) -> float:
+        return god_map.motion_start_time
 
     @profile
     def update(self):
-        god_map.time = (rospy.get_rostime() - self.start_time).to_sec()
+        god_map.time = rospy.get_rostime().to_sec() - self.start_time
         return Status.SUCCESS

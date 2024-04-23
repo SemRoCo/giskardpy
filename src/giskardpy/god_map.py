@@ -3,8 +3,6 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING, List, Dict, Tuple
 
-import rospy
-
 from giskard_msgs.msg import MoveGoal, MoveResult
 
 if TYPE_CHECKING:
@@ -58,8 +56,7 @@ class GodMap:
     added_collision_checks: Dict[Tuple[PrefixName, PrefixName], float]
     closest_point: Collisions
     # collision_matrix: Dict[Tuple[PrefixName, PrefixName], float]
-    time_delay: rospy.Duration
-    tracking_start_time: rospy.Time
+    motion_start_time: float
     eq_constraints: Dict[str, EqualityConstraint]
     neq_constraints: Dict[str, InequalityConstraint]
     derivative_constraints: Dict[str, DerivativeInequalityConstraint]

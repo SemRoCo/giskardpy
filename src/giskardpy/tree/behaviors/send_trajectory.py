@@ -52,7 +52,6 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
                  goal_time_tolerance: float = 1, fill_velocity_values: bool = True,
                  path_tolerance: Dict[Derivatives, float] = None):
         self.group_name = group_name
-        self.delay = rospy.Duration(0)
         self.namespace = namespace
         self.action_namespace = f'{self.namespace}/follow_joint_trajectory'
         GiskardBehavior.__init__(self, str(self))
@@ -98,10 +97,9 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
     @profile
     def initialise(self):
         super().initialise()
-        self.delay = god_map.time_delay
         trajectory = god_map.trajectory
         goal = FollowJointTrajectoryGoal()
-        start_time = god_map.tracking_start_time
+        start_time = god_map.motion_start_time
         fill_velocity_values = god_map.fill_trajectory_velocity_values
         if fill_velocity_values is None:
             fill_velocity_values = self.fill_velocity_values
@@ -124,8 +122,8 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
         deadline = self.action_goal.trajectory.header.stamp + \
                    self.action_goal.trajectory.points[-1].time_from_start + \
                    self.action_goal.goal_time_tolerance
-        self.min_deadline = deadline - self.goal_time_tolerance + self.delay
-        self.max_deadline = deadline + self.goal_time_tolerance + self.delay
+        self.min_deadline = deadline - self.goal_time_tolerance
+        self.max_deadline = deadline + self.goal_time_tolerance
         self.cancel_tries = 0
 
     @catch_and_raise_to_blackboard

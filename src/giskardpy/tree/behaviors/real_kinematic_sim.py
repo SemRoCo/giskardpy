@@ -13,7 +13,6 @@ class RealKinSimPlugin(GiskardBehavior):
 
     def initialise(self):
         self.last_time = None
-        self.start_time = god_map.tracking_start_time
 
     @catch_and_raise_to_blackboard
     @record_time
@@ -26,9 +25,6 @@ class RealKinSimPlugin(GiskardBehavior):
         next_cmds = god_map.qp_solver_solution
         dt = next_time - self.last_time
         if dt > god_map.qp_controller_config.sample_period:
-            # if self.print_warning:
-            #     logging.logwarn(f'dt is larger than sample period of the MPC! '
-            #                     f'{dt:.5f} > {god_map.qp_controller_config.sample_period}. ')
             dt = god_map.qp_controller_config.sample_period
         god_map.world.update_state(next_cmds, dt, max_derivative=god_map.qp_controller_config.max_derivative)
         self.last_time = next_time

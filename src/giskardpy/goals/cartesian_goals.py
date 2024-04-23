@@ -122,11 +122,9 @@ class CartesianOrientation(Goal):
 
 class CartesianPositionStraight(Goal):
     def __init__(self,
-                 root_link: str,
-                 tip_link: str,
+                 root_link: PrefixName,
+                 tip_link: PrefixName,
                  goal_point: cas.Point3,
-                 root_group: Optional[str] = None,
-                 tip_group: Optional[str] = None,
                  reference_velocity: Optional[float] = None,
                  name: Optional[str] = None,
                  absolute: bool = False,
@@ -141,8 +139,8 @@ class CartesianPositionStraight(Goal):
             reference_velocity = 0.2
         self.reference_velocity = reference_velocity
         self.weight = weight
-        self.root_link = god_map.world.search_for_link_name(root_link, root_group)
-        self.tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
+        self.root_link = root_link
+        self.tip_link = tip_link
         if absolute or cas.is_true(start_condition):
             root_P_goal = god_map.world.transform(self.root_link, goal_point)
         else:
@@ -215,8 +213,6 @@ class CartesianPose(Goal):
         :param root_link: name of the root link of the kin chain
         :param tip_link: name of the tip link of the kin chain
         :param goal_pose: the goal pose
-        :param root_group: a group name, where to search for root_link, only required to avoid name conflicts
-        :param tip_group: a group name, where to search for tip_link, only required to avoid name conflicts
         :param absolute: if False, the goal is updated when start_condition turns True.
         :param reference_linear_velocity: m/s
         :param reference_angular_velocity: rad/s

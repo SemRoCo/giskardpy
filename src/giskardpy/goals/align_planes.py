@@ -1,7 +1,7 @@
 from typing import Optional
 
 import giskardpy.casadi_wrapper as cas
-from giskardpy.data_types.data_types import ColorRGBA
+from giskardpy.data_types.data_types import ColorRGBA, PrefixName
 from giskardpy.goals.goal import Goal
 from giskardpy.middleware import logging
 from giskardpy.tasks.task import WEIGHT_ABOVE_CA
@@ -10,12 +10,10 @@ from giskardpy.god_map import god_map
 
 class AlignPlanes(Goal):
     def __init__(self,
-                 root_link: str,
-                 tip_link: str,
+                 root_link: PrefixName,
+                 tip_link: PrefixName,
                  goal_normal: cas.Vector3,
                  tip_normal: cas.Vector3,
-                 root_group: Optional[str] = None,
-                 tip_group: Optional[str] = None,
                  reference_velocity: float = 0.5,
                  weight: float = WEIGHT_ABOVE_CA,
                  name: Optional[str] = None,
@@ -29,16 +27,14 @@ class AlignPlanes(Goal):
         :param tip_link: tip link of the kinematic chain
         :param goal_normal:
         :param tip_normal:
-        :param root_group: if root_link is not unique, search in this group for matches.
-        :param tip_group: if tip_link is not unique, search in this group for matches.
         :param reference_velocity: rad/s
         :param weight:
         """
         if 'root_normal' in kwargs:
             logging.logwarn('Deprecated warning: use goal_normal instead of root_normal')
             goal_normal = kwargs['root_normal']
-        self.root = god_map.world.search_for_link_name(root_link, root_group)
-        self.tip = god_map.world.search_for_link_name(tip_link, tip_group)
+        self.root = root_link
+        self.tip = tip_link
         self.reference_velocity = reference_velocity
         self.weight = weight
 

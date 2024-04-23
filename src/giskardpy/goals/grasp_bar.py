@@ -3,6 +3,7 @@ from __future__ import division
 from typing import Optional
 
 import giskardpy.casadi_wrapper as cas
+from giskardpy.data_types.data_types import PrefixName
 from giskardpy.goals.goal import Goal
 from giskardpy.tasks.task import WEIGHT_ABOVE_CA
 from giskardpy.god_map import god_map
@@ -10,14 +11,12 @@ from giskardpy.god_map import god_map
 
 class GraspBar(Goal):
     def __init__(self,
-                 root_link: str,
-                 tip_link: str,
+                 root_link: PrefixName,
+                 tip_link: PrefixName,
                  tip_grasp_axis: cas.Vector3,
                  bar_center: cas.Point3,
                  bar_axis: cas.Vector3,
                  bar_length: float,
-                 root_group: Optional[str] = None,
-                 tip_group: Optional[str] = None,
                  reference_linear_velocity: float = 0.1,
                  reference_angular_velocity: float = 0.5,
                  weight: float = WEIGHT_ABOVE_CA,
@@ -35,14 +34,12 @@ class GraspBar(Goal):
         :param bar_center: center of the bar to be grasped
         :param bar_axis: alignment of the bar to be grasped
         :param bar_length: length of the bar to be grasped
-        :param root_group: if root_link is not unique, search in this group for matches
-        :param tip_group: if tip_link is not unique, search in this group for matches
         :param reference_linear_velocity: m/s
         :param reference_angular_velocity: rad/s
         :param weight: 
         """
-        self.root = god_map.world.search_for_link_name(root_link, root_group)
-        self.tip = god_map.world.search_for_link_name(tip_link, tip_group)
+        self.root = root_link
+        self.tip = tip_link
         if name is None:
             name = f'{self.__class__.__name__}/{self.root}/{self.tip}'
         super().__init__(name)

@@ -5,6 +5,7 @@ from typing import Optional, Dict, Tuple
 
 import numpy as np
 
+from giskardpy.data_types.data_types import PrefixName
 from giskardpy.data_types.exceptions import MonitorInitalizationException, MaxTrajectoryLengthException
 from giskardpy.monitors.monitors import PayloadMonitor, CancelMotion
 from giskardpy.god_map import god_map
@@ -84,14 +85,13 @@ class Sleep(PayloadMonitor):
 class UpdateParentLinkOfGroup(WorldUpdatePayloadMonitor):
     def __init__(self,
                  group_name: str,
-                 parent_link: str,
-                 parent_link_group: Optional[str] = '',
+                 parent_link: PrefixName,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol):
         if not god_map.tree.is_standalone():
             raise MonitorInitalizationException(f'This monitor can only be used in standalone mode.')
         self.group_name = group_name
-        self.new_parent_link = god_map.world.search_for_link_name(parent_link, parent_link_group)
+        self.new_parent_link = parent_link
         super().__init__(name=name, start_condition=start_condition)
 
     def apply_world_update(self):

@@ -2,6 +2,7 @@ from __future__ import division
 
 from typing import Optional, List
 
+from giskardpy.data_types.data_types import PrefixName
 from giskardpy.goals.cartesian_goals import CartesianPosition, CartesianOrientation
 from giskardpy.goals.goal import Goal
 from giskardpy.monitors.monitors import ExpressionMonitor
@@ -13,10 +14,8 @@ import giskardpy.casadi_wrapper as cas
 
 class Open(Goal):
     def __init__(self,
-                 tip_link: str,
-                 environment_link: str,
-                 tip_group: Optional[str] = None,
-                 environment_group: Optional[str] = None,
+                 tip_link: PrefixName,
+                 environment_link: PrefixName,
                  goal_joint_state: Optional[float] = None,
                  max_velocity: float = 100,
                  weight: float = WEIGHT_ABOVE_CA,
@@ -31,14 +30,12 @@ class Open(Goal):
         Can only handle containers with 1 dof, e.g. drawers or doors.
         :param tip_link: end effector that is grasping the handle
         :param environment_link: name of the handle that was grasped
-        :param tip_group: if tip_link is not unique, search in this group for matches
-        :param environment_group: if environment_link is not unique, search in this group for matches
         :param goal_joint_state: goal state for the container. default is maximum joint state.
         :param weight:
         """
         self.weight = weight
-        self.tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
-        self.handle_link = god_map.world.search_for_link_name(environment_link, environment_group)
+        self.tip_link = tip_link
+        self.handle_link = environment_link
         self.joint_name = god_map.world.get_movable_parent_joint(self.handle_link)
         self.handle_T_tip = god_map.world.compute_fk(self.handle_link, self.tip_link)
         if name is None:

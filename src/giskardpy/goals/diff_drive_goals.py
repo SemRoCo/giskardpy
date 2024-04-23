@@ -3,6 +3,7 @@ from __future__ import division
 from typing import Optional
 
 import giskardpy.casadi_wrapper as cas
+from giskardpy.data_types.data_types import PrefixName
 from giskardpy.goals.goal import Goal
 from giskardpy.tasks.task import WEIGHT_ABOVE_CA
 from giskardpy.god_map import god_map
@@ -71,24 +72,25 @@ class DiffDriveTangentialToPoint(Goal):
 
 class KeepHandInWorkspace(Goal):
     def __init__(self,
-                 tip_link: str,
-                 base_footprint=None,
-                 map_frame=None,
-                 pointing_axis=None, max_velocity=0.3,
-                 group_name: Optional[str] = None, weight=WEIGHT_ABOVE_CA, name: Optional[str] = None,
+                 tip_link: PrefixName,
+                 base_footprint: Optional[PrefixName] = None,
+                 map_frame: Optional[PrefixName] = None,
+                 pointing_axis: Optional[cas.Vector3] = None,
+                 max_velocity: float = 0.3,
+                 weight: float = WEIGHT_ABOVE_CA,
+                 name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.TrueSymbol
                  ):
         if base_footprint is None:
-            base_footprint = 'base_footprint'
-        base_footprint = god_map.world.search_for_link_name(base_footprint, group_name)
+            base_footprint = god_map.world.search_for_link_name('base_footprint')
         if map_frame is None:
             map_frame = god_map.world.root_link_name
         self.weight = weight
         self.max_velocity = max_velocity
         self.map_frame = map_frame
-        self.tip_link = god_map.world.search_for_link_name(tip_link, group_name)
+        self.tip_link = tip_link
         self.base_footprint = base_footprint
         if name is None:
             name = f'{self.__class__.__name__}/{self.base_footprint}/{self.tip_link}'

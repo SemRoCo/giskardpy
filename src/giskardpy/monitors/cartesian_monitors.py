@@ -1,16 +1,16 @@
 from typing import Optional
 
 import giskardpy.casadi_wrapper as cas
+from giskardpy.data_types.data_types import PrefixName
 from giskardpy.monitors.monitors import ExpressionMonitor
 from giskardpy.god_map import god_map
 
 
 class PoseReached(ExpressionMonitor):
     def __init__(self,
-                 root_link: str, tip_link: str,
+                 root_link: PrefixName,
+                 tip_link: PrefixName,
                  goal_pose: cas.TransMatrix,
-                 root_group: Optional[str] = None,
-                 tip_group: Optional[str] = None,
                  position_threshold: float = 0.01,
                  orientation_threshold: float = 0.01,
                  absolute: bool = False,
@@ -18,8 +18,8 @@ class PoseReached(ExpressionMonitor):
                  stay_true: bool = True,
                  start_condition: cas.Expression = cas.TrueSymbol):
         super().__init__(name=name, stay_true=stay_true, start_condition=start_condition)
-        root_link = god_map.world.search_for_link_name(root_link, root_group)
-        tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
+        root_link = root_link
+        tip_link = tip_link
         if absolute or cas.is_true(start_condition):
             root_T_goal = god_map.world.transform(root_link, goal_pose)
         else:
@@ -44,19 +44,15 @@ class PoseReached(ExpressionMonitor):
 
 class PositionReached(ExpressionMonitor):
     def __init__(self,
-                 root_link: str,
-                 tip_link: str,
+                 root_link: PrefixName,
+                 tip_link: PrefixName,
                  goal_point: cas.Point3,
-                 root_group: Optional[str] = None,
-                 tip_group: Optional[str] = None,
                  threshold: float = 0.01,
                  absolute: bool = False,
                  name: Optional[str] = None,
                  stay_true: bool = True,
                  start_condition: cas.Expression = cas.TrueSymbol):
         super().__init__(name=name, stay_true=stay_true, start_condition=start_condition)
-        root_link = god_map.world.search_for_link_name(root_link, root_group)
-        tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
         if absolute or cas.is_true(start_condition):
             root_P_goal = god_map.world.transform(root_link, goal_point)
         else:
@@ -71,19 +67,15 @@ class PositionReached(ExpressionMonitor):
 
 class OrientationReached(ExpressionMonitor):
     def __init__(self,
-                 root_link: str,
-                 tip_link: str,
+                 root_link: PrefixName,
+                 tip_link: PrefixName,
                  goal_orientation: cas.RotationMatrix,
-                 root_group: Optional[str] = None,
-                 tip_group: Optional[str] = None,
                  threshold: float = 0.01,
                  absolute: bool = False,
                  name: Optional[str] = None,
                  stay_true: bool = True,
                  start_condition: cas.Expression = cas.TrueSymbol):
         super().__init__(name=name, stay_true=stay_true, start_condition=start_condition)
-        root_link = god_map.world.search_for_link_name(root_link, root_group)
-        tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
 
         if absolute or cas.is_true(start_condition):
             r_R_g = god_map.world.transform(root_link, goal_orientation)
@@ -99,19 +91,17 @@ class OrientationReached(ExpressionMonitor):
 
 class PointingAt(ExpressionMonitor):
     def __init__(self,
-                 tip_link: str,
+                 tip_link: PrefixName,
                  goal_point: cas.Point3,
-                 root_link: str,
+                 root_link: PrefixName,
                  pointing_axis: cas.Vector3,
-                 tip_group: Optional[str] = None,
-                 root_group: Optional[str] = None,
                  threshold: float = 0.01,
                  name: Optional[str] = None,
                  stay_true: bool = True,
                  start_condition: cas.Expression = cas.TrueSymbol):
         super().__init__(name=name, stay_true=stay_true, start_condition=start_condition)
-        self.root = god_map.world.search_for_link_name(root_link, root_group)
-        self.tip = god_map.world.search_for_link_name(tip_link, tip_group)
+        self.root = root_link
+        self.tip = tip_link
         self.root_P_goal_point = god_map.world.transform(self.root, goal_point)
 
         tip_V_pointing_axis = god_map.world.transform(self.tip, pointing_axis)
@@ -130,19 +120,17 @@ class PointingAt(ExpressionMonitor):
 
 class VectorsAligned(ExpressionMonitor):
     def __init__(self,
-                 root_link: str,
-                 tip_link: str,
+                 root_link: PrefixName,
+                 tip_link: PrefixName,
                  goal_normal: cas.Vector3,
                  tip_normal: cas.Vector3,
-                 root_group: Optional[str] = None,
-                 tip_group: Optional[str] = None,
                  threshold: float = 0.01,
                  name: Optional[str] = None,
                  stay_true: bool = True,
                  start_condition: cas.Expression = cas.TrueSymbol):
         super().__init__(name=name, stay_true=stay_true, start_condition=start_condition)
-        self.root = god_map.world.search_for_link_name(root_link, root_group)
-        self.tip = god_map.world.search_for_link_name(tip_link, tip_group)
+        self.root = root_link
+        self.tip = tip_link
 
         self.tip_V_tip_normal = god_map.world.transform(self.tip, tip_normal)
         self.tip_V_tip_normal.vector.scale(1)
@@ -159,20 +147,18 @@ class VectorsAligned(ExpressionMonitor):
 
 class DistanceToLine(ExpressionMonitor):
     def __init__(self,
-                 root_link: str,
-                 tip_link: str,
+                 root_link: PrefixName,
+                 tip_link: PrefixName,
                  center_point: cas.Point3,
                  line_axis: cas.Vector3,
                  line_length: float,
-                 root_group: Optional[str] = None,
-                 tip_group: Optional[str] = None,
                  threshold: float = 0.01,
                  name: Optional[str] = None,
                  stay_true: bool = True,
                  start_condition: cas.Expression = cas.TrueSymbol):
         super().__init__(name=name, stay_true=stay_true, start_condition=start_condition)
-        self.root = god_map.world.search_for_link_name(root_link, root_group)
-        self.tip = god_map.world.search_for_link_name(tip_link, tip_group)
+        self.root = root_link
+        self.tip = tip_link
 
         root_P_current = god_map.world.compose_fk_expression(self.root, self.tip).to_position()
         root_V_line_axis = god_map.world.transform(self.root, line_axis)

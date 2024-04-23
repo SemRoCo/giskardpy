@@ -5,7 +5,7 @@ from typing import Optional
 import numpy as np
 
 import giskardpy.casadi_wrapper as cas
-from giskardpy.data_types.data_types import ColorRGBA
+from giskardpy.data_types.data_types import ColorRGBA, PrefixName
 from giskardpy.goals.goal import Goal
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.tasks.task import WEIGHT_BELOW_CA
@@ -14,12 +14,10 @@ from giskardpy.god_map import god_map
 
 class Pointing(Goal):
     def __init__(self,
-                 tip_link: str,
+                 tip_link: PrefixName,
                  goal_point: cas.Point3,
-                 root_link: str,
+                 root_link: PrefixName,
                  pointing_axis: cas.Vector3,
-                 tip_group: Optional[str] = None,
-                 root_group: Optional[str] = None,
                  max_velocity: float = 0.3,
                  weight: float = WEIGHT_BELOW_CA,
                  name: Optional[str] = None,
@@ -31,16 +29,14 @@ class Pointing(Goal):
         :param tip_link: tip link of the kinematic chain.
         :param goal_point: where to point pointing_axis at.
         :param root_link: root link of the kinematic chain.
-        :param tip_group: if tip_link is not unique, search this group for matches.
-        :param root_group: if root_link is not unique, search this group for matches.
         :param pointing_axis: the axis of tip_link that will be used for pointing
         :param max_velocity: rad/s
         :param weight:
         """
         self.weight = weight
         self.max_velocity = max_velocity
-        self.root = god_map.world.search_for_link_name(root_link, root_group)
-        self.tip = god_map.world.search_for_link_name(tip_link, tip_group)
+        self.root = root_link
+        self.tip = tip_link
         self.root_P_goal_point = god_map.world.transform(self.root, goal_point).to_np()
         if name is None:
             name = f'{self.__class__.__name__}/{self.root}/{self.tip}'

@@ -8,7 +8,7 @@ from giskardpy.monitors.monitors import ExpressionMonitor
 from giskardpy.monitors.payload_monitors import CollisionMatrixUpdater
 from giskardpy.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE
 from giskardpy.god_map import god_map
-from giskardpy.data_types.data_types import my_string
+from giskardpy.data_types.data_types import my_string, PrefixName
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.middleware import logging
 
@@ -240,8 +240,15 @@ class SelfCollisionAvoidance(Goal):
 
 
 class CollisionAvoidanceHint(Goal):
-    def __init__(self, tip_link, avoidance_hint, object_link_name, object_group=None, max_linear_velocity=0.1,
-                 root_link=None, max_threshold=0.05, spring_threshold=None, weight=WEIGHT_ABOVE_CA,
+    def __init__(self,
+                 tip_link: PrefixName,
+                 avoidance_hint: cas.Vector3,
+                 object_link_name: PrefixName,
+                 max_linear_velocity: float = 0.1,
+                 root_link: Optional[PrefixName] = None,
+                 max_threshold: float = 0.05,
+                 spring_threshold: Optional[float] = None,
+                 weight: float = WEIGHT_ABOVE_CA,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
@@ -265,12 +272,11 @@ class CollisionAvoidanceHint(Goal):
             name = f'{self.__class__.__name__}/{self.link_name}/{self.link_b}'
         super().__init__(name)
         self.key = (self.link_name, self.link_b)
-        self.object_group = object_group
         self.link_b_hash = self.link_b.__hash__()
         if root_link is None:
             self.root_link = god_map.world.root_link_name
         else:
-            self.root_link = god_map.world.search_for_link_name(root_link)
+            self.root_link = root_link
 
         if spring_threshold is None:
             spring_threshold = max_threshold

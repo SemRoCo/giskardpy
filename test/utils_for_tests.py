@@ -630,9 +630,8 @@ class GiskardTestWrapper(OldGiskardWrapper):
 
     TimeOut = 5000
 
-    def register_group(self, new_group_name: str, root_link_group_name: str, root_link_name: str):
+    def register_group(self, new_group_name: str, root_link_name: giskard_msgs.LinkName):
         self.world.register_group(new_group_name=new_group_name,
-                                  root_link_group_name=root_link_group_name,
                                   root_link_name=root_link_name)
         self.wait_heartbeats()
         assert new_group_name in self.world.get_group_names()

@@ -1,3 +1,4 @@
+import builtins
 import json
 from typing import Optional, Union, List, Dict, Any
 
@@ -255,13 +256,24 @@ def exception_to_error_msg(exception: Exception) -> giskard_msgs.GiskardError:
 # %% from ros
 
 exception_classes = get_all_classes_in_module(module_name='giskardpy.data_types.exceptions',
-                                               parent_class=GiskardException)
+                                              parent_class=GiskardException)
+
+# add all base exceptions
+exception_classes.update({name: getattr(builtins, name) for name in dir(builtins) if
+                          isinstance(getattr(builtins, name), type) and
+                          issubclass(getattr(builtins, name), BaseException)})
 
 
-def error_msg_to_exception(msg: giskard_msgs.GiskardError) -> Optional[GiskardException]:
+def error_msg_to_exception(msg: giskard_msgs.GiskardError) -> Optional[Exception]:
     if msg.type == GiskardError.SUCCESS:
         return None
-    return exception_classes[msg.type](msg.msg)
+    if msg.type == GiskardError in exception_classes:
+        return exception_classes[msg.type](msg.msg)
+    return Exception(f'{msg.type}: {msg.msg}')
+
+
+def link_name_msg_to_prefix_name(msg: giskard_msgs.LinkName, world: WorldTree) -> PrefixName:
+    return world.search_for_link_name(msg.name, msg.group_name)
 
 
 def replace_prefix_name_with_str(d: dict) -> dict:
@@ -337,6 +349,8 @@ def convert_ros_msg_to_giskard_obj(msg, world: WorldTree):
         return quaternion_stamped_to_quaternion(msg, world)
     elif isinstance(msg, giskard_msgs.CollisionEntry):
         return collision_entry_msg_to_giskard(msg)
+    elif isinstance(msg, giskard_msgs.LinkName):
+        return link_name_msg_to_prefix_name(msg, world)
     else:
         raise ValueError(f'Can\'t convert msg of type \'{type(msg)}\'')
 

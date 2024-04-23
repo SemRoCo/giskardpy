@@ -118,7 +118,7 @@ class ProcessWorldUpdate(GiskardBehavior):
         group_name = req.group_name
         if group_name in god_map.world.groups:
             raise DuplicateNameException(f'Group with name \'{req.group_name}\' already exists.')
-        parent_link = god_map.world.search_for_link_name(req.parent_link, req.parent_link_group)
+        parent_link = msg_converter.link_name_msg_to_prefix_name(req.parent_link, god_map.world)
         world_body = req.body
         pose = req.pose
 
@@ -171,14 +171,13 @@ class ProcessWorldUpdate(GiskardBehavior):
 
     @profile
     def update_parent_link(self, req: WorldGoal):
-        req.parent_link = god_map.world.search_for_link_name(link_name=req.parent_link,
-                                                             group_name=req.parent_link_group)
+        parent_link = msg_converter.link_name_msg_to_prefix_name(req.parent_link, god_map.world)
         if req.group_name not in god_map.world.groups:
             raise UnknownGroupException(f'Can\'t attach to unknown group: \'{req.group_name}\'')
         group = god_map.world.groups[req.group_name]
-        if group.root_link_name != req.parent_link:
+        if group.root_link_name != parent_link:
             old_parent_link = group.parent_link_of_root
-            god_map.world.move_group(req.group_name, req.parent_link)
+            god_map.world.move_group(req.group_name, parent_link)
             logging.loginfo(f'Reattached \'{req.group_name}\' from \'{old_parent_link}\' to \'{req.parent_link}\'.')
         else:
             logging.logwarn(f'Didn\'t update world. \'{req.group_name}\' is already attached to \'{req.parent_link}\'.')
@@ -207,6 +206,6 @@ class ProcessWorldUpdate(GiskardBehavior):
         logging.loginfo('Cleared world.')
 
     def register_group(self, req: WorldGoal):
-        link_name = god_map.world.search_for_link_name(link_name=req.parent_link, group_name=req.parent_link_group)
+        link_name = msg_converter.link_name_msg_to_prefix_name(req.parent_link, god_map.world)
         god_map.world.register_group(name=req.group_name, root_link_name=link_name)
         logging.loginfo(f'Registered new group \'{req.group_name}\'')

@@ -5,7 +5,7 @@ from typing import Optional
 import numpy as np
 
 from giskardpy import casadi_wrapper as cas
-from giskardpy.data_types.data_types import Derivatives, ColorRGBA
+from giskardpy.data_types.data_types import Derivatives, ColorRGBA, PrefixName
 from giskardpy.goals.goal import Goal
 from giskardpy.god_map import god_map
 from giskardpy.model.joints import DiffDrive
@@ -18,11 +18,9 @@ class CartesianPosition(Goal):
     default_reference_velocity = 0.2
 
     def __init__(self,
-                 root_link: str,
-                 tip_link: str,
+                 root_link: PrefixName,
+                 tip_link: PrefixName,
                  goal_point: cas.Point3,
-                 root_group: Optional[str] = None,
-                 tip_group: Optional[str] = None,
                  reference_velocity: Optional[float] = None,
                  weight: float = WEIGHT_ABOVE_CA,
                  absolute: bool = False,
@@ -33,8 +31,8 @@ class CartesianPosition(Goal):
         """
         See CartesianPose.
         """
-        self.root_link = god_map.world.search_for_link_name(root_link, root_group)
-        self.tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
+        self.root_link = root_link
+        self.tip_link = tip_link
         if name is None:
             name = f'{self.__class__.__name__}/{self.root_link}/{self.tip_link}'
         super().__init__(name)
@@ -66,11 +64,9 @@ class CartesianOrientation(Goal):
     default_reference_velocity = 0.5
 
     def __init__(self,
-                 root_link: str,
-                 tip_link: str,
+                 root_link: PrefixName,
+                 tip_link: PrefixName,
                  goal_orientation: cas.RotationMatrix,
-                 root_group: Optional[str] = None,
-                 tip_group: Optional[str] = None,
                  reference_velocity: Optional[float] = None,
                  weight: float = WEIGHT_ABOVE_CA,
                  name: Optional[str] = None,
@@ -82,8 +78,8 @@ class CartesianOrientation(Goal):
         """
         See CartesianPose.
         """
-        self.root_link = god_map.world.search_for_link_name(root_link, root_group)
-        self.tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
+        self.root_link = root_link
+        self.tip_link = tip_link
         if name is None:
             name = f'{self.__class__.__name__}/{self.root_link}/{self.tip_link}'
         super().__init__(name)
@@ -200,11 +196,9 @@ class CartesianPositionStraight(Goal):
 
 class CartesianPose(Goal):
     def __init__(self,
-                 root_link: str,
-                 tip_link: str,
+                 root_link: PrefixName,
+                 tip_link: PrefixName,
                  goal_pose: cas.TransMatrix,
-                 root_group: Optional[str] = None,
-                 tip_group: Optional[str] = None,
                  reference_linear_velocity: Optional[float] = None,
                  reference_angular_velocity: Optional[float] = None,
                  name: Optional[str] = None,
@@ -228,8 +222,8 @@ class CartesianPose(Goal):
         :param reference_angular_velocity: rad/s
         :param weight: default WEIGHT_ABOVE_CA
         """
-        self.root_link = god_map.world.search_for_link_name(root_link, root_group)
-        self.tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
+        self.root_link = root_link
+        self.tip_link = tip_link
         if name is None:
             name = f'{self.__class__.__name__}/{self.root_link}/{self.tip_link}'
         super().__init__(name)
@@ -244,8 +238,6 @@ class CartesianPose(Goal):
         self.add_constraints_of_goal(CartesianPosition(root_link=root_link,
                                                        tip_link=tip_link,
                                                        goal_point=goal_pose.to_position(),
-                                                       root_group=root_group,
-                                                       tip_group=tip_group,
                                                        reference_velocity=reference_linear_velocity,
                                                        weight=self.weight,
                                                        name=position_name,
@@ -257,8 +249,6 @@ class CartesianPose(Goal):
         self.add_constraints_of_goal(CartesianOrientation(root_link=root_link,
                                                           tip_link=tip_link,
                                                           goal_orientation=goal_pose.to_rotation(),
-                                                          root_group=root_group,
-                                                          tip_group=tip_group,
                                                           reference_velocity=reference_angular_velocity,
                                                           weight=self.weight,
                                                           name=orientation_name,

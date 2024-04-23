@@ -1,6 +1,6 @@
 from py_trees import Status
 
-from giskard_msgs.msg import MoveResult
+from giskard_msgs.msg import MoveResult, GiskardError
 from giskardpy.data_types.exceptions import *
 from giskardpy.goals.collision_avoidance import CollisionAvoidance
 from giskardpy.goals.goal import NonMotionGoal
@@ -49,7 +49,7 @@ class SetMoveResult(GiskardBehavior):
             logging.logwarn(f'Goal preempted: \'{move_result.error.msg}\'.')
         else:
             if self.print:
-                if e is None:
+                if move_result.error.type == GiskardError.SUCCESS:
                     logging.loginfo(f'{self.context} succeeded.')
                 else:
                     logging.logwarn(f'{self.context} failed: {move_result.error.msg}.')

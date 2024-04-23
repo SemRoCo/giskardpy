@@ -5,11 +5,9 @@ from typing import List, Optional
 
 import urdf_parser_py.urdf as up
 
-from giskard_msgs.msg import WorldBody
 from giskardpy.data_types.exceptions import CorruptMeshException
 from giskardpy.model.utils import cube_volume, cube_surface, sphere_volume, cylinder_volume, cylinder_surface
 from giskardpy.data_types.data_types import PrefixName, ColorRGBA
-from giskardpy.data_types.data_types import my_string
 from giskardpy.utils.utils import resolve_ros_iris, get_file_hash
 import giskardpy.casadi_wrapper as cas
 
@@ -161,9 +159,7 @@ class Link:
     parent_joint_name: Optional[PrefixName]
     child_joint_names: List[PrefixName]
 
-    def __init__(self, name: my_string):
-        if isinstance(name, str):
-            name = PrefixName(name, None)
+    def __init__(self, name: PrefixName):
         self.name = name
         self.visuals = []
         self.collisions = []
@@ -197,15 +193,6 @@ class Link:
         for urdf_visual in urdf_link.visuals:
             link.visuals.append(LinkGeometry.from_urdf(urdf_thing=urdf_visual,
                                                        color=color))
-        return link
-
-    @classmethod
-    def from_world_body(cls, link_name: my_string, msg: WorldBody, color: ColorRGBA) -> Link:
-        link = cls(link_name)
-        geometry = LinkGeometry.from_world_body(msg=msg,
-                                                color=color)
-        link.collisions.append(geometry)
-        link.visuals.append(geometry)
         return link
 
     def dye_collisions(self, color: ColorRGBA):

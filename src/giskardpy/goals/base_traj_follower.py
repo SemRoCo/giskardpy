@@ -231,7 +231,7 @@ class CarryMyBullshit(Goal):
         self.laser_avoidance_sideways_buffer = laser_avoidance_sideways_buffer
         self.base_orientation_threshold = base_orientation_threshold
         self.odom_joint_name = god_map.world.search_for_joint_name(odom_joint_name)
-        self.odom_joint: OmniDrive = god_map.world.get_joint(self.odom_joint_name)
+        self.odom_joint: OmniDrive = god_map.world.joints[self.odom_joint_name]
         self.target_age_threshold = target_age_threshold
         self.target_age_exception_threshold = target_age_exception_threshold
         if root_link is None:

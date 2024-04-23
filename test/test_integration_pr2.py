@@ -228,10 +228,10 @@ class PR2TestWrapper(GiskardTestWrapper):
         self.reset_base()
         self.register_group('l_gripper',
                             root_link_name=giskard_msgs.LinkName(name='l_wrist_roll_link',
-                                                                   group_name=self.robot_name))
+                                                                 group_name=self.robot_name))
         self.register_group('r_gripper',
                             root_link_name=giskard_msgs.LinkName(name='r_wrist_roll_link',
-                                                                   group_name=self.robot_name))
+                                                                 group_name=self.robot_name))
 
         # self.register_group('fl_l',
         #                     root_link_group_name=self.robot_name,
@@ -1555,10 +1555,10 @@ class TestConstraints:
         handle_name = 'sink_area_dish_washer_door_handle'
         kitchen_setup.register_group(new_group_name='dishwasher',
                                      root_link_name=giskard_msgs.LinkName(name='sink_area_dish_washer_main',
-                                                                            group_name=kitchen_setup.default_env_name))
+                                                                          group_name=kitchen_setup.default_env_name))
         kitchen_setup.register_group(new_group_name='handle',
                                      root_link_name=giskard_msgs.LinkName(name=handle_name,
-                                                                            group_name=kitchen_setup.default_env_name))
+                                                                          group_name=kitchen_setup.default_env_name))
         bar_axis = Vector3Stamped()
         bar_axis.header.frame_id = handle_frame_id
         bar_axis.vector.y = 1
@@ -1859,7 +1859,7 @@ class TestConstraints:
                                          bar_length=.3)
         kitchen_setup.register_group(new_group_name='handle',
                                      root_link_name=giskard_msgs.LinkName(name='sink_area_dish_washer_door_handle',
-                                                                            group_name='iai_kitchen'))
+                                                                          group_name='iai_kitchen'))
         kitchen_setup.allow_collision(kitchen_setup.robot_name, 'handle')
         kitchen_setup.plan_and_execute()
 
@@ -2222,16 +2222,16 @@ class TestWorldManipulation:
         god_map.world.save_graph_pdf(god_map.giskard.tmp_folder)
 
     def test_dye_group(self, kitchen_setup: PR2TestWrapper):
-        old_color = god_map.world.groups[kitchen_setup.robot_name].get_link('base_link').collisions[0].color
+        old_color = god_map.world.groups[kitchen_setup.robot_name].links['base_link'].collisions[0].color
         kitchen_setup.dye_group(kitchen_setup.robot_name, (1, 0, 0, 1))
-        god_map.world.groups[kitchen_setup.robot_name].get_link('base_link')
-        color_robot = god_map.world.groups[kitchen_setup.robot_name].get_link('base_link').collisions[0].color
+        god_map.world.groups[kitchen_setup.robot_name].links['base_link']
+        color_robot = god_map.world.groups[kitchen_setup.robot_name].links['base_link'].collisions[0].color
         assert color_robot.r == 1
         assert color_robot.g == 0
         assert color_robot.b == 0
         assert color_robot.a == 1
         kitchen_setup.dye_group('iai_kitchen', (0, 1, 0, 1))
-        color_kitchen = god_map.world.groups['iai_kitchen'].get_link('iai_kitchen/sink_area_sink').collisions[
+        color_kitchen = god_map.world.groups['iai_kitchen'].links['iai_kitchen/sink_area_sink'].collisions[
             0].color
         assert color_robot.r == 1
         assert color_robot.g == 0
@@ -2242,7 +2242,7 @@ class TestWorldManipulation:
         assert color_kitchen.b == 0
         assert color_kitchen.a == 1
         kitchen_setup.dye_group(kitchen_setup.r_gripper_group, (0, 0, 1, 1))
-        color_hand = god_map.world.groups[kitchen_setup.robot_name].get_link('r_gripper_palm_link').collisions[
+        color_hand = god_map.world.groups[kitchen_setup.robot_name].links['r_gripper_palm_link'].collisions[
             0].color
         assert color_robot.r == 1
         assert color_robot.g == 0
@@ -2271,7 +2271,7 @@ class TestWorldManipulation:
         assert color_hand.b == 1
         assert color_hand.a == 1
         kitchen_setup.clear_world()
-        color_robot = god_map.world.groups[kitchen_setup.robot_name].get_link('base_link').collisions[0].color
+        color_robot = god_map.world.groups[kitchen_setup.robot_name].links['base_link'].collisions[0].color
         assert color_robot.r == old_color.r
         assert color_robot.g == old_color.g
         assert color_robot.b == old_color.b
@@ -2409,7 +2409,9 @@ class TestWorldManipulation:
         p.pose.orientation = Quaternion(0.0, 0.0, 0.47942554, 0.87758256)
         zero_pose.add_box_to_world(object_name, size=(1, 1, 1), pose=p)
         internal_object_name = god_map.world.search_for_link_name(object_name)
-        zero_pose.update_parent_link_of_group(object_name, parent_link=zero_pose.r_tip)
+        zero_pose.update_parent_link_of_group(object_name,
+                                              parent_link=giskard_msgs.LinkName(name=zero_pose.r_tip,
+                                                                                group_name=zero_pose.robot_name))
         zero_pose.detach_group(object_name)
         zero_pose.remove_group(object_name)
         zero_pose.add_box_to_world(object_name, size=(1, 1, 1), pose=p)
@@ -2765,10 +2767,10 @@ class TestSelfCollisionAvoidance:
         zero_pose.allow_all_collisions()
         zero_pose.register_group(new_group_name='forearm',
                                  root_link_name=giskard_msgs.LinkName(name='l_forearm_link',
-                                                                        group_name='pr2'))
+                                                                      group_name='pr2'))
         zero_pose.register_group(new_group_name='forearm_roll',
                                  root_link_name=giskard_msgs.LinkName(name='l_forearm_roll_link',
-                                                                        group_name='pr2'))
+                                                                      group_name='pr2'))
         zero_pose.avoid_collision(group1='forearm_roll', group2=zero_pose.r_gripper_group)
         zero_pose.allow_collision(group1='forearm', group2=zero_pose.r_gripper_group)
         zero_pose.plan_and_execute()

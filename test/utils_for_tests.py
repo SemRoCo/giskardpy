@@ -320,7 +320,7 @@ class GiskardTestWrapper(OldGiskardWrapper):
         parent_joint_name = god_map.world.groups[group_name].root_link.parent_joint_name
         if parent_joint_name is None:
             return False
-        joint = god_map.world.get_joint(parent_joint_name)
+        joint = god_map.world.joints[parent_joint_name]
         return isinstance(joint, (OmniDrive, DiffDrive))
 
     def set_seed_odometry(self, base_pose, group_name: Optional[str] = None):
@@ -710,9 +710,9 @@ class GiskardTestWrapper(OldGiskardWrapper):
             if parent_link and parent_link.group_name != '':  # check if parent group is consistent
                 robot = self.world.get_group_info(parent_link.group_name)
                 assert name in robot.child_groups
-                short_parent_link = god_map.world.groups[parent_link.group_name].get_link_short_name_match(parent_link)
-                assert short_parent_link == god_map.world.get_parent_link_of_link(
-                    god_map.world.groups[name].root_link_name)
+                expected_parent_link = msg_converter.link_name_msg_to_prefix_name(parent_link, god_map.world)
+                real_parent_link = god_map.world.get_parent_link_of_link(god_map.world.groups[name].root_link_name)
+                assert expected_parent_link == real_parent_link
             else:
                 if parent_link is None or parent_link.name == '':
                     parent_link = god_map.world.root_link_name

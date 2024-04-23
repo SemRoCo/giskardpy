@@ -13,7 +13,6 @@ import numpy as np
 import urdf_parser_py.urdf as up
 
 import giskardpy.utils.math as mymath
-from giskard_msgs.msg import WorldBody
 from giskardpy import casadi_wrapper as cas
 from giskardpy.casadi_wrapper import CompiledFunction
 from giskardpy.data_types.data_types import JointStates, ColorRGBA
@@ -21,11 +20,10 @@ from giskardpy.data_types.exceptions import DuplicateNameException, UnknownGroup
     WorldException, UnknownJointException, CorruptURDFException
 from giskardpy.god_map import god_map
 from giskardpy.model.joints import Joint, FixedJoint, PrismaticJoint, RevoluteJoint, OmniDrive, DiffDrive, \
-    urdf_to_joint, VirtualFreeVariables, MovableJoint, Joint6DOF, OneDofJoint
+    VirtualFreeVariables, MovableJoint, Joint6DOF, OneDofJoint
 from giskardpy.model.links import Link
 from giskardpy.model.utils import hacky_urdf_parser_fix
 from giskardpy.data_types.data_types import PrefixName, Derivatives, derivative_map
-from giskardpy.data_types.data_types import my_string
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.next_command import NextCommands
 from giskardpy.symbol_manager import symbol_manager
@@ -205,10 +203,6 @@ class WorldTree(WorldTreeInterface):
             self._default_weights[derivative] = weight
         assert len(self._default_weights) == max(self._default_weights)
 
-    def get_joint_name(self, joint_name: my_string, group_name: Optional[str] = None) -> PrefixName:
-        logging.logwarn(f'Deprecated warning: use \'search_for_joint_name\' instead of \'get_joint_name\'.')
-        return self.search_for_joint_name(joint_name, group_name)
-
     def search_for_joint_name(self, joint_name: str, group_name: Optional[str] = None) -> PrefixName:
         """
         Will search the worlds joint for one that matches joint_name. group_name is only needed if there are multiple
@@ -249,11 +243,11 @@ class WorldTree(WorldTreeInterface):
             elif joint.child_link_name == old_name:
                 joint.child_link_name = new_name
 
-    def get_joint(self, joint_name: my_string, group_name: Optional[str] = None) -> Joint:
+    def get_joint(self, joint_name: PrefixName, group_name: Optional[str] = None) -> Joint:
         """
         Like get_joint_name, but returns the actual joint.
         """
-        return self.joints[self.search_for_joint_name(joint_name, group_name)]
+        return self.joints[joint_name]
 
     def get_one_dof_joint_symbol(self, joint_name: PrefixName, derivative: Derivatives) -> Union[cas.Symbol, float]:
         """
@@ -497,7 +491,7 @@ class WorldTree(WorldTreeInterface):
             raise KeyError(f'World doesn\'t have link \'{root_link_name}\'')
         if name in self.groups:
             raise DuplicateNameException(f'Group with name {name} already exists')
-        new_group = WorldBranch(name, root_link_name, actuated=actuated)
+        new_group = WorldBranch(name, root_link_name, world=self, actuated=actuated)
         # if the group is a subtree of a subtree, register it for the subtree as well
         # for group in self.groups.values():
         #     if root_link_name in group.links:
@@ -675,17 +669,6 @@ class WorldTree(WorldTreeInterface):
         else:
             return ret.pop()
 
-    def _get_robots_containing_link_short_name(self, link_name: Union[PrefixName, str]) -> Set[str]:
-        groups = set()
-        for group_name, subtree in self.groups.items():
-            if subtree.actuated:
-                try:
-                    subtree.get_link_short_name_match(link_name)
-                except KeyError:
-                    continue
-                groups.add(group_name)
-        return groups
-
     def _get_parents_of_group_name(self, group_name: str) -> Set[str]:
         ancestry = list()
         traversed = False
@@ -817,7 +800,7 @@ class WorldTree(WorldTreeInterface):
         self.joints = {}
         self.free_variables = {}
         self.virtual_free_variables = {}
-        self.groups: Dict[my_string, WorldBranch] = {}
+        self.groups: Dict[str, WorldBranch] = {}
         self.reset_cache()
 
     def delete_all_but_robots(self):
@@ -827,17 +810,6 @@ class WorldTree(WorldTreeInterface):
         self._clear()
         with self.modify_world():
             god_map.world_config.setup()  # todo
-
-    def _link_joint_to_links(self, joint: Joint):
-        self._raise_if_joint_exists(joint.name)
-        self._raise_if_link_does_not_exist(joint.child_link_name)
-        self._raise_if_link_does_not_exist(joint.parent_link_name)
-        child_link = self.links[joint.child_link_name]
-        parent_link = self.links[joint.parent_link_name]
-        self.joints[joint.name] = joint
-        child_link.parent_joint_name = joint.name
-        assert joint.name not in parent_link.child_joint_names
-        parent_link.child_joint_names.append(joint.name)
 
     def _fix_tree_structure(self) -> None:
         """
@@ -881,15 +853,15 @@ class WorldTree(WorldTreeInterface):
         if link_name not in self.links:
             raise UnknownLinkException(f'Link \'{link_name}\' does not exist.')
 
-    def _raise_if_link_exists(self, link_name: my_string):
+    def _raise_if_link_exists(self, link_name: PrefixName):
         if link_name in self.links:
             raise DuplicateNameException(f'Link \'{link_name}\' does already exist.')
 
-    def _raise_if_joint_does_not_exist(self, joint_name: my_string):
+    def _raise_if_joint_does_not_exist(self, joint_name: PrefixName):
         if joint_name not in self.joints:
             raise UnknownJointException(f'Joint \'{joint_name}\' does not exist.')
 
-    def _raise_if_joint_exists(self, joint_name: my_string):
+    def _raise_if_joint_exists(self, joint_name: PrefixName):
         if joint_name in self.joints:
             raise DuplicateNameException(f'Joint \'{joint_name}\' does already exist.')
 
@@ -1171,15 +1143,13 @@ class WorldTree(WorldTreeInterface):
                                     self.joint_velocity_symbols)
 
     @memoize
-    def compute_fk(self, root: my_string, tip: my_string) -> cas.TransMatrix:
-        root = self.search_for_link_name(root)
-        tip = self.search_for_link_name(tip)
+    def compute_fk(self, root: PrefixName, tip: PrefixName) -> cas.TransMatrix:
         result = cas.TransMatrix(self.compute_fk_np(root, tip))
         result.reference_frame = root
         result.child_frame = tip
         return result
 
-    def compute_fk_point(self, root: my_string, tip: my_string) -> cas.Point3:
+    def compute_fk_point(self, root: PrefixName, tip: PrefixName) -> cas.Point3:
         return self.compute_fk(root=root, tip=tip).to_position()
 
     @memoize
@@ -1207,7 +1177,7 @@ class WorldTree(WorldTreeInterface):
                 self.fks = {self.world.root_link_name: cas.TransMatrix()}
 
             @profile
-            def joint_call(self, joint_name: my_string) -> bool:
+            def joint_call(self, joint_name: PrefixName) -> bool:
                 joint = self.world.joints[joint_name]
                 map_T_parent = self.fks[joint.parent_link_name]
                 self.fks[joint.child_link_name] = map_T_parent.dot(joint.parent_T_child)
@@ -1344,7 +1314,7 @@ class WorldTree(WorldTreeInterface):
             upper_limit = symbol_manager.evaluate_expr(upper_limit)
         return lower_limit, upper_limit
 
-    def get_joint_position_limits(self, joint_name: my_string) -> Tuple[Optional[float], Optional[float]]:
+    def get_joint_position_limits(self, joint_name: PrefixName) -> Tuple[Optional[float], Optional[float]]:
         """
         :return: minimum position, maximum position as float
         """
@@ -1462,20 +1432,15 @@ class WorldTree(WorldTreeInterface):
 
 
 class WorldBranch(WorldTreeInterface):
-    def __init__(self, name: str, root_link_name: PrefixName, actuated: bool = False):
+    def __init__(self, name: str, root_link_name: PrefixName, world: WorldTree, actuated: bool = False):
         self.name = name
         self.root_link_name = root_link_name
         self.actuated = actuated
+        self.world = world
 
     def get_siblings_with_collisions(self, joint_name: PrefixName) -> List[PrefixName]:
-        siblings = god_map.world.get_siblings_with_collisions(joint_name)
+        siblings = self.world.get_siblings_with_collisions(joint_name)
         return [x for x in siblings if x in self.link_names_as_set]
-
-    def get_link(self, link_name: str) -> Link:
-        return god_map.world.get_link(link_name, self.name)
-
-    def get_joint(self, joint_name: str) -> Joint:
-        return god_map.world.get_joint(joint_name, self.name)
 
     def search_for_link_name(self, link_name: str) -> PrefixName:
         matches = []
@@ -1501,59 +1466,48 @@ class WorldBranch(WorldTreeInterface):
 
     @cached_property
     def controlled_joints(self) -> List[PrefixName]:
-        return [j for j in god_map.world.controlled_joints if j in self.joint_names_as_set]
+        return [j for j in self.world.controlled_joints if j in self.joint_names_as_set]
 
     @property
     def parent_link_of_root(self) -> PrefixName:
-        return god_map.world.get_parent_link_of_link(god_map.world.groups[self.name].root_link_name)
+        return self.world.get_parent_link_of_link(self.world.groups[self.name].root_link_name)
 
     @profile
     def possible_collision_combinations(self) -> Set[Tuple[PrefixName, PrefixName]]:
         links = self.link_names_with_collisions
-        link_combinations = {god_map.world.sort_links(link_a, link_b) for link_a, link_b in combinations(links, 2)}
+        link_combinations = {self.world.sort_links(link_a, link_b) for link_a, link_b in combinations(links, 2)}
         for link_name in links:
             direct_children = set()
             for child_joint_name in self.links[link_name].child_joint_names:
-                if god_map.world.is_joint_controlled(child_joint_name):
+                if self.world.is_joint_controlled(child_joint_name):
                     continue
                 child_link_name = self.joints[child_joint_name].child_link_name
-                links, joints = god_map.world._search_branch(link_name=child_link_name,
-                                                             stop_at_joint_when=god_map.world.is_joint_controlled,
+                links, joints = self.world._search_branch(link_name=child_link_name,
+                                                             stop_at_joint_when=self.world.is_joint_controlled,
                                                              stop_at_link_when=None,
                                                              collect_joint_when=None,
-                                                             collect_link_when=god_map.world.has_link_collisions)
+                                                             collect_link_when=self.world.has_link_collisions)
 
                 direct_children.update(links)
             direct_children.add(link_name)
             link_combinations.difference_update(
-                god_map.world.sort_links(link_a, link_b) for link_a, link_b in combinations(direct_children, 2))
+                self.world.sort_links(link_a, link_b) for link_a, link_b in combinations(direct_children, 2))
         return link_combinations
 
     def get_unmovable_links(self) -> List[PrefixName]:
-        unmovable_links, _ = god_map.world._search_branch(link_name=self.root_link_name,
+        unmovable_links, _ = self.world._search_branch(link_name=self.root_link_name,
                                                           stop_at_joint_when=lambda
                                                               joint_name: joint_name in self.controlled_joints,
-                                                          collect_link_when=god_map.world.has_link_collisions)
+                                                          collect_link_when=self.world.has_link_collisions)
         return unmovable_links
 
     @property
     def base_pose(self) -> cas.TransMatrix:
-        return god_map.world.compute_fk(god_map.world.root_link_name, self.root_link_name)
+        return self.world.compute_fk(self.world.root_link_name, self.root_link_name)
 
     @property
     def state(self) -> JointStates:
-        return JointStates({j: god_map.world.state[j] for j in self.joints if j in god_map.world.state})
-
-    def get_link_short_name_match(self, link_name: my_string) -> PrefixName:
-        matches = []
-        for link_name2 in self.link_names_as_set:
-            if link_name == link_name2 or link_name == link_name2.short_name:
-                matches.append(link_name2)
-        if len(matches) > 1:
-            raise ValueError(f'Found multiple link matches \'{matches}\'.')
-        if len(matches) == 0:
-            raise UnknownLinkException(f'Found no link match for \'{link_name}\'.')
-        return matches[0]
+        return JointStates({j: self.world.state[j] for j in self.joints if j in self.world.state})
 
     def reset_cache(self):
         super().reset_cache()
@@ -1576,15 +1530,15 @@ class WorldBranch(WorldTreeInterface):
 
     @property
     def root_link(self) -> Link:
-        return god_map.world.links[self.root_link_name]
+        return self.world.links[self.root_link_name]
 
     @cached_property
     def joints(self) -> Dict[PrefixName, Joint]:
         def helper(root_link: Link) -> Dict[PrefixName, Joint]:
-            joints = {j: god_map.world.joints[j] for j in root_link.child_joint_names}
+            joints = {j: self.world.joints[j] for j in root_link.child_joint_names}
             for joint_name in root_link.child_joint_names:
-                joint = god_map.world.joints[joint_name]
-                child_link = god_map.world.links[joint.child_link_name]
+                joint = self.world.joints[joint_name]
+                child_link = self.world.links[joint.child_link_name]
                 joints.update(helper(child_link))
             return joints
 
@@ -1592,29 +1546,29 @@ class WorldBranch(WorldTreeInterface):
 
     @cached_property
     def groups(self) -> Dict[str, WorldBranch]:
-        return {group_name: group for group_name, group in god_map.world.groups.items() if
+        return {group_name: group for group_name, group in self.world.groups.items() if
                 group.root_link_name in self.links
                 and group.root_link_name != self.root_link_name
                 and group.name != self.name}
 
     @cached_property
     def links(self) -> Dict[PrefixName, Link]:
-        def helper(root_link: Link) -> Dict[my_string, Link]:
+        def helper(root_link: Link) -> Dict[PrefixName, Link]:
             links = {root_link.name: root_link}
             for j in root_link.child_joint_names:
-                j = god_map.world.joints[j]
-                child_link = god_map.world.links[j.child_link_name]
+                j = self.world.joints[j]
+                child_link = self.world.links[j.child_link_name]
                 links.update(helper(child_link))
             return links
 
         return helper(self.root_link)
 
     def compute_fk_pose(self, root: PrefixName, tip: PrefixName) -> cas.TransMatrix:
-        return god_map.world.compute_fk(root, tip)
+        return self.world.compute_fk(root, tip)
 
     def compute_fk_pose_with_collision_offset(self, root: PrefixName, tip: PrefixName, collision_id: int) \
             -> cas.TransMatrix:
-        return god_map.world.compute_fk_with_collision_offset(root, tip, collision_id)
+        return self.world.compute_fk_with_collision_offset(root, tip, collision_id)
 
     def is_link_controlled(self, link_name: PrefixName) -> bool:
-        return god_map.world.is_link_controlled(link_name)
+        return self.world.is_link_controlled(link_name)

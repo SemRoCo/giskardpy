@@ -178,7 +178,7 @@ class WorldConfig(ABC):
         joint = Joint6DOF(name=joint_name, parent_link_name=parent_link, child_link_name=child_link)
         god_map.world.add_joint(joint)
 
-    def add_empty_link(self, link_name: my_string):
+    def add_empty_link(self, link_name: PrefixName):
         """
         If you need a virtual link during your world building.
         """
@@ -264,8 +264,8 @@ class WorldWithOmniDriveRobot(WorldConfig):
         self.set_default_limits({Derivatives.velocity: 1,
                                  Derivatives.acceleration: np.inf,
                                  Derivatives.jerk: 30})
-        self.add_empty_link(self.map_name)
-        self.add_empty_link(self.odom_link_name)
+        self.add_empty_link(PrefixName(self.map_name))
+        self.add_empty_link(PrefixName(self.odom_link_name))
         self.add_6dof_joint(parent_link=self.map_name, child_link=self.odom_link_name,
                             joint_name=self.localization_joint_name)
         self.add_robot_from_parameter_server()

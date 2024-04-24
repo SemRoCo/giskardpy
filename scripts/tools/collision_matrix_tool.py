@@ -578,7 +578,7 @@ class Application(QMainWindow):
                 QMessageBox.critical(self, 'Error', f'Parameter not found: \n{robot_description}')
 
     def load_urdf(self, urdf: str, progress_str: str):
-        god_map.world._clear()
+        god_map.world.clear()
         self.urdf_progress.set_progress(0, f'Loading {progress_str}')
         group_name = robot_name_from_urdf_string(urdf)
         self.urdf_progress.set_progress(10, f'Parsing {progress_str}')

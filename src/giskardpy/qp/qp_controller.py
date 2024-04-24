@@ -1033,6 +1033,7 @@ class QPProblemBuilder:
                  retries_with_relaxed_constraints: int = 0,
                  retry_added_slack: float = 100,
                  retry_weight_factor: float = 100):
+        self.sample_period = sample_period
         self.free_variables = []
         self.equality_constraints = []
         self.inequality_constraints = []
@@ -1137,7 +1138,7 @@ class QPProblemBuilder:
                   'equality_constraints': self.equality_constraints,
                   'inequality_constraints': self.inequality_constraints,
                   'derivative_constraints': self.derivative_constraints,
-                  'sample_period': god_map.qp_controller_config.sample_period,
+                  'sample_period': self.sample_period,
                   'prediction_horizon': self.prediction_horizon,
                   'max_derivative': self.order}
         self.weights = Weights(**kwargs)
@@ -1237,20 +1238,19 @@ class QPProblemBuilder:
             return tmp
 
         free_variable: FreeVariable = [x for x in self.free_variables if x.name == joint_name][0]
-        sample_period = god_map.qp_controller_config.sample_period
         try:
             start_pos = god_map.world.state[joint_name].position
         except KeyError:
             logging.loginfo('start position not found in state')
             start_pos = 0
-        ts = np.array([(i + 1) * sample_period for i in range(self.prediction_horizon)])
+        ts = np.array([(i + 1) * self.sample_period for i in range(self.prediction_horizon)])
         filtered_x = self.p_xdot.filter(like=f'/{joint_name}/', axis=0)
         vel_end = self.prediction_horizon - self.order + 1
         acc_end = vel_end + self.prediction_horizon - self.order + 2
         velocities = filtered_x[:vel_end].values
         positions = [start_pos]
         for x_ in velocities:
-            positions.append(positions[-1] + x_ * sample_period)
+            positions.append(positions[-1] + x_ * self.sample_period)
 
         positions = np.array(positions[1:])
         positions = pad(positions.T[0], len(ts), pad_value=positions[-1])
@@ -1286,7 +1286,7 @@ class QPProblemBuilder:
             if not np.isinf(lower_limit):
                 ax.axhline(y=lower_limit, color='k', linestyle='--')
         # Example: Set x-ticks for each subplot
-        tick_labels = [f'{x}/{x * sample_period:.3f}' for x in range(self.prediction_horizon)]
+        tick_labels = [f'{x}/{x * self.sample_period:.3f}' for x in range(self.prediction_horizon)]
 
         axs[-1].set_xticks(ts)  # Set tick locations
         axs[-1].set_xticklabels(tick_labels)  # Set custom tick labels
@@ -1301,7 +1301,6 @@ class QPProblemBuilder:
     @profile
     def _create_debug_pandas(self, qp_solver: QPSolver):
         weights, g, lb, ub, E, bE, A, lbA, ubA, weight_filter, bE_filter, bA_filter = qp_solver.get_problem_data()
-        sample_period = god_map.qp_controller_config.sample_period
         self.free_variable_names = self.free_variable_bounds.names[weight_filter]
         self.equality_constr_names = self.equality_bounds.names[bE_filter]
         self.inequality_constr_names = self.inequality_bounds.names[bA_filter]
@@ -1318,21 +1317,21 @@ class QPProblemBuilder:
         if len(bE) > 0:
             self.p_bE_raw = pd.DataFrame(bE, self.equality_constr_names, ['data'], dtype=float)
             self.p_bE = deepcopy(self.p_bE_raw)
-            self.p_bE[len(self.equality_bounds.names_derivative_links):] /= sample_period
+            self.p_bE[len(self.equality_bounds.names_derivative_links):] /= self.sample_period
         else:
             self.p_bE = pd.DataFrame()
         if len(lbA) > 0:
             self.p_lbA_raw = pd.DataFrame(lbA, self.inequality_constr_names, ['data'], dtype=float)
             self.p_lbA = deepcopy(self.p_lbA_raw)
-            self.p_lbA /= sample_period
+            self.p_lbA /= self.sample_period
 
             self.p_ubA_raw = pd.DataFrame(ubA, self.inequality_constr_names, ['data'], dtype=float)
             self.p_ubA = deepcopy(self.p_ubA_raw)
-            self.p_ubA /= sample_period
+            self.p_ubA /= self.sample_period
 
             self.p_bA_raw = pd.DataFrame({'lbA': lbA, 'ubA': ubA}, self.inequality_constr_names, dtype=float)
             self.p_bA = deepcopy(self.p_bA_raw)
-            self.p_bA /= sample_period
+            self.p_bA /= self.sample_period
         else:
             self.p_lbA = pd.DataFrame()
             self.p_ubA = pd.DataFrame()
@@ -1359,7 +1358,7 @@ class QPProblemBuilder:
             else:
                 self.p_Ax = pd.DataFrame()
             # self.p_Ax_without_slack = deepcopy(self.p_Ax_without_slack_raw)
-            # self.p_Ax_without_slack[-num_constr:] /= sample_period
+            # self.p_Ax_without_slack[-num_constr:] /= self.sample_period
             if len(self.p_E) > 0:
                 self.p_Ex = pd.DataFrame(self.p_E.dot(self.p_pure_xdot), self.equality_constr_names,
                                          ['data'], dtype=float)

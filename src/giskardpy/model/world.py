@@ -171,7 +171,7 @@ class WorldTree(WorldTreeInterface):
         self._state_version = 0
         self._model_version = 0
         self._controlled_joints = []
-        self._clear()
+        self.clear()
         self.set_default_weights()
 
     def set_default_weights(self,
@@ -182,9 +182,9 @@ class WorldTree(WorldTreeInterface):
         The default values are set automatically, even if this function is not called.
         A typical goal has a weight of 1, so the values in here should be sufficiently below that.
         """
-        god_map.world.update_default_weights({Derivatives.velocity: velocity_weight,
-                                               Derivatives.acceleration: acceleration_weight,
-                                               Derivatives.jerk: jerk_weight})
+        self.update_default_weights({Derivatives.velocity: velocity_weight,
+                                     Derivatives.acceleration: acceleration_weight,
+                                     Derivatives.jerk: jerk_weight})
 
     @property
     def root_link_name(self) -> PrefixName:
@@ -807,7 +807,7 @@ class WorldTree(WorldTreeInterface):
                 return potential_parent_group
         return group_name
 
-    def _clear(self):
+    def clear(self):
         self.state = JointStates()
         self.links = {}
         self.joints = {}
@@ -815,14 +815,6 @@ class WorldTree(WorldTreeInterface):
         self.virtual_free_variables = {}
         self.groups: Dict[str, WorldBranch] = {}
         self.reset_cache()
-
-    def delete_all_but_robots(self):
-        """
-        Resets Giskard to the state from when it was started.
-        """
-        self._clear()
-        with self.modify_world():
-            god_map.world_config.setup()  # todo
 
     def _fix_tree_structure(self) -> None:
         """
@@ -1496,10 +1488,10 @@ class WorldBranch(WorldTreeInterface):
                     continue
                 child_link_name = self.joints[child_joint_name].child_link_name
                 links, joints = self.world._search_branch(link_name=child_link_name,
-                                                             stop_at_joint_when=self.world.is_joint_controlled,
-                                                             stop_at_link_when=None,
-                                                             collect_joint_when=None,
-                                                             collect_link_when=self.world.has_link_collisions)
+                                                          stop_at_joint_when=self.world.is_joint_controlled,
+                                                          stop_at_link_when=None,
+                                                          collect_joint_when=None,
+                                                          collect_link_when=self.world.has_link_collisions)
 
                 direct_children.update(links)
             direct_children.add(link_name)
@@ -1509,9 +1501,9 @@ class WorldBranch(WorldTreeInterface):
 
     def get_unmovable_links(self) -> List[PrefixName]:
         unmovable_links, _ = self.world._search_branch(link_name=self.root_link_name,
-                                                          stop_at_joint_when=lambda
-                                                              joint_name: joint_name in self.controlled_joints,
-                                                          collect_link_when=self.world.has_link_collisions)
+                                                       stop_at_joint_when=lambda
+                                                           joint_name: joint_name in self.controlled_joints,
+                                                       collect_link_when=self.world.has_link_collisions)
         return unmovable_links
 
     @property

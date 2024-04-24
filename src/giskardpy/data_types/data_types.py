@@ -36,7 +36,7 @@ class PrefixName:
         return str(self)[item]
 
     @classmethod
-    def from_string(cls, name: my_string, set_none_if_no_slash: bool = False):
+    def from_string(cls, name: Union[str, PrefixName], set_none_if_no_slash: bool = False):
         if isinstance(name, PrefixName):
             return name
         parts = name.split(cls.primary_separator)
@@ -109,10 +109,8 @@ class Derivatives(IntEnum):
 
 
 my_string = Union[str, PrefixName]
-goal_parameter = Union[my_string, float, bool, genpy.Message, dict, list, IntEnum, None]
+goal_parameter = Union[str, float, bool, genpy.Message, dict, list, IntEnum, None]
 derivative_map = Dict[Derivatives, float]
-derivative_joint_map = Dict[Derivatives, Dict[my_string, float]]
-transformable_message = Union[PoseStamped, PointStamped, Vector3Stamped, QuaternionStamped]
 
 
 class KeyDefaultDict(defaultdict):

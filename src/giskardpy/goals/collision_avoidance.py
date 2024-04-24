@@ -8,7 +8,7 @@ from giskardpy.monitors.monitors import ExpressionMonitor
 from giskardpy.monitors.payload_monitors import CollisionMatrixUpdater
 from giskardpy.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE
 from giskardpy.god_map import god_map
-from giskardpy.data_types.data_types import my_string, PrefixName
+from giskardpy.data_types.data_types import PrefixName
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.middleware import logging
 
@@ -16,12 +16,12 @@ from giskardpy.middleware import logging
 class ExternalCollisionAvoidance(Goal):
 
     def __init__(self,
-                 link_name: my_string,
+                 link_name: PrefixName,
                  robot_name: str,
                  max_velocity: float = 0.2,
                  hard_threshold: float = 0.0,
                  name_prefix: Optional[str] = None,
-                 soft_thresholds: Optional[Dict[my_string, float]] = None,
+                 soft_thresholds: Optional[Dict[PrefixName, float]] = None,
                  idx: int = 0,
                  num_repeller: int = 1,
                  start_condition: cas.Expression = cas.TrueSymbol,
@@ -134,8 +134,8 @@ class ExternalCollisionAvoidance(Goal):
 class SelfCollisionAvoidance(Goal):
 
     def __init__(self,
-                 link_a: my_string,
-                 link_b: my_string,
+                 link_a: PrefixName,
+                 link_b: PrefixName,
                  robot_name: str,
                  max_velocity: float = 0.2,
                  hard_threshold: float = 0.0,

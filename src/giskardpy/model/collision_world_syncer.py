@@ -9,7 +9,7 @@ import numpy as np
 from geometry_msgs.msg import Pose
 from lxml import etree
 
-from giskardpy.data_types.data_types import my_string, Derivatives, PrefixName
+from giskardpy.data_types.data_types import Derivatives, PrefixName
 from giskardpy.data_types.exceptions import UnknownGroupException, UnknownLinkException
 from giskardpy.god_map import god_map
 from giskardpy.model.world import WorldBranch
@@ -289,7 +289,7 @@ class Collisions:
         return self.number_of_external_collisions[joint_name]
 
     # @profile
-    def get_self_collisions(self, link_a: my_string, link_b: my_string) -> SortedCollisionResults:
+    def get_self_collisions(self, link_a: PrefixName, link_b: PrefixName) -> SortedCollisionResults:
         """
         Make sure that link_a < link_b, the reverse collision is not saved.
         """
@@ -792,7 +792,7 @@ class CollisionWorldSynchronizer:
             -> Collisions:
         pass
 
-    def in_collision(self, link_a: my_string, link_b: my_string, distance: float) -> bool:
+    def in_collision(self, link_a: PrefixName, link_b: PrefixName, distance: float) -> bool:
         return False
 
     def sync(self) -> None:

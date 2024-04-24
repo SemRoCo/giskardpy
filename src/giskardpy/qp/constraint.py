@@ -1,4 +1,4 @@
-from collections import namedtuple
+from collections import namedtuple, defaultdict
 from typing import List, Union, Optional, Callable
 
 import giskardpy.casadi_wrapper as cas
@@ -35,19 +35,12 @@ class InequalityConstraint(Constraint):
                  lower_error: cas.symbol_expr_float, upper_error: cas.symbol_expr_float,
                  velocity_limit: cas.symbol_expr_float,
                  quadratic_weight: cas.symbol_expr_float,
-                 control_horizon: Optional[int] = None,
                  linear_weight: Optional[cas.symbol_expr_float] = None,
                  lower_slack_limit: Optional[cas.symbol_expr_float] = None,
                  upper_slack_limit: Optional[cas.symbol_expr_float] = None):
         super().__init__(name, parent_task_name)
         self.expression = expression
         self.quadratic_weight = quadratic_weight
-        if control_horizon is None:
-            self.control_horizon = god_map.qp_controller_config.prediction_horizon - (
-                    god_map.qp_controller_config.max_derivative - 1)
-        else:
-            self.control_horizon = control_horizon
-        self.control_horizon = max(1, self.control_horizon)
         self.velocity_limit = velocity_limit
         self.lower_error = lower_error
         self.upper_error = upper_error
@@ -61,9 +54,9 @@ class InequalityConstraint(Constraint):
     def __str__(self):
         return self.name
 
-    def normalized_weight(self):
-        weight_normalized = self.quadratic_weight * (1 / (self.velocity_limit)) ** 2
-        return weight_normalized * self.control_horizon
+    def normalized_weight(self, control_horizon: int) -> cas.Expression:
+        weight_normalized = self.quadratic_weight * (1 / self.velocity_limit) ** 2
+        return weight_normalized * control_horizon
 
 
 class EqualityConstraint(Constraint):
@@ -78,19 +71,13 @@ class EqualityConstraint(Constraint):
                  expression: cas.Expression,
                  derivative_goal: cas.symbol_expr_float,
                  velocity_limit: cas.symbol_expr_float,
-                 quadratic_weight: cas.symbol_expr_float, control_horizon: int,
+                 quadratic_weight: cas.symbol_expr_float,
                  linear_weight: Optional[cas.symbol_expr_float] = None,
                  lower_slack_limit: Optional[cas.symbol_expr_float] = None,
                  upper_slack_limit: Optional[cas.symbol_expr_float] = None):
         super().__init__(name, parent_task_name)
         self.expression = expression
         self.quadratic_weight = quadratic_weight
-        if control_horizon is None:
-            self.control_horizon = god_map.qp_controller_config.prediction_horizon - (
-                    god_map.qp_controller_config.max_derivative - 1)
-        else:
-            self.control_horizon = control_horizon
-        self.control_horizon = max(1, self.control_horizon)
         self.velocity_limit = velocity_limit
         self.bound = derivative_goal
         if lower_slack_limit is not None:
@@ -103,14 +90,14 @@ class EqualityConstraint(Constraint):
     def __str__(self):
         return self.name
 
-    def normalized_weight(self):
+    def normalized_weight(self, control_horizon: int) -> cas.Expression:
         weight_normalized = self.quadratic_weight * (1 / self.velocity_limit) ** 2
-        return weight_normalized * self.control_horizon
+        return weight_normalized * control_horizon
 
-    def capped_bound(self, dt: float):
+    def capped_bound(self, dt: float, control_horizon: int) -> cas.Expression:
         return cas.limit(self.bound,
-                         -self.velocity_limit * dt * self.control_horizon,
-                         self.velocity_limit * dt * self.control_horizon)
+                         -self.velocity_limit * dt * control_horizon,
+                         self.velocity_limit * dt * control_horizon)
 
 
 class DerivativeInequalityConstraint(Constraint):
@@ -126,35 +113,32 @@ class DerivativeInequalityConstraint(Constraint):
                  normalization_factor: Optional[cas.symbol_expr_float],
                  lower_slack_limit: Union[cas.symbol_expr_float, List[cas.symbol_expr_float]],
                  upper_slack_limit: Union[cas.symbol_expr_float, List[cas.symbol_expr_float]],
-                 control_horizon: Optional[cas.symbol_expr_float] = None,
                  linear_weight: cas.symbol_expr_float = None,
                  horizon_function: Optional[Callable[[float, int], float]] = None):
         super().__init__(name, parent_task_name)
         self.derivative = derivative
         self.expression = expression
         self.quadratic_weight = quadratic_weight
-        self.control_horizon = control_horizon if control_horizon is not None else max(
-            god_map.qp_controller_config.prediction_horizon - 2, 1)
         self.normalization_factor = normalization_factor
         if self.is_iterable(lower_limit):
             self.lower_limit = lower_limit
         else:
-            self.lower_limit = [lower_limit] * self.control_horizon
+            self.lower_limit = defaultdict(lambda: lower_limit)
 
         if self.is_iterable(upper_limit):
             self.upper_limit = upper_limit
         else:
-            self.upper_limit = [upper_limit] * self.control_horizon
+            self.upper_limit = defaultdict(lambda: upper_limit)
 
         if self.is_iterable(lower_slack_limit):
             self.lower_slack_limit = lower_slack_limit
         else:
-            self.lower_slack_limit = [lower_slack_limit] * self.control_horizon
+            self.lower_slack_limit = defaultdict(lambda: lower_slack_limit)
 
         if self.is_iterable(upper_slack_limit):
             self.upper_slack_limit = upper_slack_limit
         else:
-            self.upper_slack_limit = [upper_slack_limit] * self.control_horizon
+            self.upper_slack_limit = defaultdict(lambda: upper_slack_limit)
 
         if linear_weight is not None:
             self.linear_weight = linear_weight
@@ -171,8 +155,6 @@ class DerivativeInequalityConstraint(Constraint):
             return False
         return hasattr(thing, '__iter__')
 
-    def normalized_weight(self, t):
+    def normalized_weight(self, t) -> float:
         weight_normalized = self.quadratic_weight * (1 / self.normalization_factor) ** 2
         return self.horizon_function(weight_normalized, t)
-
-

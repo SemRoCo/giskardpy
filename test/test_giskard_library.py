@@ -79,7 +79,6 @@ class TestWorld:
         motion_goal_manager.add_motion_goal(joint_goal)
         eq, neq, neqd, lin_weight, quad_weight = motion_goal_manager.get_constraints_from_goals()
         controller = QPProblemBuilder(sample_period=dt,
-                                      prediction_horizon=9,
                                       free_variables=list(box_world.free_variables.values()),
                                       equality_constraints=list(eq.values()))
         parameters = controller.get_parameter_names()

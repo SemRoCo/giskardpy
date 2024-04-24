@@ -63,6 +63,7 @@ class ProblemDataPart(ABC):
     derivative_constraints: List[DerivativeInequalityConstraint]
     sample_period: float
     prediction_horizon: int
+    control_horizon: int
     max_derivative: Derivatives
 
     def __init__(self,
@@ -80,6 +81,7 @@ class ProblemDataPart(ABC):
         self.prediction_horizon = prediction_horizon
         self.dt = sample_period
         self.max_derivative = max_derivative
+        self.control_horizon = self.prediction_horizon - self.max_derivative
 
     @property
     def number_of_free_variables(self) -> int:
@@ -197,7 +199,8 @@ class Weights(ProblemDataPart):
             # weights are missing. Here the missing weights are filled in with zeroes.
             linear_weights, _ = self._sorter(*linear_weights)
             linear_weights = cas.Expression(linear_weights)
-            linear_weights = cas.vstack([linear_weights] + [cas.Expression(0)] * (weights.shape[0] - linear_weights.shape[0]))
+            linear_weights = cas.vstack(
+                [linear_weights] + [cas.Expression(0)] * (weights.shape[0] - linear_weights.shape[0]))
         return cas.Expression(weights), linear_weights
 
     @profile
@@ -215,7 +218,8 @@ class Weights(ProblemDataPart):
                     weights[derivative][f't{t:03}/{v.position_name}/{derivative}'] = normalized_weight
                     for q_gain in quadratic_weight_gains:
                         if t < len(q_gain.gains) and v in q_gain.gains[t][derivative].keys():
-                            weights[derivative][f't{t:03}/{v.position_name}/{derivative}'] *= q_gain.gains[t][derivative][v]
+                            weights[derivative][f't{t:03}/{v.position_name}/{derivative}'] *= \
+                            q_gain.gains[t][derivative][v]
         for _, weight in sorted(weights.items()):
             params.append(weight)
         return params
@@ -227,17 +231,19 @@ class Weights(ProblemDataPart):
             for t in range(self.prediction_horizon):
                 d = Derivatives(d)
                 for c in self.get_derivative_constraints(d):
-                    if t < c.control_horizon:
+                    if t < self.control_horizon:
                         derivative_constr_weights[f't{t:03}/{c.name}'] = c.normalized_weight(t)
             params.append(derivative_constr_weights)
         return params
 
     def equality_weight_expressions(self) -> dict:
-        error_slack_weights = {f'{c.name}/error': c.normalized_weight() for c in self.equality_constraints}
+        error_slack_weights = {f'{c.name}/error': c.normalized_weight(self.control_horizon)
+                               for c in self.equality_constraints}
         return error_slack_weights
 
     def inequality_weight_expressions(self) -> dict:
-        error_slack_weights = {f'{c.name}/error': c.normalized_weight() for c in self.inequality_constraints}
+        error_slack_weights = {f'{c.name}/error': c.normalized_weight(self.control_horizon)
+                               for c in self.inequality_constraints}
         return error_slack_weights
 
     @profile
@@ -253,7 +259,8 @@ class Weights(ProblemDataPart):
                         weights[derivative][f't{t:03}/{v.position_name}/{derivative}'] = 0
                         for l_gain in linear_weight_gains:
                             if t < len(l_gain.gains) and v in l_gain.gains[t][derivative].keys():
-                                weights[derivative][f't{t:03}/{v.position_name}/{derivative}'] += l_gain.gains[t][derivative][v]
+                                weights[derivative][f't{t:03}/{v.position_name}/{derivative}'] += \
+                                l_gain.gains[t][derivative][v]
             for _, weight in sorted(weights.items()):
                 params.append(weight)
             return params
@@ -395,7 +402,7 @@ class FreeVariableBounds(ProblemDataPart):
         upper_slack = {}
         for t in range(self.prediction_horizon):
             for c in self.get_derivative_constraints(derivative):
-                if t < c.control_horizon:
+                if t < self.control_horizon:
                     lower_slack[f't{t:03}/{c.name}'] = c.lower_slack_limit[t]
                     upper_slack[f't{t:03}/{c.name}'] = c.upper_slack_limit[t]
         return lower_slack, upper_slack
@@ -480,7 +487,7 @@ class EqualityBounds(ProblemDataPart):
         self.evaluated = True
 
     def equality_constraint_bounds(self) -> Dict[str, cas.Expression]:
-        return {f'{c.name}': c.capped_bound(self.dt) for c in self.equality_constraints}
+        return {f'{c.name}': c.capped_bound(self.dt, self.control_horizon) for c in self.equality_constraints}
 
     def last_derivative_values(self, derivative: Derivatives) -> Dict[str, cas.symbol_expr_float]:
         last_values = {}
@@ -511,24 +518,6 @@ class EqualityBounds(ProblemDataPart):
         self.names_derivative_links = self.names[:num_derivative_links]
         self.names_equality_constraints = self.names[num_derivative_links:]
         return cas.Expression(bounds)
-
-
-class GoalReached(ProblemDataPart):
-
-    def construct_expression(self) -> Union[cas.Expression, Tuple[cas.Expression, cas.Expression]]:
-        self.names = []
-        checks = []
-        for c in self.equality_constraints:
-            self.names.append(c.name)
-            checks.append(c.goal_reached())
-        return cas.Expression(checks)
-
-    def to_panda(self, substitutions: np.ndarray) -> pd.DataFrame:
-        data = self.goal_reached_f.fast_call(substitutions)
-        return pd.DataFrame({'data': data}, index=self.names)
-
-    def compile(self, free_symbols: List[cas.ca.SX]):
-        self.goal_reached_f = self.construct_expression().compile(free_symbols)
 
 
 class InequalityBounds(ProblemDataPart):
@@ -569,7 +558,7 @@ class InequalityBounds(ProblemDataPart):
         upper = {}
         for t in range(self.prediction_horizon):
             for c in self.get_derivative_constraints(derivative):
-                if t < c.control_horizon:
+                if t < self.control_horizon:
                     lower[f't{t:03}/{c.name}'] = cas.limit(c.lower_limit[t] * self.dt,
                                                            -c.normalization_factor * self.dt,
                                                            c.normalization_factor * self.dt)
@@ -581,7 +570,7 @@ class InequalityBounds(ProblemDataPart):
     def lower_inequality_constraint_bound(self):
         bounds = {}
         for constraint in self.inequality_constraints:
-            limit = constraint.velocity_limit * self.dt * constraint.control_horizon
+            limit = constraint.velocity_limit * self.dt * self.control_horizon
             if isinstance(constraint.lower_error, float) and np.isinf(constraint.lower_error):
                 bounds[f'{constraint.name}'] = constraint.lower_error
             else:
@@ -591,7 +580,7 @@ class InequalityBounds(ProblemDataPart):
     def upper_inequality_constraint_bound(self):
         bounds = {}
         for constraint in self.inequality_constraints:
-            limit = constraint.velocity_limit * self.dt * constraint.control_horizon
+            limit = constraint.velocity_limit * self.dt * self.control_horizon
             if isinstance(constraint.upper_error, float) and np.isinf(constraint.upper_error):
                 bounds[f'{constraint.name}'] = constraint.upper_error
             else:
@@ -717,12 +706,12 @@ class EqualityModel(ProblemDataPart):
                 # set jacobian entry to 0 if control horizon shorter than prediction horizon
                 for i, c in enumerate(self.equality_constraints):
                     # offset = vertical_offset + i
-                    J_hstack[i, c.control_horizon * len(self.free_variables):] = 0
+                    J_hstack[i, self.control_horizon * len(self.free_variables):] = 0
                 horizontal_offset = J_hstack.shape[1]
                 model[:, horizontal_offset * derivative:horizontal_offset * (derivative + 1)] = J_hstack
 
             # slack variable for total error
-            slack_model = cas.diag(cas.Expression([self.dt * c.control_horizon for c in self.equality_constraints]))
+            slack_model = cas.diag(cas.Expression([self.dt * self.control_horizon for c in self.equality_constraints]))
             return model, slack_model
         return cas.Expression(), cas.Expression()
 
@@ -823,12 +812,12 @@ class InequalityModel(ProblemDataPart):
             for t in range(self.prediction_horizon):
                 for i, c in enumerate(self.velocity_constraints):
                     v_index = i + (t * len(self.velocity_constraints))
-                    if t + 1 > c.control_horizon:
+                    if t + 1 > self.control_horizon:
                         rows_to_delete.append(v_index)
             model.remove(rows_to_delete, [])
 
             # constraint slack
-            num_slack_variables = sum(c.control_horizon for c in self.velocity_constraints)
+            num_slack_variables = sum(self.control_horizon for c in self.velocity_constraints)
             slack_model = cas.eye(num_slack_variables) * self.dt
             return model, slack_model
         return cas.Expression(), cas.Expression()
@@ -868,12 +857,12 @@ class InequalityModel(ProblemDataPart):
             for t in range(self.prediction_horizon):
                 for i, c in enumerate(self.velocity_constraints):
                     v_index = i + (t * len(self.velocity_constraints))
-                    if t + 1 > c.control_horizon:
+                    if t + 1 > self.control_horizon:
                         rows_to_delete.append(v_index)
             model.remove(rows_to_delete, [])
 
             # slack model
-            num_slack_variables = sum(c.control_horizon for c in self.acceleration_constraints)
+            num_slack_variables = sum(self.control_horizon for c in self.acceleration_constraints)
             slack_model = cas.eye(num_slack_variables) * self.dt
             return model, slack_model
         return cas.Expression(), cas.Expression()
@@ -922,12 +911,12 @@ class InequalityModel(ProblemDataPart):
             for t in range(self.prediction_horizon):
                 for i, c in enumerate(self.velocity_constraints):
                     v_index = i + (t * len(self.velocity_constraints))
-                    if t + 1 > c.control_horizon:
+                    if t + 1 > self.control_horizon:
                         rows_to_delete.append(v_index)
             model.remove(rows_to_delete, [])
 
             # slack model
-            num_slack_variables = sum(c.control_horizon for c in self.jerk_constraints)
+            num_slack_variables = sum(self.control_horizon for c in self.jerk_constraints)
             slack_model = cas.eye(num_slack_variables) * self.dt
             return model, slack_model
         return cas.Expression(), cas.Expression()
@@ -949,12 +938,13 @@ class InequalityModel(ProblemDataPart):
                 J_hstack = cas.hstack([J_neq for _ in range(self.prediction_horizon)])
                 # set jacobian entry to 0 if control horizon shorter than prediction horizon
                 for i, c in enumerate(self.inequality_constraints):
-                    J_hstack[i, c.control_horizon * len(self.free_variables):] = 0
+                    J_hstack[i, self.control_horizon * len(self.free_variables):] = 0
                 horizontal_offset = J_hstack.shape[1]
                 model[:, horizontal_offset * derivative:horizontal_offset * (derivative + 1)] = J_hstack
 
             # slack variable for total error
-            slack_model = cas.diag(cas.Expression([self.dt * c.control_horizon for c in self.inequality_constraints]))
+            slack_model = cas.diag(
+                cas.Expression([self.dt * self.control_horizon for c in self.inequality_constraints]))
             return model, slack_model
         return cas.Expression(), cas.Expression()
 
@@ -1021,8 +1011,9 @@ class QPProblemBuilder:
     prediction_horizon: int = None
 
     def __init__(self,
-                 sample_period: float,
-                 prediction_horizon: int,
+                 sample_period: float = 0.05,
+                 prediction_horizon: int = 9,
+                 max_derivative: Derivatives = Derivatives.jerk,
                  solver_id: Optional[SupportedQPSolver] = None,
                  free_variables: List[FreeVariable] = None,
                  equality_constraints: List[EqualityConstraint] = None,
@@ -1034,6 +1025,7 @@ class QPProblemBuilder:
                  retry_added_slack: float = 100,
                  retry_weight_factor: float = 100):
         self.sample_period = sample_period
+        self.max_derivative = max_derivative
         self.free_variables = []
         self.equality_constraints = []
         self.inequality_constraints = []
@@ -1078,7 +1070,7 @@ class QPProblemBuilder:
         self.free_variables.extend(list(sorted(free_variables, key=lambda x: x.position_name)))
         l = [x.position_name for x in free_variables]
         duplicates = set([x for x in l if l.count(x) > 1])
-        self.order = Derivatives(min(self.prediction_horizon, god_map.qp_controller_config.max_derivative))
+        self.order = Derivatives(min(self.prediction_horizon, self.max_derivative))
         assert duplicates == set(), f'there are free variables with the same name: {duplicates}'
 
     def add_inequality_constraints(self, constraints: List[InequalityConstraint]):
@@ -1086,18 +1078,12 @@ class QPProblemBuilder:
         l = [x.name for x in constraints]
         duplicates = set([x for x in l if l.count(x) > 1])
         assert duplicates == set(), f'there are multiple constraints with the same name: {duplicates}'
-        for c in self.inequality_constraints:
-            c.control_horizon = min(c.control_horizon, self.prediction_horizon)
-            self.check_control_horizon(c)
 
     def add_equality_constraints(self, constraints: List[EqualityConstraint]):
         self.equality_constraints.extend(list(sorted(constraints, key=lambda x: x.name)))
         l = [x.name for x in constraints]
         duplicates = set([x for x in l if l.count(x) > 1])
         assert duplicates == set(), f'there are multiple constraints with the same name: {duplicates}'
-        for c in self.equality_constraints:
-            c.control_horizon = min(c.control_horizon, self.prediction_horizon)
-            self.check_control_horizon(c)
 
     def add_quadratic_weight_gains(self, gains: List[QuadraticWeightGain]):
         self.quadratic_weight_gains.extend(list(sorted(gains, key=lambda x: x.name)))
@@ -1116,8 +1102,6 @@ class QPProblemBuilder:
         l = [x.name for x in constraints]
         duplicates = set([x for x in l if l.count(x) > 1])
         assert duplicates == set(), f'there are multiple constraints with the same name: {duplicates}'
-        for c in self.derivative_constraints:
-            self.check_control_horizon(c)
 
     def check_control_horizon(self, constraint):
         if constraint.control_horizon is None:

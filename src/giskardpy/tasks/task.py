@@ -174,8 +174,7 @@ class Task:
                                 task_expression: cas.symbol_expr,
                                 name: str = None,
                                 lower_slack_limit: Optional[cas.symbol_expr_float] = None,
-                                upper_slack_limit: Optional[cas.symbol_expr_float] = None,
-                                control_horizon: Optional[int] = None):
+                                upper_slack_limit: Optional[cas.symbol_expr_float] = None):
         """
         Add a task constraint to the motion problem. This should be used for most constraints.
         It will not strictly stick to the reference velocity, but requires only a single constraint in the final
@@ -201,8 +200,7 @@ class Task:
                                         velocity_limit=reference_velocity,
                                         quadratic_weight=weight,
                                         lower_slack_limit=lower_slack_limit,
-                                        upper_slack_limit=upper_slack_limit,
-                                        control_horizon=control_horizon)
+                                        upper_slack_limit=upper_slack_limit)
         if constraint.name in self.eq_constraints:
             raise DuplicateNameException(f'Constraint named {constraint.name} already exists.')
         self.eq_constraints[constraint.name] = constraint
@@ -215,8 +213,7 @@ class Task:
                                   task_expression: cas.symbol_expr,
                                   name: Optional[str] = None,
                                   lower_slack_limit: Optional[cas.symbol_expr_float] = None,
-                                  upper_slack_limit: Optional[cas.symbol_expr_float] = None,
-                                  control_horizon: Optional[int] = None):
+                                  upper_slack_limit: Optional[cas.symbol_expr_float] = None):
         """
         Add a task constraint to the motion problem. This should be used for most constraints.
         It will not strictly stick to the reference velocity, but requires only a single constraint in the final
@@ -244,8 +241,7 @@ class Task:
                                           velocity_limit=reference_velocity,
                                           quadratic_weight=weight,
                                           lower_slack_limit=lower_slack_limit,
-                                          upper_slack_limit=upper_slack_limit,
-                                          control_horizon=control_horizon)
+                                          upper_slack_limit=upper_slack_limit)
         if name in self.neq_constraints:
             raise DuplicateNameException(f'A constraint with name \'{name}\' already exists. '
                                          f'You need to set a name, if you add multiple constraints.')
@@ -431,7 +427,6 @@ class Task:
                                 task_expression: cas.symbol_expr,
                                 velocity_limit: cas.symbol_expr_float,
                                 name: Optional[str] = None,
-                                control_horizon: Optional[cas.symbol_expr_float] = None,
                                 lower_slack_limit: Union[cas.symbol_expr_float, List[cas.symbol_expr_float]] = -1e4,
                                 upper_slack_limit: Union[cas.symbol_expr_float, List[cas.symbol_expr_float]] = 1e4,
                                 horizon_function: Optional[Callable[[float, int], float]] = None):
@@ -461,7 +456,6 @@ class Task:
                                                     normalization_factor=velocity_limit,
                                                     lower_slack_limit=lower_slack_limit,
                                                     upper_slack_limit=upper_slack_limit,
-                                                    control_horizon=control_horizon,
                                                     horizon_function=horizon_function)
         if constraint.name in self.derivative_constraints:
             raise KeyError(f'a constraint with name \'{name}\' already exists')

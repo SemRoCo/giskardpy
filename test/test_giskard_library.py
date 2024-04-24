@@ -38,5 +38,7 @@ class TestWorld:
         assert joint_name in world.joints
         assert root_link_name in world.root_link_name
         assert box_name in world.links
-        world.update_state()
-        pass
+        world.state[joint_name].position = 1
+        world.notify_state_change()
+        fk = world.compute_fk_point(root=root_link_name, tip=box_name).to_np()
+        assert fk[0] == 1

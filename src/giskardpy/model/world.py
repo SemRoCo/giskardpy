@@ -556,7 +556,7 @@ class WorldTree(WorldTreeInterface):
         free_variable = FreeVariable(name=name,
                                      lower_limits={},
                                      upper_limits={},
-                                     quadratic_weights=self._default_weights)
+                                     quadratic_weights={})
         self.virtual_free_variables[name] = free_variable
         return free_variable
 

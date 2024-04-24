@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from typing import List, Optional
+from typing import List, Optional, Union, Tuple, Callable
 
 import urdf_parser_py.urdf as up
 
@@ -16,18 +16,18 @@ class LinkGeometry:
     link_T_geometry: cas.TransMatrix
     color: ColorRGBA
 
-    def __init__(self, link_T_geometry: cas.TransMatrix, color: ColorRGBA = None):
-        if color is None:
-            self.color = ColorRGBA(20 / 255, 27.1 / 255, 80 / 255, 0.2)
-        else:
-            self.color = color
-        self.link_T_geometry = link_T_geometry
+    def __init__(self, link_T_geometry: Optional[cas.TransMatrix] = None, color: Optional[ColorRGBA] = None):
+        self.color = color or ColorRGBA(20 / 255, 27.1 / 255, 80 / 255, 0.2)
+        self.link_T_geometry = link_T_geometry or cas.TransMatrix()
 
     def to_hash(self) -> str:
         return ''
 
+    def as_urdf(self):
+        raise NotImplementedError(f'as_urdf not implemented for {self.__class__.__name__}')
+
     @classmethod
-    def from_urdf(cls, urdf_thing, color) -> LinkGeometry:
+    def from_urdf(cls, urdf_thing: up.Collision, color: ColorRGBA) -> LinkGeometry:
         urdf_geometry = urdf_thing.geometry
         if urdf_thing.origin is None:
             link_T_geometry = cas.TransMatrix()
@@ -65,18 +65,19 @@ class LinkGeometry:
 
 
 class MeshGeometry(LinkGeometry):
-    def __init__(self, link_T_geometry: cas.TransMatrix, file_name: str, color: ColorRGBA, scale=None):
+    def __init__(self,
+                 file_name: str,
+                 link_T_geometry: Optional[cas.TransMatrix] = None,
+                 color: Optional[ColorRGBA] = None,
+                 scale: Optional[Tuple[float, float, float]] = None):
         super().__init__(link_T_geometry, color)
         self._file_name_ros_iris = file_name
         self.set_collision_file_name(self.file_name_absolute)
         if not os.path.isfile(resolve_ros_iris(file_name)):
             raise CorruptMeshException(f'Can\'t find file {file_name}')
-        if scale is None:
-            self.scale = [1, 1, 1]
-        else:
-            self.scale = scale
+        self.scale = scale or (1, 1, 1)
 
-    def set_collision_file_name(self, new_file_name: str):
+    def set_collision_file_name(self, new_file_name: str) -> None:
         self._collision_file_name = new_file_name
 
     @property
@@ -94,7 +95,7 @@ class MeshGeometry(LinkGeometry):
     def to_hash(self) -> str:
         return get_file_hash(self.file_name_absolute)
 
-    def as_urdf(self):
+    def as_urdf(self) -> up.Mesh:
         return up.Mesh(self.file_name_ros_iris, self.scale)
 
     def is_big(self, volume_threshold: float = 1.001e-6, surface_threshold: float = 0.00061) -> bool:
@@ -102,7 +103,12 @@ class MeshGeometry(LinkGeometry):
 
 
 class BoxGeometry(LinkGeometry):
-    def __init__(self, link_T_geometry: cas.TransMatrix, depth: float, width: float, height: float, color: ColorRGBA):
+    def __init__(self,
+                 depth: float,
+                 width: float,
+                 height: float,
+                 link_T_geometry: Optional[cas.TransMatrix] = None,
+                 color: Optional[ColorRGBA] = None):
         super().__init__(link_T_geometry, color)
         self.depth = depth
         self.width = width
@@ -111,16 +117,20 @@ class BoxGeometry(LinkGeometry):
     def to_hash(self) -> str:
         return f'box{self.depth}{self.width}{self.height}'
 
-    def as_urdf(self):
+    def as_urdf(self) -> up.Box:
         return up.Box([self.depth, self.width, self.height])
 
-    def is_big(self, volume_threshold=1.001e-6, surface_threshold=0.00061):
+    def is_big(self, volume_threshold: float = 1.001e-6, surface_threshold: float = 0.00061) -> bool:
         return (cube_volume(self.depth, self.width, self.height) > volume_threshold or
                 cube_surface(self.depth, self.width, self.height) > surface_threshold)
 
 
 class CylinderGeometry(LinkGeometry):
-    def __init__(self, link_T_geometry, height, radius, color):
+    def __init__(self,
+                 height: float,
+                 radius: float,
+                 link_T_geometry: Optional[cas.TransMatrix] = None,
+                 color: Optional[ColorRGBA] = None):
         super().__init__(link_T_geometry, color)
         self.height = height
         self.radius = radius
@@ -128,26 +138,29 @@ class CylinderGeometry(LinkGeometry):
     def to_hash(self) -> str:
         return f'cylinder{self.height}{self.radius}'
 
-    def as_urdf(self):
+    def as_urdf(self) -> up.Cylinder:
         return up.Cylinder(self.radius, self.height)
 
-    def is_big(self, volume_threshold=1.001e-6, surface_threshold=0.00061):
+    def is_big(self, volume_threshold: float = 1.001e-6, surface_threshold: float = 0.00061) -> bool:
         return (cylinder_volume(self.radius, self.height) > volume_threshold or
                 cylinder_surface(self.radius, self.height) > surface_threshold)
 
 
 class SphereGeometry(LinkGeometry):
-    def __init__(self, link_T_geometry: cas.TransMatrix, radius: float, color: ColorRGBA):
+    def __init__(self,
+                 radius: float,
+                 link_T_geometry: Optional[cas.TransMatrix] = None,
+                 color: Optional[ColorRGBA] = None):
         super().__init__(link_T_geometry, color)
         self.radius = radius
 
     def to_hash(self) -> str:
         return f'sphere{self.radius}'
 
-    def as_urdf(self):
+    def as_urdf(self) -> up.Sphere:
         return up.Sphere(self.radius)
 
-    def is_big(self, volume_threshold=1.001e-6, surface_threshold=0.00061):
+    def is_big(self, volume_threshold: float = 1.001e-6, surface_threshold: float = 0.00061) -> bool:
         return sphere_volume(self.radius) > volume_threshold
 
 
@@ -166,7 +179,7 @@ class Link:
         self.parent_joint_name = None
         self.child_joint_names = []
 
-    def _clear_memo(self, f):
+    def _clear_memo(self, f: Callable) -> None:
         try:
             if hasattr(f, 'memo'):
                 f.memo.clear()
@@ -175,16 +188,8 @@ class Link:
         except:
             pass
 
-    def name_with_collision_id(self, collision_id):
-        if collision_id > len(self.collisions):
-            raise AttributeError(f'Link {self.name} only has {len(self.collisions)} collisions, '
-                                 f'asking for {collision_id}.')
-        if collision_id == 0:
-            return self.name
-        return f'{self.name}/\\{collision_id}'
-
     @classmethod
-    def from_urdf(cls, urdf_link, prefix, color) -> Link:
+    def from_urdf(cls, urdf_link: up.Link, prefix: str, color: ColorRGBA) -> Link:
         link_name = PrefixName(urdf_link.name, prefix)
         link = cls(link_name)
         for urdf_collision in urdf_link.collisions:
@@ -195,13 +200,12 @@ class Link:
                                                        color=color))
         return link
 
-    def dye_collisions(self, color: ColorRGBA):
-        self.reset_cache()
+    def dye_collisions(self, color: ColorRGBA) -> None:
         if self.has_collisions():
             for collision in self.collisions:
                 collision.color = color
 
-    def as_urdf(self):
+    def as_urdf(self) -> str:
         r = up.Robot(self.name)
         r.version = '1.0'
         link = up.Link(self.name)
@@ -209,24 +213,20 @@ class Link:
         r.add_link(link)
         return r.to_xml_string()
 
-    def has_visuals(self):
+    def has_visuals(self) -> bool:
         return len(self.visuals) > 0
 
-    def has_collisions(self, volume_threshold=1.001e-6, surface_threshold=0.00061):
+    def has_collisions(self, volume_threshold: float = 1.001e-6, surface_threshold: float = 0.00061) -> bool:
         """
-        :type link: str
         :param volume_threshold: m**3, ignores simple geometry shapes with a volume less than this
-        :type volume_threshold: float
         :param surface_threshold: m**2, ignores simple geometry shapes with a surface area less than this
-        :type surface_threshold: float
         :return: True if collision geometry is mesh or simple shape with volume/surface bigger than thresholds.
-        :rtype: bool
         """
         for collision in self.collisions:
             geo = collision
-            if geo.is_big():
+            if geo.is_big(volume_threshold=volume_threshold, surface_threshold=surface_threshold):
                 return True
         return False
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return str(self.name)

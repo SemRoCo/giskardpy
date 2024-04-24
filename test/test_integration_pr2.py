@@ -588,7 +588,7 @@ class TestMonitors:
                                           height=cylinder_height,
                                           radius=0.0225,
                                           pose=pose,
-                                          parent_link='r_gripper_tool_frame')
+                                          parent_link=giskard_msgs.LinkName(name='r_gripper_tool_frame'))
         better_pose.dye_group(cylinder_name, (0, 0, 1, 1))
 
         better_pose.motion_goals.add_motion_goal(motion_goal_class=InsertCylinder.__name__,

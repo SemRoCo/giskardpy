@@ -172,6 +172,19 @@ class WorldTree(WorldTreeInterface):
         self._model_version = 0
         self._controlled_joints = []
         self._clear()
+        self.set_default_weights()
+
+    def set_default_weights(self,
+                            velocity_weight: float = 0.01,
+                            acceleration_weight: float = 0,
+                            jerk_weight: float = 0.01):
+        """
+        The default values are set automatically, even if this function is not called.
+        A typical goal has a weight of 1, so the values in here should be sufficiently below that.
+        """
+        god_map.world.update_default_weights({Derivatives.velocity: velocity_weight,
+                                               Derivatives.acceleration: acceleration_weight,
+                                               Derivatives.jerk: jerk_weight})
 
     @property
     def root_link_name(self) -> PrefixName:

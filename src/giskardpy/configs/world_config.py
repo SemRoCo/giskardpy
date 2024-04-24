@@ -21,7 +21,7 @@ class WorldConfig(ABC):
 
     def __init__(self):
         god_map.world = WorldTree()
-        self.set_default_weights()
+        god_map.world.set_default_weights()
 
     @property
     def world(self) -> WorldTree:
@@ -39,18 +39,6 @@ class WorldConfig(ABC):
     @property
     def robot_group_name(self) -> str:
         return god_map.world.robot_name
-
-    def set_default_weights(self,
-                            velocity_weight: float = 0.01,
-                            acceleration_weight: float = 0,
-                            jerk_weight: float = 0.01):
-        """
-        The default values are set automatically, even if this function is not called.
-        A typical goal has a weight of 1, so the values in here should be sufficiently below that.
-        """
-        god_map.world.update_default_weights({Derivatives.velocity: velocity_weight,
-                                               Derivatives.acceleration: acceleration_weight,
-                                               Derivatives.jerk: jerk_weight})
 
     def set_weight(self, weight_map: derivative_map, joint_name: str, group_name: Optional[str] = None):
         """

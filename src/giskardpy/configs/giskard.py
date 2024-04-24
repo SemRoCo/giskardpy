@@ -22,8 +22,6 @@ class Giskard:
     robot_interface_config: RobotInterfaceConfig = None
     qp_controller_config: QPControllerConfig = None
     tmp_folder: str = resolve_ros_iris('package://giskardpy/tmp/')
-    goal_package_paths = {'giskardpy.goals'}
-    monitor_package_paths = {'giskardpy.monitors'}
     action_server_name: str = '~command'
 
     def __init__(self,
@@ -115,14 +113,14 @@ class Giskard:
         if len(new_goals) == 0:
             raise SetupException(f'No classes of type \'{Goal.__name__}\' found in {package_name}.')
         logging.loginfo(f'Made goal classes {new_goals} available Giskard.')
-        self.goal_package_paths.add(package_name)
+        god_map.motion_goal_manager.goal_package_paths.add(package_name)
 
     def add_monitor_package_name(self, package_name: str) -> None:
         new_monitors = get_all_classes_in_package(package_name, Monitor)
         if len(new_monitors) == 0:
             raise SetupException(f'No classes of type \'{Monitor.__name__}\' found in \'{package_name}\'.')
         logging.loginfo(f'Made Monitor classes \'{new_monitors}\' available Giskard.')
-        self.monitor_package_paths.add(package_name)
+        god_map.monitor_manager.monitor_package_paths.add(package_name)
 
     def live(self):
         """

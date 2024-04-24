@@ -33,11 +33,12 @@ class MonitorManager:
     triggers: Dict[int, Callable]  # id -> updater callback
     trigger_conditions: List[cas.Expression]  # id -> condition
     compiled_trigger_conditions: cas.CompiledFunction  # stacked compiled function which returns array of evaluated conditions
+    monitor_package_paths = {'giskardpy.monitors'}
 
     def __init__(self):
         self.monitors = []
         self.allowed_monitor_types = {}
-        for path in god_map.giskard.monitor_package_paths:
+        for path in self.monitor_package_paths:
             self.allowed_monitor_types.update(get_all_classes_in_package(path, Monitor))
         self.state_history = []
         self.substitution_values = {}

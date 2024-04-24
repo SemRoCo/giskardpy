@@ -20,13 +20,14 @@ class MotionGoalManager:
     task_state: np.ndarray
     compiled_state_updater: cas.CompiledFunction
     state_history: List[Tuple[float, np.ndarray]]
+    goal_package_paths = {'giskardpy.goals'}
 
     def __init__(self):
         self.motion_goals = {}
         self.tasks = OrderedDict()
         self.allowed_motion_goal_types = {}
         self.state_history = []
-        for path in god_map.giskard.goal_package_paths:
+        for path in self.goal_package_paths:
             self.allowed_motion_goal_types.update(get_all_classes_in_package(path, Goal))
 
     def init_task_state(self):

@@ -1195,7 +1195,7 @@ class QPProblemBuilder:
         try:
             self.xdot_full = self.qp_solver.solve_and_retry(substitutions=substitutions)
             # self._create_debug_pandas(self.qp_solver)
-            return NextCommands(self.free_variables, self.xdot_full, self.order, self.prediction_horizon)
+            return NextCommands.from_xdot(self.free_variables, self.xdot_full, self.order, self.prediction_horizon)
         except InfeasibleException as e_original:
             self.xdot_full = None
             self._create_debug_pandas(self.qp_solver)

@@ -1,8 +1,6 @@
-from typing import Tuple, Union, Dict, List, Type, Optional
+from typing import Tuple, Union, Dict, Type, Optional, List
 
 import numpy as np
-from geometry_msgs.msg import Quaternion, Point
-from tf.transformations import euler_matrix
 
 from giskardpy.data_types.data_types import Derivatives
 from giskardpy.qp.qp_solver import QPSolver
@@ -37,7 +35,7 @@ def qv_mult(quaternion: np.ndarray, vector: np.ndarray) -> np.ndarray:
     return quaternion_multiply(quaternion_multiply(q, v), quaternion_conjugate(q))[:-1]
 
 
-def quaternion_from_axis_angle(axis: np.ndarray, angle: float) -> np.ndarray:
+def quaternion_from_axis_angle(axis: Union[List[float], Tuple[float, float, float], np.ndarray], angle: float) -> np.ndarray:
     half_angle = angle / 2
     return np.array([axis[0] * np.sin(half_angle),
                      axis[1] * np.sin(half_angle),
@@ -112,11 +110,16 @@ def rotation_matrix_from_quaternion(x: float, y: float, z: float, w: float) -> n
                      [0, 0, 0, 1]])
 
 
+def rotation_matrix_from_axis_angle(axis: Union[List[float], Tuple[float, float, float], np.ndarray], angle: float) \
+        -> np.ndarray:
+    return rotation_matrix_from_quaternion(*quaternion_from_axis_angle(axis, angle))
+
+
 def quaternion_from_rpy(roll: float, pitch: float, yaw: float) -> np.ndarray:
     return quaternion_from_rotation_matrix(rotation_matrix_from_rpy(roll, pitch, yaw))
 
 
-def quaternion_from_rotation_matrix(matrix: np.ndarray) -> np.ndarray:
+def quaternion_from_rotation_matrix(matrix: Union[List[List[float]], np.ndarray]) -> np.ndarray:
     """
     :param matrix: 4x4 Matrix
     :return: array length 4

@@ -8,7 +8,6 @@ from geometry_msgs.msg import Pose, PoseStamped
 from geometry_msgs.msg._Quaternion import Quaternion
 from interactive_markers.interactive_marker_server import InteractiveMarkerServer
 from interactive_markers.menu_handler import MenuHandler
-from tf.transformations import quaternion_multiply, quaternion_about_axis
 from visualization_msgs.msg import MarkerArray
 from visualization_msgs.msg._InteractiveMarker import InteractiveMarker
 from visualization_msgs.msg._InteractiveMarkerControl import InteractiveMarkerControl
@@ -17,7 +16,7 @@ from visualization_msgs.msg._Marker import Marker
 
 from giskardpy.python_interface.old_python_interface import OldGiskardWrapper
 from giskardpy.middleware import logging
-from giskardpy.utils.math import qv_mult
+from giskardpy.utils.math import qv_mult, quaternion_multiply, quaternion_from_axis_angle
 
 MARKER_SCALE = 0.15
 
@@ -226,7 +225,7 @@ class IMServer(object):
             m.pose.position.x += muh[0]
             m.pose.position.y += muh[1]
             m.pose.position.z += muh[2]
-            m.pose.orientation = Quaternion(*quaternion_multiply(old_q, quaternion_about_axis(np.pi / 2, [0, 1, 0])))
+            m.pose.orientation = Quaternion(*quaternion_multiply(old_q, quaternion_from_axis_angle([0, 1, 0], np.pi / 2)))
             m.color.r = 1
             m.color.g = 0
             m.color.b = 0
@@ -241,7 +240,7 @@ class IMServer(object):
             m.pose.position.x += muh[0]
             m.pose.position.y += muh[1]
             m.pose.position.z += muh[2]
-            m.pose.orientation = Quaternion(*quaternion_multiply(old_q, quaternion_about_axis(-np.pi / 2, [1, 0, 0])))
+            m.pose.orientation = Quaternion(*quaternion_multiply(old_q, quaternion_from_axis_angle([1, 0, 0], -np.pi / 2)))
             m.color.r = 0
             m.color.g = 1
             m.color.b = 0

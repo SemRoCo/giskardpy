@@ -1682,7 +1682,6 @@ class TestConstraints:
         goal_vector = Vector3Stamped()
         goal_vector.header.frame_id = 'map'
         goal_vector.vector.x = 1
-        goal_vector.vector = tf.normalize(goal_vector.vector)
         zero_pose.set_align_planes_goal(tip_link='base_footprint',
                                         root_link='map',
                                         tip_normal=eef_vector,

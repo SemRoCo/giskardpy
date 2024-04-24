@@ -5,7 +5,6 @@ import pytest
 import rospy
 from geometry_msgs.msg import PoseStamped, Point, Quaternion
 from std_srvs.srv import Trigger
-from tf.transformations import quaternion_about_axis
 
 import giskardpy.middleware.ros1.tfwrapper as tf
 from giskard_msgs.msg import MoveGoal, GiskardError
@@ -14,6 +13,7 @@ from giskardpy.configs.giskard import Giskard
 from giskardpy.configs.iai_robots.pr2 import PR2CollisionAvoidance, PR2JointTrajServerMujocoInterface, \
     WorldWithPR2Config
 from giskardpy.configs.qp_controller_config import QPControllerConfig
+from giskardpy.utils.math import quaternion_from_axis_angle
 from test_integration_pr2 import PR2TestWrapper, TestJointGoals, pocky_pose
 
 
@@ -139,7 +139,7 @@ class TestCartGoals:
         base_goal.header.frame_id = 'map'
         base_goal.pose.position.x = 1
         base_goal.pose.position.y = -1
-        base_goal.pose.orientation = Quaternion(*quaternion_about_axis(-np.pi / 4, [0, 0, 1]))
+        base_goal.pose.orientation = Quaternion(*quaternion_from_axis_angle([0, 0, 1], -np.pi / 4))
         zero_pose.move_base(base_goal)
 
     def test_forward(self, zero_pose: PR2TestWrapper):

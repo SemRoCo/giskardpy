@@ -268,26 +268,6 @@ class TestCartGoals:
         countertip_P_goal.header.frame_id = countertop_frame
         countertip_P_goal.point.x = 1.3
         countertip_P_goal.point.y = -0.3
-        map_P_goal = tf.msg_to_homogeneous_matrix(apartment_setup.transform_msg('map', countertip_P_goal))
-        map_P_goal[-2] = 0
-
-        # map_P_base_footprint = tf.msg_to_homogeneous_matrix(tf.lookup_point('map', 'base_footprint'))
-        # # map_P_goal = np.array([1.3, -0.3, 0, 1])
-        # x = map_P_goal - map_P_base_footprint
-        # x = x[:3]
-        # x /= np.linalg.norm(x)
-        # z = np.array([0,0,1])
-        # y = np.cross(z, x)
-        # y /= np.linalg.norm(y)
-        # map_R_goal = np.vstack([x,y,z]).T
-        # map_R_goal = np.vstack([np.vstack([map_R_goal.T, [0,0,0]]).T, [0,0,0,1]])
-        #
-        # base_pose = tf.lookup_pose('map', 'base_footprint')
-        # base_pose.pose.orientation = Quaternion(*quaternion_from_matrix(map_R_goal))
-        # # base_pose = tf.transform_pose(apartment_setup.default_root, base_pose)
-        # # base_pose.pose.position.z = 0
-        # apartment_setup.allow_all_collisions()
-        # apartment_setup.move_base(base_pose)
 
         base_pose = PoseStamped()
         base_pose.header.frame_id = countertop_frame

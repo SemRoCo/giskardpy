@@ -23,12 +23,15 @@ class MotionGoalManager:
     goal_package_paths = {'giskardpy.goals'}
 
     def __init__(self):
-        self.motion_goals = {}
-        self.tasks = OrderedDict()
         self.allowed_motion_goal_types = {}
-        self.state_history = []
         for path in self.goal_package_paths:
             self.allowed_motion_goal_types.update(get_all_classes_in_package(path, Goal))
+        self.reset()
+
+    def reset(self):
+        self.motion_goals = {}
+        self.tasks = OrderedDict()
+        self.state_history = []
 
     def init_task_state(self):
         self.task_state = np.zeros(len(self.tasks))

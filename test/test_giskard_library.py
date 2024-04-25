@@ -78,15 +78,10 @@ class TestWorld:
 
         joint_goal = JointPositionList(goal_state={joint_name: goal})
 
-        monitor_manager = MonitorManager()
-        god_map.monitor_manager = monitor_manager
+        god_map.motion_goal_manager.add_motion_goal(joint_goal)
+        god_map.motion_goal_manager.init_task_state()
 
-        motion_goal_manager = MotionGoalManager()
-        god_map.motion_goal_manager = motion_goal_manager
-        motion_goal_manager.add_motion_goal(joint_goal)
-        motion_goal_manager.init_task_state()
-
-        eq, neq, neqd, lin_weight, quad_weight = motion_goal_manager.get_constraints_from_goals()
+        eq, neq, neqd, lin_weight, quad_weight = god_map.motion_goal_manager.get_constraints_from_goals()
         controller = QPProblemBuilder(sample_period=dt,
                                       free_variables=list(box_world.free_variables.values()),
                                       equality_constraints=list(eq.values()))

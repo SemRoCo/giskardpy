@@ -19,8 +19,13 @@ class DebugExpressionManager:
     _debug_trajectory: Trajectory
 
     def __init__(self):
+        self.reset()
+
+    def reset(self):
         self.debug_expressions = {}
         self._debug_trajectory = Trajectory()
+        self.compiled_debug_expressions = {}
+        self.evaluated_debug_expressions = {}
 
     def add_debug_expression(self, name: str, expression: cas.Expression, color: Optional[ColorRGBA] = None):
         if isinstance(expression, cas.Symbol_):

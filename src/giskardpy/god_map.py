@@ -13,9 +13,9 @@ if TYPE_CHECKING:
     from giskardpy.configs.qp_controller_config import QPControllerConfig
     from giskardpy.data_types.data_types import PrefixName
     from giskardpy.configs.giskard import Giskard
+    from giskardpy.monitors.monitor_manager import MonitorManager
     from giskardpy.goals.motion_goal_manager import MotionGoalManager
     from giskardpy.debug_expression_manager import DebugExpressionManager
-    from giskardpy.monitors.monitor_manager import MonitorManager
     from giskardpy.configs.collision_avoidance_config import CollisionAvoidanceConfig
     from giskardpy.configs.world_config import WorldConfig
     from giskardpy.model.collision_world_syncer import (CollisionWorldSynchronizer, CollisionAvoidanceGroupThresholds,
@@ -59,6 +59,16 @@ class GodMap:
         if not self.__initialized:
             from giskardpy.model.world import WorldTree
             self.world = WorldTree()
+
+            from giskardpy.goals.motion_goal_manager import MotionGoalManager
+            self.motion_goal_manager = MotionGoalManager()
+
+            from giskardpy.monitors.monitor_manager import MonitorManager
+            self.monitor_manager = MonitorManager()
+
+            from giskardpy.debug_expression_manager import DebugExpressionManager
+            self.debug_expression_manager = DebugExpressionManager()
+
             self.__initialized = True
 
     def __getattr__(self, item):

@@ -36,10 +36,13 @@ class MonitorManager:
     monitor_package_paths = {'giskardpy.monitors'}
 
     def __init__(self):
-        self.monitors = []
         self.allowed_monitor_types = {}
         for path in self.monitor_package_paths:
             self.allowed_monitor_types.update(get_all_classes_in_package(path, Monitor))
+        self.reset()
+
+    def reset(self):
+        self.monitors = []
         self.state_history = []
         self.substitution_values = {}
         self.triggers = {}
@@ -72,7 +75,6 @@ class MonitorManager:
 
     @profile
     def compile_monitors(self) -> None:
-        self.state_history = []
         self.state = np.zeros(len(self.monitors))
         self.life_cycle_state = np.zeros(len(self.monitors))
         self.set_initial_life_cycle_state()

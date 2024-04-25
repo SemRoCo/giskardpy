@@ -92,7 +92,7 @@ class DebugExpressionManager:
             else:
                 velocity = 0
         next_js[name].position = value
-        next_js[name].velocity = velocity / god_map.qp_controller_config.sample_period
+        next_js[name].velocity = velocity / god_map.qp_controller.sample_period
 
     def to_pandas(self):
         p_debug = {}

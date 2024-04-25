@@ -4,7 +4,7 @@ from py_trees import Status
 from sensor_msgs.msg import JointState
 
 from giskardpy.god_map import god_map
-from giskardpy.qp.qp_controller import QPProblemBuilder
+from giskardpy.qp.qp_controller import QPController
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.decorators import record_time
 
@@ -34,7 +34,7 @@ class PublishDebugExpressions(GiskardBehavior):
         return super().setup(timeout)
 
     @profile
-    def create_msg(self, qp_controller: QPProblemBuilder):
+    def create_msg(self, qp_controller: QPController):
         msg = JointState()
         msg.header.stamp = rospy.get_rostime()
 
@@ -132,7 +132,7 @@ class PublishDebugExpressions(GiskardBehavior):
     @record_time
     @profile
     def update(self):
-        qp_controller: QPProblemBuilder = god_map.qp_controller
+        qp_controller: QPController = god_map.qp_controller
         msg = self.create_msg(qp_controller)
         self.publisher.publish(msg)
         return Status.SUCCESS

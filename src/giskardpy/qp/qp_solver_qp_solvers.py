@@ -2,9 +2,9 @@
 import numpy as np
 from qpsolvers import solve_qp
 
-from giskardpy.configs.qp_controller_config import SupportedQPSolver
 from giskardpy.data_types.exceptions import QPSolverException, InfeasibleException, HardConstraintsViolatedException
 from giskardpy.qp.qp_solver import QPSolver
+from giskardpy.qp.qp_solver_ids import SupportedQPSolver
 
 
 class QPSolverQPSolvers(QPSolver):

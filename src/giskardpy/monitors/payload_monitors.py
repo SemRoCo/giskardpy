@@ -32,19 +32,16 @@ class WorldUpdatePayloadMonitor(PayloadMonitor):
 
 
 class SetMaxTrajectoryLength(CancelMotion):
-    new_length: float
+    length: float
 
     def __init__(self,
-                 new_length: Optional[float] = None,
+                 length: float,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol, ):
         if not (start_condition == cas.TrueSymbol).to_np():
             raise MonitorInitalizationException(f'Cannot set start_condition for {SetMaxTrajectoryLength.__name__}')
-        if new_length is None:
-            self.new_length = god_map.qp_controller_config.max_trajectory_length
-        else:
-            self.new_length = new_length
-        error_message = f'Trajectory longer than {self.new_length}'
+        self.length = length
+        error_message = f'Trajectory longer than {self.length}'
         super().__init__(name=name,
                          start_condition=start_condition,
                          error_message=error_message,
@@ -52,7 +49,7 @@ class SetMaxTrajectoryLength(CancelMotion):
 
     @profile
     def __call__(self):
-        if god_map.time > self.new_length:
+        if god_map.time > self.length:
             return super().__call__()
 
 

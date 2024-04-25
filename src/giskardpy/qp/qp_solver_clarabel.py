@@ -2,8 +2,8 @@ import numpy as np
 from clarabel import clarabel
 from scipy import sparse
 
-from giskardpy.configs.qp_controller_config import SupportedQPSolver
 from giskardpy.qp.qp_solver import QPSolver
+from giskardpy.qp.qp_solver_ids import SupportedQPSolver
 from giskardpy.utils.decorators import record_time
 
 

@@ -38,7 +38,7 @@ class BaseArmWeightScaling(Goal):
         scaling_exp = root_P_goal - root_P_tip
 
         list_gains = []
-        for t in range(god_map.qp_controller_config.prediction_horizon):
+        for t in range(god_map.qp_controller.prediction_horizon):
             gains = defaultdict(dict)
             arm_v = None
             for name in arm_joints:

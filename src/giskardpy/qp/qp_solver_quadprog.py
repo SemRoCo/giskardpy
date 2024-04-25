@@ -1,9 +1,9 @@
 import numpy as np
 import quadprog
 
-from giskardpy.configs.qp_controller_config import SupportedQPSolver
 from giskardpy.data_types.exceptions import InfeasibleException
 from giskardpy.qp.qp_solver import QPSolver
+from giskardpy.qp.qp_solver_ids import SupportedQPSolver
 
 
 class QPSolverQuadprog(QPSolver):

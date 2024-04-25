@@ -4,11 +4,12 @@ from typing import Tuple, Dict
 
 import numpy as np
 
-from giskardpy.configs.qp_controller_config import SupportedQPSolver
 from giskardpy.data_types.exceptions import QPSolverException, InfeasibleException
 from giskardpy.qp.qp_solver import QPSWIFTFormatter
 import qpSWIFT
 import scipy.sparse as sp
+
+from giskardpy.qp.qp_solver_ids import SupportedQPSolver
 
 
 class QPSWIFTExitFlags(IntEnum):

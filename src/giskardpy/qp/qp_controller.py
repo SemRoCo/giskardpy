@@ -10,7 +10,6 @@ import numpy as np
 import pandas as pd
 
 import giskardpy.casadi_wrapper as cas
-from giskardpy.configs.qp_controller_config import SupportedQPSolver
 from giskardpy.data_types.exceptions import HardConstraintsViolatedException, QPSolverException, InfeasibleException, \
     VelocityLimitUnreachableException
 from giskardpy.god_map import god_map
@@ -20,6 +19,7 @@ from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.next_command import NextCommands
 from giskardpy.qp.pos_in_vel_limits import b_profile, implicit_vel_profile
 from giskardpy.qp.qp_solver import QPSolver
+from giskardpy.qp.qp_solver_ids import SupportedQPSolver
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.middleware import logging
 from giskardpy.utils.utils import create_path, get_all_classes_in_package
@@ -219,7 +219,7 @@ class Weights(ProblemDataPart):
                     for q_gain in quadratic_weight_gains:
                         if t < len(q_gain.gains) and v in q_gain.gains[t][derivative].keys():
                             weights[derivative][f't{t:03}/{v.position_name}/{derivative}'] *= \
-                            q_gain.gains[t][derivative][v]
+                                q_gain.gains[t][derivative][v]
         for _, weight in sorted(weights.items()):
             params.append(weight)
         return params
@@ -260,7 +260,7 @@ class Weights(ProblemDataPart):
                         for l_gain in linear_weight_gains:
                             if t < len(l_gain.gains) and v in l_gain.gains[t][derivative].keys():
                                 weights[derivative][f't{t:03}/{v.position_name}/{derivative}'] += \
-                                l_gain.gains[t][derivative][v]
+                                    l_gain.gains[t][derivative][v]
             for _, weight in sorted(weights.items()):
                 params.append(weight)
             return params
@@ -994,7 +994,7 @@ def detect_solvers():
 detect_solvers()
 
 
-class QPProblemBuilder:
+class QPController:
     """
     Wraps around QP Solver. Builds the required matrices from constraints.
     """
@@ -1015,28 +1015,56 @@ class QPProblemBuilder:
                  prediction_horizon: int = 9,
                  max_derivative: Derivatives = Derivatives.jerk,
                  solver_id: Optional[SupportedQPSolver] = None,
-                 free_variables: List[FreeVariable] = None,
-                 equality_constraints: List[EqualityConstraint] = None,
-                 inequality_constraints: List[InequalityConstraint] = None,
-                 derivative_constraints: List[DerivativeInequalityConstraint] = None,
-                 quadratic_weight_gains: List[QuadraticWeightGain] = None,
-                 linear_weight_gains: List[LinearWeightGain] = None,
                  retries_with_relaxed_constraints: int = 0,
                  retry_added_slack: float = 100,
                  retry_weight_factor: float = 100):
         self.sample_period = sample_period
         self.max_derivative = max_derivative
+        self.prediction_horizon = prediction_horizon
+        self.retries_with_relaxed_constraints = retries_with_relaxed_constraints
+        self.retry_added_slack = retry_added_slack
+        self.retry_weight_factor = retry_weight_factor
+
+        self.set_qp_solver(solver_id)
+
+        logging.loginfo(f'Initialized QP Controller:\n'
+                        f'sample period: "{self.sample_period}"s\n'
+                        f'max derivative: "{self.max_derivative.name}"\n'
+                        f'prediction horizon: "{self.prediction_horizon}"\n'
+                        f'QP solver: "{self.qp_solver_class.solver_id.name}"')
+        self.reset()
+
+    def set_qp_solver(self, solver_id: Optional[SupportedQPSolver] = None) -> None:
+        print_later = hasattr(self, 'qp_solver_class')
+        if solver_id is not None:
+            self.qp_solver_class = available_solvers[solver_id]
+        else:
+            for solver_id in SupportedQPSolver:
+                if solver_id in available_solvers:
+                    self.qp_solver_class = available_solvers[solver_id]
+                    break
+            else:
+                raise QPSolverException(f'No qp solver found')
+        if print_later:
+            logging.loginfo(f'QP Solver set to "{self.qp_solver_class.solver_id.name}"')
+
+    def reset(self):
         self.free_variables = []
         self.equality_constraints = []
         self.inequality_constraints = []
         self.derivative_constraints = []
         self.quadratic_weight_gains = []
         self.linear_weight_gains = []
-        self.prediction_horizon = prediction_horizon
-        self.retries_with_relaxed_constraints = retries_with_relaxed_constraints
-        self.retry_added_slack = retry_added_slack
-        self.retry_weight_factor = retry_weight_factor
         self.xdot_full = None
+
+    def init(self,
+             free_variables: List[FreeVariable] = None,
+             equality_constraints: List[EqualityConstraint] = None,
+             inequality_constraints: List[InequalityConstraint] = None,
+             derivative_constraints: List[DerivativeInequalityConstraint] = None,
+             quadratic_weight_gains: List[QuadraticWeightGain] = None,
+             linear_weight_gains: List[LinearWeightGain] = None):
+        self.reset()
         if free_variables is not None:
             self.add_free_variables(free_variables)
         if inequality_constraints is not None:
@@ -1049,20 +1077,6 @@ class QPProblemBuilder:
             self.add_quadratic_weight_gains(quadratic_weight_gains)
         if linear_weight_gains is not None:
             self.add_linear_weight_gains(linear_weight_gains)
-
-        if solver_id is not None:
-            self.qp_solver_class = available_solvers[solver_id]
-        else:
-            for solver_id in SupportedQPSolver:
-                if solver_id in available_solvers:
-                    self.qp_solver_class = available_solvers[solver_id]
-                    break
-            else:
-                raise QPSolverException(f'No qp solver found')
-
-        logging.loginfo(f'Using QP Solver \'{solver_id.name}\'')
-        logging.loginfo(f'Prediction horizon: \'{self.prediction_horizon}\'')
-        self.qp_solver = self.compile(self.qp_solver_class)
 
     def add_free_variables(self, free_variables: list):
         if len(free_variables) == 0:
@@ -1116,7 +1130,7 @@ class QPProblemBuilder:
             constraint.control_horizon = self.prediction_horizon
 
     @profile
-    def compile(self, solver_class: Type[QPSolver], default_limits: bool = False) -> QPSolver:
+    def compile(self, default_limits: bool = False) -> None:
         logging.loginfo('Creating controller')
         kwargs = {'free_variables': self.free_variables,
                   'equality_constraints': self.equality_constraints,
@@ -1129,7 +1143,6 @@ class QPProblemBuilder:
         self.free_variable_bounds = FreeVariableBounds(**kwargs)
         self.equality_model = EqualityModel(**kwargs)
         self.equality_bounds = EqualityBounds(**kwargs)
-        # self.goal_reached_checks = GoalReached(**kwargs)
         self.inequality_model = InequalityModel(**kwargs)
         self.inequality_bounds = InequalityBounds(default_limits=default_limits, **kwargs)
 
@@ -1140,16 +1153,13 @@ class QPProblemBuilder:
         E, E_slack = self.equality_model.construct_expression()
         bE = self.equality_bounds.construct_expression()
 
-        qp_solver = solver_class(weights=weights, g=g, lb=lb, ub=ub,
-                                 E=E, E_slack=E_slack, bE=bE,
-                                 A=A, A_slack=A_slack, lbA=lbA, ubA=ubA
-                                 )
-        # self.goal_reached_checks.compile(qp_solver.free_symbols)
+        self.qp_solver = self.qp_solver_class(weights=weights, g=g, lb=lb, ub=ub,
+                                         E=E, E_slack=E_slack, bE=bE,
+                                         A=A, A_slack=A_slack, lbA=lbA, ubA=ubA)
         logging.loginfo('Done compiling controller:')
         logging.loginfo(f'  #free variables: {weights.shape[0]}')
         logging.loginfo(f'  #equality constraints: {bE.shape[0]}')
         logging.loginfo(f'  #inequality constraints: {lbA.shape[0]}')
-        return qp_solver
 
     def get_parameter_names(self):
         return self.qp_solver.free_symbols_str

@@ -1,10 +1,10 @@
 from typing import Union, Optional
 
-from giskardpy.configs.qp_controller_config import SupportedQPSolver
 from giskardpy.goals.goal import NonMotionGoal
 from giskardpy.god_map import god_map
 from giskardpy.middleware import logging
 import giskardpy.casadi_wrapper as cas
+from giskardpy.qp.qp_solver_ids import SupportedQPSolver
 from giskardpy.tree.blackboard_utils import GiskardBlackboard
 
 
@@ -25,7 +25,7 @@ class SetPredictionHorizon(NonMotionGoal):
 
         if self.new_prediction_horizon < 7:
             logging.logwarn('Prediction horizon must be >= 7.')
-        god_map.qp_controller_config.prediction_horizon = self.new_prediction_horizon
+        god_map.qp_controller.prediction_horizon = self.new_prediction_horizon
 
 
 class SetQPSolver(NonMotionGoal):
@@ -38,7 +38,7 @@ class SetQPSolver(NonMotionGoal):
             name = self.__class__.__name__
         super().__init__(name=name)
         qp_solver_id = SupportedQPSolver(qp_solver_id)
-        god_map.qp_controller_config.set_qp_solver(qp_solver_id)
+        god_map.qp_controller.set_qp_solver(qp_solver_id)
 
 
 class EnableVelocityTrajectoryTracking(NonMotionGoal):

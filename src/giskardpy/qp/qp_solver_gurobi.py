@@ -7,10 +7,10 @@ from gurobipy import GRB
 from gurobipy.gurobipy import GurobiError
 from scipy import sparse
 
-from giskardpy.configs.qp_controller_config import SupportedQPSolver
 from giskardpy.data_types.exceptions import QPSolverException, InfeasibleException
 from giskardpy.qp.qp_solver import QPSWIFTFormatter
 from giskardpy.middleware import logging
+from giskardpy.qp.qp_solver_ids import SupportedQPSolver
 
 gurobipy.setParam(gurobipy.GRB.Param.LogToConsole, False)
 gurobipy.setParam(gurobipy.GRB.Param.FeasibilityTol, 2.5e-5)

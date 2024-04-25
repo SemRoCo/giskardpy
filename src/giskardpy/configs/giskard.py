@@ -96,10 +96,10 @@ class Giskard:
 
     def sanity_check(self):
         hz = god_map.behavior_tree_config.control_loop_max_hz
-        if god_map.qp_controller_config.sample_period < 1/hz:
+        if god_map.qp_controller.sample_period < 1/hz:
             raise GiskardException(f'control_loop_max_hz (1/{hz}hz = {1/hz}) '
                                    f'must be smaller than sample period of controller '
-                                   f'({god_map.qp_controller_config.sample_period}).')
+                                   f'({god_map.qp_controller.sample_period}).')
         self._controlled_joints_sanity_check()
 
     def _controlled_joints_sanity_check(self):

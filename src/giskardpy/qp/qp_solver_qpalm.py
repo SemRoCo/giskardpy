@@ -6,11 +6,11 @@ import numpy as np
 import qpalm
 from scipy import sparse as sp
 
-from giskardpy.configs.qp_controller_config import SupportedQPSolver
 from giskardpy.data_types.exceptions import QPSolverException, InfeasibleException, HardConstraintsViolatedException
 from giskardpy.qp.qp_solver import QPSolver
 
 import giskardpy.casadi_wrapper as cas
+from giskardpy.qp.qp_solver_ids import SupportedQPSolver
 
 
 class QPALMInfo(IntEnum):

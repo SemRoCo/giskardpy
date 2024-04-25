@@ -5,35 +5,13 @@ from enum import IntEnum
 from typing import Optional
 
 from giskardpy.data_types.data_types import Derivatives
-
-
-class SupportedQPSolver(IntEnum):
-    qpSWIFT = 1
-    qpalm = 2
-    gurobi = 3
-    # clarabel = 4
-    # qpOASES = 5
-    # osqp = 6
-    # quadprog = 7
-    # cplex = 3
-    # cvxopt = 7
-    # qp_solvers = 8
-    # mosek = 9
-    # scs = 11
-    # casadi = 12
-    # super_csc = 14
-    # cvxpy = 15
+from giskardpy.god_map import god_map
+from giskardpy.qp.qp_controller import QPController
+from giskardpy.qp.qp_solver_ids import SupportedQPSolver
 
 
 class QPControllerConfig:
-    qp_solver: SupportedQPSolver
-    prediction_horizon: int = 9
-    sample_period: float = 0.05
-    max_derivative: Derivatives = Derivatives.jerk
-    max_trajectory_length: float = 30
-    retries_with_relaxed_constraints: int = 5
-    added_slack: float = 100
-    weight_factor: float = 100
+    __max_derivative: Derivatives = Derivatives.jerk
 
     def __init__(self,
                  qp_solver: Optional[SupportedQPSolver] = None,
@@ -66,15 +44,10 @@ class QPControllerConfig:
         self.set_defaults()
 
     def set_defaults(self):
-        self.qp_solver = self.__qp_solver
-        self.prediction_horizon = self.__prediction_horizon
-        self.sample_period = self.__sample_period
-        self.retries_with_relaxed_constraints = self.__retries_with_relaxed_constraints
-        self.added_slack = self.__added_slack
-        self.weight_factor = self.__weight_factor
-        self.endless_mode = self.__endless_mode
-        self.max_trajectory_length = self.__max_trajectory_length
-
-    def set_qp_solver(self, new_solver: SupportedQPSolver):
-        self.__qp_solver = new_solver
-        self.qp_solver = new_solver
+        god_map.qp_controller = QPController(sample_period=self.__sample_period,
+                                             prediction_horizon=self.__prediction_horizon,
+                                             solver_id=self.__qp_solver,
+                                             max_derivative=self.__max_derivative,
+                                             retries_with_relaxed_constraints=self.__retries_with_relaxed_constraints,
+                                             retry_added_slack=self.__added_slack,
+                                             retry_weight_factor=self.__weight_factor)

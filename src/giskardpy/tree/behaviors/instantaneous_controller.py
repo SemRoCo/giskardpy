@@ -1,7 +1,7 @@
 from py_trees import Status
 
 from giskardpy.god_map import god_map
-from giskardpy.qp.qp_controller import QPProblemBuilder
+from giskardpy.qp.qp_controller import QPController
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.decorators import record_time
@@ -9,7 +9,7 @@ from giskardpy.tree.blackboard_utils import catch_and_raise_to_blackboard
 
 
 class ControllerPlugin(GiskardBehavior):
-    controller: QPProblemBuilder = None
+    controller: QPController = None
 
     @catch_and_raise_to_blackboard
     @profile

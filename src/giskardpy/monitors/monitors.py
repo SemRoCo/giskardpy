@@ -204,14 +204,12 @@ class LocalMinimumReached(ExpressionMonitor):
 
 class TimeAbove(ExpressionMonitor):
     def __init__(self,
-                 threshold: Optional[float] = None,
+                 threshold: float,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol):
         super().__init__(name=name,
                          stay_true=False,
                          start_condition=start_condition)
-        if threshold is None:
-            threshold = god_map.qp_controller_config.max_trajectory_length
         traj_length_in_sec = symbol_manager.time
         condition = cas.greater(traj_length_in_sec, threshold)
         self.expression = condition

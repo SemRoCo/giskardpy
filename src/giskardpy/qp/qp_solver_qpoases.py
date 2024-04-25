@@ -4,10 +4,10 @@ import numpy as np
 import qpoases
 from qpoases import PyReturnValue
 
-from giskardpy.configs.qp_controller_config import SupportedQPSolver
 from giskardpy.data_types.exceptions import QPSolverException, InfeasibleException, HardConstraintsViolatedException
 from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.middleware import logging
+from giskardpy.qp.qp_solver_ids import SupportedQPSolver
 from giskardpy.utils.decorators import record_time
 
 

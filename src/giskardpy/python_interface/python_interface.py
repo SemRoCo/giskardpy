@@ -1281,14 +1281,14 @@ class MonitorWrapper:
                                 error_type=error_type)
 
     def add_max_trajectory_length(self,
-                                  max_trajectory_length: Optional[float] = None) -> str:
+                                  max_trajectory_length: float = 30) -> str:
         """
         A monitor that cancels the motion if the trajectory is longer than max_trajectory_length.
         """
         self.max_trajectory_length_set = True
         return self.add_monitor(name=None,
                                 monitor_class=SetMaxTrajectoryLength.__name__,
-                                new_length=max_trajectory_length,
+                                length=max_trajectory_length,
                                 start_condition='')
 
     def add_print(self,

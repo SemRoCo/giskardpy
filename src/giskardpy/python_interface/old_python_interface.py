@@ -358,13 +358,13 @@ class OldGiskardWrapper(GiskardWrapper):
         self.motion_goals.set_prediction_horizon(prediction_horizon=prediction_horizon,
                                                  **kwargs)
 
-    def set_max_traj_length(self, new_length: float, **kwargs: goal_parameter):
+    def set_max_traj_length(self, length: float = 30, **kwargs: goal_parameter):
         """
         Overwrites Giskard trajectory length limit for planning.
         If the trajectory is longer than new_length, Giskard will prempt the goal.
         :param new_length: in seconds
         """
-        self.monitors.add_max_trajectory_length(max_trajectory_length=new_length,
+        self.monitors.add_max_trajectory_length(max_trajectory_length=length,
                                                 **kwargs)
 
     def set_limit_cartesian_velocity_goal(self,

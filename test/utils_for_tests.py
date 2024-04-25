@@ -26,7 +26,6 @@ import giskard_msgs.msg as giskard_msgs
 from giskard_msgs.msg import GiskardError
 from giskard_msgs.srv import DyeGroupResponse
 from giskardpy.configs.giskard import Giskard
-from giskardpy.configs.qp_controller_config import SupportedQPSolver
 from giskardpy.data_types.data_types import KeyDefaultDict
 from giskardpy.data_types.exceptions import UnknownGroupException, DuplicateNameException
 from giskardpy.goals.diff_drive_goals import DiffDriveTangentialToPoint, KeepHandInWorkspace
@@ -39,6 +38,7 @@ from giskardpy.data_types.data_types import PrefixName, Derivatives
 from giskardpy.python_interface.old_python_interface import OldGiskardWrapper
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.qp_controller import available_solvers
+from giskardpy.qp.qp_solver_ids import SupportedQPSolver
 from giskardpy.tasks.task import WEIGHT_ABOVE_CA
 from giskardpy.tree.blackboard_utils import GiskardBlackboard
 from giskardpy.utils.ros_timer import Timer
@@ -297,7 +297,7 @@ class GiskardTestWrapper(OldGiskardWrapper):
             logging.loginfo('Inside github workflow, turning off visualization')
             GiskardBlackboard().tree.turn_off_visualization()
         if 'QP_SOLVER' in os.environ:
-            god_map.qp_controller_config.set_qp_solver(SupportedQPSolver[os.environ['QP_SOLVER']])
+            god_map.qp_controller.set_qp_solver(SupportedQPSolver[os.environ['QP_SOLVER']])
         self.heart = Timer(period=rospy.Duration(GiskardBlackboard().tree.tick_rate), callback=self.heart_beat,
                            thread_name='giskard_bt')
         # self.namespaces = namespaces
@@ -406,7 +406,7 @@ class GiskardTestWrapper(OldGiskardWrapper):
                                         str(num_eq_slack_variables),
                                         str(num_neq_slack_variables),
                                         str(num_slack_variables),
-                                        str(int(god_map.qp_controller_config.max_derivative)),
+                                        str(int(god_map.qp_controller.max_derivative)),
                                         str(times)])
 
         logging.loginfo(f'saved benchmark file in {file_name}')
@@ -559,7 +559,7 @@ class GiskardTestWrapper(OldGiskardWrapper):
             diff = time() - time_spend_giskarding
             self.total_time_spend_giskarding += diff
             self.total_time_spend_moving += (len(god_map.trajectory.keys()) *
-                                             god_map.qp_controller_config.sample_period)
+                                             god_map.qp_controller.sample_period)
             logging.logwarn(f'Goal processing took {diff}')
             result_exception = msg_converter.error_msg_to_exception(r.error)
             assert result_exception == expected_error_type, \

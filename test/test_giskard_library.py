@@ -9,7 +9,7 @@ from giskardpy.model.joints import OmniDrive, PrismaticJoint
 from giskardpy.model.links import Link, BoxGeometry
 from giskardpy.model.world import WorldTree
 from giskardpy.monitors.monitor_manager import MonitorManager
-from giskardpy.qp.qp_controller import QPProblemBuilder
+from giskardpy.qp.qp_controller import QPController
 from giskardpy.symbol_manager import symbol_manager
 
 
@@ -82,9 +82,10 @@ class TestWorld:
         god_map.motion_goal_manager.init_task_state()
 
         eq, neq, neqd, lin_weight, quad_weight = god_map.motion_goal_manager.get_constraints_from_goals()
-        controller = QPProblemBuilder(sample_period=dt,
-                                      free_variables=list(box_world.free_variables.values()),
-                                      equality_constraints=eq)
+        controller = QPController(sample_period=dt)
+        controller.init(free_variables=list(box_world.free_variables.values()),
+                        equality_constraints=eq)
+        controller.compile()
         traj = []
         for i in range(100):
             parameters = controller.get_parameter_names()
@@ -93,7 +94,7 @@ class TestWorld:
             box_world.update_state(next_cmd, dt, Derivatives.jerk)
             box_world.notify_state_change()
             traj.append(box_world.state[joint_name].position)
-            if box_world.state[joint_name].position >= goal-1e-3:
+            if box_world.state[joint_name].position >= goal - 1e-3:
                 break
         fk = box_world.compute_fk_point(root=box_world.root_link_name, tip=box_name).to_np()
         np.testing.assert_almost_equal(fk[0], goal, decimal=3)

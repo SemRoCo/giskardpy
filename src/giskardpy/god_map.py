@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING, List, Dict, Tuple
 
 if TYPE_CHECKING:
     from giskardpy.model.world import WorldTree
-    from giskardpy.configs.behavior_tree_config import BehaviorTreeConfig
     from giskardpy.qp.free_variable import FreeVariable
     from giskardpy.qp.next_command import NextCommands
     from giskardpy.model.trajectory import Trajectory
@@ -46,7 +45,6 @@ class GodMap:
     # %% configs
     giskard: Giskard
     world_config: WorldConfig
-    behavior_tree_config: BehaviorTreeConfig
     collision_avoidance_config: CollisionAvoidanceConfig
     collision_avoidance_configs: Dict[str, CollisionAvoidanceGroupThresholds]
 

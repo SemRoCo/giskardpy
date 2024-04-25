@@ -57,7 +57,8 @@ class Giskard:
         god_map.collision_avoidance_config = collision_avoidance_config
         if behavior_tree_config is None:
             behavior_tree_config = OpenLoopBTConfig()
-        god_map.behavior_tree_config = behavior_tree_config
+        self.behavior_tree_config = behavior_tree_config
+        # god_map.behavior_tree_config = behavior_tree_config
         if qp_controller_config is None:
             qp_controller_config = QPControllerConfig()
         god_map.qp_controller_config = qp_controller_config
@@ -76,7 +77,7 @@ class Giskard:
         god_map.robot_interface_config.set_defaults()
         god_map.qp_controller_config.set_defaults()
         god_map.collision_avoidance_config.set_defaults()
-        god_map.behavior_tree_config.set_defaults()
+        self.behavior_tree_config.set_defaults()
 
     def grow(self):
         """
@@ -84,8 +85,8 @@ class Giskard:
         """
         with god_map.world.modify_world():
             god_map.world_config.setup()
-        god_map.behavior_tree_config._create_behavior_tree()
-        god_map.behavior_tree_config.setup()
+        self.behavior_tree_config._create_behavior_tree()
+        self.behavior_tree_config.setup()
         god_map.robot_interface_config.setup()
         god_map.world._notify_model_change()
         god_map.collision_avoidance_config.setup()
@@ -95,7 +96,7 @@ class Giskard:
         GiskardBlackboard().tree.setup(30)
 
     def sanity_check(self):
-        hz = god_map.behavior_tree_config.control_loop_max_hz
+        hz = GiskardBlackboard().control_loop_max_hz
         if god_map.qp_controller.sample_period < 1/hz:
             raise GiskardException(f'control_loop_max_hz (1/{hz}hz = {1/hz}) '
                                    f'must be smaller than sample period of controller '

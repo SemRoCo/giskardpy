@@ -21,8 +21,8 @@ class BehaviorTreeConfig(ABC):
                        if mode == ControlModes.close_loop: limits the control loop
         """
         self._control_mode = mode
-        self.control_loop_max_hz = control_loop_max_hz
-        self.simulation_max_hz = simulation_max_hz
+        GiskardBlackboard().control_loop_max_hz = control_loop_max_hz
+        GiskardBlackboard().simulation_max_hz = simulation_max_hz
 
     @abstractmethod
     def setup(self):

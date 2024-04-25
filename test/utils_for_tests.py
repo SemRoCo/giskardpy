@@ -36,7 +36,6 @@ from giskardpy.middleware.ros1.ros1_interface import make_pose_from_parts
 from giskardpy.model.collision_world_syncer import Collisions, Collision, CollisionEntry
 from giskardpy.model.joints import OneDofJoint, OmniDrive, DiffDrive
 from giskardpy.data_types.data_types import PrefixName, Derivatives
-from giskardpy.monitors.payload_monitors import UpdateParentLinkOfGroup
 from giskardpy.python_interface.old_python_interface import OldGiskardWrapper
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.qp_controller import available_solvers
@@ -855,21 +854,6 @@ class GiskardTestWrapper(OldGiskardWrapper):
             self.env_joint_state_pubs[name] = rospy.Publisher(set_js_topic, JointState, queue_size=10)
         if self.default_env_name is None:
             self.default_env_name = name
-
-    def monitors_update_parent_link_of_group(self,
-                                             start_condition: str,
-                                             group_name: str,
-                                             parent_link: giskard_msgs.LinkName,
-                                             name: Optional[str] = None) -> str:
-        """
-        A PayloadMonitor that works like world.update_parent_link_of_group().
-        CAUTION! the model changes will only come into effect, once the motion is finished.
-        """
-        return self.monitors.add_monitor(monitor_class=UpdateParentLinkOfGroup.__name__,
-                                         name=name,
-                                         start_condition=start_condition,
-                                         group_name=group_name,
-                                         parent_link=parent_link)
 
     def update_parent_link_of_group(self,
                                     name: str,

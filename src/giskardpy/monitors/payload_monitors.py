@@ -82,24 +82,6 @@ class Sleep(PayloadMonitor):
         self.state = True
 
 
-class UpdateParentLinkOfGroup(WorldUpdatePayloadMonitor):
-    def __init__(self,
-                 group_name: str,
-                 parent_link: PrefixName,
-                 name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol):
-        if not god_map.tree.is_standalone():
-            raise MonitorInitalizationException(f'This monitor can only be used in standalone mode.')
-        self.group_name = group_name
-        self.new_parent_link = parent_link
-        super().__init__(name=name, start_condition=start_condition)
-
-    def apply_world_update(self):
-        god_map.world.move_group(group_name=self.group_name,
-                                 new_parent_link_name=self.new_parent_link)
-        sleep(2)
-
-
 class CollisionMatrixUpdater(PayloadMonitor):
     collision_matrix: Dict[Tuple[str, str], float]
 

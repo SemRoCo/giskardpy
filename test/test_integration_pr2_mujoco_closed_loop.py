@@ -20,6 +20,7 @@ from giskardpy.configs.iai_robots.pr2 import PR2CollisionAvoidance, PR2VelocityM
 from giskardpy.configs.qp_controller_config import QPControllerConfig
 from giskardpy.god_map import god_map
 from giskardpy.tasks.task import WEIGHT_BELOW_CA
+from giskardpy.tree.blackboard_utils import GiskardBlackboard
 from test_integration_pr2 import PR2TestWrapper, TestJointGoals, pocky_pose
 from giskardpy.goals.weight_scaling_goals import MaxManipulabilityLinWeight
 import giskardpy.middleware.ros1.msg_converter as msg_converter
@@ -328,7 +329,7 @@ class TestMoveBaseGoals:
 
 class TestWorldManipulation:
     def test_add_urdf_body(self, kitchen_setup: PR2TestWrapper):
-        assert god_map.tree.wait_for_goal.synchronization._number_of_synchronisation_behaviors() == 2
+        assert GiskardBlackboard().tree.wait_for_goal.synchronization._number_of_synchronisation_behaviors() == 2
         joint_goal = 0.2
         object_name = kitchen_setup.default_env_name
         kitchen_setup.set_env_state({'sink_area_left_middle_drawer_main_joint': joint_goal})
@@ -336,12 +337,12 @@ class TestWorldManipulation:
         joint_state = msg_converter.ros_joint_state_to_giskard_joint_state(joint_state)
         assert joint_state['sink_area_left_middle_drawer_main_joint'].position == joint_goal
         kitchen_setup.clear_world()
-        assert god_map.tree.wait_for_goal.synchronization._number_of_synchronisation_behaviors() == 1
+        assert GiskardBlackboard().tree.wait_for_goal.synchronization._number_of_synchronisation_behaviors() == 1
         p = PoseStamped()
         p.header.frame_id = 'map'
         p.pose.position.x = 1
         p.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0, 0, 1]))
-        if god_map.tree.is_standalone():
+        if GiskardBlackboard().tree.is_standalone():
             js_topic = ''
             set_js_topic = ''
         else:
@@ -353,7 +354,7 @@ class TestWorldManipulation:
                                         js_topic=js_topic,
                                         set_js_topic=set_js_topic)
         kitchen_setup.wait_heartbeats(1)
-        assert god_map.tree.wait_for_goal.synchronization._number_of_synchronisation_behaviors() == 2
+        assert GiskardBlackboard().tree.wait_for_goal.synchronization._number_of_synchronisation_behaviors() == 2
         joint_state = kitchen_setup.get_group_info(object_name).joint_state
         joint_state = msg_converter.ros_joint_state_to_giskard_joint_state(joint_state)
         assert joint_state['iai_kitchen/sink_area_left_middle_drawer_main_joint'].position == joint_goal
@@ -361,14 +362,14 @@ class TestWorldManipulation:
         joint_goal = 0.1
         kitchen_setup.set_env_state({'sink_area_left_middle_drawer_main_joint': joint_goal})
         kitchen_setup.remove_group(object_name)
-        assert god_map.tree.wait_for_goal.synchronization._number_of_synchronisation_behaviors() == 1
+        assert GiskardBlackboard().tree.wait_for_goal.synchronization._number_of_synchronisation_behaviors() == 1
         kitchen_setup.add_urdf_to_world(name=object_name,
                                         urdf=rospy.get_param('kitchen_description'),
                                         pose=p,
                                         js_topic=js_topic,
                                         set_js_topic=set_js_topic)
         kitchen_setup.wait_heartbeats(1)
-        assert god_map.tree.wait_for_goal.synchronization._number_of_synchronisation_behaviors() == 2
+        assert GiskardBlackboard().tree.wait_for_goal.synchronization._number_of_synchronisation_behaviors() == 2
         joint_state = kitchen_setup.get_group_info(object_name).joint_state
         joint_state = msg_converter.ros_joint_state_to_giskard_joint_state(joint_state)
         assert joint_state['iai_kitchen/sink_area_left_middle_drawer_main_joint'].position == joint_goal

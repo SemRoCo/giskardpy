@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, List, Dict, Tuple
 if TYPE_CHECKING:
     from giskardpy.tree.behaviors.action_server import ActionServerHandler
     from giskardpy.configs.behavior_tree_config import BehaviorTreeConfig
-    from giskardpy.tree.branches.giskard_bt import GiskardBT
     from giskardpy.model.ros_msg_visualization import ROSMsgVisualization
     from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint
     from giskardpy.qp.free_variable import FreeVariable
@@ -35,7 +34,6 @@ class GodMap:
     world: WorldTree
     motion_goal_manager: MotionGoalManager
     debug_expression_manager: DebugExpressionManager
-    tree: GiskardBT
     collision_scene: CollisionWorldSynchronizer
     prediction_horizon: int
     max_derivative: Derivatives
@@ -69,9 +67,6 @@ class GodMap:
     @staticmethod
     def is_in_github_workflow():
         return 'GITHUB_WORKFLOW' in os.environ
-
-    def is_tree_alive(self):
-        return self.tree.count > 1
 
 
 god_map = GodMap()

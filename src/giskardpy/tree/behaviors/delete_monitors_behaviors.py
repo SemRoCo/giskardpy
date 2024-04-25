@@ -6,6 +6,7 @@ from py_trees import Status
 from giskardpy.data_types.data_types import TaskState
 from giskardpy.god_map import god_map
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
+from giskardpy.tree.blackboard_utils import GiskardBlackboard
 
 if TYPE_CHECKING:
     from giskardpy.tree.branches.payload_monitor_sequence import PayloadMonitorSequence
@@ -17,7 +18,7 @@ class DeleteMonitors(GiskardBehavior):
         super().__init__(name)
 
     def update(self):
-        god_map.tree.control_loop_branch.check_monitors.remove_all_children()
+        GiskardBlackboard().tree.control_loop_branch.check_monitors.remove_all_children()
         return Status.SUCCESS
 
 
@@ -29,9 +30,9 @@ class DeleteMonitor(GiskardBehavior):
 
     def update(self):
         if self.parent.monitor.get_state():
-            for monitor in god_map.tree.control_loop_branch.check_monitors.children:
+            for monitor in GiskardBlackboard().tree.control_loop_branch.check_monitors.children:
                 if monitor == self.parent or (hasattr(monitor, 'original') and monitor.original == self.parent):
-                    god_map.tree.control_loop_branch.check_monitors.remove_child(monitor)
+                    GiskardBlackboard().tree.control_loop_branch.check_monitors.remove_child(monitor)
                     monitor_id = self.parent.monitor.id
                     current_life_cycle_state = god_map.monitor_manager.life_cycle_state[monitor_id]
                     if current_life_cycle_state not in [TaskState.succeeded, TaskState.failed]:

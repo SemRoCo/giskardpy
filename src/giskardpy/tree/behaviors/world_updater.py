@@ -17,6 +17,7 @@ from giskardpy.model.world import WorldBranch
 from giskardpy.tree.behaviors.action_server import ActionServerHandler
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.middleware import logging
+from giskardpy.tree.blackboard_utils import GiskardBlackboard
 from giskardpy.utils.decorators import record_time
 from giskardpy.middleware.ros1.tfwrapper import transform_pose
 import giskardpy.middleware.ros1.msg_converter as msg_converter
@@ -150,7 +151,7 @@ class ProcessWorldUpdate(GiskardBehavior):
         # SUB-CASE: If it is an articulated object, open up a joint state subscriber
         logging.loginfo(f'Attached object \'{group_name}\' at \'{parent_link}\'.')
         if world_body.joint_state_topic:
-            god_map.tree.wait_for_goal.synchronization.sync_joint_state_topic(
+            GiskardBlackboard().tree.wait_for_goal.synchronization.sync_joint_state_topic(
                 group_name=group_name,
                 topic_name=world_body.joint_state_topic)
         # FIXME also keep track of base pose
@@ -185,7 +186,7 @@ class ProcessWorldUpdate(GiskardBehavior):
         if name not in god_map.world.groups:
             raise UnknownGroupException(f'Can not remove unknown group: {name}.')
         god_map.world.delete_group(name)
-        god_map.tree.wait_for_goal.synchronization.remove_group_behaviors(name)
+        GiskardBlackboard().tree.wait_for_goal.synchronization.remove_group_behaviors(name)
         logging.loginfo(f'Deleted \'{name}\'.')
 
     @profile
@@ -194,7 +195,7 @@ class ProcessWorldUpdate(GiskardBehavior):
         god_map.world.clear()
         with god_map.world.modify_world():
             god_map.world_config.setup()
-        god_map.tree.wait_for_goal.synchronization.remove_added_behaviors()
+        GiskardBlackboard().tree.wait_for_goal.synchronization.remove_added_behaviors()
         # copy only state of joints that didn't get deleted
         remaining_free_variables = list(god_map.world.free_variables.keys()) + list(
             god_map.world.virtual_free_variables.keys())

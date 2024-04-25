@@ -40,6 +40,7 @@ from giskardpy.python_interface.old_python_interface import OldGiskardWrapper
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.qp_controller import available_solvers
 from giskardpy.tasks.task import WEIGHT_ABOVE_CA
+from giskardpy.tree.blackboard_utils import GiskardBlackboard
 from giskardpy.utils.ros_timer import Timer
 from giskardpy.utils.utils import resolve_ros_iris, suppress_stderr
 import giskardpy.middleware.ros1.msg_converter as msg_converter
@@ -294,10 +295,10 @@ class GiskardTestWrapper(OldGiskardWrapper):
         self.giskard.grow()
         if god_map.is_in_github_workflow():
             logging.loginfo('Inside github workflow, turning off visualization')
-            god_map.tree.turn_off_visualization()
+            GiskardBlackboard().tree.turn_off_visualization()
         if 'QP_SOLVER' in os.environ:
             god_map.qp_controller_config.set_qp_solver(SupportedQPSolver[os.environ['QP_SOLVER']])
-        self.heart = Timer(period=rospy.Duration(god_map.tree.tick_rate), callback=self.heart_beat,
+        self.heart = Timer(period=rospy.Duration(GiskardBlackboard().tree.tick_rate), callback=self.heart_beat,
                            thread_name='giskard_bt')
         # self.namespaces = namespaces
         self.robot_names = [list(god_map.world.groups.keys())[0]]
@@ -343,7 +344,7 @@ class GiskardTestWrapper(OldGiskardWrapper):
     def transform_msg(self, target_frame, msg, timeout=1):
         result_msg = deepcopy(msg)
         try:
-            if not god_map.tree.is_standalone():
+            if not GiskardBlackboard().tree.is_standalone():
                 return tf.transform_msg(target_frame, result_msg, timeout=timeout)
             else:
                 raise LookupException('just to trigger except block')
@@ -358,7 +359,7 @@ class GiskardTestWrapper(OldGiskardWrapper):
             return msg_converter.to_ros_message(transformed_giskard_obj)
 
     def wait_heartbeats(self, number=2):
-        behavior_tree = god_map.tree
+        behavior_tree = GiskardBlackboard().tree
         c = behavior_tree.count
         while behavior_tree.count < c + number:
             rospy.sleep(0.001)
@@ -370,7 +371,7 @@ class GiskardTestWrapper(OldGiskardWrapper):
 
     def heart_beat(self, timer_thing):
         if self._alive:
-            god_map.tree.tick()
+            GiskardBlackboard().tree.tick()
 
     def stop_ticking(self):
         self._alive = False
@@ -415,9 +416,9 @@ class GiskardTestWrapper(OldGiskardWrapper):
         rospy.sleep(1)
         self.heart.shutdown()
         # TODO it is strange that I need to kill the services... should be investigated. (:
-        god_map.tree.kill_all_services()
+        GiskardBlackboard().tree.kill_all_services()
         giskarding_time = self.total_time_spend_giskarding
-        if not god_map.tree.is_standalone():
+        if not GiskardBlackboard().tree.is_standalone():
             giskarding_time -= self.total_time_spend_moving
         logging.loginfo(f'total time spend giskarding: {giskarding_time}')
         logging.loginfo(f'total time spend moving: {self.total_time_spend_moving}')
@@ -426,7 +427,7 @@ class GiskardTestWrapper(OldGiskardWrapper):
     def set_env_state(self, joint_state: Dict[str, float], object_name: Optional[str] = None):
         if object_name is None:
             object_name = self.default_env_name
-        if god_map.tree.is_standalone():
+        if GiskardBlackboard().tree.is_standalone():
             self.set_seed_configuration(joint_state)
             self.allow_all_collisions()
             self.plan_and_execute()

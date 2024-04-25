@@ -4,6 +4,7 @@ from typing import Optional
 from giskardpy.data_types.exceptions import SetupException
 from giskardpy.god_map import god_map
 from giskardpy.tree.behaviors.tf_publisher import TfPublishingModes
+from giskardpy.tree.blackboard_utils import GiskardBlackboard
 from giskardpy.tree.branches.giskard_bt import GiskardBT
 from giskardpy.tree.control_modes import ControlModes
 from giskardpy.utils.utils import is_running_in_pytest
@@ -31,10 +32,10 @@ class BehaviorTreeConfig(ABC):
 
     @property
     def tree(self) -> GiskardBT:
-        return god_map.tree
+        return GiskardBlackboard().tree
 
     def _create_behavior_tree(self):
-        god_map.tree = GiskardBT(control_mode=self._control_mode)
+        GiskardBlackboard().tree = GiskardBT(control_mode=self._control_mode)
 
     def set_defaults(self):
         pass
@@ -74,7 +75,7 @@ class BehaviorTreeConfig(ABC):
         QP data is streamed and can be visualized in e.g. plotjuggler. Useful for debugging.
         """
         self.add_evaluate_debug_expressions()
-        if god_map.tree.is_open_loop():
+        if GiskardBlackboard().tree.is_open_loop():
             self.tree.execute_traj.base_closed_loop.publish_state.add_qp_data_publisher(
                 publish_lb=publish_lb,
                 publish_ub=publish_ub,
@@ -144,22 +145,22 @@ class BehaviorTreeConfig(ABC):
 
     def add_evaluate_debug_expressions(self):
         self.tree.prepare_control_loop.add_compile_debug_expressions()
-        if god_map.tree.is_closed_loop():
+        if GiskardBlackboard().tree.is_closed_loop():
             self.tree.control_loop_branch.add_evaluate_debug_expressions(log_traj=False)
         else:
             self.tree.control_loop_branch.add_evaluate_debug_expressions(log_traj=True)
-        if god_map.tree.is_open_loop():
-            god_map.tree.execute_traj.prepare_base_control.add_compile_debug_expressions()
-            god_map.tree.execute_traj.base_closed_loop.add_evaluate_debug_expressions(log_traj=False)
+        if GiskardBlackboard().tree.is_open_loop():
+            GiskardBlackboard().tree.execute_traj.prepare_base_control.add_compile_debug_expressions()
+            GiskardBlackboard().tree.execute_traj.base_closed_loop.add_evaluate_debug_expressions(log_traj=False)
 
     def add_js_publisher(self, topic_name: Optional[str] = None, include_prefix: bool = False):
         """
         Publishes joint states for Giskard's internal state.
         """
-        god_map.tree.control_loop_branch.publish_state.add_joint_state_publisher(include_prefix=include_prefix,
+        GiskardBlackboard().tree.control_loop_branch.publish_state.add_joint_state_publisher(include_prefix=include_prefix,
                                                                                  topic_name=topic_name,
                                                                                  only_prismatic_and_revolute=True)
-        god_map.tree.wait_for_goal.publish_state.add_joint_state_publisher(include_prefix=include_prefix,
+        GiskardBlackboard().tree.wait_for_goal.publish_state.add_joint_state_publisher(include_prefix=include_prefix,
                                                                            topic_name=topic_name,
                                                                            only_prismatic_and_revolute=True)
 
@@ -167,10 +168,10 @@ class BehaviorTreeConfig(ABC):
         """
         Publishes joint states for Giskard's internal state.
         """
-        god_map.tree.control_loop_branch.publish_state.add_joint_state_publisher(include_prefix=include_prefix,
+        GiskardBlackboard().tree.control_loop_branch.publish_state.add_joint_state_publisher(include_prefix=include_prefix,
                                                                                  topic_name=topic_name,
                                                                                  only_prismatic_and_revolute=False)
-        god_map.tree.wait_for_goal.publish_state.add_joint_state_publisher(include_prefix=include_prefix,
+        GiskardBlackboard().tree.wait_for_goal.publish_state.add_joint_state_publisher(include_prefix=include_prefix,
                                                                            topic_name=topic_name,
                                                                            only_prismatic_and_revolute=False)
 

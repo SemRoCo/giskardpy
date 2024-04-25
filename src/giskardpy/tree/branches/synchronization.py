@@ -10,6 +10,7 @@ from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.tree.behaviors.sync_joint_state import SyncJointState, SyncJointStatePosition
 from giskardpy.tree.behaviors.sync_odometry import SyncOdometry, SyncOdometryNoLock
 from giskardpy.tree.behaviors.sync_tf_frames import SyncTfFrames
+from giskardpy.tree.blackboard_utils import GiskardBlackboard
 
 
 class Synchronization(Sequence):
@@ -43,7 +44,7 @@ class Synchronization(Sequence):
 
     def sync_joint_state_topic(self, group_name: str, topic_name: str):
         behavior = SyncJointState(group_name=group_name, joint_state_topic=topic_name)
-        if god_map.is_tree_alive():
+        if GiskardBlackboard().tree.has_started():
             behavior.setup()
             self.added_behaviors.append(behavior)
         self.insert_child(child=behavior, index=0)

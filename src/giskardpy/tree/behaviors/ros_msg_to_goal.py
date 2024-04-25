@@ -16,7 +16,7 @@ from giskardpy.model.joints import OmniDrive, DiffDrive
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.middleware import logging
 from giskardpy.utils.decorators import record_time
-from giskardpy.tree.blackboard_utils import catch_and_raise_to_blackboard
+from giskardpy.tree.blackboard_utils import catch_and_raise_to_blackboard, GiskardBlackboard
 import giskardpy.casadi_wrapper as cas
 import giskard_msgs.msg as giskard_msgs
 
@@ -140,9 +140,9 @@ class SetExecutionMode(GiskardBehavior):
         logging.loginfo(
             f'Goal is of type {get_ros_msgs_constant_name_by_value(type(god_map.move_action_server.goal_msg), god_map.move_action_server.goal_msg.type)}')
         if god_map.move_action_server.is_goal_msg_type_projection():
-            god_map.tree.switch_to_projection()
+            GiskardBlackboard().tree.switch_to_projection()
         elif god_map.move_action_server.is_goal_msg_type_execute():
-            god_map.tree.switch_to_execution()
+            GiskardBlackboard().tree.switch_to_execution()
         else:
             raise InvalidGoalException(f'Goal of type {god_map.goal_msg.type} is not supported.')
         return Status.SUCCESS

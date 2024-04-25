@@ -5,7 +5,7 @@ from giskardpy.god_map import god_map
 from giskardpy.monitors.monitors import CancelMotion
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.decorators import record_time
-from giskardpy.tree.blackboard_utils import catch_and_raise_to_blackboard
+from giskardpy.tree.blackboard_utils import catch_and_raise_to_blackboard, GiskardBlackboard
 
 
 class CompileMonitors(GiskardBehavior):
@@ -25,6 +25,6 @@ class CompileMonitors(GiskardBehavior):
         payload_monitors = sorted(god_map.monitor_manager.payload_monitors, key=lambda x: isinstance(x, CancelMotion))
         for monitor in payload_monitors:
             if traj_tracking:
-                god_map.tree.execute_traj.base_closed_loop.check_monitors.add_monitor(monitor)
+                GiskardBlackboard().tree.execute_traj.base_closed_loop.check_monitors.add_monitor(monitor)
             else:
-                god_map.tree.control_loop_branch.check_monitors.add_monitor(monitor)
+                GiskardBlackboard().tree.control_loop_branch.check_monitors.add_monitor(monitor)

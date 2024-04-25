@@ -4,11 +4,12 @@ import numpy as np
 import pydot
 import rospy
 from py_trees_ros.trees import BehaviourTree
-from py_trees import Chooser, common, Blackboard
+from py_trees import Chooser, common
 from py_trees import Selector, Sequence
 from giskardpy.god_map import god_map
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.tree.behaviors.send_result import SendResult
+from giskardpy.tree.blackboard_utils import GiskardBlackboard
 from giskardpy.tree.branches.clean_up_control_loop import CleanupControlLoop
 from giskardpy.tree.branches.control_loop import ControlLoop
 from giskardpy.tree.branches.post_processing import PostProcessing
@@ -40,7 +41,7 @@ class GiskardBT(BehaviourTree):
     execute_traj: ExecuteTraj
 
     def __init__(self, control_mode: ControlModes):
-        god_map.tree = self
+        GiskardBlackboard().tree = self
         self.control_mode = control_mode
         if control_mode not in ControlModes:
             raise AttributeError(f'Control mode {control_mode} doesn\'t exist.')
@@ -70,6 +71,9 @@ class GiskardBT(BehaviourTree):
         self.root.add_child(SendResult(god_map.move_action_server))
         super().__init__(self.root)
         self.switch_to_execution()
+
+    def has_started(self) -> bool:
+        return self.count > 1
 
     def is_closed_loop(self):
         return self.control_mode == self.control_mode.close_loop
@@ -121,7 +125,7 @@ class GiskardBT(BehaviourTree):
         self.blackboard_exchange.get_blackboard_variables_srv.shutdown()
         self.blackboard_exchange.open_blackboard_watcher_srv.shutdown()
         self.blackboard_exchange.close_blackboard_watcher_srv.shutdown()
-        # for value in god_map.tree_nodes.values():
+        # for value in GiskardBlackboard().tree_nodes.values():
         #     node = value.node
         #     for attribute_name, attribute in vars(node).items():
         #         if isinstance(attribute, rospy.Service):

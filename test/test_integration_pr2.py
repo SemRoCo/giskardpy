@@ -35,6 +35,7 @@ from giskardpy.model.world import WorldTree
 from giskardpy.data_types.data_types import PrefixName
 from giskardpy.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE
 from giskardpy.python_interface.old_python_interface import OldGiskardWrapper
+from giskardpy.tree.blackboard_utils import GiskardBlackboard
 from utils_for_tests import launch_launchfile, suppress_stderr, resolve_ros_iris
 from utils_for_tests import compare_poses, publish_marker_vector, \
     GiskardTestWrapper, pr2_urdf, compare_points
@@ -208,7 +209,7 @@ class PR2TestWrapper(GiskardTestWrapper):
         p = PoseStamped()
         p.header.frame_id = 'map'
         p.pose.orientation.w = 1
-        if god_map.tree.is_standalone():
+        if GiskardBlackboard().tree.is_standalone():
             self.teleport_base(p)
         else:
             self.move_base(p)
@@ -266,7 +267,7 @@ def giskard(request, ros):
 
 @pytest.fixture()
 def pocky_pose_setup(resetted_giskard: PR2TestWrapper) -> PR2TestWrapper:
-    if god_map.tree.is_standalone():
+    if GiskardBlackboard().tree.is_standalone():
         resetted_giskard.set_seed_configuration(pocky_pose)
         resetted_giskard.allow_all_collisions()
     else:
@@ -2357,7 +2358,7 @@ class TestWorldManipulation:
         p.header.frame_id = 'map'
         p.pose.position.x = 1
         p.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0, 0, 1]))
-        if god_map.tree.is_standalone():
+        if GiskardBlackboard().tree.is_standalone():
             js_topic = ''
             set_js_topic = ''
         else:

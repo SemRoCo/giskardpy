@@ -12,6 +12,7 @@ from giskardpy.data_types.exceptions import GiskardException, SetupException
 from giskardpy.goals.goal import Goal
 from giskardpy.monitors.monitors import Monitor
 from giskardpy.middleware import logging
+from giskardpy.tree.blackboard_utils import GiskardBlackboard
 from giskardpy.utils.utils import resolve_ros_iris, get_all_classes_in_package
 
 
@@ -90,7 +91,7 @@ class Giskard:
         god_map.collision_avoidance_config._sanity_check()
         god_map.collision_scene.sync()
         self.sanity_check()
-        god_map.tree.setup(30)
+        GiskardBlackboard().tree.setup(30)
 
     def sanity_check(self):
         hz = god_map.behavior_tree_config.control_loop_max_hz
@@ -127,4 +128,4 @@ class Giskard:
         Start Giskard.
         """
         self.grow()
-        god_map.tree.live()
+        GiskardBlackboard().tree.live()

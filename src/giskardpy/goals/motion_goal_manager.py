@@ -137,9 +137,4 @@ class MotionGoalManager:
             quadratic_weight_gains.update(new_quadratic_weight_gains)
             linear_weight_gains.update(new_linear_weight_gains)
             # logging.loginfo(f'{goal_name} added {len(_constraints)+len(_vel_constraints)} constraints.')
-        god_map.eq_constraints = eq_constraints
-        god_map.neq_constraints = neq_constraints
-        god_map.derivative_constraints = derivative_constraints
-        god_map.quadratic_weight_gains = quadratic_weight_gains
-        god_map.linear_weight_gains = linear_weight_gains
         return eq_constraints, neq_constraints, derivative_constraints, quadratic_weight_gains, linear_weight_gains

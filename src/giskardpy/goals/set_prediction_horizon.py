@@ -5,6 +5,7 @@ from giskardpy.goals.goal import NonMotionGoal
 from giskardpy.god_map import god_map
 from giskardpy.middleware import logging
 import giskardpy.casadi_wrapper as cas
+from giskardpy.tree.blackboard_utils import GiskardBlackboard
 
 
 class SetPredictionHorizon(NonMotionGoal):
@@ -53,4 +54,4 @@ class EnableVelocityTrajectoryTracking(NonMotionGoal):
         if name is None:
             name = self.__class__.__name__
         super().__init__(name=name)
-        god_map.fill_trajectory_velocity_values = enabled
+        GiskardBlackboard().fill_trajectory_velocity_values = enabled

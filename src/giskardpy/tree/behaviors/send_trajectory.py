@@ -26,7 +26,7 @@ from py_trees_ros.actions import ActionClient
 import giskardpy.middleware.ros1.msg_converter as msg_converter
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.middleware import logging
-from giskardpy.tree.blackboard_utils import raise_to_blackboard
+from giskardpy.tree.blackboard_utils import raise_to_blackboard, GiskardBlackboard
 from giskardpy.utils.decorators import record_time
 from giskardpy.tree.blackboard_utils import catch_and_raise_to_blackboard
 
@@ -100,7 +100,7 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
         trajectory = god_map.trajectory
         goal = FollowJointTrajectoryGoal()
         start_time = god_map.motion_start_time
-        fill_velocity_values = god_map.fill_trajectory_velocity_values
+        fill_velocity_values = GiskardBlackboard().fill_trajectory_velocity_values
         if fill_velocity_values is None:
             fill_velocity_values = self.fill_velocity_values
         goal.trajectory = msg_converter.trajectory_to_ros_trajectory(trajectory,

@@ -4,16 +4,13 @@ import os
 from typing import TYPE_CHECKING, List, Dict, Tuple
 
 if TYPE_CHECKING:
-    from giskardpy.tree.behaviors.action_server import ActionServerHandler
     from giskardpy.configs.behavior_tree_config import BehaviorTreeConfig
-    from giskardpy.model.ros_msg_visualization import ROSMsgVisualization
-    from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint
     from giskardpy.qp.free_variable import FreeVariable
     from giskardpy.qp.next_command import NextCommands
     from giskardpy.model.trajectory import Trajectory
     from giskardpy.qp.qp_controller import QPProblemBuilder
     from giskardpy.configs.qp_controller_config import QPControllerConfig
-    from giskardpy.data_types.data_types import Derivatives, PrefixName
+    from giskardpy.data_types.data_types import PrefixName
     from giskardpy.configs.giskard import Giskard
     from giskardpy.goals.motion_goal_manager import MotionGoalManager
     from giskardpy.debug_expression_manager import DebugExpressionManager
@@ -23,7 +20,6 @@ if TYPE_CHECKING:
     from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer, CollisionCheckerLib, \
         CollisionAvoidanceGroupThresholds, Collisions
     from giskardpy.model.world import WorldTree
-    from giskardpy.qp.weight_gain import QuadraticWeightGain, LinearWeightGain
 
 
 class GodMap:
@@ -47,14 +43,7 @@ class GodMap:
     added_collision_checks: Dict[Tuple[PrefixName, PrefixName], float]
     closest_point: Collisions
     motion_start_time: float
-    eq_constraints: Dict[str, EqualityConstraint]
-    neq_constraints: Dict[str, InequalityConstraint]
-    derivative_constraints: Dict[str, DerivativeInequalityConstraint]
-    quadratic_weight_gains: Dict[str, QuadraticWeightGain]
-    linear_weight_gains: Dict[str, LinearWeightGain]
     hack: float
-    fill_trajectory_velocity_values: bool  # TODO delete or move
-    ros_visualizer: ROSMsgVisualization
     free_variables: List[FreeVariable]
 
     def is_collision_checking_enabled(self):

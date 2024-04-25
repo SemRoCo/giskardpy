@@ -9,7 +9,7 @@ from giskardpy.god_map import god_map
 from giskardpy.model.collision_world_syncer import Collisions
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.decorators import record_time
-from giskardpy.tree.blackboard_utils import catch_and_raise_to_blackboard
+from giskardpy.tree.blackboard_utils import catch_and_raise_to_blackboard, GiskardBlackboard
 
 
 class CleanUp(GiskardBehavior):
@@ -52,7 +52,7 @@ class CleanUp(GiskardBehavior):
 class CleanUpPlanning(CleanUp):
     def initialise(self):
         super().initialise()
-        god_map.fill_trajectory_velocity_values = None
+        GiskardBlackboard().fill_trajectory_velocity_values = None
 
     @catch_and_raise_to_blackboard
     def update(self):

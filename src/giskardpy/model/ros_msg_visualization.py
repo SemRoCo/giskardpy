@@ -9,6 +9,8 @@ from visualization_msgs.msg import MarkerArray, Marker
 from giskardpy.god_map import god_map
 from giskardpy.model.collision_world_syncer import Collisions, Collision
 import giskardpy.middleware.ros1.msg_converter as msg_converter
+from giskardpy.tree.blackboard_utils import GiskardBlackboard
+
 
 class ROSMsgVisualization:
     red = ColorRGBA(1, 0, 0, 1)
@@ -24,7 +26,7 @@ class ROSMsgVisualization:
             self.tf_root = str(god_map.world.root_link_name)
         else:
             self.tf_root = tf_frame
-        god_map.ros_visualizer = self
+        GiskardBlackboard().ros_visualizer = self
 
     @profile
     def create_world_markers(self, name_space: str = 'planning_visualization') -> List[Marker]:

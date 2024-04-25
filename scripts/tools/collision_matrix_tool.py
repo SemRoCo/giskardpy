@@ -448,13 +448,14 @@ class Application(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.giskard = Giskard(world_config=EmptyWorld(),
+        world_config = EmptyWorld()
+        self.giskard = Giskard(world_config=world_config,
                                robot_interface_config=StandAloneRobotInterfaceConfig([]),
                                collision_avoidance_config=_BPBCollisionAvoidanceConfig(),
                                behavior_tree_config=StandAloneBTConfig(),
                                qp_controller_config=QPControllerConfig())
         with god_map.world.modify_world():
-            god_map.world_config.setup()
+            world_config.setup()
         god_map.collision_avoidance_config.setup()
         self.timer = QTimer()
         self.timer.start(1000)  # Time in milliseconds

@@ -44,7 +44,6 @@ class GodMap:
 
     # %% configs
     giskard: Giskard
-    world_config: WorldConfig
     collision_avoidance_config: CollisionAvoidanceConfig
     collision_avoidance_configs: Dict[str, CollisionAvoidanceGroupThresholds]
 

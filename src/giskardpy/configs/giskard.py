@@ -48,9 +48,8 @@ class Giskard:
                                               Giskard will run 'from <additional path> import *' for each additional
                                               path in the list.
         """
-        god_map.initialize()
         god_map.giskard = self
-        god_map.world_config = world_config
+        self.world_config = world_config
         god_map.robot_interface_config = robot_interface_config
         if collision_avoidance_config is None:
             collision_avoidance_config = DisableCollisionAvoidanceConfig()
@@ -73,7 +72,7 @@ class Giskard:
         god_map.hack = 0
 
     def set_defaults(self) -> None:
-        god_map.world_config.set_defaults()
+        self.world_config.set_defaults()
         god_map.robot_interface_config.set_defaults()
         god_map.qp_controller_config.set_defaults()
         god_map.collision_avoidance_config.set_defaults()
@@ -84,7 +83,7 @@ class Giskard:
         Initialize the behavior tree and world. You usually don't need to call this.
         """
         with god_map.world.modify_world():
-            god_map.world_config.setup()
+            self.world_config.setup()
         self.behavior_tree_config._create_behavior_tree()
         self.behavior_tree_config.setup()
         god_map.robot_interface_config.setup()

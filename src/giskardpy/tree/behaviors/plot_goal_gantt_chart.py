@@ -11,6 +11,7 @@ from giskardpy.god_map import god_map
 from giskardpy.tasks.task import TaskState
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.middleware import logging
+from giskardpy.tree.blackboard_utils import GiskardBlackboard
 from giskardpy.utils.decorators import record_time
 from giskardpy.utils.utils import create_path
 
@@ -104,7 +105,7 @@ class PlotGanttChart(GiskardBehavior):
         try:
             goals = list(god_map.motion_goal_manager.motion_goals.values())
             monitors = god_map.monitor_manager.monitors
-            file_name = god_map.giskard.tmp_folder + f'gantt_charts/goal_{god_map.move_action_server.goal_id}.pdf'
+            file_name = god_map.giskard.tmp_folder + f'gantt_charts/goal_{GiskardBlackboard().move_action_server.goal_id}.pdf'
             self.plot_gantt_chart(goals, monitors, file_name)
         except Exception as e:
             logging.logwarn(f'Failed to create goal gantt chart: {e}.')

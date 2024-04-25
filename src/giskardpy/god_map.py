@@ -35,17 +35,13 @@ class GodMap:
     motion_goal_manager: MotionGoalManager
     debug_expression_manager: DebugExpressionManager
     collision_scene: CollisionWorldSynchronizer
-    prediction_horizon: int
-    max_derivative: Derivatives
+    collision_checker_id: CollisionCheckerLib
     qp_controller: QPProblemBuilder
+    world_config: WorldConfig
     qp_controller_config: QPControllerConfig
     behavior_tree_config: BehaviorTreeConfig
-    collision_checker_id: CollisionCheckerLib
-    world_config: WorldConfig
     collision_avoidance_config: CollisionAvoidanceConfig
     collision_avoidance_configs: Dict[str, CollisionAvoidanceGroupThresholds]
-    move_action_server: ActionServerHandler
-    world_action_server: ActionServerHandler
     trajectory: Trajectory
     qp_solver_solution: NextCommands
     added_collision_checks: Dict[Tuple[PrefixName, PrefixName], float]
@@ -57,7 +53,7 @@ class GodMap:
     quadratic_weight_gains: Dict[str, QuadraticWeightGain]
     linear_weight_gains: Dict[str, LinearWeightGain]
     hack: float
-    fill_trajectory_velocity_values: bool
+    fill_trajectory_velocity_values: bool  # TODO delete or move
     ros_visualizer: ROSMsgVisualization
     free_variables: List[FreeVariable]
 

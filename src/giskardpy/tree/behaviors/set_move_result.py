@@ -54,5 +54,5 @@ class SetMoveResult(GiskardBehavior):
                     logging.loginfo(f'{self.context} succeeded.')
                 else:
                     logging.logwarn(f'{self.context} failed: {move_result.error.msg}.')
-        god_map.move_action_server.result_msg = move_result
+        GiskardBlackboard().move_action_server.result_msg = move_result
         return Status.SUCCESS

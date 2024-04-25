@@ -8,6 +8,7 @@ from py_trees import Blackboard, Status
 from giskardpy.data_types.exceptions import DontPrintStackTrace
 
 if TYPE_CHECKING:
+    from giskardpy.tree.behaviors.action_server import ActionServerHandler
     from giskardpy.tree.branches.giskard_bt import GiskardBT
 
 blackboard_exception_name = 'exception'
@@ -16,6 +17,8 @@ blackboard_exception_name = 'exception'
 class GiskardBlackboard(Blackboard):
     tree: GiskardBT
     runtime: float
+    move_action_server: ActionServerHandler
+    world_action_server: ActionServerHandler
 
 
 def raise_to_blackboard(exception):

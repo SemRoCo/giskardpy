@@ -11,7 +11,7 @@ from giskardpy.data_types.data_types import TaskState
 from giskardpy.god_map import god_map
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.decorators import record_time
-from giskardpy.tree.blackboard_utils import catch_and_raise_to_blackboard
+from giskardpy.tree.blackboard_utils import catch_and_raise_to_blackboard, GiskardBlackboard
 
 
 def giskard_state_to_execution_state() -> ExecutionState:
@@ -19,7 +19,7 @@ def giskard_state_to_execution_state() -> ExecutionState:
     task_filter = np.array([task.plot for task in god_map.motion_goal_manager.tasks.values()])
     msg = ExecutionState()
     msg.header.stamp = rospy.Time.now()
-    msg.goal_id = god_map.move_action_server.goal_id
+    msg.goal_id = GiskardBlackboard().move_action_server.goal_id
     msg.monitors = [msg_converter.monitor_to_ros_msg(m) for m in god_map.monitor_manager.monitors if m.plot]
     msg.tasks = [msg_converter.task_to_ros_msg(t) for t in god_map.motion_goal_manager.tasks.values() if t.plot]
     try:

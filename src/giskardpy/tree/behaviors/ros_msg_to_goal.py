@@ -38,8 +38,8 @@ class ParseActionGoal(GiskardBehavior):
     @record_time
     @profile
     def update(self):
-        move_goal = god_map.move_action_server.goal_msg
-        logging.loginfo(f'Parsing goal #{god_map.move_action_server.goal_id} message.')
+        move_goal = GiskardBlackboard().move_action_server.goal_msg
+        logging.loginfo(f'Parsing goal #{GiskardBlackboard().move_action_server.goal_id} message.')
         self.sanity_check(move_goal)
         try:
             self.parse_monitors(move_goal.monitors)
@@ -138,10 +138,10 @@ class SetExecutionMode(GiskardBehavior):
     @profile
     def update(self):
         logging.loginfo(
-            f'Goal is of type {get_ros_msgs_constant_name_by_value(type(god_map.move_action_server.goal_msg), god_map.move_action_server.goal_msg.type)}')
-        if god_map.move_action_server.is_goal_msg_type_projection():
+            f'Goal is of type {get_ros_msgs_constant_name_by_value(type(GiskardBlackboard().move_action_server.goal_msg), GiskardBlackboard().move_action_server.goal_msg.type)}')
+        if GiskardBlackboard().move_action_server.is_goal_msg_type_projection():
             GiskardBlackboard().tree.switch_to_projection()
-        elif god_map.move_action_server.is_goal_msg_type_execute():
+        elif GiskardBlackboard().move_action_server.is_goal_msg_type_execute():
             GiskardBlackboard().tree.switch_to_execution()
         else:
             raise InvalidGoalException(f'Goal of type {god_map.goal_msg.type} is not supported.')

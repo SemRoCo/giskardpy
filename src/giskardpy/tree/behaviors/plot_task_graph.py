@@ -13,7 +13,7 @@ from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.tree.behaviors.publish_feedback import giskard_state_to_execution_state
 from giskardpy.middleware import logging
 from giskardpy.utils.decorators import record_time
-from giskardpy.tree.blackboard_utils import catch_and_raise_to_blackboard
+from giskardpy.tree.blackboard_utils import catch_and_raise_to_blackboard, GiskardBlackboard
 from giskardpy.utils.utils import create_path
 
 
@@ -152,7 +152,7 @@ class PlotTaskMonitorGraph(GiskardBehavior):
     @record_time
     @profile
     def update(self):
-        file_name = god_map.giskard.tmp_folder + f'task_graphs/goal_{god_map.move_action_server.goal_id}.png'
+        file_name = god_map.giskard.tmp_folder + f'task_graphs/goal_{GiskardBlackboard().move_action_server.goal_id}.png'
         execution_state = giskard_state_to_execution_state()
         graph = execution_state_to_dot_graph(execution_state)
         create_path(file_name)

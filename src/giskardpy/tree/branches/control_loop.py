@@ -10,6 +10,7 @@ from giskardpy.tree.behaviors.kinematic_sim import KinSimPlugin
 from giskardpy.tree.behaviors.log_trajectory import LogTrajPlugin
 from giskardpy.tree.behaviors.real_kinematic_sim import RealKinSimPlugin
 from giskardpy.tree.behaviors.time import TimePlugin, RosTime, ControlCycleCounter
+from giskardpy.tree.blackboard_utils import GiskardBlackboard
 from giskardpy.tree.branches.check_monitors import CheckMonitors
 from giskardpy.tree.branches.publish_state import PublishState
 from giskardpy.tree.branches.send_controls import SendControls
@@ -49,7 +50,7 @@ class ControlLoop(AsyncBehavior):
         self.send_controls = success_is_running(SendControls)()
         self.closed_loop_synchronization = success_is_running(Synchronization)()
 
-        self.add_child(failure_is_running(GoalCanceled)(god_map.move_action_server))
+        self.add_child(failure_is_running(GoalCanceled)(GiskardBlackboard().move_action_server))
 
         if god_map.is_collision_checking_enabled():
             self.add_child(CollisionChecker('collision checker'))

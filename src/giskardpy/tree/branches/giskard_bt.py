@@ -4,7 +4,7 @@ import numpy as np
 import pydot
 import rospy
 from py_trees_ros.trees import BehaviourTree
-from py_trees import Chooser, common
+from py_trees import Chooser, common, Blackboard
 from py_trees import Selector, Sequence
 from giskardpy.god_map import god_map
 from giskardpy.tree.behaviors.plugin import GiskardBehavior

@@ -92,12 +92,14 @@ class TestWorld:
         controller = QPProblemBuilder(sample_period=dt,
                                       free_variables=list(box_world.free_variables.values()),
                                       equality_constraints=list(eq.values()))
+        traj = []
         for i in range(100):
             parameters = controller.get_parameter_names()
             substitutions = symbol_manager.resolve_symbols(parameters)
             next_cmd = controller.get_cmd(substitutions)
             box_world.update_state(next_cmd, dt, Derivatives.jerk)
             box_world.notify_state_change()
+            traj.append(box_world.state[joint_name].position)
             if box_world.state[joint_name].position >= goal-1e-3:
                 break
         fk = box_world.compute_fk_point(root=box_world.root_link_name, tip=box_name).to_np()

@@ -71,22 +71,12 @@ class MonitorManager:
             raise GiskardException(str(e))
 
     @profile
-    def add_payload_monitors_to_behavior_tree(self, traj_tracking: bool = False) -> None:
-        payload_monitors = sorted(self.payload_monitors, key=lambda x: isinstance(x, CancelMotion))
-        for monitor in payload_monitors:
-            if traj_tracking:
-                god_map.tree.execute_traj.base_closed_loop.check_monitors.add_monitor(monitor)
-            else:
-                god_map.tree.control_loop_branch.check_monitors.add_monitor(monitor)
-
-    @profile
-    def compile_monitors(self, traj_tracking: bool = False) -> None:
+    def compile_monitors(self) -> None:
         self.state_history = []
         self.state = np.zeros(len(self.monitors))
         self.life_cycle_state = np.zeros(len(self.monitors))
         self.set_initial_life_cycle_state()
         self.compile_monitor_state_updater()
-        self.add_payload_monitors_to_behavior_tree(traj_tracking=traj_tracking)
         self._register_expression_update_triggers()
 
     @profile
@@ -130,7 +120,7 @@ class MonitorManager:
         monitor_state = cas.Expression(self.get_state_expression_symbols())
 
         symbols = []
-        for i in range(len(god_map.monitor_manager.monitors)):
+        for i in range(len(self.monitors)):
             symbols.append(self.monitors[i].get_life_cycle_state_expression())
         monitor_life_cycle_state = cas.Expression(symbols)
 
@@ -230,14 +220,15 @@ class MonitorManager:
     def _register_expression_update_triggers(self):
         for updater_id, values in self.substitution_values.items():
             class Callback:
-                def __init__(self, updater_id: int, values):
+                def __init__(self, updater_id: int, values, monitor_manager: MonitorManager):
                     self.updater_id = updater_id
                     self.keys = list(values.keys())
+                    self.monitor_manager = monitor_manager
 
                 def __call__(self):
-                    return god_map.monitor_manager.update_substitution_values(self.updater_id, self.keys)
+                    return self.monitor_manager.update_substitution_values(self.updater_id, self.keys)
 
-            self.triggers[updater_id] = Callback(updater_id, values)
+            self.triggers[updater_id] = Callback(updater_id, values, self)
         expr = cas.Expression(self.trigger_conditions)
         self.compiled_trigger_conditions = expr.compile(self.get_state_expression_symbols())
 
@@ -260,9 +251,6 @@ class MonitorManager:
             if updater_id in self.triggers and value:
                 self.triggers[updater_id]()
                 del self.triggers[updater_id]
-
-    def evaluate_trigger_conditions(self, state: np.ndarray) -> None:
-        pass
 
     @cached_property
     def payload_monitor_filter(self):

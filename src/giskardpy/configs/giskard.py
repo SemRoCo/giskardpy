@@ -48,6 +48,7 @@ class Giskard:
                                               Giskard will run 'from <additional path> import *' for each additional
                                               path in the list.
         """
+        god_map.initialize()
         god_map.giskard = self
         god_map.world_config = world_config
         god_map.robot_interface_config = robot_interface_config

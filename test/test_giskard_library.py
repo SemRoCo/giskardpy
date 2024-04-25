@@ -2,7 +2,6 @@ import numpy as np
 import pytest
 
 from giskardpy.data_types.data_types import PrefixName, Derivatives
-from giskardpy.goals import motion_goal_manager
 from giskardpy.goals.joint_goals import JointPositionList
 from giskardpy.goals.motion_goal_manager import MotionGoalManager
 from giskardpy.god_map import god_map
@@ -16,7 +15,7 @@ from giskardpy.symbol_manager import symbol_manager
 
 @pytest.fixture(scope='module')
 def create_world():
-    return WorldTree()
+    return god_map.world
 
 
 @pytest.fixture()
@@ -31,8 +30,7 @@ def box_world(empty_world: WorldTree):
     root_link_name = PrefixName('map')
     joint_name = PrefixName('box_joint')
 
-    world = WorldTree()
-    with world.modify_world():
+    with empty_world.modify_world() as world:
         root_link = Link(root_link_name)
         world.add_link(root_link)
 
@@ -56,10 +54,10 @@ def box_world(empty_world: WorldTree):
                                              Derivatives.acceleration: np.inf,
                                              Derivatives.jerk: 30})
         world.add_joint(joint)
-    assert joint_name in world.joints
-    assert root_link_name in world.root_link_name
-    assert box_name in world.links
-    return world
+    assert joint_name in empty_world.joints
+    assert root_link_name in empty_world.root_link_name
+    assert box_name in empty_world.links
+    return empty_world
 
 
 class TestWorld:

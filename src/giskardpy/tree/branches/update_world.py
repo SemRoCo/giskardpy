@@ -1,7 +1,6 @@
 from py_trees import Sequence
 
-from giskard_msgs.msg import MoveAction, WorldAction
-from giskardpy.god_map import god_map
+from giskard_msgs.msg import WorldAction
 from giskardpy.tree.behaviors.action_server import ActionServerHandler
 from giskardpy.tree.behaviors.collision_scene_updater import CollisionSceneUpdater
 from giskardpy.tree.behaviors.goal_received import GoalReceived

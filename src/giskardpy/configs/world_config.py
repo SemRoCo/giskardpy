@@ -19,10 +19,6 @@ from giskardpy.data_types.data_types import my_string, PrefixName, Derivatives, 
 
 class WorldConfig(ABC):
 
-    def __init__(self):
-        god_map.world = WorldTree()
-        god_map.world.set_default_weights()
-
     @property
     def world(self) -> WorldTree:
         return god_map.world

@@ -18,7 +18,6 @@ from giskardpy.casadi_wrapper import CompiledFunction
 from giskardpy.data_types.data_types import JointStates, ColorRGBA
 from giskardpy.data_types.exceptions import DuplicateNameException, UnknownGroupException, UnknownLinkException, \
     WorldException, UnknownJointException, CorruptURDFException
-from giskardpy.god_map import god_map
 from giskardpy.model.joints import Joint, FixedJoint, PrismaticJoint, RevoluteJoint, OmniDrive, DiffDrive, \
     VirtualFreeVariables, MovableJoint, Joint6DOF, OneDofJoint
 from giskardpy.model.links import Link
@@ -165,7 +164,6 @@ class WorldTree(WorldTreeInterface):
 
     def __init__(self):
         self.default_link_color = ColorRGBA(1, 1, 1, 0.75)
-        god_map.world = self
         self.connection_prefix = 'connection'
         self.fast_all_fks = None
         self._state_version = 0

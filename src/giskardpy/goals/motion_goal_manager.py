@@ -104,11 +104,11 @@ class MotionGoalManager:
 
     @profile
     def get_constraints_from_goals(self) \
-            -> Tuple[Dict[str, EqualityConstraint],
-            Dict[str, InequalityConstraint],
-            Dict[str, DerivativeInequalityConstraint],
-            Dict[str, QuadraticWeightGain],
-            Dict[str, LinearWeightGain]]:
+            -> Tuple[List[EqualityConstraint],
+            List[InequalityConstraint],
+            List[DerivativeInequalityConstraint],
+            List[QuadraticWeightGain],
+            List[LinearWeightGain]]:
         eq_constraints = ImmutableDict()
         neq_constraints = ImmutableDict()
         derivative_constraints = ImmutableDict()
@@ -140,4 +140,5 @@ class MotionGoalManager:
             quadratic_weight_gains.update(new_quadratic_weight_gains)
             linear_weight_gains.update(new_linear_weight_gains)
             # logging.loginfo(f'{goal_name} added {len(_constraints)+len(_vel_constraints)} constraints.')
-        return eq_constraints, neq_constraints, derivative_constraints, quadratic_weight_gains, linear_weight_gains
+        return (list(eq_constraints.values()), list(neq_constraints.values()), list(derivative_constraints.values()),
+                list(quadratic_weight_gains.values()), list(linear_weight_gains.values()))

@@ -1,5 +1,5 @@
 from itertools import chain
-from typing import Dict
+from typing import Dict, List
 
 from py_trees import Status
 
@@ -23,11 +23,11 @@ class InitQPController(GiskardBehavior):
 
         qp_controller = QPProblemBuilder(
             free_variables=free_variables,
-            equality_constraints=list(eq_constraints.values()),
-            inequality_constraints=list(neq_constraints.values()),
-            derivative_constraints=list(derivative_constraints.values()),
-            quadratic_weight_gains=list(quadratic_weight_gains.values()),
-            linear_weight_gains=list(linear_weight_gains.values()),
+            equality_constraints=eq_constraints,
+            inequality_constraints=neq_constraints,
+            derivative_constraints=derivative_constraints,
+            quadratic_weight_gains=quadratic_weight_gains,
+            linear_weight_gains=linear_weight_gains,
             sample_period=god_map.qp_controller_config.sample_period,
             prediction_horizon=god_map.qp_controller_config.prediction_horizon,
             solver_id=god_map.qp_controller_config.qp_solver,
@@ -40,11 +40,11 @@ class InitQPController(GiskardBehavior):
         return Status.SUCCESS
 
     def get_active_free_symbols(self,
-                                eq_constraints: Dict[str, EqualityConstraint],
-                                neq_constraints: Dict[str, InequalityConstraint],
-                                derivative_constraints: Dict[str, DerivativeInequalityConstraint]):
+                                eq_constraints: List[EqualityConstraint],
+                                neq_constraints: List[InequalityConstraint],
+                                derivative_constraints: List[DerivativeInequalityConstraint]):
         symbols = set()
-        for c in chain(eq_constraints.values(), neq_constraints.values(), derivative_constraints.values()):
+        for c in chain(eq_constraints, neq_constraints, derivative_constraints):
             symbols.update(str(s) for s in w.free_symbols(c.expression))
         free_variables = list(sorted([v for v in god_map.world.free_variables.values() if v.position_name in symbols],
                                      key=lambda x: x.position_name))

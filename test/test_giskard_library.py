@@ -84,7 +84,7 @@ class TestWorld:
         eq, neq, neqd, lin_weight, quad_weight = god_map.motion_goal_manager.get_constraints_from_goals()
         controller = QPProblemBuilder(sample_period=dt,
                                       free_variables=list(box_world.free_variables.values()),
-                                      equality_constraints=list(eq.values()))
+                                      equality_constraints=eq)
         traj = []
         for i in range(100):
             parameters = controller.get_parameter_names()

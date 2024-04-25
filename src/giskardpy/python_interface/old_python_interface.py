@@ -503,8 +503,6 @@ class OldGiskardWrapper(GiskardWrapper):
                                     root_link: str,
                                     tip_link: str,
                                     door_object: str,
-                                    door_height: float,
-                                    door_length: float,
                                     door_handle: str,
                                     tip_gripper_axis: Vector3Stamped,
                                     tip_group: Optional[str] = None,
@@ -516,20 +514,15 @@ class OldGiskardWrapper(GiskardWrapper):
         : param root_link: root link of the kinematic chain
         : param tip_link: end effector
         : param door object: name of the object to be pushed
-        : param door_height: height of the door
-        : param object_handle: name of the object handle
-        : param object_joint_name: name of the joint that rotates
+        : param door_handle: name of the object handle
         : param tip_gripper_axis: axis of the tip_link that will be aligned along the door rotation axis
-        : param object_rotation_axis: door rotation axis w.r.t root
         """
         self.motion_goals.add_align_to_push_door(root_link=root_link,
                                                  tip_link=tip_link,
                                                  door_object=door_object,
-                                                 door_height=door_height,
-                                                 door_length=door_length,
                                                  door_handle=door_handle,
-                                                 tip_gripper_axis=tip_gripper_axis,
                                                  tip_group=tip_group,
+                                                 tip_gripper_axis=tip_gripper_axis,
                                                  root_group=root_group,
                                                  weight=weight)
 
@@ -537,10 +530,7 @@ class OldGiskardWrapper(GiskardWrapper):
                                root_link: str,
                                tip_link: str,
                                door_object: str,
-                               door_height: float,
-                               door_length: float,
-                               door_depth: float,
-                               tip_gripper_axis: Vector3Stamped,
+                               door_handle: str,
                                reference_linear_velocity: Optional[float] = None,
                                reference_angular_velocity: Optional[float] = None,
                                weight: float = WEIGHT_ABOVE_CA):
@@ -551,17 +541,13 @@ class OldGiskardWrapper(GiskardWrapper):
         : param door object: name of the object to be pushed
         : param door_height: height of the door
         : param door_length: length of the door
-        : param tip_gripper_axis: axis of the tip_link that will be aligned along the door rotation axis
         : param root_V_object_rotation_axis: door rotation axis w.r.t root
         : param root_V_object_normal: door normal w.r.t root
         """
         self.motion_goals.add_pre_push_door(root_link=root_link,
                                             tip_link=tip_link,
                                             door_object=door_object,
-                                            door_height=door_height,
-                                            door_length=door_length,
-                                            door_depth=door_depth,
-                                            tip_gripper_axis=tip_gripper_axis,
+                                            door_handle=door_handle,
                                             reference_linear_velocity=reference_linear_velocity,
                                             reference_angular_velocity=reference_angular_velocity,
                                             weight=weight)

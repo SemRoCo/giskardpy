@@ -2002,7 +2002,8 @@ def distance_point_to_plane(frame_P_current, frame_P_bottom_left, frame_P_bottom
 
     normal = cross(ab, ac)
     d = normal.dot(frame_P_bottom_left)
-    normal.scale(d)
+    # if symbol_manager.evaluate_expr(d) != 0:
+    #     normal.scale(d)
     nearest = frame_P_current + normal
     return norm(nearest-frame_P_current), nearest
 

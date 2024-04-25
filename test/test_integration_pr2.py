@@ -1627,8 +1627,6 @@ class TestConstraints:
                                                   tip_link=hand,
                                                   door_handle=handle_name,
                                                   door_object=door_name,
-                                                  door_height=0.6,
-                                                  door_length=0.49,
                                                   tip_gripper_axis=tip_grasp_axis)
         kitchen_setup.plan_and_execute()
 
@@ -1637,11 +1635,8 @@ class TestConstraints:
 
         kitchen_setup.set_pre_push_door_goal(root_link=kitchen_setup.default_root,
                                              tip_link=hand,
-                                             door_object=door_name,
-                                             door_height=0.6,
-                                             door_length=0.49,
-                                             door_depth=0.02,
-                                             tip_gripper_axis=tip_grasp_axis)
+                                             door_handle=handle_name,
+                                             door_object=door_name)
 
         kitchen_setup.allow_collision(group1=door_obj, group2=kitchen_setup.r_gripper_group)
         kitchen_setup.plan_and_execute()

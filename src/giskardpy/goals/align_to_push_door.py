@@ -19,8 +19,6 @@ class AlignToPushDoor(Goal):
                  root_link: str,
                  tip_link: str,
                  door_object: str,
-                 door_height: float,
-                 door_length: float,
                  door_handle: str,
                  tip_gripper_axis: Vector3Stamped,
                  root_group: Optional[str] = None,
@@ -39,8 +37,6 @@ class AlignToPushDoor(Goal):
         self.tip = god_map.world.search_for_link_name(tip_link, tip_group)
         self.handle = god_map.world.search_for_link_name(door_handle)
         self.door_object = god_map.world.search_for_link_name(door_object)
-        self.door_length = door_length
-        self.door_height = door_height
         self.reference_linear_velocity = reference_linear_velocity
         self.reference_angular_velocity = reference_angular_velocity
         self.weight = weight
@@ -80,6 +76,8 @@ class AlignToPushDoor(Goal):
         door_R_door_rotated = cas.RotationMatrix.from_axis_angle(axis=object_V_object_rotation_axis,
                                                                  angle=desired_angle)
         door_T_door_rotated = cas.TransMatrix(door_R_door_rotated)
+        # as the root_T_door is already pointing to a completely rotated door, we invert desired angle to get to the
+        # intermediate point
         door_rotated_P_top = cas.dot(door_T_door_rotated.inverse(), door_P_intermediate_point)
         root_P_top = cas.dot(cas.TransMatrix(root_T_door_expr), door_rotated_P_top)
 

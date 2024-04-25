@@ -202,7 +202,7 @@ class ProcessWorldUpdate(GiskardBehavior):
         god_map.world.state = JointStates({k: v for k, v in tmp_state.items() if k in remaining_free_variables})
         god_map.world.notify_state_change()
         god_map.collision_scene.sync()
-        god_map.collision_avoidance_config.setup()
+        GiskardBlackboard().giskard.collision_avoidance_config.setup()
         # self.clear_markers()
         logging.loginfo('Cleared world.')
 

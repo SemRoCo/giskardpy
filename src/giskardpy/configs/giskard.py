@@ -53,7 +53,7 @@ class Giskard:
         god_map.robot_interface_config = robot_interface_config
         if collision_avoidance_config is None:
             collision_avoidance_config = DisableCollisionAvoidanceConfig()
-        god_map.collision_avoidance_config = collision_avoidance_config
+        self.collision_avoidance_config = collision_avoidance_config
         if behavior_tree_config is None:
             behavior_tree_config = OpenLoopBTConfig()
         self.behavior_tree_config = behavior_tree_config
@@ -75,7 +75,7 @@ class Giskard:
         self.world_config.set_defaults()
         god_map.robot_interface_config.set_defaults()
         god_map.qp_controller_config.set_defaults()
-        god_map.collision_avoidance_config.set_defaults()
+        self.collision_avoidance_config.set_defaults()
         self.behavior_tree_config.set_defaults()
 
     def grow(self):
@@ -88,8 +88,8 @@ class Giskard:
         self.behavior_tree_config.setup()
         god_map.robot_interface_config.setup()
         god_map.world._notify_model_change()
-        god_map.collision_avoidance_config.setup()
-        god_map.collision_avoidance_config._sanity_check()
+        self.collision_avoidance_config.setup()
+        self.collision_avoidance_config._sanity_check()
         god_map.collision_scene.sync()
         self.sanity_check()
         GiskardBlackboard().tree.setup(30)

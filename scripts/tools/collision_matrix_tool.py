@@ -456,7 +456,7 @@ class Application(QMainWindow):
                                qp_controller_config=QPControllerConfig())
         with god_map.world.modify_world():
             world_config.setup()
-        god_map.collision_avoidance_config.setup()
+        self.giskard.collision_avoidance_config.setup()
         self.timer = QTimer()
         self.timer.start(1000)  # Time in milliseconds
         self.timer.timeout.connect(lambda: None)

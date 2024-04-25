@@ -10,14 +10,10 @@ if TYPE_CHECKING:
     from giskardpy.model.trajectory import Trajectory
     from giskardpy.qp.qp_controller import QPController
     from giskardpy.data_types.data_types import PrefixName
-    from giskardpy.configs.giskard import Giskard
     from giskardpy.monitors.monitor_manager import MonitorManager
     from giskardpy.goals.motion_goal_manager import MotionGoalManager
     from giskardpy.debug_expression_manager import DebugExpressionManager
-    from giskardpy.configs.collision_avoidance_config import CollisionAvoidanceConfig
-    from giskardpy.configs.world_config import WorldConfig
-    from giskardpy.model.collision_world_syncer import (CollisionWorldSynchronizer, CollisionAvoidanceGroupThresholds,
-                                                        Collisions)
+    from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer, Collisions
 
 
 class GodMap:
@@ -41,10 +37,6 @@ class GodMap:
     motion_start_time: float
     hack: float
     free_variables: List[FreeVariable]
-
-    # %% configs
-    collision_avoidance_config: CollisionAvoidanceConfig
-    collision_avoidance_configs: Dict[str, CollisionAvoidanceGroupThresholds]
 
     # %% other
     tmp_folder: str

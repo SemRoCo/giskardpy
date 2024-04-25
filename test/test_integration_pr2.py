@@ -1625,6 +1625,7 @@ class TestConstraints:
 
         kitchen_setup.set_align_to_push_door_goal(root_link=kitchen_setup.default_root,
                                                   tip_link=hand,
+                                                  door_handle=handle_name,
                                                   door_object=door_name,
                                                   door_height=0.6,
                                                   door_length=0.49,

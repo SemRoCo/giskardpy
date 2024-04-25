@@ -21,6 +21,7 @@ class AlignToPushDoor(Goal):
                  door_object: str,
                  door_height: float,
                  door_length: float,
+                 door_handle: str,
                  tip_gripper_axis: Vector3Stamped,
                  root_group: Optional[str] = None,
                  tip_group: Optional[str] = None,
@@ -36,6 +37,7 @@ class AlignToPushDoor(Goal):
         """
         self.root = god_map.world.search_for_link_name(root_link, root_group)
         self.tip = god_map.world.search_for_link_name(tip_link, tip_group)
+        self.handle = god_map.world.search_for_link_name(door_handle)
         self.door_object = god_map.world.search_for_link_name(door_object)
         self.door_length = door_length
         self.door_height = door_height
@@ -61,26 +63,24 @@ class AlignToPushDoor(Goal):
         tip_V_tip_grasp_axis = cas.Vector3(self.tip_gripper_axis)
         root_V_object_rotation_axis = cas.dot(root_T_door_expr, object_V_object_rotation_axis)
         root_V_tip_grasp_axis = cas.dot(root_T_tip, tip_V_tip_grasp_axis)
-        root_T_door = god_map.world.compute_fk_pose(self.root, self.door_object)
-        door_T_root = god_map.world.compute_fk_pose(self.door_object, self.root)
+        door_P_handle = god_map.world.compute_fk_pose(self.door_object, self.handle).pose.position
+        temp_point = np.asarray([door_P_handle.x, door_P_handle.y, door_P_handle.z])
+        door_P_intermediate_point = np.zeros(3)
+        # axis pointing in the direction of handle frame from door joint frame
+        direction_axis = np.argmax(abs(temp_point))
+        door_P_intermediate_point[direction_axis] = temp_point[direction_axis]*3/4
+        door_P_intermediate_point = cas.Point3([door_P_intermediate_point[0],
+                                                door_P_intermediate_point[1],
+                                                door_P_intermediate_point[2]])
 
-        root_P_intermediate_point = cas.Point3(root_T_door.pose.position)
-
-        if root_V_object_rotation_axis.y == 1:
-            # 3/4 of the height as the tip has to be a little further inside the object
-            root_P_intermediate_point[2] = root_P_intermediate_point[2] + self.door_height*3/4
-        elif root_V_object_rotation_axis.z == 1:
-            root_P_intermediate_point[1] = root_P_intermediate_point[1] + self.door_length*3/4
-
-        # point w.r.t door
-        door_P_intermediate_point = cas.dot(cas.TransMatrix(door_T_root), root_P_intermediate_point)
+        # # point w.r.t door
         desired_angle = object_joint_angle * 0.5  # just chose 1/2 of the goal angle
 
         # find point w.r.t rotated door in local frame
-        door_rotated_R_door = cas.RotationMatrix.from_axis_angle(axis=object_V_object_rotation_axis,
+        door_R_door_rotated = cas.RotationMatrix.from_axis_angle(axis=object_V_object_rotation_axis,
                                                                  angle=desired_angle)
-        door_rotated_T_door = cas.TransMatrix(door_rotated_R_door)
-        door_rotated_P_top = cas.dot(door_rotated_T_door, door_P_intermediate_point)
+        door_T_door_rotated = cas.TransMatrix(door_R_door_rotated)
+        door_rotated_P_top = cas.dot(door_T_door_rotated.inverse(), door_P_intermediate_point)
         root_P_top = cas.dot(cas.TransMatrix(root_T_door_expr), door_rotated_P_top)
 
         minimum_angle_to_push_door = joint_limit[1]/4

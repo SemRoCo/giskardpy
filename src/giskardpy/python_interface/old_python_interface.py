@@ -505,6 +505,7 @@ class OldGiskardWrapper(GiskardWrapper):
                                     door_object: str,
                                     door_height: float,
                                     door_length: float,
+                                    door_handle: str,
                                     tip_gripper_axis: Vector3Stamped,
                                     tip_group: Optional[str] = None,
                                     root_group: Optional[str] = None,
@@ -516,6 +517,7 @@ class OldGiskardWrapper(GiskardWrapper):
         : param tip_link: end effector
         : param door object: name of the object to be pushed
         : param door_height: height of the door
+        : param object_handle: name of the object handle
         : param object_joint_name: name of the joint that rotates
         : param tip_gripper_axis: axis of the tip_link that will be aligned along the door rotation axis
         : param object_rotation_axis: door rotation axis w.r.t root
@@ -525,6 +527,7 @@ class OldGiskardWrapper(GiskardWrapper):
                                                  door_object=door_object,
                                                  door_height=door_height,
                                                  door_length=door_length,
+                                                 door_handle=door_handle,
                                                  tip_gripper_axis=tip_gripper_axis,
                                                  tip_group=tip_group,
                                                  root_group=root_group,

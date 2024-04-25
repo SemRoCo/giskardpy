@@ -18,7 +18,7 @@ class PlotTrajectory(GiskardBehavior):
         self.wait = wait
         self.normalize_position = normalize_position
         self.kwargs = kwargs
-        self.path_to_data_folder = god_map.giskard.tmp_folder
+        self.path_to_data_folder = god_map.tmp_folder
 
     @profile
     def initialise(self):

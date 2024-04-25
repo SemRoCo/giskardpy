@@ -194,7 +194,7 @@ class ProcessWorldUpdate(GiskardBehavior):
         tmp_state = deepcopy(god_map.world.state)
         god_map.world.clear()
         with god_map.world.modify_world():
-            god_map.giskard.world_config.setup()
+            GiskardBlackboard().giskard.world_config.setup()
         GiskardBlackboard().tree.wait_for_goal.synchronization.remove_added_behaviors()
         # copy only state of joints that didn't get deleted
         remaining_free_variables = list(god_map.world.free_variables.keys()) + list(

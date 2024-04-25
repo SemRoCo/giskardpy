@@ -132,7 +132,7 @@ class GiskardBT(BehaviourTree):
         #             attribute.shutdown(reason='life is pain')
 
     def render(self):
-        path = god_map.giskard.tmp_folder + 'tree'
+        path = god_map.tmp_folder + 'tree'
         create_path(path)
         render_dot_tree(self.root, name=path)
 

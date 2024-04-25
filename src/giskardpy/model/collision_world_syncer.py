@@ -717,7 +717,7 @@ class CollisionWorldSynchronizer:
                                                         deepcopy(disabled_links))
 
     def get_path_to_self_collision_matrix(self, group_name: str) -> str:
-        path_to_tmp = god_map.giskard.tmp_folder
+        path_to_tmp = god_map.tmp_folder
         return f'{path_to_tmp}{group_name}/{group_name}.srdf'
 
     def blacklist_inter_group_collisions(self) -> None:

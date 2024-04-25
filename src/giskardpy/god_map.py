@@ -43,10 +43,11 @@ class GodMap:
     free_variables: List[FreeVariable]
 
     # %% configs
-    giskard: Giskard
     collision_avoidance_config: CollisionAvoidanceConfig
     collision_avoidance_configs: Dict[str, CollisionAvoidanceGroupThresholds]
 
+    # %% other
+    tmp_folder: str
     __initialized = False
 
     def initialize(self):

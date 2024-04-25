@@ -19,7 +19,7 @@ class WaitForGoal(Sequence):
 
     def __init__(self, name: str = 'wait for goal'):
         super().__init__(name)
-        GiskardBlackboard().move_action_server = ActionServerHandler(action_name=god_map.giskard.action_server_name,
+        GiskardBlackboard().move_action_server = ActionServerHandler(action_name=GiskardBlackboard().giskard.action_server_name,
                                                                      action_type=MoveAction)
         self.world_updater = failure_is_success(UpdateWorld)()
         self.synchronization = Synchronization()

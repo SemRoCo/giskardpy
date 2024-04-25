@@ -152,7 +152,7 @@ class PlotTaskMonitorGraph(GiskardBehavior):
     @record_time
     @profile
     def update(self):
-        file_name = god_map.giskard.tmp_folder + f'task_graphs/goal_{GiskardBlackboard().move_action_server.goal_id}.png'
+        file_name = god_map.tmp_folder + f'task_graphs/goal_{GiskardBlackboard().move_action_server.goal_id}.png'
         execution_state = giskard_state_to_execution_state()
         graph = execution_state_to_dot_graph(execution_state)
         create_path(file_name)

@@ -1172,7 +1172,7 @@ class QPController:
              self.p_A, self.p_lbA, self.p_ubA,
              god_map.debug_expression_manager.to_pandas(), self.p_xdot],
             ['weights', 'b', 'E', 'bE', 'A', 'lbA', 'ubA', 'debug'],
-            god_map.giskard.tmp_folder,
+            god_map.tmp_folder,
             god_map.time,
             folder_name)
 
@@ -1288,7 +1288,7 @@ class QPController:
         plt.tight_layout()
         path, dirs, files = next(os.walk('tmp_data/mpc'))
         file_count = len(files)
-        file_name = f'{god_map.giskard.tmp_folder}/mpc/mpc_{joint_name}_{file_count}.png'
+        file_name = f'{god_map.tmp_folder}/mpc/mpc_{joint_name}_{file_count}.png'
         create_path(file_name)
         plt.savefig(file_name)
 

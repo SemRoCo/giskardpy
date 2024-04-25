@@ -380,7 +380,7 @@ class GiskardTestWrapper(OldGiskardWrapper):
         self._alive = True
 
     def print_qp_solver_times(self):
-        file_name = f'{god_map.giskard.tmp_folder}/benchmark.csv'
+        file_name = f'{god_map.tmp_folder}/benchmark.csv'
         with open(file_name, mode='w', newline='') as csvfile:
             csvwriter = csv.writer(csvfile, delimiter=';', quotechar='"', quoting=csv.QUOTE_MINIMAL)
             csvwriter.writerow(['solver',

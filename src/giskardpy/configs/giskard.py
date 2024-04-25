@@ -22,7 +22,6 @@ class Giskard:
     behavior_tree_config: BehaviorTreeConfig = None
     robot_interface_config: RobotInterfaceConfig = None
     qp_controller_config: QPControllerConfig = None
-    tmp_folder: str = resolve_ros_iris('package://giskardpy/tmp/')
     action_server_name: str = '~command'
 
     def __init__(self,
@@ -48,7 +47,8 @@ class Giskard:
                                               Giskard will run 'from <additional path> import *' for each additional
                                               path in the list.
         """
-        god_map.giskard = self
+        god_map.tmp_folder = resolve_ros_iris('package://giskardpy/tmp/')
+        GiskardBlackboard().giskard = self
         self.world_config = world_config
         god_map.robot_interface_config = robot_interface_config
         if collision_avoidance_config is None:

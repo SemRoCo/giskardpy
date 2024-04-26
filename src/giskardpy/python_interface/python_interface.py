@@ -8,7 +8,7 @@ from shape_msgs.msg import SolidPrimitive
 
 import giskard_msgs.msg as giskard_msgs
 from giskard_msgs.msg import MoveAction, MoveGoal, WorldBody, CollisionEntry, MoveResult, MoveFeedback, MotionGoal, \
-    Monitor, WorldGoal, WorldAction, WorldResult
+    Monitor, WorldGoal, WorldAction, WorldResult, GiskardError
 from giskard_msgs.srv import DyeGroupRequest, DyeGroup, GetGroupInfoRequest, DyeGroupResponse
 from giskard_msgs.srv import GetGroupInfo, GetGroupNames
 from giskard_msgs.srv import GetGroupNamesResponse, GetGroupInfoResponse
@@ -78,7 +78,7 @@ class WorldWrapper:
                 name: str,
                 size: Tuple[float, float, float],
                 pose: PoseStamped,
-                parent_link: Optional[giskard_msgs.LinkName] = None) -> WorldResult:
+                parent_link: Optional[Union[str, giskard_msgs.LinkName]] = None) -> WorldResult:
         """
         Adds a new box to the world tree and attaches it to parent_link.
         If parent_link_group and parent_link are empty, the box will be attached to the world root link, e.g., map.
@@ -90,6 +90,7 @@ class WorldWrapper:
         """
         if isinstance(parent_link, str):
             parent_link = giskard_msgs.LinkName(name=parent_link)
+        parent_link = parent_link or giskard_msgs.LinkName()
         req = WorldGoal()
         req.group_name = str(name)
         req.operation = WorldGoal.ADD
@@ -102,12 +103,13 @@ class WorldWrapper:
                    name: str,
                    radius: float,
                    pose: PoseStamped,
-                   parent_link: Optional[giskard_msgs.LinkName] = None) -> WorldResult:
+                   parent_link: Optional[Union[str, giskard_msgs.LinkName]] = None) -> WorldResult:
         """
         See add_box.
         """
         if isinstance(parent_link, str):
             parent_link = giskard_msgs.LinkName(name=parent_link)
+        parent_link = parent_link or giskard_msgs.LinkName()
         world_body = WorldBody()
         world_body.type = WorldBody.PRIMITIVE_BODY
         world_body.shape.type = SolidPrimitive.SPHERE
@@ -124,7 +126,7 @@ class WorldWrapper:
                  name: str,
                  mesh: str,
                  pose: PoseStamped,
-                 parent_link: Optional[giskard_msgs.LinkName] = None,
+                 parent_link: Optional[Union[str, giskard_msgs.LinkName]] = None,
                  scale: Tuple[float, float, float] = (1, 1, 1)) -> WorldResult:
         """
         See add_box.
@@ -133,6 +135,7 @@ class WorldWrapper:
         """
         if isinstance(parent_link, str):
             parent_link = giskard_msgs.LinkName(name=parent_link)
+        parent_link = parent_link or giskard_msgs.LinkName()
         world_body = WorldBody()
         world_body.type = WorldBody.MESH_BODY
         world_body.mesh = mesh
@@ -152,12 +155,13 @@ class WorldWrapper:
                      height: float,
                      radius: float,
                      pose: PoseStamped,
-                     parent_link: Optional[giskard_msgs.LinkName] = None) -> WorldResult:
+                     parent_link: Optional[Union[str, giskard_msgs.LinkName]] = None) -> WorldResult:
         """
         See add_box.
         """
         if isinstance(parent_link, str):
             parent_link = giskard_msgs.LinkName(name=parent_link)
+        parent_link = parent_link or giskard_msgs.LinkName()
         world_body = WorldBody()
         world_body.type = WorldBody.PRIMITIVE_BODY
         world_body.shape.type = SolidPrimitive.CYLINDER
@@ -204,7 +208,7 @@ class WorldWrapper:
                  name: str,
                  urdf: str,
                  pose: PoseStamped,
-                 parent_link: Optional[giskard_msgs.LinkName] = None,
+                 parent_link: Optional[Union[str, giskard_msgs.LinkName]] = None,
                  js_topic: Optional[str] = '') -> WorldResult:
         """
         Adds a urdf to the world.
@@ -217,6 +221,7 @@ class WorldWrapper:
         """
         if isinstance(parent_link, str):
             parent_link = giskard_msgs.LinkName(name=parent_link)
+        parent_link = parent_link or giskard_msgs.LinkName()
         js_topic = str(js_topic)
         urdf_body = WorldBody()
         urdf_body.type = WorldBody.URDF_BODY
@@ -1267,8 +1272,7 @@ class MonitorWrapper:
 
     def add_cancel_motion(self,
                           start_condition: str,
-                          error_message: str,
-                          error_type: str = GiskardException.__name__,
+                          error: GiskardError,
                           name: Optional[str] = None) -> str:
         """
         Cancels the motion if all start_condition are True and will make Giskard return the specified error code.
@@ -1277,8 +1281,7 @@ class MonitorWrapper:
         return self.add_monitor(monitor_class=CancelMotion.__name__,
                                 name=name,
                                 start_condition=start_condition,
-                                error_message=error_message,
-                                error_type=error_type)
+                                exception=error)
 
     def add_max_trajectory_length(self,
                                   max_trajectory_length: float = 30) -> str:
@@ -1387,8 +1390,8 @@ class GiskardWrapper:
                 goal.end_condition = local_min_reached_monitor_name
         self.monitors.add_end_motion(start_condition=self.monitors.get_anded_monitor_names())
         self.monitors.add_cancel_motion(start_condition=local_min_reached_monitor_name,
-                                        error_message=f'local minimum reached',
-                                        error_type=LocalMinimumException.__name__)
+                                        error=GiskardError(type=LocalMinimumException.__name__,
+                                                           msg=f'local minimum reached'))
         if not self.monitors.max_trajectory_length_set:
             self.monitors.add_max_trajectory_length()
         self.monitors.max_trajectory_length_set = False

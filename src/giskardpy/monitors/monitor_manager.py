@@ -42,6 +42,10 @@ class MonitorManager:
         self.reset()
 
     def reset(self):
+        try:
+            del self.payload_monitor_filter
+        except Exception as e:
+            pass
         self.monitors = []
         self.state_history = []
         self.substitution_values = {}
@@ -173,20 +177,6 @@ class MonitorManager:
         return [x for x in self.monitors if isinstance(x, PayloadMonitor)]
 
     def add_monitor(self, monitor: Monitor) -> None:
-        if isinstance(monitor, ExpressionMonitor):
-            self._add_expression_monitor(monitor)
-        else:
-            self._add_payload_monitor(monitor)
-
-    @profile
-    def _add_expression_monitor(self, monitor: ExpressionMonitor):
-        if [x for x in self.monitors if x.name == monitor.name]:
-            raise MonitorInitalizationException(f'Monitor named {monitor.name} already exists.')
-        self.monitors.append(monitor)
-        monitor.set_id(len(self.monitors) - 1)
-
-    @profile
-    def _add_payload_monitor(self, monitor: PayloadMonitor):
         if [x for x in self.monitors if x.name == monitor.name]:
             raise MonitorInitalizationException(f'Monitor named {monitor.name} already exists.')
         self.monitors.append(monitor)

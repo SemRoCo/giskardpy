@@ -322,7 +322,7 @@ class TestConstraints:
         kitchen_setup.allow_all_collisions()
         # kitchen_setup.add_json_goal('AvoidJointLimits', percentage=10)
         kitchen_setup.execute()
-        current_pose = god_map.world.compute_fk(root='map', tip=kitchen_setup.tip)
+        current_pose = god_map.world.compute_fk(root_link='map', tip_link=kitchen_setup.tip)
 
         kitchen_setup.set_open_container_goal(tip_link=kitchen_setup.tip,
                                               environment_link=handle_name,

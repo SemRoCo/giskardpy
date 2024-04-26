@@ -44,8 +44,7 @@ class SetMaxTrajectoryLength(CancelMotion):
         error_message = f'Trajectory longer than {self.length}'
         super().__init__(name=name,
                          start_condition=start_condition,
-                         error_message=error_message,
-                         error_type=MaxTrajectoryLengthException)
+                         exception=MaxTrajectoryLengthException(error_message))
 
     @profile
     def __call__(self):

@@ -1146,20 +1146,20 @@ class WorldTree(WorldTreeInterface):
                                     self.joint_velocity_symbols)
 
     @memoize
-    def compute_fk(self, root: PrefixName, tip: PrefixName) -> cas.TransMatrix:
-        result = cas.TransMatrix(self.compute_fk_np(root, tip))
-        result.reference_frame = root
-        result.child_frame = tip
+    def compute_fk(self, root_link: PrefixName, tip_link: PrefixName) -> cas.TransMatrix:
+        result = cas.TransMatrix(self.compute_fk_np(root_link, tip_link))
+        result.reference_frame = root_link
+        result.child_frame = tip_link
         return result
 
     def compute_fk_point(self, root: PrefixName, tip: PrefixName) -> cas.Point3:
-        return self.compute_fk(root=root, tip=tip).to_position()
+        return self.compute_fk(root_link=root, tip_link=tip).to_position()
 
     @memoize
-    def compute_fk_with_collision_offset(self, root: PrefixName, tip: PrefixName,
+    def compute_fk_with_collision_offset(self, root_link: PrefixName, tip_link: PrefixName,
                                          collision_id: int) -> cas.TransMatrix:
-        root_T_tip = self.compute_fk(root, tip)
-        tip_link = self.links[tip]
+        root_T_tip = self.compute_fk(root_link, tip_link)
+        tip_link = self.links[tip_link]
         return root_T_tip.dot(tip_link.collisions[collision_id].link_T_geometry)
 
     @profile
@@ -1298,7 +1298,7 @@ class WorldTree(WorldTreeInterface):
     def transform(self, target_frame, geometric_cas_object):
         if geometric_cas_object.reference_frame is None:
             raise WorldException('Can\'t transform an object without reference_frame.')
-        target_frame_T_reference_frame = self.compute_fk(root=target_frame, tip=geometric_cas_object.reference_frame)
+        target_frame_T_reference_frame = self.compute_fk(root_link=target_frame, tip_link=geometric_cas_object.reference_frame)
         if isinstance(geometric_cas_object, cas.Quaternion):
             reference_frame_R = geometric_cas_object.to_rotation_matrix()
             target_frame_R = target_frame_T_reference_frame.dot(reference_frame_R)

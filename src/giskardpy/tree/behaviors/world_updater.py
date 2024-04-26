@@ -132,13 +132,14 @@ class ProcessWorldUpdate(GiskardBehavior):
         with god_map.world.modify_world() as world:
             pose = msg_converter.pose_stamped_to_trans_matrix(pose, world)
             parent_link_T_group_root_link = world.transform(parent_link, pose)
+            link_name = PrefixName(group_name, group_name)
             if world_body.type == world_body.URDF_BODY:
                 world.add_urdf(urdf=world_body.urdf,
                                parent_link_name=parent_link,
                                group_name=group_name,
                                pose=parent_link_T_group_root_link)
             else:
-                link = msg_converter.world_body_to_link(link_name=PrefixName(group_name, group_name),
+                link = msg_converter.world_body_to_link(link_name=link_name,
                                                         msg=world_body,
                                                         color=god_map.world.default_link_color)
                 god_map.world.add_link(link)
@@ -147,7 +148,7 @@ class ProcessWorldUpdate(GiskardBehavior):
                                   child_link_name=link.name)
                 joint.update_transform(parent_link_T_group_root_link)
                 world.add_joint(joint)
-        world.register_group(group_name, link.name)
+                world.register_group(group_name, link.name)
         # SUB-CASE: If it is an articulated object, open up a joint state subscriber
         logging.loginfo(f'Attached object \'{group_name}\' at \'{parent_link}\'.')
         if world_body.joint_state_topic:

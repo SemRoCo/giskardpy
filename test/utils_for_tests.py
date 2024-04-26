@@ -48,19 +48,9 @@ import giskardpy.middleware.ros1.msg_converter as msg_converter
 BIG_NUMBER = 1e100
 SMALL_NUMBER = 1e-100
 
-folder_name = 'tmp_data/'
-
 
 def vector(x):
     return st.lists(float_no_nan_no_inf(), min_size=x, max_size=x)
-
-
-error_codes = {value: name for name, value in vars(giskard_msgs.GiskardError).items() if
-               isinstance(value, int) and name[0].isupper()}
-
-
-def error_code_to_name(code):
-    return error_codes[code]
 
 
 def angle_positive():
@@ -314,6 +304,16 @@ class GiskardTestWrapper(OldGiskardWrapper):
         # rospy.sleep(1)
         self.original_number_of_links = len(god_map.world.links)
 
+    def compute_fk_pose(self, root_link: str, tip_link: str) -> PoseStamped:
+        root_T_tip = god_map.world.compute_fk(root_link=god_map.world.search_for_link_name(root_link),
+                                              tip_link=god_map.world.search_for_link_name(tip_link))
+        return msg_converter.to_ros_message(root_T_tip)
+
+    def compute_fk_point(self, root_link: str, tip_link: str) -> PointStamped:
+        root_T_tip = god_map.world.compute_fk_point(root_link=god_map.world.search_for_link_name(root_link),
+                                                    tip_link=god_map.world.search_for_link_name(tip_link))
+        return msg_converter.to_ros_message(root_T_tip)
+
     def has_odometry_joint(self, group_name: Optional[str] = None):
         if group_name is None:
             group_name = self.robot_name
@@ -558,9 +558,13 @@ class GiskardTestWrapper(OldGiskardWrapper):
                                              god_map.qp_controller.sample_period)
             logging.logwarn(f'Goal processing took {diff}')
             result_exception = msg_converter.error_msg_to_exception(r.error)
-            assert result_exception == expected_error_type, \
-                f'got: {result_exception}, ' \
-                f'expected: {expected_error_type} | error_massage: {r.error.msg}'
+            if expected_error_type is not None:
+                assert type(result_exception) == expected_error_type, \
+                    f'got: {result_exception}, ' \
+                    f'expected: {expected_error_type} | error_massage: {r.error.msg}'
+            else:
+                if result_exception is not None:
+                    raise result_exception
             # self.are_joint_limits_violated()
         finally:
             self.sync_world_with_trajectory()
@@ -691,7 +695,7 @@ class GiskardTestWrapper(OldGiskardWrapper):
     def check_add_object_result(self,
                                 name: str,
                                 pose: Optional[PoseStamped],
-                                parent_link: Optional[giskard_msgs.LinkName] = None,
+                                parent_link: Optional[Union[str, giskard_msgs.LinkName]] = None,
                                 expected_error_type: Optional[type(Exception)] = None):
         if isinstance(parent_link, str):
             parent_link = giskard_msgs.LinkName(name=parent_link)
@@ -731,7 +735,7 @@ class GiskardTestWrapper(OldGiskardWrapper):
                          name: str,
                          size: Tuple[float, float, float],
                          pose: PoseStamped,
-                         parent_link: Optional[giskard_msgs.LinkName] = None,
+                         parent_link: Optional[Union[str, giskard_msgs.LinkName]] = None,
                          expected_error_type: Optional[type(Exception)] = None) -> None:
         try:
             response = self.world.add_box(name=name,
@@ -763,7 +767,7 @@ class GiskardTestWrapper(OldGiskardWrapper):
                             name: str,
                             radius: float = 1,
                             pose: PoseStamped = None,
-                            parent_link: Optional[giskard_msgs.LinkName] = None,
+                            parent_link: Optional[Union[str, giskard_msgs.LinkName]] = None,
                             expected_error_type: Optional[type(Exception)] = None) -> None:
         try:
             response = self.world.add_sphere(name=name,
@@ -784,7 +788,7 @@ class GiskardTestWrapper(OldGiskardWrapper):
                               height: float,
                               radius: float,
                               pose: PoseStamped = None,
-                              parent_link: Optional[giskard_msgs.LinkName] = None,
+                              parent_link: Optional[Union[str, giskard_msgs.LinkName]] = None,
                               expected_error_type: Optional[type(Exception)] = None) -> None:
         try:
             response = self.world.add_cylinder(name=name,
@@ -805,7 +809,7 @@ class GiskardTestWrapper(OldGiskardWrapper):
                           name: str = 'meshy',
                           mesh: str = '',
                           pose: PoseStamped = None,
-                          parent_link: Optional[giskard_msgs.LinkName] = None,
+                          parent_link: Optional[Union[str, giskard_msgs.LinkName]] = None,
                           scale: Tuple[float, float, float] = (1, 1, 1),
                           expected_error_type: Optional[type(Exception)] = None) -> None:
         try:
@@ -829,7 +833,7 @@ class GiskardTestWrapper(OldGiskardWrapper):
                           name: str,
                           urdf: str,
                           pose: PoseStamped,
-                          parent_link: Optional[giskard_msgs.LinkName] = None,
+                          parent_link: Optional[Union[str, giskard_msgs.LinkName]] = None,
                           js_topic: Optional[str] = '',
                           set_js_topic: Optional[str] = '',
                           expected_error_type: Optional[type(Exception)] = None) -> None:

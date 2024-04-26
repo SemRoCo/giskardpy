@@ -183,7 +183,7 @@ def trajectory_to_ros_trajectory(data: Trajectory,
 def world_to_tf_message(world: WorldTree, include_prefix: bool) -> tf2_msgs.TFMessage:
     tf_msg = tf2_msgs.TFMessage()
     for joint_name, joint in world.joints.items():
-        p_T_c = world.compute_fk(root=joint.parent_link_name, tip=joint.child_link_name)
+        p_T_c = world.compute_fk(root_link=joint.parent_link_name, tip_link=joint.child_link_name)
         if include_prefix:
             parent_link_name = joint.parent_link_name
             child_link_name = joint.child_link_name
@@ -267,7 +267,7 @@ exception_classes.update({name: getattr(builtins, name) for name in dir(builtins
 def error_msg_to_exception(msg: giskard_msgs.GiskardError) -> Optional[Exception]:
     if msg.type == GiskardError.SUCCESS:
         return None
-    if msg.type == GiskardError in exception_classes:
+    if msg.type in exception_classes:
         return exception_classes[msg.type](msg.msg)
     return Exception(f'{msg.type}: {msg.msg}')
 
@@ -351,6 +351,8 @@ def convert_ros_msg_to_giskard_obj(msg, world: WorldTree):
         return collision_entry_msg_to_giskard(msg)
     elif isinstance(msg, giskard_msgs.LinkName):
         return link_name_msg_to_prefix_name(msg, world)
+    elif isinstance(msg, GiskardError):
+        return error_msg_to_exception(msg)
     else:
         raise ValueError(f'Can\'t convert msg of type \'{type(msg)}\'')
 

@@ -133,10 +133,10 @@ class VectorsAligned(ExpressionMonitor):
         self.tip = tip_link
 
         self.tip_V_tip_normal = god_map.world.transform(self.tip, tip_normal)
-        self.tip_V_tip_normal.vector.scale(1)
+        self.tip_V_tip_normal.scale(1)
 
         self.root_V_root_normal = god_map.world.transform(self.root, goal_normal)
-        self.root_V_root_normal.vector.scale(1)
+        self.root_V_root_normal.scale(1)
 
         root_R_tip = god_map.world.compose_fk_expression(self.root, self.tip).to_rotation()
         root_V_tip_normal = root_R_tip.dot(self.tip_V_tip_normal)

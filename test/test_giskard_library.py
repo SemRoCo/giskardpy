@@ -209,8 +209,10 @@ class TestWorld:
             parameters = controller.get_parameter_names()
             substitutions = symbol_manager.resolve_symbols(parameters)
             next_cmd = controller.get_cmd(substitutions)
+
             box_world.update_state(next_cmd, dt, Derivatives.jerk)
             box_world.notify_state_change()
+
             god_map.monitor_manager.evaluate_monitors()
             traj.append(box_world.state[joint_name].position)
             god_map.time += controller.sample_period
@@ -273,7 +275,7 @@ class TestWorld:
         np.testing.assert_almost_equal(fk[0], goal1.to_position().to_np()[0], decimal=2)
         np.testing.assert_almost_equal(fk[1], goal2.to_position().to_np()[1], decimal=2)
 
-class TestWorld:
+class TestWorld2:
     def test_compute_self_collision_matrix(self, world_setup: WorldTree):
         disabled_links = {world_setup.search_for_link_name('br_caster_l_wheel_link'),
                           world_setup.search_for_link_name('fr_caster_l_wheel_link')}

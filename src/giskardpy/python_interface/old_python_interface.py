@@ -548,7 +548,8 @@ class OldGiskardWrapper(GiskardWrapper):
         This goal will push joints away from their position limits. For example if percentage is 15 and the joint
         limits are 0-100, it will push it into the 15-85 range.
         """
-        joint_list = [giskard_msgs.LinkName(name=name) for name in joint_list]
+        if joint_list is not None:
+            joint_list = [giskard_msgs.LinkName(name=name) for name in joint_list]
         self.motion_goals.add_avoid_joint_limits(percentage=percentage,
                                                  weight=weight,
                                                  joint_list=joint_list)

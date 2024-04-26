@@ -1996,6 +1996,14 @@ def distance_point_to_line(frame_P_point, frame_P_line_point, frame_V_line_direc
     return distance
 
 
+def distance_point_to_plane(frame_P_current, frame_V_v1, frame_V_v2):
+    normal = cross(frame_V_v1, frame_V_v2)
+    d = normal.dot(frame_P_current)
+    normal.scale(d)
+    nearest = frame_P_current - normal
+    return norm(nearest-frame_P_current), nearest
+
+
 def angle_between_vector(v1, v2):
     v1 = v1[:3]
     v2 = v2[:3]
@@ -2211,6 +2219,7 @@ def is_false(expr):
         return (expr == FalseSymbol).evaluate()
     except Exception as e:
         return False
+
 
 def is_constant(expr):
     return len(expr.free_symbols()) == 0

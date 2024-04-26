@@ -1296,6 +1296,8 @@ class WorldTree(WorldTreeInterface):
         ...
 
     def transform(self, target_frame, geometric_cas_object):
+        if geometric_cas_object.reference_frame is None:
+            raise WorldException('Can\'t transform an object without reference_frame.')
         target_frame_T_reference_frame = self.compute_fk(root=target_frame, tip=geometric_cas_object.reference_frame)
         if isinstance(geometric_cas_object, cas.Quaternion):
             reference_frame_R = geometric_cas_object.to_rotation_matrix()

@@ -50,7 +50,7 @@ class Giskard:
         god_map.tmp_folder = resolve_ros_iris('package://giskardpy/tmp/')
         GiskardBlackboard().giskard = self
         self.world_config = world_config
-        god_map.robot_interface_config = robot_interface_config
+        self.robot_interface_config = robot_interface_config
         if collision_avoidance_config is None:
             collision_avoidance_config = DisableCollisionAvoidanceConfig()
         self.collision_avoidance_config = collision_avoidance_config
@@ -60,7 +60,7 @@ class Giskard:
         # god_map.behavior_tree_config = behavior_tree_config
         if qp_controller_config is None:
             qp_controller_config = QPControllerConfig()
-        god_map.qp_controller_config = qp_controller_config
+        self.qp_controller_config = qp_controller_config
         if additional_goal_package_paths is None:
             additional_goal_package_paths = set()
         for additional_path in additional_goal_package_paths:
@@ -73,8 +73,8 @@ class Giskard:
 
     def set_defaults(self) -> None:
         self.world_config.set_defaults()
-        god_map.robot_interface_config.set_defaults()
-        god_map.qp_controller_config.set_defaults()
+        self.robot_interface_config.set_defaults()
+        self.qp_controller_config.set_defaults()
         self.collision_avoidance_config.set_defaults()
         self.behavior_tree_config.set_defaults()
 
@@ -86,7 +86,7 @@ class Giskard:
             self.world_config.setup()
         self.behavior_tree_config._create_behavior_tree()
         self.behavior_tree_config.setup()
-        god_map.robot_interface_config.setup()
+        self.robot_interface_config.setup()
         god_map.world._notify_model_change()
         self.collision_avoidance_config.setup()
         self.collision_avoidance_config._sanity_check()

@@ -17,7 +17,7 @@ def call_back(pose_stamped):
                                         tip_link=tip_link,
                                         root_link=root_link)
     giskard.allow_all_collisions()
-    giskard.plan_and_execute(wait=False)
+    giskard.execute(wait=False)
 
 
 if __name__ == '__main__':

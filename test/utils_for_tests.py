@@ -430,7 +430,7 @@ class GiskardTestWrapper(OldGiskardWrapper):
         if GiskardBlackboard().tree.is_standalone():
             self.set_seed_configuration(joint_state)
             self.allow_all_collisions()
-            self.plan_and_execute()
+            self.execute()
         else:
             joint_state_msg = position_dict_to_joint_states(joint_state)
             self.env_joint_state_pubs[object_name].publish(joint_state_msg)
@@ -525,10 +525,6 @@ class GiskardTestWrapper(OldGiskardWrapper):
                 del new_js[key]
         self.compare_joint_state(new_js, last_js)
         return result
-
-    def plan_and_execute(self, expected_error_type: Optional[type(Exception)] = None, stop_after: float = None,
-                         wait: bool = True) -> giskard_msgs.MoveResult:
-        return self.execute(expected_error_type, stop_after, wait)
 
     def plan(self, expected_error_type: Optional[type(Exception)] = None, wait: bool = True,
              add_local_minimum_reached: bool = True) -> giskard_msgs.MoveResult:

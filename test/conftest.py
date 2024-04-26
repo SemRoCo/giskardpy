@@ -74,11 +74,11 @@ def better_pose(resetted_giskard: GiskardTestWrapper) -> GiskardTestWrapper:
     if GiskardBlackboard().tree.is_standalone():
         resetted_giskard.set_seed_configuration(resetted_giskard.better_pose)
         resetted_giskard.allow_all_collisions()
-        resetted_giskard.plan_and_execute()
+        resetted_giskard.execute()
     else:
         resetted_giskard.allow_all_collisions()
         resetted_giskard.set_joint_goal(resetted_giskard.better_pose)
-        resetted_giskard.plan_and_execute()
+        resetted_giskard.execute()
     return resetted_giskard
 
 

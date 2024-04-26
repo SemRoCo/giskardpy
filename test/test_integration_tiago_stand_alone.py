@@ -110,7 +110,7 @@ class TiagoTestWrapper(GiskardTestWrapper):
                                       root_link=root_link,
                                       goal_pose=goal_pose,
                                       add_monitor=add_monitor)
-        self.plan_and_execute()
+        self.execute()
 
     def open_right_gripper(self, goal: float = 0.45):
         js = {
@@ -120,7 +120,7 @@ class TiagoTestWrapper(GiskardTestWrapper):
             'gripper_left_right_finger_joint': goal,
         }
         self.set_joint_goal(js)
-        self.plan_and_execute()
+        self.execute()
 
     def reset(self):
         self.clear_world()
@@ -142,7 +142,7 @@ class TiagoTestWrapper(GiskardTestWrapper):
     def teleport_base(self, goal_pose, group_name: Optional[str] = None):
         self.set_seed_odometry(base_pose=goal_pose, group_name=group_name)
         self.allow_all_collisions()
-        self.plan_and_execute()
+        self.execute()
 
 
 class TestCartGoals:
@@ -236,7 +236,7 @@ class TestCartGoals:
 
     def test_drive7(self, apartment_setup: TiagoTestWrapper):
         apartment_setup.set_joint_goal(apartment_setup.better_pose2)
-        apartment_setup.plan_and_execute()
+        apartment_setup.execute()
 
         goal = PoseStamped()
         goal.header.frame_id = 'map'
@@ -287,7 +287,7 @@ class TestCollisionAvoidance:
     def test_avoid_all(self, zero_pose: TiagoTestWrapper):
         zero_pose.set_joint_goal(zero_pose.better_pose)
         zero_pose.avoid_collision(0.1, group1=zero_pose.robot_name)
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
     def test_attach_object(self, better_pose):
         parent_link = 'arm_left_tool_link'
@@ -302,7 +302,7 @@ class TestCollisionAvoidance:
                                      parent_link=parent_link,
                                      parent_link_group=better_pose.robot_name)
         better_pose.set_joint_goal(better_pose.default_pose)
-        better_pose.plan_and_execute()
+        better_pose.execute()
 
     def test_demo1(self, apartment_setup: TiagoTestWrapper):
         # setup
@@ -348,14 +348,14 @@ class TestCollisionAvoidance:
         # apartment_setup.set_diff_drive_tangential_to_point(goal_point)
         apartment_setup.set_keep_hand_in_workspace(tip_link=l_tcp)
         # apartment_setup.avoid_joint_limits(50)
-        apartment_setup.plan_and_execute()
+        apartment_setup.execute()
 
         apartment_setup.set_diff_drive_tangential_to_point(goal_point=goal_point, weight=WEIGHT_BELOW_CA)
         apartment_setup.set_cart_goal(left_pose,
                                       tip_link=l_tcp,
                                       root_link=apartment_setup.default_root,
                                       add_monitor=False)
-        apartment_setup.plan_and_execute()
+        apartment_setup.execute()
 
         apartment_setup.set_open_container_goal(tip_link=l_tcp,
                                                 environment_link=handle_name,
@@ -365,7 +365,7 @@ class TestCollisionAvoidance:
             joint_list=['arm_left_1_joint', 'arm_left_2_joint', 'arm_left_3_joint',
                         'arm_left_4_joint', 'arm_left_5_joint', 'arm_left_6_joint',
                         'arm_left_7_joint'])
-        apartment_setup.plan_and_execute()
+        apartment_setup.execute()
 
     def test_self_collision_avoidance(self, zero_pose: TiagoTestWrapper):
         js = {
@@ -428,9 +428,9 @@ class TestCollisionAvoidance:
 
         zero_pose.set_seed_configuration(js)
         zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
         zero_pose.set_joint_goal(zero_pose.better_pose2)
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
     def test_left_arm(self, zero_pose: TiagoTestWrapper):
         box_pose = PoseStamped()
@@ -449,7 +449,7 @@ class TestCollisionAvoidance:
         zero_pose.add_box_to_world('box2',
                                    size=(0.05, 0.05, 0.05),
                                    pose=box_pose)
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
     def test_load_negative_scale(self, zero_pose: TiagoTestWrapper):
         mesh_path = 'package://tiago_description/meshes/arm/arm_3_collision.dae'
@@ -504,7 +504,7 @@ class TestCollisionAvoidance:
         #                    pose=box_pose,
         #                    scale=(1, 1, 1),
         #                    )
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
     def test_drive_into_kitchen(self, apartment_setup: TiagoTestWrapper):
         base_goal = PoseStamped()
@@ -533,21 +533,21 @@ class TestCollisionAvoidance:
         goal_point.header.frame_id = 'cabinet1_door_top_left'
         apartment_setup.set_diff_drive_tangential_to_point(goal_point=goal_point)
         apartment_setup.set_avoid_joint_limits_goal(50)
-        apartment_setup.plan_and_execute()
+        apartment_setup.execute()
 
         apartment_setup.set_open_container_goal(tip_link=tcp,
                                       environment_link=handle_name,
                                       goal_joint_state=goal_angle)
         apartment_setup.set_diff_drive_tangential_to_point(goal_point=goal_point)
         apartment_setup.set_avoid_joint_limits_goal(50)
-        apartment_setup.plan_and_execute()
+        apartment_setup.execute()
 
         apartment_setup.set_open_container_goal(tip_link=tcp,
                                       environment_link=handle_name,
                                       goal_joint_state=0)
         apartment_setup.set_diff_drive_tangential_to_point(goal_point=goal_point)
         apartment_setup.set_avoid_joint_limits_goal(50)
-        apartment_setup.plan_and_execute()
+        apartment_setup.execute()
 
 
 class TestConstraints:
@@ -555,7 +555,7 @@ class TestConstraints:
         goal_point = PointStamped()
         goal_point.header.frame_id = 'iai_apartment/cabinet1_door_top_left'
         apartment_setup.set_diff_drive_tangential_to_point(goal_point=goal_point)
-        apartment_setup.plan_and_execute()
+        apartment_setup.execute()
 
 
 class TestJointGoals:
@@ -566,7 +566,7 @@ class TestJointGoals:
         zero_pose.set_seed_configuration(js)
         zero_pose.set_joint_goal(zero_pose.better_pose2, add_monitor=False)
         zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
         zero_pose.are_joint_limits_violated()
 
     def test_out_of_joint_soft_limits6(self, zero_pose: TiagoTestWrapper):
@@ -606,7 +606,7 @@ class TestJointGoals:
                                     goal_point=pointing_goal,
                                     pointing_axis=z)
         zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
         zero_pose.are_joint_limits_violated()
 
     def test_out_of_joint_soft_limits7(self, zero_pose: TiagoTestWrapper):
@@ -639,7 +639,7 @@ class TestJointGoals:
         # del js2['arm_right_2_joint']
         zero_pose.set_joint_goal(js2, add_monitor=False)
         zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
         zero_pose.are_joint_limits_violated()
 
     def test_joint_goals(self, zero_pose: TiagoTestWrapper):
@@ -664,7 +664,7 @@ class TestJointGoals:
         zero_pose.set_joint_goal(js1)
         zero_pose.set_joint_goal(js2)
 
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
     def test_joint_goals_at_limits(self, zero_pose: TiagoTestWrapper):
         js1 = {
@@ -674,7 +674,7 @@ class TestJointGoals:
         # zero_pose.set_seed_configuration(start_state)
         zero_pose.set_joint_goal(js1, add_monitor=False, weight=WEIGHT_ABOVE_CA)
         zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
         zero_pose.are_joint_limits_violated()
 
     def test_get_out_of_joint_soft_limits(self, zero_pose: TiagoTestWrapper):
@@ -684,7 +684,7 @@ class TestJointGoals:
         }
         zero_pose.set_seed_configuration(seed_configuration=js)
         zero_pose.set_joint_goal(zero_pose.default_pose)
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
         zero_pose.are_joint_limits_violated()
 
     def test_get_out_of_joint_soft_limits_passive(self, zero_pose: TiagoTestWrapper):
@@ -693,7 +693,7 @@ class TestJointGoals:
             # 'arm_left_5_joint': -3
         }
         zero_pose.set_seed_configuration(seed_configuration=js)
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
         zero_pose.are_joint_limits_violated()
 
     def test_get_out_of_joint_soft_limits_passive_with_velocity(self, zero_pose: TiagoTestWrapper):
@@ -704,7 +704,7 @@ class TestJointGoals:
         zero_pose.set_seed_configuration(seed_configuration=js)
         god_map.world.state[PrefixName('arm_right_5_joint', 'tiago_dual')].velocity = 1
         # zero_pose.world.state[PrefixName('arm_left_5_joint', 'tiago_dual')].velocity = -1
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
         zero_pose.are_joint_limits_violated()
 
     def test_try_to_stay_out_of_soft_limits(self, zero_pose: TiagoTestWrapper):
@@ -716,7 +716,7 @@ class TestJointGoals:
         zero_pose.set_joint_goal(js, add_monitor=False)
         god_map.world.state[PrefixName('arm_right_5_joint', 'tiago_dual')].velocity = 1
         zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
         zero_pose.are_joint_limits_violated()
 
     def test_get_out_of_joint_soft_limits2(self, zero_pose: TiagoTestWrapper):

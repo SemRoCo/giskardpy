@@ -114,7 +114,7 @@ class TestJointGoalsMujoco(TestJointGoals):
         }
         zero_pose.set_joint_goal(js)
         zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
     def test_joint_goal_projection(self, zero_pose: PR2TestWrapper):
         js = {
@@ -193,7 +193,7 @@ class TestMoveBaseGoals:
         # zero_pose.set_json_goal('PR2CasterConstraints')
         zero_pose.set_max_traj_length(new_length=160)
         zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
     def test_stay_put(self, zero_pose: PR2TestWrapper):
         base_goal = PoseStamped()
@@ -235,7 +235,7 @@ class TestMoveBaseGoals:
                                 height_for_camera_target=1.5)
         zero_pose.allow_all_collisions()
         # zero_pose.plan_and_execute(expected_error_codes=[GiskardError.PREEMPTED], stop_after=30)
-        zero_pose.plan_and_execute(expected_error_codes=[GiskardError.ERROR])
+        zero_pose.execute(expected_error_codes=[GiskardError.ERROR])
 
         # zero_pose.set_json_goal('CarryMyBullshit',
         #                         camera_link='head_mount_kinect_rgb_optical_frame',
@@ -250,7 +250,7 @@ class TestMoveBaseGoals:
                                 laser_frame_id='base_laser_link',
                                 drive_back=True)
         zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
     def test_wave(self, zero_pose: PR2TestWrapper):
         center = PointStamped()
@@ -262,7 +262,7 @@ class TestMoveBaseGoals:
                                 tip_link='base_footprint',
                                 scale=2)
         zero_pose.set_joint_goal(zero_pose.better_pose, check=False)
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
     def test_forward_1cm(self, zero_pose: PR2TestWrapper):
         base_goal = PoseStamped()
@@ -449,12 +449,12 @@ class TestConstraints:
                                             goal_normal=x_goal)
         # kitchen_setup.allow_all_collisions()
         kitchen_setup.allow_collision(kitchen_setup.l_gripper_group, kitchen_setup.default_env_name)
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
 
         # open drawer
         kitchen_setup.set_open_container_goal(tip_link=kitchen_setup.l_tip,
                                               environment_link=drawer_handle)
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
         kitchen_setup.set_env_state({drawer_joint: 0.48})
 
         kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
@@ -491,7 +491,7 @@ class TestConstraints:
                                     tip_link=kitchen_setup.r_tip,
                                     root_link=kitchen_setup.default_root,
                                     weight=WEIGHT_BELOW_CA)
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
 
         l_goal.pose.position.z -= .2
         r_goal.pose.position.z -= .2
@@ -505,13 +505,13 @@ class TestConstraints:
         kitchen_setup.avoid_all_collisions(0.05)
         kitchen_setup.allow_collision(group1=kitchen_setup.robot_name, group2=bowl_name)
         kitchen_setup.allow_collision(group1=kitchen_setup.robot_name, group2=cup_name)
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
 
         kitchen_setup.update_parent_link_of_group(name=bowl_name, parent_link=kitchen_setup.l_tip)
         kitchen_setup.update_parent_link_of_group(name=cup_name, parent_link=kitchen_setup.r_tip)
 
         kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
         base_goal = PoseStamped()
         base_goal.header.frame_id = 'base_footprint'
         base_goal.pose.position.x = -.1
@@ -533,14 +533,14 @@ class TestConstraints:
         kitchen_setup.set_cart_goal(goal_pose=cup_goal, tip_link=cup_name, root_link=kitchen_setup.default_root)
         kitchen_setup.set_avoid_joint_limits_goal(percentage=percentage)
         kitchen_setup.avoid_all_collisions(0.05)
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
 
         kitchen_setup.detach_group(name=bowl_name)
         kitchen_setup.detach_group(name=cup_name)
         kitchen_setup.allow_collision(group1=kitchen_setup.robot_name, group2=cup_name)
         kitchen_setup.allow_collision(group1=kitchen_setup.robot_name, group2=bowl_name)
         kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
 
 
 class TestActionServerEvents:
@@ -551,7 +551,7 @@ class TestActionServerEvents:
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.set_cart_goal(goal_pose=p, tip_link='base_footprint', root_link='map')
         zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute(expected_error_code=GiskardError.PREEMPTED, stop_after=1)
+        zero_pose.execute(expected_error_code=GiskardError.PREEMPTED, stop_after=1)
 
     def test_interrupt2(self, zero_pose: PR2TestWrapper):
         p = PoseStamped()
@@ -560,7 +560,7 @@ class TestActionServerEvents:
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.set_cart_goal(goal_pose=p, tip_link='base_footprint', root_link='map')
         zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute(expected_error_code=GiskardError.PREEMPTED, stop_after=6)
+        zero_pose.execute(expected_error_code=GiskardError.PREEMPTED, stop_after=6)
 
     def test_undefined_type(self, zero_pose: PR2TestWrapper):
         zero_pose.allow_all_collisions()
@@ -568,7 +568,7 @@ class TestActionServerEvents:
 
     def test_empty_goal(self, zero_pose: PR2TestWrapper):
         zero_pose.cmd_seq = []
-        zero_pose.plan_and_execute(expected_error_code=GiskardError.INVALID_GOAL)
+        zero_pose.execute(expected_error_code=GiskardError.INVALID_GOAL)
 
 
 class TestManipulability:
@@ -618,7 +618,7 @@ class TestManipulability:
                                         root_link='map',
                                         tip_normal=x_base,
                                         goal_normal=x_goal)
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
 # kernprof -lv py.test -s test/test_integration_pr2.py
 # time: [1-9][1-9]*.[1-9]* s

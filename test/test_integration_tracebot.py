@@ -70,7 +70,7 @@ class TestTracebot:
     def test_joint_goal(self, zero_pose: TracebotTestWrapper):
         zero_pose.set_joint_goal(zero_pose.better_pose)
         zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
     def test_place_cylinder(self, better_pose: TracebotTestWrapper):
         cylinder_name = 'C'
@@ -95,7 +95,7 @@ class TestTracebot:
                                                  cylinder_height=0.121,
                                                  hole_point=hole_point)
         better_pose.allow_all_collisions()
-        better_pose.plan_and_execute()
+        better_pose.execute()
 
 
 class TestCartGoals:
@@ -115,6 +115,6 @@ class TestCartGoals:
 
         zero_pose.set_cart_goal(goal, tip_link=tip, root_link='world')
         # zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
         # zero_pose.set_translation_goal(goal, 'base_footprint', 'odom')
         # zero_pose.plan_and_execute()

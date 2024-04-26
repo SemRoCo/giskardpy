@@ -84,7 +84,7 @@ class TestJointGoalsMujoco(TestJointGoals):
         zero_pose.set_joint_goal(js)
         zero_pose.allow_all_collisions()
         # zero_pose.set_json_goal('EnableVelocityTrajectoryTracking', enabled=True)
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
     def test_joint_goal_projection(self, zero_pose: PR2TestWrapper):
         js = {
@@ -130,7 +130,7 @@ class TestConstraints:
     def test_SetSeedConfiguration(self, zero_pose: PR2TestWrapper):
         zero_pose.set_seed_configuration(seed_configuration=zero_pose.better_pose)
         zero_pose.set_joint_goal(zero_pose.default_pose)
-        zero_pose.plan_and_execute(expected_error_code=GiskardError.GOAL_INITIALIZATION_ERROR)
+        zero_pose.execute(expected_error_code=GiskardError.GOAL_INITIALIZATION_ERROR)
 
 
 class TestCartGoals:
@@ -158,7 +158,7 @@ class TestActionServerEvents:
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.set_cart_goal(goal_pose=p, tip_link='base_footprint', root_link='map')
         zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute(expected_error_code=GiskardError.PREEMPTED, stop_after=1)
+        zero_pose.execute(expected_error_code=GiskardError.PREEMPTED, stop_after=1)
 
     def test_interrupt2(self, zero_pose: PR2TestWrapper):
         p = PoseStamped()
@@ -167,7 +167,7 @@ class TestActionServerEvents:
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.set_cart_goal(goal_pose=p, tip_link='base_footprint', root_link='map')
         zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute(expected_error_code=GiskardError.PREEMPTED, stop_after=6)
+        zero_pose.execute(expected_error_code=GiskardError.PREEMPTED, stop_after=6)
 
     def test_undefined_type(self, zero_pose: PR2TestWrapper):
         zero_pose.allow_all_collisions()
@@ -176,7 +176,7 @@ class TestActionServerEvents:
 
     def test_empty_goal(self, zero_pose: PR2TestWrapper):
         zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute(expected_error_code=GiskardError.EMPTY_PROBLEM)
+        zero_pose.execute(expected_error_code=GiskardError.EMPTY_PROBLEM)
 
     def test_plan_only(self, zero_pose: PR2TestWrapper):
         zero_pose.allow_self_collision()

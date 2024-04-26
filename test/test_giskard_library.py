@@ -176,7 +176,7 @@ class TestWorld:
                                    root_link=box_world.root_link_name,
                                    tip_link=box_name,
                                    goal_pose=goal1)
-        god_map.monitor_manager.add_expression_monitor(cart_monitor)
+        god_map.monitor_manager.add_monitor(cart_monitor)
 
         cart_goal1 = CartesianPose(name='g1',
                                    root_link=box_world.root_link_name,
@@ -230,7 +230,7 @@ class TestWorld:
                                    root_link=box_world.root_link_name,
                                    tip_link=box_name,
                                    goal_pose=goal1)
-        god_map.monitor_manager.add_expression_monitor(cart_monitor)
+        god_map.monitor_manager.add_monitor(cart_monitor)
 
         cart_goal1 = CartesianPose(name='g1',
                                    root_link=box_world.root_link_name,

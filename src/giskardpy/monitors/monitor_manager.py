@@ -172,15 +172,21 @@ class MonitorManager:
     def payload_monitors(self) -> List[PayloadMonitor]:
         return [x for x in self.monitors if isinstance(x, PayloadMonitor)]
 
+    def add_monitor(self, monitor: Monitor) -> None:
+        if isinstance(monitor, ExpressionMonitor):
+            self._add_expression_monitor(monitor)
+        else:
+            self._add_payload_monitor(monitor)
+
     @profile
-    def add_expression_monitor(self, monitor: ExpressionMonitor):
+    def _add_expression_monitor(self, monitor: ExpressionMonitor):
         if [x for x in self.monitors if x.name == monitor.name]:
             raise MonitorInitalizationException(f'Monitor named {monitor.name} already exists.')
         self.monitors.append(monitor)
         monitor.set_id(len(self.monitors) - 1)
 
     @profile
-    def add_payload_monitor(self, monitor: PayloadMonitor):
+    def _add_payload_monitor(self, monitor: PayloadMonitor):
         if [x for x in self.monitors if x.name == monitor.name]:
             raise MonitorInitalizationException(f'Monitor named {monitor.name} already exists.')
         self.monitors.append(monitor)

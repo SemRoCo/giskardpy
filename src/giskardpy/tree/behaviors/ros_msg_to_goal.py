@@ -69,10 +69,7 @@ class ParseActionGoal(GiskardBehavior):
                 monitor = C(name=monitor_msg.name,
                             start_condition=start_condition,
                             **kwargs)
-                if isinstance(monitor, ExpressionMonitor):
-                    god_map.monitor_manager.add_expression_monitor(monitor)
-                elif isinstance(monitor, PayloadMonitor):
-                    god_map.monitor_manager.add_payload_monitor(monitor)
+                god_map.monitor_manager.add_monitor(monitor)
             except Exception as e:
                 traceback.print_exc()
                 error_msg = f'Initialization of \'{C.__name__}\' monitor failed: \n {e} \n'
@@ -160,14 +157,14 @@ class AddBaseTrajFollowerGoal(GiskardBehavior):
     @profile
     def update(self):
         local_min = LocalMinimumReached('local min')
-        god_map.monitor_manager.add_expression_monitor(local_min)
+        god_map.monitor_manager.add_monitor(local_min)
 
         time_monitor = TimeAbove(threshold=god_map.trajectory.length_in_seconds)
-        god_map.monitor_manager.add_expression_monitor(time_monitor)
+        god_map.monitor_manager.add_monitor(time_monitor)
 
         end_motion = EndMotion(start_condition=cas.logic_and(local_min.get_state_expression(),
                                                              time_monitor.get_state_expression()))
-        god_map.monitor_manager.add_expression_monitor(end_motion)
+        god_map.monitor_manager.add_monitor(end_motion)
 
         goal = BaseTrajFollower(self.joint.name, track_only_velocity=True,
                                 end_condition=local_min.get_state_expression())

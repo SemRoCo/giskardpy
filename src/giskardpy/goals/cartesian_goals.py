@@ -396,11 +396,9 @@ class DiffDriveBaseGoal(Goal):
 
 class CartesianPoseStraight(Goal):
     def __init__(self,
-                 root_link: str,
-                 tip_link: str,
+                 root_link: PrefixName,
+                 tip_link: PrefixName,
                  goal_pose: cas.TransMatrix,
-                 root_group: Optional[str] = None,
-                 tip_group: Optional[str] = None,
                  reference_linear_velocity: Optional[float] = None,
                  reference_angular_velocity: Optional[float] = None,
                  weight: float = WEIGHT_ABOVE_CA,
@@ -418,9 +416,7 @@ class CartesianPoseStraight(Goal):
             name = f'{self.__class__.__name__}/{self.root_link}/{self.tip_link}'
         super().__init__(name)
         self.add_constraints_of_goal(CartesianPositionStraight(root_link=root_link,
-                                                               root_group=root_group,
                                                                tip_link=tip_link,
-                                                               tip_group=tip_group,
                                                                goal_point=goal_pose.to_position(),
                                                                reference_velocity=reference_linear_velocity,
                                                                weight=weight,
@@ -429,9 +425,7 @@ class CartesianPoseStraight(Goal):
                                                                hold_condition=hold_condition,
                                                                end_condition=end_condition))
         self.add_constraints_of_goal(CartesianOrientation(root_link=root_link,
-                                                          root_group=root_group,
                                                           tip_link=tip_link,
-                                                          tip_group=tip_group,
                                                           goal_orientation=goal_pose.to_rotation(),
                                                           reference_velocity=reference_angular_velocity,
                                                           absolute=absolute,

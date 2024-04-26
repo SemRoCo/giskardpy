@@ -129,10 +129,10 @@ class OldGiskardWrapper(GiskardWrapper):
         :param weight: default WEIGHT_ABOVE_CA
         :param add_monitor: if True, adds a monitor as end_condition to check if the goal was reached.
         """
+        monitor_name = f'{root_link}/{tip_link} pose reached'
         root_link = giskard_msgs.LinkName(name=root_link, group_name=root_group)
         tip_link = giskard_msgs.LinkName(name=tip_link, group_name=tip_group)
         if add_monitor:
-            monitor_name = f'{root_link}/{tip_link} pose reached'
             end_condition = self.monitors.add_cartesian_pose(name=monitor_name,
                                                              root_link=root_link,
                                                              tip_link=tip_link,
@@ -176,10 +176,10 @@ class OldGiskardWrapper(GiskardWrapper):
         :param weight: default WEIGHT_ABOVE_CA
         :param add_monitor: if True, adds a monitor as end_condition to check if the goal was reached.
         """
+        monitor_name = f'{root_link}/{tip_link} pose reached'
         root_link = giskard_msgs.LinkName(name=root_link, group_name=root_group)
         tip_link = giskard_msgs.LinkName(name=tip_link, group_name=tip_group)
         if add_monitor:
-            monitor_name = f'{root_link}/{tip_link} pose reached'
             end_condition = self.monitors.add_cartesian_pose(name=monitor_name,
                                                              root_link=root_link,
                                                              tip_link=tip_link,
@@ -216,10 +216,10 @@ class OldGiskardWrapper(GiskardWrapper):
         :param weight:
         :param add_monitor: if True, adds a monitor as end_condition to check if the goal was reached.
         """
+        monitor_name = f'{root_link}/{tip_link} position reached'
         root_link = giskard_msgs.LinkName(name=root_link, group_name=root_group)
         tip_link = giskard_msgs.LinkName(name=tip_link, group_name=tip_group)
         if add_monitor:
-            monitor_name = f'{root_link}/{tip_link} position reached'
             end_condition = self.monitors.add_cartesian_position(name=monitor_name,
                                                                  root_link=root_link,
                                                                  tip_link=tip_link,
@@ -290,10 +290,10 @@ class OldGiskardWrapper(GiskardWrapper):
         :param weight:
         :param add_monitor: if True, adds a monitor as end_condition to check if the goal was reached.
         """
+        monitor_name = f'{root_link}/{tip_link} orientation reached'
         root_link = giskard_msgs.LinkName(name=root_link, group_name=root_group)
         tip_link = giskard_msgs.LinkName(name=tip_link, group_name=tip_group)
         if add_monitor:
-            monitor_name = f'{root_link}/{tip_link} orientation reached'
             end_condition = self.monitors.add_cartesian_orientation(name=monitor_name,
                                                                     root_link=root_link,
                                                                     tip_link=tip_link,

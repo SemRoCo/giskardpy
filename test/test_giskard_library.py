@@ -102,7 +102,7 @@ class TestWorld:
 
         box_world_prismatic.state[joint_name].position = 1
         box_world_prismatic.notify_state_change()
-        fk = box_world_prismatic.compute_fk_point(root=box_world_prismatic.root_link_name, tip=box_name).to_np()
+        fk = box_world_prismatic.compute_fk_point(root_link=box_world_prismatic.root_link_name, tip_link=box_name).to_np()
         assert fk[0] == 1
 
     def test_joint_goal(self, box_world_prismatic: WorldTree):
@@ -131,7 +131,7 @@ class TestWorld:
             traj.append(box_world_prismatic.state[joint_name].position)
             if box_world_prismatic.state[joint_name].position >= goal - 1e-3:
                 break
-        fk = box_world_prismatic.compute_fk_point(root=box_world_prismatic.root_link_name, tip=box_name).to_np()
+        fk = box_world_prismatic.compute_fk_point(root_link=box_world_prismatic.root_link_name, tip_link=box_name).to_np()
         np.testing.assert_almost_equal(fk[0], goal, decimal=3)
 
     def test_cart_goal(self, box_world: WorldTree):
@@ -161,7 +161,7 @@ class TestWorld:
             box_world.update_state(next_cmd, dt, Derivatives.jerk)
             box_world.notify_state_change()
             traj.append(box_world.state[joint_name].position)
-        fk = box_world.compute_fk_point(root=box_world.root_link_name, tip=box_name).to_np()
+        fk = box_world.compute_fk_point(root_link=box_world.root_link_name, tip_link=box_name).to_np()
         np.testing.assert_almost_equal(fk[0], goal[0], decimal=3)
         np.testing.assert_almost_equal(fk[1], goal[1], decimal=3)
 
@@ -217,7 +217,7 @@ class TestWorld:
             traj.append(box_world.state[joint_name].position)
             god_map.time += controller.sample_period
             god_map.control_cycle_counter += 1
-        fk = box_world.compute_fk_point(root=box_world.root_link_name, tip=box_name).to_np()
+        fk = box_world.compute_fk_point(root_link=box_world.root_link_name, tip_link=box_name).to_np()
         np.testing.assert_almost_equal(fk[0], goal2.to_position().to_np()[0], decimal=3)
         np.testing.assert_almost_equal(fk[1], goal2.to_position().to_np()[1], decimal=3)
 
@@ -271,7 +271,7 @@ class TestWorld:
                          box_world.state[box_world.joints[joint_name].y_name].position))
             god_map.time += controller.sample_period
             god_map.control_cycle_counter += 1
-        fk = box_world.compute_fk_point(root=box_world.root_link_name, tip=box_name).to_np()
+        fk = box_world.compute_fk_point(root_link=box_world.root_link_name, tip_link=box_name).to_np()
         np.testing.assert_almost_equal(fk[0], goal1.to_position().to_np()[0], decimal=2)
         np.testing.assert_almost_equal(fk[1], goal2.to_position().to_np()[1], decimal=2)
 

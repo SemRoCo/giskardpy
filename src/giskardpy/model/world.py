@@ -1152,8 +1152,8 @@ class WorldTree(WorldTreeInterface):
         result.child_frame = tip_link
         return result
 
-    def compute_fk_point(self, root: PrefixName, tip: PrefixName) -> cas.Point3:
-        return self.compute_fk(root_link=root, tip_link=tip).to_position()
+    def compute_fk_point(self, root_link: PrefixName, tip_link: PrefixName) -> cas.Point3:
+        return self.compute_fk(root_link=root_link, tip_link=tip_link).to_position()
 
     @memoize
     def compute_fk_with_collision_offset(self, root_link: PrefixName, tip_link: PrefixName,

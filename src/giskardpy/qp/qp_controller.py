@@ -81,7 +81,7 @@ class ProblemDataPart(ABC):
         self.prediction_horizon = prediction_horizon
         self.dt = sample_period
         self.max_derivative = max_derivative
-        self.control_horizon = self.prediction_horizon - self.max_derivative
+        self.control_horizon = self.prediction_horizon - self.max_derivative + 1
 
     @property
     def number_of_free_variables(self) -> int:

@@ -89,10 +89,8 @@ class Open(Goal):
 
 class Close(Goal):
     def __init__(self,
-                 tip_link: str,
-                 environment_link: str,
-                 tip_group: Optional[str] = None,
-                 environment_group: Optional[str] = None,
+                 tip_link: PrefixName,
+                 environment_link: PrefixName,
                  goal_joint_state: Optional[float] = None,
                  weight: float = WEIGHT_ABOVE_CA,
                  name: Optional[str] = None,
@@ -108,17 +106,14 @@ class Close(Goal):
         if name is None:
             name = f'{self.__class__.__name__}'
         super().__init__(name)
-        handle_link = god_map.world.search_for_link_name(environment_link, environment_group)
-        joint_name = god_map.world.get_movable_parent_joint(handle_link)
+        joint_name = god_map.world.get_movable_parent_joint(self.environment_link)
         min_position, _ = god_map.world.get_joint_position_limits(joint_name)
         if goal_joint_state is None:
             goal_joint_state = min_position
         else:
             goal_joint_state = max(min_position, goal_joint_state)
         self.add_constraints_of_goal(Open(tip_link=tip_link,
-                                          tip_group=tip_group,
                                           environment_link=environment_link,
-                                          environment_group=environment_group,
                                           goal_joint_state=goal_joint_state,
                                           weight=weight,
                                           start_condition=start_condition,

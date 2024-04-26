@@ -1416,7 +1416,6 @@ class TestConstraints:
 
         tip = 'head_mount_kinect_rgb_link'
         goal_point = kitchen_setup.compute_fk_point(root_link='map', tip_link='iai_kitchen/iai_fridge_door_handle')
-        goal_point = msg_converter.to_ros_message(goal_point)
         goal_point.header.stamp = rospy.Time()
         pointing_axis = Vector3Stamped()
         pointing_axis.header.frame_id = tip

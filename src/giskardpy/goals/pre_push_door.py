@@ -1,10 +1,8 @@
 from typing import Optional
 
-from geometry_msgs.msg import Vector3Stamped, PointStamped
 from giskardpy import casadi_wrapper as cas
 from giskardpy.goals.goal import Goal
 from giskardpy.god_map import god_map
-from giskardpy.symbol_manager import symbol_manager
 from giskardpy.tasks.task import WEIGHT_BELOW_CA
 
 import numpy as np
@@ -49,38 +47,23 @@ class PrePushDoor(Goal):
         door_P_handle = god_map.world.compute_fk_pose(self.door_object, self.handle).pose.position
         temp_point = np.asarray([door_P_handle.x, door_P_handle.y, door_P_handle.z])
 
-        door_P_B = np.zeros(3)
-        door_P_A = np.zeros(3)
-        door_P_C = np.zeros(3)
+        door_V_v1 = np.zeros(3)
         # axis pointing in the direction of handle frame from door joint frame
-        direction_axis = np.argmax(abs(temp_point))[0]
-        rotation_axis = np.argmax(symbol_manager.evaluate_expr(object_V_object_rotation_axis))
-        door_P_A[direction_axis] = temp_point[direction_axis] * 3 / 4
-        door_P_C[rotation_axis] = temp_point[direction_axis] / 2
-        door_P_C[direction_axis] = temp_point[direction_axis] * 1 / 4
-        door_P_B[rotation_axis] = temp_point[direction_axis] / 2
-        door_P_B[direction_axis] = -temp_point[direction_axis] * 1 / 4
-        door_P_B = cas.Point3(door_P_B)  # B
-        door_P_A = cas.Point3(door_P_A)  # A
-        door_P_C = cas.Point3(door_P_C)  # C
+        direction_axis = np.argmax(abs(temp_point))
+        door_V_v1[direction_axis] = 1
+        door_V_v2 = object_V_object_rotation_axis  # B
+        door_V_v1 = cas.Vector3(door_V_v1)  # A
 
-        door_Pose_tip = god_map.world.compute_fk_pose(self.door_object, self.tip)
-        door_P_tip = cas.Point3(door_Pose_tip.pose.position)
+        door_Pose_tip = god_map.world.compose_fk_expression(self.door_object, self.tip)
+        door_P_tip = door_Pose_tip.to_position()
         dist, door_P_nearest = cas.distance_point_to_plane(door_P_tip,
-                                                           door_P_C,
-                                                           door_P_B,
-                                                           door_P_A)
+                                                           door_V_v2,
+                                                           door_V_v1)
 
         root_P_nearest_in_rotated_door = cas.dot(cas.TransMatrix(root_T_door), cas.Point3(door_P_nearest))
-        root_P_bottom_left = cas.dot(cas.TransMatrix(root_T_door), door_P_A)
-        root_P_bottom_right = cas.dot(cas.TransMatrix(root_T_door), door_P_B)
-        root_P_top_left = cas.dot(cas.TransMatrix(root_T_door), door_P_C)
 
         god_map.debug_expression_manager.add_debug_expression('goal_point_on_plane',
                                                               cas.Point3(root_P_nearest_in_rotated_door))
-        god_map.debug_expression_manager.add_debug_expression('A', cas.Point3(root_P_bottom_left))
-        god_map.debug_expression_manager.add_debug_expression('B', cas.Point3(root_P_bottom_right))
-        god_map.debug_expression_manager.add_debug_expression('C', cas.Point3(root_P_top_left))
 
         push_door_task = self.create_and_add_task('pre push door')
         push_door_task.add_point_goal_constraints(frame_P_current=root_T_tip.to_position(),

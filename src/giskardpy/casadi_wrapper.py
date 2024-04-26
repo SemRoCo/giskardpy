@@ -1996,15 +1996,11 @@ def distance_point_to_line(frame_P_point, frame_P_line_point, frame_V_line_direc
     return distance
 
 
-def distance_point_to_plane(frame_P_current, frame_P_bottom_left, frame_P_bottom_right, frame_P_top_left):
-    ab = frame_P_bottom_right - frame_P_bottom_left
-    ac = frame_P_top_left - frame_P_bottom_left
-
-    normal = cross(ab, ac)
-    d = normal.dot(frame_P_bottom_left)
-    # if symbol_manager.evaluate_expr(d) != 0:
-    #     normal.scale(d)
-    nearest = frame_P_current + normal
+def distance_point_to_plane(frame_P_current, frame_V_v1, frame_V_v2):
+    normal = cross(frame_V_v1, frame_V_v2)
+    d = normal.dot(frame_P_current)
+    normal.scale(d)
+    nearest = frame_P_current - normal
     return norm(nearest-frame_P_current), nearest
 
 

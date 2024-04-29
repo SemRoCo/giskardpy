@@ -354,7 +354,7 @@ class GiskardTestWrapper(OldGiskardWrapper):
                 result_msg.header.frame_id = god_map.world.search_for_link_name(result_msg.header.frame_id)
             except UnknownGroupException:
                 pass
-            giskard_obj = msg_converter.convert_ros_msg_to_giskard_obj(result_msg, god_map.world)
+            giskard_obj = msg_converter.ros_msg_to_giskard_obj(result_msg, god_map.world)
             transformed_giskard_obj = god_map.world.transform(target_frame, giskard_obj)
             return msg_converter.to_ros_message(transformed_giskard_obj)
 
@@ -861,6 +861,8 @@ class GiskardTestWrapper(OldGiskardWrapper):
                                     parent_link: Optional[Union[str, giskard_msgs.LinkName]] = None,
                                     expected_error_type: Optional[type(Exception)] = None) -> None:
         try:
+            if parent_link is None:
+                parent_link = giskard_msgs.LinkName()
             r = self.world.update_parent_link_of_group(name=name,
                                                        parent_link=parent_link)
             self.wait_heartbeats()

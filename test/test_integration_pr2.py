@@ -274,12 +274,6 @@ def pocky_pose_setup(resetted_giskard: PR2TestWrapper) -> PR2TestWrapper:
 
 
 @pytest.fixture()
-def world_setup(zero_pose: PR2TestWrapper) -> WorldTree:
-    zero_pose.stop_ticking()
-    return god_map.world
-
-
-@pytest.fixture()
 def box_setup(pocky_pose_setup: PR2TestWrapper) -> PR2TestWrapper:
     p = PoseStamped()
     p.header.frame_id = 'map'
@@ -928,7 +922,7 @@ class TestMonitors:
         zero_pose.execute(add_local_minimum_reached=False)
         assert god_map.trajectory.length_in_seconds > 6
         current_pose = zero_pose.compute_fk_pose(root_link='map',
-                                            tip_link='base_footprint')
+                                                 tip_link='base_footprint')
         compare_poses(current_pose.pose, base_goal.pose)
 
     def test_hold_monitors(self, zero_pose: PR2TestWrapper):
@@ -2396,6 +2390,7 @@ class TestWorldManipulation:
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.add_mesh_to_world(object_name, mesh='package://giskardpy/test/urdfs/meshes/muh.obj', pose=p,
                                     expected_error_type=CorruptMeshException)
+        zero_pose.clear_world()
 
     def test_add_attach_detach_remove_add(self, zero_pose: PR2TestWrapper):
         object_name = 'muh'
@@ -2589,7 +2584,7 @@ class TestWorldManipulation:
         req = WorldGoal()
         req.body = wb
         req.pose = pose
-        req.parent_link = 'base_link'
+        req.parent_link = giskard_msgs.LinkName(name='base_link')
         req.operation = WorldGoal.ADD
         with pytest.raises(CorruptURDFException):
             kitchen_setup.world._send_goal_and_wait(req)

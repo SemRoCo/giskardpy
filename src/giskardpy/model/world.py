@@ -122,9 +122,10 @@ class WorldModelUpdateContextManager:
         return self.world
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        if exc_type is None and self.first:
+        if self.first:
             self.world.context_manager_active = False
-            self.world._notify_model_change()
+            if exc_type is None:
+                self.world._notify_model_change()
 
 
 def modifies_world(func):
@@ -367,6 +368,7 @@ class WorldTree(WorldTreeInterface):
             self._fix_tree_structure()
             self.reset_cache()
             self.init_all_fks()
+            self._cleanup_unused_free_variable()
             self.notify_state_change()
             self._model_version += 1
 
@@ -904,7 +906,12 @@ class WorldTree(WorldTreeInterface):
             used_variables.extend(free_variable.name for free_variable in joint.free_variables)
         for free_variable_name in self.free_variables:
             if free_variable_name not in used_variables:
-                del self.state[free_variable_name]
+                try:
+                    del self.state[free_variable_name]
+                except KeyError as e:
+                    # idk why this sometimes throws a KeyError, even though the key existed, but the deletion
+                    # seems to work anyway ...
+                    pass
 
     @modifies_world
     def move_group(self, group_name: str, new_parent_link_name: PrefixName):
@@ -933,7 +940,6 @@ class WorldTree(WorldTreeInterface):
         Delete every link and joint from link_name downward, including the link.
         """
         self.delete_branch_at_joint(self.links[link_name].parent_joint_name)
-        self._cleanup_unused_free_variable()
 
     @modifies_world
     @profile

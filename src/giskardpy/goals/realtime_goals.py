@@ -37,6 +37,6 @@ class RealTimePointing(Pointing):
         self.sub = rospy.Subscriber('muh', PointStamped, self.cb)
 
     def cb(self, data: PointStamped):
-        data = msg_converter.convert_ros_msg_to_giskard_obj(data, god_map.world)
+        data = msg_converter.ros_msg_to_giskard_obj(data, god_map.world)
         data = god_map.world.transform(self.root, data).to_np()
         self.root_P_goal_point = data

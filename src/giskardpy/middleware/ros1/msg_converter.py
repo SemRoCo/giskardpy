@@ -214,7 +214,7 @@ def json_to_kwargs(d: dict, world: WorldTree) -> Dict[str, Any]:
             for key, value in d.copy().items():
                 d[key] = json_to_kwargs(value, world)
     if isinstance(d, rospy.Message):
-        return convert_ros_msg_to_giskard_obj(d, world)
+        return ros_msg_to_giskard_obj(d, world)
     return d
 
 
@@ -336,7 +336,7 @@ def convert_ros_message_to_dictionary(message) -> dict:
     return message
 
 
-def convert_ros_msg_to_giskard_obj(msg, world: WorldTree):
+def ros_msg_to_giskard_obj(msg, world: WorldTree):
     if isinstance(msg, sensor_msgs.JointState):
         return ros_joint_state_to_giskard_joint_state(msg)
     elif isinstance(msg, geometry_msgs.PoseStamped):

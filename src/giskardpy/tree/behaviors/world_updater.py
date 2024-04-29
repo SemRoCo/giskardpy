@@ -1,3 +1,4 @@
+import traceback
 from copy import deepcopy
 from threading import Thread
 
@@ -71,6 +72,7 @@ class ProcessWorldUpdate(GiskardBehavior):
             else:
                 raise InvalidWorldOperationException(f'Received invalid operation code: {req.operation}')
         except Exception as e:
+            traceback.print_exc()
             result.error = msg_converter.exception_to_error_msg(e)
         self.action_server.result_msg = result
 
@@ -142,11 +144,11 @@ class ProcessWorldUpdate(GiskardBehavior):
                 link = msg_converter.world_body_to_link(link_name=link_name,
                                                         msg=world_body,
                                                         color=god_map.world.default_link_color)
-                god_map.world.add_link(link)
                 joint = Joint6DOF(name=PrefixName(group_name, god_map.world.connection_prefix),
                                   parent_link_name=parent_link,
                                   child_link_name=link.name)
                 joint.update_transform(parent_link_T_group_root_link)
+                world.add_link(link)
                 world.add_joint(joint)
                 world.register_group(group_name, link.name)
         # SUB-CASE: If it is an articulated object, open up a joint state subscriber
@@ -165,7 +167,8 @@ class ProcessWorldUpdate(GiskardBehavior):
             raise UnknownGroupException(f'Can\'t update pose of unknown group: \'{req.group_name}\'')
         group = god_map.world.groups[req.group_name]
         joint_name = group.root_link.parent_joint_name
-        pose = god_map.world.transform(god_map.world.joints[joint_name].parent_link_name, req.pose).pose
+        pose = msg_converter.ros_msg_to_giskard_obj(req.pose, god_map.world)
+        pose = god_map.world.transform(god_map.world.joints[joint_name].parent_link_name, pose)
         god_map.world.joints[joint_name].update_transform(pose)
         god_map.world.notify_state_change()
 

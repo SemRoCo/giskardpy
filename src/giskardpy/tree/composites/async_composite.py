@@ -53,9 +53,20 @@ class AsyncBehavior(GiskardBehavior, Composite):
             child.stop()
 
     def tick(self):
+        self.logger.debug("%s.tick()" % self.__class__.__name__)
+        # Required behaviour for *all* behaviours and composites is
+        # for tick() to check if it isn't running and initialise
         if self.status == Status.INVALID:
             self.status = Status.RUNNING
             self.initialise()
+        elif self.status != Status.RUNNING:
+            # chooser specific initialisation
+            # invalidate everything
+            for child in self.children:
+                child.stop(Status.INVALID)
+            self.current_child = None
+            # run subclass (user) initialisation
+            # self.initialise()
         yield self
 
     def set_status(self, new_state: Status) -> None:

@@ -17,10 +17,10 @@ from giskardpy import casadi_wrapper as w
 from giskardpy.qp import pos_in_vel_limits as cas2
 import giskardpy.utils.math as giskard_math
 from giskardpy.data_types.data_types import Derivatives
-from giskardpy.utils.math import compare_orientations, axis_angle_from_quaternion, rotation_matrix_from_quaternion
+from giskardpy.utils.math import axis_angle_from_quaternion, rotation_matrix_from_quaternion
 from utils_for_tests import float_no_nan_no_inf, unit_vector, quaternion, vector, \
     pykdl_frame_to_numpy, lists_of_same_length, random_angle, compare_axis_angle, angle_positive, sq_matrix, \
-    float_no_nan_no_inf_min_max
+    float_no_nan_no_inf_min_max, compare_orientations
 
 
 class TestSymbol:

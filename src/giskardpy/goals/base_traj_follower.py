@@ -307,28 +307,28 @@ class CarryMyBullshit(Goal):
         root_T_bf = god_map.world.compose_fk_expression(self.root, self.tip)
         root_T_odom = god_map.world.compose_fk_expression(self.root, self.odom)
         root_T_camera = god_map.world.compose_fk_expression(self.root, self.camera_link)
-        root_P_tip = root_T_bf.to_position()
-        min_left_violation1 = symbol_manager.get_symbol(self.ref_str + '.closest_laser_left')
-        min_right_violation1 = symbol_manager.get_symbol(self.ref_str + '.closest_laser_right')
-        closest_laser_reading1 = symbol_manager.get_symbol(self.ref_str + '.closest_laser_reading')
-        min_left_violation2 = symbol_manager.get_symbol(self.ref_str + '.closest_laser_left_pc')
-        min_right_violation2 = symbol_manager.get_symbol(self.ref_str + '.closest_laser_right_pc')
-        closest_laser_reading2 = symbol_manager.get_symbol(self.ref_str + '.closest_laser_reading_pc')
+        root_P_bf = root_T_bf.to_position()
+        min_left_violation1 = symbol_manager.get_symbol(self + '.closest_laser_left')
+        min_right_violation1 = symbol_manager.get_symbol(self + '.closest_laser_right')
+        closest_laser_reading1 = symbol_manager.get_symbol(self + '.closest_laser_reading')
+        min_left_violation2 = symbol_manager.get_symbol(self + '.closest_laser_left_pc')
+        min_right_violation2 = symbol_manager.get_symbol(self + '.closest_laser_right_pc')
+        closest_laser_reading2 = symbol_manager.get_symbol(self + '.closest_laser_reading_pc')
         closest_laser_left = cas.min(min_left_violation1, min_left_violation2)
         closest_laser_right = cas.max(min_right_violation1, min_right_violation2)
         closest_laser_reading = cas.min(closest_laser_reading1, closest_laser_reading2)
         # self.add_debug_expr('min_left_violation', closest_laser_left)
         # self.add_debug_expr('min_right_violation', closest_laser_right)
         # self.add_debug_expr('closest_laser_reading', closest_laser_reading)
-        last_target_age = symbol_manager.get_symbol(self.ref_str + '.last_target_age')
+        last_target_age = symbol_manager.get_symbol(self + '.last_target_age')
         target_lost = cas.greater_equal(last_target_age, self.target_age_threshold)
-        map_P_human = cas.Point3(symbol_manager.get_expr(self.ref_str + '.human_point', input_type_hint=PointStamped))
+        map_P_human = cas.Point3(symbol_manager.get_expr(self + '.human_point', input_type_hint=PointStamped))
         map_P_human_projected = cas.Point3(map_P_human)
         map_P_human_projected.z = 0
-        next_x = symbol_manager.get_symbol(self.ref_str + '.get_current_target()[\'next_x\']')
-        next_y = symbol_manager.get_symbol(self.ref_str + '.get_current_target()[\'next_y\']')
-        closest_x = symbol_manager.get_symbol(self.ref_str + '.get_current_target()[\'closest_x\']')
-        closest_y = symbol_manager.get_symbol(self.ref_str + '.get_current_target()[\'closest_y\']')
+        next_x = symbol_manager.get_symbol(self + '.get_current_target()[\'next_x\']')
+        next_y = symbol_manager.get_symbol(self + '.get_current_target()[\'next_y\']')
+        closest_x = symbol_manager.get_symbol(self + '.get_current_target()[\'closest_x\']')
+        closest_y = symbol_manager.get_symbol(self + '.get_current_target()[\'closest_y\']')
         # tangent_x = god_map.to_expr(self._get_identifier() + ['get_current_target', tuple(), 'tangent_x'])
         # tangent_y = god_map.to_expr(self._get_identifier() + ['get_current_target', tuple(), 'tangent_y'])
         clear_memo(self.get_current_target)
@@ -344,12 +344,12 @@ class CarryMyBullshit(Goal):
         map_current_angle = map_odom_angle + odom_current_angle
         # root_V_goal_axis = root_P_goal_point - root_P_tip
         if self.drive_back:
-            root_V_tip_to_closest = root_P_tip - root_P_closest_point
+            root_V_tip_to_closest = root_P_bf - root_P_closest_point
             root_P_between_tip_and_closest = root_P_closest_point + root_V_tip_to_closest / 2
             # self.add_debug_expr('root_P_between_tip_and_closest', root_P_between_tip_and_closest)
             root_V_goal_axis = root_P_goal_point - root_P_between_tip_and_closest
         else:
-            root_V_goal_axis = map_P_human_projected - root_P_tip
+            root_V_goal_axis = map_P_human_projected - root_P_bf
         distance_to_human = cas.norm(root_V_goal_axis)
         root_V_goal_axis.scale(1)
         root_V_pointing_axis = root_T_bf.dot(tip_V_pointing_axis)
@@ -428,7 +428,7 @@ class CarryMyBullshit(Goal):
         # self.add_debug_expr('target_lost', target_lost)
         # self.add_debug_expr('distance_to_human', distance_to_human)
         # self.add_debug_expr('self.base_orientation_threshold', self.base_orientation_threshold)
-        task.add_point_goal_constraints(frame_P_current=root_P_tip,
+        task.add_point_goal_constraints(frame_P_current=root_P_bf,
                                         frame_P_goal=root_P_goal_point,
                                         reference_velocity=self.max_translation_velocity,
                                         weight=position_weight,
@@ -439,7 +439,7 @@ class CarryMyBullshit(Goal):
             buffer = self.traj_tracking_radius
         else:
             buffer = self.traj_tracking_radius
-        distance_to_closest_point = cas.norm(root_P_closest_point - root_P_tip)
+        distance_to_closest_point = cas.norm(root_P_closest_point - root_P_bf)
         # self.add_debug_expr('position_weight2', position_weight2)
         god_map.debug_expression_manager.add_debug_expression('distance_to_closest_point', distance_to_closest_point)
         # self.add_debug_expr('distance_to_closest_point2', distance_to_closest_point2)
@@ -452,18 +452,8 @@ class CarryMyBullshit(Goal):
 
         # %% laser avoidance
         if self.enable_laser_avoidance:
-            # min_left_violation = cas.min(self.laser_distance_threshold_width, closest_laser_left)
-            # min_right_violation = cas.min(self.laser_distance_threshold_width, closest_laser_right)
-            # left = cas.Point3([0, min_left_violation, 0])
-            # left.reference_frame = god_map.get_world().search_for_link_name(self.laser_frame)
-            # right = cas.Point3([0, min_right_violation, 0])
-            # right.reference_frame = god_map.get_world().search_for_link_name(self.laser_frame)
-            # self.add_debug_expr('left', left)
-            # self.add_debug_expr('right', right)
+            laser_avoidance_task = self.create_and_add_task('laser avoidance')
             sideways_vel = (closest_laser_left + closest_laser_right)
-            # bf_P_laser_avoidance = cas.Point3([self.laser_distance_threshold + closest_laser_reading, 0, 0])
-            # bf_P_laser_avoidance.reference_frame = god_map.get_world().search_for_link_name(self.laser_frame)
-            # self.add_debug_expr('center', bf_P_laser_avoidance)
             bf_V_laser_avoidance_direction = cas.Vector3([0, sideways_vel, 0])
             map_V_laser_avoidance_direction = root_T_bf.dot(bf_V_laser_avoidance_direction)
             map_V_laser_avoidance_direction.vis_frame = god_map.world.search_for_link_name(self.laser_frame)
@@ -471,16 +461,19 @@ class CarryMyBullshit(Goal):
                                                                   map_V_laser_avoidance_direction)
             odom_y_vel = self.odom_joint.y_vel.get_symbol(Derivatives.position)
 
-            laser_avoidance_weight = cas.if_else(cas.less(distance_to_closest_point, self.traj_tracking_radius),
-                                                 WEIGHT_COLLISION_AVOIDANCE,
-                                                 0)
+            active = ExpressionMonitor(name='laser violated')
+            self.add_monitor(active)
+            active.expression = cas.greater(distance_to_closest_point, self.traj_tracking_radius)
+
             buffer = self.laser_avoidance_sideways_buffer / 2
-            task.add_inequality_constraint(reference_velocity=self.max_translation_velocity,
-                                           lower_error=sideways_vel - buffer,
-                                           upper_error=sideways_vel + buffer,
-                                           weight=laser_avoidance_weight,
-                                           task_expression=odom_y_vel,
-                                           name='laser avoidance')
+
+            laser_avoidance_task.hold_condition = active.get_state_expression()
+            laser_avoidance_task.add_inequality_constraint(reference_velocity=self.max_translation_velocity,
+                                                           lower_error=sideways_vel - buffer,
+                                                           upper_error=sideways_vel + buffer,
+                                                           weight=WEIGHT_COLLISION_AVOIDANCE,
+                                                           task_expression=odom_y_vel,
+                                                           name='laser avoidance')
 
     def clean_up(self):
         if CarryMyBullshit.target_sub is not None:

@@ -95,6 +95,11 @@ class Goal(ABC):
         """
         return f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\']'
 
+    def __add__(self, other: str) -> str:
+        if isinstance(other, str):
+            return self.ref_str + other
+        raise NotImplementedError('Goal can only be added with a string.')
+
     def get_expr_velocity(self, expr: cas.Expression) -> cas.Expression:
         """
         Creates an expressions that computes the total derivative of expr

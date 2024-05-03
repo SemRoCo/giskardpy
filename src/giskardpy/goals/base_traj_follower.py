@@ -1,6 +1,6 @@
 from __future__ import division
 
-from typing import Optional, List
+from typing import Optional, List, Dict
 
 import numpy as np
 # import matplotlib.pyplot as plt
@@ -63,8 +63,9 @@ class BaseTrajFollower(Goal):
             b_result_cases.append((b, eq_result))
             # FIXME if less eq cases behavior changed
         return cas.if_less_eq_cases(a=time + start_t,
-                                  b_result_cases=b_result_cases,
-                                  else_result=self.x_symbol(self.trajectory_length - 1, free_variable_name, derivative))
+                                    b_result_cases=b_result_cases,
+                                    else_result=self.x_symbol(self.trajectory_length - 1, free_variable_name,
+                                                              derivative))
 
     @profile
     def make_odom_T_base_footprint_goal(self, t_in_s: float, derivative: Derivatives = Derivatives.position):
@@ -144,7 +145,7 @@ class BaseTrajFollower(Goal):
         rotation_goal = self.current_traj_point(self.joint.yaw.name, t_in_s)
         rotation_current = self.joint.yaw.get_symbol(Derivatives.position)
         error = cas.shortest_angular_distance(rotation_current,
-                                            rotation_goal) / god_map.qp_controller_config.sample_period
+                                              rotation_goal) / god_map.qp_controller_config.sample_period
         return error
 
     @profile
@@ -178,9 +179,10 @@ class CarryMyBullshit(Goal):
     last_scan_pc: LaserScan = None
 
     def __init__(self,
+                 name: str,
                  patrick_topic_name: str = '/robokudovanessa/human_position',
                  laser_topic_name: str = '/hsrb/base_scan',
-                 point_cloud_laser_topic_name: str = '/scan',
+                 point_cloud_laser_topic_name: Optional[str] = '/scan',
                  odom_joint_name: str = 'brumbrum',
                  root_link: Optional[str] = None,
                  camera_link: str = 'head_rgbd_sensor_link',
@@ -202,8 +204,11 @@ class CarryMyBullshit(Goal):
                  target_age_exception_threshold: float = 5,
                  clear_path: bool = False,
                  drive_back: bool = False,
-                 enable_laser_avoidance: bool = True):
-        super().__init__(name=None)
+                 enable_laser_avoidance: bool = True,
+                 start_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 end_condition: cas.Expression = cas.TrueSymbol):
+        super().__init__(name=name)
         if drive_back:
             logging.loginfo('driving back')
         self.end_of_traj_reached = False
@@ -296,6 +301,186 @@ class CarryMyBullshit(Goal):
                 CarryMyBullshit.trajectory = np.flip(CarryMyBullshit.trajectory, axis=0)
                 CarryMyBullshit.traj_flipped = True
             self.publish_trajectory()
+
+        # %% real shit
+        task = self.create_and_add_task(task_name='everything')
+        root_T_bf = god_map.world.compose_fk_expression(self.root, self.tip)
+        root_T_odom = god_map.world.compose_fk_expression(self.root, self.odom)
+        root_T_camera = god_map.world.compose_fk_expression(self.root, self.camera_link)
+        root_P_tip = root_T_bf.to_position()
+        min_left_violation1 = symbol_manager.get_symbol(self.ref_str + '.closest_laser_left')
+        min_right_violation1 = symbol_manager.get_symbol(self.ref_str + '.closest_laser_right')
+        closest_laser_reading1 = symbol_manager.get_symbol(self.ref_str + '.closest_laser_reading')
+        min_left_violation2 = symbol_manager.get_symbol(self.ref_str + '.closest_laser_left_pc')
+        min_right_violation2 = symbol_manager.get_symbol(self.ref_str + '.closest_laser_right_pc')
+        closest_laser_reading2 = symbol_manager.get_symbol(self.ref_str + '.closest_laser_reading_pc')
+        closest_laser_left = cas.min(min_left_violation1, min_left_violation2)
+        closest_laser_right = cas.max(min_right_violation1, min_right_violation2)
+        closest_laser_reading = cas.min(closest_laser_reading1, closest_laser_reading2)
+        # self.add_debug_expr('min_left_violation', closest_laser_left)
+        # self.add_debug_expr('min_right_violation', closest_laser_right)
+        # self.add_debug_expr('closest_laser_reading', closest_laser_reading)
+        last_target_age = symbol_manager.get_symbol(self.ref_str + '.last_target_age')
+        target_lost = cas.greater_equal(last_target_age, self.target_age_threshold)
+        map_P_human = cas.Point3(symbol_manager.get_expr(self.ref_str + '.human_point', input_type_hint=PointStamped))
+        map_P_human_projected = cas.Point3(map_P_human)
+        map_P_human_projected.z = 0
+        next_x = symbol_manager.get_symbol(self.ref_str + '.get_current_target()[\'next_x\']')
+        next_y = symbol_manager.get_symbol(self.ref_str + '.get_current_target()[\'next_y\']')
+        closest_x = symbol_manager.get_symbol(self.ref_str + '.get_current_target()[\'closest_x\']')
+        closest_y = symbol_manager.get_symbol(self.ref_str + '.get_current_target()[\'closest_y\']')
+        # tangent_x = god_map.to_expr(self._get_identifier() + ['get_current_target', tuple(), 'tangent_x'])
+        # tangent_y = god_map.to_expr(self._get_identifier() + ['get_current_target', tuple(), 'tangent_y'])
+        clear_memo(self.get_current_target)
+        root_P_goal_point = cas.Point3([next_x, next_y, 0])
+        root_P_closest_point = cas.Point3([closest_x, closest_y, 0])
+        # tangent = root_P_goal_point - root_P_closest_point
+        # root_V_tangent = cas.Vector3([tangent.x, tangent.y, 0])
+        tip_V_pointing_axis = cas.Vector3(self.tip_V_pointing_axis)
+
+        # %% orient to goal
+        _, _, map_odom_angle = root_T_odom.to_rotation().to_rpy()
+        odom_current_angle = self.odom_joint.yaw.get_symbol(Derivatives.position)
+        map_current_angle = map_odom_angle + odom_current_angle
+        # root_V_goal_axis = root_P_goal_point - root_P_tip
+        if self.drive_back:
+            root_V_tip_to_closest = root_P_tip - root_P_closest_point
+            root_P_between_tip_and_closest = root_P_closest_point + root_V_tip_to_closest / 2
+            # self.add_debug_expr('root_P_between_tip_and_closest', root_P_between_tip_and_closest)
+            root_V_goal_axis = root_P_goal_point - root_P_between_tip_and_closest
+        else:
+            root_V_goal_axis = map_P_human_projected - root_P_tip
+        distance_to_human = cas.norm(root_V_goal_axis)
+        root_V_goal_axis.scale(1)
+        root_V_pointing_axis = root_T_bf.dot(tip_V_pointing_axis)
+        root_V_pointing_axis.vis_frame = self.tip
+        root_V_goal_axis.vis_frame = self.tip
+        map_goal_angle = cas.angle_between_vector(cas.Vector3([1, 0, 0]), root_V_goal_axis)
+        map_goal_angle = cas.if_greater(root_V_goal_axis.y, 0, map_goal_angle, -map_goal_angle)
+        # self.add_debug_expr('goal_point', root_P_goal_point)
+        # self.add_debug_expr('root_P_closest_point', root_P_closest_point)
+        # self.add_debug_expr('laser_center_reading', laser_center_reading)
+        # self.add_debug_expr('root_V_pointing_axis', root_V_pointing_axis)
+        # self.add_debug_expr('root_V_goal_axis', root_V_goal_axis)
+        # self.add_debug_expr('distance_to_human', distance_to_human)
+        # self.add_vector_goal_constraints(frame_V_current=root_V_pointing_axis,
+        #                                  frame_V_goal=root_V_goal_axis,
+        #                                  reference_velocity=self.max_rotation_velocity,
+        #                                  weight=self.weight,
+        #                                  name='pointing')
+        # angle = cas.abs(cas.angle_between_vector(root_V_pointing_axis, root_V_goal_axis))
+        map_angle_error = cas.shortest_angular_distance(map_current_angle, map_goal_angle)
+        if self.drive_back:
+            buffer = 0
+        else:
+            buffer = self.base_orientation_threshold
+        ll = map_angle_error - buffer
+        ul = map_angle_error + buffer
+        # self.add_debug_expr('ll', ll)
+        # self.add_debug_expr('ul', ul)
+        # self.add_debug_expr('map_angle_error', map_angle_error)
+        # self.add_debug_expr('map_current_angle', map_current_angle)
+        # self.add_debug_expr('map_goal_angle', map_goal_angle)
+        task.add_inequality_constraint(reference_velocity=self.max_rotation_velocity,
+                                       lower_error=ll,
+                                       upper_error=ul,
+                                       weight=self.weight,
+                                       task_expression=map_current_angle,
+                                       name='/rot')
+
+        # %% look at goal
+        camera_V_camera_axis = cas.Vector3(self.tip_V_camera_axis)
+        root_V_camera_axis = root_T_camera.dot(camera_V_camera_axis)
+        root_P_camera = root_T_camera.to_position()
+        map_P_human.z = self.height_for_camera_target
+        root_V_camera_goal_axis = map_P_human - root_P_camera
+        root_V_camera_goal_axis.scale(1)
+        look_at_target_weight = cas.if_else(target_lost, 0, self.weight)
+        if not self.drive_back:
+            task.add_vector_goal_constraints(frame_V_current=root_V_camera_axis,
+                                             frame_V_goal=root_V_camera_goal_axis,
+                                             reference_velocity=self.max_rotation_velocity_head,
+                                             weight=look_at_target_weight,
+                                             name='camera')
+
+        # %% follow next point
+        root_V_camera_axis.vis_frame = self.camera_link
+        root_V_camera_goal_axis.vis_frame = self.camera_link
+        # self.add_debug_expr('root_V_camera_axis', root_V_camera_axis)
+        # self.add_debug_expr('root_V_camera_goal_axis', root_V_camera_goal_axis)
+
+        # position_weight = self.weight
+        laser_violated = cas.less(closest_laser_reading, 0)
+        if self.drive_back:
+            position_weight = cas.if_else(cas.logic_or(laser_violated,
+                                                       cas.greater(cas.abs(map_angle_error),
+                                                                   self.base_orientation_threshold)),
+                                          0,
+                                          self.weight)
+        else:
+            position_weight = cas.if_else(cas.logic_or(laser_violated,
+                                                       cas.logic_and(
+                                                           cas.logic_not(target_lost),
+                                                           cas.less_equal(distance_to_human, self.distance_to_target))),
+                                          0,
+                                          self.weight)
+        # self.add_debug_expr('laser_violated', laser_violated)
+        # self.add_debug_expr('target_lost', target_lost)
+        # self.add_debug_expr('distance_to_human', distance_to_human)
+        # self.add_debug_expr('self.base_orientation_threshold', self.base_orientation_threshold)
+        task.add_point_goal_constraints(frame_P_current=root_P_tip,
+                                        frame_P_goal=root_P_goal_point,
+                                        reference_velocity=self.max_translation_velocity,
+                                        weight=position_weight,
+                                        name='next')
+
+        # %% keep the closest point in footprint radius
+        if self.drive_back:
+            buffer = self.traj_tracking_radius
+        else:
+            buffer = self.traj_tracking_radius
+        distance_to_closest_point = cas.norm(root_P_closest_point - root_P_tip)
+        # self.add_debug_expr('position_weight2', position_weight2)
+        god_map.debug_expression_manager.add_debug_expression('distance_to_closest_point', distance_to_closest_point)
+        # self.add_debug_expr('distance_to_closest_point2', distance_to_closest_point2)
+        task.add_inequality_constraint(task_expression=distance_to_closest_point,
+                                       lower_error=-distance_to_closest_point - buffer,
+                                       upper_error=-distance_to_closest_point + buffer,
+                                       reference_velocity=self.max_translation_velocity,
+                                       weight=self.weight,
+                                       name='in_circle')
+
+        # %% laser avoidance
+        if self.enable_laser_avoidance:
+            # min_left_violation = cas.min(self.laser_distance_threshold_width, closest_laser_left)
+            # min_right_violation = cas.min(self.laser_distance_threshold_width, closest_laser_right)
+            # left = cas.Point3([0, min_left_violation, 0])
+            # left.reference_frame = god_map.get_world().search_for_link_name(self.laser_frame)
+            # right = cas.Point3([0, min_right_violation, 0])
+            # right.reference_frame = god_map.get_world().search_for_link_name(self.laser_frame)
+            # self.add_debug_expr('left', left)
+            # self.add_debug_expr('right', right)
+            sideways_vel = (closest_laser_left + closest_laser_right)
+            # bf_P_laser_avoidance = cas.Point3([self.laser_distance_threshold + closest_laser_reading, 0, 0])
+            # bf_P_laser_avoidance.reference_frame = god_map.get_world().search_for_link_name(self.laser_frame)
+            # self.add_debug_expr('center', bf_P_laser_avoidance)
+            bf_V_laser_avoidance_direction = cas.Vector3([0, sideways_vel, 0])
+            map_V_laser_avoidance_direction = root_T_bf.dot(bf_V_laser_avoidance_direction)
+            map_V_laser_avoidance_direction.vis_frame = god_map.world.search_for_link_name(self.laser_frame)
+            god_map.debug_expression_manager.add_debug_expression('base_V_laser_avoidance_direction',
+                                                                  map_V_laser_avoidance_direction)
+            odom_y_vel = self.odom_joint.y_vel.get_symbol(Derivatives.position)
+
+            laser_avoidance_weight = cas.if_else(cas.less(distance_to_closest_point, self.traj_tracking_radius),
+                                                 WEIGHT_COLLISION_AVOIDANCE,
+                                                 0)
+            buffer = self.laser_avoidance_sideways_buffer / 2
+            task.add_inequality_constraint(reference_velocity=self.max_translation_velocity,
+                                           lower_error=sideways_vel - buffer,
+                                           upper_error=sideways_vel + buffer,
+                                           weight=laser_avoidance_weight,
+                                           task_expression=odom_y_vel,
+                                           name='laser avoidance')
 
     def clean_up(self):
         if CarryMyBullshit.target_sub is not None:
@@ -395,7 +580,7 @@ class CarryMyBullshit(Goal):
         return np.array([x, y])
 
     @memoize_with_counter(4)
-    def get_current_target(self):
+    def get_current_target(self) -> Dict[str, float]:
         self.check_laser_scan_age()
         traj = CarryMyBullshit.trajectory.copy()
         current_point = self.get_current_point()
@@ -577,192 +762,6 @@ class CarryMyBullshit(Goal):
         except Exception as e:
             logging.logwarn(f'rejected new target because: {e}')
         self.publish_trajectory()
-
-    def make_constraints(self):
-        root_T_bf = god_map.world.compose_fk_expression(self.root, self.tip)
-        root_T_odom = god_map.world.compose_fk_expression(self.root, self.odom)
-        root_T_camera = god_map.world.compose_fk_expression(self.root, self.camera_link)
-        root_P_tip = root_T_bf.to_position()
-        min_left_violation1 = self.get_parameter_as_symbolic_expression('closest_laser_left')
-        min_right_violation1 = self.get_parameter_as_symbolic_expression('closest_laser_right')
-        closest_laser_reading1 = self.get_parameter_as_symbolic_expression('closest_laser_reading')
-        min_left_violation2 = self.get_parameter_as_symbolic_expression('closest_laser_left_pc')
-        min_right_violation2 = self.get_parameter_as_symbolic_expression('closest_laser_right_pc')
-        closest_laser_reading2 = self.get_parameter_as_symbolic_expression('closest_laser_reading_pc')
-        # self.add_debug_expr('min_left_violation_base', min_left_violation1)
-        # self.add_debug_expr('min_right_violation_base', min_right_violation1)
-        # self.add_debug_expr('min_left_violation_pc', min_left_violation2)
-        # self.add_debug_expr('min_right_violation_pc', min_right_violation2)
-        # self.add_debug_expr('closest_laser_reading_base', closest_laser_reading1)
-        # self.add_debug_expr('closest_laser_reading_pc', closest_laser_reading2)
-        closest_laser_left = cas.min(min_left_violation1, min_left_violation2)
-        closest_laser_right = cas.max(min_right_violation1, min_right_violation2)
-        closest_laser_reading = cas.min(closest_laser_reading1, closest_laser_reading2)
-        # self.add_debug_expr('min_left_violation', closest_laser_left)
-        # self.add_debug_expr('min_right_violation', closest_laser_right)
-        # self.add_debug_expr('closest_laser_reading', closest_laser_reading)
-        last_target_age = self.get_parameter_as_symbolic_expression('last_target_age')
-        target_lost = cas.greater_equal(last_target_age, self.target_age_threshold)
-        map_P_human = cas.Point3(self.get_parameter_as_symbolic_expression('human_point'))
-        map_P_human_projected = cas.Point3(map_P_human)
-        map_P_human_projected.z = 0
-        next_x = god_map.to_expr(self._get_identifier() + ['get_current_target', tuple(), 'next_x'])
-        next_y = god_map.to_expr(self._get_identifier() + ['get_current_target', tuple(), 'next_y'])
-        closest_x = god_map.to_expr(self._get_identifier() + ['get_current_target', tuple(), 'closest_x'])
-        closest_y = god_map.to_expr(self._get_identifier() + ['get_current_target', tuple(), 'closest_y'])
-        # tangent_x = god_map.to_expr(self._get_identifier() + ['get_current_target', tuple(), 'tangent_x'])
-        # tangent_y = god_map.to_expr(self._get_identifier() + ['get_current_target', tuple(), 'tangent_y'])
-        clear_memo(self.get_current_target)
-        root_P_goal_point = cas.Point3([next_x, next_y, 0])
-        root_P_closest_point = cas.Point3([closest_x, closest_y, 0])
-        # tangent = root_P_goal_point - root_P_closest_point
-        # root_V_tangent = cas.Vector3([tangent.x, tangent.y, 0])
-        tip_V_pointing_axis = cas.Vector3(self.tip_V_pointing_axis)
-
-        # %% orient to goal
-        _, _, map_odom_angle = root_T_odom.to_rotation().to_rpy()
-        odom_current_angle = self.odom_joint.yaw.get_symbol(Derivatives.position)
-        map_current_angle = map_odom_angle + odom_current_angle
-        # root_V_goal_axis = root_P_goal_point - root_P_tip
-        if self.drive_back:
-            root_V_tip_to_closest = root_P_tip - root_P_closest_point
-            root_P_between_tip_and_closest = root_P_closest_point + root_V_tip_to_closest / 2
-            # self.add_debug_expr('root_P_between_tip_and_closest', root_P_between_tip_and_closest)
-            root_V_goal_axis = root_P_goal_point - root_P_between_tip_and_closest
-        else:
-            root_V_goal_axis = map_P_human_projected - root_P_tip
-        distance_to_human = cas.norm(root_V_goal_axis)
-        root_V_goal_axis.scale(1)
-        root_V_pointing_axis = root_T_bf.dot(tip_V_pointing_axis)
-        root_V_pointing_axis.vis_frame = self.tip
-        root_V_goal_axis.vis_frame = self.tip
-        map_goal_angle = cas.angle_between_vector(cas.Vector3([1, 0, 0]), root_V_goal_axis)
-        map_goal_angle = cas.if_greater(root_V_goal_axis.y, 0, map_goal_angle, -map_goal_angle)
-        # self.add_debug_expr('goal_point', root_P_goal_point)
-        # self.add_debug_expr('root_P_closest_point', root_P_closest_point)
-        # self.add_debug_expr('laser_center_reading', laser_center_reading)
-        # self.add_debug_expr('root_V_pointing_axis', root_V_pointing_axis)
-        # self.add_debug_expr('root_V_goal_axis', root_V_goal_axis)
-        # self.add_debug_expr('distance_to_human', distance_to_human)
-        # self.add_vector_goal_constraints(frame_V_current=root_V_pointing_axis,
-        #                                  frame_V_goal=root_V_goal_axis,
-        #                                  reference_velocity=self.max_rotation_velocity,
-        #                                  weight=self.weight,
-        #                                  name='pointing')
-        # angle = cas.abs(cas.angle_between_vector(root_V_pointing_axis, root_V_goal_axis))
-        map_angle_error = cas.shortest_angular_distance(map_current_angle, map_goal_angle)
-        if self.drive_back:
-            buffer = 0
-        else:
-            buffer = self.base_orientation_threshold
-        ll = map_angle_error - buffer
-        ul = map_angle_error + buffer
-        # self.add_debug_expr('ll', ll)
-        # self.add_debug_expr('ul', ul)
-        # self.add_debug_expr('map_angle_error', map_angle_error)
-        # self.add_debug_expr('map_current_angle', map_current_angle)
-        # self.add_debug_expr('map_goal_angle', map_goal_angle)
-        self.add_inequality_constraint(reference_velocity=self.max_rotation_velocity,
-                                       lower_error=ll,
-                                       upper_error=ul,
-                                       weight=self.weight,
-                                       task_expression=map_current_angle,
-                                       name='/rot')
-
-        # %% look at goal
-        camera_V_camera_axis = cas.Vector3(self.tip_V_camera_axis)
-        root_V_camera_axis = root_T_camera.dot(camera_V_camera_axis)
-        root_P_camera = root_T_camera.to_position()
-        map_P_human.z = self.height_for_camera_target
-        root_V_camera_goal_axis = map_P_human - root_P_camera
-        root_V_camera_goal_axis.scale(1)
-        look_at_target_weight = cas.if_else(target_lost, 0, self.weight)
-        if not self.drive_back:
-            self.add_vector_goal_constraints(frame_V_current=root_V_camera_axis,
-                                             frame_V_goal=root_V_camera_goal_axis,
-                                             reference_velocity=self.max_rotation_velocity_head,
-                                             weight=look_at_target_weight,
-                                             name='camera')
-
-        # %% follow next point
-        root_V_camera_axis.vis_frame = self.camera_link
-        root_V_camera_goal_axis.vis_frame = self.camera_link
-        # self.add_debug_expr('root_V_camera_axis', root_V_camera_axis)
-        # self.add_debug_expr('root_V_camera_goal_axis', root_V_camera_goal_axis)
-
-        # position_weight = self.weight
-        laser_violated = cas.less(closest_laser_reading, 0)
-        if self.drive_back:
-            position_weight = cas.if_else(cas.logic_or(laser_violated,
-                                                   cas.greater(cas.abs(map_angle_error), self.base_orientation_threshold)),
-                                        0,
-                                        self.weight)
-        else:
-            position_weight = cas.if_else(cas.logic_or(laser_violated,
-                                                   cas.logic_and(
-                                                       cas.logic_not(target_lost),
-                                                       cas.less_equal(distance_to_human, self.distance_to_target))),
-                                        0,
-                                        self.weight)
-        # self.add_debug_expr('laser_violated', laser_violated)
-        # self.add_debug_expr('target_lost', target_lost)
-        # self.add_debug_expr('distance_to_human', distance_to_human)
-        # self.add_debug_expr('self.base_orientation_threshold', self.base_orientation_threshold)
-        self.add_point_goal_constraints(frame_P_current=root_P_tip,
-                                        frame_P_goal=root_P_goal_point,
-                                        reference_velocity=self.max_translation_velocity,
-                                        weight=position_weight,
-                                        name='next')
-
-        # %% keep the closest point in footprint radius
-        if self.drive_back:
-            buffer = self.traj_tracking_radius
-        else:
-            buffer = self.traj_tracking_radius
-        distance_to_closest_point = cas.norm(root_P_closest_point - root_P_tip)
-        # self.add_debug_expr('position_weight2', position_weight2)
-        self.add_debug_expr('distance_to_closest_point', distance_to_closest_point)
-        # self.add_debug_expr('distance_to_closest_point2', distance_to_closest_point2)
-        self.add_inequality_constraint(task_expression=distance_to_closest_point,
-                                       lower_error=-distance_to_closest_point - buffer,
-                                       upper_error=-distance_to_closest_point + buffer,
-                                       reference_velocity=self.max_translation_velocity,
-                                       weight=self.weight,
-                                       name='in_circle')
-
-        # %% laser avoidance
-        if self.enable_laser_avoidance:
-            # min_left_violation = cas.min(self.laser_distance_threshold_width, closest_laser_left)
-            # min_right_violation = cas.min(self.laser_distance_threshold_width, closest_laser_right)
-            # left = cas.Point3([0, min_left_violation, 0])
-            # left.reference_frame = god_map.get_world().search_for_link_name(self.laser_frame)
-            # right = cas.Point3([0, min_right_violation, 0])
-            # right.reference_frame = god_map.get_world().search_for_link_name(self.laser_frame)
-            # self.add_debug_expr('left', left)
-            # self.add_debug_expr('right', right)
-            sideways_vel = (closest_laser_left + closest_laser_right)
-            # bf_P_laser_avoidance = cas.Point3([self.laser_distance_threshold + closest_laser_reading, 0, 0])
-            # bf_P_laser_avoidance.reference_frame = god_map.get_world().search_for_link_name(self.laser_frame)
-            # self.add_debug_expr('center', bf_P_laser_avoidance)
-            bf_V_laser_avoidance_direction = cas.Vector3([0, sideways_vel, 0])
-            map_V_laser_avoidance_direction = root_T_bf.dot(bf_V_laser_avoidance_direction)
-            map_V_laser_avoidance_direction.vis_frame = god_map.world.search_for_link_name(self.laser_frame)
-            self.add_debug_expr('base_V_laser_avoidance_direction', map_V_laser_avoidance_direction)
-            odom_y_vel = self.odom_joint.y_vel.get_symbol(Derivatives.position)
-
-            laser_avoidance_weight = cas.if_else(cas.less(distance_to_closest_point, self.traj_tracking_radius),
-                                               WEIGHT_COLLISION_AVOIDANCE,
-                                               0)
-            buffer = self.laser_avoidance_sideways_buffer / 2
-            self.add_inequality_constraint(reference_velocity=self.max_translation_velocity,
-                                           lower_error=sideways_vel - buffer,
-                                           upper_error=sideways_vel + buffer,
-                                           weight=laser_avoidance_weight,
-                                           task_expression=odom_y_vel,
-                                           name='laser avoidance')
-
-    def __str__(self) -> str:
-        return super().__str__()
 
 
 class BaseTrajFollowerPR2(BaseTrajFollower):

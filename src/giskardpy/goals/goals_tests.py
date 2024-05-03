@@ -68,7 +68,7 @@ class CannotResolveSymbol(Goal):
         super().__init__(name=name, start_condition=start_condition, hold_condition=hold_condition,
                          end_condition=end_condition)
         self.data = {}
-        s = self.get_symbol_for_self_attribute('.data[2]')
+        s = self.get_self_ref_str('data[2]')
         t = self.create_and_add_task('muh')
         joint_name = god_map.world.search_for_joint_name(joint_name)
         joint_position = self.get_joint_position_symbol(joint_name)

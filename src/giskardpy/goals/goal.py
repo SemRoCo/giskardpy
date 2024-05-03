@@ -88,12 +88,12 @@ class Goal(ABC):
         self.connect_hold_condition_to_all_tasks(hold_condition)
         self.connect_end_condition_to_all_tasks(end_condition)
 
-    def get_symbol_for_self_attribute(self, self_attribute_symbol_reference: str) -> cas.Symbol:
+    @property
+    def ref_str(self) -> str:
         """
-        Like 'symbol_manager.get_symbol', but automatically prepends the place where the goal is stored on god_map.
+        A string referring to self on the god_map. Used with symbol manager.
         """
-        return symbol_manager.get_symbol(f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\']'
-                                         f'{self_attribute_symbol_reference}')
+        return f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\']'
 
     def get_expr_velocity(self, expr: cas.Expression) -> cas.Expression:
         """

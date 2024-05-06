@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, List
 
 from py_trees import Sequence
 
@@ -28,12 +28,16 @@ class ExecuteTraj(Sequence):
 
     def add_follow_joint_traj_action_server(self, namespace: str, group_name: str,
                                             fill_velocity_values: bool,
-                                            path_tolerance: Dict[Derivatives, float] = None):
+                                            path_tolerance: Dict[Derivatives, float] = None,
+                                            controlled_joints: List[str] = None,
+                                            goal_time_tolerance: float = 1):
         behavior = SendFollowJointTrajectory(namespace=namespace, group_name=group_name,
-                                             fill_velocity_values=fill_velocity_values, path_tolerance=path_tolerance)
+                                             fill_velocity_values=fill_velocity_values, path_tolerance=path_tolerance,
+                                             controlled_joints=controlled_joints, goal_time_tolerance=goal_time_tolerance)
         self.move_robots.add_child(behavior)
 
     def add_base_traj_action_server(self, cmd_vel_topic: str, track_only_velocity: bool = False,
                                     joint_name: PrefixName = None):
         self.base_closed_loop.send_controls.add_send_cmd_velocity(cmd_vel_topic=cmd_vel_topic,
-                                                                  joint_name=joint_name)
+                                                                  joint_name=joint_name,
+                                                                  track_only_velocity=track_only_velocity)

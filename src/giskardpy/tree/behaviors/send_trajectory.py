@@ -52,7 +52,7 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
     @profile
     def __init__(self, namespace: str, group_name: str,
                  goal_time_tolerance: float = 1, fill_velocity_values: bool = True,
-                 path_tolerance: Dict[Derivatives, float] = None):
+                 path_tolerance: Dict[Derivatives, float] = None, controlled_joints: List[str]=None):
         self.group_name = group_name
         self.delay = rospy.Duration(0)
         self.namespace = namespace
@@ -65,14 +65,17 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
         self.goal_time_tolerance = rospy.Duration(goal_time_tolerance)
         self.path_tolerance = path_tolerance
 
-        params: Dict[str, Any] = rospy.get_param(self.namespace)
+        if not controlled_joints:
+            params: Dict[str, Any] = rospy.get_param(self.namespace)
+            controlled_joint_names = [PrefixName(j, self.group_name) for j in params['joints']]
+        else:
+            controlled_joint_names = [PrefixName(j, self.group_name) for j in controlled_joints]
 
         actual_type = wait_for_topic_to_appear(self.action_namespace + '/goal', self.supported_action_types)
         action_type = eval(actual_type._type.replace('/', '.msg.')[:-4])
 
         ActionClient.__init__(self, str(self), action_type, None, self.action_namespace)
 
-        controlled_joint_names = [PrefixName(j, self.group_name) for j in params['joints']]
         if len(controlled_joint_names) == 0:
             raise ValueError(f'\'{self.action_namespace}\' has no joints')
 
@@ -188,8 +191,8 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
             if current_time < self.min_deadline:
                 msg = f'\'{self.namespace}\' executed too quickly, stopping execution.'
                 e = ExecutionSucceededPrematurely(msg)
-                raise_to_blackboard(e)
-                return py_trees.Status.FAILURE
+                # raise_to_blackboard(e)
+                return py_trees.Status.RUNNING
             self.feedback_message = "goal reached"
             logging.loginfo(f'\'{self.namespace}\' successfully executed the trajectory.')
             return py_trees.Status.SUCCESS

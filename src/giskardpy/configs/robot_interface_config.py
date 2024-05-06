@@ -95,7 +95,8 @@ class RobotInterfaceConfig(ABC):
                                                                               joint_name=joint_name)
         elif god_map.is_open_loop():
             self.tree.execute_traj.add_base_traj_action_server(cmd_vel_topic=cmd_vel_topic,
-                                                               joint_name=joint_name)
+                                                               joint_name=joint_name,
+                                                               track_only_velocity=track_only_velocity)
 
     def register_controlled_joints(self, joint_names: List[str], group_name: Optional[str] = None):
         """
@@ -112,7 +113,9 @@ class RobotInterfaceConfig(ABC):
                                            namespace: str,
                                            group_name: Optional[str] = None,
                                            fill_velocity_values: bool = False,
-                                           path_tolerance: Dict[Derivatives, float] = None):
+                                           path_tolerance: Dict[Derivatives, float] = None,
+                                           controlled_joints: List[str] = None,
+                                           goal_time_tolerance: float = 1):
         """
         Connect Giskard to a follow joint trajectory server. It will automatically figure out which joints are offered
         and can be controlled.
@@ -127,7 +130,9 @@ class RobotInterfaceConfig(ABC):
         self.tree.execute_traj.add_follow_joint_traj_action_server(namespace=namespace,
                                                                    group_name=group_name,
                                                                    fill_velocity_values=fill_velocity_values,
-                                                                   path_tolerance=path_tolerance)
+                                                                   path_tolerance=path_tolerance,
+                                                                   controlled_joints=controlled_joints,
+                                                                   goal_time_tolerance=goal_time_tolerance)
 
     def add_joint_velocity_controller(self, namespaces: List[str]):
         """

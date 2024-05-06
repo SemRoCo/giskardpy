@@ -15,12 +15,11 @@ from visualization_msgs.msg._InteractiveMarkerControl import InteractiveMarkerCo
 from visualization_msgs.msg._InteractiveMarkerFeedback import InteractiveMarkerFeedback
 from visualization_msgs.msg._Marker import Marker
 
-from giskardpy.python_interface.old_python_interface import OldGiskardWrapper
+from giskardpy.python_interface.python_interface import GiskardWrapper
 from giskardpy.utils import logging
 from giskardpy.utils.math import qv_mult
 
 MARKER_SCALE = 0.15
-
 
 
 class IMServer(object):
@@ -28,6 +27,7 @@ class IMServer(object):
     Spawns interactive Marker which send cart goals to action server.
     Does not interact with god map.
     """
+
     def __init__(self, root_tips, suffix=''):
         """
         :param root_tips: list containing root->tip tuple for each interactive marker.
@@ -36,7 +36,7 @@ class IMServer(object):
         :type suffix: str
         """
         self.enable_self_collision = rospy.get_param('~enable_self_collision', True)
-        self.giskard = OldGiskardWrapper()
+        self.giskard = GiskardWrapper()
         self.robot_name = self.giskard.robot_name
         if len(root_tips) > 0:
             self.roots, self.tips = zip(*root_tips)
@@ -49,7 +49,6 @@ class IMServer(object):
         # marker server
         self.server = InteractiveMarkerServer('eef_control{}'.format(self.suffix))
         self.menu_handler = MenuHandler()
-
 
         for root, tip in zip(self.roots, self.tips):
             root = root
@@ -154,7 +153,7 @@ class IMServer(object):
         return int_marker
 
     class process_feedback(object):
-        def __init__(self, i_server, marker_name, root_link, tip_link, giskard, enable_self_collision):
+        def __init__(self, i_server, marker_name, root_link, tip_link, giskard: GiskardWrapper, enable_self_collision):
             """
             :param i_server:
             :type i_server: InteractiveMarkerServer
@@ -179,7 +178,6 @@ class IMServer(object):
             self.enable_self_collision = enable_self_collision
             self.marker_pub = rospy.Publisher('visualization_marker_array', MarkerArray, queue_size=10)
 
-
         def __call__(self, feedback):
             if feedback.event_type == InteractiveMarkerFeedback.MOUSE_UP:
                 logging.loginfo('got interactive goal update')
@@ -188,13 +186,15 @@ class IMServer(object):
                 p.header.frame_id = feedback.header.frame_id
                 p.pose = feedback.pose
                 # self.giskard.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
-                self.giskard.set_straight_cart_goal(root_link=self.root_link,
-                                           tip_link=self.tip_link,
-                                           goal_pose=p)
-
+                self.giskard.motion_goals.add_cartesian_pose_straight(root_link=self.root_link,
+                                                                      tip_link=self.tip_link,
+                                                                      goal_pose=p)
+                mon = self.giskard.monitors.add_local_minimum_reached('locMin')
+                self.giskard.monitors.add_end_motion(mon, 'endMot')
                 if not self.enable_self_collision:
-                    self.giskard.allow_self_collision()
-                self.giskard.allow_all_collisions()
+                    self.giskard.motion_goals.allow_self_collision()
+                self.giskard.motion_goals.allow_all_collisions()
+                self.giskard.monitors.add_max_trajectory_length(30)
                 self.giskard.execute(wait=False)
                 # self.giskard.plan(wait=False)
                 self.pub_goal_marker(feedback.header, feedback.pose)
@@ -252,7 +252,7 @@ class IMServer(object):
             # z
             m = deepcopy(m)
             m.pose = deepcopy(pose)
-            muh = qv_mult(old_q, [0,0,m.scale.z / 2])
+            muh = qv_mult(old_q, [0, 0, m.scale.z / 2])
             m.pose.position.x += muh[0]
             m.pose.position.y += muh[1]
             m.pose.position.z += muh[2]
@@ -264,7 +264,6 @@ class IMServer(object):
             m.id = 2
             ma.markers.append(m)
             self.marker_pub.publish(ma)
-
 
 
 if __name__ == '__main__':

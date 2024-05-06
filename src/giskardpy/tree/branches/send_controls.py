@@ -17,5 +17,5 @@ class SendControls(RunningSelector):
     def add_joint_velocity_group_controllers(self, namespace: str):
         self.add_child(JointGroupVelController(namespace))
 
-    def add_send_cmd_velocity(self, cmd_vel_topic: str, joint_name: PrefixName = None):
-        self.add_child(SendCmdVel(cmd_vel_topic, joint_name=joint_name))
+    def add_send_cmd_velocity(self, cmd_vel_topic: str, joint_name: PrefixName = None, track_only_velocity: bool=False):
+        self.add_child(SendCmdVel(cmd_vel_topic, joint_name=joint_name, track_only_velocity=track_only_velocity))

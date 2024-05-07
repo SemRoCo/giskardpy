@@ -473,6 +473,9 @@ class CarryMyBullshit(Goal):
             end = EndMotion(name='done')
             end.start_condition = goal_reached.get_state_expression()
             self.add_monitor(end)
+        self.connect_start_condition_to_all_tasks(start_condition)
+        self.connect_hold_condition_to_all_tasks(hold_condition)
+        self.connect_end_condition_to_all_tasks(end_condition)
 
     def clean_up(self):
         if CarryMyBullshit.target_sub is not None:

@@ -55,7 +55,7 @@ class MotionGoalManager:
                 hold_condition = god_map.monitor_manager.logic_str_to_expr(motion_goal.hold_condition,
                                                                            default=cas.FalseSymbol)
                 end_condition = god_map.monitor_manager.logic_str_to_expr(motion_goal.end_condition,
-                                                                          default=cas.TrueSymbol)
+                                                                          default=cas.FalseSymbol)
                 c: Goal = C(name=motion_goal.name,
                             start_condition=start_condition,
                             hold_condition=hold_condition,
@@ -117,7 +117,7 @@ class MotionGoalManager:
                                       else_result=int(TaskState.running))
             else:
                 hold_if = state_symbol
-            if not cas.is_true(task.end_condition):
+            if not cas.is_false(task.end_condition):
                 else_result = cas.if_else(task.end_condition,
                                           if_result=int(TaskState.succeeded),
                                           else_result=hold_if)

@@ -958,6 +958,39 @@ class TestMonitors:
         zero_pose.set_max_traj_length(30)
         zero_pose.execute(add_local_minimum_reached=False)
 
+    def test_hold_monitors2(self, zero_pose: PR2TestWrapper):
+        true = zero_pose.monitors.add_sleep(0.0, name='always true')
+
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = 'map'
+        base_goal.pose.position.x = 1
+        base_goal.pose.orientation.w = 1
+
+        current_base = PoseStamped()
+        current_base.header.frame_id = 'map'
+        current_base.pose.position.x = 0
+        current_base.pose.orientation.w = 1
+        stayed_put = zero_pose.monitors.add_cartesian_pose(goal_pose=current_base,
+                                                           tip_link='base_footprint',
+                                                           root_link='map',
+                                                           stay_true=False,
+                                                           name='goal reached')
+
+        zero_pose.motion_goals.add_cartesian_pose(goal_pose=base_goal,
+                                                  tip_link='base_footprint',
+                                                  root_link='map',
+                                                  hold_condition=true)
+
+        local_min = zero_pose.monitors.add_local_minimum_reached()
+
+        joint_reached = zero_pose.monitors.add_joint_position(zero_pose.better_pose)
+        zero_pose.motion_goals.add_joint_position(zero_pose.better_pose)
+
+        end = zero_pose.monitors.add_end_motion(start_condition=f'{local_min} and {stayed_put} and {joint_reached}')
+        zero_pose.motion_goals.allow_all_collisions()
+        zero_pose.set_max_traj_length(30)
+        zero_pose.execute(add_local_minimum_reached=False)
+
     def test_start_monitors(self, zero_pose: PR2TestWrapper):
         alternator2 = zero_pose.monitors.add_alternator(mod=2)
 
@@ -1618,7 +1651,7 @@ class TestConstraints:
         door_name = 'sink_area_dish_washer_door'
         kitchen_setup.register_group(door_obj, kitchen_setup.default_env_name,
                                      door_name)  # root link of the objects to avoid collision
-        kitchen_setup.set_env_state({'sink_area_dish_washer_door_joint': np.pi/8})
+        kitchen_setup.set_env_state({'sink_area_dish_washer_door_joint': np.pi / 8})
         tip_grasp_axis = Vector3Stamped()
         tip_grasp_axis.header.frame_id = hand
         tip_grasp_axis.vector.y = 1

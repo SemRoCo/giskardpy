@@ -50,7 +50,7 @@ class Task:
         self.derivative_constraints = {}
         self._start_condition = cas.TrueSymbol
         self._hold_condition = cas.FalseSymbol
-        self._end_condition = cas.TrueSymbol
+        self._end_condition = cas.FalseSymbol
         self.manip_constraints = {}
         self.quadratic_gains = []
         self.linear_weight_gains = []
@@ -70,33 +70,33 @@ class Task:
         return self._start_condition
 
     @start_condition.setter
-    def start_condition(self, value: Union[Monitor, cas.Expression]) -> None:
-        if isinstance(value, Monitor):
-            self._start_condition = value.get_state_expression()
-        else:
-            self._start_condition = value
+    def start_condition(self, value: cas.Expression) -> None:
+        for monitor_state_expr in value.free_symbols():
+            if not god_map.monitor_manager.is_monitor_registered(monitor_state_expr):
+                raise GiskardException(f'No monitor found for this state expr: "{monitor_state_expr}".')
+        self._start_condition = value
 
     @property
     def hold_condition(self) -> cas.Expression:
         return self._hold_condition
 
     @hold_condition.setter
-    def hold_condition(self, value: Union[Monitor, cas.Expression]) -> None:
-        if isinstance(value, Monitor):
-            self._hold_condition = value.get_state_expression()
-        else:
-            self._hold_condition = value
+    def hold_condition(self, value: cas.Expression) -> None:
+        for monitor_state_expr in value.free_symbols():
+            if not god_map.monitor_manager.is_monitor_registered(monitor_state_expr):
+                raise GiskardException(f'No monitor found for this state expr: "{monitor_state_expr}".')
+        self._hold_condition = value
 
     @property
     def end_condition(self) -> cas.Expression:
         return self._end_condition
 
     @end_condition.setter
-    def end_condition(self, value: Union[Monitor, cas.Expression]) -> None:
-        if isinstance(value, Monitor):
-            self._end_condition = value.get_state_expression()
-        else:
-            self._end_condition = value
+    def end_condition(self, value: cas.Expression) -> None:
+        for monitor_state_expr in value.free_symbols():
+            if not god_map.monitor_manager.is_monitor_registered(monitor_state_expr):
+                raise GiskardException(f'No monitor found for this state expr: "{monitor_state_expr}".')
+        self._end_condition = value
 
     @property
     def id(self) -> int:

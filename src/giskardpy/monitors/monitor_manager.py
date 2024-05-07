@@ -121,6 +121,13 @@ class MonitorManager:
                 return monitor
         raise GiskardException('No monitor found.')
 
+    def is_monitor_registered(self, monitor_state_expr: cas.Expression) -> bool:
+        try:
+            self.get_monitor_from_state_expr(monitor_state_expr)
+            return True
+        except GiskardException as e:
+            return False
+
     def format_condition(self, condition: cas.Expression, new_line: str = '\n') -> str:
         """
         Takes a logical expression, replaces the state symbols with monitor names and formats it nicely.

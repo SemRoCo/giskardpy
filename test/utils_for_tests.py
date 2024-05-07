@@ -475,7 +475,7 @@ class GiskardTestWrapper(OldGiskardWrapper):
                 rospy.sleep(stop_after)
                 self.interrupt()
                 rospy.sleep(1)
-                r = self.get_result(rospy.Duration(3))
+                r = self.get_result(rospy.Duration(10))
             elif not wait:
                 super()._send_action_goal(goal_type, wait=wait)
                 return

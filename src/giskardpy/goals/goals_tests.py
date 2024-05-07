@@ -14,7 +14,7 @@ class DebugGoal(NonMotionGoal):
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.TrueSymbol):
+                 end_condition: cas.Expression = cas.FalseSymbol):
         if name is None:
             name = self.__class__.__name__
         super().__init__(name=name)
@@ -64,11 +64,11 @@ class DebugGoal(NonMotionGoal):
 class CannotResolveSymbol(Goal):
 
     def __init__(self, name: str, joint_name: str, start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol, end_condition: cas.Expression = cas.TrueSymbol):
+                 hold_condition: cas.Expression = cas.FalseSymbol, end_condition: cas.Expression = cas.FalseSymbol):
         super().__init__(name=name, start_condition=start_condition, hold_condition=hold_condition,
                          end_condition=end_condition)
         self.data = {}
-        s = self.get_symbol_for_self_attribute('.data[2]')
+        s = symbol_manager.get_symbol(self + '.data[2]')
         t = self.create_and_add_task('muh')
         joint_name = god_map.world.search_for_joint_name(joint_name)
         joint_position = self.get_joint_position_symbol(joint_name)

@@ -33,7 +33,7 @@ class CartesianPosition(Goal):
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.TrueSymbol):
+                 end_condition: cas.Expression = cas.FalseSymbol):
         """
         See CartesianPose.
         """
@@ -79,7 +79,7 @@ class CartesianOrientation(Goal):
                  absolute: bool = False,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.TrueSymbol,
+                 end_condition: cas.Expression = cas.FalseSymbol,
                  point_of_debug_matrix: Optional[PointStamped] = None):
         """
         See CartesianPose.
@@ -133,7 +133,7 @@ class CartesianPositionStraight(Goal):
                  weight: float = WEIGHT_ABOVE_CA,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.TrueSymbol):
+                 end_condition: cas.Expression = cas.FalseSymbol):
         """
         Same as CartesianPosition, but tries to move the tip_link in a straight line to the goal_point.
         """
@@ -207,7 +207,7 @@ class CartesianPose(Goal):
                  weight=WEIGHT_ABOVE_CA,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.TrueSymbol):
+                 end_condition: cas.Expression = cas.FalseSymbol):
         """
         This goal will use the kinematic chain between root and tip link to move tip link into the goal pose.
         The max velocities enforce a strict limit, but require a lot of additional constraints, thus making the
@@ -274,7 +274,7 @@ class DiffDriveBaseGoal(Goal):
                  always_forward: bool = False, name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.TrueSymbol):
+                 end_condition: cas.Expression = cas.FalseSymbol):
         """
         Like a CartesianPose, but specifically for differential drives. It will achieve the goal in 3 phases.
         1. orient towards goal.
@@ -409,7 +409,7 @@ class CartesianPoseStraight(Goal):
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.TrueSymbol):
+                 end_condition: cas.Expression = cas.FalseSymbol):
         """
         See CartesianPose. In contrast to it, this goal will try to move tip_link in a straight line.
         """
@@ -449,7 +449,7 @@ class TranslationVelocityLimit(Goal):
                  weight=WEIGHT_ABOVE_CA, max_velocity=0.1, hard=True, name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.TrueSymbol):
+                 end_condition: cas.Expression = cas.FalseSymbol):
         """
         See CartesianVelocityLimit
         """
@@ -481,7 +481,7 @@ class RotationVelocityLimit(Goal):
                  weight=WEIGHT_ABOVE_CA, max_velocity=0.5, hard=True, name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.TrueSymbol):
+                 end_condition: cas.Expression = cas.FalseSymbol):
         """
         See CartesianVelocityLimit
         """
@@ -523,7 +523,7 @@ class CartesianVelocityLimit(Goal):
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.TrueSymbol):
+                 end_condition: cas.Expression = cas.FalseSymbol):
         """
         This goal will use put a strict limit on the Cartesian velocity. This will require a lot of constraints, thus
         slowing down the system noticeably.
@@ -572,7 +572,7 @@ class RelativePositionSequence(Goal):
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.TrueSymbol):
+                 end_condition: cas.Expression = cas.FalseSymbol):
         """
         Only meant for testing.
         """
@@ -608,14 +608,14 @@ class RelativePositionSequence(Goal):
         error2_monitor.expression = cas.less(cas.abs(error2), 0.01)
 
         step1 = self.create_and_add_task('step1')
-        step1.end_condition = error1_monitor
+        step1.end_condition = error1_monitor.get_state_expression()
         step1.add_point_goal_constraints(root_P_current, root_P_goal1,
                                          reference_velocity=self.max_velocity,
                                          weight=self.weight)
 
         self.step2 = self.create_and_add_task('step2')
-        self.step2.start_condition = error1_monitor
-        self.step2.end_condition = error2_monitor
+        self.step2.start_condition = error1_monitor.get_state_expression()
+        self.step2.end_condition = error2_monitor.get_state_expression()
         self.step2.add_point_goal_constraints(root_P_current, root_P_goal2_cached,
                                               reference_velocity=self.max_velocity,
                                               weight=self.weight)

@@ -4,6 +4,8 @@ import builtins
 from copy import copy
 from typing import Union, List, TypeVar
 import math
+
+import casadi
 import casadi as ca  # type: ignore
 import numpy as np
 import geometry_msgs.msg as geometry_msgs
@@ -280,6 +282,15 @@ class Symbol(Symbol_):
     def __neg__(self):
         return Expression(self.s.__neg__())
 
+    def __invert__(self):
+        return logic_not(self)
+
+    def __or__(self, other):
+        return logic_or(self, other)
+
+    def __and__(self, other):
+        return logic_and(self, other)
+
     def __pow__(self, other):
         if isinstance(other, (int, float)):
             return Expression(self.s.__pow__(other))
@@ -442,6 +453,9 @@ class Expression(Symbol_):
     def __neg__(self):
         return Expression(self.s.__neg__())
 
+    def __invert__(self):
+        return logic_not(self)
+
     def __pow__(self, other):
         if isinstance(other, (int, float)):
             return Expression(self.s.__pow__(other))
@@ -462,6 +476,12 @@ class Expression(Symbol_):
         if isinstance(other, Symbol_):
             other = other.s
         return Expression(self.s.__eq__(other))
+
+    def __or__(self, other):
+        return logic_or(self, other)
+
+    def __and__(self, other):
+        return logic_and(self, other)
 
     def __ne__(self, other):
         if isinstance(other, Symbol_):

@@ -24,7 +24,7 @@ class SetSeedConfiguration(NonMotionGoal):
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.TrueSymbol):
+                 end_condition: cas.Expression = cas.FalseSymbol):
         """
         Overwrite the configuration of the world to allow starting the planning from a different state.
         Can only be used in plan only mode.
@@ -55,7 +55,7 @@ class SetOdometry(NonMotionGoal):
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.TrueSymbol):
+                 end_condition: cas.Expression = cas.FalseSymbol):
         self.group_name = group_name
         if name is None:
             name = f'{self.__class__.__name__}/{self.group_name}'
@@ -95,7 +95,7 @@ class JointVelocityLimit(Goal):
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.TrueSymbol):
+                 end_condition: cas.Expression = cas.FalseSymbol):
         """
         Limits the joint velocity of a revolute joint.
         :param joint_name:
@@ -148,7 +148,7 @@ class AvoidJointLimits(Goal):
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.TrueSymbol
+                 end_condition: cas.Expression = cas.FalseSymbol
                  ):
         """
         Calls AvoidSingleJointLimits for each joint in joint_list
@@ -212,7 +212,7 @@ class JointPositionList(Goal):
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.TrueSymbol):
+                 end_condition: cas.Expression = cas.FalseSymbol):
         """
         Calls JointPosition for a list of joints.
         :param goal_state: maps joint_name to goal position
@@ -272,7 +272,7 @@ class JointSignWave(Goal):
                  amp_percentage: float,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.TrueSymbol):
+                 end_condition: cas.Expression = cas.FalseSymbol):
         super().__init__(name=name, start_condition=start_condition, hold_condition=hold_condition,
                          end_condition=end_condition)
         joint_name = god_map.world.search_for_joint_name(joint_name)
@@ -293,7 +293,7 @@ class JointSignWave(Goal):
 class UnlimitedJointGoal(Goal):
     def __init__(self, name: str, joint_name: str, goal_position: float,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol, end_condition: cas.Expression = cas.TrueSymbol):
+                 hold_condition: cas.Expression = cas.FalseSymbol, end_condition: cas.Expression = cas.FalseSymbol):
         super().__init__(name=name, start_condition=start_condition, hold_condition=hold_condition,
                          end_condition=end_condition)
         joint_name = god_map.world.search_for_joint_name(joint_name)

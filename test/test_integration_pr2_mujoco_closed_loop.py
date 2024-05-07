@@ -239,7 +239,7 @@ class TestMoveBaseGoals:
         # zero_pose.execute(expected_error_code=GiskardError.EXECUTION_ERROR,
         #                   add_local_minimum_reached=False)
         zero_pose.execute(expected_error_code=GiskardError.PREEMPTED,
-                          stop_after=20,
+                          stop_after=60,
                           add_local_minimum_reached=False)
 
         # zero_pose.set_json_goal('CarryMyBullshit',
@@ -257,7 +257,7 @@ class TestMoveBaseGoals:
                                                laser_frame_id='base_laser_link',
                                                drive_back=True)
         zero_pose.allow_all_collisions()
-        zero_pose.execute()
+        zero_pose.execute(add_local_minimum_reached=False)
 
     def test_wave(self, zero_pose: PR2TestWrapper):
         center = PointStamped()

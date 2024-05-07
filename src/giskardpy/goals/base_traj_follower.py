@@ -1,6 +1,6 @@
 from __future__ import division
 
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Tuple
 
 import numpy as np
 # import matplotlib.pyplot as plt
@@ -12,7 +12,7 @@ from visualization_msgs.msg import MarkerArray, Marker
 import giskardpy.casadi_wrapper as cas
 from giskardpy.exceptions import GiskardException, GoalInitalizationException, ExecutionException
 from giskardpy.goals.goal import Goal
-from giskardpy.monitors.monitors import ExpressionMonitor
+from giskardpy.monitors.monitors import ExpressionMonitor, EndMotion
 from giskardpy.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE, Task
 from giskardpy.god_map import god_map
 from giskardpy.model.joints import OmniDrive, OmniDrivePR22
@@ -209,8 +209,6 @@ class CarryMyBullshit(Goal):
                  hold_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.TrueSymbol):
         super().__init__(name=name)
-        # TODO add end condition for drive back
-        # TODO look where you drive for drive back
         if drive_back:
             logging.loginfo('driving back')
         self.end_of_traj_reached = False
@@ -327,9 +325,6 @@ class CarryMyBullshit(Goal):
             self.add_monitor(target_lost)
             target_lost.expression = cas.greater_equal(last_target_age, self.target_age_threshold)
 
-        map_P_human = cas.Point3(symbol_manager.get_expr(self + '.human_point', input_type_hint=PointStamped))
-        map_P_human_projected = cas.Point3(map_P_human)
-        map_P_human_projected.z = 0
         next_x = symbol_manager.get_symbol(self + '.get_current_target()[\'next_x\']')
         next_y = symbol_manager.get_symbol(self + '.get_current_target()[\'next_y\']')
         closest_x = symbol_manager.get_symbol(self + '.get_current_target()[\'closest_x\']')
@@ -343,6 +338,14 @@ class CarryMyBullshit(Goal):
         # root_V_tangent = cas.Vector3([tangent.x, tangent.y, 0])
         tip_V_pointing_axis = cas.Vector3(self.tip_V_pointing_axis)
 
+
+        if self.drive_back:
+            map_P_human = root_P_goal_point
+        else:
+            map_P_human = cas.Point3(symbol_manager.get_expr(self + '.human_point', input_type_hint=PointStamped))
+            map_P_human_projected = cas.Point3(map_P_human)
+            map_P_human_projected.z = 0
+
         # %% orient to goal
         orient_to_goal = self.create_and_add_task('orient to goal')
         _, _, map_odom_angle = root_T_odom.to_rotation().to_rpy()
@@ -352,6 +355,9 @@ class CarryMyBullshit(Goal):
             root_V_tip_to_closest = root_P_bf - root_P_closest_point
             root_P_between_tip_and_closest = root_P_closest_point + root_V_tip_to_closest / 2
             root_V_goal_axis = root_P_goal_point - root_P_between_tip_and_closest
+            root_V_goal_axis2 = cas.Vector3(root_V_goal_axis)
+            root_V_goal_axis2.scale(1)
+            map_P_human = map_P_human + root_V_goal_axis2 * 1.5
         else:
             root_V_goal_axis = map_P_human_projected - root_P_bf
         distance_to_human = cas.norm(root_V_goal_axis)
@@ -382,14 +388,14 @@ class CarryMyBullshit(Goal):
         map_P_human.z = self.height_for_camera_target
         root_V_camera_goal_axis = map_P_human - root_P_camera
         root_V_camera_goal_axis.scale(1)
+        look_at_target = self.create_and_add_task('look at target')
         if not self.drive_back:
-            look_at_target = self.create_and_add_task('look at target')
             look_at_target.hold_condition = target_lost.get_state_expression()
-            look_at_target.add_vector_goal_constraints(frame_V_current=root_V_camera_axis,
-                                                       frame_V_goal=root_V_camera_goal_axis,
-                                                       reference_velocity=self.max_rotation_velocity_head,
-                                                       weight=self.weight,
-                                                       name='move camera')
+        look_at_target.add_vector_goal_constraints(frame_V_current=root_V_camera_axis,
+                                                   frame_V_goal=root_V_camera_goal_axis,
+                                                   reference_velocity=self.max_rotation_velocity_head,
+                                                   weight=self.weight,
+                                                   name='move camera')
 
         # %% follow next point
         follow_next_point = self.create_and_add_task('follow next')
@@ -455,6 +461,18 @@ class CarryMyBullshit(Goal):
                                                            weight=WEIGHT_COLLISION_AVOIDANCE,
                                                            task_expression=odom_y_vel,
                                                            name='move sideways')
+
+        if self.drive_back:
+            first_traj_x = symbol_manager.get_symbol(self + '.get_first_traj_point()[0]')
+            first_traj_y = symbol_manager.get_symbol(self + '.get_first_traj_point()[1]')
+            first_point = cas.Point3([first_traj_x, first_traj_y, 0])
+            goal_reached = ExpressionMonitor(name='goal reached?')
+            self.add_monitor(goal_reached)
+            goal_reached.expression = cas.euclidean_distance(first_point, root_P_bf) < self.traj_tracking_radius
+            self.connect_end_condition_to_all_tasks(goal_reached.get_state_expression())
+            end = EndMotion(name='done')
+            end.start_condition = goal_reached.get_state_expression()
+            self.add_monitor(end)
 
     def clean_up(self):
         if CarryMyBullshit.target_sub is not None:
@@ -552,6 +570,9 @@ class CarryMyBullshit(Goal):
         x = root_T_tip[0, 3]
         y = root_T_tip[1, 3]
         return np.array([x, y])
+
+    def get_first_traj_point(self) -> np.ndarray:
+        return CarryMyBullshit.traj_data[0]
 
     @memoize_with_counter(4)
     def get_current_target(self) -> Dict[str, float]:

@@ -27,7 +27,7 @@ class Goal(ABC):
                  name: str,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.TrueSymbol):
+                 end_condition: cas.Expression = cas.FalseSymbol):
         """
         This is where you specify goal parameters and save them as self attributes.
         """

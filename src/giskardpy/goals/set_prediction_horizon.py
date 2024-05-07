@@ -12,7 +12,7 @@ class SetPredictionHorizon(NonMotionGoal):
     def __init__(self, prediction_horizon: int, name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.TrueSymbol):
+                 end_condition: cas.Expression = cas.FalseSymbol):
         """
         Will overwrite the prediction horizon for a single goal.
         Setting it to 1 will turn of acceleration and jerk limits.
@@ -33,7 +33,7 @@ class SetQPSolver(NonMotionGoal):
     def __init__(self, qp_solver_id: Union[SupportedQPSolver, int], name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.TrueSymbol):
+                 end_condition: cas.Expression = cas.FalseSymbol):
         if name is None:
             name = self.__class__.__name__
         super().__init__(name=name)
@@ -45,7 +45,7 @@ class EnableVelocityTrajectoryTracking(NonMotionGoal):
     def __init__(self, enabled: bool = True, name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.TrueSymbol):
+                 end_condition: cas.Expression = cas.FalseSymbol):
         """
         A hack for the PR2. This goal decides whether the velocity part of the trajectory message is filled,
         when they are send to the robot.

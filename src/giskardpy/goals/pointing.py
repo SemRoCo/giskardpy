@@ -29,7 +29,7 @@ class Pointing(Goal):
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.TrueSymbol):
+                 end_condition: cas.Expression = cas.FalseSymbol):
         """
         Will orient pointing_axis at goal_point.
         :param tip_link: tip link of the kinematic chain.

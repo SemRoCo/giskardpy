@@ -50,7 +50,7 @@ class Task:
         self.derivative_constraints = {}
         self._start_condition = cas.TrueSymbol
         self._hold_condition = cas.FalseSymbol
-        self._end_condition = cas.TrueSymbol
+        self._end_condition = cas.FalseSymbol
         self.manip_constraints = {}
         self.quadratic_gains = []
         self.linear_weight_gains = []

@@ -24,7 +24,7 @@ class RealTimePointing(Pointing):
                  weight: float = WEIGHT_BELOW_CA,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.TrueSymbol
+                 end_condition: cas.Expression = cas.FalseSymbol
                  ):
         initial_goal = PointStamped()
         initial_goal.header.frame_id = 'base_footprint'

@@ -68,17 +68,26 @@ class Goal(ABC):
             return joint.get_symbol(Derivatives.position)
         raise TypeError(f'get_joint_position_symbol is only supported for OneDofJoint, not {type(joint)}')
 
-    def connect_start_condition_to_all_tasks(self, condition: cas.Expression):
+    def connect_start_condition_to_all_tasks(self, condition: cas.Expression) -> None:
         for task in self.tasks:
-            task.start_condition = cas.logic_and(task.start_condition, condition)
+            if cas.is_true(task.start_condition):
+                task.start_condition = condition
+            else:
+                task.start_condition = cas.logic_and(task.start_condition, condition)
 
-    def connect_hold_condition_to_all_tasks(self, condition: cas.Expression):
+    def connect_hold_condition_to_all_tasks(self, condition: cas.Expression) -> None:
         for task in self.tasks:
-            task.hold_condition = cas.logic_or(task.hold_condition, condition)
+            if cas.is_false(task.hold_condition):
+                task.hold_condition = condition
+            else:
+                task.hold_condition = cas.logic_or(task.hold_condition, condition)
 
-    def connect_end_condition_to_all_tasks(self, condition: cas.Expression):
+    def connect_end_condition_to_all_tasks(self, condition: cas.Expression) -> None:
         for task in self.tasks:
-            task.end_condition = cas.logic_and(task.end_condition, condition)
+            if cas.is_false(task.end_condition):
+                task.end_condition = condition
+            else:
+                task.end_condition = cas.logic_and(task.end_condition, condition)
 
     def connect_monitors_to_all_tasks(self,
                                       start_condition: cas.Expression,

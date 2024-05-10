@@ -95,7 +95,7 @@ class ParseActionGoal(GiskardBehavior):
                 hold_condition = god_map.monitor_manager.logic_str_to_expr(motion_goal.hold_condition,
                                                                            default=cas.FalseSymbol)
                 end_condition = god_map.monitor_manager.logic_str_to_expr(motion_goal.end_condition,
-                                                                          default=cas.TrueSymbol)
+                                                                          default=cas.FalseSymbol)
                 c: Goal = C(name=motion_goal.name,
                             start_condition=start_condition,
                             hold_condition=hold_condition,

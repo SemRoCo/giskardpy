@@ -17,13 +17,14 @@ from giskard_msgs.msg import MoveGoal, GiskardError
 from giskardpy.configs.behavior_tree_config import ClosedLoopBTConfig
 from giskardpy.configs.giskard import Giskard
 from giskardpy.configs.iai_robots.pr2 import PR2CollisionAvoidance, PR2VelocityMujocoInterface, WorldWithPR2Config
-from giskardpy.configs.qp_controller_config import QPControllerConfig
-from giskardpy.god_map import god_map
+from giskardpy.configs.qp_controller_config import QPControllerConfig, SupportedQPSolver
+from giskardpy.goals.base_traj_follower import CarryMyBullshit
 from giskardpy.tasks.task import WEIGHT_BELOW_CA
 from giskardpy.tree.blackboard_utils import GiskardBlackboard
 from test_integration_pr2 import PR2TestWrapper, TestJointGoals, pocky_pose
 from giskardpy.goals.weight_scaling_goals import MaxManipulabilityLinWeight
 import giskardpy.middleware.ros1.msg_converter as msg_converter
+
 
 class PR2TestWrapperMujoco(PR2TestWrapper):
     better_pose = {'r_shoulder_pan_joint': -1.7125,
@@ -228,14 +229,18 @@ class TestMoveBaseGoals:
         # zero_pose.allow_all_collisions()
         # zero_pose.plan_and_execute(expected_error_codes=[GiskardError.PREEMPTED], stop_after=10)
 
-        zero_pose.set_json_goal('CarryMyBullshit',
-                                camera_link='head_mount_kinect_rgb_optical_frame',
-                                # point_cloud_laser_topic_name='',
-                                laser_frame_id='base_laser_link',
-                                height_for_camera_target=1.5)
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class=CarryMyBullshit.__name__,
+                                               name='cmb',
+                                               camera_link='head_mount_kinect_rgb_optical_frame',
+                                               point_cloud_laser_topic_name='',
+                                               laser_frame_id='base_laser_link',
+                                               height_for_camera_target=1.5)
         zero_pose.allow_all_collisions()
-        # zero_pose.plan_and_execute(expected_error_codes=[GiskardError.PREEMPTED], stop_after=30)
-        zero_pose.execute(expected_error_codes=[GiskardError.ERROR])
+        # zero_pose.execute(expected_error_code=GiskardError.EXECUTION_ERROR,
+        #                   add_local_minimum_reached=False)
+        zero_pose.execute(expected_error_code=GiskardError.PREEMPTED,
+                          stop_after=20,
+                          add_local_minimum_reached=False)
 
         # zero_pose.set_json_goal('CarryMyBullshit',
         #                         camera_link='head_mount_kinect_rgb_optical_frame',
@@ -244,13 +249,15 @@ class TestMoveBaseGoals:
         # zero_pose.allow_all_collisions()
         # zero_pose.plan_and_execute(expected_error_codes=[GiskardError.PREEMPTED], stop_after=10)
 
-        zero_pose.set_json_goal('CarryMyBullshit',
-                                camera_link='head_mount_kinect_rgb_optical_frame',
-                                # laser_topic_name='/laser',
-                                laser_frame_id='base_laser_link',
-                                drive_back=True)
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class=CarryMyBullshit.__name__,
+                                               name='cmb',
+                                               camera_link='head_mount_kinect_rgb_optical_frame',
+                                               point_cloud_laser_topic_name='',
+                                               # laser_topic_name='/laser',
+                                               laser_frame_id='base_laser_link',
+                                               drive_back=True)
         zero_pose.allow_all_collisions()
-        zero_pose.execute()
+        zero_pose.execute(add_local_minimum_reached=False)
 
     def test_wave(self, zero_pose: PR2TestWrapper):
         center = PointStamped()

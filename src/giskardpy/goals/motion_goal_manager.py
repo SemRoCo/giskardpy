@@ -80,7 +80,7 @@ class MotionGoalManager:
                                       else_result=int(TaskState.running))
             else:
                 hold_if = state_symbol
-            if not cas.is_true(task.end_condition):
+            if not cas.is_false(task.end_condition):
                 else_result = cas.if_else(task.end_condition,
                                           if_result=int(TaskState.succeeded),
                                           else_result=hold_if)

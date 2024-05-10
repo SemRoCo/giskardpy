@@ -9,7 +9,7 @@ import rospy
 from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, PointStamped, QuaternionStamped
 from numpy import pi
 from shape_msgs.msg import SolidPrimitive
-from tf.transformations import quaternion_from_matrix, quaternion_about_axis
+from tf.transformations import quaternion_from_matrix, quaternion_about_axis, quaternion_matrix, rotation_matrix
 import giskard_msgs.msg as giskard_msgs
 from giskard_msgs.msg import WorldBody, CollisionEntry, WorldGoal, LinkName
 from giskardpy.configs.behavior_tree_config import StandAloneBTConfig
@@ -951,6 +951,39 @@ class TestMonitors:
         zero_pose.set_max_traj_length(30)
         zero_pose.execute(add_local_minimum_reached=False)
 
+    def test_hold_monitors2(self, zero_pose: PR2TestWrapper):
+        true = zero_pose.monitors.add_sleep(0.0, name='always true')
+
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = 'map'
+        base_goal.pose.position.x = 1
+        base_goal.pose.orientation.w = 1
+
+        current_base = PoseStamped()
+        current_base.header.frame_id = 'map'
+        current_base.pose.position.x = 0
+        current_base.pose.orientation.w = 1
+        stayed_put = zero_pose.monitors.add_cartesian_pose(goal_pose=current_base,
+                                                           tip_link='base_footprint',
+                                                           root_link='map',
+                                                           stay_true=False,
+                                                           name='goal reached')
+
+        zero_pose.motion_goals.add_cartesian_pose(goal_pose=base_goal,
+                                                  tip_link='base_footprint',
+                                                  root_link='map',
+                                                  hold_condition=true)
+
+        local_min = zero_pose.monitors.add_local_minimum_reached()
+
+        joint_reached = zero_pose.monitors.add_joint_position(zero_pose.better_pose)
+        zero_pose.motion_goals.add_joint_position(zero_pose.better_pose)
+
+        end = zero_pose.monitors.add_end_motion(start_condition=f'{local_min} and {stayed_put} and {joint_reached}')
+        zero_pose.motion_goals.allow_all_collisions()
+        zero_pose.set_max_traj_length(30)
+        zero_pose.execute(add_local_minimum_reached=False)
+
     def test_start_monitors(self, zero_pose: PR2TestWrapper):
         alternator2 = zero_pose.monitors.add_alternator(mod=2)
 
@@ -1596,6 +1629,59 @@ class TestConstraints:
         kitchen_setup.allow_all_collisions()
         kitchen_setup.execute()
         kitchen_setup.set_env_state({'sink_area_dish_washer_door_joint': 0})
+
+    def test_push_open_dishwasher(self, kitchen_setup: PR2TestWrapper):
+        # dishwasher dimensions self.depth = 0.02, self.length = 0.49 and self.height = 0.6
+        p = PoseStamped()
+        p.header.frame_id = 'map'
+        p.pose.orientation.w = 1
+        p.pose.position.x = 0.5
+        p.pose.position.y = 0.2
+        kitchen_setup.teleport_base(p)
+
+        hand = kitchen_setup.r_tip
+        door_obj = "door"
+        handle_name = 'sink_area_dish_washer_door_handle'
+        door_name = 'sink_area_dish_washer_door'
+        kitchen_setup.register_group(door_obj, LinkName(name=door_name,
+                                                        group_name=kitchen_setup.default_env_name))  # root link of the objects to avoid collision
+        kitchen_setup.set_env_state({'sink_area_dish_washer_door_joint': np.pi / 8})
+        tip_grasp_axis = Vector3Stamped()
+        tip_grasp_axis.header.frame_id = hand
+        tip_grasp_axis.vector.y = 1
+
+        kitchen_setup.set_align_to_push_door_goal(root_link=kitchen_setup.default_root,
+                                                  tip_link=hand,
+                                                  door_handle=handle_name,
+                                                  door_object=door_name,
+                                                  tip_gripper_axis=tip_grasp_axis)
+        kitchen_setup.execute()
+
+        # # # close the gripper
+        kitchen_setup.set_joint_goal(goal_state={'r_gripper_l_finger_joint': 0.0})
+
+        kitchen_setup.set_pre_push_door_goal(root_link=kitchen_setup.default_root,
+                                             tip_link=hand,
+                                             door_handle=handle_name,
+                                             door_object=door_name)
+
+        kitchen_setup.allow_collision(group1=door_obj, group2=kitchen_setup.r_gripper_group)
+        kitchen_setup.execute()
+
+        kitchen_setup.check_cpi_leq(["pr2/r_gripper_tool_frame", "iai_kitchen/sink_area_dish_washer_door"],
+                                    distance_threshold=0.001,
+                                    check_self=False)
+
+        right_forearm = 'r_forearm'
+        kitchen_setup.register_group(right_forearm,
+                                     root_link_name=LinkName(name='r_forearm_link',
+                                                             group_name=kitchen_setup.robot_name))
+        kitchen_setup.set_open_container_goal(tip_link=hand,
+                                              environment_link=handle_name,
+                                              goal_joint_state=1.3217)
+
+        kitchen_setup.allow_collision(group1=door_obj, group2=right_forearm)
+        kitchen_setup.execute()
 
     def test_align_planes1(self, zero_pose: PR2TestWrapper):
         x_gripper = Vector3Stamped()

@@ -482,6 +482,59 @@ class OldGiskardWrapper(GiskardWrapper):
                                              goal_joint_state=goal_joint_state,
                                              weight=weight)
 
+    def set_align_to_push_door_goal(self,
+                                    root_link: str,
+                                    tip_link: str,
+                                    door_object: str,
+                                    door_handle: str,
+                                    tip_gripper_axis: Vector3Stamped,
+                                    tip_group: Optional[str] = None,
+                                    root_group: Optional[str] = None,
+                                    weight: float = WEIGHT_BELOW_CA):
+        """
+        Aligns the tip_link with the door_object to push it open. Only works if the door object is part of the urdf.
+        The door has to be open a little before aligning.
+        : param root_link: root link of the kinematic chain
+        : param tip_link: end effector
+        : param door object: name of the object to be pushed
+        : param door_handle: name of the object handle
+        : param tip_gripper_axis: axis of the tip_link that will be aligned along the door rotation axis
+        """
+        self.motion_goals.add_align_to_push_door(root_link=root_link,
+                                                 tip_link=tip_link,
+                                                 door_object=door_object,
+                                                 door_handle=door_handle,
+                                                 tip_group=tip_group,
+                                                 tip_gripper_axis=tip_gripper_axis,
+                                                 root_group=root_group,
+                                                 weight=weight)
+
+    def set_pre_push_door_goal(self,
+                               root_link: str,
+                               tip_link: str,
+                               door_object: str,
+                               door_handle: str,
+                               reference_linear_velocity: Optional[float] = None,
+                               reference_angular_velocity: Optional[float] = None,
+                               weight: float = WEIGHT_ABOVE_CA):
+        """
+        Positions the gripper in contact with the door before pushing to open.
+        : param root_link: root link of the kinematic chain
+        : param tip_link: end effector
+        : param door object: name of the object to be pushed
+        : param door_height: height of the door
+        : param door_length: length of the door
+        : param root_V_object_rotation_axis: door rotation axis w.r.t root
+        : param root_V_object_normal: door normal w.r.t root
+        """
+        self.motion_goals.add_pre_push_door(root_link=root_link,
+                                            tip_link=tip_link,
+                                            door_object=door_object,
+                                            door_handle=door_handle,
+                                            reference_linear_velocity=reference_linear_velocity,
+                                            reference_angular_velocity=reference_angular_velocity,
+                                            weight=weight)
+
     def set_close_container_goal(self,
                                  tip_link: str,
                                  environment_link: str,

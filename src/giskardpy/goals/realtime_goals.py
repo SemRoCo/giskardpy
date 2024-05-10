@@ -23,7 +23,7 @@ class RealTimePointing(Pointing):
                  weight: float = WEIGHT_BELOW_CA,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.TrueSymbol):
+                 end_condition: cas.Expression = cas.FalseSymbol):
         initial_goal = cas.Point3((1, 0, 1), reference_frame=god_map.world.search_for_link_name('base_footprint'))
         super().__init__(tip_link=tip_link,
                          goal_point=initial_goal,

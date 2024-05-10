@@ -25,7 +25,7 @@ class BaseArmWeightScaling(Goal):
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.TrueSymbol):
+                 end_condition: cas.Expression = cas.FalseSymbol):
         self.root_link = god_map.world.search_for_link_name(root_link, None)
         self.tip_link = god_map.world.search_for_link_name(tip_link, None)
         if name is None:
@@ -82,7 +82,7 @@ class MaxManipulabilityLinWeight(Goal):
                  m_threshold: float = 0.16,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.TrueSymbol
+                 end_condition: cas.Expression = cas.FalseSymbol
                  ):
         self.root_link = god_map.world.search_for_link_name(root_link, None)
         self.tip_link = god_map.world.search_for_link_name(tip_link, None)

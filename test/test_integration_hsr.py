@@ -3,7 +3,7 @@ from typing import Optional
 
 import numpy as np
 import pytest
-from geometry_msgs.msg import PoseStamped, Point, Quaternion, PointStamped, Vector3Stamped
+from geometry_msgs.msg import PoseStamped, Point, Quaternion, PointStamped, Vector3Stamped, Vector3
 from numpy import pi
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
@@ -36,7 +36,7 @@ class HSRTestWrapper(GiskardTestWrapper):
             giskard = Giskard(world_config=WorldWithHSRConfig(),
                               collision_avoidance_config=HSRCollisionAvoidanceConfig(),
                               robot_interface_config=HSRStandaloneInterface(),
-                              behavior_tree_config=StandAloneBTConfig(debug_mode=True, publish_js=True),
+                              behavior_tree_config=StandAloneBTConfig(debug_mode=True, publish_js=True, simulation_max_hz=20),
                               qp_controller_config=QPControllerConfig())
         super().__init__(giskard)
         self.gripper_group = 'gripper'
@@ -450,3 +450,31 @@ class TestAddObject:
 
         zero_pose.set_joint_goal({'arm_flex_joint': -0.7})
         zero_pose.plan_and_execute()
+
+
+class TestVelocityLimit:
+    # test to see in rviz whether the rotation with limited velocity is oscilaating as it is doing it in mujoco closed loop
+    def test_vel(self, zero_pose):
+        goal_pose = PoseStamped()
+        goal_pose.header.frame_id = 'map'
+        goal_pose.pose.position = Point(1, 0, 0.5)
+        goal_pose.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 0, 1, 0],
+                                                                         [0, -1, 0, 0],
+                                                                         [1, 0, 0, 0],
+                                                                         [0, 0, 0, 1]]))
+        zero_pose.motion_goals.add_cartesian_pose(goal_pose=goal_pose, tip_link='hand_palm_link', root_link='map')
+        zero_pose.execute()
+
+        goal_pose = PoseStamped()
+        goal_pose.header.frame_id = 'hand_palm_link'
+        rotation_axis = Vector3Stamped()
+        rotation_axis.header.frame_id = 'hand_palm_link'
+        rotation_axis.vector = Vector3(*[0, 0, 1])
+
+        goal_pose.pose.orientation = Quaternion(
+            *quaternion_about_axis(1.7, [rotation_axis.vector.x, rotation_axis.vector.y, rotation_axis.vector.z]))
+        zero_pose.motion_goals.add_cartesian_pose(goal_pose, 'hand_palm_link', 'map')
+        zero_pose.motion_goals.add_limit_cartesian_velocity(tip_link='hand_palm_link', root_link='map',
+                                                            max_angular_velocity=0.1)
+        zero_pose.add_default_end_motion_conditions()
+        zero_pose.execute()

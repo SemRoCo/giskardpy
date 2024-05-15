@@ -9,7 +9,8 @@ from typing import Optional
 import numpy as np
 import pytest
 import rospy
-from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, PointStamped, QuaternionStamped, Pose
+from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, PointStamped, QuaternionStamped, Pose, \
+    Vector3
 from numpy import pi
 from shape_msgs.msg import SolidPrimitive
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis
@@ -162,7 +163,7 @@ class PR2TestWrapper(GiskardTestWrapper):
                               robot_interface_config=PR2StandaloneInterface(drive_joint_name=drive_joint_name),
                               collision_avoidance_config=PR2CollisionAvoidance(drive_joint_name=drive_joint_name),
                               behavior_tree_config=StandAloneBTConfig(debug_mode=True,
-                                                                      simulation_max_hz=None),
+                                                                      simulation_max_hz=30, publish_tf=True),
                               qp_controller_config=QPControllerConfig())
         super().__init__(giskard)
         self.robot = god_map.world.groups[self.robot_name]
@@ -4306,6 +4307,62 @@ class TestManipulability:
                                                root_link='torso_lift_link',
                                                tip_link='l_gripper_tool_frame')
         zero_pose.execute(add_local_minimum_reached=True)
+
+
+class TestTCMPs:
+    def test_tcmp_pouring(self, zero_pose: PR2TestWrapper):
+        #TODO: Parameters
+        angle = 1.7
+        velocity = 0.2
+
+        goal_pose = PoseStamped()
+        goal_pose.header.frame_id = 'map'
+        goal_pose.pose.orientation = Quaternion(*quaternion_from_matrix(np.array([[1, 0, 0, 0],
+                                                                                  [0, 1, 0, 0],
+                                                                                  [0, 0, 1, 0],
+                                                                                  [0, 0, 0, 1]])))
+        goal_pose.pose.position = Point(2, 0, 0.8)
+
+        goal_rot = PoseStamped()
+        goal_rot.header.frame_id = zero_pose.r_tip
+
+        rotation_axis = Vector3Stamped()
+        rotation_axis.header.frame_id = zero_pose.r_tip
+        rotation_axis.vector = Vector3(1, 0, 0)
+
+        goal_quat = QuaternionStamped()
+        goal_quat.header.frame_id = zero_pose.r_tip
+        goal_quat.quaternion = Quaternion(
+            *quaternion_about_axis(angle, [rotation_axis.vector.x, rotation_axis.vector.y, rotation_axis.vector.z]))
+        goal_rot.pose.orientation = goal_quat.quaternion
+
+        goal_quat2 = QuaternionStamped()
+        goal_quat2.header.frame_id = zero_pose.r_tip
+        goal_quat2.quaternion = Quaternion(
+            *quaternion_about_axis(-angle, [rotation_axis.vector.x, rotation_axis.vector.y, rotation_axis.vector.z]))
+
+        pose_monitor = zero_pose.monitors.add_cartesian_pose(root_link='map', tip_link=zero_pose.r_tip,
+                                                             goal_pose=goal_pose)
+        rot_monitor = zero_pose.monitors.add_cartesian_orientation(root_link='map', tip_link=zero_pose.r_tip,
+                                                                   goal_orientation=goal_quat,
+                                                                   start_condition=pose_monitor)
+        rot_monitor2 = zero_pose.monitors.add_cartesian_orientation(root_link='map', tip_link=zero_pose.r_tip,
+                                                                    goal_orientation=goal_quat2,
+                                                                    start_condition=rot_monitor)
+
+        zero_pose.motion_goals.add_cartesian_pose(goal_pose=goal_pose, tip_link=zero_pose.r_tip, root_link='map',
+                                                  end_condition=pose_monitor)
+
+        zero_pose.motion_goals.add_cartesian_pose(goal_rot, zero_pose.r_tip, 'map',
+                                                  reference_angular_velocity=velocity,
+                                                  start_condition=pose_monitor, end_condition=rot_monitor)
+        goal_rot.pose.orientation = goal_quat2.quaternion
+        zero_pose.motion_goals.add_cartesian_pose(goal_rot, zero_pose.r_tip, 'map',
+                                                  reference_angular_velocity=velocity*2,
+                                                  start_condition=rot_monitor, end_condition=rot_monitor2)
+        zero_pose.monitors.add_end_motion(rot_monitor2)
+        zero_pose.allow_all_collisions()
+        zero_pose.execute(add_local_minimum_reached=False)
 
 # kernprof -lv py.test -s test/test_integration_pr2.py
 # time: [1-9][1-9]*.[1-9]* s

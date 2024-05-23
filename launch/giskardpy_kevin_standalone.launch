@@ -1,0 +1,12 @@
+<launch>
+
+
+    <node pkg="giskardpy" type="kevin_standalone.py" name="giskard" output="screen"/>
+
+    <node pkg="giskardpy" type="interactive_marker.py" name="giskard_interactive_marker" output="screen">
+        <rosparam param="enable_self_collision">False</rosparam>
+        <rosparam param="interactive_marker_chains">
+            - [map, kevin/robot_arm_tool_link]
+        </rosparam>
+    </node>
+</launch>

@@ -1010,6 +1010,7 @@ class QPController:
     qp_solver: QPSolver
     prediction_horizon: int = None
 
+    @profile
     def __init__(self,
                  sample_period: float = 0.05,
                  prediction_horizon: int = 9,

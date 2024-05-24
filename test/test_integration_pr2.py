@@ -2158,6 +2158,27 @@ class TestCartGoals:
         zero_pose.set_cart_goal(p, zero_pose.r_tip, 'base_footprint')
         zero_pose.execute()
 
+    def test_10_cart_goals(self, zero_pose: PR2TestWrapper):
+        p1 = PoseStamped()
+        p1.header.stamp = rospy.get_rostime()
+        p1.header.frame_id = zero_pose.r_tip
+        p1.pose.position = Point(-0.2, 0, 0)
+        p1.pose.orientation = Quaternion(0, 0, 0, 1)
+        p2 = PoseStamped()
+        p2.header.stamp = rospy.get_rostime()
+        p2.header.frame_id = zero_pose.r_tip
+        p2.pose.position = Point(0.2, 0, 0)
+        p2.pose.orientation = Quaternion(0, 0, 0, 1)
+
+        for i in range(5):
+            zero_pose.allow_all_collisions()
+            zero_pose.set_cart_goal(p1, zero_pose.r_tip, 'base_footprint')
+            zero_pose.plan_and_execute()
+
+            zero_pose.allow_all_collisions()
+            zero_pose.set_cart_goal(p2, zero_pose.r_tip, 'base_footprint')
+            zero_pose.plan_and_execute()
+
     def test_cart_goal_unreachable(self, zero_pose: PR2TestWrapper):
         p = PoseStamped()
         p.header.frame_id = 'map'
@@ -4240,6 +4261,6 @@ class TestWeightScaling:
 # pytest.main(['-s', __file__ + '::TestSelfCollisionAvoidance::test_avoid_self_collision_with_l_arm'])
 # pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_avoid_collision_at_kitchen_corner'])
 # pytest.main(['-s', __file__ + '::TestWayPoints::test_waypoints2'])
-# pytest.main(['-s', __file__ + '::TestCartGoals::test_cart_goal_2eef2'])
+# pytest.main(['-s', __file__ + '::TestCartGoals::test_10_cart_goals'])
 # pytest.main(['-s', __file__ + '::TestCartGoals::test_cart_goal_2eef2'])
 # pytest.main(['-s', __file__ + '::TestWorld::test_compute_self_collision_matrix'])

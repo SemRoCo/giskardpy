@@ -1,10 +1,12 @@
+from collections import defaultdict
+from copy import deepcopy
 from typing import Any, Type
 
 import numpy as np
 import pydot
 import rospy
 from py_trees_ros.trees import BehaviourTree
-from py_trees import Chooser, common
+from py_trees import Chooser, common, Composite, Behaviour
 from py_trees import Selector, Sequence
 from giskard_msgs.msg import MoveAction
 from giskardpy.exceptions import GiskardException
@@ -175,6 +177,15 @@ def render_dot_tree(root, visibility_level=common.VisibilityLevel.DETAIL, name=N
     # graph.write_svg(filename_wo_extension + '.svg')
 
 
+time_function_names = ['__init__', 'setup', 'initialise', 'update']
+
+
+def get_original_node(node: Behaviour) -> Behaviour:
+    if hasattr(node, 'original'):
+        return node.original
+    return node
+
+
 def generate_pydot_graph(root, visibility_level):
     """
     Generate the pydot graph - this is usually the first step in
@@ -227,6 +238,7 @@ def generate_pydot_graph(root, visibility_level):
                            fontcolor=node_font_colour, fontname=fontname)
     graph.add_node(node_root)
     names = [root.name]
+    add_children_stats_to_parent(root)
 
     def add_edges(root, root_dot_name, visibility_level):
         if visibility_level < root.blackbox_level:
@@ -238,42 +250,40 @@ def generate_pydot_graph(root, visibility_level):
                 if hasattr(c, 'original'):
                     proposed_dot_name += f'\n{type(c).__name__}'
                 color = 'black'
-                if hasattr(c, 'original'):
-                    original_c = c.original
-                else:
-                    original_c = c
-                if isinstance(original_c, GiskardBehavior) and not isinstance(original_c, AsyncBehavior):
-                    function_names = ['__init__', 'setup', 'initialise', 'update']
-                    function_name_padding = 20
-                    entry_name_padding = 8
-                    number_padding = function_name_padding - entry_name_padding
-                    if hasattr(original_c, '__times'):
-                        time_dict = original_c.__times
-                    else:
-                        time_dict = {}
-                    for function_name in function_names:
-                        if function_name in time_dict:
-                            times = time_dict[function_name]
-                            average_time = np.average(times)
-                            std_time = np.std(times)
-                            total_time = np.sum(times)
-                            if total_time > 1:
-                                color = 'red'
-                            proposed_dot_name += f'\n{function_name.ljust(function_name_padding, "-")}' \
-                                                 f'\n{"  #calls".ljust(entry_name_padding)}{f"={len(times)}".ljust(number_padding)}' \
-                                                 f'\n{"  avg".ljust(entry_name_padding)}{f"={average_time:.7f}".ljust(number_padding)}' \
-                                                 f'\n{"  std".ljust(entry_name_padding)}{f"={std_time:.7f}".ljust(number_padding)}' \
-                                                 f'\n{"  max".ljust(entry_name_padding)}{f"={max(times):.7f}".ljust(number_padding)}' \
-                                                 f'\n{"  sum".ljust(entry_name_padding)}{f"={total_time:.7f}".ljust(number_padding)}'
-                        else:
-                            proposed_dot_name += f'\n{function_name.ljust(function_name_padding, "-")}'
+                original_c = get_original_node(c)
 
+                # %% add run time stats to proposed dot name
+                function_name_padding = 20
+                entry_name_padding = 8
+                number_padding = function_name_padding - entry_name_padding
+                if hasattr(original_c, '__times'):
+                    time_dict = original_c.__times
+                else:
+                    time_dict = {}
+                for function_name in time_function_names:
+                    if function_name in time_dict:
+                        times = time_dict[function_name]
+                        average_time = np.average(times)
+                        std_time = np.std(times)
+                        total_time = np.sum(times)
+                        if total_time > 1:
+                            color = 'red'
+                        proposed_dot_name += f'\n{function_name.ljust(function_name_padding, "-")}' \
+                                             f'\n{"  #calls".ljust(entry_name_padding)}{f"={len(times)}".ljust(number_padding)}' \
+                                             f'\n{"  avg".ljust(entry_name_padding)}{f"={average_time:.7f}".ljust(number_padding)}' \
+                                             f'\n{"  std".ljust(entry_name_padding)}{f"={std_time:.7f}".ljust(number_padding)}' \
+                                             f'\n{"  max".ljust(entry_name_padding)}{f"={max(times):.7f}".ljust(number_padding)}' \
+                                             f'\n{"  sum".ljust(entry_name_padding)}{f"={total_time:.7f}".ljust(number_padding)}'
+                    else:
+                        proposed_dot_name += f'\n{function_name.ljust(function_name_padding, "-")}'
                 while proposed_dot_name in names:
                     proposed_dot_name = proposed_dot_name + "*"
+
+                proposed_dot_name = f'"{proposed_dot_name}"'
                 names.append(proposed_dot_name)
-                node = pydot.Node(proposed_dot_name, shape=node_shape, style="filled", fillcolor=node_colour,
-                                  fontsize=fontsize, fontcolor=node_font_colour, color=color, fontname=fontname)
-                graph.add_node(node)
+                original_c = pydot.Node(proposed_dot_name, shape=node_shape, style="filled", fillcolor=node_colour,
+                                        fontsize=fontsize, fontcolor=node_font_colour, color=color, fontname=fontname)
+                graph.add_node(original_c)
                 edge = pydot.Edge(root_dot_name, proposed_dot_name)
                 graph.add_edge(edge)
                 if (hasattr(c, 'children') and c.children != []) or (hasattr(c, '_children') and c._children != []):
@@ -281,3 +291,32 @@ def generate_pydot_graph(root, visibility_level):
 
     add_edges(root, root.name, visibility_level)
     return graph
+
+
+def add_children_stats_to_parent(parent: Composite) -> None:
+    if ((hasattr(parent, 'children') and parent.children != [])
+            or (hasattr(parent, '_children') and parent._children != [])):
+        children = parent.children
+        names2 = [c.name for c in children]
+        for name, child in zip(names2, children):
+            original_child = get_original_node(child)
+            if isinstance(original_child, Composite):
+                add_children_stats_to_parent(original_child)
+
+            if not hasattr(parent, '__times'):
+                setattr(parent, '__times', defaultdict(list))
+
+            if hasattr(original_child, '__times'):
+                time_dict = original_child.__times
+            else:
+                time_dict = {}
+            for function_name in time_function_names:
+                if function_name in time_dict:
+                    if function_name not in parent.__times:
+                        parent.__times = deepcopy(time_dict)
+                    else:
+                        for i, (v1, v2) in enumerate(zip(parent.__times[function_name], time_dict[function_name])):
+                            if i > len(parent.__times[function_name]):
+                                parent.__times[function_name].append(v2)
+                            else:
+                                parent.__times[function_name][i] = v1 + v2

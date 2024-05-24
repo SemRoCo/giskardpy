@@ -3,6 +3,7 @@ from typing import List
 import numpy as np
 import giskardpy.casadi_wrapper as cas
 import giskardpy.utils.math as gm
+from giskardpy.utils.decorators import memoize
 
 
 def shifted_velocity_profile(vel_profile, acc_profile, distance, dt):
@@ -84,6 +85,8 @@ def implicit_vel_profile(acc_limit: float, jerk_limit: float, dt: float, ph: int
     return list(reversed(vel_profile))
 
 
+@memoize
+@profile
 def b_profile(current_pos, current_vel, current_acc,
               pos_limits, vel_limits, acc_limits, jerk_limits, dt, ph, eps=0.00001):
     vel_limit = vel_limits[1]

@@ -41,6 +41,8 @@ from giskardpy.utils.math import compare_points
 from utils_for_tests import compare_poses, publish_marker_vector, \
     GiskardTestWrapper, pr2_urdf
 from giskardpy.goals.manipulability_goals import MaxManipulability
+from giskardpy.goals.feature_functions import DistanceFeatureFunction, PointingFeatureFunction, \
+    PerpendicularFeatureFunction, HeightFeatureFunction
 
 # scopes = ['module', 'class', 'function']
 pocky_pose = {'r_elbow_flex_joint': -1.29610152504,
@@ -4311,7 +4313,7 @@ class TestManipulability:
 
 class TestTCMPs:
     def test_tcmp_pouring(self, zero_pose: PR2TestWrapper):
-        #TODO: Parameters
+        # TODO: Parameters
         angle = 1.7
         velocity = 0.2
 
@@ -4358,9 +4360,189 @@ class TestTCMPs:
                                                   start_condition=pose_monitor, end_condition=rot_monitor)
         goal_rot.pose.orientation = goal_quat2.quaternion
         zero_pose.motion_goals.add_cartesian_pose(goal_rot, zero_pose.r_tip, 'map',
-                                                  reference_angular_velocity=velocity*2,
+                                                  reference_angular_velocity=velocity * 2,
                                                   start_condition=rot_monitor, end_condition=rot_monitor2)
         zero_pose.monitors.add_end_motion(rot_monitor2)
+        zero_pose.allow_all_collisions()
+        zero_pose.execute(add_local_minimum_reached=False)
+
+    def test_tcmp_goal(self, zero_pose: PR2TestWrapper):
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class='TCMPGoal',
+                                               name='tcmpTest',
+                                               root_link='map',
+                                               tip_link=zero_pose.r_tip)
+        zero_pose.execute()
+
+    def test_feature_perpendicular(self, zero_pose: PR2TestWrapper):
+        world_feature = Vector3Stamped()
+        world_feature.header.frame_id = 'map'
+        world_feature.vector.x = 1
+
+        robot_feature = Vector3Stamped()
+        robot_feature.header.frame_id = zero_pose.r_tip
+        robot_feature.vector.x = 1
+
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class='PerpendicularFeatureFunction',
+                                               root_link='map',
+                                               tip_link=zero_pose.r_tip,
+                                               world_feature=world_feature,
+                                               robot_feature=robot_feature)
+
+        zero_pose.add_default_end_motion_conditions()
+        zero_pose.execute()
+
+    def test_feature_height(self, zero_pose: PR2TestWrapper):
+        world_feature = PointStamped()
+        world_feature.header.frame_id = 'map'
+
+        robot_feature = PointStamped()
+        robot_feature.header.frame_id = zero_pose.r_tip
+
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class='HeightFeatureFunction',
+                                               root_link='map',
+                                               tip_link=zero_pose.r_tip,
+                                               world_feature=world_feature,
+                                               robot_feature=robot_feature,
+                                               lower_limit=1,
+                                               upper_limit=2)
+
+        zero_pose.add_default_end_motion_conditions()
+        zero_pose.execute()
+
+    def test_feature_distance(self, zero_pose: PR2TestWrapper):
+        world_feature = PointStamped()
+        world_feature.header.frame_id = 'map'
+
+        robot_feature = PointStamped()
+        robot_feature.header.frame_id = zero_pose.r_tip
+
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class='DistanceFeatureFunction',
+                                               root_link='map',
+                                               tip_link=zero_pose.r_tip,
+                                               world_feature=world_feature,
+                                               robot_feature=robot_feature,
+                                               lower_limit=2,
+                                               upper_limit=2,
+                                               max_vel=0.3
+                                               )
+
+        zero_pose.add_default_end_motion_conditions()
+        zero_pose.execute()
+
+    def test_feature_pointing(self, zero_pose: PR2TestWrapper):
+        world_feature = PointStamped()
+        world_feature.header.frame_id = 'map'
+
+        robot_feature = Vector3Stamped()
+        robot_feature.header.frame_id = zero_pose.r_tip
+        robot_feature.vector.x = 1
+
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class='PointingFeatureFunction',
+                                               root_link='map',
+                                               tip_link=zero_pose.r_tip,
+                                               world_feature=world_feature,
+                                               robot_feature=robot_feature,
+                                               )
+
+        zero_pose.add_default_end_motion_conditions()
+        zero_pose.execute()
+
+    def test_tcmp_mixing(self, zero_pose: PR2TestWrapper):
+        # -------------- world definition ---------------
+        spoon_pose = PoseStamped()
+        spoon_pose.header.frame_id = zero_pose.r_tip
+        spoon_pose.pose.orientation.w = 1
+        spoon_pose.pose.position.z = -0.1
+        zero_pose.add_box(name='spoon', size=(0.03, 0.03, 0.20), pose=spoon_pose, parent_link=zero_pose.r_tip)
+        pot_pose = PoseStamped()
+        pot_pose.header.frame_id = 'map'
+        pot_pose.pose.orientation.w = 1
+        pot_pose.pose.position.x = 2
+        pot_pose.pose.position.y = 0
+        pot_pose.pose.position.z = 0.8
+        zero_pose.add_box(name='pot', size=(0.2, 0.2, 0.1), pose=pot_pose, parent_link='map')
+
+        # --------------------------------- object feature definition -------------------------------------------
+        spoon_tip_point = PointStamped()
+        spoon_tip_point.header.frame_id = 'spoon'
+        spoon_tip_point.point.z = -0.1
+        spoon_tool_vector = Vector3Stamped()
+        spoon_tool_vector.header.frame_id = 'spoon'
+        spoon_tool_vector.vector.z = -1
+
+        pot_center_point = PointStamped()
+        pot_center_point.header.frame_id = 'pot'
+        pot_vector_x = Vector3Stamped()
+        pot_vector_x.header.frame_id = 'pot'
+        pot_vector_x.vector.x = 1
+        pot_vector_y = Vector3Stamped()
+        pot_vector_y.header.frame_id = 'pot'
+        pot_vector_y.vector.y = 1
+
+        # ------------------------------- motion code -------------------------------------------------------------
+        monitor = zero_pose.monitors.add_pointing_at(goal_point=pot_center_point, tip_link='spoon',
+                                                     pointing_axis=spoon_tool_vector, root_link='map')
+        time_monitor = zero_pose.monitors.add_time_above(20)
+
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class=HeightFeatureFunction.__name__,
+                                               robot_feature=spoon_tip_point,
+                                               world_feature=pot_center_point,
+                                               lower_limit=0.1,
+                                               upper_limit=0.1,
+                                               tip_link='spoon',
+                                               root_link='map',
+                                               end_condition=monitor)
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class=DistanceFeatureFunction.__name__,
+                                               robot_feature=spoon_tip_point,
+                                               world_feature=pot_center_point,
+                                               lower_limit=0.0,
+                                               upper_limit=0.0,
+                                               tip_link='spoon',
+                                               root_link='map',
+                                               max_vel=0.1,
+                                               end_condition=monitor)
+        # zero_pose.motion_goals.add_motion_goal(motion_goal_class=PointingFeatureFunction.__name__,
+        #                                        robot_feature=spoon_tool_vector,
+        #                                        world_feature=pot_center_point,
+        #                                        tip_link='spoon',
+        #                                        root_link='map')
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class=PerpendicularFeatureFunction.__name__,
+                                               robot_feature=spoon_tool_vector,
+                                               world_feature=pot_vector_x,
+                                               tip_link='spoon',
+                                               root_link='map',
+                                               end_condition=monitor)
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class=PerpendicularFeatureFunction.__name__,
+                                               robot_feature=spoon_tool_vector,
+                                               world_feature=pot_vector_y,
+                                               tip_link='spoon',
+                                               root_link='map',
+                                               end_condition=monitor)
+
+        # zero_pose.allow_all_collisions()
+        # zero_pose.execute()
+
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class='TCMPGoal',
+                                               name='tcmpTest',
+                                               root_link='map',
+                                               tip_link='spoon',
+                                               start_condition=monitor,
+                                               end_condition=time_monitor)
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class=PerpendicularFeatureFunction.__name__,
+                                               robot_feature=spoon_tool_vector,
+                                               world_feature=pot_vector_x,
+                                               tip_link='spoon',
+                                               root_link='map',
+                                               start_condition=monitor,
+                                               end_condition=time_monitor)
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class=PerpendicularFeatureFunction.__name__,
+                                               robot_feature=spoon_tool_vector,
+                                               world_feature=pot_vector_y,
+                                               tip_link='spoon',
+                                               root_link='map',
+                                               start_condition=monitor,
+                                               end_condition=time_monitor)
+        zero_pose.monitors.add_end_motion(time_monitor)
         zero_pose.allow_all_collisions()
         zero_pose.execute(add_local_minimum_reached=False)
 

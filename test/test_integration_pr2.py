@@ -4509,27 +4509,7 @@ class TestTCMPs:
                                                world_feature=pot_vector_z,
                                                tip_link='spoon',
                                                root_link='map')
-        # zero_pose.motion_goals.add_motion_goal(motion_goal_class=PointingFeatureFunction.__name__,
-        #                                        robot_feature=spoon_tool_vector,
-        #                                        world_feature=pot_center_point,
-        #                                        tip_link='spoon',
-        #                                        root_link='map')
-        # zero_pose.motion_goals.add_motion_goal(motion_goal_class=PerpendicularFeatureFunction.__name__,
-        #                                        robot_feature=spoon_tool_vector,
-        #                                        world_feature=pot_vector_x,
-        #                                        tip_link='spoon',
-        #                                        root_link='map',
-        #                                        end_condition=monitor)
-        # zero_pose.motion_goals.add_motion_goal(motion_goal_class=PerpendicularFeatureFunction.__name__,
-        #                                        robot_feature=spoon_tool_vector,
-        #                                        world_feature=pot_vector_y,
-        #                                        tip_link='spoon',
-        #                                        root_link='map',
-        #                                        end_condition=monitor)
-
-        # zero_pose.allow_all_collisions()
-        # zero_pose.execute()
-
+        # --------------------- second phase ----------------------------------------------------------
         zero_pose.motion_goals.add_motion_goal(motion_goal_class='TCMPGoal',
                                                name='tcmpTest',
                                                root_link='map',

@@ -42,7 +42,7 @@ from utils_for_tests import compare_poses, publish_marker_vector, \
     GiskardTestWrapper, pr2_urdf
 from giskardpy.goals.manipulability_goals import MaxManipulability
 from giskardpy.goals.feature_functions import DistanceFeatureFunction, PointingFeatureFunction, \
-    PerpendicularFeatureFunction, HeightFeatureFunction
+    PerpendicularFeatureFunction, HeightFeatureFunction, AlignFeatureFunction
 
 # scopes = ['module', 'class', 'function']
 pocky_pose = {'r_elbow_flex_joint': -1.29610152504,
@@ -4478,6 +4478,9 @@ class TestTCMPs:
         pot_vector_y = Vector3Stamped()
         pot_vector_y.header.frame_id = 'pot'
         pot_vector_y.vector.y = 1
+        pot_vector_z = Vector3Stamped()
+        pot_vector_z.header.frame_id = 'pot'
+        pot_vector_z.vector.z = -1
 
         # ------------------------------- motion code -------------------------------------------------------------
         monitor = zero_pose.monitors.add_pointing_at(goal_point=pot_center_point, tip_link='spoon',
@@ -4499,25 +4502,30 @@ class TestTCMPs:
                                                upper_limit=0.0,
                                                tip_link='spoon',
                                                root_link='map',
-                                               max_vel=0.1,
+                                               max_vel=0.3,
                                                end_condition=monitor)
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class=AlignFeatureFunction.__name__,
+                                               robot_feature=spoon_tool_vector,
+                                               world_feature=pot_vector_z,
+                                               tip_link='spoon',
+                                               root_link='map')
         # zero_pose.motion_goals.add_motion_goal(motion_goal_class=PointingFeatureFunction.__name__,
         #                                        robot_feature=spoon_tool_vector,
         #                                        world_feature=pot_center_point,
         #                                        tip_link='spoon',
         #                                        root_link='map')
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class=PerpendicularFeatureFunction.__name__,
-                                               robot_feature=spoon_tool_vector,
-                                               world_feature=pot_vector_x,
-                                               tip_link='spoon',
-                                               root_link='map',
-                                               end_condition=monitor)
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class=PerpendicularFeatureFunction.__name__,
-                                               robot_feature=spoon_tool_vector,
-                                               world_feature=pot_vector_y,
-                                               tip_link='spoon',
-                                               root_link='map',
-                                               end_condition=monitor)
+        # zero_pose.motion_goals.add_motion_goal(motion_goal_class=PerpendicularFeatureFunction.__name__,
+        #                                        robot_feature=spoon_tool_vector,
+        #                                        world_feature=pot_vector_x,
+        #                                        tip_link='spoon',
+        #                                        root_link='map',
+        #                                        end_condition=monitor)
+        # zero_pose.motion_goals.add_motion_goal(motion_goal_class=PerpendicularFeatureFunction.__name__,
+        #                                        robot_feature=spoon_tool_vector,
+        #                                        world_feature=pot_vector_y,
+        #                                        tip_link='spoon',
+        #                                        root_link='map',
+        #                                        end_condition=monitor)
 
         # zero_pose.allow_all_collisions()
         # zero_pose.execute()
@@ -4528,20 +4536,11 @@ class TestTCMPs:
                                                tip_link='spoon',
                                                start_condition=monitor,
                                                end_condition=time_monitor)
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class=PerpendicularFeatureFunction.__name__,
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class=AlignFeatureFunction.__name__,
                                                robot_feature=spoon_tool_vector,
-                                               world_feature=pot_vector_x,
+                                               world_feature=pot_vector_z,
                                                tip_link='spoon',
-                                               root_link='map',
-                                               start_condition=monitor,
-                                               end_condition=time_monitor)
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class=PerpendicularFeatureFunction.__name__,
-                                               robot_feature=spoon_tool_vector,
-                                               world_feature=pot_vector_y,
-                                               tip_link='spoon',
-                                               root_link='map',
-                                               start_condition=monitor,
-                                               end_condition=time_monitor)
+                                               root_link='map')
         zero_pose.monitors.add_end_motion(time_monitor)
         zero_pose.allow_all_collisions()
         zero_pose.execute(add_local_minimum_reached=False)

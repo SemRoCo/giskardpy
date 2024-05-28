@@ -43,12 +43,12 @@ class TCMPGoal(Goal):
         critical_task = self.create_and_add_task(task_name='critial task')
 
         def select_movement_function(function_description: str, params: Dict[str, float] = None):
-            return cas.sin(symbol_manager.get_symbol(f'god_map.time'))
+            return cas.sin(symbol_manager.get_symbol(f'god_map.time') * 3) * 0.05
 
         function = select_movement_function(function_description=movement_function)
         root_P_tip = god_map.world.compose_fk_expression(self.root_link, self.tip_link).to_position()
         critical_task.add_equality_constraint_vector(reference_velocities=[0.3] * 3,
-                                                     equality_bounds=(cas.Vector3([2, function, 0.8]) - root_P_tip)[:3],
+                                                     equality_bounds=(cas.Vector3([2, function, 0.9]) - root_P_tip)[:3],
                                                      weights=[WEIGHT_BELOW_CA] * 3,
                                                      task_expression=root_P_tip[:3],
                                                      names=['sdf', 'gdf', 'hgj'])

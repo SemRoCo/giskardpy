@@ -43,7 +43,7 @@ from utils_for_tests import compare_poses, publish_marker_vector, \
 from giskardpy.goals.manipulability_goals import MaxManipulability
 from giskardpy.goals.feature_functions import DistanceFeatureFunction, PointingFeatureFunction, \
     PerpendicularFeatureFunction, HeightFeatureFunction, AlignFeatureFunction
-from giskardpy.monitors.feature_monitors import HeightFeature
+from giskardpy.monitors.feature_monitors import HeightFeatureMonitor
 
 # scopes = ['module', 'class', 'function']
 pocky_pose = {'r_elbow_flex_joint': -1.29610152504,
@@ -4392,6 +4392,26 @@ class TestTCMPs:
         zero_pose.add_default_end_motion_conditions()
         zero_pose.execute()
 
+    def test_feature_angle(self, zero_pose: PR2TestWrapper):
+        world_feature = Vector3Stamped()
+        world_feature.header.frame_id = 'map'
+        world_feature.vector.z = 1
+
+        robot_feature = Vector3Stamped()
+        robot_feature.header.frame_id = zero_pose.r_tip
+        robot_feature.vector.z = 1
+
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class='AngleFeatureFunction',
+                                               root_link='map',
+                                               tip_link=zero_pose.r_tip,
+                                               world_feature=world_feature,
+                                               robot_feature=robot_feature,
+                                               lower_angle=0.6,
+                                               upper_angle=0.9)
+
+        zero_pose.add_default_end_motion_conditions()
+        zero_pose.execute()
+
     def test_feature_height(self, zero_pose: PR2TestWrapper):
         world_feature = PointStamped()
         world_feature.header.frame_id = 'map'
@@ -4486,8 +4506,8 @@ class TestTCMPs:
         # ------------------------------- motion code -------------------------------------------------------------
         monitor = zero_pose.monitors.add_pointing_at(goal_point=pot_center_point, tip_link='spoon',
                                                      pointing_axis=spoon_tool_vector, root_link='map')
-        time_monitor = zero_pose.monitors.add_time_above(20)
-        monitor2 = zero_pose.monitors.add_monitor(monitor_class=HeightFeature.__name__,
+        time_monitor = zero_pose.monitors.add_time_above(10, start_condition=monitor)
+        monitor2 = zero_pose.monitors.add_monitor(monitor_class=HeightFeatureMonitor.__name__,
                                                   robot_feature=spoon_tip_point,
                                                   world_feature=pot_center_point,
                                                   lower_limit=0.09,

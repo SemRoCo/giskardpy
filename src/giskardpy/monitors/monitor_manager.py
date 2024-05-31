@@ -12,7 +12,7 @@ from giskardpy.casadi_wrapper import CompiledFunction
 from giskardpy.data_types import TaskState
 from giskardpy.exceptions import GiskardException, MonitorInitalizationException, UnknownMonitorException
 from giskardpy.god_map import god_map
-from giskardpy.monitors.monitors import ExpressionMonitor, Monitor
+from giskardpy.monitors.monitors import ExpressionMonitor, Monitor, EndMotion
 from giskardpy.monitors.payload_monitors import PayloadMonitor, CancelMotion
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils import logging
@@ -337,3 +337,15 @@ class MonitorManager:
                 if not isinstance(e, GiskardException):
                     raise MonitorInitalizationException(error_msg)
                 raise e
+
+    def has_end_motion_monitor(self) -> bool:
+        for m in self.monitors:
+            if isinstance(m, EndMotion):
+                return True
+        return False
+
+    def has_cancel_motion_monitor(self) -> bool:
+        for m in self.monitors:
+            if isinstance(m, CancelMotion):
+                return True
+        return False

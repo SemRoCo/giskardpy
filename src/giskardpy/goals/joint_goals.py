@@ -49,9 +49,10 @@ class SetSeedConfiguration(NonMotionGoal):
 
 
 class SetOdometry(NonMotionGoal):
+    odom_joints = (OmniDrive, DiffDrive, OmniDrivePR22)
     def __init__(self,
-                 group_name: str,
                  base_pose: PoseStamped,
+                 group_name: Optional[str] = None,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
@@ -62,10 +63,19 @@ class SetOdometry(NonMotionGoal):
         super().__init__(name)
         if god_map.is_goal_msg_type_execute() and not god_map.is_standalone():
             raise GoalInitalizationException(f'It is not allowed to combine {str(self)} with plan and execute.')
-        brumbrum_joint_name = god_map.world.groups[group_name].root_link.child_joint_names[0]
-        brumbrum_joint = god_map.world.joints[brumbrum_joint_name]
-        if not isinstance(brumbrum_joint, (OmniDrive, DiffDrive, OmniDrivePR22)):
-            raise GoalInitalizationException(f'Group {group_name} has no odometry joint.')
+        if self.group_name is None:
+            drive_joints = god_map.world.search_for_joint_of_type(self.odom_joints)
+            if len(drive_joints) == 0:
+                raise GoalInitalizationException('No drive joints in world')
+            elif len(drive_joints) == 1:
+                brumbrum_joint = drive_joints[0]
+            else:
+                raise GoalInitalizationException('Multiple drive joint found in world, please set \'group_name\'')
+        else:
+            brumbrum_joint_name = god_map.world.groups[group_name].root_link.child_joint_names[0]
+            brumbrum_joint = god_map.world.joints[brumbrum_joint_name]
+            if not isinstance(brumbrum_joint, self.odom_joints):
+                raise GoalInitalizationException(f'Group {self.group_name} has no odometry joint.')
         base_pose = transform_msg(brumbrum_joint.parent_link_name, base_pose).pose
         god_map.world.state[brumbrum_joint.x.name].position = base_pose.position.x
         god_map.world.state[brumbrum_joint.y.name].position = base_pose.position.y

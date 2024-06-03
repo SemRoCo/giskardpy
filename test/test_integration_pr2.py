@@ -1098,6 +1098,22 @@ class TestConstraints:
         zero_pose.set_joint_goal(zero_pose.default_pose)
         zero_pose.plan()
 
+    def test_SetOdometry(self, zero_pose: PR2TestWrapper):
+        pose = PoseStamped()
+        pose.header.frame_id = 'map'
+        pose.pose.position.x = 1
+        pose.pose.orientation.w = 1
+        zero_pose.set_seed_odometry(base_pose=pose)
+        zero_pose.set_joint_goal(zero_pose.better_pose)
+        zero_pose.plan()
+        pose = PoseStamped()
+        pose.header.frame_id = 'map'
+        pose.pose.position.x = 1
+        pose.pose.orientation.w = 1
+        zero_pose.set_seed_odometry(base_pose=pose, group_name=zero_pose.robot_name)
+        zero_pose.set_joint_goal(zero_pose.better_pose)
+        zero_pose.plan()
+
     def test_drive_into_apartment(self, apartment_setup: PR2TestWrapper):
         base_pose = PoseStamped()
         base_pose.header.frame_id = 'base_footprint'

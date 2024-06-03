@@ -252,10 +252,8 @@ class GiskardTestWrapper(OldGiskardWrapper):
         return isinstance(joint, (OmniDrive, DiffDrive))
 
     def set_seed_odometry(self, base_pose, group_name: Optional[str] = None):
-        if group_name is None:
-            group_name = self.robot_name
-        self.motion_goals.set_seed_odometry(group_name=group_name,
-                                            base_pose=base_pose)
+        self.motion_goals.set_seed_odometry(base_pose=base_pose,
+                                            group_name=group_name)
 
     def set_localization(self, map_T_odom: PoseStamped):
         if self.set_localization_srv is not None:

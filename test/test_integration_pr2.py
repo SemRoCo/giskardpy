@@ -920,7 +920,7 @@ class TestMonitors:
                                                   hold_condition=f'not {alternator}',
                                                   end_condition=base_monitor)
 
-        local_min = zero_pose.monitors.add_local_minimum_reached(stay_true=False)
+        local_min = zero_pose.monitors.add_local_minimum_reached(end_condition='')
         end = zero_pose.monitors.add_end_motion(start_condition=' and '.join([local_min,
                                                                               sleep2,
                                                                               right_monitor,
@@ -973,7 +973,7 @@ class TestMonitors:
         stayed_put = zero_pose.monitors.add_cartesian_pose(goal_pose=current_base,
                                                            tip_link='base_footprint',
                                                            root_link='map',
-                                                           stay_true=False,
+                                                           end_condition='',
                                                            name='goal reached')
 
         zero_pose.motion_goals.add_cartesian_pose(goal_pose=base_goal,

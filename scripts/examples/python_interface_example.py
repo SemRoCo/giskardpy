@@ -97,10 +97,9 @@ giskard_wrapper.motion_goals.add_cartesian_pose(root_link='map',
 
 # %% Define when the motion should end.
 # Usually you'd use the local minimum reached monitor for this.
-# Most monitors also have a stay_true parameter (when it makes sense), with reasonable default values.
 # In this case, we don't want the local minimum reached monitor to stay True, because it might get triggered during
 # the sleeps and therefore set it to False.
-local_min = giskard_wrapper.monitors.add_local_minimum_reached(stay_true=False)
+local_min = giskard_wrapper.monitors.add_local_minimum_reached(end_condition='')
 
 # Giskard will only end the motion generation and return Success, if an end monitor becomes True.
 # We do this by defining one that gets triggered, when a local minimum was reached, sleep2 is done and the motion goals

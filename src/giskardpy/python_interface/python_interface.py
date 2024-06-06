@@ -27,7 +27,8 @@ from giskardpy.goals.pointing import Pointing
 from giskardpy.goals.pre_push_door import PrePushDoor
 from giskardpy.goals.set_prediction_horizon import SetPredictionHorizon
 from giskardpy.model.utils import make_world_body_box
-from giskardpy.motion_graph.monitors.cartesian_monitors import PoseReached, PositionReached, OrientationReached, PointingAt, \
+from giskardpy.motion_graph.monitors.cartesian_monitors import PoseReached, PositionReached, OrientationReached, \
+    PointingAt, \
     VectorsAligned, DistanceToLine
 from giskardpy.motion_graph.monitors.joint_monitors import JointGoalReached
 from giskardpy.motion_graph.monitors.monitors import LocalMinimumReached, TimeAbove, Alternator, CancelMotion, EndMotion
@@ -1147,6 +1148,8 @@ class MonitorWrapper:
         :param name: a unique name for the goal, will use class name by default
         :param start_condition: a logical expression to define the start condition for this monitor. e.g.
                                     not 'monitor1' and ('monitor2' or 'monitor3')
+        :param hold_condition: a logical expression to define the hold condition for this monitor.
+        :param end_condition: a logical expression to define the end condition for this monitor.
         :param kwargs: kwargs for __init__ function of motion_goal_class
         :return: the name of the monitor with added quotes to be used in logical expressions for conditions.
         """
@@ -1188,13 +1191,17 @@ class MonitorWrapper:
     def add_time_above(self,
                        threshold: float,
                        name: Optional[str] = None,
-                       start_condition: str = ''):
+                       start_condition: str = '',
+                       hold_condition: str = '',
+                       end_condition: Optional[str] = None):
         """
         True if the length of the trajectory is above threshold
         """
         return self.add_monitor(monitor_class=TimeAbove.__name__,
                                 name=name,
                                 start_condition=start_condition,
+                                hold_condition=hold_condition,
+                                end_condition=end_condition,
                                 threshold=threshold)
 
     def add_joint_position(self,
@@ -1226,7 +1233,8 @@ class MonitorWrapper:
                            absolute: bool = False,
                            name: Optional[str] = None,
                            start_condition: str = '',
-                           stay_true: bool = True):
+                           hold_condition: str = '',
+                           end_condition: Optional[str] = None):
         """
         True if tip_link is closer than the thresholds to goal_pose.
         """
@@ -1239,9 +1247,10 @@ class MonitorWrapper:
                                 tip_group=tip_group,
                                 absolute=absolute,
                                 start_condition=start_condition,
+                                hold_condition=hold_condition,
+                                end_condition=end_condition,
                                 position_threshold=position_threshold,
-                                orientation_threshold=orientation_threshold,
-                                stay_true=stay_true)
+                                orientation_threshold=orientation_threshold)
 
     def add_cartesian_position(self,
                                root_link: str,
@@ -1253,7 +1262,8 @@ class MonitorWrapper:
                                absolute: bool = False,
                                name: Optional[str] = None,
                                start_condition: str = '',
-                               stay_true: bool = True) -> str:
+                               hold_condition: str = '',
+                               end_condition: Optional[str] = None) -> str:
         """
         True if tip_link is closer than threshold to goal_point.
         """
@@ -1264,10 +1274,11 @@ class MonitorWrapper:
                                 goal_point=goal_point,
                                 root_group=root_group,
                                 start_condition=start_condition,
+                                hold_condition=hold_condition,
+                                end_condition=end_condition,
                                 absolute=absolute,
                                 tip_group=tip_group,
-                                threshold=threshold,
-                                stay_true=stay_true)
+                                threshold=threshold)
 
     def add_distance_to_line(self,
                              root_link: str,
@@ -1278,8 +1289,9 @@ class MonitorWrapper:
                              name: Optional[str] = None,
                              root_group: Optional[str] = None,
                              tip_group: Optional[str] = None,
-                             stay_true: bool = True,
                              start_condition: str = '',
+                             hold_condition: str = '',
+                             end_condition: Optional[str] = None,
                              threshold: float = 0.01):
         """
         True if tip_link is closer than threshold to the line defined by center_point, line_axis and line_length.
@@ -1292,8 +1304,9 @@ class MonitorWrapper:
                                 root_link=root_link,
                                 tip_link=tip_link,
                                 start_condition=start_condition,
+                                hold_condition=hold_condition,
+                                end_condition=end_condition,
                                 root_group=root_group,
-                                stay_true=stay_true,
                                 tip_group=tip_group,
                                 threshold=threshold)
 
@@ -1307,7 +1320,8 @@ class MonitorWrapper:
                                   absolute: bool = False,
                                   name: Optional[str] = None,
                                   start_condition: str = '',
-                                  stay_true: bool = True):
+                                  hold_condition: str = '',
+                                  end_condition: Optional[str] = None):
         """
         True if tip_link is closer than threshold to goal_orientation
         """
@@ -1320,8 +1334,9 @@ class MonitorWrapper:
                                 tip_group=tip_group,
                                 absolute=absolute,
                                 start_condition=start_condition,
-                                threshold=threshold,
-                                stay_true=stay_true)
+                                hold_condition=hold_condition,
+                                end_condition=end_condition,
+                                threshold=threshold)
 
     def add_pointing_at(self,
                         goal_point: PointStamped,
@@ -1331,6 +1346,8 @@ class MonitorWrapper:
                         name: Optional[str] = None,
                         tip_group: Optional[str] = None,
                         start_condition: str = '',
+                        hold_condition: str = '',
+                        end_condition: Optional[str] = None,
                         root_group: Optional[str] = None,
                         threshold: float = 0.01) -> str:
         """
@@ -1343,6 +1360,8 @@ class MonitorWrapper:
                                 root_link=root_link,
                                 tip_group=tip_group,
                                 start_condition=start_condition,
+                                hold_condition=hold_condition,
+                                end_condition=end_condition,
                                 root_group=root_group,
                                 pointing_axis=pointing_axis,
                                 threshold=threshold)
@@ -1354,6 +1373,8 @@ class MonitorWrapper:
                             tip_normal: Vector3Stamped,
                             name: Optional[str] = None,
                             start_condition: str = '',
+                            hold_condition: str = '',
+                            end_condition: Optional[str] = None,
                             root_group: Optional[str] = None,
                             tip_group: Optional[str] = None,
                             threshold: float = 0.01) -> str:
@@ -1367,6 +1388,8 @@ class MonitorWrapper:
                                 goal_normal=goal_normal,
                                 tip_normal=tip_normal,
                                 start_condition=start_condition,
+                                hold_condition=hold_condition,
+                                end_condition=end_condition,
                                 root_group=root_group,
                                 tip_group=tip_group,
                                 threshold=threshold)
@@ -1410,7 +1433,9 @@ class MonitorWrapper:
         return self.add_monitor(name=None,
                                 monitor_class=SetMaxTrajectoryLength.__name__,
                                 new_length=max_trajectory_length,
-                                start_condition='')
+                                start_condition='',
+                                hold_condition='',
+                                end_condition='')
 
     def add_print(self,
                   message: str,
@@ -1439,6 +1464,8 @@ class MonitorWrapper:
 
     def add_alternator(self,
                        start_condition: str = '',
+                       hold_condition: str = '',
+                       end_condition: Optional[str] = None,
                        name: Optional[str] = None,
                        mod: int = 2) -> str:
         """
@@ -1450,10 +1477,14 @@ class MonitorWrapper:
         return self.add_monitor(monitor_class=Alternator.__name__,
                                 name=name,
                                 start_condition=start_condition,
+                                hold_condition=hold_condition,
+                                end_condition=end_condition,
                                 mod=mod)
 
     def add_payload_alternator(self,
                                start_condition: str = '',
+                               hold_condition: str = '',
+                               end_condition: Optional[str] = None,
                                name: Optional[str] = None,
                                mod: int = 2) -> str:
         """
@@ -1465,6 +1496,8 @@ class MonitorWrapper:
         return self.add_monitor(monitor_class=Alternator.__name__,
                                 name=name,
                                 start_condition=start_condition,
+                                hold_condition=hold_condition,
+                                end_condition=end_condition,
                                 mod=mod)
 
 

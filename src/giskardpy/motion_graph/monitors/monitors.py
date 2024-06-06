@@ -15,7 +15,7 @@ from giskardpy.exceptions import GiskardException, MonitorInitalizationException
 from giskardpy.god_map import god_map
 from giskardpy.motion_graph.graph_node import MotionGraphNode
 from giskardpy.symbol_manager import symbol_manager
-from giskardpy.utils.utils import string_shortener
+from giskardpy.utils.utils import string_shortener, kwargs_to_json
 
 
 class Monitor(MotionGraphNode):
@@ -49,6 +49,10 @@ class Monitor(MotionGraphNode):
         else:
             msg.monitor_class = self.__class__.__name__
         msg.start_condition = god_map.monitor_manager.format_condition(self.start_condition, new_line=' ')
+        msg.kwargs = kwargs_to_json({'hold_condition': god_map.monitor_manager.format_condition(self.hold_condition,
+                                                                                                new_line=' '),
+                                     'end_condition': god_map.monitor_manager.format_condition(self.end_condition,
+                                                                                               new_line=' ')})
         return msg
 
     @cached_property

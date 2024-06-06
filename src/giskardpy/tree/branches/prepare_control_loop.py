@@ -5,7 +5,7 @@ from giskardpy.tree.behaviors.compile_debug_expressions import CompileDebugExpre
 from giskardpy.tree.behaviors.compile_monitors import CompileMonitors
 from giskardpy.tree.behaviors.init_qp_controller import InitQPController
 from giskardpy.tree.behaviors.new_trajectory import NewTrajectory
-from giskardpy.tree.behaviors.plot_task_graph import PlotTaskMonitorGraph
+from giskardpy.tree.behaviors.plot_motion_graph import PlotTaskMonitorGraph
 from giskardpy.tree.behaviors.ros_msg_to_goal import ParseActionGoal, AddBaseTrajFollowerGoal, SetExecutionMode
 from giskardpy.tree.behaviors.set_tracking_start_time import SetTrackingStartTime
 

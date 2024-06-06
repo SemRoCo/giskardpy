@@ -14,7 +14,7 @@ from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.tree.behaviors.publish_feedback import giskard_state_to_execution_state
 from giskardpy.utils import logging
 from giskardpy.utils.decorators import record_time, catch_and_raise_to_blackboard
-from giskardpy.utils.utils import create_path
+from giskardpy.utils.utils import create_path, json_str_to_kwargs
 
 
 def extract_monitor_names_from_condition(condition: str) -> List[str]:
@@ -55,12 +55,19 @@ def format_condition(condition: str) -> str:
     condition = condition.replace('0.0', 'False')
     return condition
 
+
 def format_monitor_msg(msg: giskard_msgs.Monitor) -> str:
     start_condition = format_condition(msg.start_condition)
+    kwargs = json_str_to_kwargs(msg.kwargs)
+    hold_condition = format_condition(kwargs['hold_condition'])
+    end_condition = format_condition(kwargs['end_condition'])
     return (f'"\'{msg.name}\'\n'
-            f'class: {msg.monitor_class}\n'
             f'----------start_condition:----------\n'
-            f'{start_condition}"')
+            f'{start_condition}\n'
+            f'----------hold_condition:-----------\n'
+            f'{hold_condition}\n'
+            f'-----------end_condition:-----------\n'
+            f'{end_condition}"')
 
 
 def format_task_msg(msg: giskard_msgs.MotionGoal) -> str:

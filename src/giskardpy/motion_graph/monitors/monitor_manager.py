@@ -12,8 +12,8 @@ from giskardpy.casadi_wrapper import CompiledFunction
 from giskardpy.data_types import TaskState
 from giskardpy.exceptions import GiskardException, MonitorInitalizationException, UnknownMonitorException
 from giskardpy.god_map import god_map
-from giskardpy.monitors.monitors import ExpressionMonitor, Monitor, EndMotion
-from giskardpy.monitors.payload_monitors import PayloadMonitor, CancelMotion
+from giskardpy.motion_graph.monitors.monitors import ExpressionMonitor, Monitor, EndMotion
+from giskardpy.motion_graph.monitors.payload_monitors import PayloadMonitor, CancelMotion
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils import logging
 from giskardpy.utils.utils import get_all_classes_in_package, json_str_to_kwargs

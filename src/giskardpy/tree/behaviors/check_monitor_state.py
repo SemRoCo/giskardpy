@@ -1,9 +1,8 @@
-import numpy as np
 from py_trees import Status
 
 from giskardpy.data_types import TaskState
 from giskardpy.god_map import god_map
-from giskardpy.monitors.monitors import Monitor
+from giskardpy.motion_graph.monitors.monitors import Monitor
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.decorators import record_time, catch_and_raise_to_blackboard
 

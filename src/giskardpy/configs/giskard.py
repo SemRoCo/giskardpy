@@ -10,7 +10,7 @@ from giskardpy.configs.robot_interface_config import RobotInterfaceConfig
 from giskardpy.configs.world_config import WorldConfig
 from giskardpy.exceptions import GiskardException, SetupException
 from giskardpy.goals.goal import Goal
-from giskardpy.monitors.monitors import Monitor
+from giskardpy.motion_graph.monitors.monitors import Monitor
 from giskardpy.utils import logging
 from giskardpy.utils.utils import resolve_ros_iris, get_all_classes_in_package
 
@@ -23,7 +23,7 @@ class Giskard:
     qp_controller_config: QPControllerConfig = None
     tmp_folder: str = resolve_ros_iris('package://giskardpy/tmp/')
     goal_package_paths = {'giskardpy.goals'}
-    monitor_package_paths = {'giskardpy.monitors'}
+    monitor_package_paths = {'giskardpy.motion_graph.monitors'}
     action_server_name: str = '~command'
 
     def __init__(self,

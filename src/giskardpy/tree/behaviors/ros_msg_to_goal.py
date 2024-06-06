@@ -1,10 +1,9 @@
 import traceback
 from py_trees import Status
 
-from giskard_msgs.msg import MoveGoal
 from giskardpy.exceptions import InvalidGoalException
 from giskardpy.goals.base_traj_follower import BaseTrajFollower
-from giskardpy.monitors.monitors import TimeAbove, LocalMinimumReached, EndMotion, CancelMotion
+from giskardpy.motion_graph.monitors.monitors import TimeAbove, LocalMinimumReached, EndMotion, CancelMotion
 from giskardpy.god_map import god_map
 from giskardpy.model.joints import OmniDrive, DiffDrive
 from giskardpy.tree.behaviors.plugin import GiskardBehavior

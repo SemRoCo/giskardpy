@@ -13,8 +13,7 @@ from giskardpy.goals.goal import Goal
 import giskard_msgs.msg as giskard_msgs
 from giskardpy.god_map import god_map
 from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint
-from giskardpy.symbol_manager import symbol_manager
-from giskardpy.tasks.task import Task
+from giskardpy.motion_graph.tasks.task import Task
 from giskardpy.utils import logging
 from giskardpy.utils.utils import get_all_classes_in_package, convert_dictionary_to_ros_message, \
     json_str_to_kwargs, ImmutableDict

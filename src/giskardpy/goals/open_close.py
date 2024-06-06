@@ -1,11 +1,10 @@
 from __future__ import division
 
-from typing import Optional, List
+from typing import Optional
 
 from giskardpy.goals.cartesian_goals import CartesianPosition, CartesianOrientation
 from giskardpy.goals.goal import Goal
-from giskardpy.monitors.monitors import ExpressionMonitor
-from giskardpy.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, Task
+from giskardpy.motion_graph.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
 from giskardpy.goals.joint_goals import JointPositionList
 from giskardpy.god_map import god_map
 import giskardpy.casadi_wrapper as cas

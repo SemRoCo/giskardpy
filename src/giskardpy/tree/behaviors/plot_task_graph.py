@@ -8,7 +8,8 @@ import giskard_msgs.msg as giskard_msgs
 from giskard_msgs.msg import ExecutionState
 from giskardpy.data_types import TaskState
 from giskardpy.god_map import god_map
-from giskardpy.monitors.monitors import EndMotion, CancelMotion
+from giskardpy.motion_graph.monitors.payload_monitors import CancelMotion
+from giskardpy.motion_graph.monitors.monitor_manager import EndMotion
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.tree.behaviors.publish_feedback import giskard_state_to_execution_state
 from giskardpy.utils import logging

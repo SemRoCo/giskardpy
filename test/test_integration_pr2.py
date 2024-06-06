@@ -12,7 +12,7 @@ import rospy
 from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, PointStamped, QuaternionStamped, Pose
 from numpy import pi
 from shape_msgs.msg import SolidPrimitive
-from tf.transformations import quaternion_from_matrix, quaternion_about_axis, quaternion_matrix, rotation_matrix
+from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
 import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import WorldBody, CollisionEntry, WorldGoal, GiskardError
@@ -33,7 +33,7 @@ from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
 from giskardpy.model.utils import make_world_body_box, hacky_urdf_parser_fix
 from giskardpy.model.world import WorldTree
 from giskardpy.data_types import PrefixName
-from giskardpy.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE
+from giskardpy.motion_graph.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE
 from giskardpy.python_interface.old_python_interface import OldGiskardWrapper
 from giskardpy.utils.utils import launch_launchfile, suppress_stderr, resolve_ros_iris
 from giskardpy.utils.math import compare_points

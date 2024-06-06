@@ -27,12 +27,12 @@ from giskardpy.goals.pointing import Pointing
 from giskardpy.goals.pre_push_door import PrePushDoor
 from giskardpy.goals.set_prediction_horizon import SetPredictionHorizon
 from giskardpy.model.utils import make_world_body_box
-from giskardpy.monitors.cartesian_monitors import PoseReached, PositionReached, OrientationReached, PointingAt, \
+from giskardpy.motion_graph.monitors.cartesian_monitors import PoseReached, PositionReached, OrientationReached, PointingAt, \
     VectorsAligned, DistanceToLine
-from giskardpy.monitors.joint_monitors import JointGoalReached
-from giskardpy.monitors.monitors import LocalMinimumReached, TimeAbove, Alternator, CancelMotion, EndMotion
-from giskardpy.monitors.payload_monitors import Print, Sleep, SetMaxTrajectoryLength, \
-    UpdateParentLinkOfGroup, PayloadAlternator
+from giskardpy.motion_graph.monitors.joint_monitors import JointGoalReached
+from giskardpy.motion_graph.monitors.monitors import LocalMinimumReached, TimeAbove, Alternator, CancelMotion, EndMotion
+from giskardpy.motion_graph.monitors.payload_monitors import Print, Sleep, SetMaxTrajectoryLength, \
+    PayloadAlternator
 from giskardpy.utils.utils import kwargs_to_json, get_all_classes_in_package
 
 
@@ -1126,7 +1126,8 @@ class MonitorWrapper:
     def get_anded_monitor_names(self) -> str:
         non_cancel_monitors = []
         for monitor in self._monitors:
-            if monitor.monitor_class not in get_all_classes_in_package('giskardpy.monitors', CancelMotion):
+            if monitor.monitor_class not in get_all_classes_in_package('giskardpy.motion_graph.monitors',
+                                                                       CancelMotion):
                 non_cancel_monitors.append(f'\'{monitor.name}\'')
         return ' and '.join(non_cancel_monitors)
 

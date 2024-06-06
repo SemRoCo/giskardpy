@@ -6,9 +6,9 @@ import numpy as np
 from py_trees import Status
 from giskardpy.goals.collision_avoidance import CollisionAvoidance
 from giskardpy.goals.goal import Goal
-from giskardpy.monitors.monitors import Monitor, EndMotion, CancelMotion
+from giskardpy.motion_graph.monitors.monitors import Monitor, EndMotion, CancelMotion
 from giskardpy.god_map import god_map
-from giskardpy.tasks.task import TaskState
+from giskardpy.motion_graph.tasks.task import TaskState
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
 from giskardpy.utils.decorators import record_time

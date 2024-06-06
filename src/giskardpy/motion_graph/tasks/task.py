@@ -1,17 +1,13 @@
-from enum import IntEnum
 from typing import Optional, List, Union, Dict, Callable, Iterable, overload, DefaultDict
-
-import numpy as np
 
 import giskard_msgs.msg as giskard_msgs
 import giskardpy.casadi_wrapper as cas
 from giskardpy.exceptions import GiskardException, GoalInitalizationException, DuplicateNameException
 from giskardpy.god_map import god_map
-from giskardpy.monitors.monitors import ExpressionMonitor, Monitor
 from giskardpy.data_types import Derivatives, PrefixName, TaskState
-from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint, Constraint
+from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint
 from giskardpy.symbol_manager import symbol_manager
-from giskardpy.utils.decorators import memoize
+from giskardpy.motion_graph.graph_node import MotionGraphNode
 from giskardpy.utils.utils import string_shortener
 from giskardpy.qp.weight_gain import QuadraticWeightGain, LinearWeightGain
 from giskardpy.qp.free_variable import FreeVariable
@@ -23,38 +19,29 @@ WEIGHT_BELOW_CA = giskard_msgs.Weights.WEIGHT_BELOW_CA
 WEIGHT_MIN = giskard_msgs.Weights.WEIGHT_MIN
 
 
-class Task:
+class Task(MotionGraphNode):
     """
     Tasks are a set of constraints with the same predicates.
     """
     eq_constraints: Dict[PrefixName, EqualityConstraint]
     neq_constraints: Dict[PrefixName, InequalityConstraint]
     derivative_constraints: Dict[PrefixName, DerivativeInequalityConstraint]
-    _start_condition: cas.Expression
-    _hold_condition: cas.Expression
-    _end_condition: cas.Expression
-    _name: str
     _parent_goal_name: str
-    _id: int
-    plot: bool
 
     def __init__(self, parent_goal_name: str, name: Optional[str] = None):
-        self.plot = True
         if name is None:
             self._name = str(self.__class__.__name__)
         else:
             self._name = name
+        super().__init__(name=name,
+                         start_condition=cas.TrueSymbol, hold_condition=cas.FalseSymbol, end_condition=cas.FalseSymbol)
         self._parent_goal_name = parent_goal_name
         self.eq_constraints = {}
         self.neq_constraints = {}
         self.derivative_constraints = {}
-        self._start_condition = cas.TrueSymbol
-        self._hold_condition = cas.FalseSymbol
-        self._end_condition = cas.FalseSymbol
         self.manip_constraints = {}
         self.quadratic_gains = []
         self.linear_weight_gains = []
-        self._id = -1
 
     def to_ros_msg(self) -> giskard_msgs.MotionGoal:
         msg = giskard_msgs.MotionGoal()
@@ -97,14 +84,6 @@ class Task:
             if not god_map.monitor_manager.is_monitor_registered(monitor_state_expr):
                 raise GiskardException(f'No monitor found for this state expr: "{monitor_state_expr}".')
         self._end_condition = value
-
-    @property
-    def id(self) -> int:
-        assert self._id >= 0, f'id of {self.name} is not set.'
-        return self._id
-
-    def set_id(self, new_id: int) -> None:
-        self._id = new_id
 
     @property
     def name(self) -> PrefixName:

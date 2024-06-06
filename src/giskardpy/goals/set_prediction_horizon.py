@@ -1,8 +1,7 @@
-from typing import Union, Optional, List
+from typing import Union, Optional
 
 from giskardpy.configs.qp_controller_config import SupportedQPSolver
 from giskardpy.goals.goal import NonMotionGoal
-from giskardpy.monitors.monitors import ExpressionMonitor
 from giskardpy.god_map import god_map
 from giskardpy.utils import logging
 import giskardpy.casadi_wrapper as cas

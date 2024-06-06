@@ -2,7 +2,7 @@ import rospy
 from geometry_msgs.msg import PoseStamped
 
 from giskardpy.goals.joint_goals import JointPositionList
-from giskardpy.monitors.joint_monitors import JointGoalReached
+from giskardpy.motion_graph.monitors import JointGoalReached
 from giskardpy.python_interface.python_interface import GiskardWrapper
 
 # %% Define goals for later

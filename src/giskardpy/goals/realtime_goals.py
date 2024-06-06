@@ -1,12 +1,11 @@
 from __future__ import division
 
-from typing import Optional, List
+from typing import Optional
 
 import rospy
 from geometry_msgs.msg import Vector3Stamped, PointStamped
 
-from giskardpy.monitors.monitors import ExpressionMonitor
-from giskardpy.tasks.task import WEIGHT_BELOW_CA
+from giskardpy.motion_graph.tasks.task import WEIGHT_BELOW_CA
 from giskardpy.goals.pointing import Pointing
 import giskardpy.casadi_wrapper as cas
 from giskardpy.utils.expression_definition_utils import transform_msg

@@ -13,9 +13,9 @@ from giskardpy.data_types import Derivatives
 from giskardpy.goals.goal import Goal
 from giskardpy.god_map import god_map
 from giskardpy.model.joints import DiffDrive
-from giskardpy.monitors.monitors import ExpressionMonitor
+from giskardpy.motion_graph.monitors.monitors import ExpressionMonitor
 from giskardpy.symbol_manager import symbol_manager
-from giskardpy.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
+from giskardpy.motion_graph.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
 from giskardpy.utils.expression_definition_utils import transform_msg_and_turn_to_expr, transform_msg
 from giskardpy.utils.tfwrapper import normalize
 from giskardpy.utils.utils import split_pose_stamped

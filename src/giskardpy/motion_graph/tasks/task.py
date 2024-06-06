@@ -53,59 +53,14 @@ class Task(MotionGraphNode):
         return msg
 
     @property
-    def start_condition(self) -> cas.Expression:
-        return self._start_condition
-
-    @start_condition.setter
-    def start_condition(self, value: cas.Expression) -> None:
-        for monitor_state_expr in value.free_symbols():
-            if not god_map.monitor_manager.is_monitor_registered(monitor_state_expr):
-                raise GiskardException(f'No monitor found for this state expr: "{monitor_state_expr}".')
-        self._start_condition = value
-
-    @property
-    def hold_condition(self) -> cas.Expression:
-        return self._hold_condition
-
-    @hold_condition.setter
-    def hold_condition(self, value: cas.Expression) -> None:
-        for monitor_state_expr in value.free_symbols():
-            if not god_map.monitor_manager.is_monitor_registered(monitor_state_expr):
-                raise GiskardException(f'No monitor found for this state expr: "{monitor_state_expr}".')
-        self._hold_condition = value
-
-    @property
-    def end_condition(self) -> cas.Expression:
-        return self._end_condition
-
-    @end_condition.setter
-    def end_condition(self, value: cas.Expression) -> None:
-        for monitor_state_expr in value.free_symbols():
-            if not god_map.monitor_manager.is_monitor_registered(monitor_state_expr):
-                raise GiskardException(f'No monitor found for this state expr: "{monitor_state_expr}".')
-        self._end_condition = value
-
-    @property
     def name(self) -> PrefixName:
         return PrefixName(self._name, self._parent_goal_name)
 
     def __str__(self):
         return self.name
 
-    def formatted_name(self, quoted: bool = False) -> str:
-        formatted_name = string_shortener(original_str=str(self.name),
-                                          max_lines=4,
-                                          max_line_length=25)
-        result = (f'{formatted_name}\n'
-                  f'----start_condition----\n'
-                  f'{god_map.monitor_manager.format_condition(self.start_condition)}\n'
-                  f'----hold_condition----\n'
-                  f'{god_map.monitor_manager.format_condition(self.hold_condition)}\n'
-                  f'----end_condition----\n'
-                  f'{god_map.monitor_manager.format_condition(self.end_condition)}')
-        if quoted:
-            return '"' + result + '"'
-        return result
+    def get_life_cycle_state_expression(self) -> cas.Symbol:
+        return symbol_manager.get_symbol(f'god_map.motion_goal_manager.task_state[{self.id}]')
 
     def get_eq_constraints(self) -> List[EqualityConstraint]:
         return self._apply_monitors_to_constraints(self.eq_constraints.values())
@@ -121,9 +76,6 @@ class Task(MotionGraphNode):
 
     def get_linear_gains(self) -> List[LinearWeightGain]:
         return self.linear_weight_gains
-
-    def get_state_expression(self) -> cas.Symbol:
-        return symbol_manager.get_symbol(f'god_map.motion_goal_manager.task_state[{self.id}]')
 
     @overload
     def _apply_monitors_to_constraints(self, constraints: Iterable[EqualityConstraint]) \
@@ -143,7 +95,7 @@ class Task(MotionGraphNode):
     def _apply_monitors_to_constraints(self, constraints):
         output_constraints = []
         for constraint in constraints:
-            is_running = cas.if_eq(self.get_state_expression(), int(TaskState.running),
+            is_running = cas.if_eq(self.get_life_cycle_state_expression(), int(TaskState.running),
                                    if_result=1,
                                    else_result=0)
             constraint.quadratic_weight *= is_running

@@ -14,12 +14,12 @@ from giskardpy.utils.decorators import catch_and_raise_to_blackboard, record_tim
 
 
 def giskard_state_to_execution_state() -> ExecutionState:
-    monitor_filter = np.array([monitor.plot for monitor in god_map.monitor_manager.monitors])
+    monitor_filter = np.array([monitor.plot for monitor in god_map.monitor_manager.monitors.values()])
     task_filter = np.array([task.plot for task in god_map.motion_goal_manager.tasks.values()])
     msg = ExecutionState()
     msg.header.stamp = rospy.Time.now()
     msg.goal_id = god_map.move_action_server.goal_id
-    msg.monitors = [m.to_ros_msg() for m in god_map.monitor_manager.monitors if m.plot]
+    msg.monitors = [m.to_ros_msg() for m in god_map.monitor_manager.monitors.values() if m.plot]
     msg.tasks = [t.to_ros_msg() for t in god_map.motion_goal_manager.tasks.values() if t.plot]
     try:
         msg.monitor_state = god_map.monitor_manager.state_history[-1][1][0][monitor_filter].tolist()

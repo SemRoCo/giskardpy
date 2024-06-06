@@ -15,7 +15,7 @@ class PrefixName:
     primary_separator = '/'
     secondary_separator = '_'
 
-    def __init__(self, name: str, prefix: Optional[Union[str, PrefixName]]):
+    def __init__(self, name: str, prefix: Optional[Union[str, PrefixName]] = None):
         if isinstance(prefix, PrefixName):
             self.prefix = prefix.prefix
             old_suffix = prefix.short_name

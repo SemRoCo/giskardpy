@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import functools
+from enum import IntEnum
 from typing import overload, Union, Iterable, Tuple, Optional, Callable, List, Any, Sequence, Dict, TypeVar
 import numpy as np
 import casadi as ca  # type: ignore
@@ -11,7 +12,7 @@ from scipy import sparse as sp
 
 all_expressions = Union[Symbol_, Symbol, Expression, Point3, Vector3, RotationMatrix, TransMatrix, Quaternion]
 all_expressions_float = Union[Symbol, Expression, Point3, Vector3, RotationMatrix, TransMatrix, float, Quaternion]
-symbol_expr_float = Union[Symbol, Expression, float]
+symbol_expr_float = Union[Symbol, Expression, float, int, IntEnum]
 symbol_expr = Union[Symbol, Expression]
 PreservedCasType = TypeVar('PreservedCasType', Point3, Vector3, TransMatrix, RotationMatrix, Quaternion, Expression)
 

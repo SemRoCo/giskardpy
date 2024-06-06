@@ -1138,6 +1138,8 @@ class MonitorWrapper:
                     monitor_class: str,
                     name: Optional[str] = None,
                     start_condition: str = '',
+                    hold_condition: str = '',
+                    end_condition: Optional[str] = None,
                     **kwargs) -> str:
         """
         Generic function to add a monitor.
@@ -1153,27 +1155,35 @@ class MonitorWrapper:
             name = f'M{str(len(self._monitors))} {name}'
         if [x for x in self._monitors if x.name == name]:
             raise KeyError(f'monitor named {name} already exists.')
+
         monitor = giskard_msgs.Monitor()
         monitor.name = name
-        monitor.monitor_class = monitor_class
-        monitor.start_condition = start_condition
-        monitor.kwargs = kwargs_to_json(kwargs)
-        self._monitors.append(monitor)
         if not name.startswith('\'') and not name.startswith('"'):
             name = f'\'{name}\''  # put all monitor names in quotes so that the user doesn't have to
+
+        if end_condition is None:
+            end_condition = name
+        monitor.monitor_class = monitor_class
+        monitor.start_condition = start_condition
+        kwargs['hold_condition'] = hold_condition
+        kwargs['end_condition'] = end_condition
+        monitor.kwargs = kwargs_to_json(kwargs)
+        self._monitors.append(monitor)
         return name
 
     def add_local_minimum_reached(self,
                                   name: Optional[str] = None,
-                                  stay_true: bool = True,
-                                  start_condition: str = ''):
+                                  start_condition: str = '',
+                                  hold_condition: str = '',
+                                  end_condition: Optional[str] = None):
         """
         True if the world is currently in a local minimum.
         """
         return self.add_monitor(monitor_class=LocalMinimumReached.__name__,
                                 name=name,
                                 start_condition=start_condition,
-                                stay_true=stay_true)
+                                hold_condition=hold_condition,
+                                end_condition=end_condition)
 
     def add_time_above(self,
                        threshold: float,
@@ -1192,7 +1202,8 @@ class MonitorWrapper:
                            threshold: float = 0.01,
                            name: Optional[str] = None,
                            start_condition: str = '',
-                           stay_true: bool = True) -> str:
+                           hold_condition: str = '',
+                           end_condition: Optional[str] = None) -> str:
         """
         True if all joints in goal_state are closer than threshold to their respective value.
         """
@@ -1201,7 +1212,8 @@ class MonitorWrapper:
                                 goal_state=goal_state,
                                 threshold=threshold,
                                 start_condition=start_condition,
-                                stay_true=stay_true)
+                                hold_condition=hold_condition,
+                                end_condition=end_condition)
 
     def add_cartesian_pose(self,
                            root_link: str,
@@ -1368,7 +1380,9 @@ class MonitorWrapper:
         """
         return self.add_monitor(monitor_class=EndMotion.__name__,
                                 name=name,
-                                start_condition=start_condition)
+                                start_condition=start_condition,
+                                hold_condition='',
+                                end_condition='')
 
     def add_cancel_motion(self,
                           start_condition: str,
@@ -1382,6 +1396,8 @@ class MonitorWrapper:
         return self.add_monitor(monitor_class=CancelMotion.__name__,
                                 name=name,
                                 start_condition=start_condition,
+                                hold_condition='',
+                                end_condition='',
                                 error_message=error_message,
                                 error_code=error_code)
 

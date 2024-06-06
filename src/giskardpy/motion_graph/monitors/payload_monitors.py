@@ -18,8 +18,14 @@ class WorldUpdatePayloadMonitor(PayloadMonitor):
 
     def __init__(self, *,
                  name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol):
-        super().__init__(name=name, start_condition=start_condition, run_call_in_thread=True)
+                 start_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 end_condition: cas.Expression = cas.FalseSymbol):
+        super().__init__(name=name,
+                         start_condition=start_condition,
+                         hold_condition=hold_condition,
+                         end_condition=end_condition,
+                         run_call_in_thread=True)
 
     @abc.abstractmethod
     def apply_world_update(self):
@@ -37,7 +43,9 @@ class SetMaxTrajectoryLength(CancelMotion):
     def __init__(self,
                  new_length: Optional[float] = None,
                  name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol, ):
+                 start_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 end_condition: cas.Expression = cas.FalseSymbol):
         if not (start_condition == cas.TrueSymbol).evaluate():
             raise MonitorInitalizationException(f'Cannot set start_condition for {SetMaxTrajectoryLength.__name__}')
         if new_length is None:
@@ -47,6 +55,8 @@ class SetMaxTrajectoryLength(CancelMotion):
         error_message = f'Trajectory longer than {self.new_length}'
         super().__init__(name=name,
                          start_condition=start_condition,
+                         hold_condition=hold_condition,
+                         end_condition=end_condition,
                          error_message=error_message,
                          error_code=GiskardError.MAX_TRAJECTORY_LENGTH)
 
@@ -60,9 +70,15 @@ class Print(PayloadMonitor):
     def __init__(self,
                  message: str,
                  name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol):
+                 start_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 end_condition: cas.Expression = cas.FalseSymbol):
         self.message = message
-        super().__init__(name=name, start_condition=start_condition, run_call_in_thread=False)
+        super().__init__(name=name,
+                         start_condition=start_condition,
+                         hold_condition=hold_condition,
+                         end_condition=end_condition,
+                         run_call_in_thread=False)
 
     def __call__(self):
         logging.loginfo(self.message)
@@ -73,9 +89,15 @@ class Sleep(PayloadMonitor):
     def __init__(self,
                  seconds: float,
                  name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol):
+                 start_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 end_condition: cas.Expression = cas.FalseSymbol):
         self.seconds = seconds
-        super().__init__(name=name, start_condition=start_condition, run_call_in_thread=True)
+        super().__init__(name=name,
+                         start_condition=start_condition,
+                         hold_condition=hold_condition,
+                         end_condition=end_condition,
+                         run_call_in_thread=True)
 
     def __call__(self):
         rospy.sleep(self.seconds)
@@ -88,12 +110,17 @@ class UpdateParentLinkOfGroup(WorldUpdatePayloadMonitor):
                  parent_link: str,
                  parent_link_group: Optional[str] = '',
                  name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol):
+                 start_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 end_condition: cas.Expression = cas.FalseSymbol):
         if not god_map.is_standalone():
             raise MonitorInitalizationException(f'This monitor can only be used in standalone mode.')
         self.group_name = group_name
         self.new_parent_link = god_map.world.search_for_link_name(parent_link, parent_link_group)
-        super().__init__(name=name, start_condition=start_condition)
+        super().__init__(name=name,
+                         start_condition=start_condition,
+                         hold_condition=hold_condition,
+                         end_condition=end_condition)
 
     def apply_world_update(self):
         god_map.world.move_group(group_name=self.group_name,
@@ -107,8 +134,14 @@ class CollisionMatrixUpdater(PayloadMonitor):
     def __init__(self,
                  new_collision_matrix: Dict[Tuple[str, str], float],
                  name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol):
-        super().__init__(name=name, start_condition=start_condition, run_call_in_thread=False)
+                 start_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 end_condition: cas.Expression = cas.FalseSymbol):
+        super().__init__(name=name,
+                         start_condition=start_condition,
+                         hold_condition=hold_condition,
+                         end_condition=end_condition,
+                         run_call_in_thread=False)
         self.collision_matrix = new_collision_matrix
 
     @profile
@@ -123,8 +156,14 @@ class PayloadAlternator(PayloadMonitor):
     def __init__(self,
                  mod: int = 2,
                  name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol):
-        super().__init__(name=name, stay_true=False, start_condition=start_condition, run_call_in_thread=False)
+                 start_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 end_condition: cas.Expression = cas.FalseSymbol):
+        super().__init__(name=name,
+                         start_condition=start_condition,
+                         hold_condition=hold_condition,
+                         end_condition=end_condition,
+                         run_call_in_thread=False)
         self.mod = mod
 
     def __call__(self):

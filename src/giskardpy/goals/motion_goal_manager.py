@@ -12,6 +12,7 @@ from giskardpy.goals.collision_avoidance import ExternalCollisionAvoidance, Self
 from giskardpy.goals.goal import Goal
 import giskard_msgs.msg as giskard_msgs
 from giskardpy.god_map import god_map
+from giskardpy.motion_graph.helpers import compile_graph_node_state_updater
 from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint
 from giskardpy.motion_graph.tasks.task import Task
 from giskardpy.utils import logging
@@ -87,50 +88,11 @@ class MotionGoalManager:
             if task.name in self.tasks:
                 raise DuplicateNameException(f'Task names {task.name} already exists.')
             self.tasks[task.name] = task
-            task.set_id(len(self.tasks) - 1)
+            task.id = len(self.tasks) - 1
 
     @profile
     def compile_task_state_updater(self):
-        symbols = []
-        for task in sorted(self.tasks.values(), key=lambda x: x.id):
-            symbols.append(task.get_state_expression())
-        task_state = cas.Expression(symbols)
-        symbols = []
-        for i, monitor in enumerate(god_map.monitor_manager.monitors):
-            symbols.append(monitor.get_state_expression())
-        monitor_state = cas.Expression(symbols)
-
-        state_updater = []
-        for task in sorted(self.tasks.values(), key=lambda x: x.id):
-            state_symbol = task_state[task.id]
-
-            if not cas.is_true(task.start_condition):
-                start_if = cas.if_else(task.start_condition,
-                                       if_result=int(TaskState.running),
-                                       else_result=state_symbol)
-            else:
-                start_if = state_symbol
-            if not cas.is_true(task.hold_condition):
-                hold_if = cas.if_else(task.hold_condition,
-                                      if_result=int(TaskState.on_hold),
-                                      else_result=int(TaskState.running))
-            else:
-                hold_if = state_symbol
-            if not cas.is_false(task.end_condition):
-                else_result = cas.if_else(task.end_condition,
-                                          if_result=int(TaskState.succeeded),
-                                          else_result=hold_if)
-            else:
-                else_result = hold_if
-
-            state_f = cas.if_eq_cases(a=state_symbol,
-                                      b_result_cases=[(int(TaskState.not_started), start_if),
-                                                      (int(TaskState.succeeded), int(TaskState.succeeded))],
-                                      else_result=else_result)  # running or on_hold
-            state_updater.append(state_f)
-        state_updater = cas.Expression(state_updater)
-        symbols = task_state.free_symbols() + monitor_state.free_symbols()
-        self.compiled_state_updater = state_updater.compile(symbols)
+        self.compiled_state_updater = compile_graph_node_state_updater(self.tasks)
 
     @profile
     def update_task_state(self, new_state: np.ndarray) -> None:

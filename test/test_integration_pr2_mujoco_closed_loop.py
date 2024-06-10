@@ -229,12 +229,11 @@ class TestMoveBaseGoals:
         # zero_pose.allow_all_collisions()
         # zero_pose.plan_and_execute(expected_error_codes=[GiskardError.PREEMPTED], stop_after=10)
 
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class=CarryMyBullshit.__name__,
-                                               name='cmb',
-                                               camera_link='head_mount_kinect_rgb_optical_frame',
-                                               point_cloud_laser_topic_name='',
-                                               laser_frame_id='base_laser_link',
-                                               height_for_camera_target=1.5)
+        zero_pose.motion_goals.add_carry_my_luggage(name='cmb',
+                                                    camera_link='head_mount_kinect_rgb_optical_frame',
+                                                    point_cloud_laser_topic_name='',
+                                                    laser_frame_id='base_laser_link',
+                                                    height_for_camera_target=1.5)
         zero_pose.allow_all_collisions()
         # zero_pose.execute(expected_error_code=GiskardError.EXECUTION_ERROR,
         #                   add_local_minimum_reached=False)
@@ -249,13 +248,12 @@ class TestMoveBaseGoals:
         # zero_pose.allow_all_collisions()
         # zero_pose.plan_and_execute(expected_error_codes=[GiskardError.PREEMPTED], stop_after=10)
 
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class=CarryMyBullshit.__name__,
-                                               name='cmb',
-                                               camera_link='head_mount_kinect_rgb_optical_frame',
-                                               point_cloud_laser_topic_name='',
-                                               # laser_topic_name='/laser',
-                                               laser_frame_id='base_laser_link',
-                                               drive_back=True)
+        zero_pose.motion_goals.add_carry_my_luggage(name='cmb',
+                                                    camera_link='head_mount_kinect_rgb_optical_frame',
+                                                    point_cloud_laser_topic_name='',
+                                                    # laser_topic_name='/laser',
+                                                    laser_frame_id='base_laser_link',
+                                                    drive_back=True)
         zero_pose.allow_all_collisions()
         zero_pose.execute(add_local_minimum_reached=False)
 

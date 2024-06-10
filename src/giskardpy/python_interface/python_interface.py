@@ -1,6 +1,6 @@
 from collections import defaultdict
 from typing import Dict, Tuple, Optional, List
-
+import numpy as np
 import rospy
 from actionlib import SimpleActionClient
 from geometry_msgs.msg import PoseStamped, Vector3Stamped, PointStamped, QuaternionStamped
@@ -17,6 +17,7 @@ from giskardpy.data_types import goal_parameter
 from giskardpy.exceptions import DuplicateNameException, UnknownGroupException
 from giskardpy.goals.align_planes import AlignPlanes
 from giskardpy.goals.align_to_push_door import AlignToPushDoor
+from giskardpy.goals.base_traj_follower import CarryMyBullshit
 from giskardpy.goals.cartesian_goals import CartesianPose, DiffDriveBaseGoal, CartesianVelocityLimit, \
     CartesianOrientation, CartesianPoseStraight, CartesianPosition, CartesianPositionStraight
 from giskardpy.goals.collision_avoidance import CollisionAvoidance
@@ -925,6 +926,103 @@ class MotionGoalWrapper:
         self.add_motion_goal(motion_goal_class=SetPredictionHorizon.__name__,
                              prediction_horizon=prediction_horizon,
                              **kwargs)
+
+    def add_carry_my_luggage(self,
+                             name: str,
+                             tracked_human_position_topic_name: str = '/robokudovanessa/human_position',
+                             laser_topic_name: str = '/hsrb/base_scan',
+                             point_cloud_laser_topic_name: Optional[str] = None,
+                             odom_joint_name: str = 'brumbrum',
+                             root_link: Optional[str] = None,
+                             camera_link: str = 'head_rgbd_sensor_link',
+                             distance_to_target_stop_threshold: float = 1,
+                             laser_scan_age_threshold: float = 2,
+                             laser_distance_threshold: float = 0.5,
+                             laser_distance_threshold_width: float = 0.8,
+                             laser_avoidance_angle_cutout: float = np.pi / 4,
+                             laser_avoidance_sideways_buffer: float = 0.04,
+                             base_orientation_threshold: float = np.pi / 16,
+                             tracked_human_position_topic_name_timeout: int = 30,
+                             max_rotation_velocity: float = 0.5,
+                             max_rotation_velocity_head: float = 1,
+                             max_translation_velocity: float = 0.38,
+                             traj_tracking_radius: float = 0.4,
+                             height_for_camera_target: float = 1,
+                             laser_frame_id: str = 'base_range_sensor_link',
+                             target_age_threshold: float = 2,
+                             target_age_exception_threshold: float = 5,
+                             clear_path: bool = False,
+                             drive_back: bool = False,
+                             enable_laser_avoidance: bool = True,
+                             start_condition: str = '',
+                             hold_condition: str = '',
+                             end_condition: str = ''):
+        """
+        :param name: name of the goal
+        :param tracked_human_position_topic_name: name of the topic where the tracked human is published
+        :param laser_topic_name: topic name of the laser scanner
+        :param point_cloud_laser_topic_name: topic name of a second laser scanner, e.g. from a point cloud to laser scanner node
+        :param odom_joint_name: name of the odom joint
+        :param root_link: will use global reference frame
+        :param camera_link: link of the camera that will point to the tracked human
+        :param distance_to_target_stop_threshold: will pause if closer than this many meter to the target
+        :param laser_scan_age_threshold: giskard will complain if scans are older than this many seconds
+        :param laser_distance_threshold: this and width are used to crate a stopping zone around the robot.
+                                            laser distance draws a circle around the robot and width lines to the left and right.
+                                            the stopping zone is the minimum of the two.
+        :param laser_distance_threshold_width: see laser_distance_threshold
+        :param laser_avoidance_angle_cutout: if something is in the stop zone in front of the robot in +/- this angle range
+                                                giskard will pause, otherwise it will try to dodge left or right
+        :param laser_avoidance_sideways_buffer: increase this if the robot is shaking too much if something is to its
+                                                left and right at the same time.
+        :param base_orientation_threshold: giskard will align the base of the robot to the target, this is a +/- buffer to avoid shaking
+        :param tracked_human_position_topic_name_timeout: on start up, wait this long for tracking msg to arrive
+        :param max_rotation_velocity: how quickly the base can change orientation
+        :param max_rotation_velocity_head: how quickly the head rotates
+        :param max_translation_velocity: how quickly the base drives
+        :param traj_tracking_radius: how close the robots root link will try to stick to the path in meter
+        :param height_for_camera_target: target tracking with head will ignore the published height, but use this instead
+        :param laser_frame_id: frame_id of the laser scanner
+        :param target_age_threshold: will stop looking at the target if the messages are older than this many seconds
+        :param target_age_exception_threshold: if there are no messages from the tracked_human_position_topic_name
+                                                            topic for this many seconds, cancel
+        :param clear_path: clear the saved path. if called repeated will, giskard would just continue the old path if not cleared
+        :param drive_back: follow the saved path to drive back
+        :param enable_laser_avoidance:
+        :param start_condition:
+        :param hold_condition:
+        :param end_condition:
+        """
+        self.add_motion_goal(motion_goal_class=CarryMyBullshit.__name__,
+                             name=name,
+                             patrick_topic_name=tracked_human_position_topic_name,
+                             laser_topic_name=laser_topic_name,
+                             point_cloud_laser_topic_name=point_cloud_laser_topic_name,
+                             odom_joint_name=odom_joint_name,
+                             root_link=root_link,
+                             camera_link=camera_link,
+                             distance_to_target_stop_threshold=distance_to_target_stop_threshold,
+                             laser_scan_age_threshold=laser_scan_age_threshold,
+                             laser_distance_threshold=laser_distance_threshold,
+                             laser_distance_threshold_width=laser_distance_threshold_width,
+                             laser_avoidance_angle_cutout=laser_avoidance_angle_cutout,
+                             laser_avoidance_sideways_buffer=laser_avoidance_sideways_buffer,
+                             base_orientation_threshold=base_orientation_threshold,
+                             wait_for_patrick_timeout=tracked_human_position_topic_name_timeout,
+                             max_rotation_velocity=max_rotation_velocity,
+                             max_rotation_velocity_head=max_rotation_velocity_head,
+                             max_translation_velocity=max_translation_velocity,
+                             traj_tracking_radius=traj_tracking_radius,
+                             height_for_camera_target=height_for_camera_target,
+                             laser_frame_id=laser_frame_id,
+                             target_age_threshold=target_age_threshold,
+                             target_age_exception_threshold=target_age_exception_threshold,
+                             clear_path=clear_path,
+                             drive_back=drive_back,
+                             enable_laser_avoidance=enable_laser_avoidance,
+                             start_condition=start_condition,
+                             hold_condition=hold_condition,
+                             end_condition=end_condition)
 
     def add_cartesian_orientation(self,
                                   goal_orientation: QuaternionStamped,

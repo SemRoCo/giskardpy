@@ -26,6 +26,7 @@ from giskardpy.goals.joint_goals import JointPositionList, AvoidJointLimits, Set
 from giskardpy.goals.open_close import Close, Open
 from giskardpy.goals.pointing import Pointing
 from giskardpy.goals.pre_push_door import PrePushDoor
+from giskardpy.goals.realtime_goals import RealTimePointing
 from giskardpy.goals.set_prediction_horizon import SetPredictionHorizon
 from giskardpy.model.utils import make_world_body_box
 from giskardpy.monitors.cartesian_monitors import PoseReached, PositionReached, OrientationReached, PointingAt, \
@@ -907,6 +908,45 @@ class MotionGoalWrapper:
                              tip_group=tip_group,
                              goal_point=goal_point,
                              root_link=root_link,
+                             root_group=root_group,
+                             pointing_axis=pointing_axis,
+                             max_velocity=max_velocity,
+                             weight=weight,
+                             name=name,
+                             start_condition=start_condition,
+                             hold_condition=hold_condition,
+                             end_condition=end_condition,
+                             **kwargs)
+
+    def add_real_time_pointing(self,
+                               tip_link: str,
+                               pointing_axis: Vector3Stamped,
+                               root_link: str,
+                               topic_name: str,
+                               tip_group: Optional[str] = None,
+                               root_group: Optional[str] = None,
+                               max_velocity: float = 0.3,
+                               weight: Optional[float] = None,
+                               name: Optional[str] = None,
+                               start_condition: str = '',
+                               hold_condition: str = '',
+                               end_condition: str = '',
+                               **kwargs: goal_parameter):
+        """
+        Will orient pointing_axis at goal_point.
+        :param tip_link: tip link of the kinematic chain.
+        :param topic_name: name of a topic of type PointStamped
+        :param root_link: root link of the kinematic chain.
+        :param tip_group: if tip_link is not unique, search this group for matches.
+        :param root_group: if root_link is not unique, search this group for matches.
+        :param pointing_axis: the axis of tip_link that will be used for pointing
+        :param max_velocity: rad/s
+        """
+        self.add_motion_goal(motion_goal_class=RealTimePointing.__name__,
+                             tip_link=tip_link,
+                             tip_group=tip_group,
+                             root_link=root_link,
+                             topic_name=topic_name,
                              root_group=root_group,
                              pointing_axis=pointing_axis,
                              max_velocity=max_velocity,

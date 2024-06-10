@@ -396,6 +396,16 @@ class TestConstraints:
         zero_pose.set_joint_goal(zero_pose.default_pose)
         zero_pose.projection()
 
+    def test_real_time_pointing(self, zero_pose: PR2TestWrapper):
+        vector = Vector3Stamped()
+        vector.header.frame_id = 'head_mount_kinect_rgb_optical_frame'
+        vector.vector.x = 1
+        zero_pose.motion_goals.add_real_time_pointing(tip_link='head_mount_kinect_rgb_optical_frame',
+                                                      root_link='torso_lift_link',
+                                                      topic_name='/robokudovanessa/human_position',
+                                                      pointing_axis=vector)
+        zero_pose.execute(add_local_minimum_reached=False)
+
     def test_bowl_and_cup(self, kitchen_setup: PR2TestWrapper):
         # kernprof -lv py.test -s test/test_integration_pr2.py::TestCollisionAvoidanceGoals::test_bowl_and_cup
         bowl_name = 'bowl'

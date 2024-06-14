@@ -1,5 +1,4 @@
 from copy import deepcopy
-from typing import Optional
 
 import numpy as np
 import pytest
@@ -9,12 +8,12 @@ from tf.transformations import quaternion_about_axis, quaternion_from_matrix
 import giskardpy.utils.tfwrapper as tf
 from giskardpy.configs.behavior_tree_config import StandAloneBTConfig
 from giskardpy.configs.giskard import Giskard
-from giskardpy.configs.qp_controller_config import QPControllerConfig
 from giskardpy.configs.iai_robots.tiago import TiagoStandaloneInterface, TiagoCollisionAvoidanceConfig
+from giskardpy.configs.qp_controller_config import QPControllerConfig
 from giskardpy.configs.world_config import WorldWithDiffDriveRobot
-from giskardpy.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
-from giskardpy.god_map import god_map
 from giskardpy.data_types import PrefixName
+from giskardpy.god_map import god_map
+from giskardpy.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
 from giskardpy.utils.utils import launch_launchfile
 from utils_for_tests import GiskardTestWrapper
 
@@ -120,28 +119,6 @@ class TiagoTestWrapper(GiskardTestWrapper):
             'gripper_left_right_finger_joint': goal,
         }
         self.set_joint_goal(js)
-        self.plan_and_execute()
-
-    def reset(self):
-        self.clear_world()
-        self.reset_base()
-
-    def reset_base(self):
-        p = PoseStamped()
-        p.header.frame_id = 'map'
-        p.pose.orientation.w = 1
-        if god_map.is_standalone():
-            self.teleport_base(p)
-        else:
-            self.move_base(p)
-
-    def set_localization(self, map_T_odom: PoseStamped):
-        map_T_odom.pose.position.z = 0
-        self.teleport_base(map_T_odom)
-
-    def teleport_base(self, goal_pose, group_name: Optional[str] = None):
-        self.set_seed_odometry(base_pose=goal_pose, group_name=group_name)
-        self.allow_all_collisions()
         self.plan_and_execute()
 
 
@@ -326,7 +303,7 @@ class TestCollisionAvoidance:
 
     def test_demo1(self, apartment_setup: TiagoTestWrapper):
         # setup
-        apartment_name = apartment_setup.environment_name
+        apartment_name = apartment_setup.default_env_name
         l_tcp = 'gripper_left_grasping_frame'
         handle_name = 'handle_cab1_top_door'
         handle_name_frame = 'handle_cab1_top_door'
@@ -556,15 +533,15 @@ class TestCollisionAvoidance:
         apartment_setup.plan_and_execute()
 
         apartment_setup.set_open_container_goal(tip_link=tcp,
-                                      environment_link=handle_name,
-                                      goal_joint_state=goal_angle)
+                                                environment_link=handle_name,
+                                                goal_joint_state=goal_angle)
         apartment_setup.set_diff_drive_tangential_to_point(goal_point=goal_point)
         apartment_setup.set_avoid_joint_limits_goal(50)
         apartment_setup.plan_and_execute()
 
         apartment_setup.set_open_container_goal(tip_link=tcp,
-                                      environment_link=handle_name,
-                                      goal_joint_state=0)
+                                                environment_link=handle_name,
+                                                goal_joint_state=0)
         apartment_setup.set_diff_drive_tangential_to_point(goal_point=goal_point)
         apartment_setup.set_avoid_joint_limits_goal(50)
         apartment_setup.plan_and_execute()

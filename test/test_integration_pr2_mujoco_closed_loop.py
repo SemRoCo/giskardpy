@@ -172,7 +172,7 @@ class TestMoveBaseGoals:
         map_T_odom.pose.position.x = 1
         map_T_odom.pose.position.y = 1
         map_T_odom.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 3, [0, 0, 1]))
-        zero_pose.set_localization(map_T_odom)
+        zero_pose.teleport_base(map_T_odom)
 
         base_goal = PoseStamped()
         base_goal.header.frame_id = 'map'
@@ -634,6 +634,14 @@ class TestManipulability:
                                         tip_normal=x_base,
                                         goal_normal=x_goal)
         zero_pose.plan_and_execute()
+
+class TestMonitors:
+    def test_only_payload_monitors(self, zero_pose: PR2TestWrapper):
+        sleep = zero_pose.monitors.add_sleep(2)
+        zero_pose.monitors.add_cancel_motion(start_condition=sleep, error_message='time up',
+                                             error_code=GiskardError.SETUP_ERROR)
+        zero_pose.allow_all_collisions()
+        zero_pose.execute(add_local_minimum_reached=False, expected_error_code=GiskardError.SETUP_ERROR)
 
 # kernprof -lv py.test -s test/test_integration_pr2.py
 # time: [1-9][1-9]*.[1-9]* s

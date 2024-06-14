@@ -25,12 +25,12 @@ from giskard_msgs.srv import DyeGroupResponse
 from giskardpy.configs.giskard import Giskard
 from giskardpy.configs.qp_controller_config import SupportedQPSolver
 from giskardpy.data_types import KeyDefaultDict
-from giskardpy.exceptions import UnknownGroupException
+from giskardpy.data_types import PrefixName, Derivatives
+from giskardpy.exceptions import UnknownGroupException, WorldException
 from giskardpy.goals.diff_drive_goals import DiffDriveTangentialToPoint, KeepHandInWorkspace
 from giskardpy.god_map import god_map
 from giskardpy.model.collision_world_syncer import Collisions, Collision
-from giskardpy.model.joints import OneDofJoint, OmniDrive, DiffDrive
-from giskardpy.data_types import PrefixName, Derivatives
+from giskardpy.model.joints import OneDofJoint, OmniDrive, DiffDrive, Joint
 from giskardpy.monitors.payload_monitors import UpdateParentLinkOfGroup
 from giskardpy.python_interface.old_python_interface import OldGiskardWrapper
 from giskardpy.qp.free_variable import FreeVariable
@@ -212,13 +212,6 @@ class GiskardTestWrapper(OldGiskardWrapper):
         self.default_env_name: Optional[str] = None
         self.env_joint_state_pubs: Dict[str, rospy.Publisher] = {}
 
-        try:
-            from iai_naive_kinematics_sim.srv import UpdateTransform
-            self.set_localization_srv = rospy.ServiceProxy('/map_odom_transform_publisher/update_map_odom_transform',
-                                                           UpdateTransform)
-        except Exception as e:
-            self.set_localization_srv = None
-
         self.giskard = giskard
         self.giskard.grow()
         if god_map.is_in_github_workflow():
@@ -242,30 +235,21 @@ class GiskardTestWrapper(OldGiskardWrapper):
         # rospy.sleep(1)
         self.original_number_of_links = len(god_map.world.links)
 
-    def has_odometry_joint(self, group_name: Optional[str] = None):
+    def has_odometry_joint(self, group_name: Optional[str] = None) -> bool:
+        try:
+            joint = self.get_odometry_joint(group_name)
+        except WorldException as e:
+            return False
+        return isinstance(joint, (OmniDrive, DiffDrive))
+
+    def get_odometry_joint(self, group_name: Optional[str] = None) -> Joint:
         if group_name is None:
             group_name = self.robot_name
         parent_joint_name = god_map.world.groups[group_name].root_link.parent_joint_name
         if parent_joint_name is None:
-            return False
-        joint = god_map.world.get_joint(parent_joint_name)
-        return isinstance(joint, (OmniDrive, DiffDrive))
-
-    def set_seed_odometry(self, base_pose, group_name: Optional[str] = None):
-        self.motion_goals.set_seed_odometry(base_pose=base_pose,
-                                            group_name=group_name)
-
-    def set_localization(self, map_T_odom: PoseStamped):
-        if self.set_localization_srv is not None:
-            from iai_naive_kinematics_sim.srv import UpdateTransformRequest
-            map_T_odom.pose.position.z = 0
-            req = UpdateTransformRequest()
-            req.transform.translation = map_T_odom.pose.position
-            req.transform.rotation = map_T_odom.pose.orientation
-            assert self.set_localization_srv(req).success
-            self.wait_heartbeats(15)
-            p2 = god_map.world.compute_fk_pose(god_map.world.root_link_name, self.odom_root)
-            compare_poses(p2.pose, map_T_odom.pose)
+            raise WorldException('No odometry joint found')
+        joint_name = god_map.world.groups[group_name].root_link.child_joint_names[0]
+        return god_map.world.joints[joint_name]
 
     def transform_msg(self, target_frame, msg, timeout=1):
         result_msg = deepcopy(msg)
@@ -391,19 +375,11 @@ class GiskardTestWrapper(OldGiskardWrapper):
     # GOAL STUFF #################################################################################################
     #
 
-    def teleport_base(self, goal_pose):
-        pass
-        # goal_pose = tf.transform_pose(self.default_root, goal_pose)
-        # js = {'odom_x_joint': goal_pose.pose.position.x,
-        #       'odom_y_joint': goal_pose.pose.position.y,
-        #       'odom_z_joint': rotation_from_matrix(quaternion_matrix([goal_pose.pose.orientation.x,
-        #                                                               goal_pose.pose.orientation.y,
-        #                                                               goal_pose.pose.orientation.z,
-        #                                                               goal_pose.pose.orientation.w]))[0]}
-        # goal = SetJointStateRequest()
-        # goal.state = position_dict_to_joint_states(js)
-        # # self.set_base.call(goal)
-        # rospy.sleep(0.5)
+    def teleport_base(self, goal_pose, group_name: Optional[str] = None):
+        done = self.monitors.add_set_seed_odometry(base_pose=goal_pose, group_name=group_name)
+        self.allow_all_collisions()
+        self.monitors.add_end_motion(start_condition=done)
+        self.execute(add_local_minimum_reached=False)
 
     def set_keep_hand_in_workspace(self, tip_link, map_frame=None, base_footprint=None):
         self.motion_goals.add_motion_goal(motion_goal_class=KeepHandInWorkspace.__name__,
@@ -552,8 +528,6 @@ class GiskardTestWrapper(OldGiskardWrapper):
     #
     # BULLET WORLD #####################################################################################################
     #
-
-    TimeOut = 5000
 
     def register_group(self, new_group_name: str, root_link_group_name: str, root_link_name: str):
         self.world.register_group(new_group_name=new_group_name,
@@ -899,21 +873,18 @@ class GiskardTestWrapper(OldGiskardWrapper):
             f'{min_contact.contact_distance} > {distance_threshold} ' \
             f'({min_contact.original_link_a} with {min_contact.original_link_b})'
 
-    def move_base(self, goal_pose: PoseStamped):
-        pass
+    def move_base(self, goal_pose) -> None:
+        tip = self.get_odometry_joint().parent_link_name
+        self.motion_goals.add_cartesian_pose(goal_pose, tip_link=tip.short_name, root_link='map')
+        self.plan_and_execute()
 
     def reset(self):
         pass
 
     def reset_base(self):
         p = PoseStamped()
-        try:
-            p.header.frame_id = tf.get_tf_root()
-        except AssertionError as e:
-            p.header.frame_id = god_map.world.root_link_name
+        p.header.frame_id = god_map.world.root_link_name
         p.pose.orientation.w = 1
-        self.set_localization(p)
-        self.wait_heartbeats()
         self.teleport_base(p)
 
 

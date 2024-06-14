@@ -22,19 +22,19 @@ from giskardpy.goals.cartesian_goals import CartesianPose, DiffDriveBaseGoal, Ca
     CartesianOrientation, CartesianPoseStraight, CartesianPosition, CartesianPositionStraight
 from giskardpy.goals.collision_avoidance import CollisionAvoidance
 from giskardpy.goals.grasp_bar import GraspBar
-from giskardpy.goals.joint_goals import JointPositionList, AvoidJointLimits, SetSeedConfiguration, SetOdometry
+from giskardpy.goals.joint_goals import JointPositionList, AvoidJointLimits
 from giskardpy.goals.open_close import Close, Open
 from giskardpy.goals.pointing import Pointing
 from giskardpy.goals.pre_push_door import PrePushDoor
 from giskardpy.goals.realtime_goals import RealTimePointing
-from giskardpy.goals.set_prediction_horizon import SetPredictionHorizon
+from giskardpy.monitors.set_prediction_horizon import SetPredictionHorizon
 from giskardpy.model.utils import make_world_body_box
 from giskardpy.monitors.cartesian_monitors import PoseReached, PositionReached, OrientationReached, PointingAt, \
     VectorsAligned, DistanceToLine
 from giskardpy.monitors.joint_monitors import JointGoalReached
 from giskardpy.monitors.monitors import LocalMinimumReached, TimeAbove, Alternator, CancelMotion, EndMotion
-from giskardpy.monitors.payload_monitors import Print, Sleep, SetMaxTrajectoryLength, \
-    UpdateParentLinkOfGroup, PayloadAlternator
+from giskardpy.monitors.overwrite_state_monitors import SetOdometry, SetSeedConfiguration
+from giskardpy.monitors.payload_monitors import Print, Sleep, SetMaxTrajectoryLength, PayloadAlternator
 from giskardpy.utils.utils import kwargs_to_json, get_all_classes_in_package
 
 
@@ -957,16 +957,6 @@ class MotionGoalWrapper:
                              end_condition=end_condition,
                              **kwargs)
 
-    def set_prediction_horizon(self, prediction_horizon: int, **kwargs: goal_parameter):
-        """
-        Will overwrite the prediction horizon for a single goal.
-        Setting it to 1 will turn of acceleration and jerk limits.
-        :param prediction_horizon: size of the prediction horizon, a number that should be 1 or above 5.
-        """
-        self.add_motion_goal(motion_goal_class=SetPredictionHorizon.__name__,
-                             prediction_horizon=prediction_horizon,
-                             **kwargs)
-
     def add_carry_my_luggage(self,
                              name: str,
                              tracked_human_position_topic_name: str = '/robokudovanessa/human_position',
@@ -1111,10 +1101,7 @@ class MotionGoalWrapper:
         Only meant for use with projection. Changes the world state to seed_configuration before starting planning,
         without having to plan a motion to it like with add_joint_position
         """
-        self.add_motion_goal(motion_goal_class=SetSeedConfiguration.__name__,
-                             seed_configuration=seed_configuration,
-                             group_name=group_name,
-                             name=name)
+        raise DeprecationWarning('please use monitors.set_seed_configuration instead')
 
     def set_seed_odometry(self,
                           base_pose: PoseStamped,
@@ -1123,10 +1110,7 @@ class MotionGoalWrapper:
         """
         Only meant for use with projection. Overwrites the odometry transform with base_pose.
         """
-        self.add_motion_goal(motion_goal_class=SetOdometry.__name__,
-                             group_name=group_name,
-                             base_pose=base_pose,
-                             name=name)
+        raise DeprecationWarning('please use monitors.set_seed_odometry instead')
 
     def add_cartesian_pose_straight(self,
                                     goal_pose: PoseStamped,
@@ -1557,6 +1541,45 @@ class MonitorWrapper:
                                 name=name,
                                 seconds=seconds,
                                 start_condition=start_condition)
+
+    def add_set_seed_configuration(self,
+                                   seed_configuration: Dict[str, float],
+                                   group_name: Optional[str] = None,
+                                   name: Optional[str] = None,
+                                   start_condition: str = '') -> str:
+        """
+        Only meant for use with projection. Changes the world state to seed_configuration before starting planning,
+        without having to plan a motion to it like with add_joint_position
+        """
+        return self.add_monitor(monitor_class=SetSeedConfiguration.__name__,
+                                seed_configuration=seed_configuration,
+                                group_name=group_name,
+                                name=name,
+                                start_condition=start_condition)
+
+    def add_set_seed_odometry(self,
+                              base_pose: PoseStamped,
+                              group_name: Optional[str] = None,
+                              name: Optional[str] = None,
+                              start_condition: str = '') -> str:
+        """
+        Only meant for use with projection. Overwrites the odometry transform with base_pose.
+        """
+        return self.add_monitor(monitor_class=SetOdometry.__name__,
+                                group_name=group_name,
+                                base_pose=base_pose,
+                                name=name,
+                                start_condition=start_condition)
+
+    def add_set_prediction_horizon(self, prediction_horizon: int, **kwargs: goal_parameter):
+        """
+        Will overwrite the prediction horizon for a single goal.
+        Setting it to 1 will turn of acceleration and jerk limits.
+        :param prediction_horizon: size of the prediction horizon, a number that should be 1 or above 5.
+        """
+        self.add_monitor(monitor_class=SetPredictionHorizon.__name__,
+                         prediction_horizon=prediction_horizon,
+                         **kwargs)
 
     def add_alternator(self,
                        start_condition: str = '',

@@ -44,7 +44,7 @@ class PR2TestWrapperMujoco(PR2TestWrapper):
         self.wait_heartbeats()
 
     def set_localization(self, map_T_odom: PoseStamped):
-        super(PR2TestWrapper, self).set_localization(map_T_odom)
+        super(PR2TestWrapper, self).teleport_base(map_T_odom)
 
     def teleport_base(self, goal_pose, group_name: Optional[str] = None):
         self.allow_all_collisions()

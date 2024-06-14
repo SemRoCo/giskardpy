@@ -18,7 +18,14 @@ class InitQPController(GiskardBehavior):
     @profile
     def update(self):
         eq_constraints, neq_constraints, derivative_constraints, quadratic_weight_gains, linear_weight_gains = god_map.motion_goal_manager.get_constraints_from_goals()
-        free_variables = self.get_active_free_symbols(eq_constraints, neq_constraints, derivative_constraints)
+        try:
+            free_variables = self.get_active_free_symbols(eq_constraints, neq_constraints, derivative_constraints)
+            god_map.tree.control_loop_branch.add_qp_controller()
+        except EmptyProblemException as e:
+            if not god_map.monitor_manager.has_payload_monitors_which_are_not_end_nor_cancel():
+                raise
+            god_map.tree.control_loop_branch.remove_qp_controller()
+            return Status.SUCCESS
 
         qp_controller = QPProblemBuilder(
             free_variables=free_variables,

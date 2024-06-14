@@ -51,7 +51,11 @@ def resetted_giskard(giskard: GiskardTestWrapper) -> GiskardTestWrapper:
         zero = PoseStamped()
         zero.header.frame_id = 'map'
         zero.pose.orientation.w = 1
-        giskard.set_seed_odometry(zero)
+        done = giskard.monitors.add_set_seed_odometry(zero)
+        giskard.allow_all_collisions()
+        giskard.monitors.add_end_motion(start_condition=done)
+        giskard.execute(add_local_minimum_reached=False)
+    giskard.world.clear()
     giskard.reset()
     return giskard
 
@@ -59,9 +63,10 @@ def resetted_giskard(giskard: GiskardTestWrapper) -> GiskardTestWrapper:
 @pytest.fixture()
 def zero_pose(resetted_giskard: GiskardTestWrapper) -> GiskardTestWrapper:
     if god_map.is_standalone():
-        resetted_giskard.set_seed_configuration(resetted_giskard.default_pose)
+        done = resetted_giskard.monitors.add_set_seed_configuration(resetted_giskard.default_pose)
         resetted_giskard.allow_all_collisions()
-        resetted_giskard.execute()
+        resetted_giskard.monitors.add_end_motion(start_condition=done)
+        resetted_giskard.execute(add_local_minimum_reached=False)
     else:
         resetted_giskard.allow_all_collisions()
         resetted_giskard.set_joint_goal(resetted_giskard.default_pose)
@@ -72,35 +77,36 @@ def zero_pose(resetted_giskard: GiskardTestWrapper) -> GiskardTestWrapper:
 @pytest.fixture()
 def better_pose(resetted_giskard: GiskardTestWrapper) -> GiskardTestWrapper:
     if god_map.is_standalone():
-        resetted_giskard.set_seed_configuration(resetted_giskard.better_pose)
+        done = resetted_giskard.monitors.add_set_seed_configuration(resetted_giskard.better_pose)
         resetted_giskard.allow_all_collisions()
-        resetted_giskard.plan_and_execute()
+        resetted_giskard.monitors.add_end_motion(start_condition=done)
+        resetted_giskard.execute(add_local_minimum_reached=False)
     else:
         resetted_giskard.allow_all_collisions()
         resetted_giskard.set_joint_goal(resetted_giskard.better_pose)
-        resetted_giskard.plan_and_execute()
+        resetted_giskard.execute()
     return resetted_giskard
 
 
 @pytest.fixture()
 def kitchen_setup(better_pose: GiskardTestWrapper) -> GiskardTestWrapper:
-    kitchen_name = 'iai_kitchen'
+    better_pose.default_env_name = 'iai_kitchen'
     if god_map.is_standalone():
         kitchen_pose = PoseStamped()
         kitchen_pose.header.frame_id = str(better_pose.default_root)
         kitchen_pose.pose.orientation.w = 1
-        better_pose.add_urdf_to_world(name=kitchen_name,
+        better_pose.add_urdf_to_world(name=better_pose.default_env_name,
                                       urdf=rospy.get_param('kitchen_description'),
                                       pose=kitchen_pose)
     else:
         kitchen_pose = tf.lookup_pose('map', 'iai_kitchen/world')
-        better_pose.add_urdf_to_world(name=kitchen_name,
+        better_pose.add_urdf_to_world(name=better_pose.default_env_name,
                                       urdf=rospy.get_param('kitchen_description'),
                                       pose=kitchen_pose,
                                       js_topic='/kitchen/joint_states',
                                       set_js_topic='/kitchen/cram_joint_states')
     js = {}
-    for joint_name in god_map.world.groups[kitchen_name].movable_joint_names:
+    for joint_name in god_map.world.groups[better_pose.default_env_name].movable_joint_names:
         joint = god_map.world.joints[joint_name]
         if isinstance(joint, OneDofJoint):
             if god_map.is_standalone():
@@ -113,22 +119,22 @@ def kitchen_setup(better_pose: GiskardTestWrapper) -> GiskardTestWrapper:
 
 @pytest.fixture()
 def apartment_setup(better_pose: GiskardTestWrapper) -> GiskardTestWrapper:
-    better_pose.environment_name = 'iai_apartment'
+    better_pose.default_env_name = 'iai_apartment'
     if god_map.is_standalone():
         kitchen_pose = PoseStamped()
         kitchen_pose.header.frame_id = str(better_pose.default_root)
         kitchen_pose.pose.orientation.w = 1
-        better_pose.add_urdf_to_world(name=better_pose.environment_name,
+        better_pose.add_urdf_to_world(name=better_pose.default_env_name,
                                       urdf=rospy.get_param('apartment_description'),
                                       pose=kitchen_pose)
     else:
-        better_pose.add_urdf_to_world(name=better_pose.environment_name,
+        better_pose.add_urdf_to_world(name=better_pose.default_env_name,
                                       urdf=rospy.get_param('apartment_description'),
                                       pose=tf.lookup_pose('map', 'iai_apartment/apartment_root'),
                                       js_topic='/apartment_joint_states',
                                       set_js_topic='/iai_kitchen/cram_joint_states')
     js = {}
-    for joint_name in god_map.world.groups[better_pose.environment_name].movable_joint_names:
+    for joint_name in god_map.world.groups[better_pose.default_env_name].movable_joint_names:
         joint = god_map.world.joints[joint_name]
         if isinstance(joint, OneDofJoint):
             js[str(joint.free_variable.name)] = 0.0
@@ -139,5 +145,5 @@ def apartment_setup(better_pose: GiskardTestWrapper) -> GiskardTestWrapper:
     base_pose.pose.position.y = 2.4
     base_pose.pose.orientation.w = 1
     base_pose = better_pose.transform_msg(god_map.world.root_link_name, base_pose)
-    better_pose.set_localization(base_pose)
+    better_pose.teleport_base(base_pose)
     return better_pose

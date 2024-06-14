@@ -12,7 +12,7 @@ import rospy
 from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, PointStamped, QuaternionStamped, Pose
 from numpy import pi
 from shape_msgs.msg import SolidPrimitive
-from tf.transformations import quaternion_from_matrix, quaternion_about_axis, quaternion_matrix, rotation_matrix
+from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
 import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import WorldBody, CollisionEntry, WorldGoal, GiskardError
@@ -25,7 +25,7 @@ from giskardpy.goals.caster import Circle, Wave
 from giskardpy.goals.collision_avoidance import CollisionAvoidanceHint
 from giskardpy.goals.goals_tests import DebugGoal, CannotResolveSymbol
 from giskardpy.goals.joint_goals import JointVelocityLimit, UnlimitedJointGoal
-from giskardpy.goals.set_prediction_horizon import SetQPSolver
+from giskardpy.monitors.set_prediction_horizon import SetQPSolver
 from giskardpy.goals.tracebot import InsertCylinder
 from giskardpy.god_map import god_map
 from giskardpy.model.better_pybullet_syncer import BetterPyBulletSyncer
@@ -171,16 +171,6 @@ class PR2TestWrapper(GiskardTestWrapper):
     def low_level_interface(self):
         return super(OldGiskardWrapper, self)
 
-    def teleport_base(self, goal_pose, group_name: Optional[str] = None):
-        self.set_seed_odometry(base_pose=goal_pose, group_name=group_name)
-        self.allow_all_collisions()
-        self.plan_and_execute()
-
-    def move_base(self, goal_pose):
-        # self.set_move_base_goal(goal_pose=goal_pose)
-        self.set_cart_goal(goal_pose, tip_link='base_footprint', root_link='map')
-        self.plan_and_execute()
-
     def get_l_gripper_links(self):
         return [str(x) for x in god_map.world.groups[self.l_gripper_group].link_names_with_collisions]
 
@@ -203,54 +193,15 @@ class PR2TestWrapper(GiskardTestWrapper):
     def close_l_gripper(self):
         return
 
-    def reset_base(self):
-        p = PoseStamped()
-        p.header.frame_id = 'map'
-        p.pose.orientation.w = 1
-        if god_map.is_standalone():
-            self.teleport_base(p)
-        else:
-            self.move_base(p)
-
-    def set_localization(self, map_T_odom: PoseStamped):
-        map_T_odom.pose.position.z = 0
-        self.set_seed_odometry(map_T_odom)
-        self.plan_and_execute()
-        # self.wait_heartbeats(15)
-        # p2 = god_map.get_world().compute_fk_pose(god_map.get_world().root_link_name, self.odom_root)
-        # compare_poses(p2.pose, map_T_odom.pose)
-
     def reset(self):
-        self.clear_world()
         self.open_l_gripper()
         self.open_r_gripper()
-        self.reset_base()
         self.register_group('l_gripper',
                             root_link_group_name=self.robot_name,
                             root_link_name='l_wrist_roll_link')
         self.register_group('r_gripper',
                             root_link_group_name=self.robot_name,
                             root_link_name='r_wrist_roll_link')
-
-        # self.register_group('fl_l',
-        #                     root_link_group_name=self.robot_name,
-        #                     root_link_name='fl_caster_l_wheel_link')
-        # self.dye_group('fl_l', rgba=(1, 0, 0, 1))
-        #
-        # self.register_group('fr_l',
-        #                     root_link_group_name=self.robot_name,
-        #                     root_link_name='fr_caster_l_wheel_link')
-        # self.dye_group('fr_l', rgba=(1, 0, 0, 1))
-        #
-        # self.register_group('bl_l',
-        #                     root_link_group_name=self.robot_name,
-        #                     root_link_name='bl_caster_l_wheel_link')
-        # self.dye_group('bl_l', rgba=(1, 0, 0, 1))
-        #
-        # self.register_group('br_l',
-        #                     root_link_group_name=self.robot_name,
-        #                     root_link_name='br_caster_l_wheel_link')
-        # self.dye_group('br_l', rgba=(1, 0, 0, 1))
 
 
 @pytest.fixture(scope='module')
@@ -991,6 +942,16 @@ class TestMonitors:
         zero_pose.set_max_traj_length(30)
         zero_pose.execute(add_local_minimum_reached=False)
 
+    def test_only_payload_monitors(self, zero_pose: PR2TestWrapper):
+        sleep = zero_pose.monitors.add_sleep(5)
+        zero_pose.monitors.add_cancel_motion(start_condition=sleep, error_message='time up',
+                                             error_code=GiskardError.SETUP_ERROR)
+        zero_pose.allow_all_collisions()
+        zero_pose.execute(add_local_minimum_reached=False, expected_error_code=GiskardError.SETUP_ERROR)
+        zero_pose.set_joint_goal(zero_pose.better_pose)
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute()
+
     def test_start_monitors(self, zero_pose: PR2TestWrapper):
         alternator2 = zero_pose.monitors.add_alternator(mod=2)
 
@@ -1083,6 +1044,12 @@ class TestMonitors:
 
 class TestConstraints:
     # TODO write buggy constraints that test sanity checks
+    def test_empty_problem(self, zero_pose: PR2TestWrapper):
+        zero_pose.allow_all_collisions()
+        zero_pose.execute(expected_error_code=GiskardError.EMPTY_PROBLEM)
+        zero_pose.allow_all_collisions()
+        zero_pose.execute(expected_error_code=GiskardError.EMPTY_PROBLEM, add_local_minimum_reached=False)
+
     def test_add_debug_expr(self, zero_pose: PR2TestWrapper):
         zero_pose.motion_goals.add_motion_goal(motion_goal_class=DebugGoal.__name__)
         zero_pose.set_joint_goal(zero_pose.better_pose)
@@ -1103,14 +1070,14 @@ class TestConstraints:
         pose.header.frame_id = 'map'
         pose.pose.position.x = 1
         pose.pose.orientation.w = 1
-        zero_pose.set_seed_odometry(base_pose=pose)
+        zero_pose.monitors.add_set_seed_odometry(base_pose=pose)
         zero_pose.set_joint_goal(zero_pose.better_pose)
         zero_pose.plan()
         pose = PoseStamped()
         pose.header.frame_id = 'map'
         pose.pose.position.x = 1
         pose.pose.orientation.w = 1
-        zero_pose.set_seed_odometry(base_pose=pose, group_name=zero_pose.robot_name)
+        zero_pose.monitors.add_set_seed_odometry(base_pose=pose, group_name=zero_pose.robot_name)
         zero_pose.set_joint_goal(zero_pose.better_pose)
         zero_pose.plan()
 
@@ -1979,7 +1946,7 @@ class TestMoveBaseGoals:
         map_T_odom.pose.position.x = 1
         map_T_odom.pose.position.y = 1
         map_T_odom.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 3, [0, 0, 1]))
-        zero_pose.set_localization(map_T_odom)
+        zero_pose.teleport_base(map_T_odom)
 
         base_goal = PoseStamped()
         base_goal.header.frame_id = 'map'

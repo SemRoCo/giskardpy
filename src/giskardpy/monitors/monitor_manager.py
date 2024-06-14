@@ -349,3 +349,9 @@ class MonitorManager:
             if isinstance(m, CancelMotion):
                 return True
         return False
+
+    def has_payload_monitors_which_are_not_end_nor_cancel(self) -> bool:
+        for m in self.monitors:
+            if not isinstance(m, (CancelMotion, EndMotion)) and isinstance(m, PayloadMonitor):
+                return True
+        return False

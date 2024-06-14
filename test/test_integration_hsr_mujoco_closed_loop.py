@@ -46,10 +46,6 @@ class HSRTestWrapper(GiskardTestWrapper):
         self.odom_root = 'odom'
         self.robot = god_map.world.groups[self.robot_name]
 
-    def move_base(self, goal_pose):
-        self.set_cart_goal(goal_pose, tip_link='base_footprint', root_link=god_map.world.root_link_name)
-        self.plan_and_execute()
-
     def open_gripper(self):
         self.command_gripper(1.24)
 
@@ -61,24 +57,10 @@ class HSRTestWrapper(GiskardTestWrapper):
         self.set_joint_goal(js)
         self.plan_and_execute()
 
-    def reset_base(self):
-        p = PoseStamped()
-        p.header.frame_id = 'map'
-        p.pose.orientation.w = 1
-        self.move_base(p)
-
     def reset(self):
-        self.clear_world()
-        # self.close_gripper()
-        self.reset_base()
         self.register_group('gripper',
                             root_link_group_name=self.robot_name,
                             root_link_name='hand_palm_link')
-
-    def teleport_base(self, goal_pose, group_name: Optional[str] = None):
-        self.set_seed_odometry(base_pose=goal_pose, group_name=group_name)
-        self.allow_all_collisions()
-        self.plan_and_execute()
 
 
 @pytest.fixture(scope='module')

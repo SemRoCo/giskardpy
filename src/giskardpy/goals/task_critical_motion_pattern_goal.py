@@ -36,9 +36,11 @@ class TCMPGoal(Goal):
             name = f'{self.__class__.__name__}/{self.root_link}/{self.tip_link}'
         super().__init__(name)
 
+        # -------------- Approach -------------------------------------------------------
         # collect approach constraints and monitor their success
         # approach_task = self.create_and_add_task(task_name='approach task')
 
+        # -------------- TCMP -----------------------------------------------------------
         # define the task critical movement using the movement function or constraints and monitor their success
         critical_task = self.create_and_add_task(task_name='critial task')
 
@@ -53,10 +55,13 @@ class TCMPGoal(Goal):
                                                      task_expression=root_P_tip[:3],
                                                      names=['sdf', 'gdf', 'hgj'])
 
+        # ------------- release ---------------------------------------------------------
         # collect release constraints and monitor their success
         # release_task = self.create_and_add_task(task_name="release task")
 
+        # ------------ monitoring -------------------------------------------------------
         # monitor additional values throughout the motion execution
         # for monitoring_request in monitoring_list:
         #     pass
+
         self.connect_monitors_to_all_tasks(start_condition, hold_condition, end_condition)

@@ -54,14 +54,14 @@ class MaxManipulability(Goal):
         monitor = ManipulabilityMonitor(name=f'manipMonitor{tip_link}')
         self.add_monitor(monitor)
         # monitor.expression = cas.less(percentual_diff, monitor_threshold)
-        task.end_condition = monitor
-        god_map.debug_expression_manager.add_debug_expression('percentualDiff', percentual_diff)
-        god_map.debug_expression_manager.add_debug_expression('OldmMnitorValue',
-                                                              cas.less(percentual_diff, monitor_threshold))
-        god_map.debug_expression_manager.add_debug_expression('monitorValue', symbol_manager.get_symbol(
-            f'god_map.monitor_manager.payload_monitors[-1].state'))
-        god_map.debug_expression_manager.add_debug_expression('start', 1)
-        god_map.debug_expression_manager.add_debug_expression('mIndex', m)
+        # task.end_condition = monitor
+        # god_map.debug_expression_manager.add_debug_expression('percentualDiff', percentual_diff)
+        # god_map.debug_expression_manager.add_debug_expression('OldmMnitorValue',
+        #                                                       cas.less(percentual_diff, monitor_threshold))
+        # god_map.debug_expression_manager.add_debug_expression('monitorValue', symbol_manager.get_symbol(
+        #     f'god_map.monitor_manager.payload_monitors[-1].state'))
+        # god_map.debug_expression_manager.add_debug_expression('start', 1)
+        # god_map.debug_expression_manager.add_debug_expression('mIndex', m)
 
     """
     This goal maximizes the manipulability of the kinematic chain between root_link and tip_link.

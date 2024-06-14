@@ -2,6 +2,7 @@ from giskardpy.configs.giskard import CollisionAvoidanceConfig
 from giskardpy.configs.world_config import WorldWithOmniDriveRobot
 from giskardpy.data_types import Derivatives
 from giskardpy.configs.robot_interface_config import StandAloneRobotInterfaceConfig
+from giskardpy.god_map import god_map
 
 
 class KevinCollisionAvoidanceConfig(CollisionAvoidanceConfig):
@@ -16,6 +17,8 @@ class KevinCollisionAvoidanceConfig(CollisionAvoidanceConfig):
                                                     number_of_repeller=2,
                                                     soft_threshold=0.2,
                                                     hard_threshold=0.1)
+
+        god_map.world.register_group('gripper', 'kevin/robot_arm_wrist_link', actuated=True)
 
 
 class KevinStandaloneInterface(StandAloneRobotInterfaceConfig):

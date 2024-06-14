@@ -236,7 +236,10 @@ class GiskardTestWrapper(OldGiskardWrapper):
         self.original_number_of_links = len(god_map.world.links)
 
     def has_odometry_joint(self, group_name: Optional[str] = None) -> bool:
-        joint = self.get_odometry_joint(group_name)
+        try:
+            joint = self.get_odometry_joint(group_name)
+        except WorldException as e:
+            return False
         return isinstance(joint, (OmniDrive, DiffDrive))
 
     def get_odometry_joint(self, group_name: Optional[str] = None) -> Joint:

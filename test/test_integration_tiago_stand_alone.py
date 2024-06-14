@@ -303,7 +303,7 @@ class TestCollisionAvoidance:
 
     def test_demo1(self, apartment_setup: TiagoTestWrapper):
         # setup
-        apartment_name = apartment_setup.environment_name
+        apartment_name = apartment_setup.default_env_name
         l_tcp = 'gripper_left_grasping_frame'
         handle_name = 'handle_cab1_top_door'
         handle_name_frame = 'handle_cab1_top_door'

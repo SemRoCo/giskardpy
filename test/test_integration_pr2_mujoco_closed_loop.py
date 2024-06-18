@@ -170,7 +170,7 @@ class TestMoveBaseGoals:
         map_T_odom.pose.position.x = 1
         map_T_odom.pose.position.y = 1
         map_T_odom.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 3, [0, 0, 1]))
-        zero_pose.set_localization(map_T_odom)
+        zero_pose.teleport_base(map_T_odom)
 
         base_goal = PoseStamped()
         base_goal.header.frame_id = 'map'
@@ -227,12 +227,11 @@ class TestMoveBaseGoals:
         # zero_pose.allow_all_collisions()
         # zero_pose.plan_and_execute(expected_error_codes=[GiskardError.PREEMPTED], stop_after=10)
 
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class=CarryMyBullshit.__name__,
-                                               name='cmb',
-                                               camera_link='head_mount_kinect_rgb_optical_frame',
-                                               point_cloud_laser_topic_name='',
-                                               laser_frame_id='base_laser_link',
-                                               height_for_camera_target=1.5)
+        zero_pose.motion_goals.add_carry_my_luggage(name='cmb',
+                                                    camera_link='head_mount_kinect_rgb_optical_frame',
+                                                    point_cloud_laser_topic_name='',
+                                                    laser_frame_id='base_laser_link',
+                                                    height_for_camera_target=1.5)
         zero_pose.allow_all_collisions()
         # zero_pose.execute(expected_error_code=GiskardError.EXECUTION_ERROR,
         #                   add_local_minimum_reached=False)
@@ -247,13 +246,12 @@ class TestMoveBaseGoals:
         # zero_pose.allow_all_collisions()
         # zero_pose.plan_and_execute(expected_error_codes=[GiskardError.PREEMPTED], stop_after=10)
 
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class=CarryMyBullshit.__name__,
-                                               name='cmb',
-                                               camera_link='head_mount_kinect_rgb_optical_frame',
-                                               point_cloud_laser_topic_name='',
-                                               # laser_topic_name='/laser',
-                                               laser_frame_id='base_laser_link',
-                                               drive_back=True)
+        zero_pose.motion_goals.add_carry_my_luggage(name='cmb',
+                                                    camera_link='head_mount_kinect_rgb_optical_frame',
+                                                    point_cloud_laser_topic_name='',
+                                                    # laser_topic_name='/laser',
+                                                    laser_frame_id='base_laser_link',
+                                                    drive_back=True)
         zero_pose.allow_all_collisions()
         zero_pose.execute(add_local_minimum_reached=False)
 
@@ -395,6 +393,16 @@ class TestConstraints:
         zero_pose.set_seed_configuration(seed_configuration=zero_pose.better_pose)
         zero_pose.set_joint_goal(zero_pose.default_pose)
         zero_pose.projection()
+
+    def test_real_time_pointing(self, zero_pose: PR2TestWrapper):
+        vector = Vector3Stamped()
+        vector.header.frame_id = 'head_mount_kinect_rgb_optical_frame'
+        vector.vector.x = 1
+        zero_pose.motion_goals.add_real_time_pointing(tip_link='head_mount_kinect_rgb_optical_frame',
+                                                      root_link='torso_lift_link',
+                                                      topic_name='/robokudovanessa/human_position',
+                                                      pointing_axis=vector)
+        zero_pose.execute(add_local_minimum_reached=False)
 
     def test_bowl_and_cup(self, kitchen_setup: PR2TestWrapper):
         # kernprof -lv py.test -s test/test_integration_pr2.py::TestCollisionAvoidanceGoals::test_bowl_and_cup
@@ -624,6 +632,14 @@ class TestManipulability:
                                         tip_normal=x_base,
                                         goal_normal=x_goal)
         zero_pose.plan_and_execute()
+
+class TestMonitors:
+    def test_only_payload_monitors(self, zero_pose: PR2TestWrapper):
+        sleep = zero_pose.monitors.add_sleep(2)
+        zero_pose.monitors.add_cancel_motion(start_condition=sleep, error_message='time up',
+                                             error_code=GiskardError.SETUP_ERROR)
+        zero_pose.allow_all_collisions()
+        zero_pose.execute(add_local_minimum_reached=False, expected_error_code=GiskardError.SETUP_ERROR)
 
 # kernprof -lv py.test -s test/test_integration_pr2.py
 # time: [1-9][1-9]*.[1-9]* s

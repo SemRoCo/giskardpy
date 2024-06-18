@@ -593,7 +593,7 @@ class WorldTree(WorldTreeInterface):
         with suppress_stderr():
             try:
                 parsed_urdf: up.Robot = up.URDF.from_xml_string(hacky_urdf_parser_fix(urdf))
-            except ParseError as e:
+            except Exception as e:
                 raise CorruptURDFException(str(e))
         if group_name in self.groups:
             raise DuplicateNameException(

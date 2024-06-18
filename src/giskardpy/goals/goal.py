@@ -155,10 +155,3 @@ class Goal(ABC):
             god_map.monitor_manager.add_expression_monitor(monitor)
         else:
             god_map.monitor_manager.add_payload_monitor(monitor)
-
-
-class NonMotionGoal(Goal):
-    """
-    Inherit from this goal, if the goal does not add any constraints.
-    """
-    pass

@@ -242,7 +242,7 @@ class OldGiskardWrapper(GiskardWrapper):
                                                  **kwargs)
 
     def set_seed_configuration(self, seed_configuration, group_name: Optional[str] = None):
-        self.motion_goals.set_seed_configuration(seed_configuration=seed_configuration,
+        self.monitors.add_set_seed_configuration(seed_configuration=seed_configuration,
                                                  group_name=group_name)
 
     def set_straight_translation_goal(self,
@@ -368,8 +368,8 @@ class OldGiskardWrapper(GiskardWrapper):
         Setting it to 1 will turn of acceleration and jerk limits.
         :param prediction_horizon: size of the prediction horizon, a number that should be 1 or above 5.
         """
-        self.motion_goals.set_prediction_horizon(prediction_horizon=prediction_horizon,
-                                                 **kwargs)
+        self.monitors.add_set_prediction_horizon(prediction_horizon=prediction_horizon,
+                                             **kwargs)
 
     def set_max_traj_length(self, new_length: float, **kwargs: goal_parameter):
         """
@@ -843,8 +843,8 @@ class OldGiskardWrapper(GiskardWrapper):
         :return: WorldResult
         """
         return self.world.register_group(new_group_name=new_group_name,
-                                   root_link_name=root_link_name,
-                                   root_link_group_name=root_link_group_name)
+                                         root_link_name=root_link_name,
+                                         root_link_group_name=root_link_group_name)
 
     def clear_world(self) -> WorldResult:
         """

@@ -92,20 +92,12 @@ class DonbotTestWrapper(GiskardTestWrapper):
                                                                       goal_pose.pose.orientation.z,
                                                                       goal_pose.pose.orientation.w]))[0]}
         self.allow_all_collisions()
-        self.set_seed_configuration(js)
-        self.plan_and_execute()
-
-    def move_base(self, goal_pose):
-        self.set_cart_goal(goal_pose, tip_link='base_footprint', root_link='odom')
-        self.plan_and_execute()
-
-    def set_localization(self, map_T_odom: PoseStamped):
-        self.teleport_base(map_T_odom)
+        done = self.monitors.add_set_seed_configuration(js)
+        self.monitors.add_end_motion(start_condition=done)
+        self.execute(add_local_minimum_reached=False)
 
     def reset(self):
         self.open_gripper()
-        self.reset_base()
-        self.clear_world()
         # self.register_group('gripper',
         #                     root_link_group_name=self.robot_name,
         #                     root_link_name='l_wrist_roll_link')

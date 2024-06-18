@@ -1,3 +1,6 @@
+from typing import Tuple
+from xml.etree import ElementTree as ET
+
 import numpy as np
 from shape_msgs.msg import SolidPrimitive
 
@@ -8,22 +11,20 @@ def robot_name_from_urdf_string(urdf_string):
     return urdf_string.split('robot name="')[1].split('"')[0]
 
 
-def hacky_urdf_parser_fix(urdf_str):
-    # this function is inefficient but the tested urdfs's aren't big enough for it to be a problem
-    fixed_urdf = ''
-    delete = False
-    black_list = ['transmission', 'gazebo']
-    black_open = ['<{}'.format(x) for x in black_list]
-    black_close = ['</{}'.format(x) for x in black_list]
-    for line in urdf_str.split('\n'):
-        if len([x for x in black_open if x in line]) > 0:
-            delete = True
-        if len([x for x in black_close if x in line]) > 0:
-            delete = False
-            continue
-        if not delete:
-            fixed_urdf += line + '\n'
-    return fixed_urdf
+def hacky_urdf_parser_fix(urdf: str, blacklist: Tuple[str] = ('transmission', 'gazebo')) -> str:
+    # Parse input string
+    root = ET.fromstring(urdf)
+
+    # Iterate through each section in the blacklist
+    for section_name in blacklist:
+        # Find all sections with the given name and remove them
+        for elem in root.findall(f".//{section_name}"):
+            parent = root.find(f".//{section_name}/..")
+            if parent is not None:
+                parent.remove(elem)
+
+    # Turn back to string
+    return ET.tostring(root, encoding='unicode')
 
 
 def make_world_body_box(x_length: float = 1, y_length: float = 1, z_length: float = 1) -> WorldBody:

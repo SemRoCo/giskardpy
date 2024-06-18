@@ -2,96 +2,14 @@ from __future__ import division
 
 from typing import Dict, Optional, List
 
-from geometry_msgs.msg import PoseStamped
-
 from giskardpy import casadi_wrapper as cas
-from giskardpy.god_map import god_map
-from giskardpy.symbol_manager import symbol_manager
+from giskardpy.data_types import Derivatives
 from giskardpy.exceptions import GoalInitalizationException
-from giskardpy.goals.goal import Goal, NonMotionGoal
+from giskardpy.goals.goal import Goal
+from giskardpy.god_map import god_map
+from giskardpy.model.joints import OneDofJoint
+from giskardpy.symbol_manager import symbol_manager
 from giskardpy.motion_graph.tasks.task import WEIGHT_BELOW_CA
-from giskardpy.model.joints import OmniDrive, DiffDrive, OmniDrivePR22, OneDofJoint
-from giskardpy.data_types import PrefixName, Derivatives
-from giskardpy.utils.expression_definition_utils import transform_msg
-from giskardpy.utils.math import axis_angle_from_quaternion
-
-
-class SetSeedConfiguration(NonMotionGoal):
-    def __init__(self,
-                 seed_configuration: Dict[str, float],
-                 group_name: Optional[str] = None,
-                 name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol):
-        """
-        Overwrite the configuration of the world to allow starting the planning from a different state.
-        Can only be used in plan only mode.
-        :param seed_configuration: maps joint name to float
-        :param group_name: if joint names are not unique, it will search in this group for matches.
-        """
-        self.seed_configuration = seed_configuration
-        if name is None:
-            name = f'{str(self.__class__.__name__)}/{list(self.seed_configuration.keys())}'
-        super().__init__(name)
-        if group_name is not None:
-            seed_configuration = {PrefixName(joint_name, group_name): v for joint_name, v in seed_configuration.items()}
-        if god_map.is_goal_msg_type_execute() and not god_map.is_standalone():
-            raise GoalInitalizationException(f'It is not allowed to combine {str(self)} with plan and execute.')
-        for joint_name, initial_joint_value in seed_configuration.items():
-            joint_name = god_map.world.search_for_joint_name(joint_name, group_name)
-            if joint_name not in god_map.world.state:
-                raise KeyError(f'World has no joint \'{joint_name}\'.')
-            god_map.world.state[joint_name].position = initial_joint_value
-        god_map.world.notify_state_change()
-        self.connect_monitors_to_all_tasks(start_condition, hold_condition, end_condition)
-
-
-class SetOdometry(NonMotionGoal):
-    odom_joints = (OmniDrive, DiffDrive, OmniDrivePR22)
-    def __init__(self,
-                 base_pose: PoseStamped,
-                 group_name: Optional[str] = None,
-                 name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol):
-        self.group_name = group_name
-        if name is None:
-            name = f'{self.__class__.__name__}/{self.group_name}'
-        super().__init__(name)
-        if god_map.is_goal_msg_type_execute() and not god_map.is_standalone():
-            raise GoalInitalizationException(f'It is not allowed to combine {str(self)} with plan and execute.')
-        if self.group_name is None:
-            drive_joints = god_map.world.search_for_joint_of_type(self.odom_joints)
-            if len(drive_joints) == 0:
-                raise GoalInitalizationException('No drive joints in world')
-            elif len(drive_joints) == 1:
-                brumbrum_joint = drive_joints[0]
-            else:
-                raise GoalInitalizationException('Multiple drive joint found in world, please set \'group_name\'')
-        else:
-            brumbrum_joint_name = god_map.world.groups[group_name].root_link.child_joint_names[0]
-            brumbrum_joint = god_map.world.joints[brumbrum_joint_name]
-            if not isinstance(brumbrum_joint, self.odom_joints):
-                raise GoalInitalizationException(f'Group {self.group_name} has no odometry joint.')
-        base_pose = transform_msg(brumbrum_joint.parent_link_name, base_pose).pose
-        god_map.world.state[brumbrum_joint.x.name].position = base_pose.position.x
-        god_map.world.state[brumbrum_joint.y.name].position = base_pose.position.y
-        axis, angle = axis_angle_from_quaternion(base_pose.orientation.x,
-                                                 base_pose.orientation.y,
-                                                 base_pose.orientation.z,
-                                                 base_pose.orientation.w)
-        if axis[-1] < 0:
-            angle = -angle
-        if isinstance(brumbrum_joint, OmniDrivePR22):
-            god_map.world.state[brumbrum_joint.yaw1_vel.name].position = 0
-            # god_map.get_world().state[brumbrum_joint.yaw2_name].position = angle
-            god_map.world.state[brumbrum_joint.yaw.name].position = angle
-        else:
-            god_map.world.state[brumbrum_joint.yaw.name].position = angle
-        god_map.world.notify_state_change()
-        self.connect_monitors_to_all_tasks(start_condition, hold_condition, end_condition)
 
 
 class JointVelocityLimit(Goal):
@@ -290,7 +208,8 @@ class JointSignWave(Goal):
         min_, max_ = god_map.world.compute_joint_limits(joint_name, Derivatives.position)
         _, max_vel = god_map.world.compute_joint_limits(joint_name, Derivatives.velocity)
         center = (max_ + min_) / 2
-        goal_position = center + cas.sin(symbol_manager.time * 2 * cas.pi * (frequency)) * (max_ - center) * amp_percentage
+        goal_position = center + cas.sin(symbol_manager.time * 2 * cas.pi * (frequency)) * (
+                max_ - center) * amp_percentage
         t.add_position_constraint(expr_current=joint_symbol,
                                   expr_goal=goal_position,
                                   reference_velocity=max_vel,

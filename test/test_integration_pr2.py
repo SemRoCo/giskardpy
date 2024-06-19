@@ -942,6 +942,35 @@ class TestMonitors:
         zero_pose.set_max_traj_length(30)
         zero_pose.execute(add_local_minimum_reached=False)
 
+    def test_hold_condition_of_monitor(self, zero_pose: PR2TestWrapper):
+        sleep = zero_pose.monitors.add_sleep(2, name='sleep')
+        joint_goal = zero_pose.monitors.add_joint_position(name='joint reached',
+                                                           goal_state=zero_pose.better_pose,
+                                                           hold_condition=f'not {sleep}')
+
+        zero_pose.motion_goals.add_joint_position(goal_state=zero_pose.better_pose)
+        zero_pose.monitors.add_end_motion(start_condition=joint_goal)
+        zero_pose.execute(add_local_minimum_reached=False)
+
+    def test_hold_condition_of_monitor2(self, zero_pose: PR2TestWrapper):
+        sleep = zero_pose.monitors.add_sleep(1, name='sleep')
+        sleep2 = zero_pose.monitors.add_sleep(1, name='sleep2', start_condition=sleep)
+        joint_goal = zero_pose.monitors.add_joint_position(name='joint reached',
+                                                           goal_state=zero_pose.better_pose)
+        teleport = zero_pose.monitors.add_set_seed_configuration(seed_configuration=zero_pose.default_pose)
+        joint_goal2 = zero_pose.monitors.add_joint_position(name='joint reached2',
+                                                            goal_state=zero_pose.default_pose,
+                                                            threshold=0.03,
+                                                            start_condition=teleport,
+                                                            hold_condition=f'{sleep}',
+                                                            end_condition='')
+
+        zero_pose.motion_goals.add_joint_position(goal_state=zero_pose.better_pose,
+                                                  start_condition=sleep2)
+        zero_pose.monitors.add_end_motion(start_condition=joint_goal)
+        zero_pose.monitors.add_cancel_motion(start_condition=f'not {joint_goal2} and {sleep2}', error_message='fail')
+        zero_pose.execute(add_local_minimum_reached=False)
+
     def test_only_payload_monitors(self, zero_pose: PR2TestWrapper):
         sleep = zero_pose.monitors.add_sleep(5)
         zero_pose.monitors.add_cancel_motion(start_condition=sleep, error_message='time up',

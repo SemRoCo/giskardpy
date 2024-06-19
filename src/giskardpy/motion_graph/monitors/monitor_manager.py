@@ -312,19 +312,19 @@ class MonitorManager:
                 raise e
 
     def has_end_motion_monitor(self) -> bool:
-        for m in self.monitors:
+        for m in self.monitors.values():
             if isinstance(m, EndMotion):
                 return True
         return False
 
     def has_cancel_motion_monitor(self) -> bool:
-        for m in self.monitors:
+        for m in self.monitors.values():
             if isinstance(m, CancelMotion):
                 return True
         return False
 
     def has_payload_monitors_which_are_not_end_nor_cancel(self) -> bool:
-        for m in self.monitors:
+        for m in self.monitors.values():
             if not isinstance(m, (CancelMotion, EndMotion)) and isinstance(m, PayloadMonitor):
                 return True
         return False

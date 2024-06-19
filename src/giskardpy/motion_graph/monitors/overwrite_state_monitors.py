@@ -5,7 +5,7 @@ from typing import Dict, Optional
 from geometry_msgs.msg import PoseStamped
 
 from giskardpy import casadi_wrapper as cas
-from giskardpy.monitors.monitors import PayloadMonitor
+from giskardpy.motion_graph.monitors.monitors import PayloadMonitor
 from giskardpy.god_map import god_map
 from giskardpy.exceptions import GoalInitalizationException
 from giskardpy.model.joints import OmniDrive, DiffDrive, OmniDrivePR22
@@ -29,7 +29,7 @@ class SetSeedConfiguration(PayloadMonitor):
         self.seed_configuration = seed_configuration
         if name is None:
             name = f'{str(self.__class__.__name__)}/{list(self.seed_configuration.keys())}'
-        super().__init__(run_call_in_thread=False, name=name, stay_true=True, start_condition=start_condition)
+        super().__init__(run_call_in_thread=False, name=name, start_condition=start_condition)
         self.group_name = group_name
         if group_name is not None:
             self.seed_configuration = {PrefixName(joint_name, group_name): v for joint_name, v in
@@ -56,7 +56,7 @@ class SetOdometry(PayloadMonitor):
         self.group_name = group_name
         if name is None:
             name = f'{self.__class__.__name__}/{self.group_name}'
-        super().__init__(run_call_in_thread=False, name=name, stay_true=True, start_condition=start_condition)
+        super().__init__(run_call_in_thread=False, name=name, start_condition=start_condition)
         self.base_pose = base_pose
         if self.group_name is None:
             drive_joints = god_map.world.search_for_joint_of_type(self.odom_joints)

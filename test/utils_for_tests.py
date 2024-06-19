@@ -188,8 +188,8 @@ def unit_vector(length, elements=None):
     return st.builds(normalize, vector)
 
 
-def quaternion(elements=None):
-    return unit_vector(4, elements)
+def quaternion():
+    return unit_vector(4, float_no_nan_no_inf(outer_limit=1))
 
 
 def pykdl_frame_to_numpy(pykdl_frame):

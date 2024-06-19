@@ -26,25 +26,25 @@ def search_for_monitor(monitor_name: str, execution_state: ExecutionState) -> gi
 
 
 task_state_to_color: Dict[TaskState, str] = {
-    TaskState.not_started: 'black',
+    TaskState.not_started: 'gray',
     TaskState.running: 'green',
-    TaskState.on_hold: 'gray',
+    TaskState.on_hold: 'orange',
     TaskState.succeeded: 'palegreen',
-    TaskState.failed: 'tomato'
+    TaskState.failed: 'red'
 }
 
 monitor_state_to_color: Dict[Tuple[TaskState, int], str] = {
-    (TaskState.not_started, 1): 'black',  # doesn't exist
+    (TaskState.not_started, 1): 'darkgreen',
     (TaskState.running, 1): 'green',
-    (TaskState.on_hold, 1): 'gray',
+    (TaskState.on_hold, 1): 'turquoise',
     (TaskState.succeeded, 1): 'palegreen',
-    (TaskState.failed, 1): 'red',
+    (TaskState.failed, 1): 'gray',
 
-    (TaskState.not_started, 0): 'black',
-    (TaskState.running, 0): 'orange',
-    (TaskState.on_hold, 0): 'gray',
-    (TaskState.succeeded, 0): 'palegreen',
-    (TaskState.failed, 0): 'red'
+    (TaskState.not_started, 0): 'darkred',
+    (TaskState.running, 0): 'red2',
+    (TaskState.on_hold, 0): 'orange',
+    (TaskState.succeeded, 0): 'red',
+    (TaskState.failed, 0): 'black'
 }
 
 

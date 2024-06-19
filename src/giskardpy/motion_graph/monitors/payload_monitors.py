@@ -86,6 +86,8 @@ class Print(PayloadMonitor):
 
 
 class Sleep(PayloadMonitor):
+    start_time: float
+
     def __init__(self,
                  seconds: float,
                  name: Optional[str] = None,
@@ -97,11 +99,13 @@ class Sleep(PayloadMonitor):
                          start_condition=start_condition,
                          hold_condition=hold_condition,
                          end_condition=end_condition,
-                         run_call_in_thread=True)
+                         run_call_in_thread=False)
+        self.start_time = None
 
     def __call__(self):
-        rospy.sleep(self.seconds)
-        self.state = True
+        if self.start_time is None:
+            self.start_time = god_map.time
+        self.state = god_map.time - self.start_time >= self.seconds
 
 
 class UpdateParentLinkOfGroup(WorldUpdatePayloadMonitor):

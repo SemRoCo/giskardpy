@@ -115,6 +115,9 @@ def execution_state_to_dot_graph(execution_state: ExecutionState) -> pydot.Dot:
 
     # Process monitors and their start_condition
     for i, monitor in enumerate(execution_state.monitors):
+        kwargs = json_str_to_kwargs(monitor.kwargs)
+        hold_condition = format_condition(kwargs['hold_condition'])
+        end_condition = format_condition(kwargs['end_condition'])
         monitor_node = add_or_get_node(monitor)
         monitor_node.obj_dict['attributes']['color'] = monitor_state_to_color[
             (execution_state.monitor_life_cycle_state[i],
@@ -124,6 +127,17 @@ def execution_state_to_dot_graph(execution_state: ExecutionState) -> pydot.Dot:
             sub_monitor = search_for_monitor(sub_monitor_name, execution_state)
             sub_monitor_node = add_or_get_node(sub_monitor)
             graph.add_edge(pydot.Edge(sub_monitor_node, monitor_node, color='green'))
+        free_symbols = extract_monitor_names_from_condition(hold_condition)
+        for sub_monitor_name in free_symbols:
+            sub_monitor = search_for_monitor(sub_monitor_name, execution_state)
+            sub_monitor_node = add_or_get_node(sub_monitor)
+            graph.add_edge(pydot.Edge(sub_monitor_node, monitor_node, color='orange'))
+        free_symbols = extract_monitor_names_from_condition(end_condition)
+        for sub_monitor_name in free_symbols:
+            sub_monitor = search_for_monitor(sub_monitor_name, execution_state)
+            sub_monitor_node = add_or_get_node(sub_monitor)
+            graph.add_edge(pydot.Edge(sub_monitor_node, monitor_node, color='red', arrowhead='none', arrowtail='normal',
+                                      dir='both'))
 
     # Process goals and their connections
     for i, task in enumerate(execution_state.tasks):

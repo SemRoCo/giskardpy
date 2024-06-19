@@ -592,13 +592,13 @@ class RelativePositionSequence(Goal):
 
         error1 = cas.euclidean_distance(root_P_goal1, root_P_current)
         error1_monitor = ExpressionMonitor(name='p1')
-        error1_monitor.end_condition = error1_monitor.get_state_expression()
         self.add_monitor(error1_monitor)
+        error1_monitor.end_condition = error1_monitor.get_state_expression()
         error1_monitor.expression = cas.less(cas.abs(error1), 0.01)
 
         error2_monitor = ExpressionMonitor(name='p2')
-        error2_monitor.end_condition = error2_monitor.get_state_expression()
         self.add_monitor(error2_monitor)
+        error2_monitor.end_condition = error2_monitor.get_state_expression()
 
         root_P_goal2_cached = transform_msg_and_turn_to_expr(self.root_link,
                                                              self.tip_P_goal2,

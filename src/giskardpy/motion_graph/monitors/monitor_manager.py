@@ -48,26 +48,30 @@ class MonitorManager:
         self.triggers = {}
         self.trigger_conditions = []
 
-    def evaluate_expression(self, node):
+    def evaluate_expression(self, node,
+                            monitor_name_to_state_expr: Dict[str, cas.Expression]) -> cas.Expression:
         if isinstance(node, ast.BoolOp):
             if isinstance(node.op, ast.And):
-                return cas.logic_and(*[self.evaluate_expression(x) for x in node.values])
+                return cas.logic_and(*[self.evaluate_expression(x, monitor_name_to_state_expr) for x in node.values])
             elif isinstance(node.op, ast.Or):
-                return cas.logic_or(*[self.evaluate_expression(x) for x in node.values])
+                return cas.logic_or(*[self.evaluate_expression(x, monitor_name_to_state_expr) for x in node.values])
         elif isinstance(node, ast.UnaryOp):
             if isinstance(node.op, ast.Not):
-                return cas.logic_not(self.evaluate_expression(node.operand))
+                return cas.logic_not(self.evaluate_expression(node.operand, monitor_name_to_state_expr))
         elif isinstance(node, ast.Str):
             # replace monitor name with its state expression
-            return self.get_monitor(node.value).get_state_expression()
+            return monitor_name_to_state_expr[node.value]
         raise Exception(f'failed to parse {node}')
 
-    def logic_str_to_expr(self, logic_str: str, default: cas.Expression) -> cas.Expression:
+    def logic_str_to_expr(self, logic_str: str, default: cas.Expression,
+                          monitor_name_to_state_expr: Optional[Dict[str, cas.Expression]] = None) -> cas.Expression:
+        if monitor_name_to_state_expr is None:
+            monitor_name_to_state_expr = {key: value.get_state_expression() for key, value in self.monitors.items()}
         if logic_str == '':
             return default
         tree = ast.parse(logic_str, mode='eval')
         try:
-            return self.evaluate_expression(tree.body)
+            return self.evaluate_expression(tree.body, monitor_name_to_state_expr)
         except KeyError as e:
             raise GiskardException(f'Unknown symbol {e}')
         except Exception as e:
@@ -292,18 +296,23 @@ class MonitorManager:
                 kwargs = json_str_to_kwargs(monitor_msg.kwargs)
                 hold_condition = kwargs.pop('hold_condition')
                 end_condition = kwargs.pop('end_condition')
+                monitor_name_to_state_expr = {str(key): value.get_state_expression() for key, value in self.monitors.items()}
+                monitor_name_to_state_expr[monitor_msg.name] = symbol_manager.get_symbol(f'god_map.monitor_manager.state[{len(self.monitors)}]')
+                start_condition = self.logic_str_to_expr(monitor_msg.start_condition, default=cas.TrueSymbol,
+                                                         monitor_name_to_state_expr=monitor_name_to_state_expr)
+                hold_condition = self.logic_str_to_expr(hold_condition, default=cas.FalseSymbol,
+                                                        monitor_name_to_state_expr=monitor_name_to_state_expr)
+                end_condition = self.logic_str_to_expr(end_condition, default=cas.FalseSymbol,
+                                                       monitor_name_to_state_expr=monitor_name_to_state_expr)
                 monitor = C(name=monitor_msg.name,
+                            start_condition=start_condition,
+                            hold_condition=hold_condition,
+                            end_condition=end_condition,
                             **kwargs)
                 if isinstance(monitor, ExpressionMonitor):
                     self.add_expression_monitor(monitor)
                 elif isinstance(monitor, PayloadMonitor):
                     self.add_payload_monitor(monitor)
-                start_condition = self.logic_str_to_expr(monitor_msg.start_condition, default=cas.TrueSymbol)
-                hold_condition = self.logic_str_to_expr(hold_condition, default=cas.FalseSymbol)
-                end_condition = self.logic_str_to_expr(end_condition, default=cas.FalseSymbol)
-                monitor.start_condition = start_condition
-                monitor.hold_condition = hold_condition
-                monitor.end_condition = end_condition
             except Exception as e:
                 traceback.print_exc()
                 error_msg = f'Initialization of \'{C.__name__}\' monitor failed: \n {e} \n'

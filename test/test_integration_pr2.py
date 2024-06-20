@@ -969,6 +969,7 @@ class TestMonitors:
                                                   start_condition=sleep2)
         zero_pose.monitors.add_end_motion(start_condition=joint_goal)
         zero_pose.monitors.add_cancel_motion(start_condition=f'not {joint_goal2} and {sleep2}', error_message='fail')
+        zero_pose.monitors.add_max_trajectory_length(30)
         zero_pose.execute(add_local_minimum_reached=False)
 
     def test_end_plus_false_monitor(self, zero_pose: PR2TestWrapper):

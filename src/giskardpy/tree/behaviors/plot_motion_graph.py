@@ -41,9 +41,9 @@ monitor_state_to_color: Dict[Tuple[TaskState, int], str] = {
     (TaskState.failed, 1): 'gray',
 
     (TaskState.not_started, 0): 'darkred',
-    (TaskState.running, 0): 'red2',
+    (TaskState.running, 0): 'red',
     (TaskState.on_hold, 0): 'orange',
-    (TaskState.succeeded, 0): 'red',
+    (TaskState.succeeded, 0): 'lightpink',
     (TaskState.failed, 0): 'black'
 }
 

@@ -1627,7 +1627,7 @@ class MonitorWrapper:
     def add_alternator(self,
                        start_condition: str = '',
                        hold_condition: str = '',
-                       end_condition: Optional[str] = None,
+                       end_condition: str = '',
                        name: Optional[str] = None,
                        mod: int = 2) -> str:
         """

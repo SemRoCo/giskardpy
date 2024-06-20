@@ -1,4 +1,5 @@
 import traceback
+from copy import copy
 from typing import List, Dict, Tuple, Optional
 
 import matplotlib.pyplot as plt
@@ -83,6 +84,7 @@ class PlotGanttChart(GiskardBehavior):
         god_map.monitor_manager.evaluate_monitors()
         monitor_history: List[Tuple[float, List[Optional[TaskState]]]] = []
         for time_id, (time, (state, life_cycle_state)) in enumerate(god_map.monitor_manager.state_history):
+            life_cycle_state = copy(life_cycle_state)
             for monitor_id in range(len(state)):
                 if not state[monitor_id] and life_cycle_state[monitor_id] == TaskState.running:
                     life_cycle_state[monitor_id] = TaskState.on_hold

@@ -399,6 +399,34 @@ class TestJointGoals:
 
 
 class TestMonitors:
+    def test_cart_goal_sequence_interrupt(self, zero_pose: PR2TestWrapper):
+        pose1 = PoseStamped()
+        pose1.header.frame_id = 'map'
+        pose1.pose.position.x = 10
+        pose1.pose.orientation.w = 1
+
+        pose2 = PoseStamped()
+        pose2.header.frame_id = 'base_footprint'
+        pose2.pose.position.y = 1
+        pose2.pose.orientation.w = 1
+
+        sleep = zero_pose.monitors.add_sleep(3)
+        zero_pose.motion_goals.add_cartesian_pose(goal_pose=pose1,
+                                                  tip_link='base_footprint',
+                                                  root_link='map',
+                                                  end_condition=sleep,
+                                                  name='pose1')
+        zero_pose.motion_goals.add_cartesian_pose(goal_pose=pose2,
+                                                  tip_link='base_footprint',
+                                                  root_link='map',
+                                                  start_condition=sleep,
+                                                  absolute=True,
+                                                  name='pose2')
+        local_min = zero_pose.monitors.add_local_minimum_reached()
+        zero_pose.monitors.add_end_motion(start_condition=local_min)
+        zero_pose.allow_all_collisions()
+        zero_pose.execute(add_local_minimum_reached=False)
+
     def test_start_of_expression_monitor(self, zero_pose: PR2TestWrapper):
         time_above = zero_pose.monitors.add_time_above(threshold=5)
         local_min = zero_pose.monitors.add_local_minimum_reached(start_condition=time_above)

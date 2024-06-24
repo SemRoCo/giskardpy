@@ -6,7 +6,6 @@ from itertools import product, combinations_with_replacement, combinations
 from typing import List, Dict, Optional, Tuple, Iterable, Set, DefaultDict, Callable
 
 import numpy as np
-from geometry_msgs.msg import Pose
 from lxml import etree
 
 from giskardpy.data_types.data_types import Derivatives, PrefixName
@@ -16,7 +15,6 @@ from giskardpy.model.world import WorldBranch
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.middleware import logging
 from giskardpy.utils.utils import resolve_ros_iris
-import giskardpy.middleware.ros1.msg_converter as msg_converter
 
 np.random.seed(1337)
 
@@ -749,10 +747,10 @@ class CollisionWorldSynchronizer:
                     key = god_map.world.sort_links(link_a, link_b)
                     self.self_collision_matrix[key] = DisableCollisionReason.Unknown
 
-    def get_map_T_geometry(self, link_name: PrefixName, collision_id: int = 0) -> Pose:
-        map_T_geometry = god_map.world.compute_fk_with_collision_offset(god_map.world.root_link_name, link_name,
-                                                                        collision_id)
-        return msg_converter.to_ros_message(map_T_geometry).pose
+    # def get_map_T_geometry(self, link_name: PrefixName, collision_id: int = 0) -> Pose:
+    #     map_T_geometry = god_map.world.compute_fk_with_collision_offset(god_map.world.root_link_name, link_name,
+    #                                                                     collision_id)
+    #     return msg_converter.to_ros_message(map_T_geometry).pose
 
     def set_joint_state_to_zero(self) -> None:
         for free_variable in god_map.world.free_variables:

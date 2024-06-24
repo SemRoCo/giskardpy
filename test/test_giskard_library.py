@@ -14,6 +14,8 @@ from giskardpy.monitors.monitor_manager import MonitorManager
 from giskardpy.qp.qp_controller import QPController
 from giskardpy.symbol_manager import symbol_manager
 import giskardpy.casadi_wrapper as cas
+from model.better_pybullet_syncer import BetterPyBulletSyncer
+from model.collision_world_syncer import CollisionWorldSynchronizer
 
 
 @pytest.fixture(scope='module')

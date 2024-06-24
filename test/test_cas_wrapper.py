@@ -1,13 +1,11 @@
 import math
 import unittest
-from copy import deepcopy
 from datetime import timedelta
 
 import PyKDL
 import hypothesis.strategies as st
 import numpy as np
 from angles import shortest_angular_distance, normalize_angle_positive, normalize_angle
-from geometry_msgs.msg import Point, PointStamped, Vector3, Vector3Stamped
 from hypothesis import given, assume, settings
 from tf.transformations import quaternion_matrix, quaternion_about_axis, quaternion_from_euler, euler_matrix, \
     rotation_matrix, quaternion_multiply, quaternion_conjugate, quaternion_from_matrix, \
@@ -16,9 +14,8 @@ from tf.transformations import quaternion_matrix, quaternion_about_axis, quatern
 from giskardpy import casadi_wrapper as cas
 from giskardpy.qp import pos_in_vel_limits as cas2
 import giskardpy.utils.math as giskard_math
-from giskardpy.data_types.data_types import Derivatives
 from giskardpy.utils.math import axis_angle_from_quaternion, rotation_matrix_from_quaternion
-from utils_for_tests import float_no_nan_no_inf, unit_vector, quaternion, vector, \
+from test.utils_for_tests import float_no_nan_no_inf, unit_vector, quaternion, vector, \
     pykdl_frame_to_numpy, lists_of_same_length, random_angle, compare_axis_angle, angle_positive, sq_matrix, \
     float_no_nan_no_inf_min_max, compare_orientations
 
@@ -242,8 +239,8 @@ class TestRotationMatrix(unittest.TestCase):
         pass
 
     def test_create_RotationMatrix(self):
-        s = w.Symbol('s')
-        r = w.RotationMatrix.from_rpy(1, 2, s)
+        s = cas.Symbol('s')
+        r = cas.RotationMatrix.from_rpy(1, 2, s)
         r = cas.RotationMatrix.from_rpy(1, 2, 3)
         assert isinstance(r, cas.RotationMatrix)
         t = cas.TransMatrix.from_xyz_rpy(1, 2, 3)
@@ -252,8 +249,9 @@ class TestRotationMatrix(unittest.TestCase):
 
     @given(quaternion())
     def test_from_quaternion(self, q):
-        np.testing.assert_array_almost_equal(cas.compile_and_execute(cas.RotationMatrix.from_quaternion, [q]),
-                                             quaternion_matrix(q))
+        actual = cas.RotationMatrix.from_quaternion(cas.Quaternion(q)).to_np()
+        expected = quaternion_matrix(q)
+        np.testing.assert_array_almost_equal(actual, expected)
 
     @given(random_angle(),
            random_angle(),
@@ -337,10 +335,6 @@ class TestPoint3(unittest.TestCase):
         cas.Point3(cas.Expression(v))
         cas.Point3(cas.Point3(v))
         cas.Point3(cas.Vector3(v))
-        cas.Point3(Point(*v))
-        cas.Point3(PointStamped(point=Point(*v)))
-        cas.Point3(Vector3(*v))
-        cas.Point3(Vector3Stamped(vector=Vector3(*v)))
         cas.Point3(cas.Expression(v).s)
         cas.Point3(np.array(v))
 
@@ -442,9 +436,9 @@ class TestTransformationMatrix(unittest.TestCase):
         self.assertTrue(np.isclose(r1, r2).all(), msg=f'{r1} != {r2}')
 
     def test_dot(self):
-        s = w.Symbol('x')
-        m1 = w.TransMatrix()
-        m2 = w.TransMatrix.from_xyz_rpy(x=s)
+        s = cas.Symbol('x')
+        m1 = cas.TransMatrix()
+        m2 = cas.TransMatrix.from_xyz_rpy(x=s)
         m1.dot(m2)
 
     def test_TransformationMatrix(self):
@@ -484,7 +478,7 @@ class TestTransformationMatrix(unittest.TestCase):
         r = cas.compile_and_execute(lambda x, y, z, axis, angle: cas.TransMatrix.from_point_rotation_matrix(
             cas.Point3((x, y, z)),
             cas.RotationMatrix.from_axis_angle(axis, angle)),
-                                  [x, y, z, axis, angle])
+                                    [x, y, z, axis, angle])
         np.testing.assert_array_almost_equal(r, r2)
 
     @given(float_no_nan_no_inf(),
@@ -499,7 +493,7 @@ class TestTransformationMatrix(unittest.TestCase):
         r2[1, 3] = y
         r2[2, 3] = z
         np.testing.assert_array_almost_equal(cas.compile_and_execute(cas.TransMatrix.from_xyz_rpy,
-                                                                   [x, y, z, roll, pitch, yaw]),
+                                                                     [x, y, z, roll, pitch, yaw]),
                                              r2)
 
     @given(float_no_nan_no_inf(),
@@ -511,10 +505,9 @@ class TestTransformationMatrix(unittest.TestCase):
         r2[0, 3] = x
         r2[1, 3] = y
         r2[2, 3] = z
-        r = cas.compile_and_execute(lambda x, y, z, q: cas.TransMatrix.from_point_rotation_matrix(
-            cas.Point3((x, y, z)),
-            cas.RotationMatrix.from_quaternion(q)),
-                                  [x, y, z, q])
+        r = cas.TransMatrix.from_point_rotation_matrix(point=cas.Point3((x, y, z)),
+                                                       rotation_matrix=cas.RotationMatrix.from_quaternion(
+                                                           cas.Quaternion(q))).to_np()
         np.testing.assert_array_almost_equal(r, r2)
 
     @given(float_no_nan_no_inf(outer_limit=1000),
@@ -543,7 +536,8 @@ class TestTransformationMatrix(unittest.TestCase):
            unit_vector(4))
     def test_pos_of(self, x, y, z, q):
         r1 = cas.TransMatrix.from_point_rotation_matrix(cas.Point3((x, y, z)),
-                                                      cas.RotationMatrix.from_quaternion(q)).to_position()
+                                                        cas.RotationMatrix.from_quaternion(
+                                                            cas.Quaternion(q))).to_position()
         r2 = [x, y, z, 1]
         for i, e in enumerate(r2):
             self.assertAlmostEqual(r1[i].to_np(), e)
@@ -553,10 +547,9 @@ class TestTransformationMatrix(unittest.TestCase):
            float_no_nan_no_inf(),
            unit_vector(4))
     def test_trans_of(self, x, y, z, q):
-        r1 = cas.compile_and_execute(lambda x, y, z, q: cas.TransMatrix.from_point_rotation_matrix(
-            cas.Point3((x, y, z)),
-            cas.RotationMatrix.from_quaternion(q)).to_translation(),
-                                   [x, y, z, q])
+        r1 = cas.TransMatrix.from_point_rotation_matrix(point=cas.Point3((x, y, z)),
+                                                        rotation_matrix=cas.RotationMatrix.from_quaternion(
+                                                            cas.Quaternion(q))).to_translation().to_np()
         r2 = np.identity(4)
         r2[0, 3] = x
         r2[1, 3] = y
@@ -570,10 +563,9 @@ class TestTransformationMatrix(unittest.TestCase):
            float_no_nan_no_inf(),
            unit_vector(4))
     def test_rot_of(self, x, y, z, q):
-        r1 = cas.compile_and_execute(lambda x, y, z, q: cas.TransMatrix.from_point_rotation_matrix(
-            cas.Point3((x, y, z)),
-            cas.RotationMatrix.from_quaternion(q)).to_rotation(),
-                                   [x, y, z, q])
+        r1 = cas.TransMatrix.from_point_rotation_matrix(point=cas.Point3((x, y, z)),
+                                                        rotation_matrix=cas.RotationMatrix.from_quaternion(
+                                                            cas.Quaternion(q))).to_rotation().to_np()
         r2 = quaternion_matrix(q)
         self.assertTrue(np.isclose(r1, r2).all(), msg='\n{} != \n{}'.format(r1, r2))
 
@@ -647,7 +639,7 @@ class TestQuaternion(unittest.TestCase):
     def test_quaternion_from_matrix(self, q):
         matrix = quaternion_matrix(q)
         q2 = quaternion_from_matrix(matrix)
-        q1_2 = cas.compile_and_execute(cas.Quaternion.from_rotation_matrix, [matrix])
+        q1_2 = cas.Quaternion.from_rotation_matrix(cas.RotationMatrix(matrix)).to_np().T[0]
         self.assertTrue(np.isclose(q1_2, q2).all() or np.isclose(q1_2, -q2).all(), msg=f'{q} != {q1_2}')
 
     @given(quaternion(), quaternion())
@@ -1538,9 +1530,10 @@ class TestCASWrapper(unittest.TestCase):
                     return if_result
             return else_result
 
-        self.assertAlmostEqual(cas.compile_and_execute(lambda a, default: cas.if_less_eq_cases(a, b_result_cases, default),
-                                                     [a, 0]),
-                               float(reference(a, b_result_cases, 0)))
+        self.assertAlmostEqual(
+            cas.compile_and_execute(lambda a, default: cas.if_less_eq_cases(a, b_result_cases, default),
+                                    [a, 0]),
+            float(reference(a, b_result_cases, 0)))
 
     @given(float_no_nan_no_inf(),
            float_no_nan_no_inf(),
@@ -1664,7 +1657,7 @@ class TestCASWrapper(unittest.TestCase):
     def test_slerp123(self, q1, q2):
         step = 0.1
         q_d = cas.compile_and_execute(lambda q1, q2: cas.Quaternion(q1).diff(cas.Quaternion(q2)),
-                                    [q1, q2])
+                                      [q1, q2])
         axis = cas.compile_and_execute(lambda x, y, z, w_: cas.Quaternion((x, y, z, w_)).to_axis_angle()[0], q_d)
         angle = cas.compile_and_execute(lambda x, y, z, w_: cas.Quaternion((x, y, z, w_)).to_axis_angle()[1], q_d)
         assume(angle != np.pi)
@@ -1677,7 +1670,7 @@ class TestCASWrapper(unittest.TestCase):
         for t in np.arange(0, 1.001, step):
             r1 = cas.compile_and_execute(cas.quaternion_slerp, [q1, q2, t])
             r1 = cas.compile_and_execute(lambda q1, q2: cas.Quaternion(q1).diff(cas.Quaternion(q2)),
-                                       [q1, r1])
+                                         [q1, r1])
             axis2 = cas.compile_and_execute(lambda x, y, z, w_: cas.Quaternion((x, y, z, w_)).to_axis_angle()[0], r1)
             angle2 = cas.compile_and_execute(lambda x, y, z, w_: cas.Quaternion((x, y, z, w_)).to_axis_angle()[1], r1)
             r2 = cas.compile_and_execute(cas.Quaternion.from_axis_angle, [axis, angle * t])
@@ -1698,7 +1691,7 @@ class TestCASWrapper(unittest.TestCase):
             q2t = r1s[i + 1]
             qds.append(
                 cas.compile_and_execute(lambda q1, q2: cas.Quaternion(q1).diff(cas.Quaternion(q2)),
-                                      [q1t, q2t]))
+                                        [q1t, q2t]))
         qds = np.array(qds)
         for r1, r2 in zip(r1s, r2s):
             compare_orientations(r1, r2)
@@ -1774,7 +1767,7 @@ class TestCASWrapper(unittest.TestCase):
         j /= 1000
         # set current position to 0 such that the desired result is already the difference
         velocity = cas.compile_and_execute(cas.velocity_limit_from_position_limit,
-                                         [acceleration, desired_result, j, step_size])
+                                           [acceleration, desired_result, j, step_size])
         position = j
         i = 0
         start_sign = np.sign(velocity)
@@ -1808,8 +1801,10 @@ class TestCASWrapper(unittest.TestCase):
         p = np.array([0, 0, 0])
         start = np.array([0, 0, 0])
         end = np.array([0, 0, 1])
-        distance = cas.compile_and_execute(lambda a, b, c: cas.distance_point_to_line_segment(a, b, c)[0], [p, start, end])
-        nearest = cas.compile_and_execute(lambda a, b, c: cas.distance_point_to_line_segment(a, b, c)[1], [p, start, end])
+        distance = cas.compile_and_execute(lambda a, b, c: cas.distance_point_to_line_segment(a, b, c)[0],
+                                           [p, start, end])
+        nearest = cas.compile_and_execute(lambda a, b, c: cas.distance_point_to_line_segment(a, b, c)[1],
+                                          [p, start, end])
         assert distance == 0
         assert nearest[0] == 0
         assert nearest[1] == 0
@@ -1819,8 +1814,10 @@ class TestCASWrapper(unittest.TestCase):
         p = np.array([0, 1, 0.5])
         start = np.array([0, 0, 0])
         end = np.array([0, 0, 1])
-        distance = cas.compile_and_execute(lambda a, b, c: cas.distance_point_to_line_segment(a, b, c)[0], [p, start, end])
-        nearest = cas.compile_and_execute(lambda a, b, c: cas.distance_point_to_line_segment(a, b, c)[1], [p, start, end])
+        distance = cas.compile_and_execute(lambda a, b, c: cas.distance_point_to_line_segment(a, b, c)[0],
+                                           [p, start, end])
+        nearest = cas.compile_and_execute(lambda a, b, c: cas.distance_point_to_line_segment(a, b, c)[1],
+                                          [p, start, end])
         assert distance == 1
         assert nearest[0] == 0
         assert nearest[1] == 0
@@ -1830,8 +1827,10 @@ class TestCASWrapper(unittest.TestCase):
         p = np.array([0, 1, 2])
         start = np.array([0, 0, 0])
         end = np.array([0, 0, 1])
-        distance = cas.compile_and_execute(lambda a, b, c: cas.distance_point_to_line_segment(a, b, c)[0], [p, start, end])
-        nearest = cas.compile_and_execute(lambda a, b, c: cas.distance_point_to_line_segment(a, b, c)[1], [p, start, end])
+        distance = cas.compile_and_execute(lambda a, b, c: cas.distance_point_to_line_segment(a, b, c)[0],
+                                           [p, start, end])
+        nearest = cas.compile_and_execute(lambda a, b, c: cas.distance_point_to_line_segment(a, b, c)[1],
+                                          [p, start, end])
         assert distance == 1.4142135623730951
         assert nearest[0] == 0
         assert nearest[1] == 0
@@ -1843,9 +1842,9 @@ class TestCASWrapper(unittest.TestCase):
         q = cas.Quaternion.from_axis_angle(axis, angle)
         expr = cas.norm(q)
         assert cas.to_str(expr) == [['sqrt((((sq((v1*sin((alpha/2))))'
-                                   '+sq((v2*sin((alpha/2)))))'
-                                   '+sq((v3*sin((alpha/2)))))'
-                                   '+sq(cos((alpha/2)))))']]
+                                     '+sq((v2*sin((alpha/2)))))'
+                                     '+sq((v3*sin((alpha/2)))))'
+                                     '+sq(cos((alpha/2)))))']]
         assert cas.to_str(expr) == expr.pretty_str()
 
     def test_to_str2(self):

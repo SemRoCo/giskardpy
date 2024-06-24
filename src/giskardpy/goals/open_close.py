@@ -22,8 +22,7 @@ class Open(Goal):
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol
-                 ):
+                 end_condition: cas.Expression = cas.FalseSymbol):
         """
         Open a container in an environment.
         Only works with the environment was added as urdf.
@@ -87,7 +86,8 @@ class Open(Goal):
                                                        weight=WEIGHT_BELOW_CA,
                                                        start_condition=start_condition,
                                                        hold_condition=hold_condition,
-                                                       end_condition=end_condition))
+                                                       end_condition=end_condition,
+                                                       name=f'{self.name}/{self.joint_name.short_name}'))
 
 
 class Close(Goal):
@@ -101,8 +101,7 @@ class Close(Goal):
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol
-                 ):
+                 end_condition: cas.Expression = cas.FalseSymbol):
         """
         Same as Open, but will use minimum value as default for goal_joint_state
         """

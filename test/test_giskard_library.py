@@ -3,137 +3,175 @@ from itertools import combinations
 import numpy as np
 import pytest
 import urdf_parser_py.urdf as up
-from giskardpy.data_types.data_types import PrefixName, Derivatives
+
+import giskardpy.casadi_wrapper as cas
+from giskardpy.data_types.data_types import PrefixName, Derivatives, ColorRGBA
 from giskardpy.goals.cartesian_goals import CartesianPose
 from giskardpy.goals.joint_goals import JointPositionList
 from giskardpy.god_map import god_map
+from giskardpy.model.better_pybullet_syncer import BetterPyBulletSyncer
+from giskardpy.model.collision_avoidance_config import DefaultCollisionAvoidanceConfig
+from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
 from giskardpy.model.joints import OmniDrive, PrismaticJoint
 from giskardpy.model.links import Link, BoxGeometry
 from giskardpy.model.utils import hacky_urdf_parser_fix
 from giskardpy.model.world import WorldTree
+from giskardpy.model.world_config import EmptyWorld, WorldWithOmniDriveRobot
 from giskardpy.monitors.cartesian_monitors import PoseReached
 from giskardpy.qp.qp_controller import QPController
 from giskardpy.symbol_manager import symbol_manager
-import giskardpy.casadi_wrapper as cas
-from giskardpy.model.better_pybullet_syncer import BetterPyBulletSyncer
-from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
 from giskardpy.utils.utils import suppress_stderr
 from utils_for_tests import pr2_urdf
 
+try:
+    import rospy
+    from giskardpy_ros1.ros1.ros_msg_visualization import ROSMsgVisualization
 
-@pytest.fixture(scope='module')
-def create_world():
-    return god_map.world
+    rospy.init_node('tests')
+    vis = ROSMsgVisualization(tf_frame='map')
+    rospy.sleep(1)
+except ImportError as e:
+    pass
 
 
-@pytest.fixture()
-def empty_world(create_world: WorldTree):
-    create_world.clear()
-    return create_world
-
-
-@pytest.fixture()
-def box_world_prismatic(empty_world: WorldTree):
-    box_name = PrefixName('box')
-    root_link_name = PrefixName('map')
-    joint_name = PrefixName('box_joint')
-
-    with empty_world.modify_world() as world:
-        root_link = Link(root_link_name)
-        world.add_link(root_link)
-
-        box = Link(box_name)
-        box_geometry = BoxGeometry(1, 1, 1)
-        box.collisions.append(box_geometry)
-        box.visuals.append(box_geometry)
-        world.add_link(box)
-
-        joint = PrismaticJoint(name=joint_name,
-                               free_variable_name=joint_name,
-                               parent_link_name=root_link_name,
-                               child_link_name=box_name,
-                               axis=(1, 0, 0),
-                               lower_limits={Derivatives.position: -10,
-                                             Derivatives.velocity: -1,
-                                             Derivatives.acceleration: -np.inf,
-                                             Derivatives.jerk: -30},
-                               upper_limits={Derivatives.position: 10,
-                                             Derivatives.velocity: 1,
-                                             Derivatives.acceleration: np.inf,
-                                             Derivatives.jerk: 30})
-        world.add_joint(joint)
-    assert joint_name in empty_world.joints
-    assert root_link_name in empty_world.root_link_name
-    assert box_name in empty_world.links
-    return empty_world
+def visualize():
+    god_map.world.notify_state_change()
+    god_map.collision_scene.sync()
+    vis.publish_markers()
 
 
 @pytest.fixture()
-def box_world(empty_world: WorldTree):
-    box_name = PrefixName('box')
-    root_link_name = PrefixName('map')
-    joint_name = PrefixName('box_joint')
+def empty_world() -> WorldTree:
+    config = EmptyWorld()
+    config.setup()
+    return config.world
 
-    with empty_world.modify_world() as world:
-        root_link = Link(root_link_name)
-        world.add_link(root_link)
-
-        box = Link(box_name)
-        box_geometry = BoxGeometry(1, 1, 1)
-        box.collisions.append(box_geometry)
-        box.visuals.append(box_geometry)
-        world.add_link(box)
-
-        joint = OmniDrive(name=joint_name,
-                          parent_link_name=root_link_name,
-                          child_link_name=box_name,
-                          translation_limits={Derivatives.velocity: 1,
-                                              Derivatives.acceleration: np.inf,
-                                              Derivatives.jerk: 30},
-                          rotation_limits={Derivatives.velocity: 1,
-                                           Derivatives.acceleration: np.inf,
-                                           Derivatives.jerk: 30})
-        world.add_joint(joint)
-    assert joint_name in empty_world.joints
-    assert root_link_name in empty_world.root_link_name
-    assert box_name in empty_world.links
-    return empty_world
 
 @pytest.fixture()
-def pr2_world(empty_world: WorldTree):
-    box_name = PrefixName('box')
-    root_link_name = PrefixName('map')
-    joint_name = PrefixName('box_joint')
+def fixed_box_world() -> WorldTree:
+    class WorldWithFixedBox(EmptyWorld):
+        box_name = PrefixName('box')
+        joint_name = PrefixName('box_joint')
 
-    with empty_world.modify_world() as world:
-        root_link = Link(root_link_name)
-        world.add_link(root_link)
+        def setup(self) -> None:
+            super().setup()
+            with self.world.modify_world():
+                box = Link(self.box_name)
+                box_geometry = BoxGeometry(1, 1, 1, color=ColorRGBA(1, 0, 0, 1))
+                box.collisions.append(box_geometry)
+                box.visuals.append(box_geometry)
+                self.world.add_link(box)
+                self.world.add_fixed_joint(parent_link=self.world.root_link, child_link=box, joint_name=self.joint_name)
 
-        box = Link(box_name)
-        box_geometry = BoxGeometry(1, 1, 1)
-        box.collisions.append(box_geometry)
-        box.visuals.append(box_geometry)
-        world.add_link(box)
-
-        joint = OmniDrive(name=joint_name,
-                          parent_link_name=root_link_name,
-                          child_link_name=box_name,
-                          translation_limits={Derivatives.velocity: 1,
-                                              Derivatives.acceleration: np.inf,
-                                              Derivatives.jerk: 30},
-                          rotation_limits={Derivatives.velocity: 1,
-                                           Derivatives.acceleration: np.inf,
-                                           Derivatives.jerk: 30})
-        world.add_joint(joint)
-    assert joint_name in empty_world.joints
-    assert root_link_name in empty_world.root_link_name
-    assert box_name in empty_world.links
-    return empty_world
+    config = WorldWithFixedBox()
+    collision_avoidance = DefaultCollisionAvoidanceConfig()
+    config.setup()
+    collision_avoidance.setup()
+    return config.world
 
 
+@pytest.fixture()
+def box_world_prismatic() -> WorldTree:
+    class WorldWithPrismaticBox(EmptyWorld):
+        box_name = PrefixName('box')
+        joint_name = PrefixName('box_joint')
+
+        def setup(self) -> None:
+            super().setup()
+            with self.world.modify_world():
+                box = Link(self.box_name)
+                box_geometry = BoxGeometry(1, 1, 1, color=ColorRGBA(1, 0, 0, 1))
+                box.collisions.append(box_geometry)
+                box.visuals.append(box_geometry)
+                self.world.add_link(box)
+                joint = PrismaticJoint(name=self.joint_name,
+                                       free_variable_name=self.joint_name,
+                                       parent_link_name=self.world.root_link_name,
+                                       child_link_name=self.box_name,
+                                       axis=(1, 0, 0),
+                                       lower_limits={Derivatives.position: -10,
+                                                     Derivatives.velocity: -1,
+                                                     Derivatives.acceleration: -np.inf,
+                                                     Derivatives.jerk: -30},
+                                       upper_limits={Derivatives.position: 10,
+                                                     Derivatives.velocity: 1,
+                                                     Derivatives.acceleration: np.inf,
+                                                     Derivatives.jerk: 30})
+                self.world.add_joint(joint)
+
+    config = WorldWithPrismaticBox()
+    collision_avoidance = DefaultCollisionAvoidanceConfig()
+    config.setup()
+    collision_avoidance.setup()
+    assert config.joint_name in config.world.joints
+    assert config.box_name in config.world.links
+    return config.world
+
+
+@pytest.fixture()
+def box_world():
+    class WorldWithOmniBox(EmptyWorld):
+        box_name = PrefixName('box')
+        joint_name = PrefixName('box_joint')
+
+        def setup(self) -> None:
+            super().setup()
+            with self.world.modify_world():
+                box = Link(self.box_name)
+                box_geometry = BoxGeometry(1, 1, 1, color=ColorRGBA(1, 0, 0, 1))
+                box.collisions.append(box_geometry)
+                box.visuals.append(box_geometry)
+                self.world.add_link(box)
+                joint = OmniDrive(name=self.joint_name,
+                                  parent_link_name=self.world.root_link_name,
+                                  child_link_name=self.box_name,
+                                  translation_limits={Derivatives.velocity: 1,
+                                                      Derivatives.acceleration: np.inf,
+                                                      Derivatives.jerk: 30},
+                                  rotation_limits={Derivatives.velocity: 1,
+                                                   Derivatives.acceleration: np.inf,
+                                                   Derivatives.jerk: 30})
+                self.world.add_joint(joint)
+
+    config = WorldWithOmniBox()
+    collision_avoidance = DefaultCollisionAvoidanceConfig()
+    config.setup()
+    collision_avoidance.setup()
+    assert config.joint_name in config.world.joints
+    assert config.box_name in config.world.links
+    return config.world
+
+
+@pytest.fixture()
+def simple_two_arm_world() -> WorldTree:
+    config = WorldWithOmniDriveRobot()
+    urdf = open('urdfs/simple_two_arm_robot.urdf', 'r').read()
+    config.setup(urdf, 'muh')
+    config.world.register_controlled_joints(config.world.movable_joint_names)
+    collision_avoidance = DefaultCollisionAvoidanceConfig()
+    collision_avoidance.setup()
+    return config.world
 
 
 class TestWorld:
+    def test_empty_world(self, empty_world: WorldTree):
+        assert len(empty_world.joints) == 0
+
+    def test_fixed_box_world(self, fixed_box_world: WorldTree):
+        assert len(fixed_box_world.joints) == 1
+        assert len(fixed_box_world.links) == 2
+        visualize()
+
+    def test_simple_two_arm_robot(self, simple_two_arm_world: WorldTree):
+        simple_two_arm_world.state[PrefixName('prismatic_joint', 'muh')].position = 0.4
+        simple_two_arm_world.state[PrefixName('r_joint_1', 'muh')].position = 0.2
+        simple_two_arm_world.state[PrefixName('r_joint_2', 'muh')].position = 0.2
+        simple_two_arm_world.state[PrefixName('r_joint_3', 'muh')].position = 0.2
+        simple_two_arm_world.state[PrefixName('l_joint_1', 'muh')].position = 0.2
+        simple_two_arm_world.state[PrefixName('l_joint_2', 'muh')].position = 0.2
+        simple_two_arm_world.state[PrefixName('l_joint_3', 'muh')].position = 0.2
+        visualize()
+
     def test_compute_fk(self, box_world_prismatic: WorldTree):
         joint_name = box_world_prismatic.joint_names[0]
         box_name = box_world_prismatic.link_names[-1]
@@ -143,6 +181,7 @@ class TestWorld:
         fk = box_world_prismatic.compute_fk_point(root_link=box_world_prismatic.root_link_name,
                                                   tip_link=box_name).to_np()
         assert fk[0] == 1
+        visualize()
 
     def test_joint_goal(self, box_world_prismatic: WorldTree):
         joint_name = box_world_prismatic.joint_names[0]
@@ -168,6 +207,7 @@ class TestWorld:
             box_world_prismatic.update_state(next_cmd, dt, Derivatives.jerk)
             box_world_prismatic.notify_state_change()
             traj.append(box_world_prismatic.state[joint_name].position)
+            visualize()
             if box_world_prismatic.state[joint_name].position >= goal - 1e-3:
                 break
         fk = box_world_prismatic.compute_fk_point(root_link=box_world_prismatic.root_link_name,
@@ -201,6 +241,7 @@ class TestWorld:
             box_world.update_state(next_cmd, dt, Derivatives.jerk)
             box_world.notify_state_change()
             traj.append(box_world.state[joint_name].position)
+            visualize()
         fk = box_world.compute_fk_point(root_link=box_world.root_link_name, tip_link=box_name).to_np()
         np.testing.assert_almost_equal(fk[0], goal[0], decimal=3)
         np.testing.assert_almost_equal(fk[1], goal[1], decimal=3)
@@ -313,11 +354,9 @@ class TestWorld:
         np.testing.assert_almost_equal(fk[0], goal1.to_position().to_np()[0], decimal=2)
         np.testing.assert_almost_equal(fk[1], goal2.to_position().to_np()[1], decimal=2)
 
-
-class TestWorld2:
-    def test_compute_self_collision_matrix(self, empty_world: WorldTree):
-        disabled_links = {empty_world.search_for_link_name('br_caster_l_wheel_link'),
-                          empty_world.search_for_link_name('fr_caster_l_wheel_link')}
+    def test_compute_self_collision_matrix(self, pr2_world: WorldTree):
+        disabled_links = {pr2_world.search_for_link_name('br_caster_l_wheel_link'),
+                          pr2_world.search_for_link_name('fr_caster_l_wheel_link')}
         reference_collision_scene = BetterPyBulletSyncer()
         reference_collision_scene.load_self_collision_matrix_from_srdf(
             'package://giskardpy/test/data/pr2_test.srdf', 'pr2')
@@ -329,13 +368,13 @@ class TestWorld2:
         assert actual_reasons == reference_reasons
         assert reference_disabled_links == disabled_links
 
-    def test_compute_chain_reduced_to_controlled_joints(self, world_setup: WorldTree):
-        r_gripper_tool_frame = world_setup.search_for_link_name('r_gripper_tool_frame')
-        l_gripper_tool_frame = world_setup.search_for_link_name('l_gripper_tool_frame')
-        link_a, link_b = world_setup.compute_chain_reduced_to_controlled_joints(r_gripper_tool_frame,
-                                                                                l_gripper_tool_frame)
-        assert link_a == world_setup.search_for_link_name('r_wrist_roll_link')
-        assert link_b == world_setup.search_for_link_name('l_wrist_roll_link')
+    def test_compute_chain_reduced_to_controlled_joints(self, simple_two_arm_world: WorldTree):
+        r_gripper_tool_frame = simple_two_arm_world.search_for_link_name('r_eef')
+        l_gripper_tool_frame = simple_two_arm_world.search_for_link_name('l_eef')
+        link_a, link_b = simple_two_arm_world.compute_chain_reduced_to_controlled_joints(r_gripper_tool_frame,
+                                                                                         l_gripper_tool_frame)
+        assert link_a == simple_two_arm_world.search_for_link_name('r_eef')
+        assert link_b == simple_two_arm_world.search_for_link_name('l_link_3')
 
     def test_group_pr2_hand(self, world_setup: WorldTree):
         world_setup.register_group('r_hand', world_setup.search_for_link_name('r_wrist_roll_link'))

@@ -993,6 +993,9 @@ class WorldTree(WorldTreeInterface):
         """
         old_controlled_joints = set(self.controlled_joints)
         new_controlled_joints = set(controlled_joints)
+        for joint in new_controlled_joints:
+            if self.is_joint_fixed(joint):
+                raise WorldException(f'Can\'t register fixed joint as controllable')
         double_joints = old_controlled_joints.intersection(new_controlled_joints)
         if double_joints:
             raise DuplicateNameException(f'Controlled joints \'{double_joints}\' are already registered!')

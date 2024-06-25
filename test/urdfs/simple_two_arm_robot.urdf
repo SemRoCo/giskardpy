@@ -1,0 +1,172 @@
+<robot name="custom_robot">
+    <!-- Base link -->
+    <link name="base_link">
+        <visual>
+            <geometry>
+                <box size="0.1 0.1 0.1"/>
+            </geometry>
+        </visual>
+        <collision>
+            <geometry>
+                <box size="0.2 0.2 0.05"/>
+            </geometry>
+        </collision>
+    </link>
+
+    <!-- Prismatic joint -->
+    <joint name="prismatic_joint" type="prismatic">
+        <parent link="base_link"/>
+        <child link="prismatic_link"/>
+        <origin xyz="0 0 0.05" rpy="0 0 0"/>
+        <axis xyz="0 0 1"/>
+        <limit lower="0.0" upper="1.0" effort="100.0" velocity="0.5"/>
+    </joint>
+
+    <link name="prismatic_link">
+        <visual>
+            <geometry>
+                <box size="0.1 0.1 0.5"/>
+            </geometry>
+        </visual>
+        <collision>
+            <geometry>
+                <box size="0.1 0.1 0.5"/>
+            </geometry>
+        </collision>
+    </link>
+
+    <!-- Revolute joints -->
+    <!-- Assuming 6 revolute joints for illustration. Adjust number as needed. -->
+    <!-- First Revolute Joint -->
+    <joint name="r_joint_1" type="revolute">
+        <parent link="prismatic_link"/>
+        <child link="r_link_1"/>
+        <origin xyz="0.2 0 0" rpy="0 0 0"/>
+        <axis xyz="1 0 0"/>
+        <limit lower="-1.57" upper="1.57" effort="50.0" velocity="1.0"/>
+    </joint>
+    <link name="r_link_1">
+        <visual>
+            <geometry>
+                <box size="0.1 0.1 0.2"/>
+            </geometry>
+        </visual>
+        <collision>
+            <geometry>
+                <box size="0.1 0.1 0.2"/>
+            </geometry>
+        </collision>
+    </link>
+
+    <!-- Second Revolute Joint -->
+    <joint name="r_joint_2" type="revolute">
+        <parent link="r_link_1"/>
+        <child link="r_link_2"/>
+        <origin xyz="0 0 0.22" rpy="0 0 0"/>
+        <axis xyz="1 0 0"/>
+        <limit lower="-1.57" upper="1.57" effort="50.0" velocity="1.0"/>
+    </joint>
+    <link name="r_link_2">
+        <visual>
+            <geometry>
+                <box size="0.1 0.1 0.2"/>
+            </geometry>
+        </visual>
+        <collision>
+            <geometry>
+                <box size="0.1 0.1 0.2"/>
+            </geometry>
+        </collision>
+    </link>
+
+    <!-- Third Revolute Joint -->
+    <joint name="r_joint_3" type="revolute">
+        <parent link="r_link_2"/>
+        <child link="r_eef"/>
+        <origin xyz="0 0 0.22" rpy="0 0 0"/>
+        <axis xyz="1 0 0"/>
+        <limit lower="-1.57" upper="1.57" effort="50.0" velocity="1.0"/>
+    </joint>
+    <link name="r_eef">
+        <visual>
+            <geometry>
+                <box size="0.1 0.1 0.2"/>
+            </geometry>
+        </visual>
+        <collision>
+            <geometry>
+                <box size="0.1 0.1 0.2"/>
+            </geometry>
+        </collision>
+    </link>
+
+    <!-- Fourth Revolute Joint -->
+    <joint name="l_joint_1" type="revolute">
+        <parent link="prismatic_link"/>
+        <child link="l_link_1"/>
+        <origin xyz="-0.2 0 0" rpy="0 0 0"/>
+        <axis xyz="1 0 0"/>
+        <limit lower="-1.57" upper="1.57" effort="50.0" velocity="1.0"/>
+    </joint>
+    <link name="l_link_1">
+        <visual>
+            <geometry>
+                <box size="0.1 0.1 0.2"/>
+            </geometry>
+        </visual>
+        <collision>
+            <geometry>
+                <box size="0.1 0.1 0.2"/>
+            </geometry>
+        </collision>
+    </link>
+
+    <!-- Fifth Revolute Joint -->
+    <joint name="l_joint_2" type="revolute">
+        <parent link="l_link_1"/>
+        <child link="l_link_2"/>
+        <origin xyz="0 0 0.22" rpy="0 0 0"/>
+        <axis xyz="1 0 0"/>
+        <limit lower="-1.57" upper="1.57" effort="50.0" velocity="1.0"/>
+    </joint>
+    <link name="l_link_2">
+        <visual>
+            <geometry>
+                <box size="0.1 0.1 0.2"/>
+            </geometry>
+        </visual>
+        <collision>
+            <geometry>
+                <box size="0.1 0.1 0.2"/>
+            </geometry>
+        </collision>
+    </link>
+
+    <!-- Sixth Revolute Joint -->
+    <joint name="l_joint_3" type="revolute">
+        <parent link="l_link_2"/>
+        <child link="l_link_3"/>
+        <origin xyz="0 0 0.22" rpy="0 0 0"/>
+        <axis xyz="1 0 0"/>
+        <limit lower="-1.57" upper="1.57" effort="50.0" velocity="1.0"/>
+    </joint>
+
+    <link name="l_link_3"/>
+
+    <joint name="l_dummy_joint" type="fixed">
+        <parent link="l_link_3"/>
+        <child link="l_eef"/>
+    </joint>
+    <link name="l_eef">
+        <visual>
+            <geometry>
+                <box size="0.1 0.1 0.2"/>
+            </geometry>
+        </visual>
+        <collision>
+            <geometry>
+                <box size="0.1 0.1 0.2"/>
+            </geometry>
+        </collision>
+    </link>
+</robot>

@@ -1,9 +1,8 @@
 from typing import Optional
 import numpy as np
 
-from std_msgs.msg import ColorRGBA
-
 from giskardpy import casadi_wrapper as cas
+from giskardpy.data_types.data_types import ColorRGBA
 from giskardpy.data_types.exceptions import GoalInitalizationException
 from giskardpy.goals.goal import Goal
 from giskardpy.god_map import god_map
@@ -60,7 +59,7 @@ class AlignToPushDoor(Goal):
         door_P_intermediate_point = np.zeros(3)
         # axis pointing in the direction of handle frame from door joint frame
         direction_axis = np.argmax(abs(temp_point))
-        door_P_intermediate_point[direction_axis] = temp_point[direction_axis]*3/4
+        door_P_intermediate_point[direction_axis] = temp_point[direction_axis] * 3 / 4
         door_P_intermediate_point = cas.Point3([door_P_intermediate_point[0],
                                                 door_P_intermediate_point[1],
                                                 door_P_intermediate_point[2]])
@@ -77,7 +76,7 @@ class AlignToPushDoor(Goal):
         door_rotated_P_top = cas.dot(door_T_door_rotated.inverse(), door_P_intermediate_point)
         root_P_top = cas.dot(cas.TransMatrix(root_T_door_expr), door_rotated_P_top)
 
-        minimum_angle_to_push_door = joint_limit[1]/4
+        minimum_angle_to_push_door = joint_limit[1] / 4
 
         if object_joint_angle >= minimum_angle_to_push_door:
             god_map.debug_expression_manager.add_debug_expression('goal_point', root_P_top,

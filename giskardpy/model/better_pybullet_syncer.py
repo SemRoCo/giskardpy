@@ -2,7 +2,6 @@ from collections import defaultdict
 from typing import Dict, Tuple, DefaultDict, List, Set, Optional, Iterable
 
 import betterpybullet as bpb
-from geometry_msgs.msg import Pose
 
 from giskardpy.data_types.data_types import PrefixName
 from giskardpy.god_map import god_map
@@ -105,6 +104,6 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
             bpb.batch_set_transforms(self.objects_in_order, god_map.world.compute_all_collision_fks())
 
     @profile
-    def get_map_T_geometry(self, link_name: PrefixName, collision_id: int = 0) -> Pose:
+    def get_map_T_geometry(self, link_name: PrefixName, collision_id: int = 0):
         collision_object = self.object_name_to_id[link_name]
         return collision_object.compound_transform(collision_id)

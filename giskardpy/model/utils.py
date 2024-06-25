@@ -1,5 +1,4 @@
 import numpy as np
-from shape_msgs.msg import SolidPrimitive
 
 
 def robot_name_from_urdf_string(urdf_string):

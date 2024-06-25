@@ -7,9 +7,6 @@ from typing import Optional, Generic, TypeVar, Dict, Union
 
 import genpy
 import numpy as np
-from geometry_msgs.msg import PoseStamped, PointStamped, Vector3Stamped, QuaternionStamped
-from sensor_msgs.msg import JointState
-import std_msgs.msg as std_msgs
 
 class PrefixName:
     primary_separator = '/'
@@ -243,7 +240,7 @@ class JointStates(defaultdict, Dict[K, V], Generic[K, V]):
     def __init__(self, *args, **kwargs):
         super().__init__(_JointState, *args, **kwargs)
 
-    def __setitem__(self, key: PrefixName, value: JointState):
+    def __setitem__(self, key: PrefixName, value: _JointState):
         if not isinstance(key, PrefixName):
             if isinstance(key, str):
                 key = PrefixName.from_string(key, set_none_if_no_slash=True)

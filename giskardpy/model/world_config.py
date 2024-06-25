@@ -238,7 +238,7 @@ class WorldWithOmniDriveRobot(WorldConfig):
         self.odom_link_name = odom_link_name
         self.drive_joint_name = drive_joint_name
 
-    def setup(self, robot_urdf: str, robot_name: str):
+    def setup(self, robot_urdf: str, robot_name: Optional[str] = None):
         with self.world.modify_world():
             self.set_default_limits({Derivatives.velocity: 1,
                                      Derivatives.acceleration: np.inf,

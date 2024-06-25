@@ -21,7 +21,7 @@ from giskardpy.data_types.exceptions import DuplicateNameException, UnknownGroup
 from giskardpy.model.joints import Joint, FixedJoint, PrismaticJoint, RevoluteJoint, OmniDrive, DiffDrive, \
     VirtualFreeVariables, MovableJoint, Joint6DOF, OneDofJoint
 from giskardpy.model.links import Link
-from giskardpy.model.utils import hacky_urdf_parser_fix
+from giskardpy.model.utils import hacky_urdf_parser_fix, robot_name_from_urdf_string
 from giskardpy.data_types.data_types import PrefixName, Derivatives, derivative_map
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.next_command import NextCommands
@@ -601,6 +601,8 @@ class WorldTree(WorldTreeInterface):
                 parsed_urdf: up.Robot = up.URDF.from_xml_string(hacky_urdf_parser_fix(urdf))
             except ParseError as e:
                 raise CorruptURDFException(str(e))
+        if group_name is None:
+            group_name = robot_name_from_urdf_string(urdf)
         if group_name in self.groups:
             raise DuplicateNameException(
                 f'Failed to add group \'{group_name}\' because one with such a name already exists')

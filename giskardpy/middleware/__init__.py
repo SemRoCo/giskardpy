@@ -1,3 +1,3 @@
-from giskardpy.middleware.interface import MiddlewareWrapper
+from giskardpy.middleware.interface import MiddlewareWrapper, NoMiddleware
 
-middleware: MiddlewareWrapper
+middleware: MiddlewareWrapper = NoMiddleware()

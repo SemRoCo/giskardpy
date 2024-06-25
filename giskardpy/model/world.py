@@ -261,7 +261,7 @@ class WorldTree(WorldTreeInterface):
         """
         return self.joints[joint_name]
 
-    def get_one_dof_joint_symbol(self, joint_name: PrefixName, derivative: Derivatives) -> Union[cas.Symbol, float]:
+    def get_one_dof_joint_symbol(self, joint_name: PrefixName, derivative: Derivatives) -> Union[cas.Expression, float]:
         """
         returns a symbol that refers to the given joint
         """
@@ -620,9 +620,11 @@ class WorldTree(WorldTreeInterface):
             joint.update_transform(pose)
             self.add_joint(joint)
         else:
-            urdf_root_link = Link(urdf_root_link_name_prefixed)
+            urdf_link = parsed_urdf.link_map[urdf_root_link_name]
+            urdf_root_link = Link.from_urdf(urdf_link=urdf_link,
+                                            prefix=group_name,
+                                            color=self.default_link_color)
             self.add_link(urdf_root_link)
-            # urdf_root_link = self.links[urdf_root_link_name]
 
         def recursive_parser(urdf: up.Robot, parent_link: Link):
             short_name = parent_link.name.short_name
@@ -656,7 +658,7 @@ class WorldTree(WorldTreeInterface):
         self.register_group(group_name, urdf_root_link_name_prefixed, actuated=actuated)
 
     @modifies_world
-    def add_fixed_joint(self, parent_link: Link, child_link: Link, joint_name: Optional[str] = None,
+    def add_fixed_joint(self, parent_link: Link, child_link: Link, joint_name: Optional[PrefixName] = None,
                         transform: Optional[cas.TransMatrix] = None) -> None:
         self._raise_if_link_does_not_exist(parent_link.name)
         self._raise_if_link_does_not_exist(child_link.name)

@@ -3,7 +3,7 @@ import numpy as np
 
 from giskardpy.data_types.exceptions import QPSolverException, InfeasibleException
 from giskardpy.qp.qp_solver import QPSolver
-from giskardpy.middleware import logging
+from giskardpy.middleware import middleware
 
 error_info = {
     # https://www.ibm.com/docs/en/icos/20.1.0?topic=manual-cplexexceptionserror-codes
@@ -59,19 +59,19 @@ class QPSolverCplex(QPSolver):
 
     def print_debug(self):
         # Print QP problem stats
-        logging.logwarn('Problem Definition:')
-        logging.logwarn('Problem Type: {}'.format(self.qpProblem.problem_type[self.qpProblem.get_problem_type()]))
-        logging.logwarn(str(self.qpProblem.get_stats()))
+        middleware.logwarn('Problem Definition:')
+        middleware.logwarn('Problem Type: {}'.format(self.qpProblem.problem_type[self.qpProblem.get_problem_type()]))
+        middleware.logwarn(str(self.qpProblem.get_stats()))
         # Print solution type and stats if solution exists
-        logging.logwarn('Solving method: {}'.format(self.qpProblem.solution.method[self.qpProblem.solution.get_method()]))
-        logging.logwarn('Solution status: {}'.format(self.qpProblem.solution.get_status_string()))
+        middleware.logwarn('Solving method: {}'.format(self.qpProblem.solution.method[self.qpProblem.solution.get_method()]))
+        middleware.logwarn('Solution status: {}'.format(self.qpProblem.solution.get_status_string()))
         if self.qpProblem.solution.get_status() not in infeasible:
             m = self.qpProblem.solution.quality_metric
             arr = self.qpProblem.solution.get_float_quality([m.max_x, m.max_dual_infeasibility])
             if len(arr) == 0:
                 arr = self.qpProblem.solution.get_integer_quality([m.max_x, m.max_dual_infeasibility])
-            logging.logwarn('Solution quality [max, max_dual_infeasibility]: {}'.format(str(arr)))
-            logging.logwarn('Solution objective value'.format(str(self.qpProblem.solution.get_objective_value())))
+            middleware.logwarn('Solution quality [max, max_dual_infeasibility]: {}'.format(str(arr)))
+            middleware.logwarn('Solution objective value'.format(str(self.qpProblem.solution.get_objective_value())))
         # Write QP problem in prob.lp and solution in solution.lp
         #self.qpProblem.write("prob.lp")
         #self.qpProblem.solution.write("solution.lp")
@@ -110,12 +110,12 @@ class QPSolverCplex(QPSolver):
             success = self.qpProblem.solution.get_status()
             if success in optimal or success in feasible:
                 if success in feasible:
-                    logging.logwarn('Solution may be suboptimal!')
+                    middleware.logwarn('Solution may be suboptimal!')
                 self.xdot_full = np.array(self.qpProblem.solution.get_values())
                 break
             elif i < tries - 1:
                 self.print_debug()
-                logging.logwarn('Solver returned \'{}\', retrying with data rounded to \'{}\' decimal places'.format(
+                middleware.logwarn('Solver returned \'{}\', retrying with data rounded to \'{}\' decimal places'.format(
                     self.qpProblem.solution.get_status_string(),
                     decimal_places
                 ))

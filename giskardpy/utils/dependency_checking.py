@@ -3,7 +3,7 @@ import re
 import pkg_resources
 import rospkg
 
-from giskardpy.middleware import logging
+from giskardpy.middleware import middleware
 from giskardpy.utils.utils import resolve_ros_iris
 
 r = rospkg.RosPack()
@@ -90,18 +90,18 @@ def rospkg_exists(name):
     try:
         m = r.get_manifest(package_name)
     except Exception as e:
-        logging.logwarn('package {name} not found'.format(name=name))
+        middleware.logwarn('package {name} not found'.format(name=name))
         return False
     if len(version_entry1) == 1:
         return True
     if not compare_version(version_entry1[2], version_entry1[1], m.version):
-        logging.logwarn('found ROS package {installed_name}=={installed_version} but {r} is required}'.format(
+        middleware.logwarn('found ROS package {installed_name}=={installed_version} but {r} is required}'.format(
             installed_name=package_name, installed_version=str(m.version), r=name))
         return False
     for entry in version_list[1:]:
         operator_and_version = re.split('(==|>=|<=|<|>)', entry)
         if not compare_version(operator_and_version[2], operator_and_version[1], m.version):
-            logging.logwarn('found ROS package {installed_name}=={installed_version} but {r} is required}'.format(
+            middleware.logwarn('found ROS package {installed_name}=={installed_version} but {r} is required}'.format(
                 installed_name=package_name, installed_version=str(m.version), r=name))
             return False
 
@@ -125,5 +125,5 @@ def check_dependencies():
         except pkg_resources.DistributionNotFound as e:
             rospkg_exists(d)
         except pkg_resources.VersionConflict as e:
-            logging.logwarn(f'found {str(e.dist)} but version {str(e.req)} is required')
+            middleware.logwarn(f'found {str(e.dist)} but version {str(e.req)} is required')
 

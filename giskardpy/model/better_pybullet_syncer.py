@@ -4,13 +4,13 @@ from typing import Dict, Tuple, DefaultDict, List, Set, Optional, Iterable
 import betterpybullet as bpb
 from geometry_msgs.msg import Pose
 
-from giskardpy.configs.collision_avoidance_config import CollisionCheckerLib
+from giskardpy.data_types.data_types import PrefixName
 from giskardpy.god_map import god_map
+from giskardpy.middleware import middleware
 from giskardpy.model.bpb_wrapper import create_shape_from_link, to_giskard_collision
 from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer, Collisions
+from giskardpy.model.collision_world_syncer import CollisionCheckerLib
 from giskardpy.model.links import Link
-from giskardpy.data_types.data_types import PrefixName
-from giskardpy.middleware import logging
 
 
 class BetterPyBulletSyncer(CollisionWorldSynchronizer):
@@ -89,7 +89,7 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
         super().sync()
         if self.has_world_changed():
             self.reset_cache()
-            logging.logdebug('hard sync')
+            middleware.logdebug('hard sync')
             for o in self.kw.collision_objects:
                 self.kw.remove_collision_object(o)
             self.object_name_to_id = {}

@@ -1,7 +1,8 @@
 import abc
 
 
-class Logger(abc.ABC):
+
+class MiddlewareWrapper(abc.ABC):
     @classmethod
     @abc.abstractmethod
     def loginfo(self, msg: str): ...
@@ -21,3 +22,7 @@ class Logger(abc.ABC):
     @classmethod
     @abc.abstractmethod
     def logfatal(self, msg: str): ...
+
+    @classmethod
+    @abc.abstractmethod
+    def resolve_iri(cls, path: str) -> str: ...

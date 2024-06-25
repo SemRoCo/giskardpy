@@ -2,10 +2,9 @@ from typing import Union, Optional
 
 from giskardpy.goals.goal import NonMotionGoal
 from giskardpy.god_map import god_map
-from giskardpy.middleware import logging
+from giskardpy.middleware import middleware
 import giskardpy.casadi_wrapper as cas
 from giskardpy.qp.qp_solver_ids import SupportedQPSolver
-from giskardpy.tree.blackboard_utils import GiskardBlackboard
 
 
 class SetPredictionHorizon(NonMotionGoal):
@@ -24,7 +23,7 @@ class SetPredictionHorizon(NonMotionGoal):
         self.new_prediction_horizon = prediction_horizon
 
         if self.new_prediction_horizon < 7:
-            logging.logwarn('Prediction horizon must be >= 7.')
+            middleware.logwarn('Prediction horizon must be >= 7.')
         god_map.qp_controller.prediction_horizon = self.new_prediction_horizon
 
 

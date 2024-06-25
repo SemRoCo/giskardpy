@@ -3,6 +3,9 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING, List, Dict, Tuple
 
+from giskardpy.middleware import middleware
+from giskardpy.utils.utils import create_path
+
 if TYPE_CHECKING:
     from giskardpy.model.world import WorldTree
     from giskardpy.qp.free_variable import FreeVariable
@@ -70,6 +73,30 @@ class GodMap:
     @staticmethod
     def is_in_github_workflow():
         return 'GITHUB_WORKFLOW' in os.environ
+
+    def to_tmp_path(self, file_name: str) -> str:
+        path = god_map.tmp_folder
+        return middleware.resolve_iri(f'{path}{file_name}')
+
+    def write_to_tmp(self, file_name: str, file_str: str) -> str:
+        """
+        Writes a URDF string into a temporary file on disc. Used to deliver URDFs to PyBullet that only loads file.
+        :param file_name: Name of the temporary file without any path information, e.g. 'pr2.urdfs'
+        :param file_str: URDF as an XML string that shall be written to disc.
+        :return: Complete path to where the urdfs was written, e.g. '/tmp/pr2.urdfs'
+        """
+        new_path = self.to_tmp_path(file_name)
+        create_path(new_path)
+        with open(new_path, 'w') as f:
+            f.write(file_str)
+        return new_path
+
+    def load_from_tmp(self, file_name: str):
+        new_path = self.to_tmp_path(file_name)
+        create_path(new_path)
+        with open(new_path, 'r') as f:
+            loaded_file = f.read()
+        return loaded_file
 
 
 god_map = GodMap()

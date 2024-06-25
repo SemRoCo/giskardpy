@@ -9,7 +9,7 @@ from giskardpy.data_types.data_types import PrefixName
 from giskardpy.data_types.exceptions import MonitorInitalizationException, MaxTrajectoryLengthException
 from giskardpy.monitors.monitors import PayloadMonitor, CancelMotion
 from giskardpy.god_map import god_map
-from giskardpy.middleware import logging
+from giskardpy.middleware import middleware
 import giskardpy.casadi_wrapper as cas
 
 
@@ -61,7 +61,7 @@ class Print(PayloadMonitor):
         super().__init__(name=name, start_condition=start_condition, run_call_in_thread=False)
 
     def __call__(self):
-        logging.loginfo(self.message)
+        middleware.loginfo(self.message)
         self.state = True
 
 

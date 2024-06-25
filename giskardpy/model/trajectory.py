@@ -13,7 +13,7 @@ from sortedcontainers import SortedDict
 from giskardpy.data_types.data_types import JointStates
 from giskardpy.god_map import god_map
 from giskardpy.data_types.data_types import PrefixName, Derivatives
-from giskardpy.middleware import logging
+from giskardpy.middleware import middleware
 from giskardpy.utils.utils import cm_to_inch
 
 plot_lock = Lock()
@@ -172,7 +172,7 @@ class Trajectory:
                                              linestyle=style,
                                              label=free_variable)
                     except KeyError:
-                        logging.logwarn(f'Not enough colors to plot all joints, skipping {free_variable}.')
+                        middleware.logwarn(f'Not enough colors to plot all joints, skipping {free_variable}.')
                     except Exception as e:
                         pass
                 axs[derivative].grid()
@@ -199,4 +199,4 @@ class Trajectory:
                     except FileNotFoundError:
                         pass
             plt.savefig(file_name, bbox_inches="tight")
-            logging.loginfo(f'saved {file_name}')
+            middleware.loginfo(f'saved {file_name}')

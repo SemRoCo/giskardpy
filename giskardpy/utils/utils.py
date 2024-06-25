@@ -15,9 +15,7 @@ from contextlib import contextmanager
 from functools import cached_property
 from typing import Type, Optional, Dict, Any
 
-from giskardpy.god_map import god_map
-from giskardpy.middleware import logging
-from giskardpy.middleware.ros1.ros1_interface import resolve_ros_iris
+from giskardpy.middleware import middleware
 
 
 @contextmanager
@@ -68,7 +66,7 @@ def get_all_classes_in_package(package_name: str, parent_class: Optional[Type] =
             new_classes = get_all_classes_in_module(f'{package.__name__}.{module_name}', parent_class)
         except Exception as e:
             if not silent:
-                logging.logwarn(f'Failed to load {module_name}: {str(e)}')
+                middleware.logwarn(f'Failed to load {module_name}: {str(e)}')
             continue
         classes.update(new_classes)
     return classes
@@ -164,50 +162,8 @@ def clear_cached_properties(instance: Any):
                 del instance.__dict__[attr]
 
 
-def resolve_ros_iris_in_urdf(input_urdf):
-    """
-    Replace all instances of ROS IRIs with a urdfs string with global paths in the file system.
-    :param input_urdf: URDF in which the ROS IRIs shall be replaced.
-    :type input_urdf: str
-    :return: URDF with replaced ROS IRIs.
-    :rtype: str
-    """
-    output_urdf = ''
-    for line in input_urdf.split('\n'):
-        output_urdf += resolve_ros_iris(line)
-        output_urdf += '\n'
-    return output_urdf
-
-
-def write_to_tmp(file_name: str, file_str: str) -> str:
-    """
-    Writes a URDF string into a temporary file on disc. Used to deliver URDFs to PyBullet that only loads file.
-    :param file_name: Name of the temporary file without any path information, e.g. 'pr2.urdfs'
-    :param file_str: URDF as an XML string that shall be written to disc.
-    :return: Complete path to where the urdfs was written, e.g. '/tmp/pr2.urdfs'
-    """
-    new_path = to_tmp_path(file_name)
-    create_path(new_path)
-    with open(new_path, 'w') as f:
-        f.write(file_str)
-    return new_path
-
-
-def to_tmp_path(file_name: str) -> str:
-    path = god_map.tmp_folder
-    return resolve_ros_iris(f'{path}{file_name}')
-
-
-def load_from_tmp(file_name: str):
-    new_path = to_tmp_path(file_name)
-    create_path(new_path)
-    with open(new_path, 'r') as f:
-        loaded_file = f.read()
-    return loaded_file
-
-
 def fix_obj(file_name):
-    logging.loginfo(f'Attempting to fix {file_name}.')
+    middleware.loginfo(f'Attempting to fix {file_name}.')
     with open(file_name, 'r') as f:
         lines = f.readlines()
         fixed_obj = ''
@@ -263,3 +219,18 @@ class ImmutableDict(dict):
 
 def is_running_in_pytest():
     return "pytest" in sys.modules
+
+
+def resolve_ros_iris_in_urdf(input_urdf):
+    """
+    Replace all instances of ROS IRIs with a urdfs string with global paths in the file system.
+    :param input_urdf: URDF in which the ROS IRIs shall be replaced.
+    :type input_urdf: str
+    :return: URDF with replaced ROS IRIs.
+    :rtype: str
+    """
+    output_urdf = ''
+    for line in input_urdf.split('\n'):
+        output_urdf += middleware.resolve_iri(line)
+        output_urdf += '\n'
+    return output_urdf

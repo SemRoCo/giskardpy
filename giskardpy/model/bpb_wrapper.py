@@ -3,13 +3,14 @@ from typing import List, Tuple, Optional
 
 import betterpybullet as pb
 import trimesh
+from pkg_resources import resource_filename
 
 from giskardpy.god_map import god_map
 from giskardpy.model.collision_world_syncer import Collision
 from giskardpy.model.links import Link, LinkGeometry, BoxGeometry, SphereGeometry, CylinderGeometry, MeshGeometry
 from giskardpy.data_types.data_types import PrefixName
-from giskardpy.middleware import logging
-from giskardpy.utils.utils import resolve_ros_iris, to_tmp_path, write_to_tmp, suppress_stdout
+from giskardpy.middleware import middleware
+from giskardpy.utils.utils import suppress_stdout
 
 CollisionObject = pb.CollisionObject
 
@@ -73,7 +74,8 @@ def create_cylinder_shape(diameter: float, height: float) -> pb.CylinderShape:
     # out = pb.CylinderShapeZ(pb.Vector3(0.5 * diameter, 0.5 * diameter, height * 0.5))
     # out.margin = 0.001
     # Weird thing: The default URDF loader in bullet instantiates convex meshes. Idk why.
-    return load_convex_mesh_shape(resolve_ros_iris('package://giskardpy/test/urdfs/meshes/cylinder.obj'),
+    file_name = resource_filename('giskardpy', '../test/urdfs/meshes/cylinder.obj')
+    return load_convex_mesh_shape(file_name,
                                   single_shape=True,
                                   scale=[diameter, diameter, height])
 
@@ -130,29 +132,29 @@ def load_convex_mesh_shape(pkg_filename: str, single_shape=False, scale=(1, 1, 1
         obj_pkg_filename = convert_to_decomposed_obj_and_save_in_tmp(pkg_filename)
     else:
         obj_pkg_filename = pkg_filename
-    return pb.load_convex_shape(resolve_ros_iris(obj_pkg_filename),
+    return pb.load_convex_shape(middleware.resolve_iri(obj_pkg_filename),
                                 single_shape=single_shape,
                                 scaling=pb.Vector3(scale[0], scale[1], scale[2]))
 
 
 def convert_to_decomposed_obj_and_save_in_tmp(file_name: str, log_path='/tmp/giskardpy/vhacd.log'):
     first_group_name = list(god_map.world.groups.keys())[0]
-    resolved_old_path = resolve_ros_iris(file_name)
+    resolved_old_path = middleware.resolve_iri(file_name)
     short_file_name = file_name.split('/')[-1][:-3]
     obj_file_name = f'{first_group_name}/{short_file_name}obj'
-    new_path_original = to_tmp_path(obj_file_name)
+    new_path_original = god_map.to_tmp_path(obj_file_name)
     if not os.path.exists(new_path_original):
         mesh = trimesh.load(resolved_old_path, force='mesh')
         obj_str = trimesh.exchange.obj.export_obj(mesh)
-        write_to_tmp(obj_file_name, obj_str)
-        logging.loginfo(f'Converted {file_name} to obj and saved in {new_path_original}.')
+        god_map.write_to_tmp(obj_file_name, obj_str)
+        middleware.loginfo(f'Converted {file_name} to obj and saved in {new_path_original}.')
     new_path = new_path_original
 
     new_path_decomposed = new_path_original.replace('.obj', '_decomposed.obj')
     if not os.path.exists(new_path_decomposed):
         mesh = trimesh.load(new_path_original, force='mesh')
         if not trimesh.convex.is_convex(mesh):
-            logging.loginfo(f'{file_name} is not convex, applying vhacd.')
+            middleware.loginfo(f'{file_name} is not convex, applying vhacd.')
             with suppress_stdout():
                 pb.vhacd(new_path_original, new_path_decomposed, log_path)
             new_path = new_path_decomposed

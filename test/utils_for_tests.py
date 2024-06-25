@@ -7,7 +7,8 @@ from hypothesis import assume
 from hypothesis.strategies import composite
 from numpy import pi
 
-from giskardpy.utils.utils import resolve_ros_iris
+from giskardpy import middleware
+from giskardpy.middleware import middleware
 
 BIG_NUMBER = 1e100
 SMALL_NUMBER = 1e-100
@@ -91,7 +92,7 @@ def pr2_joint_state(draw):
 
 
 def pr2_urdf():
-    path = resolve_ros_iris('package://giskardpy/test/urdfs/pr2_with_base.urdf')
+    path = middleware.resolve_iri('package://giskardpy/test/urdfs/pr2_with_base.urdf')
     with open(path, 'r') as f:
         urdf_string = f.read()
     return urdf_string

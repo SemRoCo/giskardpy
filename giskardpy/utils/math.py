@@ -35,12 +35,13 @@ def qv_mult(quaternion: np.ndarray, vector: np.ndarray) -> np.ndarray:
     return quaternion_multiply(quaternion_multiply(q, v), quaternion_conjugate(q))[:-1]
 
 
-def quaternion_from_axis_angle(axis: Union[List[float], Tuple[float, float, float], np.ndarray], angle: float) -> np.ndarray:
+def quaternion_from_axis_angle(axis: Union[List[float], Tuple[float, float, float], np.ndarray],
+                               angle: float) -> np.ndarray:
     half_angle = angle / 2
     return np.array([axis[0] * np.sin(half_angle),
                      axis[1] * np.sin(half_angle),
                      axis[2] * np.sin(half_angle),
-                     np.cos(half_angle)])
+                     np.cos(half_angle)], dtype=np.float64)
 
 
 _EPS = np.finfo(float).eps * 4.0
@@ -107,7 +108,7 @@ def rotation_matrix_from_quaternion(x: float, y: float, z: float, w: float) -> n
     return np.array([[w2 + x2 - y2 - z2, 2 * x * y - 2 * w * z, 2 * x * z + 2 * w * y, 0],
                      [2 * x * y + 2 * w * z, w2 - x2 + y2 - z2, 2 * y * z - 2 * w * x, 0],
                      [2 * x * z - 2 * w * y, 2 * y * z + 2 * w * x, w2 - x2 - y2 + z2, 0],
-                     [0, 0, 0, 1]])
+                     [0, 0, 0, 1]], dtype=np.float64)
 
 
 def rotation_matrix_from_axis_angle(axis: Union[List[float], Tuple[float, float, float], np.ndarray], angle: float) \
@@ -168,6 +169,14 @@ def axis_angle_from_quaternion(x: float, y: float, z: float, w: float) -> Tuple[
         y = y / m
         z = z / m
     return np.array([x, y, z]), angle
+
+
+def axis_angle_from_rotation_matrix(m: np.ndarray) -> Tuple[np.ndarray, float]:
+    return axis_angle_from_quaternion(*quaternion_from_rotation_matrix(m))
+
+
+def axis_angle_from_rpy(roll: float, pitch: float, yaw: float) -> Tuple[np.ndarray, float]:
+    return axis_angle_from_quaternion(*quaternion_from_rpy(roll, pitch, yaw))
 
 
 def gauss(n: float) -> float:
@@ -381,3 +390,60 @@ def point_to_caster_angles(px, py):
     # print(f'br {point_to_single_caster_angle(px, py, center_P_br, forward_velocity)}')
     center = np.array([0, 0, 0, 1])
     print(f'center {point_to_single_caster_angle(px, py, center, forward_velocity)}')
+
+
+def shortest_angular_distance(from_angle, to_angle):
+    """ Given 2 angles, this returns the shortest angular
+        difference.  The inputs and ouputs are of course radians.
+
+        The result would always be -pi <= result <= pi. Adding the result
+        to "from" will always get you an equivelent angle to "to".
+    """
+    return normalize_angle(to_angle - from_angle)
+
+
+def normalize_angle(angle):
+    """ Normalizes the angle to be -pi to +pi
+        It takes and returns radians."""
+    a = normalize_angle_positive(angle)
+    if a > np.pi:
+        a -= 2.0 * np.pi
+    return a
+
+
+def normalize_angle_positive(angle):
+    """ Normalizes the angle to be 0 to 2*pi
+        It takes and returns radians. """
+    return angle % (2.0 * np.pi)
+
+
+def quaternion_slerp(q1, q2, t):
+    """
+    spherical linear interpolation that takes into account that q == -q
+    :param q1: 4x1 Matrix
+    :param q2: 4x1 Matrix
+    :param t: float, 0-1
+    :return: 4x1 Matrix; Return spherical linear interpolation between two quaternions.
+    """
+    cos_half_theta = q1.dot(q2)
+
+    if cos_half_theta < 0:
+        q2 = -q2
+        cos_half_theta = -cos_half_theta
+
+    if abs(cos_half_theta) > 1:
+        return q1
+    # enforce acos(x) with -1 < x < 1
+    cos_half_theta = min(1, cos_half_theta)
+    cos_half_theta = max(-1, cos_half_theta)
+
+    half_theta = np.arccos(cos_half_theta)
+
+    sin_half_theta = np.sqrt(1.0 - cos_half_theta * cos_half_theta)
+
+    ratio_a = np.sin((1.0 - t) * half_theta) / sin_half_theta
+    ratio_b = np.sin(t * half_theta) / sin_half_theta
+
+    if 0.001 > abs(sin_half_theta):
+        return 0.5 * q1 + 0.5 * q2
+    return ratio_a * q1 + ratio_b * q2

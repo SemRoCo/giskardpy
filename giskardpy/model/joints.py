@@ -8,7 +8,6 @@ import numpy as np
 import urdf_parser_py.urdf as up
 
 import giskardpy.casadi_wrapper as cas
-from giskardpy.data_types.data_types import JointStates
 from giskardpy.data_types.data_types import derivative_map, PrefixName, Derivatives
 from giskardpy.god_map import god_map
 from giskardpy.qp.free_variable import FreeVariable

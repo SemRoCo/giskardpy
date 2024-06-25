@@ -1,21 +1,24 @@
+from itertools import combinations
+
 import numpy as np
 import pytest
-
+import urdf_parser_py.urdf as up
 from giskardpy.data_types.data_types import PrefixName, Derivatives
 from giskardpy.goals.cartesian_goals import CartesianPose
 from giskardpy.goals.joint_goals import JointPositionList
-from giskardpy.goals.motion_goal_manager import MotionGoalManager
 from giskardpy.god_map import god_map
 from giskardpy.model.joints import OmniDrive, PrismaticJoint
 from giskardpy.model.links import Link, BoxGeometry
+from giskardpy.model.utils import hacky_urdf_parser_fix
 from giskardpy.model.world import WorldTree
 from giskardpy.monitors.cartesian_monitors import PoseReached
-from giskardpy.monitors.monitor_manager import MonitorManager
 from giskardpy.qp.qp_controller import QPController
 from giskardpy.symbol_manager import symbol_manager
 import giskardpy.casadi_wrapper as cas
-from model.better_pybullet_syncer import BetterPyBulletSyncer
-from model.collision_world_syncer import CollisionWorldSynchronizer
+from giskardpy.model.better_pybullet_syncer import BetterPyBulletSyncer
+from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
+from giskardpy.utils.utils import suppress_stderr
+from utils_for_tests import pr2_urdf
 
 
 @pytest.fixture(scope='module')
@@ -96,6 +99,39 @@ def box_world(empty_world: WorldTree):
     assert box_name in empty_world.links
     return empty_world
 
+@pytest.fixture()
+def pr2_world(empty_world: WorldTree):
+    box_name = PrefixName('box')
+    root_link_name = PrefixName('map')
+    joint_name = PrefixName('box_joint')
+
+    with empty_world.modify_world() as world:
+        root_link = Link(root_link_name)
+        world.add_link(root_link)
+
+        box = Link(box_name)
+        box_geometry = BoxGeometry(1, 1, 1)
+        box.collisions.append(box_geometry)
+        box.visuals.append(box_geometry)
+        world.add_link(box)
+
+        joint = OmniDrive(name=joint_name,
+                          parent_link_name=root_link_name,
+                          child_link_name=box_name,
+                          translation_limits={Derivatives.velocity: 1,
+                                              Derivatives.acceleration: np.inf,
+                                              Derivatives.jerk: 30},
+                          rotation_limits={Derivatives.velocity: 1,
+                                           Derivatives.acceleration: np.inf,
+                                           Derivatives.jerk: 30})
+        world.add_joint(joint)
+    assert joint_name in empty_world.joints
+    assert root_link_name in empty_world.root_link_name
+    assert box_name in empty_world.links
+    return empty_world
+
+
+
 
 class TestWorld:
     def test_compute_fk(self, box_world_prismatic: WorldTree):
@@ -104,7 +140,8 @@ class TestWorld:
 
         box_world_prismatic.state[joint_name].position = 1
         box_world_prismatic.notify_state_change()
-        fk = box_world_prismatic.compute_fk_point(root_link=box_world_prismatic.root_link_name, tip_link=box_name).to_np()
+        fk = box_world_prismatic.compute_fk_point(root_link=box_world_prismatic.root_link_name,
+                                                  tip_link=box_name).to_np()
         assert fk[0] == 1
 
     def test_joint_goal(self, box_world_prismatic: WorldTree):
@@ -133,7 +170,8 @@ class TestWorld:
             traj.append(box_world_prismatic.state[joint_name].position)
             if box_world_prismatic.state[joint_name].position >= goal - 1e-3:
                 break
-        fk = box_world_prismatic.compute_fk_point(root_link=box_world_prismatic.root_link_name, tip_link=box_name).to_np()
+        fk = box_world_prismatic.compute_fk_point(root_link=box_world_prismatic.root_link_name,
+                                                  tip_link=box_name).to_np()
         np.testing.assert_almost_equal(fk[0], goal, decimal=3)
 
     def test_cart_goal(self, box_world: WorldTree):
@@ -192,7 +230,6 @@ class TestWorld:
                                    absolute=True,
                                    start_condition=cart_monitor.get_state_expression())
 
-
         god_map.motion_goal_manager.add_motion_goal(cart_goal1)
         god_map.motion_goal_manager.add_motion_goal(cart_goal2)
 
@@ -247,7 +284,6 @@ class TestWorld:
                                    goal_pose=goal2,
                                    start_condition=cart_monitor.get_state_expression())
 
-
         god_map.motion_goal_manager.add_motion_goal(cart_goal1)
         god_map.motion_goal_manager.add_motion_goal(cart_goal2)
 
@@ -277,10 +313,11 @@ class TestWorld:
         np.testing.assert_almost_equal(fk[0], goal1.to_position().to_np()[0], decimal=2)
         np.testing.assert_almost_equal(fk[1], goal2.to_position().to_np()[1], decimal=2)
 
+
 class TestWorld2:
-    def test_compute_self_collision_matrix(self, world_setup: WorldTree):
-        disabled_links = {world_setup.search_for_link_name('br_caster_l_wheel_link'),
-                          world_setup.search_for_link_name('fr_caster_l_wheel_link')}
+    def test_compute_self_collision_matrix(self, empty_world: WorldTree):
+        disabled_links = {empty_world.search_for_link_name('br_caster_l_wheel_link'),
+                          empty_world.search_for_link_name('fr_caster_l_wheel_link')}
         reference_collision_scene = BetterPyBulletSyncer()
         reference_collision_scene.load_self_collision_matrix_from_srdf(
             'package://giskardpy/test/data/pr2_test.srdf', 'pr2')
@@ -299,50 +336,6 @@ class TestWorld2:
                                                                                 l_gripper_tool_frame)
         assert link_a == world_setup.search_for_link_name('r_wrist_roll_link')
         assert link_b == world_setup.search_for_link_name('l_wrist_roll_link')
-
-    def test_add_box(self, world_setup: WorldTree):
-        box1_name = 'box1'
-        box2_name = 'box2'
-        box = make_world_body_box()
-        pose = Pose()
-        pose.orientation.w = 1
-        world_setup.add_world_body(group_name=box1_name,
-                                   msg=box,
-                                   pose=pose,
-                                   parent_link_name=world_setup.root_link_name)
-        world_setup.add_world_body(group_name=box2_name,
-                                   msg=box,
-                                   pose=pose,
-                                   parent_link_name=PrefixName('r_gripper_tool_frame', 'pr2'))
-        assert box1_name in world_setup.groups
-        assert world_setup.groups['pr2'].search_for_link_name(box2_name) == 'box2/box2'
-        assert world_setup.groups['pr2'].search_for_link_name('box2/box2') == 'box2/box2'
-        assert world_setup.search_for_link_name(box2_name) == 'box2/box2'
-        assert world_setup.search_for_link_name(box1_name) == 'box1/box1'
-
-    def test_attach_box(self, world_setup: WorldTree):
-        box_name = 'boxy'
-        box = make_world_body_box()
-        pose = Pose()
-        pose.orientation.w = 1
-        world_setup.add_world_body(group_name=box_name,
-                                   msg=box,
-                                   pose=pose,
-                                   parent_link_name=world_setup.root_link_name)
-        new_parent_link_name = world_setup.search_for_link_name('r_gripper_tool_frame')
-        old_fk = world_setup.compute_fk(world_setup.root_link_name, box_name)
-
-        world_setup.move_group(box_name, new_parent_link_name)
-
-        new_fk = world_setup.compute_fk(world_setup.root_link_name, box_name)
-        assert world_setup.search_for_link_name(box_name) in world_setup.groups[
-            world_setup.robot_names[0]].link_names_as_set
-        assert world_setup.get_parent_link_of_link(world_setup.search_for_link_name(box_name)) == new_parent_link_name
-        compare_poses(old_fk.pose, new_fk.pose)
-
-        assert box_name in world_setup.groups[world_setup.robot_names[0]].groups
-        assert world_setup.robot_names[0] not in world_setup.groups[world_setup.robot_names[0]].groups
-        assert box_name not in world_setup.minimal_group_names
 
     def test_group_pr2_hand(self, world_setup: WorldTree):
         world_setup.register_group('r_hand', world_setup.search_for_link_name('r_wrist_roll_link'))

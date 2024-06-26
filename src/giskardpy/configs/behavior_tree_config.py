@@ -197,9 +197,9 @@ class StandAloneBTConfig(BehaviorTreeConfig):
         """
         self.include_prefix = include_prefix
         if is_running_in_pytest():
-            # publish_tf = False
-            publish_js = False
             if god_map.is_in_github_workflow():
+                publish_js = False
+                publish_tf = False
                 debug_mode = False
                 simulation_max_hz = None
         super().__init__(ControlModes.standalone, simulation_max_hz=simulation_max_hz)

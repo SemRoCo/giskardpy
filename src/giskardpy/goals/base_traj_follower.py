@@ -174,13 +174,6 @@ class FollowPointPath(Goal):
     last_scan: Dict[int, LaserScan]
     odom_joint: OmniDrive
 
-    # class LaserSub:
-    #     def __init__(self, host: FollowPointPath, id: int):
-    #         self.id = id
-    #         self.host = host
-    #
-    #     def __call__(self, ):
-
     def __init__(self,
                  name: str,
                  path: Path,
@@ -205,7 +198,6 @@ class FollowPointPath(Goal):
                  hold_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol):
         super().__init__(name=name)
-        self.path_to_trajectory(path=path)
         self.end_of_traj_reached = False
         self.laser_thresholds = {}
         self.last_scan = {}
@@ -218,10 +210,6 @@ class FollowPointPath(Goal):
         self.closest_laser_right = [-self.laser_distance_threshold_width] * len(self.laser_topics)
         self.closest_laser_reading = [0] * len(self.laser_topics)
         self.laser_frame = laser_frame_id
-        # self.last_scan = LaserScan()
-        # self.last_scan.header.stamp = rospy.get_rostime()
-        # self.last_scan_pc = LaserScan()
-        # self.last_scan_pc.header.stamp = rospy.get_rostime()
         self.laser_scan_age_threshold = laser_scan_age_threshold
         self.laser_avoidance_angle_cutout = laser_avoidance_angle_cutout
         self.laser_avoidance_sideways_buffer = laser_avoidance_sideways_buffer
@@ -259,8 +247,7 @@ class FollowPointPath(Goal):
             cb = lambda scan: self.laser_cb(scan, i)
             self.laser_subs.append(rospy.Subscriber(laser_topic, LaserScan, cb, queue_size=10))
         self.publish_tracking_radius()
-        self.publish_distance_to_target()
-        self.publish_trajectory()
+        self.path_to_trajectory(path=path)
 
         # %% real shit
         root_T_bf = god_map.world.compose_fk_expression(self.root, self.tip)
@@ -338,15 +325,16 @@ class FollowPointPath(Goal):
         root_V_camera_axis.vis_frame = self.camera_link
         root_V_camera_goal_axis.vis_frame = self.camera_link
 
-        laser_violated = ExpressionMonitor(name='laser violated')
-        self.add_monitor(laser_violated)
-        laser_violated.expression = cas.less(closest_laser_reading, 0)
         oriented_towards_next = ExpressionMonitor(name='oriented towards next')
         self.add_monitor(oriented_towards_next)
         oriented_towards_next.expression = cas.abs(map_angle_error) > self.base_orientation_threshold
 
-        follow_next_point.hold_condition = (laser_violated.get_state_expression()
-                                            | oriented_towards_next.get_state_expression())
+        follow_next_point.hold_condition = oriented_towards_next.get_state_expression()
+        if self.enable_laser_avoidance:
+            laser_violated = ExpressionMonitor(name='laser violated')
+            self.add_monitor(laser_violated)
+            laser_violated.expression = cas.less(closest_laser_reading, 0)
+            follow_next_point.hold_condition |= laser_violated.get_state_expression()
         follow_next_point.add_point_goal_constraints(frame_P_current=root_P_bf,
                                                      frame_P_goal=root_P_goal_point,
                                                      reference_velocity=self.max_translation_velocity,
@@ -357,14 +345,14 @@ class FollowPointPath(Goal):
         # %% keep the closest point in footprint radius
         stay_in_circle = self.create_and_add_task('in circle')
         buffer = self.traj_tracking_radius
-        distance_to_closest_point = cas.norm(root_P_closest_point - root_P_bf)
+        hack = cas.Vector3([0, 0, 0.0001])
+        distance_to_closest_point = cas.norm(root_P_closest_point + hack - root_P_bf)
         stay_in_circle.add_inequality_constraint(task_expression=distance_to_closest_point,
                                                  lower_error=-distance_to_closest_point - buffer,
                                                  upper_error=-distance_to_closest_point + buffer,
                                                  reference_velocity=self.max_translation_velocity,
                                                  weight=self.weight,
                                                  name='stay in circle')
-        god_map.debug_expression_manager.add_debug_expression('root_P_closest_point', root_P_closest_point)
 
         # %% laser avoidance
         if self.enable_laser_avoidance:
@@ -396,19 +384,53 @@ class FollowPointPath(Goal):
         self.add_monitor(goal_reached)
         goal_reached.expression = cas.euclidean_distance(last_point, root_P_bf) < 0.03
         self.connect_end_condition_to_all_tasks(goal_reached.get_state_expression())
-        end = EndMotion(name='done')
-        end.start_condition = goal_reached.get_state_expression()
-        self.add_monitor(end)
 
+        final_orientation = self.create_and_add_task('final orientation')
+        frame_R_current = root_T_bf.to_rotation()
+        current_R_frame_eval = god_map.world.compose_fk_evaluated_expression(self.tip, self.root).to_rotation()
+        frame_R_goal = cas.TransMatrix(path.poses[-1]).to_rotation()
+        final_orientation.add_rotation_goal_constraints(frame_R_current=frame_R_current,
+                                                        frame_R_goal=frame_R_goal,
+                                                        current_R_frame_eval=current_R_frame_eval,
+                                                        reference_velocity=self.max_rotation_velocity,
+                                                        weight=self.weight)
+        final_orientation.start_condition = goal_reached.get_state_expression()
+
+        orientation_reached = ExpressionMonitor(name='final orientation reached',
+                                                start_condition=goal_reached.get_state_expression())
+        self.add_monitor(orientation_reached)
+        rotation_error = cas.rotational_error(frame_R_current, frame_R_goal)
+        orientation_reached.expression = cas.less(cas.abs(rotation_error), 0.01)
+
+        end = EndMotion(name='done')
+        end.start_condition = orientation_reached.get_state_expression()
+        self.add_monitor(end)
         self.connect_start_condition_to_all_tasks(start_condition)
         self.connect_hold_condition_to_all_tasks(hold_condition)
         self.connect_end_condition_to_all_tasks(end_condition)
 
     def path_to_trajectory(self, path: Path):
-        self.traj_data = []
+        self.traj_data = [self.get_current_point()]
         for p in path.poses:
-            self.traj_data.append(np.array([p.pose.position.x, p.pose.position.y]))
+            self.append_point_to_traj(p.pose.position.x, p.pose.position.y)
         self.trajectory = np.array(self.traj_data)
+        self.publish_trajectory()
+
+    def append_point_to_traj(self, x: float, y: float):
+        current_point = np.array([x, y], dtype=np.float64)
+        last_point = self.traj_data[-1]
+        error_vector = current_point - last_point
+        distance = np.linalg.norm(error_vector)
+        if distance < self.interpolation_step_size * 2:
+            self.traj_data[-1] = 0.5 * self.traj_data[-1] + 0.5 * current_point
+        else:
+            error_vector /= distance
+            ranges = np.arange(self.interpolation_step_size, distance, self.interpolation_step_size)
+            interpolated_distance = distance / len(ranges)
+            for i, dt in enumerate(ranges):
+                interpolated_point = last_point + error_vector * interpolated_distance * (i + 1)
+                self.traj_data.append(interpolated_point)
+            self.traj_data.append(current_point)
 
     def clean_up(self):
         for sub in self.laser_subs:
@@ -623,25 +645,7 @@ class FollowPointPath(Goal):
         m_line.pose.orientation.w = 1
         m_line.frame_locked = True
         ms.markers.append(m_line)
-        self.pub.publish(ms)
-
-    def publish_distance_to_target(self):
-        ms = MarkerArray()
-        m_line = Marker()
-        m_line.action = m_line.ADD
-        m_line.ns = 'distance_to_target_stop_threshold'
-        m_line.id = 1332
-        m_line.type = m_line.CYLINDER
-        m_line.header.frame_id = str(self.tip.short_name)
-        m_line.scale.x = self.min_distance_to_target * 2
-        m_line.scale.y = self.min_distance_to_target * 2
-        m_line.scale.z = 0.01
-        m_line.color.a = 0.5
-        m_line.color.g = 1
-        m_line.pose.orientation.w = 1
-        m_line.frame_locked = True
-        ms.markers.append(m_line)
-        self.pub.publish(ms)
+        FollowPointPath.pub.publish(ms)
 
 
 class CarryMyBullshit(Goal):

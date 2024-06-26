@@ -141,6 +141,10 @@ class BehaviorTreeConfig(ABC):
         self.tree.wait_for_goal.publish_state.add_tf_publisher(include_prefix=include_prefix,
                                                                tf_topic=tf_topic,
                                                                mode=mode)
+        if god_map.is_standalone():
+            self.tree.control_loop_branch.publish_state.add_tf_publisher(include_prefix=include_prefix,
+                                                                   tf_topic=tf_topic,
+                                                                   mode=mode)
 
     def add_evaluate_debug_expressions(self):
         self.tree.prepare_control_loop.add_compile_debug_expressions()
@@ -193,9 +197,9 @@ class StandAloneBTConfig(BehaviorTreeConfig):
         """
         self.include_prefix = include_prefix
         if is_running_in_pytest():
-            publish_tf = False
-            publish_js = False
             if god_map.is_in_github_workflow():
+                publish_js = False
+                publish_tf = False
                 debug_mode = False
                 simulation_max_hz = None
         super().__init__(ControlModes.standalone, simulation_max_hz=simulation_max_hz)

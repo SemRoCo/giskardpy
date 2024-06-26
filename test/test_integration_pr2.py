@@ -21,7 +21,7 @@ from giskardpy.configs.behavior_tree_config import StandAloneBTConfig
 from giskardpy.configs.giskard import Giskard
 from giskardpy.configs.iai_robots.pr2 import PR2CollisionAvoidance, PR2StandaloneInterface, WorldWithPR2Config
 from giskardpy.configs.qp_controller_config import SupportedQPSolver, QPControllerConfig
-from giskardpy.goals.base_traj_follower import FollowPointPath
+from giskardpy.goals.base_traj_follower import FollowNavPath
 from giskardpy.goals.cartesian_goals import RelativePositionSequence
 from giskardpy.goals.caster import Circle, Wave
 from giskardpy.goals.collision_avoidance import CollisionAvoidanceHint
@@ -1086,7 +1086,7 @@ class TestConstraints:
             pose.pose.orientation.x, pose.pose.orientation.y, pose.pose.orientation.z, pose.pose.orientation.w = \
                 pose_data['orientation']
             path_msg.poses.append(pose)
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class=FollowPointPath.__name__,
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class=FollowNavPath.__name__,
                                                name='follow',
                                                camera_link='head_mount_kinect_rgb_optical_frame',
                                                laser_frame_id='base_laser_link',
@@ -1112,12 +1112,11 @@ class TestConstraints:
             pose.pose.orientation.x, pose.pose.orientation.y, pose.pose.orientation.z, pose.pose.orientation.w = \
                 pose_data['orientation']
             path_msg.poses.append(pose)
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class=FollowPointPath.__name__,
-                                               name='follow',
-                                               camera_link='head_mount_kinect_rgb_optical_frame',
-                                               laser_frame_id='base_laser_link',
-                                               # laser_topics=[],
-                                               path=path_msg)
+        zero_pose.motion_goals.add_follow_nav_path(name='follow',
+                                                   camera_link='head_mount_kinect_rgb_optical_frame',
+                                                   laser_frame_id='base_laser_link',
+                                                   # laser_topics=[],
+                                                   path=path_msg)
         zero_pose.execute(add_local_minimum_reached=False)
 
     # TODO write buggy constraints that test sanity checks

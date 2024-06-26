@@ -165,7 +165,7 @@ class BaseTrajFollower(Goal):
                                           name='/rot')
 
 
-class FollowPointPath(Goal):
+class FollowNavPath(Goal):
     trajectory: np.ndarray
     traj_data: List[np.ndarray]
     laser_thresholds: Dict[int, np.ndarray]
@@ -181,7 +181,6 @@ class FollowPointPath(Goal):
                  odom_joint_name: Optional[str] = None,
                  root_link: Optional[str] = None,
                  camera_link: str = 'head_rgbd_sensor_link',
-                 distance_to_target_stop_threshold: float = 1,
                  laser_scan_age_threshold: float = 2,
                  laser_distance_threshold: float = 0.5,
                  laser_distance_threshold_width: float = 0.8,
@@ -191,7 +190,7 @@ class FollowPointPath(Goal):
                  max_rotation_velocity: float = 0.5,
                  max_rotation_velocity_head: float = 1,
                  max_translation_velocity: float = 0.38,
-                 traj_tracking_radius: float = 0.4,
+                 traj_tracking_radius: float = 0.5,
                  height_for_camera_target: float = 1,
                  laser_frame_id: str = 'base_range_sensor_link',
                  start_condition: cas.Expression = cas.TrueSymbol,
@@ -202,8 +201,8 @@ class FollowPointPath(Goal):
         self.laser_thresholds = {}
         self.last_scan = {}
         self.enable_laser_avoidance = len(laser_topics) > 0
-        if FollowPointPath.pub is None:
-            FollowPointPath.pub = rospy.Publisher('~visualization_marker_array', MarkerArray)
+        if FollowNavPath.pub is None:
+            FollowNavPath.pub = rospy.Publisher('~visualization_marker_array', MarkerArray)
         self.laser_topics = list(laser_topics)
         self.laser_distance_threshold_width = laser_distance_threshold_width / 2
         self.closest_laser_left = [self.laser_distance_threshold_width] * len(self.laser_topics)
@@ -235,7 +234,6 @@ class FollowPointPath(Goal):
         self.max_rotation_velocity_head = max_rotation_velocity_head
         self.max_translation_velocity = max_translation_velocity
         self.weight = WEIGHT_BELOW_CA
-        self.min_distance_to_target = distance_to_target_stop_threshold
         self.laser_distance_threshold = laser_distance_threshold
         self.traj_tracking_radius = traj_tracking_radius
         self.interpolation_step_size = 0.05
@@ -645,7 +643,7 @@ class FollowPointPath(Goal):
         m_line.pose.orientation.w = 1
         m_line.frame_locked = True
         ms.markers.append(m_line)
-        FollowPointPath.pub.publish(ms)
+        FollowNavPath.pub.publish(ms)
 
 
 class CarryMyBullshit(Goal):

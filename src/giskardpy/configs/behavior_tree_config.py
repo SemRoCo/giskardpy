@@ -281,7 +281,7 @@ class ClosedLoopBTConfig(BehaviorTreeConfig):
         if self.debug_mode:
             self.add_trajectory_plotter(wait=True)
             self.add_debug_trajectory_plotter(wait=True)
-            # self.add_debug_marker_publisher()
+            self.add_debug_marker_publisher()
             # self.add_qp_data_publisher(
             #     publish_debug=True,
             #     publish_xdot=True,

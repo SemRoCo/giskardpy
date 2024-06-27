@@ -1,7 +1,11 @@
 <launch>
 
-  <node pkg="giskardpy" type="giskard.py" name="giskard" output="screen">
-    <param name="config" value="PR2_IAIRealTime"/>
+  <node pkg="giskardpy" type="iai_pr2_vel_controllers.py" name="giskard" output="screen"/>
+
+  <node pkg="giskardpy" type="joystick_e_stop.py" name="giskard_e_stop" output="screen">
+    <rosparam param="button_ids">
+        [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    </rosparam>
   </node>
 
   <node pkg="giskardpy" type="interactive_marker.py" name="giskard_interactive_marker" output="screen">
@@ -10,6 +14,8 @@
       - [odom_combined, r_gripper_tool_frame]
       - [odom_combined, l_gripper_tool_frame]
       - [torso_lift_link, head_mount_kinect2_rgb_optical_frame]
+      - [map, base_footprint]
+      - [base_footprint, laser_tilt_link]
     </rosparam>
   </node>
 

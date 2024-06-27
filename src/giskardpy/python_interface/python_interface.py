@@ -1,6 +1,6 @@
 from collections import defaultdict
 from typing import Dict, Tuple, Optional, List
-
+import numpy as np
 import rospy
 from actionlib import SimpleActionClient
 from geometry_msgs.msg import PoseStamped, Vector3Stamped, PointStamped, QuaternionStamped
@@ -16,22 +16,26 @@ from giskard_msgs.srv import GetGroupNamesResponse, GetGroupInfoResponse
 from giskardpy.data_types import goal_parameter
 from giskardpy.exceptions import DuplicateNameException, UnknownGroupException
 from giskardpy.goals.align_planes import AlignPlanes
+from giskardpy.goals.align_to_push_door import AlignToPushDoor
+from giskardpy.goals.base_traj_follower import CarryMyBullshit
 from giskardpy.goals.cartesian_goals import CartesianPose, DiffDriveBaseGoal, CartesianVelocityLimit, \
     CartesianOrientation, CartesianPoseStraight, CartesianPosition, CartesianPositionStraight
 from giskardpy.goals.collision_avoidance import CollisionAvoidance
 from giskardpy.goals.grasp_bar import GraspBar
-from giskardpy.goals.joint_goals import JointPositionList, AvoidJointLimits, SetSeedConfiguration, SetOdometry
+from giskardpy.goals.joint_goals import JointPositionList, AvoidJointLimits
 from giskardpy.goals.open_close import Close, Open
 from giskardpy.goals.pointing import Pointing
-from giskardpy.goals.set_prediction_horizon import SetPredictionHorizon
+from giskardpy.goals.pre_push_door import PrePushDoor
+from giskardpy.goals.realtime_goals import RealTimePointing
+from giskardpy.monitors.set_prediction_horizon import SetPredictionHorizon
 from giskardpy.model.utils import make_world_body_box
 from giskardpy.monitors.cartesian_monitors import PoseReached, PositionReached, OrientationReached, PointingAt, \
     VectorsAligned, DistanceToLine
 from giskardpy.monitors.joint_monitors import JointGoalReached
 from giskardpy.monitors.monitors import LocalMinimumReached, TimeAbove, Alternator, CancelMotion, EndMotion
-from giskardpy.monitors.payload_monitors import Print, Sleep, SetMaxTrajectoryLength, \
-    UpdateParentLinkOfGroup, PayloadAlternator
-from giskardpy.utils.utils import kwargs_to_json
+from giskardpy.monitors.overwrite_state_monitors import SetOdometry, SetSeedConfiguration
+from giskardpy.monitors.payload_monitors import Print, Sleep, SetMaxTrajectoryLength, PayloadAlternator
+from giskardpy.utils.utils import kwargs_to_json, get_all_classes_in_package
 
 
 class WorldWrapper:
@@ -665,6 +669,83 @@ class MotionGoalWrapper:
                              hold_condition=hold_condition,
                              end_condition=end_condition)
 
+    def add_align_to_push_door(self,
+                               root_link: str,
+                               tip_link: str,
+                               door_object: str,
+                               door_handle: str,
+                               tip_gripper_axis: Vector3Stamped,
+                               weight: float,
+                               tip_group: Optional[str] = None,
+                               root_group: Optional[str] = None,
+                               name: Optional[str] = None,
+                               start_condition: str = '',
+                               hold_condition: str = '',
+                               end_condition: str = ''):
+        """
+        Aligns the tip_link with the door_object to push it open. Only works if the door object is part of the urdf.
+        The door has to be open a little before aligning.
+        : param root_link: root link of the kinematic chain
+        : param tip_link: end effector
+        : param door object: name of the object to be pushed
+        : param door_height: height of the door
+        : param door_handle: name of the object handle
+        : param object_joint_name: name of the joint that rotates
+        : param tip_gripper_axis: axis of the tip_link that will be aligned along the door rotation axis
+        : param object_rotation_axis: door rotation axis w.r.t root
+        """
+        self.add_motion_goal(motion_goal_class=AlignToPushDoor.__name__,
+                             root_link=root_link,
+                             tip_link=tip_link,
+                             door_handle=door_handle,
+                             door_object=door_object,
+                             tip_gripper_axis=tip_gripper_axis,
+                             tip_group=tip_group,
+                             root_group=root_group,
+                             weight=weight,
+                             name=name,
+                             start_condition=start_condition,
+                             hold_condition=hold_condition,
+                             end_condition=end_condition)
+
+    def add_pre_push_door(self,
+                          root_link: str,
+                          tip_link: str,
+                          door_object: str,
+                          door_handle: str,
+                          weight: float,
+                          tip_group: Optional[str] = None,
+                          root_group: Optional[str] = None,
+                          reference_linear_velocity: Optional[float] = None,
+                          reference_angular_velocity: Optional[float] = None,
+                          name: Optional[str] = None,
+                          start_condition: str = '',
+                          hold_condition: str = '',
+                          end_condition: str = ''):
+        """
+        Positions the gripper in contact with the door before pushing to open.
+        : param root_link: root link of the kinematic chain
+        : param tip_link: end effector
+        : param door object: name of the object to be pushed
+        : param door_handle: name of the object handle
+        : param root_V_object_rotation_axis: door rotation axis w.r.t root
+        : param root_V_object_normal: door normal w.r.t root
+        """
+        self.add_motion_goal(motion_goal_class=PrePushDoor.__name__,
+                             root_link=root_link,
+                             tip_link=tip_link,
+                             door_object=door_object,
+                             door_handle=door_handle,
+                             tip_group=tip_group,
+                             root_group=root_group,
+                             weight=weight,
+                             name=name,
+                             reference_linear_velocity=reference_linear_velocity,
+                             reference_angular_velocity=reference_angular_velocity,
+                             start_condition=start_condition,
+                             hold_condition=hold_condition,
+                             end_condition=end_condition)
+
     def add_diff_drive_base(self,
                             goal_pose: PoseStamped,
                             tip_link: str,
@@ -837,15 +918,141 @@ class MotionGoalWrapper:
                              end_condition=end_condition,
                              **kwargs)
 
-    def set_prediction_horizon(self, prediction_horizon: int, **kwargs: goal_parameter):
+    def add_real_time_pointing(self,
+                               tip_link: str,
+                               pointing_axis: Vector3Stamped,
+                               root_link: str,
+                               topic_name: str,
+                               tip_group: Optional[str] = None,
+                               root_group: Optional[str] = None,
+                               max_velocity: float = 0.3,
+                               weight: Optional[float] = None,
+                               name: Optional[str] = None,
+                               start_condition: str = '',
+                               hold_condition: str = '',
+                               end_condition: str = '',
+                               **kwargs: goal_parameter):
         """
-        Will overwrite the prediction horizon for a single goal.
-        Setting it to 1 will turn of acceleration and jerk limits.
-        :param prediction_horizon: size of the prediction horizon, a number that should be 1 or above 5.
+        Will orient pointing_axis at goal_point.
+        :param tip_link: tip link of the kinematic chain.
+        :param topic_name: name of a topic of type PointStamped
+        :param root_link: root link of the kinematic chain.
+        :param tip_group: if tip_link is not unique, search this group for matches.
+        :param root_group: if root_link is not unique, search this group for matches.
+        :param pointing_axis: the axis of tip_link that will be used for pointing
+        :param max_velocity: rad/s
         """
-        self.add_motion_goal(motion_goal_class=SetPredictionHorizon.__name__,
-                             prediction_horizon=prediction_horizon,
+        self.add_motion_goal(motion_goal_class=RealTimePointing.__name__,
+                             tip_link=tip_link,
+                             tip_group=tip_group,
+                             root_link=root_link,
+                             topic_name=topic_name,
+                             root_group=root_group,
+                             pointing_axis=pointing_axis,
+                             max_velocity=max_velocity,
+                             weight=weight,
+                             name=name,
+                             start_condition=start_condition,
+                             hold_condition=hold_condition,
+                             end_condition=end_condition,
                              **kwargs)
+
+    def add_carry_my_luggage(self,
+                             name: str,
+                             tracked_human_position_topic_name: str = '/robokudovanessa/human_position',
+                             laser_topic_name: str = '/hsrb/base_scan',
+                             point_cloud_laser_topic_name: Optional[str] = None,
+                             odom_joint_name: str = 'brumbrum',
+                             root_link: Optional[str] = None,
+                             camera_link: str = 'head_rgbd_sensor_link',
+                             distance_to_target_stop_threshold: float = 1,
+                             laser_scan_age_threshold: float = 2,
+                             laser_distance_threshold: float = 0.5,
+                             laser_distance_threshold_width: float = 0.8,
+                             laser_avoidance_angle_cutout: float = np.pi / 4,
+                             laser_avoidance_sideways_buffer: float = 0.04,
+                             base_orientation_threshold: float = np.pi / 16,
+                             tracked_human_position_topic_name_timeout: int = 30,
+                             max_rotation_velocity: float = 0.5,
+                             max_rotation_velocity_head: float = 1,
+                             max_translation_velocity: float = 0.38,
+                             traj_tracking_radius: float = 0.4,
+                             height_for_camera_target: float = 1,
+                             laser_frame_id: str = 'base_range_sensor_link',
+                             target_age_threshold: float = 2,
+                             target_age_exception_threshold: float = 5,
+                             clear_path: bool = False,
+                             drive_back: bool = False,
+                             enable_laser_avoidance: bool = True,
+                             start_condition: str = '',
+                             hold_condition: str = '',
+                             end_condition: str = ''):
+        """
+        :param name: name of the goal
+        :param tracked_human_position_topic_name: name of the topic where the tracked human is published
+        :param laser_topic_name: topic name of the laser scanner
+        :param point_cloud_laser_topic_name: topic name of a second laser scanner, e.g. from a point cloud to laser scanner node
+        :param odom_joint_name: name of the odom joint
+        :param root_link: will use global reference frame
+        :param camera_link: link of the camera that will point to the tracked human
+        :param distance_to_target_stop_threshold: will pause if closer than this many meter to the target
+        :param laser_scan_age_threshold: giskard will complain if scans are older than this many seconds
+        :param laser_distance_threshold: this and width are used to crate a stopping zone around the robot.
+                                            laser distance draws a circle around the robot and width lines to the left and right.
+                                            the stopping zone is the minimum of the two.
+        :param laser_distance_threshold_width: see laser_distance_threshold
+        :param laser_avoidance_angle_cutout: if something is in the stop zone in front of the robot in +/- this angle range
+                                                giskard will pause, otherwise it will try to dodge left or right
+        :param laser_avoidance_sideways_buffer: increase this if the robot is shaking too much if something is to its
+                                                left and right at the same time.
+        :param base_orientation_threshold: giskard will align the base of the robot to the target, this is a +/- buffer to avoid shaking
+        :param tracked_human_position_topic_name_timeout: on start up, wait this long for tracking msg to arrive
+        :param max_rotation_velocity: how quickly the base can change orientation
+        :param max_rotation_velocity_head: how quickly the head rotates
+        :param max_translation_velocity: how quickly the base drives
+        :param traj_tracking_radius: how close the robots root link will try to stick to the path in meter
+        :param height_for_camera_target: target tracking with head will ignore the published height, but use this instead
+        :param laser_frame_id: frame_id of the laser scanner
+        :param target_age_threshold: will stop looking at the target if the messages are older than this many seconds
+        :param target_age_exception_threshold: if there are no messages from the tracked_human_position_topic_name
+                                                            topic for this many seconds, cancel
+        :param clear_path: clear the saved path. if called repeated will, giskard would just continue the old path if not cleared
+        :param drive_back: follow the saved path to drive back
+        :param enable_laser_avoidance:
+        :param start_condition:
+        :param hold_condition:
+        :param end_condition:
+        """
+        self.add_motion_goal(motion_goal_class=CarryMyBullshit.__name__,
+                             name=name,
+                             patrick_topic_name=tracked_human_position_topic_name,
+                             laser_topic_name=laser_topic_name,
+                             point_cloud_laser_topic_name=point_cloud_laser_topic_name,
+                             odom_joint_name=odom_joint_name,
+                             root_link=root_link,
+                             camera_link=camera_link,
+                             distance_to_target_stop_threshold=distance_to_target_stop_threshold,
+                             laser_scan_age_threshold=laser_scan_age_threshold,
+                             laser_distance_threshold=laser_distance_threshold,
+                             laser_distance_threshold_width=laser_distance_threshold_width,
+                             laser_avoidance_angle_cutout=laser_avoidance_angle_cutout,
+                             laser_avoidance_sideways_buffer=laser_avoidance_sideways_buffer,
+                             base_orientation_threshold=base_orientation_threshold,
+                             wait_for_patrick_timeout=tracked_human_position_topic_name_timeout,
+                             max_rotation_velocity=max_rotation_velocity,
+                             max_rotation_velocity_head=max_rotation_velocity_head,
+                             max_translation_velocity=max_translation_velocity,
+                             traj_tracking_radius=traj_tracking_radius,
+                             height_for_camera_target=height_for_camera_target,
+                             laser_frame_id=laser_frame_id,
+                             target_age_threshold=target_age_threshold,
+                             target_age_exception_threshold=target_age_exception_threshold,
+                             clear_path=clear_path,
+                             drive_back=drive_back,
+                             enable_laser_avoidance=enable_laser_avoidance,
+                             start_condition=start_condition,
+                             hold_condition=hold_condition,
+                             end_condition=end_condition)
 
     def add_cartesian_orientation(self,
                                   goal_orientation: QuaternionStamped,
@@ -894,10 +1101,7 @@ class MotionGoalWrapper:
         Only meant for use with projection. Changes the world state to seed_configuration before starting planning,
         without having to plan a motion to it like with add_joint_position
         """
-        self.add_motion_goal(motion_goal_class=SetSeedConfiguration.__name__,
-                             seed_configuration=seed_configuration,
-                             group_name=group_name,
-                             name=name)
+        raise DeprecationWarning('please use monitors.set_seed_configuration instead')
 
     def set_seed_odometry(self,
                           base_pose: PoseStamped,
@@ -906,10 +1110,7 @@ class MotionGoalWrapper:
         """
         Only meant for use with projection. Overwrites the odometry transform with base_pose.
         """
-        self.add_motion_goal(motion_goal_class=SetOdometry.__name__,
-                             group_name=group_name,
-                             base_pose=base_pose,
-                             name=name)
+        raise DeprecationWarning('please use monitors.set_seed_odometry instead')
 
     def add_cartesian_pose_straight(self,
                                     goal_pose: PoseStamped,
@@ -1045,7 +1246,11 @@ class MonitorWrapper:
         return self._monitors
 
     def get_anded_monitor_names(self) -> str:
-        return ' and '.join(f'\'{monitor.name}\'' for monitor in self._monitors)
+        non_cancel_monitors = []
+        for monitor in self._monitors:
+            if monitor.monitor_class not in get_all_classes_in_package('giskardpy.monitors', CancelMotion):
+                non_cancel_monitors.append(f'\'{monitor.name}\'')
+        return ' and '.join(non_cancel_monitors)
 
     def reset(self):
         self._monitors = []
@@ -1336,6 +1541,45 @@ class MonitorWrapper:
                                 name=name,
                                 seconds=seconds,
                                 start_condition=start_condition)
+
+    def add_set_seed_configuration(self,
+                                   seed_configuration: Dict[str, float],
+                                   group_name: Optional[str] = None,
+                                   name: Optional[str] = None,
+                                   start_condition: str = '') -> str:
+        """
+        Only meant for use with projection. Changes the world state to seed_configuration before starting planning,
+        without having to plan a motion to it like with add_joint_position
+        """
+        return self.add_monitor(monitor_class=SetSeedConfiguration.__name__,
+                                seed_configuration=seed_configuration,
+                                group_name=group_name,
+                                name=name,
+                                start_condition=start_condition)
+
+    def add_set_seed_odometry(self,
+                              base_pose: PoseStamped,
+                              group_name: Optional[str] = None,
+                              name: Optional[str] = None,
+                              start_condition: str = '') -> str:
+        """
+        Only meant for use with projection. Overwrites the odometry transform with base_pose.
+        """
+        return self.add_monitor(monitor_class=SetOdometry.__name__,
+                                group_name=group_name,
+                                base_pose=base_pose,
+                                name=name,
+                                start_condition=start_condition)
+
+    def add_set_prediction_horizon(self, prediction_horizon: int, **kwargs: goal_parameter):
+        """
+        Will overwrite the prediction horizon for a single goal.
+        Setting it to 1 will turn of acceleration and jerk limits.
+        :param prediction_horizon: size of the prediction horizon, a number that should be 1 or above 5.
+        """
+        self.add_monitor(monitor_class=SetPredictionHorizon.__name__,
+                         prediction_horizon=prediction_horizon,
+                         **kwargs)
 
     def add_alternator(self,
                        start_condition: str = '',

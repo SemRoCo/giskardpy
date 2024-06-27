@@ -1,6 +1,6 @@
 <launch>
 
-<!--  <node pkg="giskardpy" type="pr2_mujoco_vel.py" name="giskard" output="screen"/>-->
+<node pkg="giskardpy" type="pr2_mujoco_vel.py" name="giskard" output="screen"/>
 
   <node pkg="giskardpy" type="interactive_marker.py" name="giskard_interactive_marker" output="screen">
     <rosparam param="enable_self_collision">False</rosparam>

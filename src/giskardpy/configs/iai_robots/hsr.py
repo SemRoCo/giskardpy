@@ -16,12 +16,14 @@ class WorldWithHSRConfig(WorldConfig):
                  map_name: str = 'map',
                  localization_joint_name: str = 'localization',
                  odom_link_name: str = 'odom',
-                 drive_joint_name: str = 'brumbrum'):
+                 drive_joint_name: str = 'brumbrum',
+                 description_name: str = 'robot_description'):
         super().__init__()
         self.map_name = map_name
         self.localization_joint_name = localization_joint_name
         self.odom_link_name = odom_link_name
         self.drive_joint_name = drive_joint_name
+        self.robot_description_name = description_name
 
     def setup(self):
         self.set_default_color(1, 1, 1, 1)
@@ -32,7 +34,7 @@ class WorldWithHSRConfig(WorldConfig):
         self.add_6dof_joint(parent_link=self.map_name, child_link=self.odom_link_name,
                             joint_name=self.localization_joint_name)
         self.add_empty_link(self.odom_link_name)
-        self.add_robot_from_parameter_server()
+        self.add_robot_from_parameter_server(parameter_name=self.robot_description_name)
         root_link_name = self.get_root_link_of_group(self.robot_group_name)
         self.add_omni_drive_joint(parent_link_name=self.odom_link_name,
                                   child_link_name=root_link_name,
@@ -52,8 +54,8 @@ class WorldWithHSRConfig(WorldConfig):
                                   },
                                   robot_group_name=self.robot_group_name)
         self.set_joint_limits(limit_map={
-                                      Derivatives.jerk: 10,
-                                  },
+            Derivatives.jerk: 10,
+        },
             joint_name='arm_lift_joint')
 
 
@@ -157,3 +159,85 @@ class HSRJointTrajInterfaceConfig(RobotInterfaceConfig):
         # self.add_base_cmd_velocity(cmd_vel_topic='/hsrb/command_velocity',
         #                            track_only_velocity=True,
         #                            joint_name=self.drive_joint_name)
+
+
+class HSRMujocoVelocityInterface(RobotInterfaceConfig):
+    map_name: str
+    localization_joint_name: str
+    odom_link_name: str
+    drive_joint_name: str
+
+    def __init__(self,
+                 map_name: str = 'map',
+                 localization_joint_name: str = 'localization',
+                 odom_link_name: str = 'odom',
+                 drive_joint_name: str = 'brumbrum'):
+        self.map_name = map_name
+        self.localization_joint_name = localization_joint_name
+        self.odom_link_name = odom_link_name
+        self.drive_joint_name = drive_joint_name
+
+    def setup(self):
+        self.sync_6dof_joint_with_tf_frame(joint_name=self.localization_joint_name,
+                                           tf_parent_frame=self.map_name,
+                                           tf_child_frame=self.odom_link_name)
+        self.sync_joint_state_topic('/hsrb4s/joint_states')
+        self.sync_odometry_topic('/hsrb4s/base_footprint', self.drive_joint_name)
+
+        self.add_joint_velocity_controller(namespaces=['hsrb4s/arm_flex_joint_velocity_controller',
+                                                       'hsrb4s/arm_lift_joint_velocity_controller',
+                                                       'hsrb4s/arm_roll_joint_velocity_controller',
+                                                       'hsrb4s/head_pan_joint_velocity_controller',
+                                                       'hsrb4s/head_tilt_joint_velocity_controller',
+                                                       'hsrb4s/wrist_flex_joint_velocity_controller',
+                                                       'hsrb4s/wrist_roll_joint_velocity_controller'])
+
+        self.add_base_cmd_velocity(cmd_vel_topic='/hsrb4s/cmd_vel',
+                                   joint_name=self.drive_joint_name)
+
+
+class HSRMujocoPositionInterface(RobotInterfaceConfig):
+    map_name: str
+    localization_joint_name: str
+    odom_link_name: str
+    drive_joint_name: str
+
+    def __init__(self,
+                 map_name: str = 'map',
+                 localization_joint_name: str = 'localization',
+                 odom_link_name: str = 'odom',
+                 drive_joint_name: str = 'brumbrum'):
+        self.map_name = map_name
+        self.localization_joint_name = localization_joint_name
+        self.odom_link_name = odom_link_name
+        self.drive_joint_name = drive_joint_name
+
+    def setup(self):
+        self.sync_6dof_joint_with_tf_frame(joint_name=self.localization_joint_name,
+                                           tf_parent_frame=self.map_name,
+                                           tf_child_frame=self.odom_link_name)
+        self.sync_joint_state_topic('/hsrb4s/joint_states')
+        self.sync_odometry_topic('/hsrb4s/base_footprint', self.drive_joint_name)
+
+        self.add_joint_position_controller(namespaces=[
+            'hsrb4s/arm_flex_joint_position_controller',
+            # 'hsrb4s/arm_lift_joint_position_controller',
+            'hsrb4s/arm_roll_joint_position_controller',
+            'hsrb4s/head_pan_joint_position_controller',
+            'hsrb4s/head_tilt_joint_position_controller',
+            'hsrb4s/wrist_flex_joint_position_controller',
+            'hsrb4s/wrist_roll_joint_position_controller'
+        ])
+
+        self.add_joint_velocity_controller(namespaces=[
+            # 'hsrb4s/arm_flex_joint_position_controller',
+            'hsrb4s/arm_lift_joint_position_controller',
+            # 'hsrb4s/arm_roll_joint_position_controller',
+            # 'hsrb4s/head_pan_joint_position_controller',
+            # 'hsrb4s/head_tilt_joint_position_controller',
+            # 'hsrb4s/wrist_flex_joint_position_controller',
+            # 'hsrb4s/wrist_roll_joint_position_controller'
+        ])
+
+        self.add_base_cmd_velocity(cmd_vel_topic='/hsrb4s/cmd_vel',
+                                   joint_name=self.drive_joint_name)

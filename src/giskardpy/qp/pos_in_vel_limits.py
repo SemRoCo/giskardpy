@@ -3,6 +3,7 @@ from typing import List
 import numpy as np
 import giskardpy.casadi_wrapper as cas
 import giskardpy.utils.math as gm
+from giskardpy.utils.decorators import memoize
 
 
 def shifted_velocity_profile(vel_profile, acc_profile, distance, dt):
@@ -49,7 +50,7 @@ def compute_next_vel_and_acc(current_vel, current_acc, vel_limit, jerk_limit, dt
     return next_vel, next_acc
 
 
-def compute_projected_vel_profile(current_vel, current_acc, target_vel_profile, jerk_limit, dt, ph, skip_first):
+def compute_slowdown_asap_vel_profile(current_vel, current_acc, target_vel_profile, jerk_limit, dt, ph, skip_first):
     """
     Compute the vel, acc and jerk profile for slowing down asap.
     """
@@ -84,6 +85,8 @@ def implicit_vel_profile(acc_limit: float, jerk_limit: float, dt: float, ph: int
     return list(reversed(vel_profile))
 
 
+@memoize
+@profile
 def b_profile(current_pos, current_vel, current_acc,
               pos_limits, vel_limits, acc_limits, jerk_limits, dt, ph, eps=0.00001):
     vel_limit = vel_limits[1]
@@ -137,19 +140,19 @@ def b_profile(current_pos, current_vel, current_acc,
     # skip first when lower or upper position limit are violated
     skip_first = cas.logic_or(pos_vel_profile_lb[0] >= 0, pos_vel_profile_ub[0] <= 0)
     # vel and acc profile for slowing down asap
-    proj_vel_profile, proj_acc_profile, _ = compute_projected_vel_profile(current_vel,
-                                                                          current_acc,
-                                                                          goal_profile,
-                                                                          jerk_limit,
-                                                                          dt, ph,
-                                                                          skip_first)
+    proj_vel_profile, proj_acc_profile, _ = compute_slowdown_asap_vel_profile(current_vel,
+                                                                              current_acc,
+                                                                              goal_profile,
+                                                                              jerk_limit,
+                                                                              dt, ph,
+                                                                              skip_first)
     # jerk profile when slowing down without jerk limits
-    _, _, proj_jerk_profile_violated = compute_projected_vel_profile(current_vel,
-                                                                     current_acc,
-                                                                     goal_profile,
-                                                                     np.inf,
-                                                                     dt, ph,
-                                                                     skip_first)
+    _, _, proj_jerk_profile_violated = compute_slowdown_asap_vel_profile(current_vel,
+                                                                         current_acc,
+                                                                         goal_profile,
+                                                                         np.inf,
+                                                                         dt, ph,
+                                                                         skip_first)
     # check if my projected vel profile violated position limits
     vel_lb_violated = cas.logic_any(proj_vel_profile < pos_vel_profile_lb - eps)
     vel_ub_violated = cas.logic_any(proj_vel_profile > pos_vel_profile_ub + eps)

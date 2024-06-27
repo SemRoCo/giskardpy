@@ -4,7 +4,7 @@ from time import time
 from typing import Optional
 
 import rospy
-from py_trees import Status, Composite
+from py_trees import Status, Composite, Behaviour
 
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.ros_timer import Rate
@@ -52,10 +52,25 @@ class AsyncBehavior(GiskardBehavior, Composite):
         for child in self.children:
             child.stop()
 
+    def insert_behind(self, node: Behaviour, left_sibling_name: Behaviour) -> None:
+        sibling_id = self.children.index(left_sibling_name)
+        self.insert_child(node, sibling_id+1)
+
     def tick(self):
+        self.logger.debug("%s.tick()" % self.__class__.__name__)
+        # Required behaviour for *all* behaviours and composites is
+        # for tick() to check if it isn't running and initialise
         if self.status == Status.INVALID:
             self.status = Status.RUNNING
             self.initialise()
+        elif self.status != Status.RUNNING:
+            # chooser specific initialisation
+            # invalidate everything
+            for child in self.children:
+                child.stop(Status.INVALID)
+            self.current_child = None
+            # run subclass (user) initialisation
+            # self.initialise()
         yield self
 
     def set_status(self, new_state: Status) -> None:

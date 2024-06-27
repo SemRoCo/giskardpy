@@ -4,6 +4,8 @@ import builtins
 from copy import copy
 from typing import Union, List, TypeVar
 import math
+
+import casadi
 import casadi as ca  # type: ignore
 import numpy as np
 import geometry_msgs.msg as geometry_msgs
@@ -280,6 +282,15 @@ class Symbol(Symbol_):
     def __neg__(self):
         return Expression(self.s.__neg__())
 
+    def __invert__(self):
+        return logic_not(self)
+
+    def __or__(self, other):
+        return logic_or(self, other)
+
+    def __and__(self, other):
+        return logic_and(self, other)
+
     def __pow__(self, other):
         if isinstance(other, (int, float)):
             return Expression(self.s.__pow__(other))
@@ -442,6 +453,9 @@ class Expression(Symbol_):
     def __neg__(self):
         return Expression(self.s.__neg__())
 
+    def __invert__(self):
+        return logic_not(self)
+
     def __pow__(self, other):
         if isinstance(other, (int, float)):
             return Expression(self.s.__pow__(other))
@@ -462,6 +476,12 @@ class Expression(Symbol_):
         if isinstance(other, Symbol_):
             other = other.s
         return Expression(self.s.__eq__(other))
+
+    def __or__(self, other):
+        return logic_or(self, other)
+
+    def __and__(self, other):
+        return logic_and(self, other)
 
     def __ne__(self, other):
         if isinstance(other, Symbol_):
@@ -1996,6 +2016,14 @@ def distance_point_to_line(frame_P_point, frame_P_line_point, frame_V_line_direc
     return distance
 
 
+def distance_point_to_plane(frame_P_current, frame_V_v1, frame_V_v2):
+    normal = cross(frame_V_v1, frame_V_v2)
+    d = normal.dot(frame_P_current)
+    normal.scale(d)
+    nearest = frame_P_current - normal
+    return norm(nearest-frame_P_current), nearest
+
+
 def angle_between_vector(v1, v2):
     v1 = v1[:3]
     v2 = v2[:3]
@@ -2212,5 +2240,10 @@ def is_false(expr):
     except Exception as e:
         return False
 
+
 def is_constant(expr):
     return len(expr.free_symbols()) == 0
+
+
+def det(expr):
+    return Expression(ca.det(expr.s))

@@ -24,7 +24,8 @@ def giskard_state_to_execution_state() -> ExecutionState:
     try:
         msg.monitor_state = god_map.monitor_manager.state_history[-1][1][0][monitor_filter].tolist()
         msg.monitor_life_cycle_state = god_map.monitor_manager.state_history[-1][1][1][monitor_filter].tolist()
-        msg.task_state = god_map.motion_goal_manager.task_state[task_filter].tolist()
+        if len(task_filter) > 0:
+            msg.task_state = god_map.motion_goal_manager.task_state[task_filter].tolist()
     except Exception as e:  # state not initialized yet
         msg.monitor_state = [0] * len(msg.monitors)
         msg.monitor_life_cycle_state = [TaskState.not_started] * len(msg.monitors)
@@ -58,7 +59,7 @@ class PublishFeedback(GiskardBehavior):
             topic_name = '~state'
         super().__init__(name)
         self.cmd_topic = topic_name
-        self.pub = rospy.Publisher(self.cmd_topic, ExecutionState, queue_size=10)
+        self.pub = rospy.Publisher(self.cmd_topic, ExecutionState, queue_size=10, latch=True)
 
     @record_time
     @profile

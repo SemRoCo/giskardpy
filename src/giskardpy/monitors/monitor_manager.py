@@ -12,7 +12,7 @@ from giskardpy.casadi_wrapper import CompiledFunction
 from giskardpy.data_types import TaskState
 from giskardpy.exceptions import GiskardException, MonitorInitalizationException, UnknownMonitorException
 from giskardpy.god_map import god_map
-from giskardpy.monitors.monitors import ExpressionMonitor, Monitor
+from giskardpy.monitors.monitors import ExpressionMonitor, Monitor, EndMotion
 from giskardpy.monitors.payload_monitors import PayloadMonitor, CancelMotion
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils import logging
@@ -120,6 +120,13 @@ class MonitorManager:
             if cas.is_true(monitor.get_state_expression() == expr):
                 return monitor
         raise GiskardException('No monitor found.')
+
+    def is_monitor_registered(self, monitor_state_expr: cas.Expression) -> bool:
+        try:
+            self.get_monitor_from_state_expr(monitor_state_expr)
+            return True
+        except GiskardException as e:
+            return False
 
     def format_condition(self, condition: cas.Expression, new_line: str = '\n') -> str:
         """
@@ -330,3 +337,21 @@ class MonitorManager:
                 if not isinstance(e, GiskardException):
                     raise MonitorInitalizationException(error_msg)
                 raise e
+
+    def has_end_motion_monitor(self) -> bool:
+        for m in self.monitors:
+            if isinstance(m, EndMotion):
+                return True
+        return False
+
+    def has_cancel_motion_monitor(self) -> bool:
+        for m in self.monitors:
+            if isinstance(m, CancelMotion):
+                return True
+        return False
+
+    def has_payload_monitors_which_are_not_end_nor_cancel(self) -> bool:
+        for m in self.monitors:
+            if not isinstance(m, (CancelMotion, EndMotion)) and isinstance(m, PayloadMonitor):
+                return True
+        return False

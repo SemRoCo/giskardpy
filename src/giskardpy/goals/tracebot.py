@@ -25,7 +25,7 @@ class InsertCylinder(Goal):
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.TrueSymbol):
+                 end_condition: cas.Expression = cas.FalseSymbol):
         self.cylinder_name = cylinder_name
         self.get_straight_after = get_straight_after
         self.root = god_map.world.root_link_name
@@ -78,7 +78,7 @@ class InsertCylinder(Goal):
                                              frame_P_goal=root_P_top,
                                              reference_velocity=0.1,
                                              weight=self.weight)
-        reach_top.end_condition = top_reached_monitor
+        reach_top.end_condition = top_reached_monitor.get_state_expression()
 
         go_to_line = self.create_and_add_task('straight line')
         go_to_line.add_point_goal_constraints(frame_P_current=root_P_tip,
@@ -86,7 +86,7 @@ class InsertCylinder(Goal):
                                               reference_velocity=0.1,
                                               weight=self.weight,
                                               name='pregrasp')
-        go_to_line.start_condition = top_reached_monitor
+        go_to_line.start_condition = top_reached_monitor.get_state_expression()
         # god_map.debug_expression_manager.add_debug_expression('root_V_up', root_V_up)
         # god_map.debug_expression_manager.add_debug_expression('root_P_hole', root_P_hole)
         # god_map.debug_expression_manager.add_debug_expression('root_P_tip', root_P_tip)
@@ -99,7 +99,7 @@ class InsertCylinder(Goal):
                                           expr_goal=self.tilt,
                                           reference_velocity=0.1,
                                           weight=self.weight)
-        tilt_task.end_condition = bottom_reached_monitor
+        tilt_task.end_condition = bottom_reached_monitor.get_state_expression()
         root_V_cylinder_z.vis_frame = self.tip
 
         # move down
@@ -109,7 +109,7 @@ class InsertCylinder(Goal):
                                                reference_velocity=0.1,
                                                weight=self.weight,
                                                name='insertion')
-        insert_task.start_condition = top_reached_monitor
+        insert_task.start_condition = top_reached_monitor.get_state_expression()
         # # tilt straight
         tilt_error = cas.angle_between_vector(root_V_cylinder_z, root_V_up)
         tilt_monitor = ExpressionMonitor(name='straight', start_condition=start_condition)
@@ -121,8 +121,8 @@ class InsertCylinder(Goal):
                                                        frame_V_goal=root_V_up,
                                                        reference_velocity=0.1,
                                                        weight=self.weight)
-        tilt_straight_task.start_condition = bottom_reached_monitor
-        tilt_straight_task.end_condition = tilt_monitor
+        tilt_straight_task.start_condition = bottom_reached_monitor.get_state_expression()
+        tilt_straight_task.end_condition = tilt_monitor.get_state_expression()
         self.connect_start_condition_to_all_tasks(start_condition)
         self.connect_hold_condition_to_all_tasks(hold_condition)
         # for task in self.tasks:

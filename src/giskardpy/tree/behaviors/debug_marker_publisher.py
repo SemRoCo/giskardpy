@@ -18,14 +18,15 @@ from giskardpy.utils.tfwrapper import normalize_quaternion_msg, np_to_kdl, point
 
 
 class DebugMarkerPublisher(GiskardBehavior):
-    colors = [ColorRGBA(r=0, g=0, b=0, a=1),  # black
-              ColorRGBA(r=1, g=0, b=0, a=1),  # red
-              ColorRGBA(r=0, g=1, b=0, a=1),  # green
-              ColorRGBA(r=1, g=1, b=0, a=1),  # yellow
+    colors = [ColorRGBA(r=1, g=0, b=0, a=1),  # red
               ColorRGBA(r=0, g=0, b=1, a=1),  # blue
+              ColorRGBA(r=1, g=1, b=0, a=1),  # yellow
               ColorRGBA(r=1, g=0, b=1, a=1),  # violet
               ColorRGBA(r=0, g=1, b=1, a=1),  # cyan
-              ColorRGBA(r=1, g=1, b=1, a=1)]  # white
+              ColorRGBA(r=0, g=1, b=0, a=1),  # green
+              ColorRGBA(r=1, g=1, b=1, a=1),  # white
+              ColorRGBA(r=0, g=0, b=0, a=1),  # black
+              ]
 
     @profile
     def __init__(self, name: str = 'debug marker', tf_topic: str = '/tf', map_frame: Optional[str] = None):
@@ -136,11 +137,14 @@ class DebugMarkerPublisher(GiskardBehavior):
                     map_V_d = np.dot(map_T_ref, ref_V_d)
                     map_P_vis = map_T_vis[:4, 3:].T[0]
                     map_P_p1 = map_P_vis
-                    map_P_p2 = map_P_vis + map_V_d
+                    map_P_p2 = map_P_vis + map_V_d * 0.5
                     m.points.append(Point(map_P_p1[0], map_P_p1[1], map_P_p1[2]))
                     m.points.append(Point(map_P_p2[0], map_P_p2[1], map_P_p2[2]))
                     m.type = m.ARROW
-                    m.color = self.colors[color_counter]
+                    if expr.color is None:
+                        m.color = self.colors[color_counter]
+                    else:
+                        m.color = expr.color
                     m.scale.x = width / 2
                     m.scale.y = width
                     m.scale.z = 0
@@ -153,7 +157,10 @@ class DebugMarkerPublisher(GiskardBehavior):
                     m.pose.position.z = map_P_d[2]
                     m.pose.orientation.w = 1
                     m.type = m.SPHERE
-                    m.color = self.colors[color_counter]
+                    if expr.color is None:
+                        m.color = self.colors[color_counter]
+                    else:
+                        m.color = expr.color
                     m.scale.x = width
                     m.scale.y = width
                     m.scale.z = width

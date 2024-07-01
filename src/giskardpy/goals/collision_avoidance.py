@@ -1,6 +1,9 @@
 from collections import defaultdict
 from copy import deepcopy
 from typing import Dict, Optional, List
+
+from geometry_msgs.msg import Vector3Stamped
+
 import giskardpy.casadi_wrapper as cas
 import giskardpy.utils.tfwrapper as tf
 from giskard_msgs.msg import CollisionEntry
@@ -241,8 +244,16 @@ class SelfCollisionAvoidance(Goal):
 
 
 class CollisionAvoidanceHint(Goal):
-    def __init__(self, tip_link, avoidance_hint, object_link_name, object_group=None, max_linear_velocity=0.1,
-                 root_link=None, max_threshold=0.05, spring_threshold=None, weight=WEIGHT_ABOVE_CA,
+    def __init__(self,
+                 tip_link: str,
+                 avoidance_hint: Vector3Stamped,
+                 object_link_name: str,
+                 object_group: Optional[str] = None,
+                 max_linear_velocity: float = 0.1,
+                 root_link: Optional[str] = None,
+                 max_threshold: float = 0.05,
+                 spring_threshold: Optional[float] = None,
+                 weight: float = WEIGHT_ABOVE_CA,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
@@ -359,7 +370,7 @@ class CollisionAvoidance(Goal):
                                      not god_map.collision_scene.is_allow_all_self_collision(collision_entries[-1])):
             self.add_self_collision_avoidance_constraints()
         if not cas.is_true(start_condition):
-            payload_monitor = CollisionMatrixUpdater(name='update collision matrix',
+            payload_monitor = CollisionMatrixUpdater(name=f'{self.name}/update collision matrix',
                                                      start_condition=start_condition,
                                                      new_collision_matrix=self.collision_matrix)
             god_map.monitor_manager.add_payload_monitor(payload_monitor)

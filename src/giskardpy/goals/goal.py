@@ -86,7 +86,7 @@ class Goal(ABC):
         for task in self.tasks:
             if cas.is_false(task.end_condition):
                 task.end_condition = condition
-            else:
+            elif not cas.is_false(condition):
                 task.end_condition = cas.logic_and(task.end_condition, condition)
 
     def connect_monitors_to_all_tasks(self,

@@ -10,6 +10,7 @@ import numpy as np
 import pytest
 import rospy
 from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, PointStamped, QuaternionStamped, Pose
+from nav_msgs.msg import Path
 from numpy import pi
 from shape_msgs.msg import SolidPrimitive
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis
@@ -20,6 +21,7 @@ from giskardpy.configs.behavior_tree_config import StandAloneBTConfig
 from giskardpy.configs.giskard import Giskard
 from giskardpy.configs.iai_robots.pr2 import PR2CollisionAvoidance, PR2StandaloneInterface, WorldWithPR2Config
 from giskardpy.configs.qp_controller_config import SupportedQPSolver, QPControllerConfig
+from giskardpy.goals.base_traj_follower import FollowNavPath
 from giskardpy.goals.cartesian_goals import RelativePositionSequence
 from giskardpy.goals.caster import Circle, Wave
 from giskardpy.goals.collision_avoidance import CollisionAvoidanceHint
@@ -162,6 +164,7 @@ class PR2TestWrapper(GiskardTestWrapper):
                               robot_interface_config=PR2StandaloneInterface(drive_joint_name=drive_joint_name),
                               collision_avoidance_config=PR2CollisionAvoidance(drive_joint_name=drive_joint_name),
                               behavior_tree_config=StandAloneBTConfig(debug_mode=True,
+                                                                      publish_tf=True,
                                                                       simulation_max_hz=None),
                               # qp_controller_config=QPControllerConfig(qp_solver=SupportedQPSolver.gurobi))
                               qp_controller_config=QPControllerConfig())
@@ -1043,6 +1046,79 @@ class TestMonitors:
 
 
 class TestConstraints:
+    def test_follow_nav_path(self, zero_pose: PR2TestWrapper):
+        path_msg = Path()
+        path_msg.header.frame_id = 'map'
+
+        poses_data = [
+            {'position': (3.4403343200683594, 2.349609851837158, 0.0),
+             'orientation': (0.0, 0.0, -0.9999553938074013, 0.009445125488052377)},
+            {'position': (3.498216525117533, 2.3331048932770795, 0.0),
+             'orientation': (0.0, 0.0, 0.9993770281155905, 0.035292430843599024)},
+            {'position': (3.5582080985686915, 2.3288624659763553, 0.0),
+             'orientation': (0.0, 0.0, 0.9996662404939319, 0.02583423342636984)},
+            {'position': (3.6068967725310745, 2.326344275148637, 0.0),
+             'orientation': (0.0, 0.0, 0.9997591723006155, 0.021945327538867403)},
+            {'position': (3.6598472962032886, 2.324018561554272, 0.0),
+             'orientation': (0.0, 0.0, 0.9992479949741707, 0.03877427678370992)},
+            {'position': (3.6924761139448794, 2.3214825211531753, 0.0),
+             'orientation': (0.0, 0.0, 0.9991740059338614, 0.04063626294431946)},
+            {'position': (3.727106939527923, 2.318660992860927, 0.0),
+             'orientation': (0.0, 0.0, 0.9991306638705609, 0.0416883258667487)},
+            {'position': (3.7636721910961253, 2.3156043305022376, 0.0),
+             'orientation': (0.0, 0.0, 0.9990501048487416, 0.043576232073442425)},
+            {'position': (3.8028157945033154, 2.31218311653614, 0.0),
+             'orientation': (0.0, 0.0, 0.9987543902336266, 0.04989657291895693)},
+            {'position': (3.8460085061683724, 2.307856605808622, 0.0),
+             'orientation': (0.0, 0.0, 0.9975155500290784, 0.07044662838053373)},
+            {'position': (3.8961558228154374, 2.3007380861823137, 0.0),
+             'orientation': (0.0, 0.0, 0.9969280676127491, 0.07832258937184026)},
+            {'position': (3.9597676634174857, 2.2906808170884503, 0.0),
+             'orientation': (0.0, 0.0, -0.9986858657493689, 0.05124979563308978)},
+            {'position': (4.03348337802564, 2.2982665669040685, 0.0),
+             'orientation': (0.0, 0.0, -0.9986858657493689, 0.05124979563308978)},
+        ]
+
+        for pose_data in poses_data:
+            pose = PoseStamped()
+            pose.header.frame_id = 'map'
+            pose.pose.position.x, pose.pose.position.y, pose.pose.position.z = pose_data['position']
+            pose.pose.orientation.x, pose.pose.orientation.y, pose.pose.orientation.z, pose.pose.orientation.w = \
+                pose_data['orientation']
+            path_msg.poses.append(pose)
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class=FollowNavPath.__name__,
+                                               name='follow',
+                                               camera_link='head_mount_kinect_rgb_optical_frame',
+                                               laser_frame_id='base_laser_link',
+                                               # laser_topics=[],
+                                               path=path_msg)
+        zero_pose.execute(add_local_minimum_reached=False)
+
+    def test_follow_nav_path2(self, zero_pose: PR2TestWrapper):
+        path_msg = Path()
+        path_msg.header.frame_id = 'map'
+
+        poses_data = [
+            {'position': (1, 0, 0.0), 'orientation': (0.0, 0.0, 0, 1)},
+            {'position': (1, 1, 0.0), 'orientation': (0.0, 0.0, 0, 1)},
+            {'position': (-1, 1, 0.0), 'orientation': (0.0, 0.0, 0, 1)},
+            {'position': (-1, -1, 0.0), 'orientation': (0.0, 0.0, 0, 1)},
+        ]
+
+        for pose_data in poses_data:
+            pose = PoseStamped()
+            pose.header.frame_id = 'map'
+            pose.pose.position.x, pose.pose.position.y, pose.pose.position.z = pose_data['position']
+            pose.pose.orientation.x, pose.pose.orientation.y, pose.pose.orientation.z, pose.pose.orientation.w = \
+                pose_data['orientation']
+            path_msg.poses.append(pose)
+        zero_pose.motion_goals.add_follow_nav_path(name='follow',
+                                                   camera_link='head_mount_kinect_rgb_optical_frame',
+                                                   laser_frame_id='base_laser_link',
+                                                   # laser_topics=[],
+                                                   path=path_msg)
+        zero_pose.execute(add_local_minimum_reached=False)
+
     # TODO write buggy constraints that test sanity checks
     def test_empty_problem(self, zero_pose: PR2TestWrapper):
         zero_pose.allow_all_collisions()

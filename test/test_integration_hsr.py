@@ -36,7 +36,9 @@ class HSRTestWrapper(GiskardTestWrapper):
             giskard = Giskard(world_config=WorldWithHSRConfig(),
                               collision_avoidance_config=HSRCollisionAvoidanceConfig(),
                               robot_interface_config=HSRStandaloneInterface(),
-                              behavior_tree_config=StandAloneBTConfig(debug_mode=True, publish_js=True),
+                              behavior_tree_config=StandAloneBTConfig(debug_mode=True,
+                                                                      publish_tf=False,
+                                                                      publish_js=False),
                               qp_controller_config=QPControllerConfig())
         super().__init__(giskard)
         self.gripper_group = 'gripper'

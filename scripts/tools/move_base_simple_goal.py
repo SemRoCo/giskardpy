@@ -14,9 +14,9 @@ def call_back(pose_stamped):
     rospy.loginfo('received simple move base goal')
     tip_link = 'base_footprint'
     root_link = 'map'
-    giskard.set_straight_cart_goal(goal_pose=pose_stamped,
-                                   tip_link=tip_link,
-                                   root_link=root_link)
+    giskard.add_cartesian_pose_straight(goal_pose=pose_stamped,
+                                        tip_link=tip_link,
+                                        root_link=root_link)
     giskard.allow_all_collisions()
     giskard.plan_and_execute(wait=False)
 

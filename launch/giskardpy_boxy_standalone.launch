@@ -7,13 +7,13 @@
   <node pkg="giskardpy" type="interactive_marker.py" name="giskard_interactive_marker" output="screen">
     <rosparam param="enable_self_collision">False</rosparam>
     <rosparam param="interactive_marker_chains">
-      - [boxy_description/odom, boxy_description/base_footprint]
-      - [boxy_description/odom, boxy_description/triangle_base_link]
-      - [boxy_description/odom, boxy_description/neck_ee_link]
-      - [boxy_description/base_footprint, boxy_description/left_gripper_tool_frame]
-      - [boxy_description/odom, boxy_description/left_gripper_tool_frame]
-      - [boxy_description/odom, boxy_description/right_gripper_tool_frame]
-      - [boxy_description/left_gripper_base_link, boxy_description/left_gripper_finger_left_link]
+      - [odom, base_footprint]
+      - [odom, triangle_base_link]
+      - [odom, neck_ee_link]
+      - [base_footprint, left_gripper_tool_frame]
+      - [odom, left_gripper_tool_frame]
+      - [odom, right_gripper_tool_frame]
+      - [left_gripper_base_link, left_gripper_finger_left_link]
    </rosparam>
   </node>
 

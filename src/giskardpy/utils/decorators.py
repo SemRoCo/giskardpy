@@ -16,7 +16,7 @@ from contextlib import contextmanager
 from copy import deepcopy
 from functools import wraps
 from time import time
-from typing import Type, Optional, Dict
+from typing import Type, Optional, Dict, TypeVar, Callable
 
 import numpy as np
 import roslaunch
@@ -27,26 +27,21 @@ from genpy import Message
 from geometry_msgs.msg import PointStamped, Point, Vector3Stamped, Vector3, Pose, PoseStamped, QuaternionStamped, \
     Quaternion
 from py_trees import Status, Blackboard
-from rospy_message_converter.message_converter import \
-    convert_ros_message_to_dictionary as original_convert_ros_message_to_dictionary, \
-    convert_dictionary_to_ros_message as original_convert_dictionary_to_ros_message
-from sensor_msgs.msg import JointState
-from visualization_msgs.msg import Marker, MarkerArray
 
-from giskardpy import identifier
 from giskardpy.exceptions import DontPrintStackTrace
-from giskardpy.god_map import GodMap
-from giskardpy.my_types import PrefixName
-from giskardpy.utils import logging
-from giskardpy.utils.time_collector import TimeCollector
 from giskardpy.utils.utils import has_blackboard_exception, raise_to_blackboard
 
+from functools import wraps
+from typing import Any, TypeVar
 
-def memoize(function):
+T = TypeVar("T", bound=Callable)
+
+
+def memoize(function: T) -> T:
     memo = function.memo = {}
 
     @wraps(function)
-    def wrapper(*args, **kwargs):
+    def wrapper(*args: Any, **kwargs: Any) -> T:
         key = (args, frozenset(kwargs.items()))
         try:
             return memo[key]
@@ -55,11 +50,11 @@ def memoize(function):
             memo[key] = rv
             return rv
 
-    return wrapper
+    return wrapper  # type: ignore
 
 
 def memoize_with_counter(reset_after: int):
-    def memoize(function):
+    def memoize(function: T) -> T:
         memo = function.memo = {}
         function.__counter = 0
 
@@ -84,7 +79,7 @@ def memoize_with_counter(reset_after: int):
     return memoize
 
 
-def record_time(function):
+def record_time(function: T) -> T:
     # return function
     function_name = function.__name__
 
@@ -107,7 +102,7 @@ def clear_memo(f):
         f.memo.clear()
 
 
-def copy_memoize(function):
+def copy_memoize(function: T) -> T:
     memo = function.memo = {}
 
     @wraps(function)
@@ -123,7 +118,7 @@ def copy_memoize(function):
     return wrapper
 
 
-def catch_and_raise_to_blackboard(function):
+def catch_and_raise_to_blackboard(function: T) -> T:
     @wraps(function)
     def wrapper(*args, **kwargs):
         if has_blackboard_exception():
@@ -138,3 +133,30 @@ def catch_and_raise_to_blackboard(function):
         return r
 
     return wrapper
+
+
+# %% these two decorators automatically add a state variable to an object that prevents multiple calls for off on pairs
+def toggle_on(state_var: str):
+    def decorator(func: T) -> T:
+        def wrapper(self, *args, **kwargs) -> T:
+            if getattr(self, state_var, False):
+                return
+            setattr(self, state_var, True)
+            return func(self, *args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
+def toggle_off(state_var: str):
+    def decorator(func: T) -> T:
+        def wrapper(self, *args, **kwargs) -> T:
+            if not getattr(self, state_var, True):
+                return
+            setattr(self, state_var, False)
+            return func(self, *args, **kwargs)
+
+        return wrapper
+
+    return decorator

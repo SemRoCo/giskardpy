@@ -4,7 +4,7 @@ import pkg_resources
 import rospkg
 
 from giskardpy.utils import logging
-from giskardpy.utils.config_loader import get_ros_pkg_path
+from giskardpy.utils.utils import resolve_ros_iris
 
 r = rospkg.RosPack()
 
@@ -113,7 +113,7 @@ def check_dependencies():
     dependecy is not installed a message is printed.
     """
 
-    with open(get_ros_pkg_path('giskardpy') + '/requirements.txt') as f:
+    with open(resolve_ros_iris('giskardpy') + '/requirements.txt') as f:
         dependencies = f.readlines()
 
     dependencies = [x.split('#')[0] for x in dependencies]

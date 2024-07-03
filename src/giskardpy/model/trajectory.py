@@ -12,11 +12,10 @@ import rospy
 from sortedcontainers import SortedDict
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
-from giskardpy import identifier
 from giskardpy.data_types import JointStates
-from giskardpy.god_map import GodMap
+from giskardpy.god_map import god_map
 from giskardpy.model.joints import Joint, OmniDrive, MovableJoint
-from giskardpy.my_types import PrefixName, Derivatives
+from giskardpy.data_types import PrefixName, Derivatives
 from giskardpy.utils import logging
 from giskardpy.utils.utils import cm_to_inch
 
@@ -32,8 +31,9 @@ class Trajectory:
     def clear(self):
         self._points = OrderedDict()
 
-    def get_exact(self, time):
-        return self._points[time]
+    def get_exact(self, time: int) -> JointStates:
+        time = max(-len(self), min(len(self), time))
+        return list(self._points.values())[time]
 
     def set(self, time: int, point: JointStates):
         if len(self._points) > 0 and list(self._points.keys())[-1] > time:
@@ -93,6 +93,10 @@ class Trajectory:
             trajectory_msg.points.append(p)
         return trajectory_msg
 
+    @property
+    def length_in_seconds(self) -> float:
+        return len(self) * god_map.qp_controller_config.sample_period
+
     def to_dict(self, normalize_position: bool = False, filter_0_vel: bool = True) -> Dict[
         Derivatives, Dict[PrefixName, np.ndarray]]:
         data = defaultdict(lambda: defaultdict(list))
@@ -102,9 +106,12 @@ class Trajectory:
                     data[derivative][free_variable].append(state)
         for derivative, d_data in data.items():
             for free_variable, trajectory in d_data.items():
-                d_data[free_variable] = np.array(trajectory)
+                d_data[free_variable] = np.array(trajectory, dtype=float)
+                if (free_variable in god_map.world.free_variables
+                        and not god_map.world.free_variables[free_variable].has_position_limits()):
+                    normalize_position = True
                 if normalize_position and derivative == Derivatives.position:
-                    d_data[free_variable] -= (d_data[free_variable].max() + d_data[free_variable].min()) / 2
+                    d_data[free_variable] -= (d_data[free_variable].max() + d_data[free_variable].min()) / 2.
         if filter_0_vel:
             for free_variable, trajectory in list(data[Derivatives.velocity].items()):
                 if abs(trajectory.max() - trajectory.min()) < 1e-5:
@@ -141,7 +148,7 @@ class Trajectory:
         cm_per_second = cm_to_inch(cm_per_second)
         height_per_derivative = cm_to_inch(height_per_derivative)
         hspace = cm_to_inch(hspace)
-        max_derivative = GodMap().get_data(identifier.max_derivative)
+        max_derivative = god_map.qp_controller_config.max_derivative
         with plot_lock:
             def ceil(val, base=0.0, stride=1.0):
                 base = base % stride

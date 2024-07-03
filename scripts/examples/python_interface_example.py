@@ -1,172 +1,169 @@
 import rospy
-from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, PointStamped
-from giskardpy.python_interface import GiskardWrapper
+from geometry_msgs.msg import PoseStamped
 
-# create goal joint state dictionary
-start_joint_state = {'r_elbow_flex_joint': -1.29610152504,
-                     'r_forearm_roll_joint': -0.0301682323805,
-                     'r_shoulder_lift_joint': 1.20324921318,
-                     'r_shoulder_pan_joint': -0.73456435706,
-                     'r_upper_arm_roll_joint': -0.70790051778,
-                     'r_wrist_flex_joint': -0.10001,
-                     'r_wrist_roll_joint': 0.258268529825,
+from giskardpy.goals.joint_goals import JointPositionList
+from giskardpy.motion_graph.monitors import JointGoalReached
+from giskardpy.python_interface.python_interface import GiskardWrapper
 
-                     'l_elbow_flex_joint': -1.29610152504,
-                     'l_forearm_roll_joint': 0.0301682323805,
-                     'l_shoulder_lift_joint': 1.20324921318,
-                     'l_shoulder_pan_joint': 0.73456435706,
-                     'l_upper_arm_roll_joint': 0.70790051778,
-                     'l_wrist_flex_joint': -0.1001,
-                     'l_wrist_roll_joint': -0.258268529825,
+# %% Define goals for later
+right_arm_goal = {'r_shoulder_pan_joint': -1.7125,
+                  'r_shoulder_lift_joint': -0.25672,
+                  'r_upper_arm_roll_joint': -1.46335,
+                  'r_elbow_flex_joint': -2.12,
+                  'r_forearm_roll_joint': 1.76632,
+                  'r_wrist_flex_joint': -0.10001,
+                  'r_wrist_roll_joint': 0.05106}
 
-                     'torso_lift_joint': 0.2,
-                     'head_pan_joint': 0,
-                     'head_tilt_joint': 0}
+left_arm_goal = {'l_shoulder_pan_joint': 1.9652,
+                 'l_shoulder_lift_joint': - 0.26499,
+                 'l_upper_arm_roll_joint': 1.3837,
+                 'l_elbow_flex_joint': -2.12,
+                 'l_forearm_roll_joint': 16.99,
+                 'l_wrist_flex_joint': - 0.10001,
+                 'l_wrist_roll_joint': 0}
 
-# init ros node
+base_goal = PoseStamped()
+base_goal.header.frame_id = 'map'
+base_goal.pose.position.x = 2
+base_goal.pose.orientation.w = 1
+
+# %% init ros node and Giskard Wrapper.
+# This assumes that roslaunch giskardpy giskardpy_pr2_standalone.launch is running.
 rospy.init_node('test')
 
 rospy.loginfo('Instantiating Giskard wrapper.')
 giskard_wrapper = GiskardWrapper()
 
-# Remove everything but the robot.
-giskard_wrapper.clear_world()
+# %% Remove everything but the robot.
+# All world related operations are grouped under giskard_wrapper.world.
+giskard_wrapper.world.clear()
 
-rospy.loginfo('Combining a joint goal for the arm with a Cartesian goal for the base to reset the pr2.')
-# Setting the joint goal
-giskard_wrapper.set_joint_goal(start_joint_state)
+# %% Monitors observe something and turn to True, if the condition is met. They don't cause any motions.
+# All monitor related operations are grouped under giskard_wrapper.monitors.
+# Let's define a few
+# This one turns True when the length of the current trajectory % mod = 0
+alternator = giskard_wrapper.monitors.add_alternator(mod=2)
+# This one sleeps and then turns True
+sleep1 = giskard_wrapper.monitors.add_sleep(1, name='sleep1')
+# This prints a message and then turns True.
+# With start_condition you can define which monitors need to be True in order for this one to become active
+print1 = giskard_wrapper.monitors.add_print(message=f'{sleep1} done', start_condition=sleep1)
+# You can also write logical expressions using "and", "or" and "not" to combine multiple monitors
+sleep2 = giskard_wrapper.monitors.add_sleep(1.5, name='sleep2', start_condition=f'{print1} or not {sleep1}')
 
-base_goal = PoseStamped()
-base_goal.header.frame_id = 'map'
-base_goal.pose.position = Point(0, 0, 0)
-base_goal.pose.orientation = Quaternion(0, 0, 0, 1)
-# Setting the Cartesian goal.
-# Choosing map as root_link will allow Giskard to drive with the pr2.
-giskard_wrapper.set_cart_goal(root_link='map', tip_link='base_footprint', goal_pose=base_goal)
+# %% Now Let's define some motion goals.
+# We want to reach two joint goals, so we first define monitors for checking that end condition.
+right_monitor = giskard_wrapper.monitors.add_joint_position(goal_state=right_arm_goal,
+                                                            name='right pose reached',
+                                                            start_condition=sleep1)
+# You can use add_motion_goal to add any monitor implemented in giskardpy.monitor.
+# All remaining parameters are forwarded to the __init__ function of that class.
+# All specialized add_ functions are just wrappers for add_monitor.
+left_monitor = giskard_wrapper.monitors.add_monitor(monitor_class=JointGoalReached.__name__,
+                                                    goal_state=left_arm_goal,
+                                                    name='left pose reached',
+                                                    start_condition=sleep1,
+                                                    threshold=0.01)
 
-# Turn off collision avoidance to make sure that the robot can recover from any state.
-giskard_wrapper.allow_all_collisions()
-giskard_wrapper.plan_and_execute()
+# We set two separate motion goals for the joints of the left and right arm.
+# All motion goal related operations are groups under giskard_wrapper.motion_goals.
+# The one for the right arm starts when the sleep2 monitor is done and ends, when the right_monitor is done,
+# meaning it continues until the joint goal was reached.
+giskard_wrapper.motion_goals.add_joint_position(goal_state=right_arm_goal,
+                                                name='right pose',
+                                                start_condition=sleep2,
+                                                end_condition=right_monitor)
+# You can use add_motion_goal to add any motion goal implemented in giskardpy.goals.
+# All remaining parameters are forwarded to the __init__ function of that class.
+giskard_wrapper.motion_goals.add_motion_goal(motion_goal_class=JointPositionList.__name__,
+                                             goal_state=left_arm_goal,
+                                             name='left pose',
+                                             end_condition=left_monitor)
 
-rospy.loginfo('Setting a Cartesian goal for the right gripper.')
-r_goal = PoseStamped()
-r_goal.header.frame_id = 'r_gripper_tool_frame'
-r_goal.pose.position = Point(-0.2, -0.2, 0.2)
-r_goal.pose.orientation = Quaternion(0, 0, 0, 1)
-giskard_wrapper.set_cart_goal(root_link='map', tip_link='r_gripper_tool_frame', goal_pose=r_goal)
+# %% Now let's define a goal for the base, 2m in front of it.
+# First we define a monitor which checks if that pose was reached.
+base_monitor = giskard_wrapper.monitors.add_cartesian_pose(root_link='map',
+                                                           tip_link='base_footprint',
+                                                           goal_pose=base_goal)
 
-rospy.loginfo('Setting a Cartesian goal for the left gripper.')
-l_goal = PoseStamped()
-l_goal.header.frame_id = 'l_gripper_tool_frame'
-l_goal.pose.position = Point(0.2, 0.2, 0.2)
-l_goal.pose.orientation = Quaternion(0, 0, 0, 1)
-giskard_wrapper.set_cart_goal(root_link='map', tip_link='l_gripper_tool_frame', goal_pose=l_goal)
+# and then we define a motion goal for it.
+# The hold_condition causes the motion goal to hold as long as the condition is True.
+# In this case, the cart pose is halted if time % 2 == 1 and active if time % 2 == 0.
+giskard_wrapper.motion_goals.add_cartesian_pose(root_link='map',
+                                                tip_link='base_footprint',
+                                                goal_pose=base_goal,
+                                                hold_condition=f'not {alternator}',
+                                                end_condition=base_monitor)
 
-rospy.loginfo('Executing both Cartesian goals at the same time')
-giskard_wrapper.plan_and_execute()
+# %% Define when the motion should end.
+# Usually you'd use the local minimum reached monitor for this.
+# In this case, we don't want the local minimum reached monitor to stay True, because it might get triggered during
+# the sleeps and therefore set it to False.
+local_min = giskard_wrapper.monitors.add_local_minimum_reached(end_condition='')
 
-rospy.loginfo('Combining a Cartesian goal with a partial joint goal.')
-p = PoseStamped()
-p.header.frame_id = 'map'
-p.pose.position.x = 0.8
-p.pose.position.y = 0.2
-p.pose.position.z = 1.0
-p.pose.orientation.w = 1
+# Giskard will only end the motion generation and return Success, if an end monitor becomes True.
+# We do this by defining one that gets triggered, when a local minimum was reached, sleep2 is done and the motion goals
+# were reached.
+giskard_wrapper.monitors.add_end_motion(start_condition=' and '.join([local_min,
+                                                                      sleep2,
+                                                                      right_monitor,
+                                                                      left_monitor,
+                                                                      base_monitor]))
+# It's good to also add a cancel condition in case something went wrong and the end motion monitor is unable to become
+# True. Currently, the only predefined specialized cancel monitor is max trajectory length.
+# Alternative you can use monitor.add_cancel_motion similar to end_motion.
+giskard_wrapper.monitors.add_max_trajectory_length(120)
+# Lastly we allow all collisions
+giskard_wrapper.motion_goals.allow_all_collisions()
+# And execute the goal.
+rospy.loginfo('Sending first goal.')
+giskard_wrapper.execute()
+rospy.loginfo('First goal finished.')
 
-rospy.loginfo('Setting Cartesian goal.')
-# Choosing base_footprint as root_link will not include the base, therefore not allowing pr2 to drive.
-giskard_wrapper.set_cart_goal(root_link='base_footprint', tip_link='l_gripper_tool_frame', goal_pose=p)
-
-rospy.loginfo('Setting joint goal for only the torso.')
-giskard_wrapper.set_joint_goal({'torso_lift_joint': 0.3})
-
-rospy.loginfo('Executing.')
-giskard_wrapper.plan_and_execute()
-
-rospy.loginfo('Setting a pointing goal via the json interface.')
-goal_point = PointStamped()
-goal_point.header.frame_id = 'r_gripper_tool_frame'
-
-tip = 'high_def_frame'
-# The root link torso_lift_link is above the torso joint, therefore the pr2 can't use its torso to achieve the goal.
-root = 'torso_lift_link'
-pointing_axis = Vector3Stamped()
-pointing_axis.header.frame_id = tip
-pointing_axis.vector.x = 1
-
-giskard_wrapper.set_json_goal('Pointing',
-                              tip_link=tip,
-                              root_link=root,
-                              goal_point=goal_point,
-                              pointing_axis=pointing_axis)
-giskard_wrapper.plan_and_execute()
-
-rospy.loginfo('Setting a pointing goal via the predefined Giskard wrapper function to look at the left hand.')
-goal_point = PointStamped()
-goal_point.header.frame_id = 'l_gripper_tool_frame'
-
-tip = 'high_def_frame'
-root = 'torso_lift_link'
-pointing_axis = Vector3Stamped()
-pointing_axis.header.frame_id = tip
-pointing_axis.vector.x = 1
-
-giskard_wrapper.set_pointing_goal(tip_link=tip,
-                                  root_link=root,
-                                  goal_point=goal_point,
-                                  pointing_axis=pointing_axis)
-
-rospy.loginfo('Combining it with a goal that makes the right hand point at the left hand.')
-tip = 'r_gripper_tool_frame'
-root = 'torso_lift_link'
-pointing_axis = Vector3Stamped()
-pointing_axis.header.frame_id = tip
-pointing_axis.vector.x = 1
-giskard_wrapper.set_pointing_goal(tip_link='r_gripper_tool_frame',
-                                  root_link=root,
-                                  goal_point=goal_point,
-                                  pointing_axis=pointing_axis)
-rospy.loginfo('Execute')
-giskard_wrapper.plan_and_execute()
-
-rospy.loginfo('Spawn a box in the world.')
+# %% manipulate world
 box_name = 'muh'
 box_pose = PoseStamped()
 box_pose.header.frame_id = 'r_gripper_tool_frame'
 box_pose.pose.orientation.w = 1
-giskard_wrapper.add_box(name=box_name,
-                        size=(0.2, 0.1, 0.1),
-                        pose=box_pose,
-                        parent_link='map')
-rospy.loginfo('Delete everything but the robot.')
-giskard_wrapper.clear_world()
+rospy.loginfo('Add box.')
+giskard_wrapper.world.add_box(name=box_name,
+                              size=(0.2, 0.1, 0.1),
+                              pose=box_pose,
+                              parent_link='map')
+rospy.loginfo('Clear world.')
+giskard_wrapper.world.clear()
 
-rospy.loginfo('Spawn a box again')
-giskard_wrapper.add_box(name=box_name,
-                        size=(0.2, 0.1, 0.1),
-                        pose=box_pose,
-                        parent_link='map')
+rospy.loginfo('Add box again.')
+giskard_wrapper.world.add_box(name=box_name,
+                              size=(0.2, 0.1, 0.1),
+                              pose=box_pose,
+                              parent_link='map')
 
-rospy.loginfo('Attach it to the robot')
-giskard_wrapper.update_parent_link_of_group(name=box_name,
-                                            parent_link='r_gripper_tool_frame')
+rospy.loginfo('Attach box at gripper.')
+giskard_wrapper.world.update_parent_link_of_group(name=box_name,
+                                                  parent_link='r_gripper_tool_frame')
 
-rospy.loginfo('Delete only the box.')
-giskard_wrapper.remove_group(name=box_name)
+rospy.loginfo('Delete box.')
+giskard_wrapper.world.remove_group(name=box_name)
 
-rospy.loginfo('Attach a box directly to the robot\'s right gripper.')
-giskard_wrapper.add_box(name=box_name,
-                        size=(0.2, 0.1, 0.1),
-                        pose=box_pose,
-                        parent_link='r_gripper_tool_frame')
+rospy.loginfo('Add a new box directly at gripper.')
+giskard_wrapper.world.add_box(name=box_name,
+                              size=(0.2, 0.1, 0.1),
+                              pose=box_pose,
+                              parent_link='r_gripper_tool_frame')
 
-rospy.loginfo('Set a Cartesian goal for the box')
+# All objects added to the world can be used as root or tip links in most motion goals or monitors.
+# In this case we use the box name to set a goal for the box attached to the robot.
 box_goal = PoseStamped()
 box_goal.header.frame_id = box_name
 box_goal.pose.position.x = 0.5
 box_goal.pose.orientation.w = 1
-giskard_wrapper.set_cart_goal(goal_pose=box_goal,
-                              tip_link=box_name,
-                              root_link='map')
-giskard_wrapper.plan_and_execute()
+giskard_wrapper.motion_goals.add_cartesian_pose(goal_pose=box_goal,
+                                                tip_link=box_name,
+                                                root_link='map')
 
+# If you don't want to create complicated monitor/motion goal chains, the default ending conditions might be sufficient.
+giskard_wrapper.add_default_end_motion_conditions()
+rospy.loginfo('Send cartesian goal for box.')
+giskard_wrapper.execute()
+rospy.loginfo('Done.')

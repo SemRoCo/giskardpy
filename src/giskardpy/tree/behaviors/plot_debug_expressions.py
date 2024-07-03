@@ -1,16 +1,12 @@
 import traceback
-from collections import defaultdict
 from threading import Lock
-from typing import Dict
-import re
 import numpy as np
 
-from giskardpy import identifier
-from giskardpy.data_types import JointStates
+from giskardpy.data_types import JointStates, PrefixName
+from giskardpy.god_map import god_map
 from giskardpy.model.trajectory import Trajectory
 from giskardpy.tree.behaviors.plot_trajectory import PlotTrajectory
 from giskardpy.utils.logging import logwarn
-from giskardpy.utils.utils import create_path
 
 plot_lock = Lock()
 
@@ -33,13 +29,13 @@ class PlotDebugExpressions(PlotTrajectory):
                 if isinstance(js_.position, np.ndarray):
                     if len(js_.position.shape) == 1:
                         for x in range(js_.position.shape[0]):
-                            tmp_name = f'{name}|{x}'
+                            tmp_name = PrefixName(f'{name}|{x}')
                             new_js[tmp_name].position = js_.position[x]
                             new_js[tmp_name].velocity = js_.velocity[x]
                     else:
                         for x in range(js_.position.shape[0]):
                             for y in range(js_.position.shape[1]):
-                                tmp_name = f'{name}|{x}_{y}'
+                                tmp_name = PrefixName(f'{name}|{x}_{y}')
                                 new_js[tmp_name].position = js_.position[x, y]
                                 new_js[tmp_name].velocity = js_.velocity[x, y]
                 else:
@@ -49,9 +45,9 @@ class PlotDebugExpressions(PlotTrajectory):
         return new_traj
 
     def plot(self):
-        trajectory = self.god_map.get_data(identifier.debug_trajectory)
+        trajectory = god_map.debug_expression_manager.debug_trajectory
         if trajectory and len(trajectory.items()) > 0:
-            sample_period = self.god_map.get_data(identifier.sample_period)
+            sample_period = god_map.qp_controller_config.sample_period
             traj = self.split_traj(trajectory)
             try:
                 traj.plot_trajectory(path_to_data_folder=self.path_to_data_folder,

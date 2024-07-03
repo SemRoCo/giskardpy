@@ -7,9 +7,9 @@
     <node pkg="giskardpy" type="interactive_marker.py" name="giskard_interactive_marker" output="screen">
         <rosparam param="enable_self_collision">False</rosparam>
         <rosparam param="interactive_marker_chains">
-            - [iai_donbot/odom, iai_donbot/gripper_tool_frame]
-            - [iai_donbot/ur5_shoulder_link, iai_donbot/camera_link]
-            - [iai_donbot/odom, iai_donbot/base_footprint]
+            - [odom, gripper_tool_frame]
+            - [ur5_shoulder_link, camera_link]
+            - [odom, base_footprint]
         </rosparam>
     </node>
 

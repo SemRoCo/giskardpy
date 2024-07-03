@@ -1,34 +1,35 @@
 from py_trees import Status
 
-import giskardpy.identifier as identifier
+from giskardpy.god_map import god_map
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
-from giskardpy.utils.decorators import record_time
+from giskardpy.utils import logging
+from giskardpy.utils.decorators import record_time, catch_and_raise_to_blackboard
+from giskardpy.utils.utils import is_running_in_pytest
 
 
 class RealKinSimPlugin(GiskardBehavior):
     last_time: float
+    print_warning = is_running_in_pytest()
 
     def initialise(self):
         self.last_time = None
-        self.god_map.set_data(identifier.dt, 0)
-        self.start_time = self.god_map.get_data(identifier.tracking_start_time)
+        self.start_time = god_map.tracking_start_time
 
+    @catch_and_raise_to_blackboard
     @record_time
     @profile
     def update(self):
-        next_time = self.god_map.get_data(identifier.time)
+        next_time = god_map.time
         if next_time <= 0.0 or self.last_time is None:
             self.last_time = next_time
             return Status.RUNNING
-        # if self.last_time is None:
-        next_cmds = self.god_map.get_data(identifier.qp_solver_solution)
-        # joints = self.world.joints
-        # next_time = rospy.get_rostime()
+        next_cmds = god_map.qp_solver_solution
         dt = next_time - self.last_time
-        # dt = 0.0125
-        # self.god_map.set_data(identifier.dt, 0.0125)
-        # print(f'dt: {dt}')
-        self.world.update_state(next_cmds, dt)
+        if dt > god_map.qp_controller_config.sample_period:
+            # if self.print_warning:
+            #     logging.logwarn(f'dt is larger than sample period of the MPC! '
+            #                     f'{dt:.5f} > {god_map.qp_controller_config.sample_period}. ')
+            dt = god_map.qp_controller_config.sample_period
+        god_map.world.update_state(next_cmds, dt)
         self.last_time = next_time
-        # self.world.notify_state_change()
         return Status.RUNNING

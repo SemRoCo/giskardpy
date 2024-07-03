@@ -2,15 +2,16 @@ from __future__ import annotations
 
 import builtins
 from copy import copy
-from typing import Union, List
+from enum import IntEnum
+from typing import Union, List, TypeVar
 import math
+
+import casadi
 import casadi as ca  # type: ignore
 import numpy as np
 import geometry_msgs.msg as geometry_msgs
 import rospy
 from scipy import sparse as sp
-from giskardpy.my_types import PrefixName, Derivatives
-from giskardpy.utils import logging
 
 builtin_max = builtins.max
 builtin_min = builtins.min
@@ -66,10 +67,10 @@ class CompiledFunction:
         else:
             try:
                 self.compiled_f = ca.Function('f', parameters, [ca.densify(expression.s)])
-            except Exception:
+            except Exception as e:
                 self.compiled_f = ca.Function('f', parameters, ca.densify(expression.s))
             self.buf, self.f_eval = self.compiled_f.buffer()
-            if expression.shape[1] == 1:
+            if expression.shape[1] <= 1:
                 shape = expression.shape[0]
             else:
                 shape = expression.shape
@@ -280,6 +281,15 @@ class Symbol(Symbol_):
     def __neg__(self):
         return Expression(self.s.__neg__())
 
+    def __invert__(self):
+        return logic_not(self)
+
+    def __or__(self, other):
+        return logic_or(self, other)
+
+    def __and__(self, other):
+        return logic_and(self, other)
+
     def __pow__(self, other):
         if isinstance(other, (int, float)):
             return Expression(self.s.__pow__(other))
@@ -442,6 +452,9 @@ class Expression(Symbol_):
     def __neg__(self):
         return Expression(self.s.__neg__())
 
+    def __invert__(self):
+        return logic_not(self)
+
     def __pow__(self, other):
         if isinstance(other, (int, float)):
             return Expression(self.s.__pow__(other))
@@ -463,6 +476,12 @@ class Expression(Symbol_):
             other = other.s
         return Expression(self.s.__eq__(other))
 
+    def __or__(self, other):
+        return logic_or(self, other)
+
+    def __and__(self, other):
+        return logic_and(self, other)
+
     def __ne__(self, other):
         if isinstance(other, Symbol_):
             other = other.s
@@ -481,6 +500,10 @@ class Expression(Symbol_):
 
     def reshape(self, new_shape):
         return Expression(self.s.reshape(new_shape))
+
+
+TrueSymbol = Expression(True)
+FalseSymbol = Expression(False)
 
 
 class TransMatrix(Symbol_):
@@ -699,16 +722,19 @@ class RotationMatrix(Symbol_):
     def to_axis_angle(self):
         return self.to_quaternion().to_axis_angle()
 
-    def to_angle(self, hint):
+    def to_angle(self, hint=None):
         """
         :param hint: A function whose sign of the result will be used to determine if angle should be positive or
                         negative
         :return:
         """
         axis, angle = self.to_axis_angle()
-        return normalize_angle(if_greater_zero(hint(axis),
-                                               if_result=angle,
-                                               else_result=-angle))
+        if hint is not None:
+            return normalize_angle(if_greater_zero(hint(axis),
+                                                   if_result=angle,
+                                                   else_result=-angle))
+        else:
+            return angle
 
     @classmethod
     def from_vectors(cls, x=None, y=None, z=None):
@@ -1324,8 +1350,9 @@ class Quaternion(Symbol_):
 
 all_expressions = Union[Symbol_, Symbol, Expression, Point3, Vector3, RotationMatrix, TransMatrix, Quaternion]
 all_expressions_float = Union[Symbol, Expression, Point3, Vector3, RotationMatrix, TransMatrix, float, Quaternion]
-symbol_expr_float = Union[Symbol, Expression, float]
+symbol_expr_float = Union[Symbol, Expression, float, int, IntEnum]
 symbol_expr = Union[Symbol, Expression]
+PreservedCasType = TypeVar('PreservedCasType', Point3, Vector3, TransMatrix, RotationMatrix, Quaternion, Expression)
 
 
 def var(variables_names: str):
@@ -1465,9 +1492,9 @@ def limit(x, lower_limit, upper_limit):
 
 def if_else(condition, if_result, else_result):
     condition = Expression(condition).s
-    if isinstance(if_result, float):
+    if isinstance(if_result, (float, int)):
         if_result = Expression(if_result)
-    if isinstance(else_result, float):
+    if isinstance(else_result, (float, int)):
         else_result = Expression(else_result)
     if isinstance(if_result, (Point3, Vector3, TransMatrix, RotationMatrix, Quaternion)):
         assert type(if_result) == type(else_result), \
@@ -1527,6 +1554,15 @@ def greater(x, y, decimal_places=None):
 
 def logic_and(*args):
     assert len(args) >= 2, 'and must be called with at least 2 arguments'
+    # if there is any False, return False
+    if [x for x in args if is_false(x)]:
+        return FalseSymbol
+    # filter all True
+    args = [x for x in args if not is_true(x)]
+    if len(args) == 0:
+        return TrueSymbol
+    if len(args) == 1:
+        return args[0]
     if len(args) == 2:
         return Expression(ca.logic_and(args[0].s, args[1].s))
     else:
@@ -1543,6 +1579,15 @@ def logic_all(args):
 
 def logic_or(*args):
     assert len(args) >= 2, 'and must be called with at least 2 arguments'
+    # if there is any True, return True
+    if [x for x in args if is_true(x)]:
+        return TrueSymbol
+    # filter all False
+    args = [x for x in args if not is_false(x)]
+    if len(args) == 0:
+        return FalseSymbol
+    if len(args) == 1:
+        return args[0]
     if len(args) == 2:
         return Expression(ca.logic_or(args[0].s, args[1].s))
     else:
@@ -1616,6 +1661,17 @@ def if_eq(a, b, if_result, else_result):
 
 @profile
 def if_eq_cases(a, b_result_cases, else_result):
+    """
+    if a == b_result_cases[0][0]:
+        return b_result_cases[0][1]
+    elif a == b_result_cases[1][0]:
+        return b_result_cases[1][1]
+    elif a == b_result_cases[2][0]:
+        return b_result_cases[2][1]
+    ...
+    else:
+        return else_result
+    """
     a = _to_sx(a)
     else_result = _to_sx(else_result)
     result = _to_sx(else_result)
@@ -1630,6 +1686,13 @@ def if_eq_cases(a, b_result_cases, else_result):
 def if_less_eq_cases(a, b_result_cases, else_result):
     """
     This only works if b_result_cases is sorted in ascending order.
+    if a <= b_result_cases[0][0]:
+        return b_result_cases[0][1]
+    elif a <= b_result_cases[1][0]:
+        return b_result_cases[1][1]
+    ...
+    else:
+        return else_result
     """
     a = _to_sx(a)
     result = _to_sx(else_result)
@@ -1941,10 +2004,34 @@ def distance_point_to_line_segment(frame_P_current, frame_P_line_start, frame_P_
     return dist, Point3(nearest)
 
 
+def distance_point_to_line(frame_P_point, frame_P_line_point, frame_V_line_direction):
+    frame_P_current = Point3(frame_P_point)
+    frame_P_line_point = Point3(frame_P_line_point)
+    frame_V_line_direction = Vector3(frame_V_line_direction)
+
+    lp_vector = frame_P_current - frame_P_line_point
+    cross_product = cross(lp_vector, frame_V_line_direction)
+    distance = norm(cross_product) / norm(frame_V_line_direction)
+    return distance
+
+
+def distance_point_to_plane(frame_P_current, frame_V_v1, frame_V_v2):
+    normal = cross(frame_V_v1, frame_V_v2)
+    d = normal.dot(frame_P_current)
+    normal.scale(d)
+    nearest = frame_P_current - normal
+    return norm(nearest-frame_P_current), nearest
+
+
 def angle_between_vector(v1, v2):
     v1 = v1[:3]
     v2 = v2[:3]
     return acos(dot(v1.T, v2) / (norm(v1) * norm(v2)))
+
+
+def rotational_error(r1, r2):
+    r_distance = r1.dot(r2.inverse())
+    return r_distance.to_angle()
 
 
 def velocity_limit_from_position_limit(acceleration_limit,
@@ -2119,3 +2206,43 @@ def vel_integral(vel_limit, jerk_limit, dt, ph):
     half1 = math.floor(ph / 2)
     x = f(0, 0, jerk_limit, half1, dt, ph)
     return x
+
+
+def substitute(expression, old_symbols, new_symbols):
+    sx = expression.s
+    old_symbols = Expression([_to_sx(s) for s in old_symbols]).s
+    new_symbols = Expression([_to_sx(s) for s in new_symbols]).s
+    sx = ca.substitute(sx, old_symbols, new_symbols)
+    return type(expression)(sx)
+
+
+def matrix_inverse(a):
+    if isinstance(a, TransMatrix):
+        return a.inverse()
+    return Expression(ca.inv(a.s))
+
+
+def gradient(ex, arg):
+    return Expression(ca.gradient(ex.s, arg.s))
+
+
+def is_true(expr):
+    try:
+        return (expr == TrueSymbol).evaluate()
+    except Exception as e:
+        return False
+
+
+def is_false(expr):
+    try:
+        return (expr == FalseSymbol).evaluate()
+    except Exception as e:
+        return False
+
+
+def is_constant(expr):
+    return len(expr.free_symbols()) == 0
+
+
+def det(expr):
+    return Expression(ca.det(expr.s))

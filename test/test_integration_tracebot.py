@@ -5,7 +5,10 @@ from geometry_msgs.msg import PoseStamped, PointStamped
 from giskardpy.configs.behavior_tree_config import StandAloneBTConfig
 from giskardpy.configs.giskard import Giskard
 from giskardpy.configs.qp_controller_config import QPControllerConfig
-from giskardpy.configs.iai_robots.tracy import TracyStandAloneRobotInterfaceConfig, TracyWorldConfig, TracyCollisionAvoidanceConfig
+from giskardpy.configs.iai_robots.tracy import TracyStandAloneRobotInterfaceConfig, TracyWorldConfig, \
+    TracyCollisionAvoidanceConfig
+from giskardpy.goals.tracebot import InsertCylinder
+from giskardpy.god_map import god_map
 from giskardpy.utils.utils import launch_launchfile
 from utils_for_tests import GiskardTestWrapper
 
@@ -55,7 +58,7 @@ class TracebotTestWrapper(GiskardTestWrapper):
         giskard = Giskard(world_config=TracyWorldConfig(),
                           collision_avoidance_config=TracyCollisionAvoidanceConfig(),
                           robot_interface_config=TracyStandAloneRobotInterfaceConfig(),
-                          behavior_tree_config=StandAloneBTConfig(),
+                          behavior_tree_config=StandAloneBTConfig(debug_mode=True),
                           qp_controller_config=QPControllerConfig())
         super().__init__(giskard)
 
@@ -65,6 +68,11 @@ class TracebotTestWrapper(GiskardTestWrapper):
 
 
 class TestTracebot:
+    def test_joint_goal(self, zero_pose: TracebotTestWrapper):
+        zero_pose.set_joint_goal(zero_pose.better_pose)
+        zero_pose.allow_all_collisions()
+        zero_pose.plan_and_execute()
+
     def test_place_cylinder(self, better_pose: TracebotTestWrapper):
         cylinder_name = 'C'
         cylinder_height = 0.121
@@ -76,23 +84,28 @@ class TestTracebot:
         pose.header.frame_id = 'r_gripper_tool_frame'
         pose.pose.position.z = cylinder_height / 5
         pose.pose.orientation.w = 1
-        better_pose.add_cylinder(name=cylinder_name,
-                                 height=cylinder_height,
-                                 radius=0.0225,
-                                 pose=pose,
-                                 parent_link='r_gripper_tool_frame')
+        better_pose.add_cylinder_to_world(name=cylinder_name,
+                                          height=cylinder_height,
+                                          radius=0.0225,
+                                          pose=pose,
+                                          parent_link='r_gripper_tool_frame')
         better_pose.dye_group(cylinder_name, (0, 0, 1, 1))
 
-        better_pose.set_json_goal('InsertCylinder',
-                                  cylinder_name=cylinder_name,
-                                  cylinder_height=0.121,
-                                  hole_point=hole_point)
+        better_pose.motion_goals.add_motion_goal(motion_goal_class=InsertCylinder.__name__,
+                                                 cylinder_name=cylinder_name,
+                                                 cylinder_height=0.121,
+                                                 hole_point=hole_point)
         better_pose.allow_all_collisions()
         better_pose.plan_and_execute()
 
 
 class TestCartGoals:
     def test_move_left_hand(self, zero_pose: TracebotTestWrapper):
+        box_pose = PoseStamped()
+        box_pose.header.frame_id = zero_pose.default_root
+        box_pose.pose.orientation.w = 1
+        zero_pose.add_box('box', size=(0.1, 0.1, 0.1), pose=box_pose,
+                          parent_link=zero_pose.default_root)
         tip = 'left_tool0'
         goal = PoseStamped()
         goal.header.frame_id = tip

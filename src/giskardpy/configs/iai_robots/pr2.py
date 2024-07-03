@@ -1,6 +1,6 @@
 from giskardpy.configs.giskard import CollisionAvoidanceConfig, RobotInterfaceConfig
 from giskardpy.configs.world_config import WorldWithOmniDriveRobot
-from giskardpy.my_types import Derivatives
+from giskardpy.data_types import Derivatives
 
 
 class WorldWithPR2Config(WorldWithOmniDriveRobot):
@@ -10,9 +10,12 @@ class WorldWithPR2Config(WorldWithOmniDriveRobot):
 
     def setup(self):
         super().setup()
-        self.set_joint_limits(limit_map={Derivatives.velocity: 3,
+        self.set_joint_limits(limit_map={Derivatives.velocity: 2,
                                          Derivatives.jerk: 60},
                               joint_name='head_pan_joint')
+        self.set_joint_limits(limit_map={Derivatives.velocity: 4,
+                                         Derivatives.jerk: 120},
+                              joint_name='head_tilt_joint')
 
 
 class PR2StandaloneInterface(RobotInterfaceConfig):
@@ -67,14 +70,11 @@ class PR2JointTrajServerMujocoInterface(RobotInterfaceConfig):
         self.sync_joint_state_topic('/joint_states')
         self.sync_odometry_topic('/pr2/base_footprint', self.drive_joint_name)
         self.add_follow_joint_trajectory_server(
-            namespace='/pr2/whole_body_controller/follow_joint_trajectory',
-            state_topic='/pr2/whole_body_controller/state')
+            namespace='/pr2/whole_body_controller')
         self.add_follow_joint_trajectory_server(
-            namespace='/pr2/l_gripper_l_finger_controller/follow_joint_trajectory',
-            state_topic='/pr2/l_gripper_l_finger_controller/state')
+            namespace='/pr2/l_gripper_l_finger_controller')
         self.add_follow_joint_trajectory_server(
-            namespace='/pr2/r_gripper_l_finger_controller/follow_joint_trajectory',
-            state_topic='/pr2/r_gripper_l_finger_controller/state')
+            namespace='/pr2/r_gripper_l_finger_controller')
         self.add_base_cmd_velocity(cmd_vel_topic='/pr2/cmd_vel',
                                    track_only_velocity=True,
                                    joint_name=self.drive_joint_name)
@@ -123,6 +123,39 @@ class PR2VelocityMujocoInterface(RobotInterfaceConfig):
         ])
 
         self.add_base_cmd_velocity(cmd_vel_topic='/pr2/cmd_vel',
+                                   joint_name=self.drive_joint_name)
+
+
+class PR2VelocityIAIInterface(RobotInterfaceConfig):
+    map_name: str
+    localization_joint_name: str
+    odom_link_name: str
+    drive_joint_name: str
+
+    def __init__(self,
+                 map_name: str = 'map',
+                 localization_joint_name: str = 'localization',
+                 odom_link_name: str = 'odom_combined',
+                 drive_joint_name: str = 'brumbrum'):
+        self.map_name = map_name
+        self.localization_joint_name = localization_joint_name
+        self.odom_link_name = odom_link_name
+        self.drive_joint_name = drive_joint_name
+
+    def setup(self):
+        self.sync_6dof_joint_with_tf_frame(joint_name=self.localization_joint_name,
+                                           tf_parent_frame=self.map_name,
+                                           tf_child_frame=self.odom_link_name)
+        self.sync_joint_state_topic('/joint_states')
+        self.sync_odometry_topic('/robot_pose_ekf/odom_combined', self.drive_joint_name)
+        self.add_joint_velocity_group_controller(namespace='l_arm_joint_group_velocity_controller')
+        self.add_joint_velocity_group_controller(namespace='r_arm_joint_group_velocity_controller')
+        self.add_joint_position_controller(namespaces=[
+            'head_pan_position_controller',
+            'head_tilt_position_controller',
+        ])
+
+        self.add_base_cmd_velocity(cmd_vel_topic='/base_controller/command',
                                    joint_name=self.drive_joint_name)
 
 
@@ -188,17 +221,13 @@ class PR2JointTrajServerIAIInterface(RobotInterfaceConfig):
         self.sync_joint_state_topic('/joint_states')
         self.sync_odometry_topic('/robot_pose_ekf/odom_combined', self.drive_joint_name)
         fill_velocity_values = False
-        self.add_follow_joint_trajectory_server(namespace='/l_arm_controller/follow_joint_trajectory',
-                                                state_topic='/l_arm_controller/state',
+        self.add_follow_joint_trajectory_server(namespace='/l_arm_controller',
                                                 fill_velocity_values=fill_velocity_values)
-        self.add_follow_joint_trajectory_server(namespace='/r_arm_controller/follow_joint_trajectory',
-                                                state_topic='/r_arm_controller/state',
+        self.add_follow_joint_trajectory_server(namespace='/r_arm_controller',
                                                 fill_velocity_values=fill_velocity_values)
-        self.add_follow_joint_trajectory_server(namespace='/torso_controller/follow_joint_trajectory',
-                                                state_topic='/torso_controller/state',
+        self.add_follow_joint_trajectory_server(namespace='/torso_controller',
                                                 fill_velocity_values=fill_velocity_values)
-        self.add_follow_joint_trajectory_server(namespace='/head_traj_controller/follow_joint_trajectory',
-                                                state_topic='/head_traj_controller/state',
+        self.add_follow_joint_trajectory_server(namespace='/head_traj_controller',
                                                 fill_velocity_values=fill_velocity_values)
         self.add_base_cmd_velocity(cmd_vel_topic='/base_controller/command',
                                    track_only_velocity=True,
@@ -228,11 +257,9 @@ class PR2JointTrajServerUnrealInterface(RobotInterfaceConfig):
         self.sync_joint_state_topic('/joint_states')
         self.sync_odometry_topic('/base_odometry/odom', self.drive_joint_name)
         fill_velocity_values = False
-        self.add_follow_joint_trajectory_server(namespace='/whole_body_controller/follow_joint_trajectory',
-                                                state_topic='/whole_body_controller/state',
+        self.add_follow_joint_trajectory_server(namespace='/whole_body_controller',
                                                 fill_velocity_values=fill_velocity_values)
-        self.add_follow_joint_trajectory_server(namespace='/head_traj_controller/follow_joint_trajectory',
-                                                state_topic='/head_traj_controller/state',
+        self.add_follow_joint_trajectory_server(namespace='/head_traj_controller',
                                                 fill_velocity_values=fill_velocity_values)
         self.add_base_cmd_velocity(cmd_vel_topic='/base_controller/command',
                                    track_only_velocity=True,

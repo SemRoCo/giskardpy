@@ -118,7 +118,7 @@ def pr2_joint_state(draw):
 
 
 def pr2_urdf():
-    path = resolve_ros_iris('package://giskardpy/test/urdfs/pr2_with_base.urdf')
+    path = resolve_ros_iris('package://giskardpy_ros/test/urdfs/pr2_with_base.urdf')
     with open(path, 'r') as f:
         urdf_string = f.read()
     return urdf_string

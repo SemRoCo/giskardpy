@@ -41,7 +41,7 @@ class CollisionAvoidanceConfig(abc.ABC):
     def _sanity_check(self):
         if god_map.is_collision_checking_enabled() and not self.collision_scene.has_self_collision_matrix():
             raise SetupException('You have to load a collision matrix, use: \n'
-                                 'roslaunch giskardpy collision_matrix_tool.launch')
+                                 'roslaunch giskardpy_ros collision_matrix_tool.launch')
 
     def _create_collision_checker(self, collision_checker: CollisionCheckerLib):
         if collision_checker not in CollisionCheckerLib:
@@ -171,7 +171,7 @@ class CollisionAvoidanceConfig(abc.ABC):
 
     def load_self_collision_matrix(self, path_to_srdf: str, group_name: Optional[str] = None):
         """
-        Load a self collision matrix. It can be created with roslaunch giskardpy collision_matrix_tool.launch.
+        Load a self collision matrix. It can be created with roslaunch giskardpy_ros collision_matrix_tool.launch.
         :param path_to_srdf: path to the srdf, can handle ros package paths
         :param group_name: name of the robot for which it will be applied, only needs to be set if there are multiple robots.
         """

@@ -132,7 +132,7 @@ class WorldWrapper:
         """
         See add_box.
         :param mesh: path to the mesh location, can be ros package path, e.g.,
-                        package://giskardpy/test/urdfs/meshes/bowl_21.obj
+                        package://giskardpy_ros/test/urdfs/meshes/bowl_21.obj
         """
         world_body = WorldBody()
         world_body.type = WorldBody.MESH_BODY
@@ -338,7 +338,7 @@ class MotionGoalWrapper:
                         **kwargs):
         """
         Generic function to add a motion goal.
-        :param motion_goal_class: Name of a class defined in src/giskardpy/goals
+        :param motion_goal_class: Name of a class defined in src/giskardpy_ros/goals
         :param name: a unique name for the goal, will use class name by default
         :param start_condition: a logical expression to define the start condition for this monitor. e.g.
                                     not 'monitor1' and ('monitor2' or 'monitor3')
@@ -1325,7 +1325,7 @@ class MonitorWrapper:
     def get_anded_monitor_names(self) -> str:
         non_cancel_monitors = []
         for monitor in self._monitors:
-            if monitor.monitor_class not in get_all_classes_in_package('giskardpy.motion_graph.monitors',
+            if monitor.monitor_class not in get_all_classes_in_package('giskardpy_ros.motion_graph.monitors',
                                                                        CancelMotion):
                 non_cancel_monitors.append(f'\'{monitor.name}\'')
         return ' and '.join(non_cancel_monitors)
@@ -1342,7 +1342,7 @@ class MonitorWrapper:
                     **kwargs) -> str:
         """
         Generic function to add a monitor.
-        :param monitor_class: Name of a class defined in src/giskardpy/monitors
+        :param monitor_class: Name of a class defined in src/giskardpy_ros/monitors
         :param name: a unique name for the goal, will use class name by default
         :param start_condition: a logical expression to define the start condition for this monitor. e.g.
                                     not 'monitor1' and ('monitor2' or 'monitor3')

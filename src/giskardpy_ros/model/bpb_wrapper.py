@@ -73,7 +73,7 @@ def create_cylinder_shape(diameter: float, height: float) -> pb.CylinderShape:
     # out = pb.CylinderShapeZ(pb.Vector3(0.5 * diameter, 0.5 * diameter, height * 0.5))
     # out.margin = 0.001
     # Weird thing: The default URDF loader in bullet instantiates convex meshes. Idk why.
-    return load_convex_mesh_shape(resolve_ros_iris('package://giskardpy/test/urdfs/meshes/cylinder.obj'),
+    return load_convex_mesh_shape(resolve_ros_iris('package://giskardpy_ros/test/urdfs/meshes/cylinder.obj'),
                                   single_shape=True,
                                   scale=[diameter, diameter, height])
 
@@ -135,7 +135,7 @@ def load_convex_mesh_shape(pkg_filename: str, single_shape=False, scale=(1, 1, 1
                                 scaling=pb.Vector3(scale[0], scale[1], scale[2]))
 
 
-def convert_to_decomposed_obj_and_save_in_tmp(file_name: str, log_path='/tmp/giskardpy/vhacd.log'):
+def convert_to_decomposed_obj_and_save_in_tmp(file_name: str, log_path='/tmp/giskardpy_ros/vhacd.log'):
     first_group_name = list(god_map.world.groups.keys())[0]
     resolved_old_path = resolve_ros_iris(file_name)
     short_file_name = file_name.split('/')[-1][:-3]

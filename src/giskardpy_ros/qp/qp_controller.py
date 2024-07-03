@@ -992,7 +992,7 @@ def detect_solvers():
     global available_solvers
     solver_name: str
     qp_solver_class: Type[QPSolver]
-    for solver_name, qp_solver_class in get_all_classes_in_package('giskardpy.qp', QPSolver, silent=True).items():
+    for solver_name, qp_solver_class in get_all_classes_in_package('giskardpy_ros.qp', QPSolver, silent=True).items():
         try:
             available_solvers[qp_solver_class.solver_id] = qp_solver_class
         except Exception:

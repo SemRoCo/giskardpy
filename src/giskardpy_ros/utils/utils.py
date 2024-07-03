@@ -76,7 +76,7 @@ class NullContextManager(object):
 def get_all_classes_in_package(package_name: str, parent_class: Optional[Type] = None, silent: bool = False) \
         -> Dict[str, Type]:
     """
-    :param package_name: e.g. giskardpy.goals
+    :param package_name: e.g. giskardpy_ros.goals
     :param parent_class: e.g. Goal
     :return:
     """
@@ -270,7 +270,7 @@ rospack = rospkg.RosPack()
 
 def resolve_ros_iris(path: str) -> str:
     """
-    e.g. 'package://giskardpy/data'
+    e.g. 'package://giskardpy_ros/data'
     """
     if 'package://' in path:
         split = path.split('package://')

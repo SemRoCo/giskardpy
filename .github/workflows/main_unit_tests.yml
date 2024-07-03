@@ -32,8 +32,8 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-          path: 'ros_ws/src/giskardpy'
-          repository: SemRoCo/giskardpy
+          path: 'ros_ws/src/giskardpy_ros'
+          repository: SemRoCo/giskardpy_ros
       - name: Checkout giskard msgs
         uses: actions/checkout@v3
         with:

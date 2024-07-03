@@ -109,11 +109,11 @@ def rospkg_exists(name):
 
 def check_dependencies():
     """
-    Checks whether the dependencies specified in the dependency.txt in the root folder of giskardpy are installed. If a
+    Checks whether the dependencies specified in the dependency.txt in the root folder of giskardpy_ros are installed. If a
     dependecy is not installed a message is printed.
     """
 
-    with open(resolve_ros_iris('giskardpy') + '/requirements.txt') as f:
+    with open(resolve_ros_iris('giskardpy_ros') + '/requirements.txt') as f:
         dependencies = f.readlines()
 
     dependencies = [x.split('#')[0] for x in dependencies]

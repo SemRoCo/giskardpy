@@ -28,7 +28,7 @@ base_goal.pose.position.x = 2
 base_goal.pose.orientation.w = 1
 
 # %% init ros node and Giskard Wrapper.
-# This assumes that roslaunch giskardpy giskardpy_pr2_standalone.launch is running.
+# This assumes that roslaunch giskardpy_ros giskardpy_pr2_standalone.launch is running.
 rospy.init_node('test')
 
 rospy.loginfo('Instantiating Giskard wrapper.')
@@ -56,7 +56,7 @@ sleep2 = giskard_wrapper.monitors.add_sleep(1.5, name='sleep2', start_condition=
 right_monitor = giskard_wrapper.monitors.add_joint_position(goal_state=right_arm_goal,
                                                             name='right pose reached',
                                                             start_condition=sleep1)
-# You can use add_motion_goal to add any monitor implemented in giskardpy.monitor.
+# You can use add_motion_goal to add any monitor implemented in giskardpy_ros.monitor.
 # All remaining parameters are forwarded to the __init__ function of that class.
 # All specialized add_ functions are just wrappers for add_monitor.
 left_monitor = giskard_wrapper.monitors.add_monitor(monitor_class=JointGoalReached.__name__,
@@ -73,7 +73,7 @@ giskard_wrapper.motion_goals.add_joint_position(goal_state=right_arm_goal,
                                                 name='right pose',
                                                 start_condition=sleep2,
                                                 end_condition=right_monitor)
-# You can use add_motion_goal to add any motion goal implemented in giskardpy.goals.
+# You can use add_motion_goal to add any motion goal implemented in giskardpy_ros.goals.
 # All remaining parameters are forwarded to the __init__ function of that class.
 giskard_wrapper.motion_goals.add_motion_goal(motion_goal_class=JointPositionList.__name__,
                                              goal_state=left_arm_goal,

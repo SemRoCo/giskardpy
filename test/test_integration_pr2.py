@@ -2645,7 +2645,7 @@ class TestWorldManipulation:
         p.header.frame_id = zero_pose.r_tip
         p.pose.position = Point(0.1, 0, 0)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
-        zero_pose.add_mesh_to_world(object_name, mesh='package://giskardpy/test/urdfs/meshes/bowl_21.obj', pose=p)
+        zero_pose.add_mesh_to_world(object_name, mesh='package://giskardpy_ros/test/urdfs/meshes/bowl_21.obj', pose=p)
 
     def test_add_non_existing_mesh(self, zero_pose: PR2TestWrapper):
         object_name = 'muh'
@@ -2653,7 +2653,7 @@ class TestWorldManipulation:
         p.header.frame_id = zero_pose.r_tip
         p.pose.position = Point(0.1, 0, 0)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
-        zero_pose.add_mesh_to_world(object_name, mesh='package://giskardpy/test/urdfs/meshes/muh.obj', pose=p,
+        zero_pose.add_mesh_to_world(object_name, mesh='package://giskardpy_ros/test/urdfs/meshes/muh.obj', pose=p,
                                     expected_error_code=GiskardError.CORRUPT_MESH)
 
     def test_add_attach_detach_remove_add(self, zero_pose: PR2TestWrapper):
@@ -2689,7 +2689,7 @@ class TestWorldManipulation:
 
     def test_single_joint_urdf(self, zero_pose: PR2TestWrapper):
         object_name = 'spoon'
-        path = resolve_ros_iris('package://giskardpy/test/spoon/urdf/spoon.urdf')
+        path = resolve_ros_iris('package://giskardpy_ros/test/spoon/urdf/spoon.urdf')
         with open(path, 'r') as f:
             urdf_str = hacky_urdf_parser_fix(f.read())
         pose = PoseStamped()
@@ -3135,7 +3135,7 @@ class TestCollisionAvoidanceGoals:
         p.header.frame_id = zero_pose.r_tip
         p.pose.position = Point(0.01, 0, 0)
         p.pose.orientation = Quaternion(*quaternion_about_axis(-np.pi / 2, [0, 1, 0]))
-        zero_pose.add_mesh_to_world(object_name, mesh='package://giskardpy/test/urdfs/meshes/bowl_21.obj', pose=p)
+        zero_pose.add_mesh_to_world(object_name, mesh='package://giskardpy_ros/test/urdfs/meshes/bowl_21.obj', pose=p)
         zero_pose.plan_and_execute()
 
     def test_attach_box_as_eef(self, zero_pose: PR2TestWrapper):
@@ -4130,7 +4130,7 @@ class TestWorld:
                           world_setup.search_for_link_name('fr_caster_l_wheel_link')}
         reference_collision_scene = BetterPyBulletSyncer()
         reference_collision_scene.load_self_collision_matrix_from_srdf(
-            'package://giskardpy/test/data/pr2_test.srdf', 'pr2')
+            'package://giskardpy_ros/test/data/pr2_test.srdf', 'pr2')
         reference_reasons = reference_collision_scene.self_collision_matrix
         reference_disabled_links = reference_collision_scene.disabled_links
         collision_scene: CollisionWorldSynchronizer = god_map.collision_scene

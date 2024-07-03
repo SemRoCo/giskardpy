@@ -594,7 +594,7 @@ class Application(QMainWindow):
         self.urdf_progress.set_progress(100, f'Loaded {progress_str}')
 
     def set_tmp_srdf_path(self):
-        self.__srdf_path = resolve_ros_iris('package://giskardpy/self_collision_matrices/')
+        self.__srdf_path = resolve_ros_iris('package://giskardpy_ros/self_collision_matrices/')
 
     def disable_srdf_buttons(self):
         self.__disable_srdf_buttons(True)

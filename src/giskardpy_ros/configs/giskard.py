@@ -21,9 +21,9 @@ class Giskard:
     behavior_tree_config: BehaviorTreeConfig = None
     robot_interface_config: RobotInterfaceConfig = None
     qp_controller_config: QPControllerConfig = None
-    tmp_folder: str = resolve_ros_iris('package://giskardpy/tmp/')
-    goal_package_paths = {'giskardpy.goals'}
-    monitor_package_paths = {'giskardpy.motion_graph.monitors'}
+    tmp_folder: str = resolve_ros_iris('package://giskardpy_ros/tmp/')
+    goal_package_paths = {'giskardpy_ros.goals'}
+    monitor_package_paths = {'giskardpy_ros.motion_graph.monitors'}
     action_server_name: str = '~command'
 
     def __init__(self,

@@ -721,7 +721,7 @@ class OldGiskardWrapper(GiskardWrapper):
         """
         See add_box.
         :param mesh: path to the mesh location, can be ros package path, e.g.,
-                        package://giskardpy/test/urdfs/meshes/bowl_21.obj
+                        package://giskardpy_ros/test/urdfs/meshes/bowl_21.obj
         """
         return self.world.add_mesh(name=name,
                                    mesh=mesh,

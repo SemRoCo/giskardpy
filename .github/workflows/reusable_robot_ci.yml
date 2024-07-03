@@ -82,8 +82,8 @@ jobs:
       #pull github deps ================================================================================================
       - uses: actions/checkout@v3
         with:
-          path: 'ros_ws/src/giskardpy'
-          repository: SemRoCo/giskardpy
+          path: 'ros_ws/src/giskardpy_ros'
+          repository: SemRoCo/giskardpy_ros
       - name: install pip dependencies
         run: |
           python3 -m pip install --upgrade pip

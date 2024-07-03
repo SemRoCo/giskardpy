@@ -59,7 +59,7 @@ class ArmarCollisionAvoidanceConfig(CollisionAvoidanceConfig):
         self.drive_joint_name = drive_joint_name
 
     def setup(self):
-        self.load_self_collision_matrix('package://giskardpy/self_collision_matrices/other_robots/armar.srdf')
+        self.load_self_collision_matrix('package://giskardpy_ros/self_collision_matrices/other_robots/armar.srdf')
         self.set_default_external_collision_avoidance(soft_threshold=0.05,
                                                       hard_threshold=0.0)
 

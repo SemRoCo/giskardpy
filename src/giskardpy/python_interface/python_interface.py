@@ -4,6 +4,7 @@ import numpy as np
 import rospy
 from actionlib import SimpleActionClient
 from geometry_msgs.msg import PoseStamped, Vector3Stamped, PointStamped, QuaternionStamped
+from nav_msgs.msg import Path
 from rospy import ServiceException
 from shape_msgs.msg import SolidPrimitive
 
@@ -17,7 +18,7 @@ from giskardpy.data_types import goal_parameter
 from giskardpy.exceptions import DuplicateNameException, UnknownGroupException
 from giskardpy.goals.align_planes import AlignPlanes
 from giskardpy.goals.align_to_push_door import AlignToPushDoor
-from giskardpy.goals.base_traj_follower import CarryMyBullshit
+from giskardpy.goals.base_traj_follower import CarryMyBullshit, FollowNavPath
 from giskardpy.goals.cartesian_goals import CartesianPose, DiffDriveBaseGoal, CartesianVelocityLimit, \
     CartesianOrientation, CartesianPoseStraight, CartesianPosition, CartesianPositionStraight
 from giskardpy.goals.collision_avoidance import CollisionAvoidance
@@ -1052,6 +1053,80 @@ class MotionGoalWrapper:
                              clear_path=clear_path,
                              drive_back=drive_back,
                              enable_laser_avoidance=enable_laser_avoidance,
+                             start_condition=start_condition,
+                             hold_condition=hold_condition,
+                             end_condition=end_condition)
+
+    def add_follow_nav_path(self,
+                            name: str,
+                            path: Path,
+                            laser_topics: Tuple[str] = ('/hsrb/base_scan',),
+                            odom_joint_name: Optional[str] = None,
+                            root_link: Optional[str] = None,
+                            camera_link: str = 'head_rgbd_sensor_link',
+                            distance_to_target_stop_threshold: float = 1,
+                            laser_scan_age_threshold: float = 2,
+                            laser_distance_threshold: float = 0.5,
+                            laser_distance_threshold_width: float = 0.8,
+                            laser_avoidance_angle_cutout: float = np.pi / 4,
+                            laser_avoidance_sideways_buffer: float = 0.04,
+                            base_orientation_threshold: float = np.pi / 16,
+                            max_rotation_velocity: float = 0.5,
+                            max_rotation_velocity_head: float = 1,
+                            max_translation_velocity: float = 0.38,
+                            traj_tracking_radius: float = 0.4,
+                            height_for_camera_target: float = 1,
+                            laser_frame_id: str = 'base_range_sensor_link',
+                            start_condition: str = '',
+                            hold_condition: str = '',
+                            end_condition: str = ''):
+        """
+        Will follow the path, orienting itself and the head towards the next points in the list.
+        At the end orient itself according to the final orientation in it. All other orientations will be ignored.
+        :param name: name of the goal
+        :param path: a nav path, make sure it's ordered correctly!
+        :param odom_joint_name: name of the odom joint
+        :param root_link: will use global reference frame
+        :param camera_link: link of the camera that will point to the tracked human
+        :param laser_scan_age_threshold: giskard will complain if scans are older than this many seconds
+        :param laser_distance_threshold: this and width are used to crate a stopping zone around the robot.
+                                            laser distance draws a circle around the robot and width lines to the left and right.
+                                            the stopping zone is the minimum of the two.
+        :param laser_distance_threshold_width: see laser_distance_threshold
+        :param laser_avoidance_angle_cutout: if something is in the stop zone in front of the robot in +/- this angle range
+                                                giskard will pause, otherwise it will try to dodge left or right
+        :param laser_avoidance_sideways_buffer: increase this if the robot is shaking too much if something is to its
+                                                left and right at the same time.
+        :param base_orientation_threshold: giskard will align the base of the robot to the target, this is a +/- buffer to avoid shaking
+        :param max_rotation_velocity: how quickly the base can change orientation
+        :param max_rotation_velocity_head: how quickly the head rotates
+        :param max_translation_velocity: how quickly the base drives
+        :param traj_tracking_radius: how close the robots root link will try to stick to the path in meter
+        :param height_for_camera_target: target tracking with head will ignore the published height, but use this instead
+        :param laser_frame_id: frame_id of the laser scanner
+        :param start_condition:
+        :param hold_condition:
+        :param end_condition:
+        """
+        self.add_motion_goal(motion_goal_class=FollowNavPath.__name__,
+                             name=name,
+                             path=path,
+                             laser_topics=laser_topics,
+                             odom_joint_name=odom_joint_name,
+                             root_link=root_link,
+                             camera_link=camera_link,
+                             laser_scan_age_threshold=laser_scan_age_threshold,
+                             laser_distance_threshold=laser_distance_threshold,
+                             laser_distance_threshold_width=laser_distance_threshold_width,
+                             laser_avoidance_angle_cutout=laser_avoidance_angle_cutout,
+                             laser_avoidance_sideways_buffer=laser_avoidance_sideways_buffer,
+                             base_orientation_threshold=base_orientation_threshold,
+                             max_rotation_velocity=max_rotation_velocity,
+                             max_rotation_velocity_head=max_rotation_velocity_head,
+                             max_translation_velocity=max_translation_velocity,
+                             traj_tracking_radius=traj_tracking_radius,
+                             height_for_camera_target=height_for_camera_target,
+                             laser_frame_id=laser_frame_id,
                              start_condition=start_condition,
                              hold_condition=hold_condition,
                              end_condition=end_condition)

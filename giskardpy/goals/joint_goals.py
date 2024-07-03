@@ -61,12 +61,12 @@ class SetOdometry(NonMotionGoal):
         base_pose = god_map.world.transform(brumbrum_joint.parent_link_name, base_pose)
         position = base_pose.to_position().to_np()
         orientation = base_pose.to_rotation().to_quaternion().to_np()
-        god_map.world.state[brumbrum_joint.x.name].position = position[0]
-        god_map.world.state[brumbrum_joint.y.name].position = position[1]
-        axis, angle = axis_angle_from_quaternion(orientation[0],
-                                                 orientation[1],
-                                                 orientation[2],
-                                                 orientation[3])
+        god_map.world.state[brumbrum_joint.x.name].position = position[0][0]
+        god_map.world.state[brumbrum_joint.y.name].position = position[1][0]
+        axis, angle = axis_angle_from_quaternion(orientation[0][0],
+                                                 orientation[1][0],
+                                                 orientation[2][0],
+                                                 orientation[3][0])
         if axis[-1] < 0:
             angle = -angle
         if isinstance(brumbrum_joint, OmniDrivePR22):

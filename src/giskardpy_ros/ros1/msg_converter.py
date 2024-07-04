@@ -124,9 +124,9 @@ def trans_matrix_to_pose_stamped(data: cas.TransMatrix) -> geometry_msgs.PoseSta
     pose_stamped.header.frame_id = str(data.reference_frame)
     position = data.to_position().to_np()
     orientation = data.to_rotation().to_quaternion().to_np()
-    pose_stamped.pose.position = geometry_msgs.Point(position[0][0], position[1][0], position[2][0])
-    pose_stamped.pose.orientation = geometry_msgs.Quaternion(orientation[0][0], orientation[1][0],
-                                                             orientation[2][0], orientation[3][0])
+    pose_stamped.pose.position = geometry_msgs.Point(position[0], position[1], position[2])
+    pose_stamped.pose.orientation = geometry_msgs.Quaternion(orientation[0], orientation[1],
+                                                             orientation[2], orientation[3])
     return pose_stamped
 
 
@@ -134,7 +134,7 @@ def point3_to_point_stamped(data: cas.Point3) -> geometry_msgs.PointStamped:
     point_stamped = geometry_msgs.PointStamped()
     point_stamped.header.frame_id = str(data.reference_frame)
     position = data.to_np()
-    point_stamped.point = geometry_msgs.Point(position[0][0], position[1][0], position[2][0])
+    point_stamped.point = geometry_msgs.Point(position[0], position[1], position[2])
     return point_stamped
 
 
@@ -144,9 +144,9 @@ def trans_matrix_to_transform_stamped(data: cas.TransMatrix) -> geometry_msgs.Tr
     transform_stamped.child_frame_id = data.child_frame
     position = data.to_position().to_np()
     orientation = data.to_rotation().to_quaternion().to_np()
-    transform_stamped.transform.translation = geometry_msgs.Point(position[0][0], position[1][0], position[2][0])
-    transform_stamped.transform.rotation = geometry_msgs.Quaternion(orientation[0][0], orientation[1][0],
-                                                                    orientation[2][0], orientation[3][0])
+    transform_stamped.transform.translation = geometry_msgs.Point(position[0], position[1], position[2])
+    transform_stamped.transform.rotation = geometry_msgs.Quaternion(orientation[0], orientation[1],
+                                                                    orientation[2], orientation[3])
     return transform_stamped
 
 

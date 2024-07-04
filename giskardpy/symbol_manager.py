@@ -37,6 +37,7 @@ class SymbolManager(metaclass=SingletonMeta):
                     self.symbol_str_to_lambda[s]()
                 except Exception as e2:
                     raise GiskardException(f'Cannot resolve {s} ({e2.__class__.__name__}: {str(e2)})')
+            raise e
 
     def compile_resolve_symbols(self, symbols):
         self.c = eval('lambda: np.array([' + ', '.join(symbols) + '])')

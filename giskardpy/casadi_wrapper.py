@@ -144,6 +144,8 @@ class Symbol_:
             return np.eye(0)
         elif self.s.shape[0] * self.s.shape[1] <= 1:
             return float(ca.evalf(self.s))
+        elif self.s.shape[0] == 1 or self.s.shape[1] == 1:
+            return np.array(ca.evalf(self.s)).ravel()
         else:
             return np.array(ca.evalf(self.s))
 

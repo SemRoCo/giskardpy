@@ -7,8 +7,9 @@ from giskardpy.motion_graph.monitors.monitor_manager import MonitorManager
 from giskardpy.goals.motion_goal_manager import MotionGoalManager
 from giskardpy.god_map import god_map
 from giskardpy.model.collision_world_syncer import Collisions
-from giskardpy.tree.behaviors.plugin import GiskardBehavior
-from giskardpy.utils.decorators import record_time, catch_and_raise_to_blackboard
+from giskardpy_ros.tree.behaviors.plugin import GiskardBehavior
+from giskardpy.utils.decorators import record_time
+from giskardpy_ros.tree.blackboard_utils import catch_and_raise_to_blackboard, GiskardBlackboard
 
 
 class CleanUp(GiskardBehavior):
@@ -30,16 +31,16 @@ class CleanUp(GiskardBehavior):
     def initialise(self):
         if self.clear_markers_:
             self.clear_markers()
-        god_map.giskard.set_defaults()
+        GiskardBlackboard().giskard.set_defaults()
         god_map.world.fast_all_fks = None
         god_map.collision_scene.reset_cache()
         god_map.collision_scene.clear_collision_matrix()
         god_map.closest_point = Collisions(1)
         god_map.time = 0
         god_map.control_cycle_counter = 1
-        god_map.monitor_manager = MonitorManager()
-        god_map.motion_goal_manager = MotionGoalManager()
-        god_map.debug_expression_manager = DebugExpressionManager()
+        god_map.monitor_manager.reset()
+        god_map.motion_goal_manager.reset()
+        god_map.debug_expression_manager.reset()
 
         if hasattr(self.get_blackboard(), 'runtime'):
             del self.get_blackboard().runtime
@@ -51,7 +52,7 @@ class CleanUp(GiskardBehavior):
 class CleanUpPlanning(CleanUp):
     def initialise(self):
         super().initialise()
-        god_map.fill_trajectory_velocity_values = None
+        GiskardBlackboard().fill_trajectory_velocity_values = None
         god_map.free_variables = []
 
     @catch_and_raise_to_blackboard

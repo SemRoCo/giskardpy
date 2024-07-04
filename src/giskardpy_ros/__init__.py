@@ -1,5 +1,8 @@
 import builtins
 
+import giskardpy
+from giskardpy_ros.ros1.interface import ROS1Wrapper
+
 try:
     builtins.profile  # type: ignore
 except AttributeError:
@@ -9,3 +12,5 @@ except AttributeError:
 
 
     builtins.profile = profile  # type: ignore
+
+giskardpy.middleware.middleware = ROS1Wrapper()

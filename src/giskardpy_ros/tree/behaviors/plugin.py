@@ -1,11 +1,12 @@
 from time import time
-from typing import Dict, Optional
+from typing import Optional
 
-from py_trees import Behaviour, Blackboard
+from py_trees import Behaviour
 
-import giskardpy.utils.tfwrapper as tf
+import giskardpy_ros.ros1.tfwrapper as tf
 from giskardpy.god_map import god_map
-from giskardpy.utils.utils import has_blackboard_exception, get_blackboard_exception, clear_blackboard_exception
+from giskardpy_ros.tree.blackboard_utils import has_blackboard_exception, get_blackboard_exception, \
+    clear_blackboard_exception, GiskardBlackboard
 
 
 class GiskardBehavior(Behaviour):
@@ -26,11 +27,11 @@ class GiskardBehavior(Behaviour):
 
     @staticmethod
     def raise_to_blackboard(exception):
-        Blackboard().set('exception', exception)
+        GiskardBlackboard().set('exception', exception)
 
     @staticmethod
     def get_blackboard():
-        return Blackboard()
+        return GiskardBlackboard()
 
     @staticmethod
     def has_blackboard_exception():
@@ -46,6 +47,6 @@ class GiskardBehavior(Behaviour):
 
     def transform_msg(self, target_frame, msg, timeout=1):
         try:
-            return god_map.world.transform_msg(target_frame, msg)
+            return god_map.world.transform(target_frame, msg)
         except KeyError as e:
             return tf.transform_msg(target_frame, msg, timeout=timeout)

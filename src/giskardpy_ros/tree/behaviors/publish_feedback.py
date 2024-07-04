@@ -1,16 +1,17 @@
 from copy import deepcopy
 from typing import Optional
-
+import giskardpy_ros.ros1.msg_converter as msg_converter
 import numpy as np
 import rospy
 from sensor_msgs.msg import JointState
 from py_trees import Status
 
 from giskard_msgs.msg import ExecutionState
-from giskardpy.data_types import TaskState
+from giskardpy.data_types.data_types import TaskState
 from giskardpy.god_map import god_map
-from giskardpy.tree.behaviors.plugin import GiskardBehavior
-from giskardpy.utils.decorators import catch_and_raise_to_blackboard, record_time
+from giskardpy_ros.tree.behaviors.plugin import GiskardBehavior
+from giskardpy.utils.decorators import record_time
+from giskardpy_ros.tree.blackboard_utils import catch_and_raise_to_blackboard, GiskardBlackboard
 
 
 def giskard_state_to_execution_state() -> ExecutionState:
@@ -18,9 +19,9 @@ def giskard_state_to_execution_state() -> ExecutionState:
     task_filter = np.array([task.plot for task in god_map.motion_goal_manager.tasks.values()])
     msg = ExecutionState()
     msg.header.stamp = rospy.Time.now()
-    msg.goal_id = god_map.move_action_server.goal_id
-    msg.monitors = [m.to_ros_msg() for m in god_map.monitor_manager.monitors.values() if m.plot]
-    msg.tasks = [t.to_ros_msg() for t in god_map.motion_goal_manager.tasks.values() if t.plot]
+    msg.goal_id = GiskardBlackboard().move_action_server.goal_id
+    msg.monitors = [msg_converter.monitor_to_ros_msg(m) for m in god_map.monitor_manager.monitors.values() if m.plot]
+    msg.tasks = [msg_converter.task_to_ros_msg(t) for t in god_map.motion_goal_manager.tasks.values() if t.plot]
     try:
         msg.monitor_state = god_map.monitor_manager.state_history[-1][1][0][monitor_filter].tolist()
         msg.monitor_life_cycle_state = god_map.monitor_manager.state_history[-1][1][1][monitor_filter].tolist()

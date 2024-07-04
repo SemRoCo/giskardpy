@@ -2,11 +2,11 @@ import traceback
 from threading import Lock
 import numpy as np
 
-from giskardpy.data_types import JointStates, PrefixName
+from giskardpy.data_types.data_types import JointStates
 from giskardpy.god_map import god_map
+from giskardpy.middleware import middleware
 from giskardpy.model.trajectory import Trajectory
-from giskardpy.tree.behaviors.plot_trajectory import PlotTrajectory
-from giskardpy.utils.logging import logwarn
+from giskardpy_ros.tree.behaviors.plot_trajectory import PlotTrajectory
 
 plot_lock = Lock()
 
@@ -47,7 +47,7 @@ class PlotDebugExpressions(PlotTrajectory):
     def plot(self):
         trajectory = god_map.debug_expression_manager.debug_trajectory
         if trajectory and len(trajectory.items()) > 0:
-            sample_period = god_map.qp_controller_config.sample_period
+            sample_period = god_map.qp_controller.sample_period
             traj = self.split_traj(trajectory)
             try:
                 traj.plot_trajectory(path_to_data_folder=self.path_to_data_folder,
@@ -57,4 +57,4 @@ class PlotDebugExpressions(PlotTrajectory):
                                      **self.kwargs)
             except Exception:
                 traceback.print_exc()
-                logwarn('failed to save debug.pdf')
+                middleware.logwarn('failed to save debug.pdf')

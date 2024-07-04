@@ -4,11 +4,11 @@ import rospy
 from py_trees import Status
 from std_msgs.msg import Float64
 
-from giskardpy.data_types import KeyDefaultDict
 from giskardpy.god_map import god_map
-from giskardpy.tree.behaviors.plugin import GiskardBehavior
-from giskardpy.utils.decorators import catch_and_raise_to_blackboard, record_time
-from giskardpy.utils.utils import wait_for_topic_to_appear
+from giskardpy_ros.ros1.ros1_interface import wait_for_topic_to_appear
+from giskardpy_ros.tree.behaviors.plugin import GiskardBehavior
+from giskardpy.utils.decorators import record_time
+from giskardpy_ros.tree.blackboard_utils import catch_and_raise_to_blackboard
 
 
 class JointPosController(GiskardBehavior):

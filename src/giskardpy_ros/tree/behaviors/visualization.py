@@ -1,10 +1,10 @@
 import py_trees
 import rospy
-from visualization_msgs.msg import Marker, MarkerArray
 
-from giskardpy.model.ros_msg_visualization import ROSMsgVisualization
-from giskardpy.tree.behaviors.plugin import GiskardBehavior
-from giskardpy.utils.decorators import catch_and_raise_to_blackboard, record_time
+from giskardpy_ros.ros1.ros_msg_visualization import ROSMsgVisualization
+from giskardpy_ros.tree.behaviors.plugin import GiskardBehavior
+from giskardpy.utils.decorators import record_time
+from giskardpy_ros.tree.blackboard_utils import catch_and_raise_to_blackboard
 
 
 class VisualizationBehavior(GiskardBehavior):

@@ -1,17 +1,24 @@
 import traceback
+from typing import List, Union
+
+import genpy
 from py_trees import Status
 
-from giskardpy.exceptions import InvalidGoalException
-from giskardpy.goals.base_traj_follower import BaseTrajFollower
-from giskardpy.motion_graph.monitors.monitors import TimeAbove, LocalMinimumReached, EndMotion, CancelMotion
-from giskardpy.god_map import god_map
-from giskardpy.model.joints import OmniDrive, DiffDrive
-from giskardpy.tree.behaviors.plugin import GiskardBehavior
-from giskardpy.utils import logging
-from giskardpy.utils.logging import loginfo
-from giskardpy.utils.decorators import catch_and_raise_to_blackboard, record_time
-from giskardpy.utils.utils import get_ros_msgs_constant_name_by_value
+import giskard_msgs.msg as giskard_msgs
 import giskardpy.casadi_wrapper as cas
+from giskardpy.data_types.exceptions import InvalidGoalException, UnknownGoalException, GiskardException, \
+    GoalInitalizationException, UnknownMonitorException, MonitorInitalizationException
+from giskardpy.goals.base_traj_follower import BaseTrajFollower
+from giskardpy.goals.goal import Goal
+from giskardpy.god_map import god_map
+from giskardpy.middleware import middleware
+from giskardpy.model.joints import OmniDrive, DiffDrive
+from giskardpy.motion_graph.monitors.monitors import TimeAbove, LocalMinimumReached, EndMotion, CancelMotion
+from giskardpy.symbol_manager import symbol_manager
+from giskardpy.utils.decorators import record_time
+from giskardpy_ros.ros1.msg_converter import json_str_to_kwargs
+from giskardpy_ros.tree.behaviors.plugin import GiskardBehavior
+from giskardpy_ros.tree.blackboard_utils import catch_and_raise_to_blackboard, GiskardBlackboard
 
 
 class ParseActionGoal(GiskardBehavior):
@@ -24,11 +31,11 @@ class ParseActionGoal(GiskardBehavior):
     @record_time
     @profile
     def update(self):
-        move_goal = god_map.move_action_server.goal_msg
-        loginfo(f'Parsing goal #{god_map.move_action_server.goal_id} message.')
+        move_goal = GiskardBlackboard().move_action_server.goal_msg
+        middleware.loginfo(f'Parsing goal #{GiskardBlackboard().move_action_server.goal_id} message.')
         try:
-            god_map.monitor_manager.parse_monitors(move_goal.monitors)
-            god_map.motion_goal_manager.parse_motion_goals(move_goal.goals)
+            self.parse_monitors(move_goal.monitors)
+            self.parse_motion_goals(move_goal.goals)
         except AttributeError:
             traceback.print_exc()
             raise InvalidGoalException('Couldn\'t transform goal')
@@ -37,17 +44,95 @@ class ParseActionGoal(GiskardBehavior):
         self.sanity_check()
         # if god_map.is_collision_checking_enabled():
         #     god_map.motion_goal_manager.parse_collision_entries(move_goal.collisions)
-        loginfo('Done parsing goal message.')
+        middleware.loginfo('Done parsing goal message.')
         return Status.SUCCESS
 
     def sanity_check(self) -> None:
         if (not god_map.monitor_manager.has_end_motion_monitor()
                 and not god_map.monitor_manager.has_cancel_motion_monitor()):
-            logging.logwarn(f'No {EndMotion.__name__} or {CancelMotion.__name__} monitor specified. '
-                            f'Motion will not stop unless cancelled externally.')
+            middleware.logwarn(f'No {EndMotion.__name__} or {CancelMotion.__name__} monitor specified. '
+                               f'Motion will not stop unless cancelled externally.')
             return
         if not god_map.monitor_manager.has_end_motion_monitor():
-            logging.logwarn(f'No {EndMotion.__name__} monitor specified. Motion can\'t end successfully.')
+            middleware.logwarn(f'No {EndMotion.__name__} monitor specified. Motion can\'t end successfully.')
+
+    @profile
+    def parse_monitors(self, monitor_msgs: List[giskard_msgs.Monitor]):
+        for monitor_msg in monitor_msgs:
+            try:
+                middleware.loginfo(f'Adding monitor of type: \'{monitor_msg.monitor_class}\'')
+                C = god_map.monitor_manager.allowed_monitor_types[monitor_msg.monitor_class]
+            except KeyError:
+                raise UnknownMonitorException(f'unknown monitor type: \'{monitor_msg.monitor_class}\'.')
+            try:
+                kwargs = json_str_to_kwargs(monitor_msg.kwargs, god_map.world)
+                hold_condition = kwargs.pop('hold_condition')
+                end_condition = kwargs.pop('end_condition')
+                monitor_name_to_state_expr = {str(key): value.get_state_expression() for key, value in
+                                              god_map.monitor_manager.monitors.items()}
+                monitor_name_to_state_expr[monitor_msg.name] = symbol_manager.get_symbol(
+                    f'god_map.monitor_manager.state[{len(god_map.monitor_manager.monitors)}]')
+                start_condition = god_map.monitor_manager.logic_str_to_expr(monitor_msg.start_condition,
+                                                                            default=cas.TrueSymbol,
+                                                                            monitor_name_to_state_expr=monitor_name_to_state_expr)
+                hold_condition = god_map.monitor_manager.logic_str_to_expr(hold_condition, default=cas.FalseSymbol,
+                                                                           monitor_name_to_state_expr=monitor_name_to_state_expr)
+                end_condition = god_map.monitor_manager.logic_str_to_expr(end_condition, default=cas.FalseSymbol,
+                                                                          monitor_name_to_state_expr=monitor_name_to_state_expr)
+                monitor = C(name=monitor_msg.name,
+                            start_condition=start_condition,
+                            hold_condition=hold_condition,
+                            end_condition=end_condition,
+                            **kwargs)
+                god_map.monitor_manager.add_monitor(monitor)
+            except Exception as e:
+                traceback.print_exc()
+                error_msg = f'Initialization of \'{C.__name__}\' monitor failed: \n {e} \n'
+                if not isinstance(e, GiskardException):
+                    raise MonitorInitalizationException(error_msg)
+                raise e
+
+    @profile
+    def parse_motion_goals(self, motion_goals: List[giskard_msgs.MotionGoal]):
+        for motion_goal in motion_goals:
+            try:
+                middleware.loginfo(
+                    f'Adding motion goal of type: \'{motion_goal.motion_goal_class}\' named: \'{motion_goal.name}\'')
+                C = god_map.motion_goal_manager.allowed_motion_goal_types[motion_goal.motion_goal_class]
+            except KeyError:
+                raise UnknownGoalException(f'unknown constraint {motion_goal.motion_goal_class}.')
+            try:
+                params = json_str_to_kwargs(motion_goal.kwargs, god_map.world)
+                if motion_goal.name == '':
+                    motion_goal.name = None
+                start_condition = god_map.monitor_manager.logic_str_to_expr(motion_goal.start_condition,
+                                                                            default=cas.TrueSymbol)
+                hold_condition = god_map.monitor_manager.logic_str_to_expr(motion_goal.hold_condition,
+                                                                           default=cas.FalseSymbol)
+                end_condition = god_map.monitor_manager.logic_str_to_expr(motion_goal.end_condition,
+                                                                          default=cas.FalseSymbol)
+                c: Goal = C(name=motion_goal.name,
+                            start_condition=start_condition,
+                            hold_condition=hold_condition,
+                            end_condition=end_condition,
+                            **params)
+                god_map.motion_goal_manager.add_motion_goal(c)
+            except Exception as e:
+                traceback.print_exc()
+                error_msg = f'Initialization of \'{C.__name__}\' constraint failed: \n {e} \n'
+                if not isinstance(e, GiskardException):
+                    raise GoalInitalizationException(error_msg)
+                raise e
+        god_map.motion_goal_manager.init_task_state()
+
+
+def get_ros_msgs_constant_name_by_value(ros_msg_class: genpy.Message, value: Union[str, int, float]) -> str:
+    for attr_name in dir(ros_msg_class):
+        if not attr_name.startswith('_'):
+            attr_value = getattr(ros_msg_class, attr_name)
+            if attr_value == value:
+                return attr_name
+    raise AttributeError(f'Message type {ros_msg_class} has no constant that matches {value}.')
 
 
 class SetExecutionMode(GiskardBehavior):
@@ -60,12 +145,12 @@ class SetExecutionMode(GiskardBehavior):
     @record_time
     @profile
     def update(self):
-        loginfo(
-            f'Goal is of type {get_ros_msgs_constant_name_by_value(type(god_map.move_action_server.goal_msg), god_map.move_action_server.goal_msg.type)}')
-        if god_map.is_goal_msg_type_projection():
-            god_map.tree.switch_to_projection()
-        elif god_map.is_goal_msg_type_execute():
-            god_map.tree.switch_to_execution()
+        middleware.loginfo(
+            f'Goal is of type {get_ros_msgs_constant_name_by_value(type(GiskardBlackboard().move_action_server.goal_msg), GiskardBlackboard().move_action_server.goal_msg.type)}')
+        if GiskardBlackboard().move_action_server.is_goal_msg_type_projection():
+            GiskardBlackboard().tree.switch_to_projection()
+        elif GiskardBlackboard().move_action_server.is_goal_msg_type_execute():
+            GiskardBlackboard().tree.switch_to_execution()
         else:
             raise InvalidGoalException(f'Goal of type {god_map.goal_msg.type} is not supported.')
         return Status.SUCCESS
@@ -83,14 +168,14 @@ class AddBaseTrajFollowerGoal(GiskardBehavior):
     @profile
     def update(self):
         local_min = LocalMinimumReached('local min')
-        god_map.monitor_manager.add_expression_monitor(local_min)
+        god_map.monitor_manager.add_monitor(local_min)
 
         time_monitor = TimeAbove(threshold=god_map.trajectory.length_in_seconds)
-        god_map.monitor_manager.add_expression_monitor(time_monitor)
+        god_map.monitor_manager.add_monitor(time_monitor)
 
         end_motion = EndMotion(start_condition=cas.logic_and(local_min.get_state_expression(),
                                                              time_monitor.get_state_expression()))
-        god_map.monitor_manager.add_expression_monitor(end_motion)
+        god_map.monitor_manager.add_monitor(end_motion)
 
         goal = BaseTrajFollower(self.joint.name, track_only_velocity=True,
                                 end_condition=local_min.get_state_expression())

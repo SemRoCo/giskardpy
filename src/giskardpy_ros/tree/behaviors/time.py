@@ -4,7 +4,7 @@ import rospy
 from py_trees import Status
 
 from giskardpy.god_map import god_map
-from giskardpy.tree.behaviors.plugin import GiskardBehavior
+from giskardpy_ros.tree.behaviors.plugin import GiskardBehavior
 
 
 class TimePlugin(GiskardBehavior):
@@ -13,7 +13,7 @@ class TimePlugin(GiskardBehavior):
 
     @profile
     def update(self):
-        god_map.time += god_map.qp_controller_config.sample_period
+        god_map.time += god_map.qp_controller.sample_period
         return Status.SUCCESS
 
 
@@ -34,10 +34,10 @@ class RosTime(GiskardBehavior):
         super().__init__(name)
 
     @property
-    def start_time(self):
-        return god_map.tracking_start_time
+    def start_time(self) -> float:
+        return god_map.motion_start_time
 
     @profile
     def update(self):
-        god_map.time = (rospy.get_rostime() - self.start_time).to_sec()
+        god_map.time = rospy.get_rostime().to_sec() - self.start_time
         return Status.SUCCESS

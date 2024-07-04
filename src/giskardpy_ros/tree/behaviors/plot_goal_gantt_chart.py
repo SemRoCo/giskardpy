@@ -10,8 +10,9 @@ from giskardpy.goals.goal import Goal
 from giskardpy.motion_graph.monitors.monitors import Monitor, EndMotion, CancelMotion
 from giskardpy.god_map import god_map
 from giskardpy.motion_graph.tasks.task import TaskState
-from giskardpy.tree.behaviors.plugin import GiskardBehavior
-from giskardpy.utils import logging
+from giskardpy_ros.tree.behaviors.plugin import GiskardBehavior
+from giskardpy.middleware import middleware
+from giskardpy_ros.tree.blackboard_utils import GiskardBlackboard
 from giskardpy.utils.decorators import record_time
 from giskardpy.utils.utils import create_path
 
@@ -53,7 +54,7 @@ class PlotGanttChart(GiskardBehavior):
 
         create_path(file_name)
         plt.savefig(file_name)
-        logging.loginfo(f'Saved gantt chart to {file_name}.')
+        middleware.loginfo(f'Saved gantt chart to {file_name}.')
 
     def plot_history(self,
                      history: List[Tuple[float, List[Optional[TaskState]]]],
@@ -91,7 +92,7 @@ class PlotGanttChart(GiskardBehavior):
             monitor_history.append((time, life_cycle_state))
 
         # add Nones to make sure all bars gets "ended"
-        new_end_time = god_map.time + god_map.qp_controller_config.sample_period
+        new_end_time = god_map.time + god_map.qp_controller.sample_period
         monitor_history.append((new_end_time, [None] * len(monitor_history[0][1])))
         task_history = god_map.motion_goal_manager.state_history
         task_history.append((new_end_time, [None] * len(task_history[0][1])))
@@ -106,10 +107,10 @@ class PlotGanttChart(GiskardBehavior):
         try:
             goals = list(god_map.motion_goal_manager.motion_goals.values())
             monitors = list(god_map.monitor_manager.monitors.values())
-            file_name = god_map.giskard.tmp_folder + f'gantt_charts/goal_{god_map.move_action_server.goal_id}.pdf'
+            file_name = god_map.tmp_folder + f'gantt_charts/goal_{GiskardBlackboard().move_action_server.goal_id}.pdf'
             self.plot_gantt_chart(goals, monitors, file_name)
         except Exception as e:
-            logging.logwarn(f'Failed to create goal gantt chart: {e}.')
+            middleware.logwarn(f'Failed to create goal gantt chart: {e}.')
             traceback.print_exc()
 
         return Status.SUCCESS

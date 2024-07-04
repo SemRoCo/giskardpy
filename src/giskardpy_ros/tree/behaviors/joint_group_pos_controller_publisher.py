@@ -3,10 +3,10 @@ from copy import deepcopy
 import rospy
 from std_msgs.msg import Float64MultiArray
 
-from giskardpy.data_types import Derivatives
-from giskardpy.data_types import KeyDefaultDict
+from giskardpy.data_types.data_types import Derivatives
+from giskardpy.data_types.data_types import KeyDefaultDict
 from giskardpy.god_map import god_map
-from giskardpy.tree.behaviors.plugin import GiskardBehavior
+from giskardpy_ros.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.decorators import record_time
 
 

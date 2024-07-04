@@ -2,12 +2,12 @@ from typing import Optional
 
 from py_trees import Sequence
 
-from giskardpy.tree.behaviors.debug_marker_publisher import DebugMarkerPublisher
-from giskardpy.tree.behaviors.publish_debug_expressions import PublishDebugExpressions
-from giskardpy.tree.behaviors.publish_feedback import PublishFeedback
-from giskardpy.tree.behaviors.publish_joint_states import PublishJointState
-from giskardpy.tree.behaviors.tf_publisher import TfPublishingModes, TFPublisher
-from giskardpy.tree.behaviors.visualization import VisualizationBehavior
+from giskardpy_ros.tree.behaviors.debug_marker_publisher import DebugMarkerPublisher
+from giskardpy_ros.tree.behaviors.publish_debug_expressions import PublishDebugExpressions
+from giskardpy_ros.tree.behaviors.publish_feedback import PublishFeedback
+from giskardpy_ros.tree.behaviors.publish_joint_states import PublishJointState
+from giskardpy_ros.tree.behaviors.tf_publisher import TfPublishingModes, TFPublisher
+from giskardpy_ros.tree.behaviors.visualization import VisualizationBehavior
 from giskardpy.utils.decorators import toggle_on, toggle_off
 
 

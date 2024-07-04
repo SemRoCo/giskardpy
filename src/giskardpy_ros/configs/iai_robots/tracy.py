@@ -1,10 +1,10 @@
 import numpy as np
 
-from giskardpy.configs.collision_avoidance_config import LoadSelfCollisionMatrixConfig
-from giskardpy.configs.robot_interface_config import RobotInterfaceConfig, StandAloneRobotInterfaceConfig
-from giskardpy.configs.world_config import WorldWithFixedRobot
+from giskardpy.model.collision_avoidance_config import LoadSelfCollisionMatrixConfig
+from giskardpy.model.world_config import WorldWithFixedRobot
+from giskardpy_ros.configs.robot_interface_config import RobotInterfaceConfig, StandAloneRobotInterfaceConfig
 from giskardpy.model.collision_world_syncer import CollisionCheckerLib
-from giskardpy.data_types import Derivatives
+from giskardpy.data_types.data_types import Derivatives
 
 
 class TracyWorldConfig(WorldWithFixedRobot):
@@ -16,7 +16,7 @@ class TracyWorldConfig(WorldWithFixedRobot):
 
 class TracyCollisionAvoidanceConfig(LoadSelfCollisionMatrixConfig):
     def __init__(self, collision_checker: CollisionCheckerLib = CollisionCheckerLib.bpb):
-        super().__init__('package://giskardpy_ros/self_collision_matrices/iai/tracy.srdf',
+        super().__init__('package://giskardpy/self_collision_matrices/iai/tracy.srdf',
                          collision_checker)
 
 

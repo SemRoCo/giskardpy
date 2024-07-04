@@ -1,8 +1,8 @@
 from py_trees import Sequence
-from giskardpy.motion_graph.monitors.monitors import PayloadMonitor
-from giskardpy.tree.behaviors.check_monitor_state import CheckMonitorState
-from giskardpy.tree.behaviors.delete_monitors_behaviors import DeleteMonitor
-from giskardpy.tree.behaviors.execute_payload_monitor import ExecutePayloadMonitor
+from giskardpy.motion_graph.monitors.payload_monitors import PayloadMonitor
+from giskardpy_ros.tree.behaviors.check_monitor_state import CheckMonitorState
+from giskardpy_ros.tree.behaviors.delete_monitors_behaviors import DeleteMonitor
+from giskardpy_ros.tree.behaviors.execute_payload_monitor import ExecutePayloadMonitor
 import giskardpy.casadi_wrapper as cas
 
 

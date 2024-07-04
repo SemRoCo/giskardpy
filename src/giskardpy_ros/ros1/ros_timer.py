@@ -6,8 +6,8 @@ import rospy
 from rospy.timer import TimerEvent
 from rospy.timer import sleep
 
-from giskardpy.god_map import god_map
-from giskardpy.utils import logging
+from giskardpy.middleware import middleware
+from giskardpy_ros.tree.blackboard_utils import GiskardBlackboard
 from giskardpy.utils.utils import is_running_in_pytest
 
 
@@ -81,7 +81,7 @@ class Rate:
         if elapsed_time > self.sleep_dur * 2:
             self.last_time = curr_time
             if self.print_warning:
-                logging.logwarn(f'Control loop can\'t keep up with {god_map.behavior_tree_config.control_loop_max_hz} hz. '
+                middleware.logwarn(f'Control loop can\'t keep up with {GiskardBlackboard().control_loop_max_hz} hz. '
                                 f'This loop took {elapsed_time.to_sec():.5f}s')
 
 

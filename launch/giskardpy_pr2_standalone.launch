@@ -2,9 +2,9 @@
 
     <include file="$(find pr2_description)/robots/upload_pr2.launch"/>
 
-    <node pkg="giskardpy" type="pr2_standalone.py" name="giskard" output="screen"/>
+    <node pkg="giskardpy_ros" type="pr2_standalone.py" name="giskard" output="screen"/>
 
-    <node pkg="giskardpy" type="interactive_marker.py" name="giskard_interactive_marker" output="screen">
+    <node pkg="giskardpy_ros" type="interactive_marker.py" name="giskard_interactive_marker" output="screen">
         <rosparam param="enable_self_collision">False</rosparam>
         <rosparam param="interactive_marker_chains">
           - [odom_combined, r_gripper_tool_frame]
@@ -14,7 +14,7 @@
         </rosparam>
     </node>
 
-    <node name="rviz" pkg="rviz" type="rviz" args="-d $(find giskardpy)/launch/rviz_config/standalone.rviz" />
+    <node name="rviz" pkg="rviz" type="rviz" args="-d $(find giskardpy_ros)/launch/rviz_config/standalone.rviz" />
 
 </launch>
 

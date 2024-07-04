@@ -1,20 +1,18 @@
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 import numpy as np
 import rospy
-from geometry_msgs.msg import TransformStamped, Quaternion, Point, Transform
+from geometry_msgs.msg import Quaternion, Point
 from py_trees import Status
 from std_msgs.msg import ColorRGBA
-from tf.transformations import quaternion_from_matrix, quaternion_about_axis, rotation_matrix
 from tf2_msgs.msg import TFMessage
 from visualization_msgs.msg import Marker, MarkerArray
 
 import giskardpy.casadi_wrapper as w
 from giskardpy.god_map import god_map
-from giskardpy.tree.behaviors.plugin import GiskardBehavior
+from giskardpy_ros.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.decorators import record_time
-from giskardpy.utils.tfwrapper import normalize_quaternion_msg, np_to_kdl, point_to_kdl, kdl_to_point, \
-    quaternion_to_kdl, transform_to_kdl, kdl_to_transform_stamped
+from giskardpy.utils.math import rotation_matrix_from_axis_angle, quaternion_from_rotation_matrix
 
 
 class DebugMarkerPublisher(GiskardBehavior):
@@ -75,9 +73,9 @@ class DebugMarkerPublisher(GiskardBehavior):
                 mx.pose.position.x = map_P_d[0][0] + map_V_x_offset[0]
                 mx.pose.position.y = map_P_d[1][0] + map_V_x_offset[1]
                 mx.pose.position.z = map_P_d[2][0] + map_V_x_offset[2]
-                d_R_x = rotation_matrix(np.pi / 2, [0, 1, 0])
+                d_R_x = rotation_matrix_from_axis_angle([0, 1, 0], np.pi / 2)
                 map_R_x = np.dot(map_T_d, d_R_x)
-                mx.pose.orientation = Quaternion(*quaternion_from_matrix(map_R_x))
+                mx.pose.orientation = Quaternion(*quaternion_from_rotation_matrix(map_R_x))
                 mx.color = ColorRGBA(1, 0, 0, 1)
                 mx.scale.x = width / 4
                 mx.scale.y = width / 4
@@ -95,9 +93,9 @@ class DebugMarkerPublisher(GiskardBehavior):
                 my.pose.position.x = map_P_d[0][0] + map_V_y_offset[0]
                 my.pose.position.y = map_P_d[1][0] + map_V_y_offset[1]
                 my.pose.position.z = map_P_d[2][0] + map_V_y_offset[2]
-                d_R_y = rotation_matrix(-np.pi / 2, [1, 0, 0])
+                d_R_y = rotation_matrix_from_axis_angle([1, 0, 0], -np.pi / 2)
                 map_R_y = np.dot(map_T_d, d_R_y)
-                my.pose.orientation = Quaternion(*quaternion_from_matrix(map_R_y))
+                my.pose.orientation = Quaternion(*quaternion_from_rotation_matrix(map_R_y))
                 my.color = ColorRGBA(0, 1, 0, 1)
                 my.scale.x = width / 4
                 my.scale.y = width / 4
@@ -115,7 +113,7 @@ class DebugMarkerPublisher(GiskardBehavior):
                 mz.pose.position.x = map_P_d[0][0] + map_V_z_offset[0]
                 mz.pose.position.y = map_P_d[1][0] + map_V_z_offset[1]
                 mz.pose.position.z = map_P_d[2][0] + map_V_z_offset[2]
-                mz.pose.orientation = Quaternion(*quaternion_from_matrix(map_T_d))
+                mz.pose.orientation = Quaternion(*quaternion_from_rotation_matrix(map_T_d))
                 mz.color = ColorRGBA(0, 0, 1, 1)
                 mz.scale.x = width / 4
                 mz.scale.y = width / 4

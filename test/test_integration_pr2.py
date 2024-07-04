@@ -1,8 +1,5 @@
 from __future__ import division
 
-from itertools import combinations
-
-import urdf_parser_py.urdf as up
 from copy import deepcopy
 from typing import Optional
 
@@ -14,34 +11,34 @@ from nav_msgs.msg import Path
 from numpy import pi
 from shape_msgs.msg import SolidPrimitive
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis
-
-import giskardpy.utils.tfwrapper as tf
-from giskard_msgs.msg import WorldBody, CollisionEntry, WorldGoal, GiskardError
-from giskardpy.configs.behavior_tree_config import StandAloneBTConfig
-from giskardpy.configs.giskard import Giskard
-from giskardpy.configs.iai_robots.pr2 import PR2CollisionAvoidance, PR2StandaloneInterface, WorldWithPR2Config
-from giskardpy.configs.qp_controller_config import SupportedQPSolver, QPControllerConfig
-from giskardpy.goals.base_traj_follower import FollowNavPath
+import giskard_msgs.msg as giskard_msgs
+from giskard_msgs.msg import WorldBody, CollisionEntry, WorldGoal, LinkName
+from giskardpy.middleware import middleware
+from giskardpy_ros.configs.behavior_tree_config import StandAloneBTConfig
+from giskardpy_ros.configs.giskard import Giskard
+from giskardpy_ros.configs.iai_robots.pr2 import PR2CollisionAvoidance, PR2StandaloneInterface, WorldWithPR2Config
+from giskardpy.qp.qp_controller_config import SupportedQPSolver, QPControllerConfig
+from giskardpy.data_types.exceptions import GiskardException, VelocityLimitUnreachableException, \
+    MaxTrajectoryLengthException, UnknownGoalException, GoalInitalizationException, LocalMinimumException, \
+    DuplicateNameException, CorruptMeshException, UnknownGroupException, UnknownLinkException, \
+    InvalidWorldOperationException, CorruptShapeException, TransformException, CorruptURDFException, \
+    SelfCollisionViolatedException, HardConstraintsViolatedException
 from giskardpy.goals.cartesian_goals import RelativePositionSequence
-from giskardpy.goals.caster import Circle, Wave
 from giskardpy.goals.collision_avoidance import CollisionAvoidanceHint
 from giskardpy.goals.goals_tests import DebugGoal, CannotResolveSymbol
 from giskardpy.goals.joint_goals import JointVelocityLimit, UnlimitedJointGoal
-from giskardpy.motion_graph.monitors.set_prediction_horizon import SetQPSolver
+from giskardpy.goals.set_prediction_horizon import SetQPSolver
 from giskardpy.goals.tracebot import InsertCylinder
 from giskardpy.god_map import god_map
-from giskardpy.model.better_pybullet_syncer import BetterPyBulletSyncer
-from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
-from giskardpy.model.utils import make_world_body_box, hacky_urdf_parser_fix
-from giskardpy.model.world import WorldTree
-from giskardpy.data_types import PrefixName
+from giskardpy.model.utils import hacky_urdf_parser_fix
+from giskardpy.data_types.data_types import PrefixName
 from giskardpy.motion_graph.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE
-from giskardpy.python_interface.old_python_interface import OldGiskardWrapper
-from giskardpy.utils.utils import launch_launchfile, suppress_stderr, resolve_ros_iris
-from giskardpy.utils.math import compare_points
-from utils_for_tests import compare_poses, publish_marker_vector, \
-    GiskardTestWrapper, pr2_urdf
+from giskardpy_ros.python_interface.old_python_interface import OldGiskardWrapper
+from giskardpy_ros.tree.blackboard_utils import GiskardBlackboard
+from utils_for_tests import launch_launchfile
+from utils_for_tests import compare_poses, publish_marker_vector, GiskardTestWrapper, compare_points
 from giskardpy.goals.weight_scaling_goals import MaxManipulabilityLinWeight, BaseArmWeightScaling
+
 
 # scopes = ['module', 'class', 'function']
 pocky_pose = {'r_elbow_flex_joint': -1.29610152504,
@@ -162,7 +159,9 @@ class PR2TestWrapper(GiskardTestWrapper):
         if giskard is None:
             giskard = Giskard(world_config=WorldWithPR2Config(drive_joint_name=drive_joint_name),
                               robot_interface_config=PR2StandaloneInterface(drive_joint_name=drive_joint_name),
-                              collision_avoidance_config=PR2CollisionAvoidance(drive_joint_name=drive_joint_name),
+                              collision_avoidance_config=PR2CollisionAvoidance(drive_joint_name=drive_joint_name,
+                                                                               # collision_checker=CollisionCheckerLib.none),
+                                                                               ),
                               behavior_tree_config=StandAloneBTConfig(debug_mode=True,
                                                                       publish_tf=False,
                                                                       simulation_max_hz=None),
@@ -200,11 +199,31 @@ class PR2TestWrapper(GiskardTestWrapper):
         self.open_l_gripper()
         self.open_r_gripper()
         self.register_group('l_gripper',
-                            root_link_group_name=self.robot_name,
-                            root_link_name='l_wrist_roll_link')
+                            root_link_name=giskard_msgs.LinkName(name='l_wrist_roll_link',
+                                                                 group_name=self.robot_name))
         self.register_group('r_gripper',
-                            root_link_group_name=self.robot_name,
-                            root_link_name='r_wrist_roll_link')
+                            root_link_name=giskard_msgs.LinkName(name='r_wrist_roll_link',
+                                                                 group_name=self.robot_name))
+
+        # self.register_group('fl_l',
+        #                     root_link_group_name=self.robot_name,
+        #                     root_link_name='fl_caster_l_wheel_link')
+        # self.dye_group('fl_l', rgba=(1, 0, 0, 1))
+        #
+        # self.register_group('fr_l',
+        #                     root_link_group_name=self.robot_name,
+        #                     root_link_name='fr_caster_l_wheel_link')
+        # self.dye_group('fr_l', rgba=(1, 0, 0, 1))
+        #
+        # self.register_group('bl_l',
+        #                     root_link_group_name=self.robot_name,
+        #                     root_link_name='bl_caster_l_wheel_link')
+        # self.dye_group('bl_l', rgba=(1, 0, 0, 1))
+        #
+        # self.register_group('br_l',
+        #                     root_link_group_name=self.robot_name,
+        #                     root_link_name='br_caster_l_wheel_link')
+        # self.dye_group('br_l', rgba=(1, 0, 0, 1))
 
 
 @pytest.fixture(scope='module')
@@ -219,20 +238,14 @@ def giskard(request, ros):
 
 @pytest.fixture()
 def pocky_pose_setup(resetted_giskard: PR2TestWrapper) -> PR2TestWrapper:
-    if god_map.is_standalone():
+    if GiskardBlackboard().tree.is_standalone():
         resetted_giskard.set_seed_configuration(pocky_pose)
         resetted_giskard.allow_all_collisions()
     else:
         resetted_giskard.allow_all_collisions()
         resetted_giskard.set_joint_goal(pocky_pose)
-    resetted_giskard.plan_and_execute()
+    resetted_giskard.execute()
     return resetted_giskard
-
-
-@pytest.fixture()
-def world_setup(zero_pose: PR2TestWrapper) -> WorldTree:
-    zero_pose.stop_ticking()
-    return god_map.world
 
 
 @pytest.fixture()
@@ -282,7 +295,7 @@ class TestJointGoals:
         }
         zero_pose.set_joint_goal(goal_state=js)
         zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
     def test_joint_goal_projection(self, zero_pose: PR2TestWrapper):
         js = {
@@ -328,25 +341,25 @@ class TestJointGoals:
         }
         zero_pose.set_joint_goal(js)
         zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
     def test_joint_movement1(self, zero_pose: PR2TestWrapper):
         zero_pose.allow_all_collisions()
         zero_pose.set_joint_goal(pocky_pose)
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
     def test_partial_joint_state_goal1(self, zero_pose: PR2TestWrapper):
         zero_pose.allow_self_collision()
         js = dict(list(pocky_pose.items())[:3])
         zero_pose.set_joint_goal(js)
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
     def test_continuous_joint1(self, zero_pose: PR2TestWrapper):
         zero_pose.allow_all_collisions()
         # zero_pose.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
         js = {'r_wrist_roll_joint': -pi}
         zero_pose.set_joint_goal(js)
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
     def test_continuous_joint2(self, zero_pose: PR2TestWrapper):
         zero_pose.allow_self_collision()
@@ -354,26 +367,26 @@ class TestJointGoals:
         js = {'r_wrist_roll_joint': -pi,
               'l_wrist_roll_joint': -2.1 * pi, }
         zero_pose.set_joint_goal(js)
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
     def test_prismatic_joint1(self, zero_pose: PR2TestWrapper):
         zero_pose.allow_all_collisions()
         js = {'torso_lift_joint': 0.1}
         zero_pose.set_joint_goal(js)
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
     def test_revolute_joint1(self, zero_pose: PR2TestWrapper):
         zero_pose.allow_all_collisions()
         js = {'r_elbow_flex_joint': -1}
         zero_pose.set_joint_goal(js)
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
     def test_unlimited_joint_goal(self, zero_pose: PR2TestWrapper):
         zero_pose.allow_all_collisions()
         zero_pose.motion_goals.add_motion_goal(motion_goal_class=UnlimitedJointGoal.__name__,
                                                joint_name='r_elbow_flex_joint',
                                                goal_position=-3)
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
     def test_hard_joint_limits(self, zero_pose: PR2TestWrapper):
         zero_pose.allow_self_collision()
@@ -388,17 +401,17 @@ class TestJointGoals:
                    'torso_lift_joint': torso_lift_joint_limits[0] - 0.2,
                    'head_pan_joint': head_pan_joint_limits[0] - 0.2}
         zero_pose.set_joint_goal(goal_js, add_monitor=False)
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
         js = {'torso_lift_joint': 0.32}
         zero_pose.set_joint_goal(js)
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
         goal_js = {'r_elbow_flex_joint': r_elbow_flex_joint_limits[1] + 0.2,
                    'torso_lift_joint': torso_lift_joint_limits[1] + 0.2,
                    'head_pan_joint': head_pan_joint_limits[1] + 0.2}
 
         zero_pose.set_joint_goal(goal_js, add_monitor=False)
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
 
 class TestMonitors:
@@ -499,7 +512,7 @@ class TestMonitors:
         zero_pose.monitors.add_end_motion(start_condition=' and '.join([end_monitor, monitor2]))
         zero_pose.set_max_traj_length(30)
         zero_pose.execute(add_local_minimum_reached=False)
-        current_pose = god_map.world.compute_fk_pose(root=root_link, tip=tip_link)
+        current_pose = zero_pose.compute_fk_pose(root_link=root_link, tip_link=tip_link)
         np.testing.assert_almost_equal(current_pose.pose.position.x, 1, decimal=2)
         np.testing.assert_almost_equal(current_pose.pose.position.y, 1, decimal=2)
 
@@ -547,7 +560,7 @@ class TestMonitors:
         zero_pose.set_max_traj_length(30)
         zero_pose.execute(add_local_minimum_reached=False)
 
-        current_pose = god_map.world.compute_fk_pose(root=root_link, tip=tip_link)
+        current_pose = zero_pose.compute_fk_pose(root_link=root_link, tip_link=tip_link)
         np.testing.assert_almost_equal(current_pose.pose.position.x, 0, decimal=2)
         np.testing.assert_almost_equal(current_pose.pose.position.y, 1, decimal=2)
 
@@ -569,7 +582,7 @@ class TestMonitors:
                                           height=cylinder_height,
                                           radius=0.0225,
                                           pose=pose,
-                                          parent_link='r_gripper_tool_frame')
+                                          parent_link=giskard_msgs.LinkName(name='r_gripper_tool_frame'))
         better_pose.dye_group(cylinder_name, (0, 0, 1, 1))
 
         better_pose.motion_goals.add_motion_goal(motion_goal_class=InsertCylinder.__name__,
@@ -577,7 +590,7 @@ class TestMonitors:
                                                  cylinder_height=0.121,
                                                  hole_point=hole_point)
         better_pose.allow_all_collisions()
-        better_pose.plan_and_execute()
+        better_pose.execute()
 
     def test_bowl_and_cup_sequence(self, kitchen_setup: PR2TestWrapper):
         kitchen_setup.set_avoid_name_conflict(False)
@@ -911,7 +924,8 @@ class TestMonitors:
         zero_pose.monitors.add_max_trajectory_length(120)
         zero_pose.execute(add_local_minimum_reached=False)
         assert god_map.trajectory.length_in_seconds > 6
-        current_pose = god_map.world.compute_fk_pose(root='map', tip='base_footprint')
+        current_pose = zero_pose.compute_fk_pose(root_link='map',
+                                                 tip_link='base_footprint')
         compare_poses(current_pose.pose, base_goal.pose)
 
     def test_hold_monitors(self, zero_pose: PR2TestWrapper):
@@ -1064,8 +1078,8 @@ class TestMonitors:
                                                root_link='map',
                                                tip_link='base_footprint')
         zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute()
-        current_pose = god_map.world.compute_fk_pose(root='map', tip='base_footprint')
+        zero_pose.execute()
+        current_pose = zero_pose.compute_fk_pose(root_link='map', tip_link='base_footprint')
         np.testing.assert_almost_equal(current_pose.pose.position.x, 1, decimal=2)
         np.testing.assert_almost_equal(current_pose.pose.position.y, 1, decimal=2)
 
@@ -1201,12 +1215,12 @@ class TestConstraints:
     def test_add_debug_expr(self, zero_pose: PR2TestWrapper):
         zero_pose.motion_goals.add_motion_goal(motion_goal_class=DebugGoal.__name__)
         zero_pose.set_joint_goal(zero_pose.better_pose)
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
     def test_cannot_resolve_symbol(self, zero_pose: PR2TestWrapper):
         zero_pose.motion_goals.add_motion_goal(motion_goal_class=CannotResolveSymbol.__name__,
                                                joint_name='torso_lift_joint')
-        zero_pose.plan_and_execute(expected_error_code=GiskardError.ERROR)
+        zero_pose.execute(expected_error_type=GiskardException)
 
     def test_SetSeedConfiguration(self, zero_pose: PR2TestWrapper):
         zero_pose.set_seed_configuration(seed_configuration=zero_pose.better_pose)
@@ -1235,27 +1249,26 @@ class TestConstraints:
         base_pose.pose.position.x = 0.4
         base_pose.pose.position.y = -2
         base_pose.pose.orientation.w = 1
-        # apartment_setup.allow_all_collisions()
         apartment_setup.set_cart_goal(goal_pose=base_pose,
                                       tip_link='base_footprint',
                                       root_link=apartment_setup.default_root,
                                       add_monitor=False)
-        apartment_setup.plan_and_execute()
+        apartment_setup.execute()
 
     def test_VelocityLimitUnreachableException(self, zero_pose: PR2TestWrapper):
         zero_pose.set_prediction_horizon(prediction_horizon=7)
         zero_pose.set_joint_goal(zero_pose.better_pose)
-        zero_pose.plan_and_execute(expected_error_code=GiskardError.VELOCITY_LIMIT_UNREACHABLE)
+        zero_pose.execute(expected_error_type=VelocityLimitUnreachableException)
 
     def test_SetPredictionHorizon11(self, zero_pose: PR2TestWrapper):
-        default_prediction_horizon = god_map.qp_controller_config.prediction_horizon
+        default_prediction_horizon = god_map.qp_controller.prediction_horizon
         zero_pose.set_prediction_horizon(prediction_horizon=11)
         zero_pose.set_joint_goal(zero_pose.better_pose)
-        zero_pose.plan_and_execute()
-        assert god_map.qp_controller_config.prediction_horizon == 11
+        zero_pose.execute()
+        assert god_map.qp_controller.prediction_horizon == 11
         zero_pose.set_joint_goal(zero_pose.default_pose)
-        zero_pose.plan_and_execute()
-        assert god_map.qp_controller_config.prediction_horizon == default_prediction_horizon
+        zero_pose.execute()
+        assert god_map.qp_controller.prediction_horizon == default_prediction_horizon
 
     def test_SetMaxTrajLength(self, zero_pose: PR2TestWrapper):
         new_length = 4
@@ -1265,13 +1278,13 @@ class TestConstraints:
         base_goal.pose.orientation.w = 1
         zero_pose.set_max_traj_length(new_length)
         zero_pose.set_cart_goal(base_goal, tip_link='base_footprint', root_link='map')
-        result = zero_pose.plan_and_execute(expected_error_code=GiskardError.MAX_TRAJECTORY_LENGTH)
-        dt = god_map.qp_controller_config.sample_period
+        result = zero_pose.execute(expected_error_type=MaxTrajectoryLengthException)
+        dt = god_map.qp_controller.sample_period
         np.testing.assert_almost_equal(len(result.trajectory.points) * dt, new_length + dt * 2)
 
         zero_pose.set_cart_goal(base_goal, tip_link='base_footprint', root_link='map')
-        result = zero_pose.plan_and_execute(expected_error_code=GiskardError.MAX_TRAJECTORY_LENGTH)
-        dt = god_map.qp_controller_config.sample_period
+        result = zero_pose.execute(expected_error_type=MaxTrajectoryLengthException)
+        dt = god_map.qp_controller.sample_period
         assert len(result.trajectory.points) * dt > new_length + 1
 
     def test_CollisionAvoidanceHint(self, kitchen_setup: PR2TestWrapper):
@@ -1304,7 +1317,7 @@ class TestConstraints:
         kitchen_setup.set_cart_goal(goal_pose=base_pose, tip_link=tip, root_link='map',
                                     weight=WEIGHT_BELOW_CA, reference_linear_velocity=0.5)
         # kitchen_setup.allow_all_collisions()
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
 
     def test_CartesianPosition(self, zero_pose: PR2TestWrapper):
         tip = zero_pose.r_tip
@@ -1317,7 +1330,7 @@ class TestConstraints:
         zero_pose.set_translation_goal(root_link=zero_pose.default_root,
                                        tip_link=tip,
                                        goal_point=p)
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
     def test_CartesianPosition1(self, zero_pose: PR2TestWrapper):
         pocky = 'box'
@@ -1342,7 +1355,7 @@ class TestConstraints:
                                        tip_link=pocky,
                                        tip_group='box',
                                        goal_point=p)
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
     def test_CartesianPose(self, zero_pose: PR2TestWrapper):
         tip = zero_pose.r_tip
@@ -1360,8 +1373,8 @@ class TestConstraints:
                                 tip_link=tip,
                                 tip_group=zero_pose.robot_name,
                                 goal_pose=p)
-        zero_pose.plan_and_execute()
-        new_pose = god_map.world.compute_fk_pose('map', tip)
+        zero_pose.execute()
+        new_pose = zero_pose.compute_fk_pose('map', tip)
         compare_points(expected.pose.position, new_pose.pose.position)
 
     def test_JointVelocityRevolute(self, zero_pose: PR2TestWrapper):
@@ -1374,7 +1387,7 @@ class TestConstraints:
                                                max_velocity=vel_limit,
                                                hard=True)
         zero_pose.set_joint_goal(goal_state={joint.short_name: joint_goal})
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
         np.testing.assert_almost_equal(god_map.world.state[joint].position, joint_goal, decimal=3)
         np.testing.assert_array_less(god_map.trajectory.to_dict()[1][joint], vel_limit + 1e-4)
 
@@ -1389,7 +1402,7 @@ class TestConstraints:
         }
         # kitchen_setup.allow_all_collisions()
         kitchen_setup.set_joint_goal(goal_state=goal_state)
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
         np.testing.assert_almost_equal(
             god_map.trajectory.get_last()[
                 PrefixName(joint_name1, group_name)].position,
@@ -1412,7 +1425,7 @@ class TestConstraints:
                                     tip_link=tip,
                                     tip_group=zero_pose.robot_name,
                                     goal_orientation=q)
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
     def test_CartesianPoseStraight1(self, zero_pose: PR2TestWrapper):
         zero_pose.close_l_gripper()
@@ -1423,7 +1436,7 @@ class TestConstraints:
         goal_position.pose.position.z = 1
         goal_position.pose.orientation.w = 1
 
-        start_pose = god_map.world.compute_fk_pose('map', zero_pose.l_tip)
+        start_pose = zero_pose.compute_fk_pose('map', zero_pose.l_tip)
         map_T_goal_position = zero_pose.transform_msg('map', goal_position)
 
         object_pose = PoseStamped()
@@ -1442,7 +1455,7 @@ class TestConstraints:
         goal_position_p.header.frame_id = 'base_link'
         zero_pose.set_straight_cart_goal(goal_pose=goal_position_p, tip_link=zero_pose.l_tip,
                                          root_link=zero_pose.default_root)
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
     def test_CartesianPoseStraight2(self, better_pose: PR2TestWrapper):
         better_pose.close_l_gripper()
@@ -1453,7 +1466,7 @@ class TestConstraints:
         goal_position.pose.position.z = 1
         goal_position.pose.orientation.w = 1
 
-        start_pose = god_map.world.compute_fk_pose('map', better_pose.l_tip)
+        start_pose = better_pose.compute_fk_pose('map', better_pose.l_tip)
         map_T_goal_position = better_pose.transform_msg('map', goal_position)
 
         object_pose = PoseStamped()
@@ -1473,26 +1486,26 @@ class TestConstraints:
         goal.pose.position.y += 0.4
         better_pose.set_straight_cart_goal(goal_pose=goal, tip_link=better_pose.l_tip,
                                            root_link=better_pose.default_root)
-        better_pose.plan_and_execute()
+        better_pose.execute()
 
         goal = deepcopy(object_pose)
         goal.pose.position.z -= 0.4
         better_pose.set_straight_cart_goal(goal_pose=goal, tip_link=better_pose.l_tip,
                                            root_link=better_pose.default_root)
-        better_pose.plan_and_execute()
+        better_pose.execute()
 
         goal = deepcopy(object_pose)
         goal.pose.position.y -= 0.4
         goal.pose.position.x -= 0.2
         better_pose.set_straight_cart_goal(goal_pose=goal, tip_link=better_pose.l_tip,
                                            root_link=better_pose.default_root)
-        better_pose.plan_and_execute()
+        better_pose.execute()
 
         goal = deepcopy(object_pose)
         goal.pose.position.x -= 0.4
         better_pose.set_straight_cart_goal(goal_pose=goal, tip_link=better_pose.l_tip,
                                            root_link=better_pose.default_root)
-        better_pose.plan_and_execute()
+        better_pose.execute()
 
     def test_CartesianVelocityLimit(self, zero_pose: PR2TestWrapper):
         base_linear_velocity = 0.1
@@ -1518,7 +1531,7 @@ class TestConstraints:
                                 reference_linear_velocity=eef_linear_velocity,
                                 reference_angular_velocity=eef_angular_velocity,
                                 weight=WEIGHT_BELOW_CA)
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
         for time, state in god_map.debug_expression_manager.debug_trajectory.items():
             key = f'trans_error'
@@ -1530,7 +1543,7 @@ class TestConstraints:
         percentage = 10
         zero_pose.allow_all_collisions()
         zero_pose.set_avoid_joint_limits_goal(percentage=percentage)
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
         joint_non_continuous = [j for j in zero_pose.robot.controlled_joints if
                                 not god_map.world.is_joint_continuous(j) and
@@ -1556,11 +1569,11 @@ class TestConstraints:
         zero_pose.set_avoid_joint_limits_goal(percentage=percentage)
         zero_pose.set_joint_goal(goal_state, add_monitor=False)
         zero_pose.allow_self_collision()
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
         zero_pose.set_avoid_joint_limits_goal(percentage=percentage)
         zero_pose.allow_self_collision()
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
         current_joint_state = god_map.world.state.to_position_dict()
         percentage *= 0.9  # it will not reach the exact percentage, because the weight is so low
@@ -1581,7 +1594,7 @@ class TestConstraints:
         kitchen_setup.teleport_base(base_goal)
 
         tip = 'head_mount_kinect_rgb_link'
-        goal_point = god_map.world.compute_fk_point(root='map', tip='iai_kitchen/iai_fridge_door_handle')
+        goal_point = kitchen_setup.compute_fk_point(root_link='map', tip_link='iai_kitchen/iai_fridge_door_handle')
         goal_point.header.stamp = rospy.Time()
         pointing_axis = Vector3Stamped()
         pointing_axis.header.frame_id = tip
@@ -1589,7 +1602,7 @@ class TestConstraints:
         kitchen_setup.set_pointing_goal(tip_link=tip, goal_point=goal_point, root_link=kitchen_setup.default_root,
                                         pointing_axis=pointing_axis)
         kitchen_setup.allow_all_collisions()
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
 
         base_goal = PoseStamped()
         base_goal.header.frame_id = 'pr2/base_footprint'
@@ -1614,7 +1627,7 @@ class TestConstraints:
 
         rospy.loginfo("Starting looking")
         tip = 'head_mount_kinect_rgb_link'
-        goal_point = god_map.world.compute_fk_point('map', kitchen_setup.r_tip)
+        goal_point = kitchen_setup.compute_fk_point('map', kitchen_setup.r_tip)
         goal_point.header.stamp = rospy.Time()
         pointing_axis = Vector3Stamped()
         pointing_axis.header.frame_id = tip
@@ -1640,7 +1653,7 @@ class TestConstraints:
                                     weight=WEIGHT_BELOW_CA,
                                     add_monitor=False)
         kitchen_setup.allow_all_collisions()
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
 
     def test_open_drawer(self, kitchen_setup: PR2TestWrapper):
         handle_frame_id = 'iai_kitchen/sink_area_left_middle_drawer_handle'
@@ -1680,7 +1693,7 @@ class TestConstraints:
         kitchen_setup.set_open_container_goal(tip_link=kitchen_setup.l_tip,
                                               environment_link=handle_name)
         kitchen_setup.allow_all_collisions()  # makes execution faster
-        kitchen_setup.plan_and_execute()  # send goal to Giskard
+        kitchen_setup.execute()  # send goal to Giskard
         # Update kitchen object
         kitchen_setup.set_env_state({'sink_area_left_middle_drawer_main_joint': 0.48})
 
@@ -1696,7 +1709,7 @@ class TestConstraints:
         kitchen_setup.set_close_container_goal(tip_link=kitchen_setup.l_tip,
                                                environment_link=handle_name)
         kitchen_setup.allow_all_collisions()  # makes execution faster
-        kitchen_setup.plan_and_execute()  # send goal to Giskard
+        kitchen_setup.execute()  # send goal to Giskard
         # Update kitchen object
         kitchen_setup.set_env_state({'sink_area_left_middle_drawer_main_joint': 0.0})
 
@@ -1713,10 +1726,12 @@ class TestConstraints:
         goal_angle = np.pi / 4
         handle_frame_id = 'sink_area_dish_washer_door_handle'
         handle_name = 'sink_area_dish_washer_door_handle'
-        kitchen_setup.register_group('dishwasher', root_link_name='sink_area_dish_washer_main',
-                                     root_link_group_name=kitchen_setup.default_env_name)
-        kitchen_setup.register_group('handle', root_link_name=handle_name,
-                                     root_link_group_name=kitchen_setup.default_env_name)
+        kitchen_setup.register_group(new_group_name='dishwasher',
+                                     root_link_name=giskard_msgs.LinkName(name='sink_area_dish_washer_main',
+                                                                          group_name=kitchen_setup.default_env_name))
+        kitchen_setup.register_group(new_group_name='handle',
+                                     root_link_name=giskard_msgs.LinkName(name=handle_name,
+                                                                          group_name=kitchen_setup.default_env_name))
         bar_axis = Vector3Stamped()
         bar_axis.header.frame_id = handle_frame_id
         bar_axis.vector.y = 1
@@ -1750,21 +1765,21 @@ class TestConstraints:
                                             goal_normal=x_goal)
         # kitchen_setup.allow_all_collisions()
 
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
 
         kitchen_setup.set_open_container_goal(tip_link=hand,
                                               environment_link=handle_name,
                                               goal_joint_state=goal_angle)
         # kitchen_setup.allow_all_collisions()
         kitchen_setup.allow_collision(group1=kitchen_setup.default_env_name, group2=kitchen_setup.r_gripper_group)
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
         kitchen_setup.set_env_state({'sink_area_dish_washer_door_joint': goal_angle})
 
         kitchen_setup.set_open_container_goal(tip_link=hand,
                                               environment_link=handle_name,
                                               goal_joint_state=0)
         kitchen_setup.allow_all_collisions()
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
         kitchen_setup.set_env_state({'sink_area_dish_washer_door_joint': 0})
 
     def test_push_open_dishwasher(self, kitchen_setup: PR2TestWrapper):
@@ -1780,8 +1795,8 @@ class TestConstraints:
         door_obj = "door"
         handle_name = 'sink_area_dish_washer_door_handle'
         door_name = 'sink_area_dish_washer_door'
-        kitchen_setup.register_group(door_obj, kitchen_setup.default_env_name,
-                                     door_name)  # root link of the objects to avoid collision
+        kitchen_setup.register_group(door_obj, LinkName(name=door_name,
+                                                        group_name=kitchen_setup.default_env_name))  # root link of the objects to avoid collision
         kitchen_setup.set_env_state({'sink_area_dish_washer_door_joint': np.pi / 8})
         tip_grasp_axis = Vector3Stamped()
         tip_grasp_axis.header.frame_id = hand
@@ -1792,7 +1807,7 @@ class TestConstraints:
                                                   door_handle=handle_name,
                                                   door_object=door_name,
                                                   tip_gripper_axis=tip_grasp_axis)
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
 
         # # # close the gripper
         kitchen_setup.set_joint_goal(goal_state={'r_gripper_l_finger_joint': 0.0})
@@ -1803,7 +1818,7 @@ class TestConstraints:
                                              door_object=door_name)
 
         kitchen_setup.allow_collision(group1=door_obj, group2=kitchen_setup.r_gripper_group)
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
 
         kitchen_setup.check_cpi_leq(["pr2/r_gripper_tool_frame", "iai_kitchen/sink_area_dish_washer_door"],
                                     distance_threshold=0.001,
@@ -1811,14 +1826,14 @@ class TestConstraints:
 
         right_forearm = 'r_forearm'
         kitchen_setup.register_group(right_forearm,
-                                     root_link_group_name=kitchen_setup.robot_name,
-                                     root_link_name='r_forearm_link')
+                                     root_link_name=LinkName(name='r_forearm_link',
+                                                             group_name=kitchen_setup.robot_name))
         kitchen_setup.set_open_container_goal(tip_link=hand,
                                               environment_link=handle_name,
                                               goal_joint_state=1.3217)
 
         kitchen_setup.allow_collision(group1=door_obj, group2=right_forearm)
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
 
     def test_align_planes1(self, zero_pose: PR2TestWrapper):
         x_gripper = Vector3Stamped()
@@ -1843,31 +1858,31 @@ class TestConstraints:
                                         tip_normal=y_gripper,
                                         goal_normal=y_goal)
         zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
     def test_wrong_constraint_type(self, zero_pose: PR2TestWrapper):
         goal_state = {'r_elbow_flex_joint': -1.0}
         kwargs = {'goal_state': goal_state}
         zero_pose.motion_goals.add_motion_goal(motion_goal_class='jointpos', **kwargs)
-        zero_pose.plan_and_execute(expected_error_code=GiskardError.UNKNOWN_GOAL)
+        zero_pose.execute(expected_error_type=UnknownGoalException)
 
     def test_python_code_in_constraint_type(self, zero_pose: PR2TestWrapper):
         goal_state = {'r_elbow_flex_joint': -1.0}
         kwargs = {'goal_state': goal_state}
         zero_pose.motion_goals.add_motion_goal(motion_goal_class='print("muh")', **kwargs)
-        zero_pose.plan_and_execute(expected_error_code=GiskardError.UNKNOWN_GOAL)
+        zero_pose.execute(expected_error_type=UnknownGoalException)
 
     def test_wrong_params1(self, zero_pose: PR2TestWrapper):
         goal_state = {5432: 'muh'}
         kwargs = {'goal_state': goal_state}
         zero_pose.motion_goals.add_motion_goal(motion_goal_class='JointPositionList', **kwargs)
-        zero_pose.plan_and_execute(expected_error_code=GiskardError.GOAL_INITIALIZATION_ERROR)
+        zero_pose.execute(expected_error_type=GoalInitalizationException)
 
     def test_wrong_params2(self, zero_pose: PR2TestWrapper):
         goal_state = {'r_elbow_flex_joint': 'muh'}
         kwargs = {'goal_state': goal_state}
         zero_pose.motion_goals.add_motion_goal(motion_goal_class='JointPositionList', **kwargs)
-        zero_pose.plan_and_execute(expected_error_code=GiskardError.GOAL_INITIALIZATION_ERROR)
+        zero_pose.execute(expected_error_type=GoalInitalizationException)
 
     # def test_align_planes2(self, zero_pose: PR2TestWrapper):
     #     # FIXME, what should I do with opposite vectors?
@@ -1893,13 +1908,12 @@ class TestConstraints:
         goal_vector = Vector3Stamped()
         goal_vector.header.frame_id = 'map'
         goal_vector.vector.x = 1
-        goal_vector.vector = tf.normalize(goal_vector.vector)
         zero_pose.set_align_planes_goal(tip_link='base_footprint',
                                         root_link='map',
                                         tip_normal=eef_vector,
                                         goal_normal=goal_vector)
         zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
     def test_align_planes4(self, kitchen_setup: PR2TestWrapper):
         elbow = 'r_elbow_flex_link'
@@ -1917,7 +1931,7 @@ class TestConstraints:
                                             tip_normal=tip_axis, goal_normal=env_axis,
                                             weight=WEIGHT_ABOVE_CA)
         kitchen_setup.allow_all_collisions()
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
 
     def test_grasp_fridge_handle(self, kitchen_setup: PR2TestWrapper):
         handle_name = 'iai_fridge_door_handle'
@@ -1951,7 +1965,7 @@ class TestConstraints:
                                             tip_normal=x_gripper,
                                             goal_normal=x_goal)
         kitchen_setup.allow_all_collisions()
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
 
     def test_close_fridge_with_elbow(self, kitchen_setup: PR2TestWrapper):
         base_pose = PoseStamped()
@@ -1979,7 +1993,7 @@ class TestConstraints:
                                             tip_normal=tip_axis, goal_normal=env_axis,
                                             weight=WEIGHT_ABOVE_CA)
         kitchen_setup.allow_all_collisions()
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
         elbow_point = PointStamped()
         elbow_point.header.frame_id = handle_frame_id
         elbow_point.point.x += 0.1
@@ -1989,12 +2003,12 @@ class TestConstraints:
                                             tip_normal=tip_axis, goal_normal=env_axis,
                                             weight=WEIGHT_ABOVE_CA)
         kitchen_setup.allow_all_collisions()
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
 
         kitchen_setup.set_close_container_goal(tip_link=elbow,
                                                environment_link=handle_name)
         kitchen_setup.allow_all_collisions()
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
         kitchen_setup.set_env_state({'iai_fridge_door_joint': 0})
 
     def test_open_close_oven(self, kitchen_setup: PR2TestWrapper):
@@ -2034,19 +2048,19 @@ class TestConstraints:
                                             goal_normal=x_goal)
         # kitchen_setup.allow_all_collisions()
 
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
 
         kitchen_setup.set_open_container_goal(tip_link=kitchen_setup.l_tip,
                                               environment_link=handle_name,
                                               goal_joint_state=goal_angle)
         kitchen_setup.allow_all_collisions()
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
         kitchen_setup.set_env_state({'oven_area_oven_door_joint': goal_angle})
 
         kitchen_setup.set_close_container_goal(tip_link=kitchen_setup.l_tip,
                                                environment_link=handle_name)
         kitchen_setup.allow_all_collisions()
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
         kitchen_setup.set_env_state({'oven_area_oven_door_joint': 0})
 
     def test_grasp_dishwasher_handle(self, kitchen_setup: PR2TestWrapper):
@@ -2068,9 +2082,11 @@ class TestConstraints:
                                          bar_center=bar_center,
                                          bar_axis=bar_axis,
                                          bar_length=.3)
-        kitchen_setup.register_group('handle', 'iai_kitchen', 'sink_area_dish_washer_door_handle')
+        kitchen_setup.register_group(new_group_name='handle',
+                                     root_link_name=giskard_msgs.LinkName(name='sink_area_dish_washer_door_handle',
+                                                                          group_name='iai_kitchen'))
         kitchen_setup.allow_collision(kitchen_setup.robot_name, 'handle')
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
 
 
 class TestMoveBaseGoals:
@@ -2094,7 +2110,7 @@ class TestMoveBaseGoals:
         map_T_odom.pose.position.x = 1
         map_T_odom.pose.position.y = 1
         map_T_odom.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 3, [0, 0, 1]))
-        zero_pose.teleport_base(map_T_odom)
+        zero_pose.set_localization(map_T_odom)
 
         base_goal = PoseStamped()
         base_goal.header.frame_id = 'map'
@@ -2104,19 +2120,6 @@ class TestMoveBaseGoals:
         base_goal.pose.orientation = Quaternion(*quaternion_about_axis(-pi / 4, [0, 0, 1]))
         zero_pose.allow_all_collisions()
         zero_pose.move_base(base_goal)
-
-    def test_circle(self, zero_pose: PR2TestWrapper):
-        center = PointStamped()
-        center.header.frame_id = zero_pose.default_root
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class=Circle.__name__,
-                                               center=center,
-                                               radius=0.5,
-                                               tip_link='base_footprint',
-                                               scale=0.1)
-        # zero_pose.set_json_goal('PR2CasterConstraints')
-        zero_pose.set_max_traj_length(new_length=60)
-        zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute()
 
     def test_stay_put(self, zero_pose: PR2TestWrapper):
         base_goal = PoseStamped()
@@ -2134,18 +2137,6 @@ class TestMoveBaseGoals:
         base_goal.pose.orientation.w = 1
         zero_pose.allow_all_collisions()
         zero_pose.move_base(base_goal)
-
-    def test_wave(self, zero_pose: PR2TestWrapper):
-        center = PointStamped()
-        center.header.frame_id = zero_pose.default_root
-        zero_pose.allow_all_collisions()
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class=Wave.__name__,
-                                               center=center,
-                                               radius=0.05,
-                                               tip_link='base_footprint',
-                                               scale=2)
-        zero_pose.set_joint_goal(zero_pose.better_pose, add_monitor=False)
-        zero_pose.plan_and_execute()
 
     def test_forward_1cm(self, zero_pose: PR2TestWrapper):
         base_goal = PoseStamped()
@@ -2224,14 +2215,14 @@ class TestCartGoals:
         l_goal.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.set_cart_goal(root_link='map', tip_link='l_gripper_tool_frame', goal_pose=l_goal)
 
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
     def test_rotate_gripper(self, zero_pose: PR2TestWrapper):
         r_goal = PoseStamped()
         r_goal.header.frame_id = zero_pose.r_tip
         r_goal.pose.orientation = Quaternion(*quaternion_about_axis(pi, [1, 0, 0]))
         zero_pose.set_cart_goal(goal_pose=r_goal, tip_link=zero_pose.r_tip, root_link='map')
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
     def test_keep_position1(self, zero_pose: PR2TestWrapper):
         zero_pose.allow_self_collision()
@@ -2240,7 +2231,7 @@ class TestCartGoals:
         r_goal.pose.position.x = -.1
         r_goal.pose.orientation.w = 1
         zero_pose.set_cart_goal(r_goal, zero_pose.r_tip, 'torso_lift_link')
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
         js = {'torso_lift_joint': 0.1}
         r_goal = PoseStamped()
@@ -2249,7 +2240,7 @@ class TestCartGoals:
         zero_pose.set_cart_goal(r_goal, zero_pose.r_tip, 'torso_lift_link')
         zero_pose.set_joint_goal(js)
         zero_pose.allow_self_collision()
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
     def test_keep_position2(self, zero_pose: PR2TestWrapper):
         zero_pose.allow_self_collision()
@@ -2258,18 +2249,18 @@ class TestCartGoals:
         r_goal.pose.position.x = -.1
         r_goal.pose.orientation.w = 1
         zero_pose.set_cart_goal(r_goal, zero_pose.r_tip, 'torso_lift_link')
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
         zero_pose.allow_self_collision()
         js = {'torso_lift_joint': 0.1}
         r_goal = PoseStamped()
         r_goal.header.frame_id = zero_pose.r_tip
         r_goal.pose.orientation.w = 1
-        expected_pose = god_map.world.compute_fk_pose(zero_pose.default_root, zero_pose.r_tip)
+        expected_pose = zero_pose.compute_fk_pose(zero_pose.default_root, zero_pose.r_tip)
         expected_pose.header.stamp = rospy.Time()
         zero_pose.set_cart_goal(r_goal, zero_pose.r_tip, zero_pose.default_root)
         zero_pose.set_joint_goal(js)
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
     def test_keep_position3(self, zero_pose: PR2TestWrapper):
         js = {
@@ -2283,7 +2274,7 @@ class TestCartGoals:
         }
         zero_pose.set_joint_goal(js)
         zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
         r_goal = PoseStamped()
         r_goal.header.frame_id = zero_pose.r_tip
@@ -2294,7 +2285,7 @@ class TestCartGoals:
                                                                       [0, 0, 0, 1]]))
         zero_pose.set_cart_goal(r_goal, zero_pose.l_tip, 'torso_lift_link')
         zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
         r_goal = PoseStamped()
         r_goal.header.frame_id = zero_pose.r_tip
@@ -2307,7 +2298,7 @@ class TestCartGoals:
         l_goal.pose.orientation.w = 1
         zero_pose.set_cart_goal(l_goal, zero_pose.r_tip, zero_pose.default_root)
         zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
     def test_cart_goal_1eef(self, zero_pose: PR2TestWrapper):
         p = PoseStamped()
@@ -2317,7 +2308,7 @@ class TestCartGoals:
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.allow_all_collisions()
         zero_pose.set_cart_goal(p, zero_pose.r_tip, 'base_footprint')
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
     def test_10_cart_goals(self, zero_pose: PR2TestWrapper):
         p1 = PoseStamped()
@@ -2349,7 +2340,7 @@ class TestCartGoals:
         zero_pose.set_cart_goal(goal_pose=p,
                                 tip_link='base_footprint',
                                 root_link='map')
-        zero_pose.plan_and_execute(expected_error_code=GiskardError.LOCAL_MINIMUM)
+        zero_pose.execute(expected_error_type=LocalMinimumException)
 
     def test_cart_goal_1eef2(self, zero_pose: PR2TestWrapper):
         # zero_pose.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
@@ -2360,7 +2351,7 @@ class TestCartGoals:
         p.pose.orientation = Quaternion(0.524, -0.495, 0.487, -0.494)
         zero_pose.allow_all_collisions()
         zero_pose.set_cart_goal(p, zero_pose.l_tip, 'torso_lift_link')
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
     def test_cart_goal_1eef3(self, zero_pose: PR2TestWrapper):
         self.test_cart_goal_1eef(zero_pose)
@@ -2374,7 +2365,7 @@ class TestCartGoals:
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.allow_all_collisions()
         zero_pose.set_cart_goal(p, zero_pose.r_tip, zero_pose.default_root)
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
     def test_cart_goal_orientation_singularity(self, zero_pose: PR2TestWrapper):
         root = 'base_link'
@@ -2391,7 +2382,7 @@ class TestCartGoals:
         l_goal.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.set_cart_goal(l_goal, zero_pose.l_tip, root)
         zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
     def test_cart_goal_2eef2(self, zero_pose: PR2TestWrapper):
         root = 'odom_combined'
@@ -2409,7 +2400,7 @@ class TestCartGoals:
         l_goal.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.set_cart_goal(l_goal, zero_pose.l_tip, root)
         zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
     def test_cart_goal_left_right_chain(self, zero_pose: PR2TestWrapper):
         r_goal = PoseStamped()
@@ -2423,7 +2414,7 @@ class TestCartGoals:
         zero_pose.set_cart_goal(goal_pose=r_goal,
                                 tip_link=zero_pose.r_tip,
                                 root_link=zero_pose.l_tip)
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
     # def test_wiggle1(self, kitchen_setup: PR2TestWrapper):
     #     # FIXME
@@ -2468,25 +2459,28 @@ class TestCartGoals:
         p.pose.orientation.w = 1
         zero_pose.allow_self_collision()
         zero_pose.set_cart_goal(p, zero_pose.r_tip, 'torso_lift_link')
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
 
 class TestWorldManipulation:
 
     def test_save_graph_pdf(self, kitchen_setup):
-        god_map.world.save_graph_pdf()
+        god_map.world.save_graph_pdf(god_map.tmp_folder)
 
     def test_dye_group(self, kitchen_setup: PR2TestWrapper):
-        old_color = god_map.world.groups[kitchen_setup.robot_name].get_link('base_link').collisions[0].color
+        base_link = god_map.world.search_for_link_name('base_link')
+        sink_area_sink = god_map.world.search_for_link_name('iai_kitchen/sink_area_sink')
+        r_gripper_palm_link = god_map.world.search_for_link_name('r_gripper_palm_link')
+
+        old_color = god_map.world.groups[kitchen_setup.robot_name].links[base_link].collisions[0].color
         kitchen_setup.dye_group(kitchen_setup.robot_name, (1, 0, 0, 1))
-        god_map.world.groups[kitchen_setup.robot_name].get_link('base_link')
-        color_robot = god_map.world.groups[kitchen_setup.robot_name].get_link('base_link').collisions[0].color
+        color_robot = god_map.world.groups[kitchen_setup.robot_name].links[base_link].collisions[0].color
         assert color_robot.r == 1
         assert color_robot.g == 0
         assert color_robot.b == 0
         assert color_robot.a == 1
         kitchen_setup.dye_group('iai_kitchen', (0, 1, 0, 1))
-        color_kitchen = god_map.world.groups['iai_kitchen'].get_link('iai_kitchen/sink_area_sink').collisions[
+        color_kitchen = god_map.world.groups['iai_kitchen'].links[sink_area_sink].collisions[
             0].color
         assert color_robot.r == 1
         assert color_robot.g == 0
@@ -2497,7 +2491,7 @@ class TestWorldManipulation:
         assert color_kitchen.b == 0
         assert color_kitchen.a == 1
         kitchen_setup.dye_group(kitchen_setup.r_gripper_group, (0, 0, 1, 1))
-        color_hand = god_map.world.groups[kitchen_setup.robot_name].get_link('r_gripper_palm_link').collisions[
+        color_hand = god_map.world.groups[kitchen_setup.robot_name].links[r_gripper_palm_link].collisions[
             0].color
         assert color_robot.r == 1
         assert color_robot.g == 0
@@ -2512,7 +2506,7 @@ class TestWorldManipulation:
         assert color_hand.b == 1
         assert color_hand.a == 1
         kitchen_setup.set_joint_goal(kitchen_setup.default_pose)
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
         assert color_robot.r == 1
         assert color_robot.g == 0
         assert color_robot.b == 0
@@ -2526,7 +2520,7 @@ class TestWorldManipulation:
         assert color_hand.b == 1
         assert color_hand.a == 1
         kitchen_setup.clear_world()
-        color_robot = god_map.world.groups[kitchen_setup.robot_name].get_link('base_link').collisions[0].color
+        color_robot = god_map.world.groups[kitchen_setup.robot_name].links[base_link].collisions[0].color
         assert color_robot.r == old_color.r
         assert color_robot.g == old_color.g
         assert color_robot.b == old_color.b
@@ -2548,7 +2542,7 @@ class TestWorldManipulation:
         zero_pose.add_box_to_world(object_name, size=(1, 1, 1), pose=p)
         zero_pose.clear_world()
         zero_pose.set_joint_goal(zero_pose.better_pose)
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
     def test_attach_remove_box(self, better_pose: PR2TestWrapper):
         pocky = 'http:muh#pocky'
@@ -2569,7 +2563,7 @@ class TestWorldManipulation:
         p.pose.orientation = Quaternion(0., 0., 0.47942554, 0.87758256)
         zero_pose.add_box_to_world(pocky, (0.1, 0.02, 0.02), pose=p)
         zero_pose.update_parent_link_of_group(pocky, parent_link=zero_pose.r_tip)
-        relative_pose = zero_pose.robot.compute_fk_pose(zero_pose.r_tip, pocky).pose
+        relative_pose = zero_pose.compute_fk_pose(zero_pose.r_tip, pocky).pose
         compare_poses(p.pose, relative_pose)
 
     def test_add_box_twice(self, zero_pose: PR2TestWrapper):
@@ -2580,7 +2574,7 @@ class TestWorldManipulation:
         p.pose.orientation = Quaternion(0.0, 0.0, 0.47942554, 0.87758256)
         zero_pose.add_box_to_world(object_name, size=(1, 1, 1), pose=p)
         zero_pose.add_box_to_world(object_name, size=(1, 1, 1), pose=p,
-                                   expected_error_code=GiskardError.DUPLICATE_NAME)
+                                   expected_error_type=DuplicateNameException)
 
     def test_add_remove_sphere(self, zero_pose: PR2TestWrapper):
         object_name = 'muh'
@@ -2612,7 +2606,7 @@ class TestWorldManipulation:
         p.header.frame_id = 'map'
         p.pose.position.x = 1
         p.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0, 0, 1]))
-        if god_map.is_standalone():
+        if GiskardBlackboard().tree.is_standalone():
             js_topic = ''
             set_js_topic = ''
         else:
@@ -2645,7 +2639,7 @@ class TestWorldManipulation:
         p.header.frame_id = zero_pose.r_tip
         p.pose.position = Point(0.1, 0, 0)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
-        zero_pose.add_mesh_to_world(object_name, mesh='package://giskardpy_ros/test/urdfs/meshes/bowl_21.obj', pose=p)
+        zero_pose.add_mesh_to_world(object_name, mesh='package://giskardpy/test/urdfs/meshes/bowl_21.obj', pose=p)
 
     def test_add_non_existing_mesh(self, zero_pose: PR2TestWrapper):
         object_name = 'muh'
@@ -2653,8 +2647,9 @@ class TestWorldManipulation:
         p.header.frame_id = zero_pose.r_tip
         p.pose.position = Point(0.1, 0, 0)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
-        zero_pose.add_mesh_to_world(object_name, mesh='package://giskardpy_ros/test/urdfs/meshes/muh.obj', pose=p,
-                                    expected_error_code=GiskardError.CORRUPT_MESH)
+        zero_pose.add_mesh_to_world(object_name, mesh='package://giskardpy/test/urdfs/meshes/muh.obj', pose=p,
+                                    expected_error_type=CorruptMeshException)
+        zero_pose.clear_world()
 
     def test_add_attach_detach_remove_add(self, zero_pose: PR2TestWrapper):
         object_name = 'muh'
@@ -2664,7 +2659,9 @@ class TestWorldManipulation:
         p.pose.orientation = Quaternion(0.0, 0.0, 0.47942554, 0.87758256)
         zero_pose.add_box_to_world(object_name, size=(1, 1, 1), pose=p)
         internal_object_name = god_map.world.search_for_link_name(object_name)
-        zero_pose.update_parent_link_of_group(object_name, parent_link=zero_pose.r_tip)
+        zero_pose.update_parent_link_of_group(object_name,
+                                              parent_link=giskard_msgs.LinkName(name=zero_pose.r_tip,
+                                                                                group_name=zero_pose.robot_name))
         zero_pose.detach_group(object_name)
         zero_pose.remove_group(object_name)
         zero_pose.add_box_to_world(object_name, size=(1, 1, 1), pose=p)
@@ -2679,17 +2676,17 @@ class TestWorldManipulation:
         cup_pose.pose.orientation = Quaternion(0, 0, 0, 1)
 
         kitchen_setup.add_cylinder_to_world(object_name, height=0.07, radius=0.04, pose=cup_pose,
-                                            parent_link_group='iai_kitchen',
-                                            parent_link='sink_area_left_middle_drawer_main')
+                                            parent_link=LinkName(name='sink_area_left_middle_drawer_main',
+                                                                 group_name='iai_kitchen'))
         kitchen_setup.set_env_state({drawer_joint: 0.48})
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
         kitchen_setup.detach_group(object_name)
         kitchen_setup.set_env_state({drawer_joint: 0})
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
 
     def test_single_joint_urdf(self, zero_pose: PR2TestWrapper):
         object_name = 'spoon'
-        path = resolve_ros_iris('package://giskardpy_ros/test/spoon/urdf/spoon.urdf')
+        path = middleware.resolve_iri('package://giskardpy_ros/test/spoon/urdf/spoon.urdf')
         with open(path, 'r') as f:
             urdf_str = hacky_urdf_parser_fix(f.read())
         pose = PoseStamped()
@@ -2708,7 +2705,7 @@ class TestWorldManipulation:
         p.pose.orientation = Quaternion(0.0, 0.0, 0.47942554, 0.87758256)
         zero_pose.add_box_to_world(group_name, size=(1, 1, 1), pose=p)
         p.pose.position = Point(1, 0, 0)
-        zero_pose.update_group_pose('asdf', p, expected_error_code=GiskardError.UNKNOWN_GROUP)
+        zero_pose.update_group_pose('asdf', p, expected_error_type=UnknownGroupException)
         zero_pose.update_group_pose(group_name, p)
 
     def test_update_group_pose2(self, zero_pose: PR2TestWrapper):
@@ -2719,11 +2716,11 @@ class TestWorldManipulation:
         p.pose.orientation = Quaternion(0.0, 0.0, 0.47942554, 0.87758256)
         zero_pose.add_box_to_world(group_name, size=(1, 1, 1), pose=p, parent_link='r_gripper_tool_frame')
         p.pose.position = Point(1, 0, 0)
-        zero_pose.update_group_pose('asdf', p, expected_error_code=GiskardError.UNKNOWN_GROUP)
+        zero_pose.update_group_pose('asdf', p, expected_error_type=UnknownGroupException)
         zero_pose.update_group_pose(group_name, p)
         zero_pose.set_joint_goal(zero_pose.better_pose)
         zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
     def test_attach_existing_box2(self, zero_pose: PR2TestWrapper):
         pocky = 'http://muh#pocky'
@@ -2733,7 +2730,7 @@ class TestWorldManipulation:
         old_p.pose.orientation = Quaternion(0., 0., 0.47942554, 0.87758256)
         zero_pose.add_box_to_world(pocky, (0.1, 0.02, 0.02), pose=old_p)
         zero_pose.update_parent_link_of_group(pocky, parent_link=zero_pose.r_tip)
-        relative_pose = zero_pose.robot.compute_fk_pose(zero_pose.r_tip, pocky).pose
+        relative_pose = zero_pose.compute_fk_pose(zero_pose.r_tip, pocky).pose
         compare_poses(old_p.pose, relative_pose)
 
         p = PoseStamped()
@@ -2741,7 +2738,7 @@ class TestWorldManipulation:
         p.pose.position.x = -0.1
         p.pose.orientation.w = 1.0
         zero_pose.set_cart_goal(p, zero_pose.r_tip, zero_pose.default_root)
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
         p.header.frame_id = 'map'
         p.pose.position.y = -1
         p.pose.orientation = Quaternion(0, 0, 0.47942554, 0.87758256)
@@ -2757,13 +2754,11 @@ class TestWorldManipulation:
                                    size=(0.1, 0.02, 0.02),
                                    pose=p,
                                    parent_link='muh',
-                                   expected_error_code=GiskardError.UNKNOWN_LINK)
+                                   expected_error_type=UnknownLinkException)
 
     def test_reattach_unknown_object(self, zero_pose: PR2TestWrapper):
         zero_pose.update_parent_link_of_group('muh',
-                                              parent_link='',
-                                              parent_link_group='',
-                                              expected_response=GiskardError.UNKNOWN_GROUP)
+                                              expected_error_type=UnknownGroupException)
 
     def test_add_remove_box(self, zero_pose: PR2TestWrapper):
         object_name = 'muh'
@@ -2780,12 +2775,13 @@ class TestWorldManipulation:
         req = WorldGoal()
         req.body = WorldBody()
         req.pose = PoseStamped()
-        req.parent_link = zero_pose.r_tip
+        req.parent_link = LinkName(name=zero_pose.r_tip)
         req.operation = 42
-        assert zero_pose.world._send_goal_and_wait(req).error.code == GiskardError.INVALID_WORLD_OPERATION
+        with pytest.raises(InvalidWorldOperationException):
+            zero_pose.world._send_goal_and_wait(req)
 
     def test_remove_unkown_group(self, zero_pose: PR2TestWrapper):
-        zero_pose.remove_group('muh', expected_response=GiskardError.UNKNOWN_GROUP)
+        zero_pose.remove_group('muh', expected_error_type=UnknownGroupException)
 
     def test_corrupt_shape_error(self, zero_pose: PR2TestWrapper):
         p = PoseStamped()
@@ -2795,9 +2791,10 @@ class TestWorldManipulation:
                              shape=SolidPrimitive(type=42))
         req.pose = PoseStamped()
         req.pose.header.frame_id = 'map'
-        req.parent_link = 'base_link'
+        req.parent_link = LinkName(name='base_link')
         req.operation = WorldGoal.ADD
-        assert zero_pose.world._send_goal_and_wait(req).error.code == GiskardError.CORRUPT_SHAPE
+        with pytest.raises(CorruptShapeException):
+            zero_pose.world._send_goal_and_wait(req)
 
     def test_corrupt_shape_error_scale_0(self, zero_pose: PR2TestWrapper):
         p = PoseStamped()
@@ -2806,9 +2803,10 @@ class TestWorldManipulation:
         req.body = WorldBody(type=WorldBody.MESH_BODY)
         req.pose = PoseStamped()
         req.pose.header.frame_id = 'map'
-        req.parent_link = 'base_link'
+        req.parent_link = LinkName(name='base_link')
         req.operation = WorldGoal.ADD
-        assert zero_pose.world._send_goal_and_wait(req).error.code == GiskardError.CORRUPT_SHAPE
+        with pytest.raises(CorruptShapeException):
+            zero_pose.world._send_goal_and_wait(req)
 
     def test_busy(self, zero_pose: PR2TestWrapper):
         p = PoseStamped()
@@ -2818,7 +2816,7 @@ class TestWorldManipulation:
                              shape=SolidPrimitive(type=42))
         req.pose = PoseStamped()
         req.pose.header.frame_id = 'map'
-        req.parent_link = 'base_link'
+        req.parent_link = LinkName(name='base_link')
         req.operation = WorldGoal.ADD
         zero_pose.world._client.send_goal_and_wait(req)
         zero_pose.world._client.send_goal_and_wait(req)
@@ -2828,9 +2826,10 @@ class TestWorldManipulation:
         req.body = WorldBody(type=WorldBody.PRIMITIVE_BODY,
                              shape=SolidPrimitive(type=1))
         req.pose = PoseStamped()
-        req.parent_link = 'base_link'
+        req.parent_link = LinkName(name='base_link')
         req.operation = WorldGoal.ADD
-        assert zero_pose.world._send_goal_and_wait(req).error.code == GiskardError.TRANSFORM_ERROR
+        with pytest.raises(TransformException):
+            zero_pose.world._send_goal_and_wait(req)
 
     def test_unsupported_options(self, kitchen_setup: PR2TestWrapper):
         wb = WorldBody()
@@ -2844,9 +2843,10 @@ class TestWorldManipulation:
         req = WorldGoal()
         req.body = wb
         req.pose = pose
-        req.parent_link = 'base_link'
+        req.parent_link = giskard_msgs.LinkName(name='base_link')
         req.operation = WorldGoal.ADD
-        assert kitchen_setup.world._send_goal_and_wait(req).error.code == GiskardError.CORRUPT_URDF
+        with pytest.raises(CorruptURDFException):
+            kitchen_setup.world._send_goal_and_wait(req)
 
 
 class TestSelfCollisionAvoidance:
@@ -2857,7 +2857,7 @@ class TestSelfCollisionAvoidance:
             'head_tilt_joint': 1.
         }
         zero_pose.set_joint_goal(js, add_monitor=False)
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
     def test_attached_self_collision_avoid_stick(self, zero_pose: PR2TestWrapper):
         collision_pose = {
@@ -2871,7 +2871,7 @@ class TestSelfCollisionAvoidance:
             'torso_lift_joint': 0.2}
 
         zero_pose.set_joint_goal(collision_pose)
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
         attached_link_name = 'pocky'
         p = PoseStamped()
@@ -2899,7 +2899,7 @@ class TestSelfCollisionAvoidance:
         p.pose.position.z = 0.20
         p.pose.orientation.w = 1
         zero_pose.set_cart_goal(p, zero_pose.l_tip, zero_pose.default_root)
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
         zero_pose.check_cpi_geq(zero_pose.get_l_gripper_links(), 0.048)
         zero_pose.check_cpi_geq([attached_link_name], 0.048)
@@ -2937,7 +2937,7 @@ class TestSelfCollisionAvoidance:
         }
         zero_pose.allow_all_collisions()
         zero_pose.set_joint_goal(goal_js)
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
         p = PoseStamped()
         p.header.frame_id = zero_pose.l_tip
@@ -2946,7 +2946,7 @@ class TestSelfCollisionAvoidance:
         p.pose.orientation.w = 1
         zero_pose.allow_self_collision()
         zero_pose.set_cart_goal(goal_pose=p, tip_link=zero_pose.l_tip, root_link='base_footprint')
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
         zero_pose.check_cpi_leq(zero_pose.get_l_gripper_links(), 0.01)
         zero_pose.check_cpi_leq(['r_forearm_link'], 0.01)
         zero_pose.check_cpi_geq(zero_pose.get_r_gripper_links(), 0.05)
@@ -2963,7 +2963,7 @@ class TestSelfCollisionAvoidance:
         }
         zero_pose.allow_all_collisions()
         zero_pose.set_joint_goal(goal_js)
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
         p = PoseStamped()
         p.header.frame_id = zero_pose.l_tip
@@ -2971,7 +2971,7 @@ class TestSelfCollisionAvoidance:
         p.pose.position.x = 0.2
         p.pose.orientation.w = 1
         zero_pose.set_cart_goal(p, zero_pose.l_tip, 'base_footprint')
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
         zero_pose.check_cpi_geq(zero_pose.get_l_gripper_links(), 0.047)
 
     def test_avoid_self_collision_with_l_arm(self, zero_pose: PR2TestWrapper):
@@ -2986,7 +2986,7 @@ class TestSelfCollisionAvoidance:
         }
         zero_pose.allow_all_collisions()
         zero_pose.set_joint_goal(goal_js)
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
         p = PoseStamped()
         p.header.frame_id = zero_pose.r_tip
@@ -3009,7 +3009,7 @@ class TestSelfCollisionAvoidance:
         }
         zero_pose.allow_all_collisions()
         zero_pose.set_joint_goal(goal_js)
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
         p = PoseStamped()
         p.header.frame_id = zero_pose.r_tip
@@ -3018,11 +3018,15 @@ class TestSelfCollisionAvoidance:
         p.pose.orientation.w = 1
         zero_pose.set_cart_goal(goal_pose=p, tip_link=zero_pose.r_tip, root_link='base_footprint')
         zero_pose.allow_all_collisions()
-        zero_pose.register_group('forearm', root_link_name='l_forearm_link', root_link_group_name='pr2')
-        zero_pose.register_group('forearm_roll', root_link_name='l_forearm_roll_link', root_link_group_name='pr2')
+        zero_pose.register_group(new_group_name='forearm',
+                                 root_link_name=giskard_msgs.LinkName(name='l_forearm_link',
+                                                                      group_name='pr2'))
+        zero_pose.register_group(new_group_name='forearm_roll',
+                                 root_link_name=giskard_msgs.LinkName(name='l_forearm_roll_link',
+                                                                      group_name='pr2'))
         zero_pose.avoid_collision(group1='forearm_roll', group2=zero_pose.r_gripper_group)
         zero_pose.allow_collision(group1='forearm', group2=zero_pose.r_gripper_group)
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
         zero_pose.check_cpi_geq(zero_pose.get_r_gripper_links(), 0.048)
 
     def test_avoid_self_collision_move_away(self, zero_pose: PR2TestWrapper):
@@ -3037,7 +3041,7 @@ class TestSelfCollisionAvoidance:
         }
         zero_pose.allow_all_collisions()
         zero_pose.set_joint_goal(goal_js)
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
         p = PoseStamped()
         p.header.frame_id = zero_pose.r_tip
@@ -3045,7 +3049,7 @@ class TestSelfCollisionAvoidance:
         p.pose.position.x = -0.2
         p.pose.orientation.w = 1
         zero_pose.set_cart_goal(goal_pose=p, tip_link=zero_pose.r_tip, root_link='base_footprint')
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
         zero_pose.check_cpi_geq(zero_pose.get_r_gripper_links(), 0.048)
 
     def test_get_out_of_self_collision(self, zero_pose: PR2TestWrapper):
@@ -3060,7 +3064,7 @@ class TestSelfCollisionAvoidance:
         }
         zero_pose.allow_all_collisions()
         zero_pose.set_joint_goal(goal_js)
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
         p = PoseStamped()
         p.header.frame_id = zero_pose.l_tip
@@ -3070,7 +3074,7 @@ class TestSelfCollisionAvoidance:
         zero_pose.set_cart_goal(p, zero_pose.l_tip, 'base_footprint')
         zero_pose.allow_all_collisions()
         zero_pose.execute()
-        zero_pose.execute(expected_error_code=GiskardError.SELF_COLLISION_VIOLATED)
+        zero_pose.execute(expected_error_type=SelfCollisionViolatedException)
 
 
 class TestCollisionAvoidanceGoals:
@@ -3087,7 +3091,7 @@ class TestCollisionAvoidanceGoals:
         }
         kitchen_setup.set_joint_goal(js)
         # kitchen_setup.allow_all_collisions()
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
 
         p = PoseStamped()
         p.header.frame_id = kitchen_setup.l_tip
@@ -3111,7 +3115,7 @@ class TestCollisionAvoidanceGoals:
                                     reference_angular_velocity=1
                                     )
         kitchen_setup.allow_collision(group1=kitchen_setup.robot_name, group2='box')
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
 
         kitchen_setup.update_parent_link_of_group('box', kitchen_setup.r_tip)
 
@@ -3122,11 +3126,11 @@ class TestCollisionAvoidanceGoals:
 
         kitchen_setup.set_cart_goal(goal_pose=r_goal2, tip_link='box', root_link=kitchen_setup.l_tip)
         kitchen_setup.allow_self_collision()
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
         # kitchen_setup.check_cart_goal('box', r_goal2)
 
     def test_only_collision_avoidance(self, zero_pose: PR2TestWrapper):
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
     def test_mesh_collision_avoidance(self, zero_pose: PR2TestWrapper):
         zero_pose.close_r_gripper()
@@ -3135,8 +3139,8 @@ class TestCollisionAvoidanceGoals:
         p.header.frame_id = zero_pose.r_tip
         p.pose.position = Point(0.01, 0, 0)
         p.pose.orientation = Quaternion(*quaternion_about_axis(-np.pi / 2, [0, 1, 0]))
-        zero_pose.add_mesh_to_world(object_name, mesh='package://giskardpy_ros/test/urdfs/meshes/bowl_21.obj', pose=p)
-        zero_pose.plan_and_execute()
+        zero_pose.add_mesh_to_world(object_name, mesh='package://giskardpy/test/urdfs/meshes/bowl_21.obj', pose=p)
+        zero_pose.execute()
 
     def test_attach_box_as_eef(self, zero_pose: PR2TestWrapper):
         pocky = 'muh#pocky'
@@ -3144,15 +3148,14 @@ class TestCollisionAvoidanceGoals:
         box_pose.header.frame_id = zero_pose.r_tip
         box_pose.pose.position = Point(0.05, 0, 0, )
         box_pose.pose.orientation = Quaternion(1, 0, 0, 0)
-        zero_pose.add_box_to_world(name=pocky, size=(0.1, 0.02, 0.02), pose=box_pose, parent_link=zero_pose.r_tip,
-                                   parent_link_group=zero_pose.robot_name)
+        zero_pose.add_box_to_world(name=pocky, size=(0.1, 0.02, 0.02), pose=box_pose, parent_link=zero_pose.r_tip)
         p = PoseStamped()
         p.header.frame_id = zero_pose.r_tip
         p.pose.orientation.w = 1
         zero_pose.set_cart_goal(p, pocky, zero_pose.default_root)
         p = zero_pose.transform_msg(zero_pose.default_root, p)
-        zero_pose.plan_and_execute()
-        p2 = god_map.world.compute_fk_pose(zero_pose.default_root, pocky)
+        zero_pose.execute()
+        p2 = zero_pose.compute_fk_pose(zero_pose.default_root, pocky)
         compare_poses(p2.pose, p.pose)
         zero_pose.detach_group(pocky)
         p = PoseStamped()
@@ -3160,7 +3163,7 @@ class TestCollisionAvoidanceGoals:
         p.pose.orientation.w = 1
         p.pose.position.x = -.1
         zero_pose.set_cart_goal(p, zero_pose.r_tip, zero_pose.default_root)
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
     def test_hard_constraints_violated(self, kitchen_setup: PR2TestWrapper):
         pose = PoseStamped()
@@ -3168,15 +3171,15 @@ class TestCollisionAvoidanceGoals:
         pose.pose.position = Point(2, 0, 0)
         pose.pose.orientation = Quaternion(w=1)
         kitchen_setup.teleport_base(pose)
-        kitchen_setup.plan_and_execute(expected_error_code=GiskardError.HARD_CONSTRAINTS_VIOLATED)
+        kitchen_setup.execute(expected_error_type=HardConstraintsViolatedException)
 
     def test_unknown_group1(self, box_setup: PR2TestWrapper):
         box_setup.avoid_collision(min_distance=0.05, group1='muh')
-        box_setup.plan_and_execute(GiskardError.UNKNOWN_GROUP)
+        box_setup.execute(expected_error_type=UnknownGroupException)
 
     def test_unknown_group2(self, box_setup: PR2TestWrapper):
         box_setup.avoid_collision(group2='muh')
-        box_setup.plan_and_execute(GiskardError.UNKNOWN_GROUP)
+        box_setup.execute(expected_error_type=UnknownGroupException)
 
     def test_base_link_in_collision(self, zero_pose: PR2TestWrapper):
         zero_pose.allow_self_collision()
@@ -3188,7 +3191,7 @@ class TestCollisionAvoidanceGoals:
         p.pose.orientation.w = 1
         zero_pose.add_box_to_world(name='box', size=(1, 1, 1), pose=p)
         zero_pose.set_joint_goal(pocky_pose)
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
     def test_avoid_collision_with_box(self, box_setup: PR2TestWrapper):
         box_setup.avoid_collision(min_distance=0.05, group1=box_setup.robot_name)
@@ -3227,7 +3230,7 @@ class TestCollisionAvoidanceGoals:
         box_setup.teleport_base(base_goal)
         box_setup.avoid_collision(min_distance=0.05, group1=box_setup.robot_name)
         box_setup.allow_self_collision()
-        box_setup.plan_and_execute()
+        box_setup.execute()
         box_setup.check_cpi_geq(['base_link'], 0.048)
         box_setup.check_cpi_leq(['base_link'], 0.07)
 
@@ -3239,7 +3242,7 @@ class TestCollisionAvoidanceGoals:
         box_setup.teleport_base(p)
         box_setup.allow_self_collision()
         box_setup.avoid_collision(min_distance=0.25, group1=box_setup.robot_name, group2='box')
-        box_setup.plan_and_execute()
+        box_setup.execute()
         box_setup.check_cpi_geq(['base_link'], distance_threshold=0.25, check_self=False)
 
     def test_ignore_all_collisions_of_links(self, box_setup: PR2TestWrapper):
@@ -3264,7 +3267,7 @@ class TestCollisionAvoidanceGoals:
         r_goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 2, [0, 1, 0]))
         fake_table_setup.avoid_all_collisions(0.1)
         fake_table_setup.set_cart_goal(goal_pose=r_goal, tip_link=fake_table_setup.r_tip, root_link='map')
-        fake_table_setup.plan_and_execute()
+        fake_table_setup.execute()
         fake_table_setup.check_cpi_geq(fake_table_setup.get_l_gripper_links(), 0.05)
         fake_table_setup.check_cpi_leq(['r_gripper_l_finger_tip_link'], 0.04)
         fake_table_setup.check_cpi_leq(['r_gripper_r_finger_tip_link'], 0.04)
@@ -3280,7 +3283,7 @@ class TestCollisionAvoidanceGoals:
 
         box_setup.allow_self_collision()
         box_setup.set_cart_goal(p, 'base_footprint', box_setup.default_root)
-        box_setup.plan_and_execute()
+        box_setup.execute()
 
         box_setup.check_cpi_leq(box_setup.get_l_gripper_links(), 0.0)
         box_setup.check_cpi_leq(box_setup.get_r_gripper_links(), 0.0)
@@ -3317,7 +3320,7 @@ class TestCollisionAvoidanceGoals:
 
         pocky_pose_setup.allow_self_collision()
 
-        pocky_pose_setup.plan_and_execute()
+        pocky_pose_setup.execute()
         pocky_pose_setup.check_cpi_geq(['box'], 0.048)
 
     def test_avoid_collision_box_between_3_boxes(self, pocky_pose_setup: PR2TestWrapper):
@@ -3372,7 +3375,7 @@ class TestCollisionAvoidanceGoals:
         pocky_pose_setup.set_align_planes_goal(tip_link='box', tip_normal=y, goal_normal=y_map, root_link='map')
         pocky_pose_setup.allow_self_collision()
 
-        pocky_pose_setup.plan_and_execute()
+        pocky_pose_setup.execute()
         assert ('box', 'bl') not in god_map.collision_scene.self_collision_matrix
         pocky_pose_setup.check_cpi_geq(pocky_pose_setup.get_group_info('r_gripper').links, 0.04)
 
@@ -3400,7 +3403,7 @@ class TestCollisionAvoidanceGoals:
         p.pose.orientation.w = 1
         pocky_pose_setup.add_cylinder_to_world('br', height=0.2, radius=0.01, pose=p)
 
-        pocky_pose_setup.plan_and_execute()
+        pocky_pose_setup.execute()
 
     def test_avoid_collision_at_kitchen_corner(self, kitchen_setup: PR2TestWrapper):
         base_pose = PoseStamped()
@@ -3413,7 +3416,7 @@ class TestCollisionAvoidanceGoals:
         base_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0, 0, 1]))
         kitchen_setup.set_joint_goal(kitchen_setup.better_pose, weight=WEIGHT_ABOVE_CA, add_monitor=False)
         kitchen_setup.set_cart_goal(goal_pose=base_pose, tip_link='base_footprint', root_link='map', add_monitor=False)
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
 
     def test_avoid_collision_drive_under_drawer(self, kitchen_setup: PR2TestWrapper):
         kitchen_js = {'sink_area_left_middle_drawer_main_joint': 0.45}
@@ -3429,7 +3432,7 @@ class TestCollisionAvoidanceGoals:
         base_pose.pose.position.y = 1
         base_pose.pose.orientation = Quaternion(*quaternion_about_axis(0, [0, 0, 1]))
         kitchen_setup.set_cart_goal(goal_pose=base_pose, tip_link='base_footprint', root_link='map')
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
 
     def test_get_out_of_collision(self, box_setup: PR2TestWrapper):
         p = PoseStamped()
@@ -3440,11 +3443,11 @@ class TestCollisionAvoidanceGoals:
 
         box_setup.allow_all_collisions()
 
-        box_setup.plan_and_execute()
+        box_setup.execute()
 
         box_setup.avoid_all_collisions(0.05)
 
-        box_setup.plan_and_execute()
+        box_setup.execute()
 
         box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.0)
         box_setup.check_cpi_geq(box_setup.get_r_gripper_links(), 0.0)
@@ -3457,7 +3460,7 @@ class TestCollisionAvoidanceGoals:
         p.pose.position.x = 0.11
         p.pose.orientation.w = 1
         box_setup.set_cart_goal(p, box_setup.l_tip, box_setup.default_root)
-        box_setup.plan_and_execute()
+        box_setup.execute()
         box_setup.check_cpi_leq(box_setup.get_l_gripper_links(), 0.0)
         box_setup.check_cpi_geq(box_setup.get_r_gripper_links(), 0.048)
 
@@ -3477,7 +3480,7 @@ class TestCollisionAvoidanceGoals:
         p.pose.position.x = -0.15
         p.pose.orientation.w = 1
         box_setup.set_cart_goal(goal_pose=p, tip_link=box_setup.r_tip, root_link=box_setup.default_root)
-        box_setup.plan_and_execute()
+        box_setup.execute()
         box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.048)
         box_setup.check_cpi_geq([attached_link_name], 0.048)
 
@@ -3488,7 +3491,7 @@ class TestCollisionAvoidanceGoals:
         p.pose.orientation.w = 1
         box_setup.set_cart_goal(goal_pose=p, tip_link=box_setup.r_tip,
                                 root_link=box_setup.default_root, add_monitor=False)
-        box_setup.plan_and_execute()
+        box_setup.execute()
         box_setup.check_cpi_geq([attached_link_name], -0.008)
         box_setup.check_cpi_leq([attached_link_name], 0.01)
         box_setup.detach_group(attached_link_name)
@@ -3509,7 +3512,7 @@ class TestCollisionAvoidanceGoals:
         p.pose.position.x = -0.15
         p.pose.orientation.w = 1
         box_setup.set_cart_goal(p, box_setup.r_tip, box_setup.default_root)
-        box_setup.plan_and_execute()
+        box_setup.execute()
         box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.048)
         box_setup.check_cpi_geq([attached_link_name], 0.048)
 
@@ -3519,7 +3522,7 @@ class TestCollisionAvoidanceGoals:
         p.pose.position.x = 0.05
         p.pose.orientation.w = 1
         box_setup.set_cart_goal(p, box_setup.r_tip, box_setup.default_root, weight=WEIGHT_BELOW_CA, add_monitor=False)
-        box_setup.plan_and_execute()
+        box_setup.execute()
         box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.048)
         box_setup.check_cpi_geq([attached_link_name], 0.048)
         box_setup.detach_group(attached_link_name)
@@ -3546,7 +3549,7 @@ class TestCollisionAvoidanceGoals:
         p.pose.position.x = -0.09
         p.pose.orientation.w = 1
         box_setup.set_cart_goal(p, box_setup.r_tip, box_setup.default_root)
-        box_setup.plan_and_execute()
+        box_setup.execute()
         box_setup.check_cpi_geq([attached_link_name], -0.003)
 
         p = PoseStamped()
@@ -3555,7 +3558,7 @@ class TestCollisionAvoidanceGoals:
         p.pose.position.x = 0.08
         p.pose.orientation.w = 1
         box_setup.set_cart_goal(p, box_setup.r_tip, box_setup.default_root, add_monitor=False)
-        box_setup.plan_and_execute()
+        box_setup.execute()
         box_setup.check_cpi_geq([attached_link_name], -0.005)
         box_setup.check_cpi_leq([attached_link_name], 0.01)
         box_setup.detach_group(attached_link_name)
@@ -3576,7 +3579,7 @@ class TestCollisionAvoidanceGoals:
         p.pose.position.x = 0.
         p.pose.orientation.w = 1
         box_setup.set_cart_goal(p, box_setup.r_tip, box_setup.default_root)
-        box_setup.plan_and_execute()
+        box_setup.execute()
         box_setup.check_cpi_geq([attached_link_name], -0.082)
         box_setup.detach_group(attached_link_name)
 
@@ -3590,7 +3593,7 @@ class TestCollisionAvoidanceGoals:
                                    size=(0.2, 0.04, 0.04),
                                    parent_link=box_setup.r_tip,
                                    pose=p)
-        box_setup.plan_and_execute()
+        box_setup.execute()
         box_setup.check_cpi_geq([attached_link_name], 0.048)
         box_setup.detach_group(attached_link_name)
 
@@ -3605,7 +3608,7 @@ class TestCollisionAvoidanceGoals:
                                    parent_link=box_setup.r_tip,
                                    pose=p)
         box_setup.allow_self_collision()
-        box_setup.plan_and_execute()
+        box_setup.execute()
         box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.048)
         box_setup.check_cpi_geq([attached_link_name], 0.048)
         box_setup.detach_group(attached_link_name)
@@ -3629,7 +3632,7 @@ class TestCollisionAvoidanceGoals:
         p.pose.position.y = -0.11
         p.pose.orientation.w = 1
         box_setup.set_cart_goal(p, box_setup.r_tip, box_setup.default_root)
-        box_setup.plan_and_execute()
+        box_setup.execute()
         box_setup.check_cpi_geq(box_setup.get_l_gripper_links(), 0.048)
         box_setup.check_cpi_leq([pocky], 0.0)
 
@@ -3647,7 +3650,7 @@ class TestCollisionAvoidanceGoals:
             'r_wrist_roll_joint': 0.190433188769,
         }
         zero_pose.set_joint_goal(js)
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
         r_goal = PoseStamped()
         r_goal.header.frame_id = zero_pose.r_tip
@@ -3657,7 +3660,7 @@ class TestCollisionAvoidanceGoals:
                                                                       [0, 0, -1, 0],
                                                                       [0, 0, 0, 1]]))
         zero_pose.set_cart_goal(r_goal, zero_pose.l_tip, 'torso_lift_link')
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
         p = PoseStamped()
         p.header.frame_id = zero_pose.r_tip
@@ -3673,7 +3676,7 @@ class TestCollisionAvoidanceGoals:
                                    parent_link=zero_pose.l_tip,
                                    pose=p)
 
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
         zero_pose.check_cpi_geq([box1_name, box2_name], 0.049)
 
@@ -3744,14 +3747,14 @@ class TestCollisionAvoidanceGoals:
                                             goal_normal=x_map,
                                             root_link='map')
 
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
 
         kitchen_setup.update_parent_link_of_group(milk_name, kitchen_setup.l_tip)
         kitchen_setup.close_l_gripper()
 
         # Remove Milk
         kitchen_setup.set_cart_goal(milk_pre_pose, milk_name, kitchen_setup.default_root)
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
         base_goal = PoseStamped()
         base_goal.header.frame_id = 'base_footprint'
         base_goal.pose.orientation.w = 1
@@ -3760,17 +3763,17 @@ class TestCollisionAvoidanceGoals:
 
         # place milk back
         kitchen_setup.set_cart_goal(milk_pre_pose, milk_name, kitchen_setup.default_root)
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
 
         kitchen_setup.set_cart_goal(milk_pose, milk_name, kitchen_setup.default_root)
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
 
         kitchen_setup.open_l_gripper()
 
         kitchen_setup.detach_group(milk_name)
 
         kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
 
     def test_bowl_and_cup(self, kitchen_setup: PR2TestWrapper):
         # kernprof -lv py.test -s test/test_integration_pr2.py::TestCollisionAvoidanceGoals::test_bowl_and_cup
@@ -3829,12 +3832,12 @@ class TestCollisionAvoidanceGoals:
                                             root_link=kitchen_setup.default_root,
                                             goal_normal=x_goal)
         # kitchen_setup.allow_all_collisions()
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
 
         # open drawer
         kitchen_setup.set_open_container_goal(tip_link=kitchen_setup.l_tip,
                                               environment_link=drawer_handle)
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
         kitchen_setup.set_env_state({drawer_joint: 0.48})
 
         kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
@@ -3870,7 +3873,7 @@ class TestCollisionAvoidanceGoals:
         kitchen_setup.set_cart_goal(goal_pose=r_goal,
                                     tip_link=kitchen_setup.r_tip,
                                     root_link=kitchen_setup.default_root)
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
 
         l_goal.pose.position.z -= .2
         r_goal.pose.position.z -= .2
@@ -3884,13 +3887,13 @@ class TestCollisionAvoidanceGoals:
         kitchen_setup.avoid_all_collisions(0.05)
         kitchen_setup.allow_collision(group1=kitchen_setup.robot_name, group2=bowl_name)
         kitchen_setup.allow_collision(group1=kitchen_setup.robot_name, group2=cup_name)
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
 
         kitchen_setup.update_parent_link_of_group(name=bowl_name, parent_link=kitchen_setup.l_tip)
         kitchen_setup.update_parent_link_of_group(name=cup_name, parent_link=kitchen_setup.r_tip)
 
         kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
         base_goal = PoseStamped()
         base_goal.header.frame_id = 'base_footprint'
         base_goal.pose.position.x = -.1
@@ -3912,14 +3915,14 @@ class TestCollisionAvoidanceGoals:
         kitchen_setup.set_cart_goal(goal_pose=cup_goal, tip_link=cup_name, root_link=kitchen_setup.default_root)
         kitchen_setup.set_avoid_joint_limits_goal(percentage=percentage)
         kitchen_setup.avoid_all_collisions(0.05)
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
 
         kitchen_setup.detach_group(name=bowl_name)
         kitchen_setup.detach_group(name=cup_name)
         kitchen_setup.allow_collision(group1=kitchen_setup.robot_name, group2=cup_name)
         kitchen_setup.allow_collision(group1=kitchen_setup.robot_name, group2=bowl_name)
         kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
 
     def test_ease_spoon(self, kitchen_setup: PR2TestWrapper):
         spoon_name = 'spoon'
@@ -3944,29 +3947,29 @@ class TestCollisionAvoidanceGoals:
                                                                       [0, 0, 0, 1]]))
         kitchen_setup.set_avoid_joint_limits_goal(percentage=percentage)
         kitchen_setup.set_cart_goal(l_goal, kitchen_setup.l_tip, kitchen_setup.default_root)
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
 
         l_goal.pose.position.z -= .2
         # kitchen_setup.allow_collision([CollisionEntry.ALL], spoon_name, [CollisionEntry.ALL])
         kitchen_setup.set_cart_goal(l_goal, kitchen_setup.l_tip, kitchen_setup.default_root)
         kitchen_setup.set_avoid_joint_limits_goal(percentage=percentage)
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
         kitchen_setup.update_parent_link_of_group(spoon_name, kitchen_setup.l_tip)
 
         l_goal.pose.position.z += .2
         # kitchen_setup.allow_collision([CollisionEntry.ALL], spoon_name, [CollisionEntry.ALL])
         kitchen_setup.set_cart_goal(l_goal, kitchen_setup.l_tip, kitchen_setup.default_root)
         kitchen_setup.set_avoid_joint_limits_goal(percentage=percentage)
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
 
         l_goal.pose.position.z -= .2
         # kitchen_setup.allow_collision([CollisionEntry.ALL], spoon_name, [CollisionEntry.ALL])
         kitchen_setup.set_cart_goal(l_goal, kitchen_setup.l_tip, kitchen_setup.default_root)
         kitchen_setup.set_avoid_joint_limits_goal(percentage=percentage)
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
 
         kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
 
     def test_tray(self, kitchen_setup: PR2TestWrapper):
         tray_name = 'tray'
@@ -4000,7 +4003,7 @@ class TestCollisionAvoidanceGoals:
         kitchen_setup.allow_collision(kitchen_setup.robot_name, tray_name)
         kitchen_setup.set_avoid_joint_limits_goal(percentage=percentage)
         # grasp tray
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
 
         kitchen_setup.update_parent_link_of_group(tray_name, kitchen_setup.r_tip)
 
@@ -4009,7 +4012,7 @@ class TestCollisionAvoidanceGoals:
         r_goal.pose.orientation.w = 1
         kitchen_setup.set_cart_goal(r_goal, kitchen_setup.l_tip, tray_name)
 
-        tray_goal = god_map.world.compute_fk_pose('base_footprint', tray_name)
+        tray_goal = kitchen_setup.compute_fk_pose('base_footprint', tray_name)
         tray_goal.pose.position.y = 0
         tray_goal.pose.orientation = Quaternion(*quaternion_from_matrix([[-1, 0, 0, 0],
                                                                          [0, -1, 0, 0],
@@ -4034,7 +4037,7 @@ class TestCollisionAvoidanceGoals:
         r_goal.pose.orientation.w = 1
         kitchen_setup.set_cart_goal(r_goal, kitchen_setup.l_tip, tray_name)
 
-        expected_pose = god_map.world.compute_fk_pose(tray_name, kitchen_setup.l_tip)
+        expected_pose = kitchen_setup.compute_fk_pose(tray_name, kitchen_setup.l_tip)
         expected_pose.header.stamp = rospy.Time()
 
         tray_goal = PoseStamped()
@@ -4046,7 +4049,7 @@ class TestCollisionAvoidanceGoals:
         kitchen_setup.allow_collision(group1=tray_name,
                                       group2=kitchen_setup.l_gripper_group)
         kitchen_setup.set_cart_goal(tray_goal, tray_name, 'base_footprint')
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
 
     # TODO FIXME attaching and detach of urdf objects that listen to joint states
 
@@ -4124,326 +4127,6 @@ class TestInfoServices:
         assert set(result.controlled_joints) == expected
 
 
-class TestWorld:
-    def test_compute_self_collision_matrix(self, world_setup: WorldTree):
-        disabled_links = {world_setup.search_for_link_name('br_caster_l_wheel_link'),
-                          world_setup.search_for_link_name('fr_caster_l_wheel_link')}
-        reference_collision_scene = BetterPyBulletSyncer()
-        reference_collision_scene.load_self_collision_matrix_from_srdf(
-            'package://giskardpy_ros/test/data/pr2_test.srdf', 'pr2')
-        reference_reasons = reference_collision_scene.self_collision_matrix
-        reference_disabled_links = reference_collision_scene.disabled_links
-        collision_scene: CollisionWorldSynchronizer = god_map.collision_scene
-        actual_reasons = collision_scene.compute_self_collision_matrix('pr2',
-                                                                       number_of_tries_never=500)
-        assert actual_reasons == reference_reasons
-        assert reference_disabled_links == disabled_links
-
-    def test_compute_chain_reduced_to_controlled_joints(self, world_setup: WorldTree):
-        r_gripper_tool_frame = world_setup.search_for_link_name('r_gripper_tool_frame')
-        l_gripper_tool_frame = world_setup.search_for_link_name('l_gripper_tool_frame')
-        link_a, link_b = world_setup.compute_chain_reduced_to_controlled_joints(r_gripper_tool_frame,
-                                                                                l_gripper_tool_frame)
-        assert link_a == world_setup.search_for_link_name('r_wrist_roll_link')
-        assert link_b == world_setup.search_for_link_name('l_wrist_roll_link')
-
-    def test_add_box(self, world_setup: WorldTree):
-        box1_name = 'box1'
-        box2_name = 'box2'
-        box = make_world_body_box()
-        pose = Pose()
-        pose.orientation.w = 1
-        world_setup.add_world_body(group_name=box1_name,
-                                   msg=box,
-                                   pose=pose,
-                                   parent_link_name=world_setup.root_link_name)
-        world_setup.add_world_body(group_name=box2_name,
-                                   msg=box,
-                                   pose=pose,
-                                   parent_link_name=PrefixName('r_gripper_tool_frame', 'pr2'))
-        assert box1_name in world_setup.groups
-        assert world_setup.groups['pr2'].search_for_link_name(box2_name) == 'box2/box2'
-        assert world_setup.groups['pr2'].search_for_link_name('box2/box2') == 'box2/box2'
-        assert world_setup.search_for_link_name(box2_name) == 'box2/box2'
-        assert world_setup.search_for_link_name(box1_name) == 'box1/box1'
-
-    def test_attach_box(self, world_setup: WorldTree):
-        box_name = 'boxy'
-        box = make_world_body_box()
-        pose = Pose()
-        pose.orientation.w = 1
-        world_setup.add_world_body(group_name=box_name,
-                                   msg=box,
-                                   pose=pose,
-                                   parent_link_name=world_setup.root_link_name)
-        new_parent_link_name = world_setup.search_for_link_name('r_gripper_tool_frame')
-        old_fk = world_setup.compute_fk_pose(world_setup.root_link_name, box_name)
-
-        world_setup.move_group(box_name, new_parent_link_name)
-
-        new_fk = world_setup.compute_fk_pose(world_setup.root_link_name, box_name)
-        assert world_setup.search_for_link_name(box_name) in world_setup.groups[
-            world_setup.robot_names[0]].link_names_as_set
-        assert world_setup.get_parent_link_of_link(world_setup.search_for_link_name(box_name)) == new_parent_link_name
-        compare_poses(old_fk.pose, new_fk.pose)
-
-        assert box_name in world_setup.groups[world_setup.robot_names[0]].groups
-        assert world_setup.robot_names[0] not in world_setup.groups[world_setup.robot_names[0]].groups
-        assert box_name not in world_setup.minimal_group_names
-
-    def test_group_pr2_hand(self, world_setup: WorldTree):
-        world_setup.register_group('r_hand', world_setup.search_for_link_name('r_wrist_roll_link'))
-        assert set(world_setup.groups['r_hand'].joint_names) == {
-            world_setup.search_for_joint_name('r_gripper_palm_joint'),
-            world_setup.search_for_joint_name('r_gripper_led_joint'),
-            world_setup.search_for_joint_name(
-                'r_gripper_motor_accelerometer_joint'),
-            world_setup.search_for_joint_name('r_gripper_tool_joint'),
-            world_setup.search_for_joint_name(
-                'r_gripper_motor_slider_joint'),
-            world_setup.search_for_joint_name('r_gripper_l_finger_joint'),
-            world_setup.search_for_joint_name('r_gripper_r_finger_joint'),
-            world_setup.search_for_joint_name(
-                'r_gripper_motor_screw_joint'),
-            world_setup.search_for_joint_name(
-                'r_gripper_l_finger_tip_joint'),
-            world_setup.search_for_joint_name(
-                'r_gripper_r_finger_tip_joint'),
-            world_setup.search_for_joint_name('r_gripper_joint')}
-        assert set(world_setup.groups['r_hand'].link_names_as_set) == {
-            world_setup.search_for_link_name('r_wrist_roll_link'),
-            world_setup.search_for_link_name('r_gripper_palm_link'),
-            world_setup.search_for_link_name('r_gripper_led_frame'),
-            world_setup.search_for_link_name(
-                'r_gripper_motor_accelerometer_link'),
-            world_setup.search_for_link_name(
-                'r_gripper_tool_frame'),
-            world_setup.search_for_link_name(
-                'r_gripper_motor_slider_link'),
-            world_setup.search_for_link_name(
-                'r_gripper_motor_screw_link'),
-            world_setup.search_for_link_name(
-                'r_gripper_l_finger_link'),
-            world_setup.search_for_link_name(
-                'r_gripper_l_finger_tip_link'),
-            world_setup.search_for_link_name(
-                'r_gripper_r_finger_link'),
-            world_setup.search_for_link_name(
-                'r_gripper_r_finger_tip_link'),
-            world_setup.search_for_link_name(
-                'r_gripper_l_finger_tip_frame')}
-
-    def test_get_chain(self, world_setup: WorldTree):
-        with suppress_stderr():
-            urdf = pr2_urdf()
-            parsed_urdf = up.URDF.from_xml_string(hacky_urdf_parser_fix(urdf))
-
-        root_link = 'base_footprint'
-        tip_link = 'r_gripper_tool_frame'
-        real = world_setup.compute_chain(root_link_name=world_setup.search_for_link_name(root_link),
-                                         tip_link_name=world_setup.search_for_link_name(tip_link),
-                                         add_joints=True,
-                                         add_links=True,
-                                         add_fixed_joints=True,
-                                         add_non_controlled_joints=True)
-        expected = parsed_urdf.get_chain(root_link, tip_link, True, True, True)
-        assert {x.short_name for x in real} == set(expected)
-
-    def test_get_chain2(self, world_setup: WorldTree):
-        root_link = world_setup.search_for_link_name('l_gripper_tool_frame')
-        tip_link = world_setup.search_for_link_name('r_gripper_tool_frame')
-        try:
-            world_setup.compute_chain(root_link, tip_link, True, True, True, True)
-            assert False
-        except ValueError:
-            pass
-
-    def test_get_chain_group(self, world_setup: WorldTree):
-        root_link = world_setup.search_for_link_name('r_wrist_roll_link')
-        tip_link = world_setup.search_for_link_name('r_gripper_r_finger_tip_link')
-        world_setup.register_group('r_hand', root_link)
-        real = world_setup.compute_chain(root_link, tip_link, True, True, True, True)
-        assert real == ['pr2/r_wrist_roll_link',
-                        'pr2/r_gripper_palm_joint',
-                        'pr2/r_gripper_palm_link',
-                        'pr2/r_gripper_r_finger_joint',
-                        'pr2/r_gripper_r_finger_link',
-                        'pr2/r_gripper_r_finger_tip_joint',
-                        'pr2/r_gripper_r_finger_tip_link']
-
-    def test_get_chain_group2(self, world_setup: WorldTree):
-        root_link = world_setup.search_for_link_name('r_gripper_l_finger_tip_link')
-        tip_link = world_setup.search_for_link_name('r_gripper_r_finger_tip_link')
-        world_setup.register_group('r_hand', world_setup.search_for_link_name('r_wrist_roll_link'))
-        try:
-            real = world_setup.compute_chain(root_link, tip_link, True, True, True, True)
-            assert False
-        except ValueError:
-            pass
-
-    def test_get_split_chain(self, world_setup: WorldTree):
-        root_link = world_setup.search_for_link_name('l_gripper_r_finger_tip_link')
-        tip_link = world_setup.search_for_link_name('l_gripper_l_finger_tip_link')
-        chain1, connection, chain2 = world_setup.compute_split_chain(root_link, tip_link, True, True, True, True)
-        chain1 = [n.short_name for n in chain1]
-        connection = [n.short_name for n in connection]
-        chain2 = [n.short_name for n in chain2]
-        assert chain1 == ['l_gripper_r_finger_tip_link', 'l_gripper_r_finger_tip_joint', 'l_gripper_r_finger_link',
-                          'l_gripper_r_finger_joint']
-        assert connection == ['l_gripper_palm_link']
-        assert chain2 == ['l_gripper_l_finger_joint', 'l_gripper_l_finger_link', 'l_gripper_l_finger_tip_joint',
-                          'l_gripper_l_finger_tip_link']
-
-    def test_get_split_chain_group(self, world_setup: WorldTree):
-        root_link = world_setup.search_for_link_name('r_gripper_l_finger_tip_link')
-        tip_link = world_setup.search_for_link_name('r_gripper_r_finger_tip_link')
-        world_setup.register_group('r_hand', world_setup.search_for_link_name('r_wrist_roll_link'))
-        chain1, connection, chain2 = world_setup.compute_split_chain(root_link, tip_link,
-                                                                     True, True, True, True)
-        assert chain1 == ['pr2/r_gripper_l_finger_tip_link',
-                          'pr2/r_gripper_l_finger_tip_joint',
-                          'pr2/r_gripper_l_finger_link',
-                          'pr2/r_gripper_l_finger_joint']
-        assert connection == ['pr2/r_gripper_palm_link']
-        assert chain2 == ['pr2/r_gripper_r_finger_joint',
-                          'pr2/r_gripper_r_finger_link',
-                          'pr2/r_gripper_r_finger_tip_joint',
-                          'pr2/r_gripper_r_finger_tip_link']
-
-    def test_get_joint_limits2(self, world_setup: WorldTree):
-        lower_limit, upper_limit = world_setup.get_joint_position_limits(
-            world_setup.search_for_joint_name('l_shoulder_pan_joint'))
-        assert lower_limit == -0.564601836603
-        assert upper_limit == 2.1353981634
-
-    def test_search_branch(self, world_setup: WorldTree):
-        result = world_setup.search_branch(world_setup.search_for_link_name('odom_combined'),
-                                           stop_at_joint_when=lambda _: False,
-                                           stop_at_link_when=lambda _: False)
-        assert result == ([], [])
-        result = world_setup.search_branch(world_setup.search_for_link_name('odom_combined'),
-                                           stop_at_joint_when=world_setup.is_joint_controlled,
-                                           stop_at_link_when=lambda _: False,
-                                           collect_link_when=world_setup.has_link_collisions)
-        assert result == ([], [])
-        result = world_setup.search_branch(world_setup.search_for_link_name('base_footprint'),
-                                           stop_at_joint_when=world_setup.is_joint_controlled,
-                                           collect_link_when=world_setup.has_link_collisions)
-        assert set(result[0]) == {'pr2/base_bellow_link',
-                                  'pr2/fl_caster_l_wheel_link',
-                                  'pr2/fl_caster_r_wheel_link',
-                                  'pr2/fl_caster_rotation_link',
-                                  'pr2/fr_caster_l_wheel_link',
-                                  'pr2/fr_caster_r_wheel_link',
-                                  'pr2/fr_caster_rotation_link',
-                                  'pr2/bl_caster_l_wheel_link',
-                                  'pr2/bl_caster_r_wheel_link',
-                                  'pr2/bl_caster_rotation_link',
-                                  'pr2/br_caster_l_wheel_link',
-                                  'pr2/br_caster_r_wheel_link',
-                                  'pr2/br_caster_rotation_link',
-                                  'pr2/base_link'}
-        result = world_setup.search_branch(world_setup.search_for_link_name('l_elbow_flex_link'),
-                                           collect_joint_when=world_setup.is_joint_fixed)
-        assert set(result[0]) == set()
-        assert set(result[1]) == {'pr2/l_force_torque_adapter_joint',
-                                  'pr2/l_force_torque_joint',
-                                  'pr2/l_forearm_cam_frame_joint',
-                                  'pr2/l_forearm_cam_optical_frame_joint',
-                                  'pr2/l_forearm_joint',
-                                  'pr2/l_gripper_led_joint',
-                                  'pr2/l_gripper_motor_accelerometer_joint',
-                                  'pr2/l_gripper_palm_joint',
-                                  'pr2/l_gripper_tool_joint'}
-        links, joints = world_setup.search_branch(world_setup.search_for_link_name('r_wrist_roll_link'),
-                                                  stop_at_joint_when=world_setup.is_joint_controlled,
-                                                  collect_link_when=world_setup.has_link_collisions,
-                                                  collect_joint_when=lambda _: True)
-        assert set(links) == {'pr2/r_gripper_l_finger_tip_link',
-                              'pr2/r_gripper_l_finger_link',
-                              'pr2/r_gripper_r_finger_tip_link',
-                              'pr2/r_gripper_r_finger_link',
-                              'pr2/r_gripper_palm_link',
-                              'pr2/r_wrist_roll_link'}
-        assert set(joints) == {'pr2/r_gripper_palm_joint',
-                               'pr2/r_gripper_led_joint',
-                               'pr2/r_gripper_motor_accelerometer_joint',
-                               'pr2/r_gripper_tool_joint',
-                               'pr2/r_gripper_motor_slider_joint',
-                               'pr2/r_gripper_motor_screw_joint',
-                               'pr2/r_gripper_l_finger_joint',
-                               'pr2/r_gripper_l_finger_tip_joint',
-                               'pr2/r_gripper_r_finger_joint',
-                               'pr2/r_gripper_r_finger_tip_joint',
-                               'pr2/r_gripper_joint'}
-        links, joints = world_setup.search_branch(world_setup.search_for_link_name('br_caster_l_wheel_link'),
-                                                  collect_link_when=lambda _: True,
-                                                  collect_joint_when=lambda _: True)
-        assert links == ['pr2/br_caster_l_wheel_link']
-        assert joints == []
-
-    # def test_get_siblings_with_collisions(self, world_setup: WorldTree):
-    #     # FIXME
-    #     result = world_setup.get_siblings_with_collisions(world_setup.search_for_joint_name('brumbrum'))
-    #     assert result == []
-    #     result = world_setup.get_siblings_with_collisions(world_setup.search_for_joint_name('l_elbow_flex_joint'))
-    #     assert set(result) == {'pr2/l_upper_arm_roll_link', 'pr2/l_upper_arm_link'}
-    #     result = world_setup.get_siblings_with_collisions(world_setup.search_for_joint_name('r_wrist_roll_joint'))
-    #     assert result == ['pr2/r_wrist_flex_link']
-    #     result = world_setup.get_siblings_with_collisions(world_setup.search_for_joint_name('br_caster_l_wheel_joint'))
-    #     assert set(result) == {'pr2/base_bellow_link',
-    #                            'pr2/fl_caster_l_wheel_link',
-    #                            'pr2/fl_caster_r_wheel_link',
-    #                            'pr2/fl_caster_rotation_link',
-    #                            'pr2/fr_caster_l_wheel_link',
-    #                            'pr2/fr_caster_r_wheel_link',
-    #                            'pr2/fr_caster_rotation_link',
-    #                            'pr2/bl_caster_l_wheel_link',
-    #                            'pr2/bl_caster_r_wheel_link',
-    #                            'pr2/bl_caster_rotation_link',
-    #                            'pr2/br_caster_r_wheel_link',
-    #                            'pr2/br_caster_rotation_link',
-    #                            'pr2/base_link'}
-
-    def test_get_controlled_parent_joint_of_link(self, world_setup: WorldTree):
-        with pytest.raises(KeyError) as e_info:
-            world_setup.get_controlled_parent_joint_of_link(world_setup.search_for_link_name('odom_combined'))
-        assert world_setup.get_controlled_parent_joint_of_link(
-            world_setup.search_for_link_name('base_footprint')) == 'pr2/brumbrum'
-
-    def test_get_parent_joint_of_joint(self, world_setup: WorldTree):
-        # TODO shouldn't this return a not found error?
-        with pytest.raises(KeyError) as e_info:
-            world_setup.get_controlled_parent_joint_of_joint(PrefixName('brumbrum', 'pr2'))
-        with pytest.raises(KeyError) as e_info:
-            world_setup.search_for_parent_joint(world_setup.search_for_joint_name('r_wrist_roll_joint'),
-                                                stop_when=lambda x: False)
-        assert world_setup.get_controlled_parent_joint_of_joint(
-            world_setup.search_for_joint_name('r_torso_lift_side_plate_joint')) == 'pr2/torso_lift_joint'
-        assert world_setup.get_controlled_parent_joint_of_joint(
-            world_setup.search_for_joint_name('torso_lift_joint')) == 'pr2/brumbrum'
-
-    def test_possible_collision_combinations(self, world_setup: WorldTree):
-        result = world_setup.groups[world_setup.robot_names[0]].possible_collision_combinations()
-        reference = {world_setup.sort_links(link_a, link_b) for link_a, link_b in
-                     combinations(world_setup.groups[world_setup.robot_names[0]].link_names_with_collisions, 2) if
-                     not world_setup.are_linked(link_a, link_b)}
-        assert result == reference
-
-    def test_compute_chain_reduced_to_controlled_joints2(self, world_setup: WorldTree):
-        link_a, link_b = world_setup.compute_chain_reduced_to_controlled_joints(
-            world_setup.search_for_link_name('l_upper_arm_link'),
-            world_setup.search_for_link_name('r_upper_arm_link'))
-        assert link_a == 'pr2/l_upper_arm_roll_link'
-        assert link_b == 'pr2/r_upper_arm_roll_link'
-
-    def test_compute_chain_reduced_to_controlled_joints3(self, world_setup: WorldTree):
-        with pytest.raises(KeyError):
-            world_setup.compute_chain_reduced_to_controlled_joints(
-                world_setup.search_for_link_name('l_wrist_roll_link'),
-                world_setup.search_for_link_name('l_gripper_r_finger_link'))
-
-
 class TestBenchmark:
     qp_solvers = [
         SupportedQPSolver.qpSWIFT,
@@ -4462,7 +4145,7 @@ class TestBenchmark:
                                                        qp_solver_id=qp_solver)
                 zero_pose.set_joint_goal(js, add_monitor=False)
                 zero_pose.allow_all_collisions()
-                zero_pose.plan_and_execute()
+                zero_pose.execute()
 
                 zero_pose.set_seed_configuration(zero_pose.default_pose)
                 zero_pose.allow_all_collisions()
@@ -4479,7 +4162,7 @@ class TestBenchmark:
                                                        qp_solver_id=qp_solver)
                 zero_pose.set_joint_goal(zero_pose.better_pose, add_monitor=False)
                 zero_pose.allow_all_collisions()
-                zero_pose.plan_and_execute()
+                zero_pose.execute()
 
                 zero_pose.set_seed_configuration(zero_pose.default_pose)
                 zero_pose.allow_all_collisions()
@@ -4507,7 +4190,7 @@ class TestBenchmark:
                 l_goal.pose.position = Point(-0.05, 0, 0)
                 l_goal.pose.orientation = Quaternion(0, 0, 0, 1)
                 zero_pose.set_cart_goal(l_goal, zero_pose.l_tip, root)
-                zero_pose.plan_and_execute()
+                zero_pose.execute()
 
                 zero_pose.set_seed_configuration(zero_pose.default_pose)
                 zero_pose.allow_all_collisions()
@@ -4530,7 +4213,7 @@ class TestBenchmark:
                 fake_table_setup.avoid_all_collisions(0.1)
                 fake_table_setup.set_cart_goal(goal_pose=r_goal, tip_link=fake_table_setup.r_tip, root_link='map',
                                                add_monitor=False)
-                fake_table_setup.plan_and_execute()
+                fake_table_setup.execute()
 
                 fake_table_setup.set_seed_configuration(pocky_pose)
                 fake_table_setup.allow_all_collisions()
@@ -4549,7 +4232,7 @@ class TestManipulability:
         zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulabilityLinWeight.__name__,
                                                root_link='torso_lift_link',
                                                tip_link='r_gripper_tool_frame')
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
     def test_manip2(self, zero_pose: PR2TestWrapper):
         p = PoseStamped()
@@ -4687,7 +4370,7 @@ class TestWeightScaling:
                                                root_link='torso_lift_link',
                                                tip_link=zero_pose.r_tip,
                                                m_threshold=m_threshold)
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
         assert god_map.debug_expression_manager.evaluated_debug_expressions[f'mIndex{zero_pose.r_tip}'][
                    0] >= m_threshold
 
@@ -4710,7 +4393,7 @@ class TestWeightScaling:
                                                root_link='torso_lift_link',
                                                tip_link=zero_pose.l_tip,
                                                m_threshold=m_threshold)
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
         assert god_map.debug_expression_manager.evaluated_debug_expressions[f'mIndex{zero_pose.r_tip}'][
                    0] >= m_threshold
         assert god_map.debug_expression_manager.evaluated_debug_expressions[f'mIndex{zero_pose.l_tip}'][
@@ -4727,7 +4410,7 @@ class TestWeightScaling:
 # pytest.main(['-s', __file__ + '::TestMonitors::test_bowl_and_cup_sequence'])
 # pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_avoid_collision_go_around_corner'])
 # pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_avoid_collision_box_between_boxes'])
-# pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_avoid_self_collision'])
+# pytest.main(['-s', __file__ + '::TestSelfCollisionAvoidance::test_avoid_self_collision_with_l_arm'])
 # pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_avoid_collision_at_kitchen_corner'])
 # pytest.main(['-s', __file__ + '::TestWayPoints::test_waypoints2'])
 # pytest.main(['-s', __file__ + '::TestCartGoals::test_10_cart_goals'])

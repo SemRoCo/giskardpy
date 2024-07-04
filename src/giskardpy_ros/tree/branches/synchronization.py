@@ -3,13 +3,14 @@ from typing import List
 from py_trees import Sequence, Status
 
 from giskardpy.god_map import god_map
-from giskardpy.data_types import PrefixName
-from giskardpy.tree.behaviors.collision_scene_updater import CollisionSceneUpdater
-from giskardpy.tree.behaviors.notify_state_change import NotifyStateChange
-from giskardpy.tree.behaviors.plugin import GiskardBehavior
-from giskardpy.tree.behaviors.sync_joint_state import SyncJointState, SyncJointStatePosition
-from giskardpy.tree.behaviors.sync_odometry import SyncOdometry, SyncOdometryNoLock
-from giskardpy.tree.behaviors.sync_tf_frames import SyncTfFrames
+from giskardpy.data_types.data_types import PrefixName
+from giskardpy_ros.tree.behaviors.collision_scene_updater import CollisionSceneUpdater
+from giskardpy_ros.tree.behaviors.notify_state_change import NotifyStateChange
+from giskardpy_ros.tree.behaviors.plugin import GiskardBehavior
+from giskardpy_ros.tree.behaviors.sync_joint_state import SyncJointState, SyncJointStatePosition
+from giskardpy_ros.tree.behaviors.sync_odometry import SyncOdometry, SyncOdometryNoLock
+from giskardpy_ros.tree.behaviors.sync_tf_frames import SyncTfFrames
+from giskardpy_ros.tree.blackboard_utils import GiskardBlackboard
 
 
 class Synchronization(Sequence):
@@ -43,7 +44,7 @@ class Synchronization(Sequence):
 
     def sync_joint_state_topic(self, group_name: str, topic_name: str):
         behavior = SyncJointState(group_name=group_name, joint_state_topic=topic_name)
-        if god_map.is_tree_alive():
+        if GiskardBlackboard().tree.has_started():
             behavior.setup()
             self.added_behaviors.append(behavior)
         self.insert_child(child=behavior, index=0)

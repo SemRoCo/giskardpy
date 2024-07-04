@@ -1,15 +1,15 @@
 from py_trees import Sequence
 
-from giskard_msgs.msg import MoveAction, WorldAction
-from giskardpy.god_map import god_map
-from giskardpy.tree.behaviors.action_server import ActionServerHandler
-from giskardpy.tree.behaviors.collision_scene_updater import CollisionSceneUpdater
-from giskardpy.tree.behaviors.goal_received import GoalReceived
-from giskardpy.tree.behaviors.notify_state_change import NotifyStateChange, NotifyModelChange
-from giskardpy.tree.behaviors.send_result import SendResult
-from giskardpy.tree.behaviors.world_updater import ProcessWorldUpdate
-from giskardpy.tree.branches.publish_state import PublishState
-from giskardpy.tree.branches.synchronization import Synchronization
+from giskard_msgs.msg import WorldAction
+from giskardpy_ros.tree.behaviors.action_server import ActionServerHandler
+from giskardpy_ros.tree.behaviors.collision_scene_updater import CollisionSceneUpdater
+from giskardpy_ros.tree.behaviors.goal_received import GoalReceived
+from giskardpy_ros.tree.behaviors.notify_state_change import NotifyStateChange, NotifyModelChange
+from giskardpy_ros.tree.behaviors.send_result import SendResult
+from giskardpy_ros.tree.behaviors.world_updater import ProcessWorldUpdate
+from giskardpy_ros.tree.blackboard_utils import GiskardBlackboard
+from giskardpy_ros.tree.branches.publish_state import PublishState
+from giskardpy_ros.tree.branches.synchronization import Synchronization
 
 
 class UpdateWorld(Sequence):
@@ -21,10 +21,10 @@ class UpdateWorld(Sequence):
     def __init__(self):
         name = 'update world'
         super().__init__(name)
-        god_map.world_action_server = ActionServerHandler(action_name='~update_world', action_type=WorldAction)
-        self.goal_received = GoalReceived(god_map.world_action_server)
-        self.send_result = SendResult(action_server=god_map.world_action_server)
-        self.process_goal = ProcessWorldUpdate(action_server=god_map.world_action_server)
+        GiskardBlackboard().world_action_server = ActionServerHandler(action_name='~update_world', action_type=WorldAction)
+        self.goal_received = GoalReceived(GiskardBlackboard().world_action_server)
+        self.send_result = SendResult(action_server=GiskardBlackboard().world_action_server)
+        self.process_goal = ProcessWorldUpdate(action_server=GiskardBlackboard().world_action_server)
 
         self.add_child(self.goal_received)
         self.add_child(self.process_goal)

@@ -1,7 +1,7 @@
 from py_trees import Status
 
-from giskardpy.tree.behaviors.action_server import ActionServerHandler
-from giskardpy.tree.behaviors.plugin import GiskardBehavior
+from giskardpy_ros.tree.behaviors.action_server import ActionServerHandler
+from giskardpy_ros.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.decorators import record_time
 
 

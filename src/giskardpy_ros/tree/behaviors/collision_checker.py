@@ -1,10 +1,11 @@
 from py_trees import Status
 
-from giskardpy.exceptions import SelfCollisionViolatedException
+from giskardpy.data_types.exceptions import SelfCollisionViolatedException
 from giskardpy.god_map import god_map
 from giskardpy.model.collision_world_syncer import Collisions
-from giskardpy.tree.behaviors.plugin import GiskardBehavior
-from giskardpy.utils.decorators import catch_and_raise_to_blackboard, record_time
+from giskardpy_ros.tree.behaviors.plugin import GiskardBehavior
+from giskardpy.utils.decorators import record_time
+from giskardpy_ros.tree.blackboard_utils import catch_and_raise_to_blackboard
 
 
 class CollisionChecker(GiskardBehavior):

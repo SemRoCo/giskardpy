@@ -2,8 +2,9 @@ import rospy
 from py_trees import Status
 
 from giskardpy.god_map import god_map
-from giskardpy.tree.behaviors.plugin import GiskardBehavior
-from giskardpy.utils.decorators import record_time, catch_and_raise_to_blackboard
+from giskardpy_ros.tree.behaviors.plugin import GiskardBehavior
+from giskardpy.utils.decorators import record_time
+from giskardpy_ros.tree.blackboard_utils import catch_and_raise_to_blackboard
 
 
 class CompileDebugExpressions(GiskardBehavior):

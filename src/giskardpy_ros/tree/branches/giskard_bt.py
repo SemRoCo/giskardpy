@@ -8,22 +8,21 @@ import rospy
 from py_trees_ros.trees import BehaviourTree
 from py_trees import Chooser, common, Composite, Behaviour
 from py_trees import Selector, Sequence
-from giskard_msgs.msg import MoveAction
-from giskardpy.exceptions import GiskardException
 from giskardpy.god_map import god_map
-from giskardpy.tree.behaviors.plugin import GiskardBehavior
-from giskardpy.tree.behaviors.send_result import SendResult
-from giskardpy.tree.branches.clean_up_control_loop import CleanupControlLoop
-from giskardpy.tree.branches.control_loop import ControlLoop
-from giskardpy.tree.branches.post_processing import PostProcessing
-from giskardpy.tree.branches.prepare_control_loop import PrepareControlLoop
-from giskardpy.tree.branches.send_trajectories import ExecuteTraj
-from giskardpy.tree.branches.wait_for_goal import WaitForGoal
-from giskardpy.tree.composites.async_composite import AsyncBehavior
-from giskardpy.tree.composites.better_parallel import Parallel
-from giskardpy.tree.control_modes import ControlModes
-from giskardpy.tree.decorators import failure_is_success
-from giskardpy.utils import logging
+from giskardpy_ros.tree.behaviors.plugin import GiskardBehavior
+from giskardpy_ros.tree.behaviors.send_result import SendResult
+from giskardpy_ros.tree.blackboard_utils import GiskardBlackboard
+from giskardpy_ros.tree.branches.clean_up_control_loop import CleanupControlLoop
+from giskardpy_ros.tree.branches.control_loop import ControlLoop
+from giskardpy_ros.tree.branches.post_processing import PostProcessing
+from giskardpy_ros.tree.branches.prepare_control_loop import PrepareControlLoop
+from giskardpy_ros.tree.branches.send_trajectories import ExecuteTraj
+from giskardpy_ros.tree.branches.wait_for_goal import WaitForGoal
+from giskardpy_ros.tree.composites.async_composite import AsyncBehavior
+from giskardpy_ros.tree.composites.better_parallel import Parallel
+from giskardpy_ros.tree.control_modes import ControlModes
+from giskardpy_ros.tree.decorators import failure_is_success
+from giskardpy.middleware import middleware
 from giskardpy.utils.decorators import toggle_on, toggle_off
 from giskardpy.utils.utils import create_path
 
@@ -44,7 +43,7 @@ class GiskardBT(BehaviourTree):
     execute_traj: ExecuteTraj
 
     def __init__(self, control_mode: ControlModes):
-        god_map.tree = self
+        GiskardBlackboard().tree = self
         self.control_mode = control_mode
         if control_mode not in ControlModes:
             raise AttributeError(f'Control mode {control_mode} doesn\'t exist.')
@@ -52,9 +51,9 @@ class GiskardBT(BehaviourTree):
         self.wait_for_goal = WaitForGoal()
         self.prepare_control_loop = failure_is_success(PrepareControlLoop)()
         if self.is_closed_loop():
-            max_hz = god_map.behavior_tree_config.control_loop_max_hz
+            max_hz = GiskardBlackboard().control_loop_max_hz
         else:
-            max_hz = god_map.behavior_tree_config.simulation_max_hz
+            max_hz = GiskardBlackboard().simulation_max_hz
         self.control_loop_branch = failure_is_success(ControlLoop)(max_hz=max_hz)
         if self.is_closed_loop():
             self.control_loop_branch.add_closed_loop_behaviors()
@@ -71,9 +70,12 @@ class GiskardBT(BehaviourTree):
         self.root.add_child(self.control_loop_branch)
         self.root.add_child(self.cleanup_control_loop)
         self.root.add_child(self.post_processing)
-        self.root.add_child(SendResult(god_map.move_action_server))
+        self.root.add_child(SendResult(GiskardBlackboard().move_action_server))
         super().__init__(self.root)
         self.switch_to_execution()
+
+    def has_started(self) -> bool:
+        return self.count > 1
 
     def is_closed_loop(self):
         return self.control_mode == self.control_mode.close_loop
@@ -112,27 +114,27 @@ class GiskardBT(BehaviourTree):
 
     def live(self):
         sleeper = rospy.Rate(1 / self.tick_rate)
-        logging.loginfo('giskard is ready')
+        middleware.loginfo('giskard is ready')
         while not rospy.is_shutdown():
             try:
                 self.tick()
                 sleeper.sleep()
             except KeyboardInterrupt:
                 break
-        logging.loginfo('giskard died')
+        middleware.loginfo('giskard died')
 
     def kill_all_services(self):
         self.blackboard_exchange.get_blackboard_variables_srv.shutdown()
         self.blackboard_exchange.open_blackboard_watcher_srv.shutdown()
         self.blackboard_exchange.close_blackboard_watcher_srv.shutdown()
-        # for value in god_map.tree_nodes.values():
+        # for value in GiskardBlackboard().tree_nodes.values():
         #     node = value.node
         #     for attribute_name, attribute in vars(node).items():
         #         if isinstance(attribute, rospy.Service):
         #             attribute.shutdown(reason='life is pain')
 
     def render(self):
-        path = god_map.giskard.tmp_folder + 'tree'
+        path = god_map.tmp_folder + 'tree'
         create_path(path)
         render_dot_tree(self.root, name=path)
 
@@ -171,7 +173,7 @@ def render_dot_tree(root, visibility_level=common.VisibilityLevel.DETAIL, name=N
     """
     graph = generate_pydot_graph(root, visibility_level)
     filename_wo_extension = root.name.lower().replace(" ", "_") if name is None else name
-    logging.loginfo(f"Writing {filename_wo_extension}.dot/svg/png")
+    middleware.loginfo(f"Writing {filename_wo_extension}.dot/svg/png")
     # graph.write(filename_wo_extension + '.dot')
     graph.write_png(filename_wo_extension + '.png')
     # graph.write_svg(filename_wo_extension + '.svg')

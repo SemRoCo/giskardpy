@@ -1,9 +1,9 @@
 import numpy as np
 
-from giskardpy.configs.collision_avoidance_config import CollisionAvoidanceConfig
-from giskardpy.configs.robot_interface_config import StandAloneRobotInterfaceConfig, RobotInterfaceConfig
-from giskardpy.configs.world_config import WorldConfig
-from giskardpy.data_types import PrefixName, Derivatives
+from giskardpy.model.collision_avoidance_config import CollisionAvoidanceConfig
+from giskardpy.model.world_config import WorldConfig
+from giskardpy_ros.configs.robot_interface_config import StandAloneRobotInterfaceConfig, RobotInterfaceConfig
+from giskardpy.data_types.data_types import PrefixName, Derivatives
 
 
 class WorldWithHSRConfig(WorldConfig):
@@ -65,7 +65,7 @@ class HSRCollisionAvoidanceConfig(CollisionAvoidanceConfig):
         self.drive_joint_name = drive_joint_name
 
     def setup(self):
-        self.load_self_collision_matrix('package://giskardpy_ros/self_collision_matrices/iai/hsrb.srdf')
+        self.load_self_collision_matrix('package://giskardpy/self_collision_matrices/iai/hsrb.srdf')
         self.set_default_external_collision_avoidance(soft_threshold=0.05,
                                                       hard_threshold=0.0)
         self.overwrite_external_collision_avoidance('wrist_roll_joint',

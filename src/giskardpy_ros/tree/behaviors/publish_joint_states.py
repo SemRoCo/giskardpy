@@ -7,7 +7,7 @@ from sensor_msgs.msg import JointState
 from py_trees import Status
 
 from giskardpy.god_map import god_map
-from giskardpy.tree.behaviors.plugin import GiskardBehavior
+from giskardpy_ros.tree.behaviors.plugin import GiskardBehavior
 
 
 class PublishJointState(GiskardBehavior):

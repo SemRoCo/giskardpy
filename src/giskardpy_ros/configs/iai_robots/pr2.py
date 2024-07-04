@@ -1,6 +1,10 @@
-from giskardpy.configs.giskard import CollisionAvoidanceConfig, RobotInterfaceConfig
-from giskardpy.configs.world_config import WorldWithOmniDriveRobot
-from giskardpy.data_types import Derivatives
+import rospy
+
+from giskardpy.model.collision_avoidance_config import CollisionAvoidanceConfig
+from giskardpy.model.world_config import WorldWithOmniDriveRobot
+from giskardpy_ros.configs.giskard import RobotInterfaceConfig
+from giskardpy.data_types.data_types import Derivatives
+from giskardpy.model.collision_world_syncer import CollisionCheckerLib
 
 
 class WorldWithPR2Config(WorldWithOmniDriveRobot):
@@ -9,7 +13,7 @@ class WorldWithPR2Config(WorldWithOmniDriveRobot):
         super().__init__(map_name, localization_joint_name, odom_link_name, drive_joint_name)
 
     def setup(self):
-        super().setup()
+        super().setup(rospy.get_param('robot_description'))
         self.set_joint_limits(limit_map={Derivatives.velocity: 2,
                                          Derivatives.jerk: 60},
                               joint_name='head_pan_joint')
@@ -160,12 +164,13 @@ class PR2VelocityIAIInterface(RobotInterfaceConfig):
 
 
 class PR2CollisionAvoidance(CollisionAvoidanceConfig):
-    def __init__(self, drive_joint_name: str = 'brumbrum'):
-        super().__init__()
+    def __init__(self, drive_joint_name: str = 'brumbrum',
+                 collision_checker: CollisionCheckerLib = CollisionCheckerLib.bpb):
+        super().__init__(collision_checker=collision_checker)
         self.drive_joint_name = drive_joint_name
 
     def setup(self):
-        self.load_self_collision_matrix('package://giskardpy_ros/self_collision_matrices/iai/pr2.srdf')
+        self.load_self_collision_matrix('self_collision_matrices/iai/pr2.srdf')
         self.set_default_external_collision_avoidance(soft_threshold=0.1,
                                                       hard_threshold=0.0)
         for joint_name in ['r_wrist_roll_joint', 'l_wrist_roll_joint']:

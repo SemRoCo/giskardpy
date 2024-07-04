@@ -1,4 +1,3 @@
-from copy import deepcopy
 from typing import Optional
 
 import numpy as np
@@ -6,16 +5,15 @@ import pytest
 import rospy
 from geometry_msgs.msg import PoseStamped, Point, Quaternion
 from std_srvs.srv import Trigger
-from tf.transformations import quaternion_about_axis
 
-import giskardpy.utils.tfwrapper as tf
-from giskard_msgs.msg import MoveResult, MoveGoal, GiskardError
-from giskardpy.configs.behavior_tree_config import OpenLoopBTConfig
-from giskardpy.configs.giskard import Giskard
-from giskardpy.configs.iai_robots.pr2 import PR2CollisionAvoidance, PR2JointTrajServerMujocoInterface, \
+import giskardpy_ros.ros1.tfwrapper as tf
+from giskard_msgs.msg import MoveGoal, GiskardError
+from giskardpy_ros.configs.behavior_tree_config import OpenLoopBTConfig
+from giskardpy_ros.configs.giskard import Giskard
+from giskardpy_ros.configs.iai_robots.pr2 import PR2CollisionAvoidance, PR2JointTrajServerMujocoInterface, \
     WorldWithPR2Config
-from giskardpy.configs.qp_controller_config import QPControllerConfig
-from giskardpy.configs.world_config import WorldWithOmniDriveRobot
+from giskardpy.qp.qp_controller_config import QPControllerConfig
+from giskardpy.utils.math import quaternion_from_axis_angle
 from test_integration_pr2 import PR2TestWrapper, TestJointGoals, pocky_pose
 
 
@@ -42,13 +40,6 @@ class PR2TestWrapperMujoco(PR2TestWrapper):
         p.pose.orientation.w = 1
         self.set_localization(p)
         self.wait_heartbeats()
-
-    def set_localization(self, map_T_odom: PoseStamped):
-        super(PR2TestWrapper, self).teleport_base(map_T_odom)
-
-    def teleport_base(self, goal_pose, group_name: Optional[str] = None):
-        self.allow_all_collisions()
-        self.move_base(goal_pose)
 
     def reset(self):
         self.mujoco_reset()
@@ -86,7 +77,7 @@ class TestJointGoalsMujoco(TestJointGoals):
         zero_pose.set_joint_goal(js)
         zero_pose.allow_all_collisions()
         # zero_pose.set_json_goal('EnableVelocityTrajectoryTracking', enabled=True)
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
     def test_joint_goal_projection(self, zero_pose: PR2TestWrapper):
         js = {
@@ -132,7 +123,7 @@ class TestConstraints:
     def test_SetSeedConfiguration(self, zero_pose: PR2TestWrapper):
         zero_pose.set_seed_configuration(seed_configuration=zero_pose.better_pose)
         zero_pose.set_joint_goal(zero_pose.default_pose)
-        zero_pose.plan_and_execute(expected_error_code=GiskardError.GOAL_INITIALIZATION_ERROR)
+        zero_pose.execute(expected_error_code=GiskardError.GOAL_INITIALIZATION_ERROR)
 
 
 class TestCartGoals:
@@ -141,7 +132,7 @@ class TestCartGoals:
         base_goal.header.frame_id = 'map'
         base_goal.pose.position.x = 1
         base_goal.pose.position.y = -1
-        base_goal.pose.orientation = Quaternion(*quaternion_about_axis(-np.pi / 4, [0, 0, 1]))
+        base_goal.pose.orientation = Quaternion(*quaternion_from_axis_angle([0, 0, 1], -np.pi / 4))
         zero_pose.move_base(base_goal)
 
     def test_forward(self, zero_pose: PR2TestWrapper):
@@ -160,7 +151,7 @@ class TestActionServerEvents:
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.set_cart_goal(goal_pose=p, tip_link='base_footprint', root_link='map')
         zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute(expected_error_code=GiskardError.PREEMPTED, stop_after=1)
+        zero_pose.execute(expected_error_code=GiskardError.PREEMPTED, stop_after=1)
 
     def test_interrupt2(self, zero_pose: PR2TestWrapper):
         p = PoseStamped()
@@ -169,7 +160,7 @@ class TestActionServerEvents:
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.set_cart_goal(goal_pose=p, tip_link='base_footprint', root_link='map')
         zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute(expected_error_code=GiskardError.PREEMPTED, stop_after=6)
+        zero_pose.execute(expected_error_code=GiskardError.PREEMPTED, stop_after=6)
 
     def test_undefined_type(self, zero_pose: PR2TestWrapper):
         zero_pose.allow_all_collisions()
@@ -178,7 +169,7 @@ class TestActionServerEvents:
 
     def test_empty_goal(self, zero_pose: PR2TestWrapper):
         zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute(expected_error_code=GiskardError.EMPTY_PROBLEM)
+        zero_pose.execute(expected_error_code=GiskardError.EMPTY_PROBLEM)
 
     def test_plan_only(self, zero_pose: PR2TestWrapper):
         zero_pose.allow_self_collision()

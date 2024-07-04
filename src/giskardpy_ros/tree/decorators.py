@@ -4,7 +4,7 @@ from typing import TypeVar, Union, Type, TYPE_CHECKING
 import py_trees
 from py_trees import Composite
 
-from giskardpy.tree.behaviors.plugin import GiskardBehavior
+from giskardpy_ros.tree.behaviors.plugin import GiskardBehavior
 
 T = TypeVar('T', bound=Union[Type[GiskardBehavior], Type[Composite]])
 

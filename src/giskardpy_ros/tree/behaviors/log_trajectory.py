@@ -3,7 +3,7 @@ from copy import deepcopy
 from py_trees import Status
 
 from giskardpy.god_map import god_map
-from giskardpy.tree.behaviors.plugin import GiskardBehavior
+from giskardpy_ros.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.decorators import record_time
 
 

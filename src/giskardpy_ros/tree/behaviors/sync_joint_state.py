@@ -4,13 +4,13 @@ import rospy
 from py_trees import Status
 from sensor_msgs.msg import JointState
 
-from giskardpy.data_types import JointStates
-from giskardpy.data_types import PrefixName, Derivatives
+from giskardpy.data_types.data_types import JointStates
+from giskardpy.data_types.data_types import PrefixName, Derivatives
 from giskardpy.god_map import god_map
-from giskardpy.tree.behaviors.plugin import GiskardBehavior
+from giskardpy_ros.ros1.ros1_interface import wait_for_topic_to_appear
+from giskardpy_ros.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.decorators import record_time
-from giskardpy.utils.utils import wait_for_topic_to_appear
-
+import giskardpy_ros.ros1.msg_converter as msg_converter
 
 class SyncJointState(GiskardBehavior):
 
@@ -38,7 +38,7 @@ class SyncJointState(GiskardBehavior):
     @profile
     def update(self):
         if self.data:
-            mjs = JointStates.from_msg(self.data, self.group_name)
+            mjs = msg_converter.ros_joint_state_to_giskard_joint_state(self.data, self.group_name)
             god_map.world.state.update(mjs)
             self.data = None
             return Status.SUCCESS

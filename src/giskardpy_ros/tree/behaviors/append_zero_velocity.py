@@ -1,8 +1,8 @@
 from py_trees import Status
 
 from giskardpy.god_map import god_map
-from giskardpy.data_types import Derivatives
-from giskardpy.tree.behaviors.plugin import GiskardBehavior
+from giskardpy.data_types.data_types import Derivatives
+from giskardpy_ros.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.decorators import record_time
 
 

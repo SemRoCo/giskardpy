@@ -1,8 +1,8 @@
 from py_trees import Status
 
-from giskardpy.tree.behaviors.action_server import ActionServerHandler
-from giskardpy.tree.behaviors.plugin import GiskardBehavior
-from giskardpy.utils import logging
+from giskardpy_ros.tree.behaviors.action_server import ActionServerHandler
+from giskardpy_ros.tree.behaviors.plugin import GiskardBehavior
+from giskardpy.middleware import middleware
 
 
 class GoalReceived(GiskardBehavior):
@@ -14,7 +14,7 @@ class GoalReceived(GiskardBehavior):
     @profile
     def update(self):
         if self.action_server.has_goal():
-            logging.loginfo(f'Received new goal.')
+            middleware.loginfo(f'Received new goal.')
             self.action_server.accept_goal()
             return Status.SUCCESS
         return Status.FAILURE

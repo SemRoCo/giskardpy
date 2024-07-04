@@ -6,9 +6,9 @@ from typing import Optional
 import rospy
 from py_trees import Status, Composite, Behaviour
 
-from giskardpy.tree.behaviors.plugin import GiskardBehavior
-from giskardpy.utils.ros_timer import Rate
-from giskardpy.utils.utils import raise_to_blackboard
+from giskardpy_ros.tree.behaviors.plugin import GiskardBehavior
+from giskardpy_ros.ros1.ros_timer import Rate
+from giskardpy_ros.tree.blackboard_utils import raise_to_blackboard
 
 
 class AsyncBehavior(GiskardBehavior, Composite):

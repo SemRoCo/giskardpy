@@ -1,15 +1,14 @@
-import giskardpy.utils.tfwrapper as tf
+import giskardpy_ros.ros1.tfwrapper as tf
 import pytest
 from geometry_msgs.msg import PoseStamped, PointStamped
 
-from giskardpy.configs.behavior_tree_config import StandAloneBTConfig
-from giskardpy.configs.giskard import Giskard
-from giskardpy.configs.qp_controller_config import QPControllerConfig
-from giskardpy.configs.iai_robots.tracy import TracyStandAloneRobotInterfaceConfig, TracyWorldConfig, \
+from giskardpy_ros.configs.behavior_tree_config import StandAloneBTConfig
+from giskardpy_ros.configs.giskard import Giskard
+from giskardpy.qp.qp_controller_config import QPControllerConfig
+from giskardpy_ros.configs.iai_robots.tracy import TracyStandAloneRobotInterfaceConfig, TracyWorldConfig, \
     TracyCollisionAvoidanceConfig
 from giskardpy.goals.tracebot import InsertCylinder
-from giskardpy.god_map import god_map
-from giskardpy.utils.utils import launch_launchfile
+from utils_for_tests import launch_launchfile
 from utils_for_tests import GiskardTestWrapper
 
 
@@ -71,7 +70,7 @@ class TestTracebot:
     def test_joint_goal(self, zero_pose: TracebotTestWrapper):
         zero_pose.set_joint_goal(zero_pose.better_pose)
         zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
     def test_place_cylinder(self, better_pose: TracebotTestWrapper):
         cylinder_name = 'C'
@@ -96,7 +95,7 @@ class TestTracebot:
                                                  cylinder_height=0.121,
                                                  hole_point=hole_point)
         better_pose.allow_all_collisions()
-        better_pose.plan_and_execute()
+        better_pose.execute()
 
 
 class TestCartGoals:
@@ -116,6 +115,6 @@ class TestCartGoals:
 
         zero_pose.set_cart_goal(goal, tip_link=tip, root_link='world')
         # zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
         # zero_pose.set_translation_goal(goal, 'base_footprint', 'odom')
         # zero_pose.plan_and_execute()

@@ -4,11 +4,12 @@ from abc import ABC, abstractmethod
 from typing import Optional, List, Dict
 
 from giskardpy.god_map import god_map
-from giskardpy.tree.branches.giskard_bt import GiskardBT
-from giskardpy.tree.control_modes import ControlModes
-from giskardpy.exceptions import GiskardException, SetupException
+from giskardpy_ros.tree.blackboard_utils import GiskardBlackboard
+from giskardpy_ros.tree.branches.giskard_bt import GiskardBT
+from giskardpy_ros.tree.control_modes import ControlModes
+from giskardpy.data_types.exceptions import SetupException
 from giskardpy.model.world import WorldTree
-from giskardpy.data_types import my_string, PrefixName, Derivatives
+from giskardpy.data_types.data_types import my_string, PrefixName, Derivatives
 
 
 class RobotInterfaceConfig(ABC):
@@ -34,11 +35,11 @@ class RobotInterfaceConfig(ABC):
 
     @property
     def tree(self) -> GiskardBT:
-        return god_map.tree
+        return GiskardBlackboard().tree
 
     @property
     def control_mode(self) -> ControlModes:
-        return god_map.tree.control_mode
+        return GiskardBlackboard().tree.control_mode
 
     def sync_odometry_topic(self, odometry_topic: str, joint_name: str):
         """
@@ -46,7 +47,7 @@ class RobotInterfaceConfig(ABC):
         """
         joint_name = self.world.search_for_joint_name(joint_name)
         self.tree.wait_for_goal.synchronization.sync_odometry_topic(odometry_topic, joint_name)
-        if god_map.is_closed_loop():
+        if GiskardBlackboard().tree.is_closed_loop():
             self.tree.control_loop_branch.closed_loop_synchronization.sync_odometry_topic_no_lock(
                 odometry_topic,
                 joint_name)
@@ -59,7 +60,7 @@ class RobotInterfaceConfig(ABC):
         self.tree.wait_for_goal.synchronization.sync_6dof_joint_with_tf_frame(joint_name,
                                                                               tf_parent_frame,
                                                                               tf_child_frame)
-        if god_map.is_closed_loop():
+        if GiskardBlackboard().tree.is_closed_loop():
             self.tree.control_loop_branch.closed_loop_synchronization.sync_6dof_joint_with_tf_frame(
                 joint_name,
                 tf_parent_frame,
@@ -73,7 +74,7 @@ class RobotInterfaceConfig(ABC):
             group_name = self.world.robot_name
         self.tree.wait_for_goal.synchronization.sync_joint_state_topic(group_name=group_name,
                                                                        topic_name=topic_name)
-        if god_map.is_closed_loop():
+        if GiskardBlackboard().tree.is_closed_loop():
             self.tree.control_loop_branch.closed_loop_synchronization.sync_joint_state2_topic(
                 group_name=group_name,
                 topic_name=topic_name)
@@ -90,10 +91,10 @@ class RobotInterfaceConfig(ABC):
         :param joint_name: name of the omni or diff drive joint. Doesn't need to be specified if there is only one.
         """
         joint_name = self.world.search_for_joint_name(joint_name)
-        if god_map.is_closed_loop():
+        if GiskardBlackboard().tree.is_closed_loop():
             self.tree.control_loop_branch.send_controls.add_send_cmd_velocity(cmd_vel_topic=cmd_vel_topic,
                                                                               joint_name=joint_name)
-        elif god_map.is_open_loop():
+        elif GiskardBlackboard().tree.is_open_loop():
             self.tree.execute_traj.add_base_traj_action_server(cmd_vel_topic=cmd_vel_topic,
                                                                joint_name=joint_name)
 
@@ -122,7 +123,7 @@ class RobotInterfaceConfig(ABC):
         """
         if group_name is None:
             group_name = self.world.robot_name
-        if not god_map.is_open_loop():
+        if not GiskardBlackboard().tree.is_open_loop():
             raise SetupException('add_follow_joint_trajectory_server only works in planning mode')
         self.tree.execute_traj.add_follow_joint_traj_action_server(namespace=namespace,
                                                                    group_name=group_name,

@@ -1,7 +1,7 @@
 from py_trees import Sequence
 
-from giskardpy.tree.behaviors.exception_to_execute import ClearBlackboardException
-from giskardpy.tree.behaviors.set_move_result import SetMoveResult
+from giskardpy_ros.tree.behaviors.exception_to_execute import ClearBlackboardException
+from giskardpy_ros.tree.behaviors.set_move_result import SetMoveResult
 
 
 class PostProcessing(Sequence):

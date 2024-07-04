@@ -6,13 +6,13 @@ import pytest
 from geometry_msgs.msg import PoseStamped, Quaternion, Vector3Stamped, PointStamped
 from tf.transformations import quaternion_from_matrix
 
-from giskardpy.configs.behavior_tree_config import StandAloneBTConfig
-from giskardpy.configs.iai_robots.boxy import BoxyCollisionAvoidanceConfig, BoxyStandaloneInterfaceConfig
-from giskardpy.configs.iai_robots.donbot import WorldWithBoxyBaseConfig
-from giskardpy.configs.giskard import Giskard
-from giskardpy.configs.qp_controller_config import QPControllerConfig
+from giskardpy_ros.configs.behavior_tree_config import StandAloneBTConfig
+from giskardpy_ros.configs.iai_robots.boxy import BoxyCollisionAvoidanceConfig, BoxyStandaloneInterfaceConfig
+from giskardpy_ros.configs.iai_robots.donbot import WorldWithBoxyBaseConfig
+from giskardpy_ros.configs.giskard import Giskard
+from giskardpy.qp.qp_controller_config import QPControllerConfig
 from giskardpy.god_map import god_map
-from giskardpy.utils.utils import launch_launchfile
+from utils_for_tests import launch_launchfile
 from utils_for_tests import GiskardTestWrapper
 
 
@@ -114,7 +114,7 @@ class TestJointGoals:
         js = copy(zero_pose.better_pose)
         js['triangle_base_joint'] = zero_pose.default_pose['triangle_base_joint']
         zero_pose.set_joint_goal(js)
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
 
 class TestConstraints:
@@ -125,7 +125,7 @@ class TestConstraints:
         z.header.frame_id = tip
         z.vector.z = 1
         better_pose.set_pointing_goal(goal_point=goal_point, tip_link=tip, pointing_axis=z, root_link='map')
-        better_pose.plan_and_execute()
+        better_pose.execute()
 
         current_x = Vector3Stamped()
         current_x.header.frame_id = tip
@@ -150,7 +150,7 @@ class TestConstraints:
                                                                       [0, 0, 0, 1]]))
 
         better_pose.set_cart_goal(r_goal, better_pose.r_tip, 'base_footprint')
-        better_pose.plan_and_execute()
+        better_pose.execute()
 
         current_x = Vector3Stamped()
         current_x.header.frame_id = tip
@@ -197,12 +197,12 @@ class TestConstraints:
                                             root_link='map',
                                             goal_normal=x_goal)
         kitchen_setup.allow_all_collisions()  # makes execution faster
-        kitchen_setup.plan_and_execute()  # send goal to Giskard
+        kitchen_setup.execute()  # send goal to Giskard
 
         kitchen_setup.set_open_container_goal(tip_link=kitchen_setup.l_tip,
                                               environment_link=handle_name)
         kitchen_setup.allow_all_collisions()  # makes execution faster
-        kitchen_setup.plan_and_execute()  # send goal to Giskard
+        kitchen_setup.execute()  # send goal to Giskard
         # Update kitchen object
         kitchen_setup.set_env_state({'sink_area_left_middle_drawer_main_joint': 0.48})
 
@@ -211,13 +211,13 @@ class TestConstraints:
                                               environment_link=handle_name,
                                               goal_joint_state=0.2)
         kitchen_setup.allow_all_collisions()  # makes execution faster
-        kitchen_setup.plan_and_execute()  # send goal to Giskard
+        kitchen_setup.execute()  # send goal to Giskard
         # Update kitchen object
         kitchen_setup.set_env_state({'sink_area_left_middle_drawer_main_joint': 0.2})
 
         kitchen_setup.set_close_container_goal(tip_link=kitchen_setup.l_tip,
                                                environment_link=handle_name)
         kitchen_setup.allow_all_collisions()  # makes execution faster
-        kitchen_setup.plan_and_execute()  # send goal to Giskard
+        kitchen_setup.execute()  # send goal to Giskard
         # Update kitchen object
         kitchen_setup.set_env_state({'sink_area_left_middle_drawer_main_joint': 0.0})

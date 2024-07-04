@@ -1,21 +1,22 @@
 from typing import Optional
 
 from giskardpy.god_map import god_map
-from giskardpy.tree.behaviors.collision_checker import CollisionChecker
-from giskardpy.tree.behaviors.evaluate_debug_expressions import EvaluateDebugExpressions
-from giskardpy.tree.behaviors.evaluate_monitors import EvaluateMonitors
-from giskardpy.tree.behaviors.goal_canceled import GoalCanceled
-from giskardpy.tree.behaviors.instantaneous_controller import ControllerPlugin
-from giskardpy.tree.behaviors.kinematic_sim import KinSimPlugin
-from giskardpy.tree.behaviors.log_trajectory import LogTrajPlugin
-from giskardpy.tree.behaviors.real_kinematic_sim import RealKinSimPlugin
-from giskardpy.tree.behaviors.time import TimePlugin, RosTime, ControlCycleCounter
-from giskardpy.tree.branches.check_monitors import CheckMonitors
-from giskardpy.tree.branches.publish_state import PublishState
-from giskardpy.tree.branches.send_controls import SendControls
-from giskardpy.tree.branches.synchronization import Synchronization
-from giskardpy.tree.composites.async_composite import AsyncBehavior
-from giskardpy.tree.decorators import success_is_running, failure_is_running
+from giskardpy_ros.tree.behaviors.collision_checker import CollisionChecker
+from giskardpy_ros.tree.behaviors.evaluate_debug_expressions import EvaluateDebugExpressions
+from giskardpy_ros.tree.behaviors.evaluate_monitors import EvaluateMonitors
+from giskardpy_ros.tree.behaviors.goal_canceled import GoalCanceled
+from giskardpy_ros.tree.behaviors.instantaneous_controller import ControllerPlugin
+from giskardpy_ros.tree.behaviors.kinematic_sim import KinSimPlugin
+from giskardpy_ros.tree.behaviors.log_trajectory import LogTrajPlugin
+from giskardpy_ros.tree.behaviors.real_kinematic_sim import RealKinSimPlugin
+from giskardpy_ros.tree.behaviors.time import TimePlugin, RosTime, ControlCycleCounter
+from giskardpy_ros.tree.blackboard_utils import GiskardBlackboard
+from giskardpy_ros.tree.branches.check_monitors import CheckMonitors
+from giskardpy_ros.tree.branches.publish_state import PublishState
+from giskardpy_ros.tree.branches.send_controls import SendControls
+from giskardpy_ros.tree.branches.synchronization import Synchronization
+from giskardpy_ros.tree.composites.async_composite import AsyncBehavior
+from giskardpy_ros.tree.decorators import success_is_running, failure_is_running
 from giskardpy.utils.decorators import toggle_on, toggle_off
 
 
@@ -52,7 +53,7 @@ class ControlLoop(AsyncBehavior):
         self.send_controls = success_is_running(SendControls)()
         self.closed_loop_synchronization = success_is_running(Synchronization)()
 
-        self.add_child(failure_is_running(GoalCanceled)(god_map.move_action_server))
+        self.add_child(failure_is_running(GoalCanceled)(GiskardBlackboard().move_action_server))
 
         if god_map.is_collision_checking_enabled():
             self.add_child(CollisionChecker('collision checker'))
@@ -77,7 +78,7 @@ class ControlLoop(AsyncBehavior):
 
     @toggle_off('in_projection')
     def switch_to_closed_loop(self):
-        assert god_map.is_closed_loop()
+        assert GiskardBlackboard().tree.is_closed_loop()
         self.remove_projection_behaviors()
         self.add_closed_loop_behaviors()
 

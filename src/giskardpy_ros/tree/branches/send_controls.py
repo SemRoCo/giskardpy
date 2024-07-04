@@ -1,11 +1,11 @@
 from typing import List
 
-from giskardpy.data_types import PrefixName
-from giskardpy.tree.behaviors.joint_group_vel_controller_publisher import JointGroupVelController
-from giskardpy.tree.behaviors.joint_pos_controller_publisher import JointPosController
-from giskardpy.tree.behaviors.joint_vel_controller_publisher import JointVelController
-from giskardpy.tree.behaviors.send_cmd_vel import SendCmdVel
-from giskardpy.tree.composites.running_selector import RunningSelector
+from giskardpy.data_types.data_types import PrefixName
+from giskardpy_ros.tree.behaviors.joint_group_vel_controller_publisher import JointGroupVelController
+from giskardpy_ros.tree.behaviors.joint_pos_controller_publisher import JointPosController
+from giskardpy_ros.tree.behaviors.joint_vel_controller_publisher import JointVelController
+from giskardpy_ros.tree.behaviors.send_cmd_vel import SendCmdVel
+from giskardpy_ros.tree.composites.running_selector import RunningSelector
 
 
 class SendControls(RunningSelector):

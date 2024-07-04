@@ -1,11 +1,14 @@
 from py_trees import Status
 
-from giskard_msgs.msg import MoveResult
-from giskardpy.exceptions import *
+from giskard_msgs.msg import MoveResult, GiskardError
+from giskardpy.data_types.exceptions import *
+from giskardpy.goals.collision_avoidance import CollisionAvoidance
 from giskardpy.god_map import god_map
-from giskardpy.tree.behaviors.plugin import GiskardBehavior
-from giskardpy.utils import logging
+from giskardpy_ros.tree.behaviors.plugin import GiskardBehavior
+from giskardpy.middleware import middleware
+from giskardpy_ros.tree.blackboard_utils import GiskardBlackboard
 from giskardpy.utils.decorators import record_time
+import giskardpy_ros.ros1.msg_converter as msg_converter
 
 
 class SetMoveResult(GiskardBehavior):
@@ -22,22 +25,23 @@ class SetMoveResult(GiskardBehavior):
         e = self.get_blackboard_exception()
         if e is None:
             move_result = MoveResult()
-        elif isinstance(e, GiskardException):
-            move_result = MoveResult(error=e.to_error_msg())
         else:
-            move_result = MoveResult(error=GiskardException(str(e)).to_error_msg())
+            move_result = MoveResult(error=msg_converter.exception_to_error_msg(e))
 
         trajectory = god_map.trajectory
         joints = [god_map.world.joints[joint_name] for joint_name in god_map.world.movable_joint_names]
-        sample_period = god_map.qp_controller_config.sample_period
-        move_result.trajectory = trajectory.to_msg(sample_period=sample_period, start_time=0, joints=joints)
-        if move_result.error.code == GiskardError.PREEMPTED:
-            logging.logwarn(f'Goal preempted: \'{move_result.error.msg}\'.')
+        sample_period = god_map.qp_controller.sample_period
+        move_result.trajectory = msg_converter.trajectory_to_ros_trajectory(trajectory,
+                                                                            sample_period=sample_period,
+                                                                            start_time=0,
+                                                                            joints=joints)
+        if isinstance(e, PreemptedException):
+            middleware.logwarn(f'Goal preempted: \'{move_result.error.msg}\'.')
         else:
             if self.print:
-                if move_result.error.code == GiskardError.SUCCESS:
-                    logging.loginfo(f'{self.context} succeeded.')
+                if move_result.error.type == GiskardError.SUCCESS:
+                    middleware.loginfo(f'{self.context} succeeded.')
                 else:
-                    logging.logwarn(f'{self.context} failed: {move_result.error.msg}.')
-        god_map.move_action_server.result_msg = move_result
+                    middleware.logwarn(f'{self.context} failed: {move_result.error.msg}.')
+        GiskardBlackboard().move_action_server.result_msg = move_result
         return Status.SUCCESS

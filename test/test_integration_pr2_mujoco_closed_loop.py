@@ -1,27 +1,29 @@
+import math
 from copy import deepcopy
 from typing import Optional
 
 import numpy as np
 from numpy import pi
 import pytest
+import math
 import rospy
 from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, PointStamped
 from sensor_msgs.msg import JointState
 from std_srvs.srv import Trigger
-from tf.transformations import quaternion_from_matrix, quaternion_about_axis
+from tf.transformations import quaternion_from_matrix, quaternion_about_axis, quaternion_multiply
 
-import giskardpy.utils.tfwrapper as tf
+import giskardpy_ros.ros1.tfwrapper as tf
 from giskard_msgs.msg import MoveGoal, GiskardError
-from giskardpy.configs.behavior_tree_config import ClosedLoopBTConfig
-from giskardpy.configs.giskard import Giskard
-from giskardpy.configs.iai_robots.pr2 import PR2CollisionAvoidance, PR2VelocityMujocoInterface, WorldWithPR2Config
-from giskardpy.configs.qp_controller_config import QPControllerConfig, SupportedQPSolver
-from giskardpy.data_types import JointStates
-from giskardpy.goals.base_traj_follower import CarryMyBullshit
-from giskardpy.god_map import god_map
+from giskardpy_ros.configs.behavior_tree_config import ClosedLoopBTConfig
+from giskardpy_ros.configs.giskard import Giskard
+from giskardpy_ros.configs.iai_robots.pr2 import PR2CollisionAvoidance, PR2VelocityMujocoInterface, WorldWithPR2Config
+from giskardpy.qp.qp_controller_config import QPControllerConfig, SupportedQPSolver
+from giskardpy_ros.goals.realtime_goals import CarryMyBullshit
 from giskardpy.motion_graph.tasks.task import WEIGHT_BELOW_CA
-from test_integration_pr2 import PR2TestWrapper, TestJointGoals
+from giskardpy_ros.tree.blackboard_utils import GiskardBlackboard
+from test_integration_pr2 import PR2TestWrapper, TestJointGoals, pocky_pose
 from giskardpy.goals.weight_scaling_goals import MaxManipulabilityLinWeight
+import giskardpy_ros.ros1.msg_converter as msg_converter
 
 
 class PR2TestWrapperMujoco(PR2TestWrapper):
@@ -113,7 +115,7 @@ class TestJointGoalsMujoco(TestJointGoals):
         }
         zero_pose.set_joint_goal(js)
         zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
     def test_joint_goal_projection(self, zero_pose: PR2TestWrapper):
         js = {
@@ -170,7 +172,7 @@ class TestMoveBaseGoals:
         map_T_odom.pose.position.x = 1
         map_T_odom.pose.position.y = 1
         map_T_odom.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 3, [0, 0, 1]))
-        zero_pose.teleport_base(map_T_odom)
+        zero_pose.set_localization(map_T_odom)
 
         base_goal = PoseStamped()
         base_goal.header.frame_id = 'map'
@@ -192,7 +194,7 @@ class TestMoveBaseGoals:
         # zero_pose.set_json_goal('PR2CasterConstraints')
         zero_pose.set_max_traj_length(new_length=160)
         zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
     def test_stay_put(self, zero_pose: PR2TestWrapper):
         base_goal = PoseStamped()
@@ -228,10 +230,10 @@ class TestMoveBaseGoals:
         # zero_pose.plan_and_execute(expected_error_codes=[GiskardError.PREEMPTED], stop_after=10)
 
         zero_pose.motion_goals.add_carry_my_luggage(name='cmb',
-                                                    camera_link='head_mount_kinect_rgb_optical_frame',
-                                                    point_cloud_laser_topic_name='',
-                                                    laser_frame_id='base_laser_link',
-                                                    height_for_camera_target=1.5)
+                                               camera_link='head_mount_kinect_rgb_optical_frame',
+                                               point_cloud_laser_topic_name='',
+                                               laser_frame_id='base_laser_link',
+                                               height_for_camera_target=1.5)
         zero_pose.allow_all_collisions()
         # zero_pose.execute(expected_error_code=GiskardError.EXECUTION_ERROR,
         #                   add_local_minimum_reached=False)
@@ -247,11 +249,11 @@ class TestMoveBaseGoals:
         # zero_pose.plan_and_execute(expected_error_codes=[GiskardError.PREEMPTED], stop_after=10)
 
         zero_pose.motion_goals.add_carry_my_luggage(name='cmb',
-                                                    camera_link='head_mount_kinect_rgb_optical_frame',
-                                                    point_cloud_laser_topic_name='',
-                                                    # laser_topic_name='/laser',
-                                                    laser_frame_id='base_laser_link',
-                                                    drive_back=True)
+                                               camera_link='head_mount_kinect_rgb_optical_frame',
+                                               point_cloud_laser_topic_name='',
+                                               # laser_topic_name='/laser',
+                                               laser_frame_id='base_laser_link',
+                                               drive_back=True)
         zero_pose.allow_all_collisions()
         zero_pose.execute(add_local_minimum_reached=False)
 
@@ -265,7 +267,7 @@ class TestMoveBaseGoals:
                                 tip_link='base_footprint',
                                 scale=2)
         zero_pose.set_joint_goal(zero_pose.better_pose, check=False)
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
     def test_forward_1cm(self, zero_pose: PR2TestWrapper):
         base_goal = PoseStamped()
@@ -332,20 +334,20 @@ class TestMoveBaseGoals:
 
 class TestWorldManipulation:
     def test_add_urdf_body(self, kitchen_setup: PR2TestWrapper):
-        assert god_map.tree.wait_for_goal.synchronization._number_of_synchronisation_behaviors() == 2
+        assert GiskardBlackboard().tree.wait_for_goal.synchronization._number_of_synchronisation_behaviors() == 2
         joint_goal = 0.2
         object_name = kitchen_setup.default_env_name
         kitchen_setup.set_env_state({'sink_area_left_middle_drawer_main_joint': joint_goal})
         joint_state = rospy.wait_for_message('/kitchen/joint_states', JointState, rospy.Duration(1))
-        joint_state = JointStates.from_msg(joint_state)
+        joint_state = msg_converter.ros_joint_state_to_giskard_joint_state(joint_state)
         assert joint_state['sink_area_left_middle_drawer_main_joint'].position == joint_goal
         kitchen_setup.clear_world()
-        assert god_map.tree.wait_for_goal.synchronization._number_of_synchronisation_behaviors() == 1
+        assert GiskardBlackboard().tree.wait_for_goal.synchronization._number_of_synchronisation_behaviors() == 1
         p = PoseStamped()
         p.header.frame_id = 'map'
         p.pose.position.x = 1
         p.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0, 0, 1]))
-        if god_map.is_standalone():
+        if GiskardBlackboard().tree.is_standalone():
             js_topic = ''
             set_js_topic = ''
         else:
@@ -357,24 +359,24 @@ class TestWorldManipulation:
                                         js_topic=js_topic,
                                         set_js_topic=set_js_topic)
         kitchen_setup.wait_heartbeats(1)
-        assert god_map.tree.wait_for_goal.synchronization._number_of_synchronisation_behaviors() == 2
+        assert GiskardBlackboard().tree.wait_for_goal.synchronization._number_of_synchronisation_behaviors() == 2
         joint_state = kitchen_setup.get_group_info(object_name).joint_state
-        joint_state = JointStates.from_msg(joint_state)
+        joint_state = msg_converter.ros_joint_state_to_giskard_joint_state(joint_state)
         assert joint_state['iai_kitchen/sink_area_left_middle_drawer_main_joint'].position == joint_goal
 
         joint_goal = 0.1
         kitchen_setup.set_env_state({'sink_area_left_middle_drawer_main_joint': joint_goal})
         kitchen_setup.remove_group(object_name)
-        assert god_map.tree.wait_for_goal.synchronization._number_of_synchronisation_behaviors() == 1
+        assert GiskardBlackboard().tree.wait_for_goal.synchronization._number_of_synchronisation_behaviors() == 1
         kitchen_setup.add_urdf_to_world(name=object_name,
                                         urdf=rospy.get_param('kitchen_description'),
                                         pose=p,
                                         js_topic=js_topic,
                                         set_js_topic=set_js_topic)
         kitchen_setup.wait_heartbeats(1)
-        assert god_map.tree.wait_for_goal.synchronization._number_of_synchronisation_behaviors() == 2
+        assert GiskardBlackboard().tree.wait_for_goal.synchronization._number_of_synchronisation_behaviors() == 2
         joint_state = kitchen_setup.get_group_info(object_name).joint_state
-        joint_state = JointStates.from_msg(joint_state)
+        joint_state = msg_converter.ros_joint_state_to_giskard_joint_state(joint_state)
         assert joint_state['iai_kitchen/sink_area_left_middle_drawer_main_joint'].position == joint_goal
 
 
@@ -462,12 +464,12 @@ class TestConstraints:
                                             goal_normal=x_goal)
         # kitchen_setup.allow_all_collisions()
         kitchen_setup.allow_collision(kitchen_setup.l_gripper_group, kitchen_setup.default_env_name)
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
 
         # open drawer
         kitchen_setup.set_open_container_goal(tip_link=kitchen_setup.l_tip,
                                               environment_link=drawer_handle)
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
         kitchen_setup.set_env_state({drawer_joint: 0.48})
 
         kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
@@ -504,7 +506,7 @@ class TestConstraints:
                                     tip_link=kitchen_setup.r_tip,
                                     root_link=kitchen_setup.default_root,
                                     weight=WEIGHT_BELOW_CA)
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
 
         l_goal.pose.position.z -= .2
         r_goal.pose.position.z -= .2
@@ -518,13 +520,13 @@ class TestConstraints:
         kitchen_setup.avoid_all_collisions(0.05)
         kitchen_setup.allow_collision(group1=kitchen_setup.robot_name, group2=bowl_name)
         kitchen_setup.allow_collision(group1=kitchen_setup.robot_name, group2=cup_name)
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
 
         kitchen_setup.update_parent_link_of_group(name=bowl_name, parent_link=kitchen_setup.l_tip)
         kitchen_setup.update_parent_link_of_group(name=cup_name, parent_link=kitchen_setup.r_tip)
 
         kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
         base_goal = PoseStamped()
         base_goal.header.frame_id = 'base_footprint'
         base_goal.pose.position.x = -.1
@@ -546,14 +548,14 @@ class TestConstraints:
         kitchen_setup.set_cart_goal(goal_pose=cup_goal, tip_link=cup_name, root_link=kitchen_setup.default_root)
         kitchen_setup.set_avoid_joint_limits_goal(percentage=percentage)
         kitchen_setup.avoid_all_collisions(0.05)
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
 
         kitchen_setup.detach_group(name=bowl_name)
         kitchen_setup.detach_group(name=cup_name)
         kitchen_setup.allow_collision(group1=kitchen_setup.robot_name, group2=cup_name)
         kitchen_setup.allow_collision(group1=kitchen_setup.robot_name, group2=bowl_name)
         kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
-        kitchen_setup.plan_and_execute()
+        kitchen_setup.execute()
 
 
 class TestActionServerEvents:
@@ -564,7 +566,7 @@ class TestActionServerEvents:
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.set_cart_goal(goal_pose=p, tip_link='base_footprint', root_link='map')
         zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute(expected_error_code=GiskardError.PREEMPTED, stop_after=1)
+        zero_pose.execute(expected_error_code=GiskardError.PREEMPTED, stop_after=1)
 
     def test_interrupt2(self, zero_pose: PR2TestWrapper):
         p = PoseStamped()
@@ -573,7 +575,7 @@ class TestActionServerEvents:
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.set_cart_goal(goal_pose=p, tip_link='base_footprint', root_link='map')
         zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute(expected_error_code=GiskardError.PREEMPTED, stop_after=6)
+        zero_pose.execute(expected_error_code=GiskardError.PREEMPTED, stop_after=6)
 
     def test_undefined_type(self, zero_pose: PR2TestWrapper):
         zero_pose.allow_all_collisions()
@@ -581,7 +583,7 @@ class TestActionServerEvents:
 
     def test_empty_goal(self, zero_pose: PR2TestWrapper):
         zero_pose.cmd_seq = []
-        zero_pose.plan_and_execute(expected_error_code=GiskardError.INVALID_GOAL)
+        zero_pose.execute(expected_error_code=GiskardError.INVALID_GOAL)
 
 
 class TestManipulability:
@@ -631,7 +633,7 @@ class TestManipulability:
                                         root_link='map',
                                         tip_normal=x_base,
                                         goal_normal=x_goal)
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
 class TestMonitors:
     def test_only_payload_monitors(self, zero_pose: PR2TestWrapper):

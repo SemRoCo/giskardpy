@@ -6,10 +6,8 @@ import rosnode
 import rospy
 
 from giskard_msgs.msg import MoveGoal
-from giskard_msgs.msg import MoveResult
-from giskardpy.exceptions import GiskardException
-from giskardpy.tree.behaviors.plugin import GiskardBehavior
-from giskardpy.utils import logging
+from giskardpy.data_types.exceptions import GiskardException
+from giskardpy.middleware import middleware
 from giskardpy.utils.decorators import record_time
 
 
@@ -35,6 +33,15 @@ class ActionServerHandler:
                                                 execute_cb=self.execute_cb, auto_start=False)
         self._as.start()
 
+    def is_goal_msg_type_execute(self):
+        return self.goal_msg.type in [MoveGoal.EXECUTE]
+
+    def is_goal_msg_type_projection(self):
+        return MoveGoal.PROJECTION == self.goal_msg.type
+
+    def is_goal_msg_type_undefined(self):
+        return MoveGoal.UNDEFINED == self.goal_msg.type
+
     def execute_cb(self, goal) -> None:
         self.goal_queue.put(goal)
         result_cb = self.result_queue.get()
@@ -51,7 +58,7 @@ class ActionServerHandler:
         client_name = self._as.current_goal.goal.goal_id.id.split('-')[0]
         self.client_alive = rosnode.rosnode_ping(client_name, max_count=1)
         if not self.client_alive:
-            logging.logerr(f'Lost connection to Client "{client_name}".')
+            middleware.logerr(f'Lost connection to Client "{client_name}".')
             self.client_alive_checker.shutdown()
 
     def accept_goal(self) -> None:

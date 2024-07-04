@@ -9,9 +9,9 @@ from giskardpy.data_types.data_types import Derivatives, ColorRGBA, PrefixName
 from giskardpy.goals.goal import Goal
 from giskardpy.god_map import god_map
 from giskardpy.model.joints import DiffDrive
-from giskardpy.monitors.monitors import ExpressionMonitor
+from giskardpy.motion_graph.monitors.monitors import ExpressionMonitor
 from giskardpy.symbol_manager import symbol_manager
-from giskardpy.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
+from giskardpy.motion_graph.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
 
 
 class CartesianPosition(Goal):
@@ -584,14 +584,14 @@ class RelativePositionSequence(Goal):
         root_P_goal1 = cas.Point3(self.root_P_goal1)
 
         error1 = cas.euclidean_distance(root_P_goal1, root_P_current)
-        error1_monitor = ExpressionMonitor(name='p1',
-                                           stay_true=True)
+        error1_monitor = ExpressionMonitor(name='p1')
         self.add_monitor(error1_monitor)
+        error1_monitor.end_condition = error1_monitor.get_state_expression()
         error1_monitor.expression = cas.less(cas.abs(error1), 0.01)
 
-        error2_monitor = ExpressionMonitor(name='p2',
-                                           stay_true=True)
+        error2_monitor = ExpressionMonitor(name='p2')
         self.add_monitor(error2_monitor)
+        error2_monitor.end_condition = error2_monitor.get_state_expression()
 
         root_T_goal2_cached = root_T_tip.dot(self.tip_P_goal2)
         root_P_goal2_cached = god_map.monitor_manager.register_expression_updater(root_T_goal2_cached,

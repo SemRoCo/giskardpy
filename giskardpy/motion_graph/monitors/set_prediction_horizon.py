@@ -1,11 +1,11 @@
 from typing import Union, Optional
 
+from giskardpy.middleware import middleware
+from giskardpy.qp.qp_solver_ids import SupportedQPSolver
 import giskardpy.casadi_wrapper as cas
 from giskardpy.data_types.exceptions import MonitorInitalizationException
 from giskardpy.god_map import god_map
-from giskardpy.middleware import middleware
 from giskardpy.motion_graph.monitors.monitors import PayloadMonitor
-from giskardpy.qp.qp_solver_ids import SupportedQPSolver
 
 
 class SetPredictionHorizon(PayloadMonitor):
@@ -55,3 +55,4 @@ class SetQPSolver(PayloadMonitor):
 
     def __call__(self):
         self.state = True
+

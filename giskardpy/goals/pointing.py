@@ -8,7 +8,7 @@ import giskardpy.casadi_wrapper as cas
 from giskardpy.data_types.data_types import ColorRGBA, PrefixName
 from giskardpy.goals.goal import Goal
 from giskardpy.symbol_manager import symbol_manager
-from giskardpy.tasks.task import WEIGHT_BELOW_CA
+from giskardpy.motion_graph.tasks.task import WEIGHT_BELOW_CA
 from giskardpy.god_map import god_map
 
 

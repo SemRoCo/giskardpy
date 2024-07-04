@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from giskardpy.model.trajectory import Trajectory
     from giskardpy.qp.qp_controller import QPController
     from giskardpy.data_types.data_types import PrefixName
-    from giskardpy.monitors.monitor_manager import MonitorManager
+    from giskardpy.motion_graph.monitors.monitor_manager import MonitorManager
     from giskardpy.goals.motion_goal_manager import MotionGoalManager
     from giskardpy.debug_expression_manager import DebugExpressionManager
     from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer, Collisions
@@ -43,28 +43,21 @@ class GodMap:
 
     # %% other
     tmp_folder: str
-    __initialized = False
-
-    def initialize(self):
-        # can't use __init__.py because it creates a circular import exception
-        if not self.__initialized:
-            from giskardpy.model.world import WorldTree
-            self.world = WorldTree()
-
-            from giskardpy.goals.motion_goal_manager import MotionGoalManager
-            self.motion_goal_manager = MotionGoalManager()
-
-            from giskardpy.monitors.monitor_manager import MonitorManager
-            self.monitor_manager = MonitorManager()
-
-            from giskardpy.debug_expression_manager import DebugExpressionManager
-            self.debug_expression_manager = DebugExpressionManager()
-
-            self.__initialized = True
 
     def __getattr__(self, item):
-        # automatically initialize self, when an attribute isn't found
-        self.initialize()
+        # automatically initialize certain attributes
+        if item == 'world':
+            from giskardpy.model.world import WorldTree
+            self.world = WorldTree()
+        elif item == 'motion_goal_manager':
+            from giskardpy.goals.motion_goal_manager import MotionGoalManager
+            self.motion_goal_manager = MotionGoalManager()
+        elif item == 'monitor_manager':
+            from giskardpy.motion_graph.monitors.monitor_manager import MonitorManager
+            self.monitor_manager = MonitorManager()
+        elif item == 'debug_expression_manager':
+            from giskardpy.debug_expression_manager import DebugExpressionManager
+            self.debug_expression_manager = DebugExpressionManager()
         return super().__getattribute__(item)
 
     def is_collision_checking_enabled(self):

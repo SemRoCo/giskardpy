@@ -8,47 +8,33 @@ from typing import Optional
 import numpy as np
 
 import giskardpy.casadi_wrapper as cas
-from giskardpy.data_types.data_types import Derivatives
+from giskardpy.data_types.data_types import Derivatives, PrefixName
 from giskardpy.data_types.exceptions import GiskardException, MonitorInitalizationException
 from giskardpy.god_map import god_map
+from giskardpy.motion_graph.graph_node import MotionGraphNode
 from giskardpy.symbol_manager import symbol_manager
-from giskardpy.utils.utils import string_shortener
 
 
-class Monitor:
-    id: int
-    name: str
-    start_condition: cas.Expression
-    plot: bool
-    stay_true: bool
+class Monitor(MotionGraphNode):
 
     def __init__(self, *,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 plot: bool = True,
-                 stay_true: bool = False):
+                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 end_condition: cas.Expression = cas.FalseSymbol,
+                 plot: bool = True):
         """
         Every class inheriting from this can be called via the ROS interface.
         :param name: name of the monitor
         :param start_condition: A logical casadi expression using monitor variables, "not", "and" and "or". This monitor
                                  will only get executed once this condition becomes True.
         :param plot: If true, this monitor will not be plotted in the gantt chart and task graph.
-        :param stay_true: If True, this monitor will stay True once it gets into that state.
         """
-        self.name = name or self.__class__.__name__
+        self.name = PrefixName(name or self.__class__.__name__)
+        super().__init__(name=name,
+                         start_condition=start_condition, hold_condition=hold_condition, end_condition=end_condition,
+                         plot=plot)
         self.start_condition = start_condition
-        self._id = -1
-        self.plot = plot
-        self.stay_true = stay_true
-
-    def set_id(self, new_id: int):
-        self._id = new_id
-
-    @property
-    def id(self) -> int:
-        if self._id == -1:
-            raise MonitorInitalizationException(f'Id of {self.name} is not set.')
-        return self._id
 
     @cached_property
     def state_filter(self) -> np.ndarray:
@@ -60,19 +46,8 @@ class Monitor:
     def get_life_cycle_state_expression(self):
         return symbol_manager.get_symbol(f'god_map.monitor_manager.life_cycle_state[{self.id}]')
 
-    def formatted_name(self, quoted: bool = False) -> str:
-        formatted_name = string_shortener(original_str=self.name,
-                                          max_lines=4,
-                                          max_line_length=25)
-        result = (f'{formatted_name}\n'
-                  f'----start_condition----\n'
-                  f'{god_map.monitor_manager.format_condition(self.start_condition)}')
-        if quoted:
-            return '"' + result + '"'
-        return result
-
     def __repr__(self) -> str:
-        return self.name
+        return str(self.name)
 
 
 class PayloadMonitor(Monitor, ABC):
@@ -82,8 +57,9 @@ class PayloadMonitor(Monitor, ABC):
     def __init__(self, *,
                  run_call_in_thread: bool,
                  name: Optional[str] = None,
-                 stay_true: bool = True,
-                 start_condition: cas.Expression = cas.TrueSymbol):
+                 start_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 end_condition: cas.Expression = cas.FalseSymbol):
         """
         A monitor which executes its __call__ function when start_condition becomes True.
         Subclass this and implement __init__.py and __call__. The __call__ method should change self.state to True when
@@ -92,7 +68,10 @@ class PayloadMonitor(Monitor, ABC):
         """
         self.state = False
         self.run_call_in_thread = run_call_in_thread
-        super().__init__(name=name, start_condition=start_condition, stay_true=stay_true)
+        super().__init__(name=name,
+                         start_condition=start_condition,
+                         hold_condition=hold_condition,
+                         end_condition=end_condition)
 
     def get_state(self) -> bool:
         return self.state
@@ -105,8 +84,14 @@ class PayloadMonitor(Monitor, ABC):
 class EndMotion(PayloadMonitor):
     def __init__(self,
                  name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol, ):
-        super().__init__(name=name, start_condition=start_condition, run_call_in_thread=False)
+                 start_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 end_condition: cas.Expression = cas.FalseSymbol):
+        super().__init__(name=name,
+                         start_condition=start_condition,
+                         hold_condition=hold_condition,
+                         end_condition=end_condition,
+                         run_call_in_thread=False)
 
     def __call__(self):
         self.state = True
@@ -119,8 +104,14 @@ class CancelMotion(PayloadMonitor):
     def __init__(self,
                  exception: Exception = GiskardException,
                  name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol):
-        super().__init__(name=name, start_condition=start_condition, run_call_in_thread=False)
+                 start_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 end_condition: cas.Expression = cas.FalseSymbol):
+        super().__init__(name=name,
+                         start_condition=start_condition,
+                         hold_condition=hold_condition,
+                         end_condition=end_condition,
+                         run_call_in_thread=False)
         self.exception = exception
 
     @profile
@@ -137,8 +128,9 @@ class ExpressionMonitor(Monitor):
 
     def __init__(self, *,
                  name: Optional[str] = None,
-                 stay_true: bool = False,
                  start_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 end_condition: cas.Expression = cas.FalseSymbol,
                  plot: bool = True):
         """
         A Monitor whose state is determined by its expression.
@@ -147,7 +139,11 @@ class ExpressionMonitor(Monitor):
         self.substitution_values = []
         self.substitution_keys = []
         self._expression = None
-        super().__init__(name=name, start_condition=start_condition, plot=plot, stay_true=stay_true)
+        super().__init__(name=name,
+                         start_condition=start_condition,
+                         hold_condition=hold_condition,
+                         end_condition=end_condition,
+                         plot=plot)
 
     @property
     def expression(self) -> cas.Expression:
@@ -173,8 +169,12 @@ class LocalMinimumReached(ExpressionMonitor):
                  joint_convergence_threshold: float = 0.01,
                  windows_size: int = 1,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 stay_true: bool = True):
-        super().__init__(name=name, stay_true=stay_true, start_condition=start_condition)
+                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 end_condition: cas.Expression = cas.FalseSymbol):
+        super().__init__(name=name,
+                         start_condition=start_condition,
+                         hold_condition=hold_condition,
+                         end_condition=end_condition)
         self.joint_convergence_threshold = joint_convergence_threshold
         self.min_cut_off = min_cut_off
         self.max_cut_off = max_cut_off
@@ -204,10 +204,15 @@ class TimeAbove(ExpressionMonitor):
     def __init__(self,
                  threshold: float,
                  name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol):
+                 start_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 end_condition: cas.Expression = cas.FalseSymbol):
         super().__init__(name=name,
-                         stay_true=False,
-                         start_condition=start_condition)
+                         start_condition=start_condition,
+                         hold_condition=hold_condition,
+                         end_condition=end_condition)
+        if threshold is None:
+            threshold = god_map.qp_controller_config.max_trajectory_length
         traj_length_in_sec = symbol_manager.time
         condition = cas.greater(traj_length_in_sec, threshold)
         self.expression = condition
@@ -217,11 +222,16 @@ class Alternator(ExpressionMonitor):
 
     def __init__(self,
                  name: Optional[str] = None,
-                 stay_true: bool = False,
                  start_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 end_condition: cas.Expression = cas.FalseSymbol,
                  mod: int = 2,
                  plot: bool = True):
-        super().__init__(name=name, stay_true=stay_true, start_condition=start_condition, plot=plot)
+        super().__init__(name=name,
+                         start_condition=start_condition,
+                         hold_condition=hold_condition,
+                         end_condition=end_condition,
+                         plot=plot)
         time = symbol_manager.time
         expr = cas.equal(cas.fmod(cas.floor(time), mod), 0)
         self.expression = expr

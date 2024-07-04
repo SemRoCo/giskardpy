@@ -4,10 +4,9 @@ import abc
 from abc import ABC
 from typing import List, Union
 
-from giskardpy.monitors.monitors import ExpressionMonitor, Monitor
+from giskardpy.motion_graph.monitors.monitors import ExpressionMonitor, Monitor
 from giskardpy.god_map import god_map
-from giskardpy.symbol_manager import symbol_manager
-from giskardpy.tasks.task import Task
+from giskardpy.motion_graph.tasks.task import Task
 from giskardpy.utils.utils import string_shortener
 from giskardpy.data_types.exceptions import GoalInitalizationException
 from giskardpy.model.joints import OneDofJoint
@@ -153,10 +152,3 @@ class Goal(ABC):
 
     def add_monitor(self, monitor: Monitor) -> None:
         god_map.monitor_manager.add_monitor(monitor)
-
-
-class NonMotionGoal(Goal):
-    """
-    Inherit from this goal, if the goal does not add any constraints.
-    """
-    pass

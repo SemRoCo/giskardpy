@@ -3,80 +3,13 @@ from __future__ import division
 from typing import Dict, Optional, List
 
 from giskardpy import casadi_wrapper as cas
-from giskardpy.god_map import god_map
-from giskardpy.symbol_manager import symbol_manager
+from giskardpy.data_types.data_types import Derivatives
 from giskardpy.data_types.exceptions import GoalInitalizationException
-from giskardpy.goals.goal import Goal, NonMotionGoal
-from giskardpy.tasks.task import WEIGHT_BELOW_CA
-from giskardpy.model.joints import OmniDrive, DiffDrive, OmniDrivePR22, OneDofJoint
-from giskardpy.data_types.data_types import PrefixName, Derivatives
-from giskardpy.utils.math import axis_angle_from_quaternion
-
-
-class SetSeedConfiguration(NonMotionGoal):
-    def __init__(self,
-                 seed_configuration: Dict[str, float],
-                 group_name: Optional[str] = None,
-                 name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol):
-        """
-        Overwrite the configuration of the world to allow starting the planning from a different state.
-        Can only be used in plan only mode.
-        :param seed_configuration: maps joint name to float
-        :param group_name: if joint names are not unique, it will search in this group for matches.
-        """
-        self.seed_configuration = seed_configuration
-        if name is None:
-            name = f'{str(self.__class__.__name__)}/{list(self.seed_configuration.keys())}'
-        super().__init__(name)
-        if group_name is not None:
-            seed_configuration = {PrefixName(joint_name, group_name): v for joint_name, v in seed_configuration.items()}
-        for joint_name, initial_joint_value in seed_configuration.items():
-            joint_name = god_map.world.search_for_joint_name(joint_name, group_name)
-            if joint_name not in god_map.world.state:
-                raise KeyError(f'World has no joint \'{joint_name}\'.')
-            god_map.world.state[joint_name].position = initial_joint_value
-        god_map.world.notify_state_change()
-        self.connect_monitors_to_all_tasks(start_condition, hold_condition, end_condition)
-
-
-class SetOdometry(NonMotionGoal):
-    def __init__(self,
-                 group_name: str,
-                 base_pose: cas.TransMatrix,
-                 name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol):
-        self.group_name = group_name
-        if name is None:
-            name = f'{self.__class__.__name__}/{self.group_name}'
-        super().__init__(name)
-        brumbrum_joint_name = god_map.world.groups[group_name].root_link.child_joint_names[0]
-        brumbrum_joint = god_map.world.joints[brumbrum_joint_name]
-        if not isinstance(brumbrum_joint, (OmniDrive, DiffDrive, OmniDrivePR22)):
-            raise GoalInitalizationException(f'Group {group_name} has no odometry joint.')
-        base_pose = god_map.world.transform(brumbrum_joint.parent_link_name, base_pose)
-        position = base_pose.to_position().to_np()
-        orientation = base_pose.to_rotation().to_quaternion().to_np()
-        god_map.world.state[brumbrum_joint.x.name].position = position[0][0]
-        god_map.world.state[brumbrum_joint.y.name].position = position[1][0]
-        axis, angle = axis_angle_from_quaternion(orientation[0][0],
-                                                 orientation[1][0],
-                                                 orientation[2][0],
-                                                 orientation[3][0])
-        if axis[-1] < 0:
-            angle = -angle
-        if isinstance(brumbrum_joint, OmniDrivePR22):
-            god_map.world.state[brumbrum_joint.yaw1_vel.name].position = 0
-            # god_map.get_world().state[brumbrum_joint.yaw2_name].position = angle
-            god_map.world.state[brumbrum_joint.yaw.name].position = angle
-        else:
-            god_map.world.state[brumbrum_joint.yaw.name].position = angle
-        god_map.world.notify_state_change()
-        self.connect_monitors_to_all_tasks(start_condition, hold_condition, end_condition)
+from giskardpy.goals.goal import Goal
+from giskardpy.god_map import god_map
+from giskardpy.model.joints import OneDofJoint
+from giskardpy.symbol_manager import symbol_manager
+from giskardpy.motion_graph.tasks.task import WEIGHT_BELOW_CA
 
 
 class JointVelocityLimit(Goal):
@@ -275,7 +208,8 @@ class JointSignWave(Goal):
         min_, max_ = god_map.world.compute_joint_limits(joint_name, Derivatives.position)
         _, max_vel = god_map.world.compute_joint_limits(joint_name, Derivatives.velocity)
         center = (max_ + min_) / 2
-        goal_position = center + cas.sin(symbol_manager.time * 2 * cas.pi * (frequency)) * (max_ - center) * amp_percentage
+        goal_position = center + cas.sin(symbol_manager.time * 2 * cas.pi * (frequency)) * (
+                max_ - center) * amp_percentage
         t.add_position_constraint(expr_current=joint_symbol,
                                   expr_goal=goal_position,
                                   reference_velocity=max_vel,

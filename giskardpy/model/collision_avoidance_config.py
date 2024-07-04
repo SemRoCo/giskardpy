@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import abc
+from copy import copy
 from typing import Optional, List
 
 from giskardpy.data_types.exceptions import SetupException
@@ -98,13 +99,19 @@ class CollisionAvoidanceConfig(abc.ABC):
         :param hard_threshold: distance threshold not allowed to be violated
         :param max_velocity: how fast it will move away from collisions
         """
+        new_default = CollisionAvoidanceThresholds(
+            number_of_repeller=number_of_repeller,
+            soft_threshold=soft_threshold,
+            hard_threshold=hard_threshold,
+            max_velocity=max_velocity
+        )
+        # overwrite the default of default
+        old_default = self.collision_scene.collision_avoidance_configs.default_factory()
+        old_default.external_collision_avoidance.default_factory = lambda: copy(new_default)
+        self.collision_scene.collision_avoidance_configs.default_factory = lambda: copy(old_default)
+        # overwrite the defaults of existing entries
         for config in self.collision_scene.collision_avoidance_configs.values():
-            config.external_collision_avoidance.default_factory = lambda: CollisionAvoidanceThresholds(
-                number_of_repeller=number_of_repeller,
-                soft_threshold=soft_threshold,
-                hard_threshold=hard_threshold,
-                max_velocity=max_velocity
-            )
+            config.external_collision_avoidance.default_factory = lambda: copy(new_default)
 
     def overwrite_external_collision_avoidance(self,
                                                joint_name: str,

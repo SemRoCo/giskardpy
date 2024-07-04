@@ -4,9 +4,9 @@ from typing import Dict, Optional, List
 import giskardpy.casadi_wrapper as cas
 from giskardpy.goals.goal import Goal
 from giskardpy.model.collision_world_syncer import CollisionEntry
-from giskardpy.monitors.monitors import ExpressionMonitor
-from giskardpy.monitors.payload_monitors import CollisionMatrixUpdater
-from giskardpy.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE
+from giskardpy.motion_graph.monitors.monitors import ExpressionMonitor
+from giskardpy.motion_graph.monitors.payload_monitors import CollisionMatrixUpdater
+from giskardpy.motion_graph.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE
 from giskardpy.god_map import god_map
 from giskardpy.data_types.data_types import PrefixName
 from giskardpy.symbol_manager import symbol_manager

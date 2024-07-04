@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import builtins
 from copy import copy
+from enum import IntEnum
 from typing import Union, TypeVar
 import math
 
@@ -64,7 +65,7 @@ class CompiledFunction:
         else:
             try:
                 self.compiled_f = ca.Function('f', parameters, [ca.densify(expression.s)])
-            except Exception:
+            except Exception as e:
                 self.compiled_f = ca.Function('f', parameters, ca.densify(expression.s))
             self.buf, self.f_eval = self.compiled_f.buffer()
             if expression.shape[1] <= 1:
@@ -1338,7 +1339,7 @@ class Quaternion(Symbol_, GeometricType):
 
 all_expressions = Union[Symbol_, Symbol, Expression, Point3, Vector3, RotationMatrix, TransMatrix, Quaternion]
 all_expressions_float = Union[Symbol, Expression, Point3, Vector3, RotationMatrix, TransMatrix, float, Quaternion]
-symbol_expr_float = Union[Symbol, Expression, float]
+symbol_expr_float = Union[Symbol, Expression, float, int, IntEnum]
 symbol_expr = Union[Symbol, Expression]
 PreservedCasType = TypeVar('PreservedCasType', Point3, Vector3, TransMatrix, RotationMatrix, Quaternion, Expression)
 
@@ -1480,9 +1481,9 @@ def limit(x, lower_limit, upper_limit):
 
 def if_else(condition, if_result, else_result):
     condition = Expression(condition).s
-    if isinstance(if_result, float):
+    if isinstance(if_result, (float, int)):
         if_result = Expression(if_result)
-    if isinstance(else_result, float):
+    if isinstance(else_result, (float, int)):
         else_result = Expression(else_result)
     if isinstance(if_result, (Point3, Vector3, TransMatrix, RotationMatrix, Quaternion)):
         assert type(if_result) == type(else_result), \

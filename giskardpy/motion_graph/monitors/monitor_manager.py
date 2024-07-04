@@ -7,11 +7,12 @@ import numpy as np
 
 import giskardpy.casadi_wrapper as cas
 from giskardpy.casadi_wrapper import CompiledFunction
-from giskardpy.data_types.data_types import TaskState
+from giskardpy.data_types.data_types import TaskState, PrefixName
 from giskardpy.data_types.exceptions import GiskardException, MonitorInitalizationException
 from giskardpy.god_map import god_map
-from giskardpy.monitors.monitors import ExpressionMonitor, Monitor
-from giskardpy.monitors.payload_monitors import PayloadMonitor, CancelMotion
+from giskardpy.motion_graph.helpers import compile_graph_node_state_updater
+from giskardpy.motion_graph.monitors.monitors import ExpressionMonitor, Monitor, EndMotion
+from giskardpy.motion_graph.monitors.payload_monitors import PayloadMonitor, CancelMotion
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils.utils import get_all_classes_in_package
 
@@ -27,13 +28,13 @@ class MonitorManager:
     compiled_life_cycle_state_updater: CompiledFunction
     state_history: List[Tuple[float, Tuple[np.ndarray, np.ndarray]]]  # time -> (state, life_cycle_state)
 
-    monitors: List[Monitor]
+    monitors: Dict[PrefixName, Monitor]
 
     substitution_values: Dict[int, Dict[str, float]]  # id -> (old_symbol, value)
     triggers: Dict[int, Callable]  # id -> updater callback
     trigger_conditions: List[cas.Expression]  # id -> condition
     compiled_trigger_conditions: cas.CompiledFunction  # stacked compiled function which returns array of evaluated conditions
-    monitor_package_paths = {'giskardpy.monitors'}
+    monitor_package_paths = {'giskardpy.motion_graph.monitors'}
 
     def __init__(self):
         self.allowed_monitor_types = {}
@@ -46,32 +47,36 @@ class MonitorManager:
             del self.payload_monitor_filter
         except Exception as e:
             pass
-        self.monitors = []
+        self.monitors = OrderedDict()
         self.state_history = []
         self.substitution_values = {}
         self.triggers = {}
         self.trigger_conditions = []
 
-    def evaluate_expression(self, node):
+    def evaluate_expression(self, node,
+                            monitor_name_to_state_expr: Dict[str, cas.Expression]) -> cas.Expression:
         if isinstance(node, ast.BoolOp):
             if isinstance(node.op, ast.And):
-                return cas.logic_and(*[self.evaluate_expression(x) for x in node.values])
+                return cas.logic_and(*[self.evaluate_expression(x, monitor_name_to_state_expr) for x in node.values])
             elif isinstance(node.op, ast.Or):
-                return cas.logic_or(*[self.evaluate_expression(x) for x in node.values])
+                return cas.logic_or(*[self.evaluate_expression(x, monitor_name_to_state_expr) for x in node.values])
         elif isinstance(node, ast.UnaryOp):
             if isinstance(node.op, ast.Not):
-                return cas.logic_not(self.evaluate_expression(node.operand))
+                return cas.logic_not(self.evaluate_expression(node.operand, monitor_name_to_state_expr))
         elif isinstance(node, ast.Str):
             # replace monitor name with its state expression
-            return self.get_monitor(node.value).get_state_expression()
+            return monitor_name_to_state_expr[node.value]
         raise Exception(f'failed to parse {node}')
 
-    def logic_str_to_expr(self, logic_str: str, default: cas.Expression) -> cas.Expression:
+    def logic_str_to_expr(self, logic_str: str, default: cas.Expression,
+                          monitor_name_to_state_expr: Optional[Dict[str, cas.Expression]] = None) -> cas.Expression:
+        if monitor_name_to_state_expr is None:
+            monitor_name_to_state_expr = {key: value.get_state_expression() for key, value in self.monitors.items()}
         if logic_str == '':
             return default
         tree = ast.parse(logic_str, mode='eval')
         try:
-            return self.evaluate_expression(tree.body)
+            return self.evaluate_expression(tree.body, monitor_name_to_state_expr)
         except KeyError as e:
             raise GiskardException(f'Unknown symbol {e}')
         except Exception as e:
@@ -87,20 +92,26 @@ class MonitorManager:
 
     @profile
     def get_monitor(self, name: str) -> Monitor:
-        for monitor in self.monitors:
+        for monitor in self.monitors.values():
             if monitor.name == name:
                 return monitor
         raise KeyError(f'No monitor of name \'{name}\' found.')
 
+    def get_monitor_state_expr(self) -> cas.Expression:
+        symbols = []
+        for monitor in self.monitors.values():
+            symbols.append(monitor.get_state_expression())
+        return cas.Expression(symbols)
+
     def set_initial_life_cycle_state(self):
-        for monitor in self.monitors:
+        for monitor in self.monitors.values():
             if cas.is_true(monitor.start_condition):
                 self.life_cycle_state[monitor.id] = TaskState.running
             else:
                 self.life_cycle_state[monitor.id] = TaskState.not_started
 
     def get_monitor_from_state_expr(self, expr: cas.Expression) -> Monitor:
-        for monitor in self.monitors:
+        for monitor in self.monitors.values():
             if cas.is_true(monitor.get_state_expression() == expr):
                 return monitor
         raise GiskardException('No monitor found.')
@@ -129,51 +140,24 @@ class MonitorManager:
         return condition
 
     @profile
-    def compile_monitor_state_updater(self):
-        monitor_state = cas.Expression(self.get_state_expression_symbols())
-
-        symbols = []
-        for i in range(len(self.monitors)):
-            symbols.append(self.monitors[i].get_life_cycle_state_expression())
-        monitor_life_cycle_state = cas.Expression(symbols)
-
+    def compile_monitor_state_updater(self) -> None:
         state_updater = []
-        life_cycle_state_updater = []
-        for i, monitor in enumerate(self.monitors):
-            state_symbol = monitor_state[monitor.id]
-            life_cycle_state_symbol = monitor_life_cycle_state[monitor.id]
-
-            if not cas.is_true(monitor.start_condition):
-                start_if = cas.if_else(monitor.start_condition,
-                                       if_result=int(TaskState.running),
-                                       else_result=life_cycle_state_symbol)
-            else:
-                start_if = life_cycle_state_symbol
-
-            done_if = cas.if_else(condition=cas.logic_and(cas.Expression(monitor.stay_true), state_symbol),
-                                  if_result=int(TaskState.succeeded),
-                                  else_result=life_cycle_state_symbol)
-
-            life_cycle_state_f = cas.if_eq_cases(a=state_symbol,
-                                                 b_result_cases=[(int(TaskState.not_started), start_if),
-                                                                 (int(TaskState.running), done_if)],
-                                                 else_result=life_cycle_state_symbol)
-            life_cycle_state_updater.append(life_cycle_state_f)
+        for monitor in self.monitors.values():
+            state_symbol = monitor.get_state_expression()
 
             if isinstance(monitor, ExpressionMonitor):
                 monitor.compile()
-                state_f = cas.if_eq(life_cycle_state_symbol, int(TaskState.running),
+                state_f = cas.if_eq(monitor.get_life_cycle_state_expression(), int(TaskState.running),
                                     if_result=monitor.expression,
                                     else_result=state_symbol)
             else:
                 state_f = state_symbol  # if payload monitor, copy last state
             state_updater.append(state_f)
 
-        symbols = monitor_state.free_symbols() + monitor_life_cycle_state.free_symbols()
-        life_cycle_state_updater = cas.Expression(life_cycle_state_updater)
         state_updater = cas.Expression(state_updater)
         self.compiled_state_updater = state_updater.compile(state_updater.free_symbols())
-        self.compiled_life_cycle_state_updater = life_cycle_state_updater.compile(symbols)
+
+        self.compiled_life_cycle_state_updater = compile_graph_node_state_updater(self.monitors)
 
     @property
     def expression_monitors(self) -> List[ExpressionMonitor]:
@@ -181,17 +165,17 @@ class MonitorManager:
 
     @property
     def payload_monitors(self) -> List[PayloadMonitor]:
-        return [x for x in self.monitors if isinstance(x, PayloadMonitor)]
+        return [x for x in self.monitors.values() if isinstance(x, PayloadMonitor)]
 
     def add_monitor(self, monitor: Monitor) -> None:
-        if [x for x in self.monitors if x.name == monitor.name]:
+        if [x for x in self.monitors.values() if x.name == monitor.name]:
             raise MonitorInitalizationException(f'Monitor named {monitor.name} already exists.')
-        self.monitors.append(monitor)
-        monitor.set_id(len(self.monitors) - 1)
+        self.monitors[monitor.name] = monitor
+        monitor.id = len(self.monitors) - 1
 
     def get_state_dict(self) -> Dict[str, Tuple[str, bool]]:
         return OrderedDict((monitor.name, (str(TaskState(self.life_cycle_state[i])), bool(self.state[i])))
-                           for i, monitor in enumerate(self.monitors))
+                           for i, monitor in enumerate(self.monitors.values()))
 
     @profile
     def register_expression_updater(self, expression: cas.PreservedCasType,
@@ -216,10 +200,10 @@ class MonitorManager:
     @profile
     def to_state_filter(self, monitor_names: List[Union[str, Monitor]]) -> np.ndarray:
         monitor_names = monitor_list_to_monitor_name_tuple(monitor_names)
-        return np.array([monitor.id for monitor in self.monitors if monitor.name in monitor_names])
+        return np.array([monitor.id for monitor in self.monitors.values() if monitor.name in monitor_names])
 
     def get_state_expression_symbols(self) -> List[cas.Symbol]:
-        return [m.get_state_expression() for m in self.monitors]
+        return [m.get_state_expression() for m in self.monitors.values()]
 
     @profile
     def _register_expression_update_triggers(self):
@@ -259,7 +243,7 @@ class MonitorManager:
 
     @cached_property
     def payload_monitor_filter(self):
-        return np.array([i for i, m in enumerate(self.monitors) if isinstance(m, PayloadMonitor)])
+        return np.array([i for i, m in enumerate(self.monitors.values()) if isinstance(m, PayloadMonitor)])
 
     @profile
     def evaluate_monitors(self):
@@ -268,7 +252,7 @@ class MonitorManager:
         self.state = self.compiled_state_updater.fast_call(args)
 
         # %% update life cycle state
-        args = np.concatenate((self.state, self.life_cycle_state))
+        args = np.concatenate((self.life_cycle_state, self.state))
         self.life_cycle_state = self.compiled_life_cycle_state_updater.fast_call(args)
 
         if len(self.payload_monitor_filter) > 0:
@@ -286,3 +270,21 @@ class MonitorManager:
     @profile
     def search_for_monitors(self, monitor_names: List[str]) -> List[Monitor]:
         return [self.get_monitor(monitor_name) for monitor_name in monitor_names]
+
+    def has_end_motion_monitor(self) -> bool:
+        for m in self.monitors.values():
+            if isinstance(m, EndMotion):
+                return True
+        return False
+
+    def has_cancel_motion_monitor(self) -> bool:
+        for m in self.monitors.values():
+            if isinstance(m, CancelMotion):
+                return True
+        return False
+
+    def has_payload_monitors_which_are_not_end_nor_cancel(self) -> bool:
+        for m in self.monitors.values():
+            if not isinstance(m, (CancelMotion, EndMotion)) and isinstance(m, PayloadMonitor):
+                return True
+        return False

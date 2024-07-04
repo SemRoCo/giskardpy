@@ -3,11 +3,10 @@ from typing import Optional, List, Union, Dict, Callable, Iterable, overload, De
 import giskardpy.casadi_wrapper as cas
 from giskardpy.data_types.exceptions import GoalInitalizationException, DuplicateNameException
 from giskardpy.god_map import god_map
-from giskardpy.monitors.monitors import Monitor
 from giskardpy.data_types.data_types import Derivatives, PrefixName, TaskState
 from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint
 from giskardpy.symbol_manager import symbol_manager
-from giskardpy.utils.utils import string_shortener
+from giskardpy.motion_graph.graph_node import MotionGraphNode
 from giskardpy.qp.weight_gain import QuadraticWeightGain, LinearWeightGain
 from giskardpy.qp.free_variable import FreeVariable
 
@@ -18,79 +17,29 @@ WEIGHT_BELOW_CA = 1
 WEIGHT_MIN = 0
 
 
-class Task:
+class Task(MotionGraphNode):
     """
     Tasks are a set of constraints with the same predicates.
     """
     eq_constraints: Dict[PrefixName, EqualityConstraint]
     neq_constraints: Dict[PrefixName, InequalityConstraint]
     derivative_constraints: Dict[PrefixName, DerivativeInequalityConstraint]
-    _start_condition: cas.Expression
-    _hold_condition: cas.Expression
-    _end_condition: cas.Expression
-    _name: str
     _parent_goal_name: str
-    _id: int
-    plot: bool
 
     def __init__(self, parent_goal_name: str, name: Optional[str] = None):
-        self.plot = True
         if name is None:
             self._name = str(self.__class__.__name__)
         else:
             self._name = name
+        super().__init__(name=name,
+                         start_condition=cas.TrueSymbol, hold_condition=cas.FalseSymbol, end_condition=cas.FalseSymbol)
         self._parent_goal_name = parent_goal_name
         self.eq_constraints = {}
         self.neq_constraints = {}
         self.derivative_constraints = {}
-        self._start_condition = cas.TrueSymbol
-        self._hold_condition = cas.FalseSymbol
-        self._end_condition = cas.FalseSymbol
         self.manip_constraints = {}
         self.quadratic_gains = []
         self.linear_weight_gains = []
-        self._id = -1
-
-    @property
-    def start_condition(self) -> cas.Expression:
-        return self._start_condition
-
-    @start_condition.setter
-    def start_condition(self, value: cas.Expression) -> None:
-        for monitor_state_expr in value.free_symbols():
-            if not god_map.monitor_manager.is_monitor_registered(monitor_state_expr):
-                raise GiskardException(f'No monitor found for this state expr: "{monitor_state_expr}".')
-        self._start_condition = value
-
-    @property
-    def hold_condition(self) -> cas.Expression:
-        return self._hold_condition
-
-    @hold_condition.setter
-    def hold_condition(self, value: cas.Expression) -> None:
-        for monitor_state_expr in value.free_symbols():
-            if not god_map.monitor_manager.is_monitor_registered(monitor_state_expr):
-                raise GiskardException(f'No monitor found for this state expr: "{monitor_state_expr}".')
-        self._hold_condition = value
-
-    @property
-    def end_condition(self) -> cas.Expression:
-        return self._end_condition
-
-    @end_condition.setter
-    def end_condition(self, value: cas.Expression) -> None:
-        for monitor_state_expr in value.free_symbols():
-            if not god_map.monitor_manager.is_monitor_registered(monitor_state_expr):
-                raise GiskardException(f'No monitor found for this state expr: "{monitor_state_expr}".')
-        self._end_condition = value
-
-    @property
-    def id(self) -> int:
-        assert self._id >= 0, f'id of {self.name} is not set.'
-        return self._id
-
-    def set_id(self, new_id: int) -> None:
-        self._id = new_id
 
     @property
     def name(self) -> PrefixName:
@@ -99,20 +48,8 @@ class Task:
     def __str__(self):
         return self.name
 
-    def formatted_name(self, quoted: bool = False) -> str:
-        formatted_name = string_shortener(original_str=str(self.name),
-                                          max_lines=4,
-                                          max_line_length=25)
-        result = (f'{formatted_name}\n'
-                  f'----start_condition----\n'
-                  f'{god_map.monitor_manager.format_condition(self.start_condition)}\n'
-                  f'----hold_condition----\n'
-                  f'{god_map.monitor_manager.format_condition(self.hold_condition)}\n'
-                  f'----end_condition----\n'
-                  f'{god_map.monitor_manager.format_condition(self.end_condition)}')
-        if quoted:
-            return '"' + result + '"'
-        return result
+    def get_life_cycle_state_expression(self) -> cas.Symbol:
+        return symbol_manager.get_symbol(f'god_map.motion_goal_manager.task_state[{self.id}]')
 
     def get_eq_constraints(self) -> List[EqualityConstraint]:
         return self._apply_monitors_to_constraints(self.eq_constraints.values())
@@ -128,9 +65,6 @@ class Task:
 
     def get_linear_gains(self) -> List[LinearWeightGain]:
         return self.linear_weight_gains
-
-    def get_state_expression(self) -> cas.Symbol:
-        return symbol_manager.get_symbol(f'god_map.motion_goal_manager.task_state[{self.id}]')
 
     @overload
     def _apply_monitors_to_constraints(self, constraints: Iterable[EqualityConstraint]) \
@@ -150,7 +84,7 @@ class Task:
     def _apply_monitors_to_constraints(self, constraints):
         output_constraints = []
         for constraint in constraints:
-            is_running = cas.if_eq(self.get_state_expression(), int(TaskState.running),
+            is_running = cas.if_eq(self.get_life_cycle_state_expression(), int(TaskState.running),
                                    if_result=1,
                                    else_result=0)
             constraint.quadratic_weight *= is_running

@@ -6,7 +6,7 @@ from giskardpy.goals.goal import Goal
 from giskardpy.god_map import god_map
 from giskardpy.model.joints import OmniDrive, OmniDrivePR22
 from giskardpy.symbol_manager import symbol_manager
-from giskardpy.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
+from giskardpy.motion_graph.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
 
 
 class BaseTrajFollower(Goal):

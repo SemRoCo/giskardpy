@@ -5,8 +5,8 @@ from copy import deepcopy
 from enum import IntEnum
 from typing import Optional, Generic, TypeVar, Dict, Union
 
-import genpy
 import numpy as np
+
 
 class PrefixName:
     primary_separator = '/'
@@ -79,13 +79,45 @@ class PrefixName:
 
 
 class ColorRGBA:
-    r: float
-    g: float
-    b: float
-    a: float
+    _r: float
+    _g: float
+    _b: float
+    _a: float
 
     def __init__(self, r: float, g: float, b: float, a: float):
         self.r, self.g, self.b, self.a = r, g, b, a
+
+    @property
+    def r(self):
+        return self._r
+
+    @r.setter
+    def r(self, value):
+        self._r = float(value)
+
+    @property
+    def g(self):
+        return self._g
+
+    @g.setter
+    def g(self, value):
+        self._g = float(value)
+
+    @property
+    def b(self):
+        return self._b
+
+    @b.setter
+    def b(self, value):
+        self._b = float(value)
+
+    @property
+    def a(self):
+        return self._a
+
+    @a.setter
+    def a(self, value):
+        self._a = float(value)
 
 
 class Derivatives(IntEnum):
@@ -106,7 +138,7 @@ class Derivatives(IntEnum):
 
 
 my_string = Union[str, PrefixName]
-goal_parameter = Union[str, float, bool, genpy.Message, dict, list, IntEnum, None]
+goal_parameter = Union[str, float, bool, dict, list, IntEnum, None]
 derivative_map = Dict[Derivatives, float]
 
 
@@ -269,6 +301,7 @@ class JointStates(defaultdict, Dict[K, V], Generic[K, V]):
 class ExecutionMode(IntEnum):
     Execute = 1
     Projection = 2
+
 
 class BiDict(dict):
     def __init__(self, *args, **kwargs):

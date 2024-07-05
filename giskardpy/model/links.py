@@ -76,7 +76,7 @@ class MeshGeometry(LinkGeometry):
         self.set_collision_file_name(self.file_name_absolute)
         if not os.path.isfile(middleware.resolve_iri(file_name)):
             raise CorruptMeshException(f'Can\'t find file {file_name}')
-        self.scale = scale or (1, 1, 1)
+        self.scale = scale or (1.0, 1.0, 1.0)
 
     def set_collision_file_name(self, new_file_name: str) -> None:
         self._collision_file_name = new_file_name

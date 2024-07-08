@@ -63,7 +63,7 @@ class PR2TestWrapperMujoco(PR2TestWrapper):
                           collision_avoidance_config=PR2CollisionAvoidance(),
                           robot_interface_config=PR2VelocityMujocoInterface(),
                           behavior_tree_config=ClosedLoopBTConfig(debug_mode=True, control_loop_max_hz=50),
-                          qp_controller_config=QPControllerConfig(qp_solver=SupportedQPSolver.gurobi))
+                          qp_controller_config=QPControllerConfig(qp_solver=SupportedQPSolver.qpSWIFT))
         super().__init__(giskard)
 
     def reset_base(self):

@@ -3,7 +3,7 @@ from __future__ import annotations
 import builtins
 from copy import copy
 from enum import IntEnum
-from typing import Union, TypeVar
+from typing import Union, TypeVar, Optional
 import math
 
 import casadi
@@ -142,14 +142,16 @@ class Symbol_:
         return free_symbols(self.s)
 
     def to_np(self):
-        if self.shape[0] == self.shape[1] == 0:
-            return np.eye(0)
-        elif self.s.shape[0] * self.s.shape[1] <= 1:
-            return float(ca.evalf(self.s))
-        elif self.s.shape[0] == 1 or self.s.shape[1] == 1:
-            return np.array(ca.evalf(self.s)).ravel()
-        else:
-            return np.array(ca.evalf(self.s))
+        if not hasattr(self, 'np_data'):
+            if self.shape[0] == self.shape[1] == 0:
+                self.np_data = np.eye(0)
+            elif self.s.shape[0] * self.s.shape[1] <= 1:
+                self.np_data = float(ca.evalf(self.s))
+            elif self.s.shape[0] == 1 or self.s.shape[1] == 1:
+                self.np_data = np.array(ca.evalf(self.s)).ravel()
+            else:
+                self.np_data = np.array(ca.evalf(self.s))
+        return self.np_data
 
     def compile(self, parameters=None, sparse=False):
         return CompiledFunction(self, parameters, sparse)

@@ -48,6 +48,7 @@ class CompiledFunction:
 
 class Symbol_:
     s: Union[ca.SX, np.ndarray]
+    np_data: Optional[np.ndarray]
 
     @property
     def shape(self) -> Tuple[int, int]: ...

@@ -966,5 +966,5 @@ class CollisionWorldSynchronizer:
     def reset_cache(self):
         pass
 
-    def get_map_T_geometry(self, link_name: PrefixName, collision_id: int = 0) -> cas.TransMatrix:
-        return god_map.world.compute_fk_with_collision_offset(god_map.world.root_link_name, link_name, collision_id)
+    def get_map_T_geometry(self, link_name: PrefixName, collision_id: int = 0) -> np.ndarray:
+        return god_map.world.compute_fk_with_collision_offset_np(god_map.world.root_link_name, link_name, collision_id)

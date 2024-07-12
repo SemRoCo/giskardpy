@@ -338,7 +338,7 @@ class WorldTree(WorldTreeInterface):
         the state version.
         """
         clear_memo(self.compute_fk)
-        clear_memo(self.compute_fk_with_collision_offset)
+        clear_memo(self.compute_fk_with_collision_offset_np)
         self._recompute_fks()
         self._state_version += 1
 
@@ -1169,11 +1169,12 @@ class WorldTree(WorldTreeInterface):
         return self.compute_fk(root_link=root_link, tip_link=tip_link).to_position()
 
     @memoize
-    def compute_fk_with_collision_offset(self, root_link: PrefixName, tip_link: PrefixName,
-                                         collision_id: int) -> cas.TransMatrix:
-        root_T_tip = self.compute_fk(root_link, tip_link)
+    @profile
+    def compute_fk_with_collision_offset_np(self, root_link: PrefixName, tip_link: PrefixName,
+                                            collision_id: int) -> np.ndarray:
+        root_T_tip = self.compute_fk_np(root_link, tip_link)
         tip_link = self.links[tip_link]
-        return root_T_tip.dot(tip_link.collisions[collision_id].link_T_geometry)
+        return np.dot(root_T_tip, tip_link.collisions[collision_id].link_T_geometry.to_np())
 
     @profile
     def compute_all_collision_fks(self):
@@ -1311,7 +1312,8 @@ class WorldTree(WorldTreeInterface):
     def transform(self, target_frame, geometric_cas_object):
         if geometric_cas_object.reference_frame is None:
             raise WorldException('Can\'t transform an object without reference_frame.')
-        target_frame_T_reference_frame = self.compute_fk(root_link=target_frame, tip_link=geometric_cas_object.reference_frame)
+        target_frame_T_reference_frame = self.compute_fk(root_link=target_frame,
+                                                         tip_link=geometric_cas_object.reference_frame)
         if isinstance(geometric_cas_object, cas.Quaternion):
             reference_frame_R = geometric_cas_object.to_rotation_matrix()
             target_frame_R = target_frame_T_reference_frame.dot(reference_frame_R)
@@ -1586,7 +1588,7 @@ class WorldBranch(WorldTreeInterface):
 
     def compute_fk_pose_with_collision_offset(self, root: PrefixName, tip: PrefixName, collision_id: int) \
             -> cas.TransMatrix:
-        return self.world.compute_fk_with_collision_offset(root, tip, collision_id)
+        return self.world.compute_fk_with_collision_offset_np(root, tip, collision_id)
 
     def is_link_controlled(self, link_name: PrefixName) -> bool:
         return self.world.is_link_controlled(link_name)

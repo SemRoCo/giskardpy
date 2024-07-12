@@ -11,6 +11,8 @@ import casadi as ca  # type: ignore
 import numpy as np
 from scipy import sparse as sp
 
+from giskardpy.utils.decorators import memoize
+
 builtin_max = builtins.max
 builtin_min = builtins.min
 builtin_abs = builtins.abs

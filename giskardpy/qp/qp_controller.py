@@ -988,7 +988,7 @@ def detect_solvers():
         except Exception:
             pass
     solver_names = [solver_name.name for solver_name in available_solvers.keys()]
-    middleware.loginfo(f'Found these qp solvers: {solver_names}')
+    print(f'Found these qp solvers: {solver_names}')
 
 
 detect_solvers()

@@ -26,6 +26,9 @@ class TCMPGoal(Goal):
                  movement_function: str = None,
                  reference_frame: str = None,
                  monitoring_list: List[str] = None,
+                 # Tuple for approach functions
+                 # Tuple for release functions
+                 # some kind of tuple for 3 dimensions of the movement function?
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.TrueSymbol

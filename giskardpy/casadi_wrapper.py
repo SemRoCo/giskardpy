@@ -2140,6 +2140,28 @@ def sin(x):
     return Expression(ca.sin(x))
 
 
+def exp(x):
+    x = Expression(x).s
+    return Expression(ca.exp(x))
+
+
+def log(x):
+    x = Expression(x).s
+    return Expression(ca.log(x))
+
+def tan(x):
+    x = Expression(x).s
+    return Expression(ca.tan(x))
+
+def cosh(x):
+    x = Expression(x).s
+    return Expression(ca.cosh(x))
+
+def sinh(x):
+    x = Expression(x).s
+    return Expression(ca.sinh(x))
+
+
 def sqrt(x):
     x = Expression(x).s
     return Expression(ca.sqrt(x))

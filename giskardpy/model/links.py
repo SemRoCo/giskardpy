@@ -171,7 +171,6 @@ class Link:
     name: PrefixName
     visuals: List[LinkGeometry]
     parent_joint_name: Optional[PrefixName]
-    child_joint_names: List[PrefixName]
 
     def __init__(self, name: PrefixName):
         self.name = name

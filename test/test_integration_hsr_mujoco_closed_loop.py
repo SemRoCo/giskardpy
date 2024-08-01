@@ -20,6 +20,7 @@ from giskardpy.goals.manipulability_goals import MaxManipulability
 import giskardpy.utils.tfwrapper as tf
 from giskardpy.goals.action_goals import PouringAction
 from giskardpy.goals.adaptive_goals import CloseGripper, PouringAdaptiveTilt
+from neem_interface_python.neem_interface import NEEMInterface
 
 
 class HSRTestWrapper(GiskardTestWrapper):
@@ -502,6 +503,17 @@ class TestActionGoals:
         zero_pose.execute(add_local_minimum_reached=False)
 
     def test_complete_pouring(self, zero_pose):
+        ni = NEEMInterface()
+        task_type = 'soma:Pouring'
+        env_owl = '/home/huerkamp/workspace/new_giskard_ws/environment.owl'
+        env_owl_ind_name = 'world'
+        env_urdf = '/home/huerkamp/workspace/new_giskard_ws/new_world_cups.urdf'
+        agent_owl = '/home/huerkamp/workspace/new_giskard_ws/src/knowrob/owl/robots/hsrb.owl'
+        agent_owl_ind_name = 'robotHSR'
+        agent_urdf = '/home/huerkamp/workspace/new_giskard_ws/src/mujoco_robots/hsr_robot/hsr_description/hsr_description/robots/hsrb4s.urdf'
+        ni.start_episode(task_type=task_type, env_owl=env_owl, env_owl_ind_name=env_owl_ind_name, env_urdf=env_urdf,
+                         agent_owl=agent_owl, agent_owl_ind_name=agent_owl_ind_name, agent_urdf=agent_urdf)
+
         # first start related scripts for BB detection and scene action reasoning
         zero_pose.motion_goals.add_motion_goal(motion_goal_class=CloseGripper.__name__,
                                                name='openGripper',
@@ -566,8 +578,10 @@ class TestActionGoals:
                                                pre_tilt=False)
         zero_pose.allow_all_collisions()
         zero_pose.avoid_collision(0.01, 'cup1', 'cup2')
+        # ni.start_episode(task_type=task_type, env_owl=env_owl, env_owl_ind_name=env_owl_ind_name, env_urdf=env_urdf,
+        #                  agent_owl=agent_owl, agent_owl_ind_name=agent_owl_ind_name, agent_urdf=agent_urdf)
         zero_pose.execute(add_local_minimum_reached=False)
-
+        ni.stop_episode('/home/huerkamp/workspace/new_giskard_ws')
         goal_pose.pose.position.x = 1.93
         goal_pose.pose.position.y = -0.2
         goal_pose.pose.position.z = 0.3

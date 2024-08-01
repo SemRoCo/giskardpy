@@ -52,6 +52,7 @@ class CleanUpPlanning(CleanUp):
     def initialise(self):
         super().initialise()
         god_map.fill_trajectory_velocity_values = None
+        god_map.free_variables = []
 
     @catch_and_raise_to_blackboard
     def update(self):

@@ -46,8 +46,7 @@ class QPSolverQPalm(QPSolver):
     @profile
     def __init__(self, weights: cas.Expression, g: cas.Expression, lb: cas.Expression, ub: cas.Expression,
                  E: cas.Expression, E_slack: cas.Expression, bE: cas.Expression,
-                 A: cas.Expression, A_slack: cas.Expression, lbA: cas.Expression, ubA: cas.Expression,
-                 constraint_jacobian: cas.Expression, grad_traces: [cas.Expression]):
+                 A: cas.Expression, A_slack: cas.Expression, lbA: cas.Expression, ubA: cas.Expression):
         """
         min_x 0.5 x^T H x + g^T x
         s.t.  lb <= Ax <= ub
@@ -80,27 +79,11 @@ class QPSolverQPalm(QPSolver):
         len_lb_be_lba_end = weights.shape[0] + lb.shape[0] + bE.shape[0] + lbA.shape[0]
         len_ub_be_uba_end = len_lb_be_lba_end + ub.shape[0] + bE.shape[0] + ubA.shape[0]
 
-        self.init_manipulability_variables(constraint_jacobian, grad_traces)
-        if self.use_manipulability:
-            self.combined_vector_f = cas.StackedCompiledFunction(expressions=[weights,
-                                                                              lb,
-                                                                              bE,
-                                                                              lbA,
-                                                                              ub,
-                                                                              bE,
-                                                                              ubA,
-                                                                              self.grad_traces_augmented * self.m_symbolic,
-                                                                              self.m_symbolic],
-                                                                 parameters=free_symbols + [self.det_symbol.s],
-                                                                 additional_views=[
-                                                                     slice(weights.shape[0], len_lb_be_lba_end),
-                                                                     slice(len_lb_be_lba_end, len_ub_be_uba_end)])
-        else:
-            self.combined_vector_f = cas.StackedCompiledFunction(expressions=[weights, lb, bE, lbA, ub, bE, ubA],
-                                                                 parameters=free_symbols,
-                                                                 additional_views=[
-                                                                     slice(weights.shape[0], len_lb_be_lba_end),
-                                                                     slice(len_lb_be_lba_end, len_ub_be_uba_end)])
+        self.combined_vector_f = cas.StackedCompiledFunction(expressions=[weights, lb, bE, lbA, ub, bE, ubA, g],
+                                                             parameters=free_symbols,
+                                                             additional_views=[
+                                                                 slice(weights.shape[0], len_lb_be_lba_end),
+                                                                 slice(len_lb_be_lba_end, len_ub_be_uba_end)])
 
         self.A_f = combined_A.compile(parameters=free_symbols, sparse=self.sparse)
 
@@ -111,19 +94,9 @@ class QPSolverQPalm(QPSolver):
 
     @profile
     def evaluate_functions(self, substitutions: np.ndarray):
-        if self.use_manipulability:
-            self.calc_det_of_jjt_manipulability(substitutions)
-            self.weights, self.lb, self.bE, self.lbA, self.ub, _, self.ubA, m_grad, m, self.lb_bE_lbA, self.ub_bE_ubA = self.combined_vector_f.fast_call(
-                np.append(substitutions, self.det))
-            self.g = np.zeros(self.weights.shape)
-            self.g[:len(m_grad)] = m_grad
-            god_map.qp_controller.manipulability_indexes[1] = god_map.qp_controller.manipulability_indexes[0]
-            god_map.qp_controller.manipulability_indexes[0] = m
-        else:
-            self.weights, self.lb, self.bE, self.lbA, self.ub, _, self.ubA, self.lb_bE_lbA, self.ub_bE_ubA = self.combined_vector_f.fast_call(
-                substitutions)
-            self.g = np.zeros(self.weights.shape)
 
+        self.weights, self.lb, self.bE, self.lbA, self.ub, _, self.ubA, self.g, self.lb_bE_lbA, self.ub_bE_ubA = self.combined_vector_f.fast_call(
+            substitutions)
         self.A = self.A_f.fast_call(substitutions)
 
     @profile
@@ -141,9 +114,9 @@ class QPSolverQPalm(QPSolver):
         self.bE_bA_filter = self.b_bE_bA_filter[self.lb.shape[0]:]
 
         self.b_zero_filter = self.weight_filter.copy()
-        self.b_inf_filter = np.isfinite(self.lb) | np.isfinite(self.ub)
-        self.b_zero_inf_filter_view[::] = self.b_zero_filter & self.b_inf_filter
-        self.Ai_inf_filter = self.b_inf_filter[self.b_zero_filter]
+        self.b_finite_filter = np.isfinite(self.lb) | np.isfinite(self.ub)
+        self.b_zero_inf_filter_view[::] = self.b_zero_filter & self.b_finite_filter
+        self.Ai_inf_filter = self.b_finite_filter[self.b_zero_filter]
 
         if len(self.bE_part) > 0:
             self.bE_filter_view[-len(self.bE_part):] = self.bE_part
@@ -195,7 +168,7 @@ class QPSolverQPalm(QPSolver):
         self.retries_with_relaxed_constraints -= 1
         if self.retries_with_relaxed_constraints <= 0:
             raise HardConstraintsViolatedException('Out of retries with relaxed hard constraints.')
-        lb_filter, lbA_relaxed, ub_filter, ubA_relaxed = self.compute_violated_constraints(
+        lb_filter, lbA_relaxed, ub_filter, ubA_relaxed, relaxed_qp_data = self.compute_violated_constraints(
             self.lb[self.b_zero_inf_filter_view],
             self.ub[self.b_zero_inf_filter_view])
         if np.any(lb_filter) or np.any(ub_filter):
@@ -203,21 +176,24 @@ class QPSolverQPalm(QPSolver):
             self.lb_bE_lbA = lbA_relaxed
             self.ub_bE_ubA = ubA_relaxed
             return self.problem_data_to_qp_format()
-        self.retries_with_relaxed_constraints += 1
-        raise InfeasibleException('')
+        # relaxing makes it solvable, without actually violating any of the old constraints
+        return relaxed_qp_data
+        # self.retries_with_relaxed_constraints += 1
+        # raise InfeasibleException('')
 
     @profile
     def compute_violated_constraints(self, filtered_lb: np.ndarray, filtered_ub: np.ndarray):
         lb_relaxed = filtered_lb.copy()
         ub_relaxed = filtered_ub.copy()
-        num_constraints_not_filtered = np.where(self.slack_part)[0].shape[0]
+        slack_finite_filter = self.b_finite_filter[-(self.num_eq_slack_variables + self.num_neq_slack_variables):]
+        num_constraints_not_filtered = np.where(self.slack_part[slack_finite_filter])[0].shape[0]
         lb_relaxed[-num_constraints_not_filtered:] -= self.retry_added_slack
         ub_relaxed[-num_constraints_not_filtered:] += self.retry_added_slack
         try:
             H, g, A, lbA, ubA = self.problem_data_to_qp_format()
-            lbA_relaxed = np.concatenate([lb_relaxed, lbA[lb_relaxed.shape[0]:]])
-            ubA_relaxed = np.concatenate([ub_relaxed, ubA[ub_relaxed.shape[0]:]])
-            xdot_full = self.solver_call(H=H, g=g, A=A, lbA=lbA_relaxed, ubA=ubA_relaxed)
+            all_lbA_relaxed = np.concatenate([lb_relaxed, lbA[lb_relaxed.shape[0]:]])
+            all_ubA_relaxed = np.concatenate([ub_relaxed, ubA[ub_relaxed.shape[0]:]])
+            xdot_full = self.solver_call(H=H, g=g, A=A, lbA=all_lbA_relaxed, ubA=all_ubA_relaxed)
         except QPSolverException as e:
             self.retries_with_relaxed_constraints += 1
             raise e
@@ -226,13 +202,17 @@ class QPSolverQPalm(QPSolver):
         upper_violations = xdot_full > self.ub[self.b_zero_filter] + eps
         lower_violations[:-num_constraints_not_filtered] = False
         upper_violations[:-num_constraints_not_filtered] = False
-        lb_relaxed[-num_constraints_not_filtered:] += self.retry_added_slack
-        ub_relaxed[-num_constraints_not_filtered:] -= self.retry_added_slack
-        lb_relaxed[lower_violations[self.b_inf_filter[self.b_zero_filter]]] -= self.retry_added_slack
-        ub_relaxed[upper_violations[self.b_inf_filter[self.b_zero_filter]]] += self.retry_added_slack
+        # revert previous relaxations
+        lb_relaxed = filtered_lb.copy()
+        ub_relaxed = filtered_ub.copy()
+        # add relaxations only to constraints that where violated
+        lb_relaxed[lower_violations[self.b_finite_filter[self.b_zero_filter]]] -= self.retry_added_slack
+        ub_relaxed[upper_violations[self.b_finite_filter[self.b_zero_filter]]] += self.retry_added_slack
+        lbA_relaxed = all_lbA_relaxed.copy()
+        ubA_relaxed = all_ubA_relaxed.copy()
         lbA_relaxed[:lb_relaxed.shape[0]] = lb_relaxed
         ubA_relaxed[:ub_relaxed.shape[0]] = ub_relaxed
-        return lower_violations, lbA_relaxed, upper_violations, ubA_relaxed
+        return lower_violations, lbA_relaxed, upper_violations, ubA_relaxed, (H, g, A, all_lbA_relaxed, all_ubA_relaxed)
 
     @profile
     def problem_data_to_qp_format(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
@@ -241,10 +221,10 @@ class QPSolverQPalm(QPSolver):
         return H, self.g, A, self.lb_bE_lbA, self.ub_bE_ubA
 
     def lb_ub_with_inf(self, nlb: np.ndarray, ub: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-        lb_with_inf = (np.ones(self.b_inf_filter.shape) * -np.inf)
-        ub_with_inf = (np.ones(self.b_inf_filter.shape) * np.inf)
-        lb_with_inf[self.weight_filter & self.b_inf_filter] = -nlb
-        ub_with_inf[self.weight_filter & self.b_inf_filter] = ub
+        lb_with_inf = (np.ones(self.b_finite_filter.shape) * -np.inf)
+        ub_with_inf = (np.ones(self.b_finite_filter.shape) * np.inf)
+        lb_with_inf[self.weight_filter & self.b_finite_filter] = -nlb
+        ub_with_inf[self.weight_filter & self.b_finite_filter] = ub
         lb_with_inf = lb_with_inf[self.weight_filter]
         ub_with_inf = ub_with_inf[self.weight_filter]
         return lb_with_inf, ub_with_inf

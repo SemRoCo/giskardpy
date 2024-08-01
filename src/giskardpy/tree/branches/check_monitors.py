@@ -1,4 +1,5 @@
-from giskardpy.monitors.payload_monitors import PayloadMonitor, EndMotion
+from giskardpy.monitors.monitors import EndMotion
+from giskardpy.monitors.payload_monitors import PayloadMonitor
 from giskardpy.tree.branches.payload_monitor_sequence import PayloadMonitorSequence
 from giskardpy.tree.composites.running_selector import RunningSelector
 from giskardpy.tree.decorators import success_is_running

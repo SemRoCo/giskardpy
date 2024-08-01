@@ -8,8 +8,9 @@ from giskardpy.configs.iai_robots.hsr import WorldWithHSRConfig, HSRCollisionAvo
 
 if __name__ == '__main__':
     rospy.init_node('giskard')
+    debug_mode = rospy.get_param('~debug_mode', False)
     giskard = Giskard(world_config=WorldWithHSRConfig(),
                       collision_avoidance_config=HSRCollisionAvoidanceConfig(),
                       robot_interface_config=HSRVelocityInterface(),
-                      behavior_tree_config=ClosedLoopBTConfig())
+                      behavior_tree_config=ClosedLoopBTConfig(debug_mode=debug_mode))
     giskard.live()

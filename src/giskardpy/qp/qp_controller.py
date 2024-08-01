@@ -15,17 +15,17 @@ from giskardpy.exceptions import HardConstraintsViolatedException, QPSolverExcep
     VelocityLimitUnreachableException
 from giskardpy.god_map import god_map
 from giskardpy.data_types import Derivatives
-from giskardpy.qp.constraint import InequalityConstraint, EqualityConstraint, DerivativeInequalityConstraint, \
-    ManipulabilityConstraint
+from giskardpy.qp.constraint import InequalityConstraint, EqualityConstraint, DerivativeInequalityConstraint
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.next_command import NextCommands
-from giskardpy.qp.pos_in_vel_limits import b_profile
+from giskardpy.qp.pos_in_vel_limits import b_profile, implicit_vel_profile
 from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils import logging
 from giskardpy.utils.utils import create_path, get_all_classes_in_package
 from giskardpy.utils.decorators import memoize
 import giskardpy.utils.math as giskard_math
+from giskardpy.qp.weight_gain import QuadraticWeightGain, LinearWeightGain
 
 # used for saving pandas in the same folder every time within a run
 date_str = datetime.datetime.now().strftime('%Yy-%mm-%dd--%Hh-%Mm-%Ss')
@@ -178,19 +178,31 @@ class Weights(ProblemDataPart):
         return (cas.abs(current_position + x_offset - limit) * a) ** exp, x_offset
 
     @profile
-    def construct_expression(self) -> Union[cas.Expression, Tuple[cas.Expression, cas.Expression]]:
+    def construct_expression(self, quadratic_weight_gains: List[QuadraticWeightGain] = None,
+                             linear_weight_gains: List[LinearWeightGain] = None) -> Union[
+        cas.Expression, Tuple[cas.Expression, cas.Expression]]:
         components = []
-        components.extend(self.free_variable_weights_expression())
+        components.extend(
+            self.free_variable_weights_expression(quadratic_weight_gains=quadratic_weight_gains))
         components.append(self.equality_weight_expressions())
         components.extend(self.derivative_weight_expressions())
         components.append(self.inequality_weight_expressions())
         weights, _ = self._sorter(*components)
         weights = cas.Expression(weights)
-        linear_weights = cas.zeros(*weights.shape)
+        linear_weights = self.linear_weights_expression(linear_weight_gains=linear_weight_gains)
+        if linear_weights is None:
+            linear_weights = cas.zeros(*weights.shape)
+        else:
+            # as of now linear weights are only added for joints, therefore equality-, derivative- and inequality
+            # weights are missing. Here the missing weights are filled in with zeroes.
+            linear_weights, _ = self._sorter(*linear_weights)
+            linear_weights = cas.Expression(linear_weights)
+            linear_weights = cas.vstack([linear_weights] + [cas.Expression(0)] * (weights.shape[0] - linear_weights.shape[0]))
         return cas.Expression(weights), linear_weights
 
     @profile
-    def free_variable_weights_expression(self) -> List[defaultdict]:
+    def free_variable_weights_expression(self, quadratic_weight_gains: List[QuadraticWeightGain] = None) -> \
+            List[defaultdict]:
         params = []
         weights = defaultdict(dict)  # maps order to joints
         for t in range(self.prediction_horizon):
@@ -201,6 +213,9 @@ class Weights(ProblemDataPart):
                     normalized_weight = v.normalized_weight(t, derivative, self.prediction_horizon,
                                                             evaluated=self.evaluated)
                     weights[derivative][f't{t:03}/{v.position_name}/{derivative}'] = normalized_weight
+                    for q_gain in quadratic_weight_gains:
+                        if t < len(q_gain.gains) and v in q_gain.gains[t][derivative].keys():
+                            weights[derivative][f't{t:03}/{v.position_name}/{derivative}'] *= q_gain.gains[t][derivative][v]
         for _, weight in sorted(weights.items()):
             params.append(weight)
         return params
@@ -226,23 +241,23 @@ class Weights(ProblemDataPart):
         return error_slack_weights
 
     @profile
-    def linear_weights_expression(self, manip_expressions: List[ManipulabilityConstraint]):
-        if len(manip_expressions) == 0:
-            return None, None
-
-        stacked_exp = cas.vstack([x.expression for x in manip_expressions])
-
-        J = cas.jacobian(stacked_exp, self.get_free_variable_symbols(Derivatives.position))
-
-        grad_traces = []
-        for symbol in self.get_free_variable_symbols(Derivatives.position):
-            JJt = J.dot(J.T)
-            J_dq = cas.total_derivative(J, [symbol], [1])
-            product = cas.matrix_inverse(JJt).dot(J_dq).dot(J.T)
-            trace = cas.trace(product)
-            grad_traces.append(trace)
-
-        return J, grad_traces
+    def linear_weights_expression(self, linear_weight_gains: List[LinearWeightGain] = None):
+        if len(linear_weight_gains) > 0:
+            params = []
+            weights = defaultdict(dict)  # maps order to joints
+            for t in range(self.prediction_horizon):
+                for v in self.free_variables:
+                    for derivative in Derivatives.range(Derivatives.velocity, self.max_derivative):
+                        if t >= self.prediction_horizon - (self.max_derivative - derivative):
+                            continue
+                        weights[derivative][f't{t:03}/{v.position_name}/{derivative}'] = 0
+                        for l_gain in linear_weight_gains:
+                            if t < len(l_gain.gains) and v in l_gain.gains[t][derivative].keys():
+                                weights[derivative][f't{t:03}/{v.position_name}/{derivative}'] += l_gain.gains[t][derivative][v]
+            for _, weight in sorted(weights.items()):
+                params.append(weight)
+            return params
+        return None
 
     def get_free_variable_symbols(self, order: Derivatives) -> List[cas.Symbol]:
         return self._sorter({v.position_name: v.get_symbol(order) for v in self.free_variables})[0]
@@ -283,6 +298,7 @@ class FreeVariableBounds(ProblemDataPart):
                          max_derivative=max_derivative)
         self.evaluated = True
 
+    @profile
     def velocity_limit(self, v: FreeVariable):
         current_position = v.get_symbol(Derivatives.position)
         lower_velocity_limit = v.get_lower_limit(Derivatives.velocity, evaluated=True)
@@ -295,6 +311,15 @@ class FreeVariableBounds(ProblemDataPart):
         lower_jerk_limit = v.get_lower_limit(Derivatives.jerk, evaluated=True)
         upper_jerk_limit = v.get_upper_limit(Derivatives.jerk, evaluated=True)
 
+        max_reachable_vel = giskard_math.max_velocity_from_horizon_and_jerk(self.prediction_horizon,
+                                                                            upper_jerk_limit, self.dt)
+        if max_reachable_vel < upper_velocity_limit:
+            error_msg = f'Free variable "{v.name}" can\'t reach velocity limit of "{upper_velocity_limit}". ' \
+                        f'Maximum reachable with prediction horizon = "{self.prediction_horizon}", ' \
+                        f'jerk limit = "{upper_jerk_limit}" and dt = "{self.dt}" is "{max_reachable_vel}".'
+            logging.logerr(error_msg)
+            raise VelocityLimitUnreachableException(error_msg)
+
         if not v.has_position_limits():
             lb = cas.Expression([lower_velocity_limit] * self.prediction_horizon
                                 + [lower_acc_limit] * self.prediction_horizon
@@ -302,33 +327,44 @@ class FreeVariableBounds(ProblemDataPart):
             ub = cas.Expression([upper_velocity_limit] * self.prediction_horizon
                                 + [upper_acc_limit] * self.prediction_horizon
                                 + [upper_jerk_limit] * self.prediction_horizon)
-            return lb, ub
+        else:
+            lower_limit = v.get_lower_limit(Derivatives.position, evaluated=True)
+            upper_limit = v.get_upper_limit(Derivatives.position, evaluated=True)
 
-        lower_limit = v.get_lower_limit(Derivatives.position, evaluated=True)
-        upper_limit = v.get_upper_limit(Derivatives.position, evaluated=True)
-
-        try:
-            lb, ub = b_profile(current_pos=current_position,
-                               current_vel=current_vel,
-                               current_acc=current_acc,
-                               pos_limits=(lower_limit, upper_limit),
-                               vel_limits=(lower_velocity_limit, upper_velocity_limit),
-                               acc_limits=(lower_acc_limit, upper_acc_limit),
-                               jerk_limits=(lower_jerk_limit, upper_jerk_limit),
-                               dt=self.dt,
-                               ph=self.prediction_horizon)
-        except InfeasibleException as e:
-            max_reachable_vel = giskard_math.max_velocity_from_horizon_and_jerk(self.prediction_horizon,
-                                                                                upper_jerk_limit, self.dt)
-            if max_reachable_vel < upper_velocity_limit:
-                error_msg = f'Free variable "{v.name}" can\'t reach velocity limit of "{upper_velocity_limit}". ' \
-                            f'Maximum reachable with prediction horizon = "{self.prediction_horizon}", ' \
-                            f'jerk limit = "{upper_jerk_limit}" and dt = "{self.dt}" is "{max_reachable_vel}".'
-                logging.logerr(error_msg)
-                raise VelocityLimitUnreachableException(error_msg)
-            else:
-                raise
-
+            try:
+                lb, ub = b_profile(current_pos=current_position,
+                                   current_vel=current_vel,
+                                   current_acc=current_acc,
+                                   pos_limits=(lower_limit, upper_limit),
+                                   vel_limits=(lower_velocity_limit, upper_velocity_limit),
+                                   acc_limits=(lower_acc_limit, upper_acc_limit),
+                                   jerk_limits=(lower_jerk_limit, upper_jerk_limit),
+                                   dt=self.dt,
+                                   ph=self.prediction_horizon)
+            except InfeasibleException as e:
+                max_reachable_vel = giskard_math.max_velocity_from_horizon_and_jerk(self.prediction_horizon,
+                                                                                    upper_jerk_limit, self.dt)
+                if max_reachable_vel < upper_velocity_limit:
+                    error_msg = f'Free variable "{v.name}" can\'t reach velocity limit of "{upper_velocity_limit}". ' \
+                                f'Maximum reachable with prediction horizon = "{self.prediction_horizon}", ' \
+                                f'jerk limit = "{upper_jerk_limit}" and dt = "{self.dt}" is "{max_reachable_vel}".'
+                    logging.logerr(error_msg)
+                    raise VelocityLimitUnreachableException(error_msg)
+                else:
+                    raise
+        # %% set velocity limits to infinite, that can't be reached due to acc/jerk limits anyway
+        unlimited_vel_profile = implicit_vel_profile(acc_limit=upper_acc_limit,
+                                                     jerk_limit=upper_jerk_limit,
+                                                     dt=self.dt,
+                                                     ph=self.prediction_horizon)
+        for i in range(self.prediction_horizon):
+            ub[i] = cas.if_less(ub[i], unlimited_vel_profile[i], ub[i], np.inf)
+        unlimited_vel_profile = implicit_vel_profile(acc_limit=-lower_acc_limit,
+                                                     jerk_limit=-lower_jerk_limit,
+                                                     dt=self.dt,
+                                                     ph=self.prediction_horizon)
+        for i in range(self.prediction_horizon):
+            lb[i] = cas.if_less(-lb[i], unlimited_vel_profile[i], lb[i], -np.inf)
         return lb, ub
 
     @profile
@@ -611,35 +647,21 @@ class EqualityModel(ProblemDataPart):
     @profile
     def derivative_link_model(self) -> cas.Expression:
         """
-        |   t1   |   t2   |   t3   |   t1   |   t2   |   t3   |   t1   |   t2   |   t3   | prediction horizon
-        |v1 v2 v3|v1 v2 v3|v1 v2 v3|a1 a2 a3|a1 a2 a3|a1 a2 a3|j1 j2 j3|j1 j2 j3|j1 j2 j3| free variables / slack
-        |--------------------------------------------------------------------------------|
-        | 1      |        |        |-sp     |        |        |        |        |        | # v_n - a_n * dt = last vel
-        |    1   |        |        |   -sp  |        |        |        |        |        | = last velocity
-        |       1|        |        |     -sp|        |        |        |        |        |
-        |--------------------------------------------------------------------------------|
-        |-1      | 1      |        |        |-sp     |        |        |        |        | # -v_c + v_n - a_n * dt = 0
-        |   -1   |    1   |        |        |   -sp  |        |        |        |        | = 0
-        |      -1|       1|        |        |     -sp|        |        |        |        |
-        |--------------------------------------------------------------------------------|
-        |        |-1      | 1      |        |        |-sp     |        |        |        | # -v_c + v_n - a_n * dt = 0
-        |        |   -1   |    1   |        |        |   -sp  |        |        |        | = 0
-        |        |      -1|       1|        |        |     -sp|        |        |        |
-        |================================================================================|
-        |        |        |        | 1      |        |        |-sp     |        |        | # a_n - j_n * dt = last acc
-        |        |        |        |    1   |        |        |   -sp  |        |        | = last acceleration
-        |        |        |        |       1|        |        |     -sp|        |        |
-        |--------------------------------------------------------------------------------|
-        |        |        |        |-1      | 1      |        |        |-sp     |        | # -a_c + a_n - j_n * dt = 0
-        |        |        |        |   -1   |    1   |        |        |   -sp  |        | = 0
-        |        |        |        |      -1|       1|        |        |     -sp|        |
-        |--------------------------------------------------------------------------------|
-        |        |        |        |        |-1      | 1      |        |        |-sp     | # -a_c + a_n - j_n * dt = 0
-        |        |        |        |        |   -1   |    1   |        |        |   -sp  | = 0
-        |        |        |        |        |      -1|       1|        |        |     -sp|
-        |--------------------------------------------------------------------------------|
-        x_n - xd_n * dt = x_c
-        - x_c + x_n - xd_n * dt = 0
+        Layout for prediction horizon 5
+        Slots are matrices of |controlled variables| x |controlled variables|
+        | vt0 | vt1 | vt2 | at0 | at1 | at2 | at3 | jt0 | jt1 | jt2 | jt3 | jt4 |
+        |-----------------------------------------------------------------------|
+        |  1  |     |     | -dt |     |     |     |     |     |     |     |     | last_v =  vt0 - at0*dt
+        | -1  |  1  |     |     | -dt |     |     |     |     |     |     |     |      0 = -vt0 + vt1 - at1 * dt
+        |     | -1  |  1  |     |     | -dt |     |     |     |     |     |     |      0 = -vt1 + vt2 - at2 * dt
+        |     |     | -1  |     |     |     | -dt |     |     |     |     |     |      0 = -vt2 + vt3 - at3 * dt
+        |=======================================================================|
+        |     |     |     |  1  |     |     |     | -dt |     |     |     |     | last_a =  at0 - jt0*dt
+        |     |     |     | -1  |  1  |     |     |     | -dt |     |     |     |      0 = -at0 + at1 - jt1 * dt
+        |     |     |     |     | -1  |  1  |     |     |     | -dt |     |     |      0 = -at1 + at2 - jt2 * dt
+        |     |     |     |     |     | -1  |  1  |     |     |     | -dt |     |      0 = -at2 + at3 - jt3 * dt
+        |     |     |     |     |     |     | -1  |     |     |     |     | -dt |      0 = -at3 + at4 - jt4 * dt
+        |-----------------------------------------------------------------------|
         """
         num_rows = self.number_of_free_variables * self.prediction_horizon * (self.max_derivative - 1)
         num_columns = self.number_of_free_variables * self.prediction_horizon * self.max_derivative
@@ -997,8 +1019,8 @@ class QPProblemBuilder:
     inequality_bounds: InequalityBounds
     qp_solver: QPSolver
     prediction_horizon: int = None
-    manipulability_indexes: np.ndarray = np.array([0.0, 0.0])
 
+    @profile
     def __init__(self,
                  sample_period: float,
                  prediction_horizon: int,
@@ -1007,7 +1029,8 @@ class QPProblemBuilder:
                  equality_constraints: List[EqualityConstraint] = None,
                  inequality_constraints: List[InequalityConstraint] = None,
                  derivative_constraints: List[DerivativeInequalityConstraint] = None,
-                 manipulability_constraints: List[ManipulabilityConstraint] = None,
+                 quadratic_weight_gains: List[QuadraticWeightGain] = None,
+                 linear_weight_gains: List[LinearWeightGain] = None,
                  retries_with_relaxed_constraints: int = 0,
                  retry_added_slack: float = 100,
                  retry_weight_factor: float = 100):
@@ -1015,7 +1038,8 @@ class QPProblemBuilder:
         self.equality_constraints = []
         self.inequality_constraints = []
         self.derivative_constraints = []
-        self.manipulability_constraints = []
+        self.quadratic_weight_gains = []
+        self.linear_weight_gains = []
         self.prediction_horizon = prediction_horizon
         self.retries_with_relaxed_constraints = retries_with_relaxed_constraints
         self.retry_added_slack = retry_added_slack
@@ -1029,8 +1053,10 @@ class QPProblemBuilder:
             self.add_equality_constraints(equality_constraints)
         if derivative_constraints is not None:
             self.add_derivative_constraints(derivative_constraints)
-        if manipulability_constraints is not None:
-            self.add_manipulability_constraints(manipulability_constraints)
+        if quadratic_weight_gains is not None:
+            self.add_quadratic_weight_gains(quadratic_weight_gains)
+        if linear_weight_gains is not None:
+            self.add_linear_weight_gains(linear_weight_gains)
 
         if solver_id is not None:
             self.qp_solver_class = available_solvers[solver_id]
@@ -1073,11 +1099,17 @@ class QPProblemBuilder:
             c.control_horizon = min(c.control_horizon, self.prediction_horizon)
             self.check_control_horizon(c)
 
-    def add_manipulability_constraints(self, constraints: List[ManipulabilityConstraint]):
-        self.manipulability_constraints.extend(list(sorted(constraints, key=lambda x: x.name)))
-        l = [x.name for x in constraints]
+    def add_quadratic_weight_gains(self, gains: List[QuadraticWeightGain]):
+        self.quadratic_weight_gains.extend(list(sorted(gains, key=lambda x: x.name)))
+        l = [x.name for x in gains]
         duplicates = set([x for x in l if l.count(x) > 1])
-        assert duplicates == set(), f'there are multiple manipulability constraints with the same name: {duplicates}'
+        assert duplicates == set(), f'there are multiple quadratic weight gains with the same name: {duplicates}'
+
+    def add_linear_weight_gains(self, gains: List[LinearWeightGain]):
+        self.linear_weight_gains.extend(list(sorted(gains, key=lambda x: x.name)))
+        l = [x.name for x in gains]
+        duplicates = set([x for x in l if l.count(x) > 1])
+        assert duplicates == set(), f'there are multiple linear weight gains with the same name: {duplicates}'
 
     def add_derivative_constraints(self, constraints: List[DerivativeInequalityConstraint]):
         self.derivative_constraints.extend(list(sorted(constraints, key=lambda x: x.name)))
@@ -1117,19 +1149,16 @@ class QPProblemBuilder:
         self.inequality_model = InequalityModel(**kwargs)
         self.inequality_bounds = InequalityBounds(default_limits=default_limits, **kwargs)
 
-        weights, g = self.weights.construct_expression()
+        weights, g = self.weights.construct_expression(self.quadratic_weight_gains, self.linear_weight_gains)
         lb, ub = self.free_variable_bounds.construct_expression()
         A, A_slack = self.inequality_model.construct_expression()
         lbA, ubA = self.inequality_bounds.construct_expression()
         E, E_slack = self.equality_model.construct_expression()
         bE = self.equality_bounds.construct_expression()
-        J, grad_traces = self.weights.linear_weights_expression(
-            manip_expressions=self.manipulability_constraints)
 
         qp_solver = solver_class(weights=weights, g=g, lb=lb, ub=ub,
                                  E=E, E_slack=E_slack, bE=bE,
-                                 A=A, A_slack=A_slack, lbA=lbA, ubA=ubA,
-                                 constraint_jacobian=J, grad_traces=grad_traces
+                                 A=A, A_slack=A_slack, lbA=lbA, ubA=ubA
                                  )
         # self.goal_reached_checks.compile(qp_solver.free_symbols)
         logging.loginfo('Done compiling controller:')
@@ -1142,26 +1171,16 @@ class QPProblemBuilder:
         return self.qp_solver.free_symbols_str
 
     def save_all_pandas(self, folder_name: Optional[str] = None):
-        if hasattr(self, 'p_xdot') and self.p_xdot is not None:
-            save_pandas(
-                [self.p_weights, self.p_lb, self.p_ub,
-                 self.p_E, self.p_bE,
-                 self.p_A, self.p_lbA, self.p_ubA,
-                 god_map.debug_expression_manager.to_pandas(), self.p_xdot],
-                ['weights', 'lb', 'ub', 'E', 'bE', 'A', 'lbA', 'ubA', 'debug', 'xdot'],
-                god_map.giskard.tmp_folder,
-                god_map.time,
-                folder_name)
-        else:
-            save_pandas(
-                [self.p_weights, self.p_lb, self.p_ub,
-                 self.p_E, self.p_bE,
-                 self.p_A, self.p_lbA, self.p_ubA,
-                 god_map.debug_expression_manager.to_pandas()],
-                ['weights', 'lb', 'ub', 'E', 'bE', 'A', 'lbA', 'ubA', 'debug'],
-                god_map.giskard.tmp_folder,
-                god_map.time,
-                folder_name)
+        self._create_debug_pandas(self.qp_solver)
+        save_pandas(
+            [self.p_weights, self.p_b,
+             self.p_E, self.p_bE,
+             self.p_A, self.p_lbA, self.p_ubA,
+             god_map.debug_expression_manager.to_pandas(), self.p_xdot],
+            ['weights', 'b', 'E', 'bE', 'A', 'lbA', 'ubA', 'debug'],
+            god_map.giskard.tmp_folder,
+            god_map.time,
+            folder_name)
 
     def _print_pandas_array(self, array):
         import pandas as pd
@@ -1226,7 +1245,7 @@ class QPProblemBuilder:
             logging.loginfo('start position not found in state')
             start_pos = 0
         ts = np.array([(i + 1) * sample_period for i in range(self.prediction_horizon)])
-        filtered_x = self.p_xdot.filter(like=f'{joint_name}', axis=0)
+        filtered_x = self.p_xdot.filter(like=f'/{joint_name}/', axis=0)
         vel_end = self.prediction_horizon - self.order + 1
         acc_end = vel_end + self.prediction_horizon - self.order + 2
         velocities = filtered_x[:vel_end].values
@@ -1350,6 +1369,7 @@ class QPProblemBuilder:
 
         else:
             self.p_xdot = None
+        self.p_debug = god_map.debug_expression_manager.to_pandas()
 
     def _print_iis(self):
         result = self.qp_solver.analyze_infeasibility()

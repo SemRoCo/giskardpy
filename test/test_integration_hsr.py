@@ -3,7 +3,7 @@ from typing import Optional
 
 import numpy as np
 import pytest
-from geometry_msgs.msg import PoseStamped, Point, Quaternion, PointStamped, Vector3Stamped, Vector3
+from geometry_msgs.msg import PoseStamped, Point, Quaternion, PointStamped, Vector3Stamped
 from numpy import pi
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
@@ -11,7 +11,7 @@ from giskard_msgs.msg import GiskardError
 from giskardpy.configs.behavior_tree_config import StandAloneBTConfig
 from giskardpy.configs.giskard import Giskard
 from giskardpy.configs.iai_robots.hsr import HSRCollisionAvoidanceConfig, WorldWithHSRConfig, HSRStandaloneInterface
-from giskardpy.configs.qp_controller_config import QPControllerConfig
+from giskardpy.configs.qp_controller_config import QPControllerConfig, SupportedQPSolver
 from giskardpy.god_map import god_map
 from giskardpy.utils.utils import launch_launchfile
 from utils_for_tests import compare_poses, GiskardTestWrapper
@@ -36,7 +36,9 @@ class HSRTestWrapper(GiskardTestWrapper):
             giskard = Giskard(world_config=WorldWithHSRConfig(),
                               collision_avoidance_config=HSRCollisionAvoidanceConfig(),
                               robot_interface_config=HSRStandaloneInterface(),
-                              behavior_tree_config=StandAloneBTConfig(debug_mode=True, publish_js=True, simulation_max_hz=20),
+                              behavior_tree_config=StandAloneBTConfig(debug_mode=True,
+                                                                      publish_tf=False,
+                                                                      publish_js=False),
                               qp_controller_config=QPControllerConfig())
         super().__init__(giskard)
         self.gripper_group = 'gripper'
@@ -44,10 +46,6 @@ class HSRTestWrapper(GiskardTestWrapper):
         # self.l_gripper = rospy.ServiceProxy('l_gripper_simulator/set_joint_states', SetJointState)
         self.odom_root = 'odom'
         self.robot = god_map.world.groups[self.robot_name]
-
-    def move_base(self, goal_pose):
-        self.set_cart_goal(goal_pose, tip_link='base_footprint', root_link=god_map.world.root_link_name)
-        self.plan_and_execute()
 
     def open_gripper(self):
         self.command_gripper(1.23)
@@ -60,27 +58,11 @@ class HSRTestWrapper(GiskardTestWrapper):
         self.set_joint_goal(js)
         self.plan_and_execute()
 
-    def reset_base(self):
-        p = PoseStamped()
-        p.header.frame_id = 'map'
-        p.pose.orientation.w = 1
-        if god_map.is_standalone():
-            self.teleport_base(p)
-        else:
-            self.move_base(p)
-
     def reset(self):
-        self.clear_world()
-        # self.close_gripper()
-        self.reset_base()
         self.register_group('gripper',
                             root_link_group_name=self.robot_name,
                             root_link_name='hand_palm_link')
 
-    def teleport_base(self, goal_pose, group_name: Optional[str] = None):
-        self.set_seed_odometry(base_pose=goal_pose, group_name=group_name)
-        self.allow_all_collisions()
-        self.plan_and_execute()
 
 
 @pytest.fixture(scope='module')
@@ -450,31 +432,3 @@ class TestAddObject:
 
         zero_pose.set_joint_goal({'arm_flex_joint': -0.7})
         zero_pose.plan_and_execute()
-
-
-class TestVelocityLimit:
-    # test to see in rviz whether the rotation with limited velocity is oscilaating as it is doing it in mujoco closed loop
-    def test_vel(self, zero_pose):
-        goal_pose = PoseStamped()
-        goal_pose.header.frame_id = 'map'
-        goal_pose.pose.position = Point(1, 0, 0.5)
-        goal_pose.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 0, 1, 0],
-                                                                         [0, -1, 0, 0],
-                                                                         [1, 0, 0, 0],
-                                                                         [0, 0, 0, 1]]))
-        zero_pose.motion_goals.add_cartesian_pose(goal_pose=goal_pose, tip_link='hand_palm_link', root_link='map')
-        zero_pose.execute()
-
-        goal_pose = PoseStamped()
-        goal_pose.header.frame_id = 'hand_palm_link'
-        rotation_axis = Vector3Stamped()
-        rotation_axis.header.frame_id = 'hand_palm_link'
-        rotation_axis.vector = Vector3(*[0, 0, 1])
-
-        goal_pose.pose.orientation = Quaternion(
-            *quaternion_about_axis(1.7, [rotation_axis.vector.x, rotation_axis.vector.y, rotation_axis.vector.z]))
-        zero_pose.motion_goals.add_cartesian_pose(goal_pose, 'hand_palm_link', 'map')
-        zero_pose.motion_goals.add_limit_cartesian_velocity(tip_link='hand_palm_link', root_link='map',
-                                                            max_angular_velocity=0.1)
-        zero_pose.add_default_end_motion_conditions()
-        zero_pose.execute()

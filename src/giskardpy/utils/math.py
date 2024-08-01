@@ -7,6 +7,7 @@ from tf.transformations import quaternion_multiply, quaternion_conjugate, quater
 from giskardpy.data_types import Derivatives
 from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.qp.qp_solver_qpalm import QPSolverQPalm
+from giskardpy.utils.decorators import memoize
 
 
 def qv_mult(quaternion, vector):
@@ -145,75 +146,79 @@ def max_velocity_from_horizon_and_jerk(prediction_horizon, jerk_limit, sample_pe
     return (gauss(n2) + gauss(n2 - 1)) * jerk_limit * sample_period ** 2
 
 
-def mpc(upper_limits: Dict[Derivatives, List[float]],
-        lower_limits: Dict[Derivatives, List[float]],
-        current_values: Dict[Derivatives, float],
+@memoize
+def mpc(upper_limits: Tuple[Tuple[float, ...], ...],
+        lower_limits: Tuple[Tuple[float, ...], ...],
+        current_values: Tuple[float, ...],
         dt: float,
         ph: int,
-        q_weight: Tuple[float],
-        lin_weight: Tuple[float],
-        solver_class: Optional[Type[QPSolver]] = None) -> np.ndarray:
+        q_weight: Tuple[float, ...],
+        lin_weight: Tuple[float, ...],
+        solver_class: Optional[Type[QPSolver]] = None,
+        link_to_current_vel: bool = True) -> np.ndarray:
     if solver_class is None:
         solver = QPSolverQPalm.empty()
         # solver = QPSolverQPSwift.empty()
         # solver = QPSolverGurobi.empty()
     else:
         solver = solver_class.empty()
-    max_d = max(upper_limits.keys())
+    max_d = len(upper_limits)
     lb = []
     ub = []
-    for (derivative, lb_), (_, ub_) in sorted(zip(lower_limits.items(), upper_limits.items())):
+    for derivative in range(max_d):
+        lb_ = lower_limits[derivative]
+        ub_ = upper_limits[derivative]
         lb.extend(lb_)
         ub.extend(ub_)
-        if derivative != max_d:
+        if (derivative + 1) != max_d:  # because we start at velocity
             lb[-1] = 0
             ub[-1] = 0
     model = derivative_link_model(dt, ph, max_d)
-    lbA = np.zeros(model.shape[0])
-    ubA = np.zeros(model.shape[0])
-    for derivative, current_value in sorted(current_values.items()):
-        ubA[ph * (derivative - 1)] = current_value
-        lbA[ph * (derivative - 1)] = current_value
+    bE = np.zeros(model.shape[0])
+    for i, current_value in enumerate(current_values):
+        derivative = i + 1
+        bE[ph * (derivative - 1)] = current_value
     w = np.zeros(len(lb))
     w[:ph] = q_weight[0]
-    w[ph:ph*2] = q_weight[1]
+    w[ph:ph * 2] = q_weight[1]
     w[-ph:] = q_weight[2]
     H = np.diag(w)
     g = np.zeros(len(lb))
     g[:ph] = lin_weight[0]
-    g[ph:ph*2] = lin_weight[1]
+    g[ph:ph * 2] = lin_weight[1]
     g[-ph:] = lin_weight[2]
     empty = np.eye(0)
     lb = np.array(lb)
     ub = np.array(ub)
+    if not link_to_current_vel:
+        model = np.delete(model, [0, ph], axis=0)
+        bE = np.delete(bE, [0, ph])
     result = solver.default_interface_solver_call(H=H, g=g, lb=lb, ub=ub,
-                                                  E=model, bE=ubA,
+                                                  E=model, bE=bE,
                                                   A=empty, lbA=np.array([]), ubA=np.array([]))
     return result
 
 
-def simple_mpc(vel_limit, acc_limit, jerk_limit, current_vel, current_acc, dt, ph, q_weight, lin_weight, solver_class = None):
-    upper_limits = {
-        Derivatives.velocity: np.ones(ph) * vel_limit,
-        Derivatives.acceleration: np.ones(ph) * acc_limit,
-        Derivatives.jerk: np.ones(ph) * jerk_limit
-    }
-    lower_limits = {
-        Derivatives.velocity: np.ones(ph) * -vel_limit,
-        Derivatives.acceleration: np.ones(ph) * -acc_limit,
-        Derivatives.jerk: np.ones(ph) * -jerk_limit
-    }
-    return mpc(upper_limits, lower_limits,
-               {Derivatives.velocity: current_vel,
-                Derivatives.acceleration: current_acc}, dt, ph, q_weight, lin_weight, solver_class=solver_class)
+def simple_mpc(vel_limit, acc_limit, jerk_limit, current_vel, current_acc, dt, ph, q_weight, lin_weight,
+               solver_class=None, link_to_current_vel: bool = True):
+    upper_limits = ((vel_limit,) * ph,
+                    (acc_limit,) * ph,
+                    (jerk_limit,) * ph)
+    lower_limits = ((-vel_limit,) * ph,
+                    (-acc_limit,) * ph,
+                    (-jerk_limit,) * ph)
+    return mpc(upper_limits=upper_limits, lower_limits=lower_limits,
+               current_values=(current_vel, current_acc), dt=dt, ph=ph, q_weight=q_weight, lin_weight=lin_weight,
+               solver_class=solver_class, link_to_current_vel=link_to_current_vel)
 
-def mpc_velocities(upper_limits: Dict[Derivatives, List[float]],
-                   lower_limits: Dict[Derivatives, List[float]],
-                   current_values: Dict[Derivatives, float],
+
+def mpc_velocities(upper_limits: Tuple[Tuple[float, ...], ...],
+                   lower_limits: Tuple[Tuple[float, ...], ...],
+                   current_values: Tuple[float, ...],
                    dt: float,
                    ph: int,
-                   solver_class = None):
-    return mpc(upper_limits, lower_limits, current_values, dt, ph, (1, 1, 1), (0,0,0), solver_class)
+                   solver_class=None):
+    return mpc(upper_limits, lower_limits, current_values, dt, ph, (1, 1, 1), (0, 0, 0), solver_class)
 
 
 def derivative_link_model(dt, ph, max_derivative):

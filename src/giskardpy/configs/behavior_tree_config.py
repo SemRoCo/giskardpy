@@ -1,10 +1,12 @@
 from abc import ABC, abstractmethod
 from typing import Optional
 
+from giskardpy.exceptions import SetupException
 from giskardpy.god_map import god_map
 from giskardpy.tree.behaviors.tf_publisher import TfPublishingModes
 from giskardpy.tree.branches.giskard_bt import GiskardBT
 from giskardpy.tree.control_modes import ControlModes
+from giskardpy.utils.utils import is_running_in_pytest
 
 
 class BehaviorTreeConfig(ABC):
@@ -139,6 +141,10 @@ class BehaviorTreeConfig(ABC):
         self.tree.wait_for_goal.publish_state.add_tf_publisher(include_prefix=include_prefix,
                                                                tf_topic=tf_topic,
                                                                mode=mode)
+        if god_map.is_standalone():
+            self.tree.control_loop_branch.publish_state.add_tf_publisher(include_prefix=include_prefix,
+                                                                   tf_topic=tf_topic,
+                                                                   mode=mode)
 
     def add_evaluate_debug_expressions(self):
         self.tree.prepare_control_loop.add_compile_debug_expressions()
@@ -155,16 +161,31 @@ class BehaviorTreeConfig(ABC):
         Publishes joint states for Giskard's internal state.
         """
         god_map.tree.control_loop_branch.publish_state.add_joint_state_publisher(include_prefix=include_prefix,
-                                                                                 topic_name=topic_name)
+                                                                                 topic_name=topic_name,
+                                                                                 only_prismatic_and_revolute=True)
         god_map.tree.wait_for_goal.publish_state.add_joint_state_publisher(include_prefix=include_prefix,
-                                                                           topic_name=topic_name)
+                                                                           topic_name=topic_name,
+                                                                           only_prismatic_and_revolute=True)
+
+    def add_free_variable_publisher(self, topic_name: Optional[str] = None, include_prefix: bool = False):
+        """
+        Publishes joint states for Giskard's internal state.
+        """
+        god_map.tree.control_loop_branch.publish_state.add_joint_state_publisher(include_prefix=include_prefix,
+                                                                                 topic_name=topic_name,
+                                                                                 only_prismatic_and_revolute=False)
+        god_map.tree.wait_for_goal.publish_state.add_joint_state_publisher(include_prefix=include_prefix,
+                                                                           topic_name=topic_name,
+                                                                           only_prismatic_and_revolute=False)
 
 
 class StandAloneBTConfig(BehaviorTreeConfig):
     def __init__(self,
                  debug_mode: bool = False,
                  publish_js: bool = False,
-                 publish_tf: bool = False,
+                 publish_free_variables: bool = False,
+                 publish_tf: bool = True,
+                 include_prefix: bool = False,
                  simulation_max_hz: Optional[float] = None):
         """
         The default behavior tree for Giskard in standalone mode. Make sure to set up the robot interface accordingly.
@@ -172,19 +193,27 @@ class StandAloneBTConfig(BehaviorTreeConfig):
         :param publish_js: publish current world state.
         :param publish_tf: publish all link poses in tf.
         :param simulation_max_hz: if not None, will limit the frequency of the simulation.
+        :param include_prefix: whether to include the robot name prefix when publishing joint states or tf
         """
-        if god_map.is_in_github_workflow():
-            debug_mode = False
-            simulation_max_hz = None
+        self.include_prefix = include_prefix
+        if is_running_in_pytest():
+            if god_map.is_in_github_workflow():
+                publish_js = False
+                publish_tf = False
+                debug_mode = False
+                simulation_max_hz = None
         super().__init__(ControlModes.standalone, simulation_max_hz=simulation_max_hz)
         self.debug_mode = debug_mode
         self.publish_js = publish_js
+        self.publish_free_variables = publish_free_variables
         self.publish_tf = publish_tf
+        if publish_js and publish_free_variables:
+            raise SetupException('publish_js and publish_free_variables cannot be True at the same time.')
 
     def setup(self):
         self.add_visualization_marker_publisher(add_to_sync=True, add_to_control_loop=True)
         if self.publish_tf:
-            self.add_tf_publisher(include_prefix=True, mode=TfPublishingModes.all)
+            self.add_tf_publisher(include_prefix=self.include_prefix, mode=TfPublishingModes.all)
         self.add_gantt_chart_plotter()
         self.add_goal_graph_plotter()
         if self.debug_mode:
@@ -193,7 +222,9 @@ class StandAloneBTConfig(BehaviorTreeConfig):
             self.add_debug_marker_publisher()
         # self.add_debug_marker_publisher()
         if self.publish_js:
-            self.add_js_publisher()
+            self.add_js_publisher(include_prefix=self.include_prefix)
+        if self.publish_free_variables:
+            self.add_free_variable_publisher()
 
 
 class OpenLoopBTConfig(BehaviorTreeConfig):
@@ -220,12 +251,12 @@ class OpenLoopBTConfig(BehaviorTreeConfig):
             self.add_trajectory_plotter(wait=True)
             self.add_debug_trajectory_plotter(wait=True)
             self.add_debug_marker_publisher()
-            self.add_qp_data_publisher(
-                publish_debug=True,
-                publish_xdot=True,
-                # publish_lbA=True,
-                # publish_ubA=True
-            )
+            # self.add_qp_data_publisher(
+            #     publish_debug=True,
+            #     publish_xdot=True,
+            #     # publish_lbA=True,
+            #     # publish_ubA=True
+            # )
 
 
 class ClosedLoopBTConfig(BehaviorTreeConfig):
@@ -248,12 +279,12 @@ class ClosedLoopBTConfig(BehaviorTreeConfig):
         self.add_gantt_chart_plotter()
         self.add_goal_graph_plotter()
         if self.debug_mode:
-            # self.add_trajectory_plotter(wait=True)
-            # self.add_debug_trajectory_plotter(wait=True)
+            self.add_trajectory_plotter(wait=True)
+            self.add_debug_trajectory_plotter(wait=True)
             self.add_debug_marker_publisher()
-            self.add_qp_data_publisher(
-                publish_debug=True,
-                publish_xdot=True,
-                # publish_lbA=True,
-                # publish_ubA=True
-            )
+            # self.add_qp_data_publisher(
+            #     publish_debug=True,
+            #     publish_xdot=True,
+            #     # publish_lbA=True,
+            #     # publish_ubA=True
+            # )

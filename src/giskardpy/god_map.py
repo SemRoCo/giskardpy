@@ -13,8 +13,7 @@ if TYPE_CHECKING:
     from giskardpy.tree.branches.giskard_bt import GiskardBT
     from giskardpy.model.joints import Joint
     from giskardpy.model.ros_msg_visualization import ROSMsgVisualization
-    from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint, \
-        ManipulabilityConstraint
+    from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint
     from giskardpy.qp.free_variable import FreeVariable
     from giskardpy.qp.next_command import NextCommands
     from giskardpy.model.trajectory import Trajectory
@@ -30,6 +29,7 @@ if TYPE_CHECKING:
     from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer, CollisionCheckerLib, \
         CollisionAvoidanceGroupThresholds, Collisions
     from giskardpy.model.world import WorldTree
+    from giskardpy.qp.weight_gain import QuadraticWeightGain, LinearWeightGain
 
 
 class GodMap:
@@ -63,7 +63,8 @@ class GodMap:
     eq_constraints: Dict[str, EqualityConstraint]
     neq_constraints: Dict[str, InequalityConstraint]
     derivative_constraints: Dict[str, DerivativeInequalityConstraint]
-    manip_constraints: Dict[str, ManipulabilityConstraint]
+    quadratic_weight_gains: Dict[str, QuadraticWeightGain]
+    linear_weight_gains: Dict[str, LinearWeightGain]
     hack: float
     fill_trajectory_velocity_values: bool
     ros_visualizer: ROSMsgVisualization

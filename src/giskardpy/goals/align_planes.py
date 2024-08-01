@@ -1,6 +1,7 @@
 from typing import Optional, List
 
 from geometry_msgs.msg import Vector3Stamped
+from std_msgs.msg import ColorRGBA
 
 import giskardpy.utils.tfwrapper as tf
 import giskardpy.casadi_wrapper as cas
@@ -25,7 +26,7 @@ class AlignPlanes(Goal):
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.TrueSymbol,
+                 end_condition: cas.Expression = cas.FalseSymbol,
                  **kwargs):
         """
         This goal will use the kinematic chain between tip and root to align tip_normal with goal_normal.
@@ -68,4 +69,12 @@ class AlignPlanes(Goal):
                                          frame_V_goal=root_V_root_normal,
                                          reference_velocity=self.reference_velocity,
                                          weight=self.weight)
+        root_V_tip_normal.vis_frame = self.tip
+        god_map.debug_expression_manager.add_debug_expression(f'{self.name}/current_normal',
+                                                              root_V_tip_normal,
+                                                              color=ColorRGBA(r=1, g=0, b=0, a=1))
+        root_V_root_normal.vis_frame = self.tip
+        god_map.debug_expression_manager.add_debug_expression(f'{self.name}/goal_normal',
+                                                              root_V_root_normal,
+                                                              color=ColorRGBA(r=0, g=0, b=1, a=1))
         self.connect_monitors_to_all_tasks(start_condition, hold_condition, end_condition)

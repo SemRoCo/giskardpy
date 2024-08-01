@@ -77,16 +77,6 @@ class BoxyTestWrapper(GiskardTestWrapper):
         self.l_tip = 'left_gripper_tool_frame'
         self.r_gripper_group = 'r_gripper'
         super().__init__(giskard)
-
-    def teleport_base(self, goal_pose, group_name: Optional[str] = None):
-        self.set_seed_odometry(base_pose=goal_pose, group_name=group_name)
-        self.allow_all_collisions()
-        self.plan_and_execute()
-
-    def move_base(self, goal_pose):
-        self.set_cart_goal(goal_pose, tip_link='base_footprint', root_link='odom')
-        self.plan_and_execute()
-
     def open_r_gripper(self):
         return
 
@@ -99,22 +89,9 @@ class BoxyTestWrapper(GiskardTestWrapper):
     def close_l_gripper(self):
         return
 
-    def reset_base(self):
-        pass
-
-    def set_localization(self, map_T_odom: PoseStamped):
-        map_T_odom.pose.position.z = 0
-        self.set_seed_odometry(map_T_odom)
-        self.plan_and_execute()
-        # self.wait_heartbeats(15)
-        # p2 = self.world.compute_fk_pose(self.world.root_link_name, self.odom_root)
-        # compare_poses(p2.pose, map_T_odom.pose)
-
     def reset(self):
         self.open_l_gripper()
         self.open_r_gripper()
-        self.reset_base()
-        self.clear_world()
         self.register_group('l_gripper',
                             root_link_group_name=self.robot_name,
                             root_link_name='left_gripper_tool_frame')

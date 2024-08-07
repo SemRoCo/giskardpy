@@ -6,11 +6,11 @@ It uses constraint and optimization based task space control to control the whol
 
 ### (Optional) create a virtual environment using virtualenvwrapper
 ```
-sudo pip3 install virtualenvwrapper
+sudo apt install virtualenvwrapper
 echo "export WORKON_HOME=~/venvs" >> ~/.bashrc
-echo "source /usr/share/virtualenvwrapper.sh" >> ~/.bashrc
-mkdir -p $WORKON_HOME
+echo "source /usr/share/virtualenvwrapper/virtualenvwrapper.sh" >> ~/.bashrc
 source ~/.bashrc
+mkdir -p $WORKON_HOME
 
 mkvirtualenv giskardpy --system-site-packages
 ls $WORKON_HOME

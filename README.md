@@ -1,44 +1,57 @@
-# Giskard(py)
-Giskard is an open source motion planning framework for ROS, which uses constraint and optimization based task space control to generate trajectories for the whole body of mobile manipulators.
+# Giskardpy
+Giskardpy is an open source library for implementing motion control frameworks.
+It uses constraint and optimization based task space control to control the whole body of mobile manipulators.
 
-## Installation instructions for Ubuntu 20.04 + Noetic
+## Installation instructions for Ubuntu (tested on 20.04 and 24.04)
 
-#### ROS Workspace
+### (Optional) create a virtual environment using virtualenvwrapper
 ```
-source /opt/ros/noetic/setup.bash           # source ROS
-mkdir -p ~/giskardpy_ws/src                 # create directory for workspace
-cd ~/giskardpy_ws                           # go to workspace directory
-catkin init                                 # init workspace, you might have to pip install catkin-tools
-cd src                                      # go to source directory of workspace
-wstool init                                 # init rosinstall
-wstool merge https://raw.githubusercontent.com/SemRoCo/giskardpy/master/rosinstall/noetic.rosinstall
-                                            # update rosinstall file
-wstool update                               # pull source repositories
-rosdep install --ignore-src --from-paths .  # install dependencies available through apt
-pip3 install -r giskardpy/requirements.txt  # install python deps
-cd ..                                       # go to workspace directory
-catkin build                                # build packages
-source ~/giskardpy_ws/devel/setup.bash      # source new overlay
+sudo pip3 install virtualenvwrapper
+echo "export WORKON_HOME=~/venvs" >> ~/.bashrc
+echo "source /usr/share/virtualenvwrapper.sh" >> ~/.bashrc
+mkdir -p $WORKON_HOME
+source ~/.bashrc
+
+mkvirtualenv giskardpy --system-site-packages
+ls $WORKON_HOME
+```
+To use it do:
+```
+workon giskardpy
 ```
 
-#### Custom Bullet Bindings
+### Build Giskardpy
+Switch to your venv.
+```
+workon giskardpy
+```
+Choose a place where you want to build giskardpy and clone it
+```
+mkdir -p ~/libs && cd ~/libs
+git clone -b giskard_library https://github.com/SemRoCo/giskardpy.git
+cd giskardpy
+```
+Install Giskardpy, `-e` is optional but prevents you from having to rebuild every time the code changes.
+```
+pip3 install -r requirements.txt
+pip3 install -e .                           
+```
+
+### (Optional) Build Custom Bullet Bindings
 Giskard uses Adrian Röfer's bullet bindings instead of the official ones, as they are much faster for our use case.
 Install them like this:
 ```
+workon giskardpy
 mkdir -p ~/libs && cd ~/libs                # choose a place where you want to build pybullet
-git clone https://github.com/SemRoCo/bullet3.git
+git clone -b jazzy https://github.com/SemRoCo/bullet3.git
 cd bullet3                                  # be sure to be in the bullet3 folder
 ./build_better_pybullet.sh                  # this script will also clone and build pybind11 into libs
 source ~/.bashrc                            # the script adds a python path modification to your bashrc
 ```
 To test your installation do:
 ```
-$ python3
-Python 3.8.10 (default, Nov 14 2022, 12:59:47) 
-[GCC 9.4.0] on linux
-Type "help", "copyright", "credits" or "license" for more information.
->>> import betterpybullet
->>>
+workon giskardpy
+python3 -c "import betterpybullet"
 ```
 If it doesn't work, make sure that your ```$PYTHONPATH``` includes something like 
 ```/path/to/your/bullet3/build_cmake/better_python:/path/to/your/bullet3/examples/pybullet```. 

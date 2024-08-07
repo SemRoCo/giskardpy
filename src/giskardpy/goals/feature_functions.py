@@ -11,6 +11,7 @@ from giskardpy.goals.pointing import Pointing
 from giskardpy.goals.align_planes import AlignPlanes
 
 from typing import Optional, List, Dict, Union
+from std_msgs.msg import ColorRGBA
 
 
 class FeatureFunctionGoal(Goal):
@@ -33,13 +34,25 @@ class FeatureFunctionGoal(Goal):
         root_T_tip = god_map.world.compose_fk_expression(self.root, self.tip)
         if type(robot_feature) == PointStamped:
             self.root_P_robot_feature = root_T_tip.dot(cas.Point3(tip_robot_feature))
+            god_map.debug_expression_manager.add_debug_expression('root_P_robot_feature',
+                                                                  self.root_P_robot_feature,
+                                                                  color=ColorRGBA(r=1, g=0, b=0, a=1))
         elif type(robot_feature) == Vector3Stamped:
             self.root_V_robot_feature = root_T_tip.dot(cas.Vector3(tip_robot_feature))
+            god_map.debug_expression_manager.add_debug_expression('root_V_robot_feature',
+                                                                  self.root_V_robot_feature,
+                                                                  color=ColorRGBA(r=1, g=0, b=0, a=1))
 
         if type(world_feature) == PointStamped:
             self.root_P_world_feature = cas.Point3(root_world_feature)
+            god_map.debug_expression_manager.add_debug_expression('root_P_world_feature',
+                                                                  self.root_P_world_feature,
+                                                                  color=ColorRGBA(r=0, g=1, b=0, a=1))
         if type(world_feature) == Vector3Stamped:
             self.root_V_world_feature = cas.Vector3(root_world_feature)
+            god_map.debug_expression_manager.add_debug_expression('root_V_world_feature',
+                                                                  self.root_V_world_feature,
+                                                                  color=ColorRGBA(r=0, g=1, b=0, a=1))
 
 
 class PerpendicularFeatureFunction(FeatureFunctionGoal):

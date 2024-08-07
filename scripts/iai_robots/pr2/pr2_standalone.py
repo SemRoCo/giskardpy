@@ -34,6 +34,6 @@ if __name__ == '__main__':
                               drive_joint_name,
                           ]
                       ),
-                      behavior_tree_config=StandAloneBTConfig(publish_tf=True, publish_js=True),
+                      behavior_tree_config=StandAloneBTConfig(publish_tf=True, publish_js=True, debug_mode=True),
                       qp_controller_config=QPControllerConfig())
     giskard.live()

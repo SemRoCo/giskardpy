@@ -60,10 +60,11 @@ class Pointing(Goal):
             self.tip_V_pointing_axis.vector.z = 1
 
         root_T_tip = god_map.world.compose_fk_expression(self.root, self.tip)
-        root_P_goal_point = symbol_manager.get_expr(f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\']'
-                                                    f'.root_P_goal_point',
-                                                    input_type_hint=PointStamped,
-                                                    output_type_hint=cas.Point3)
+        # root_P_goal_point = symbol_manager.get_expr(f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\']'
+        #                                             f'.root_P_goal_point',
+        #                                             input_type_hint=PointStamped,
+        #                                             output_type_hint=cas.Point3)
+        root_P_goal_point = cas.Point3(self.root_P_goal_point)
         root_P_goal_point.reference_frame = self.root
         tip_V_pointing_axis = cas.Vector3(self.tip_V_pointing_axis)
 

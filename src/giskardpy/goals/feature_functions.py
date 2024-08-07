@@ -10,10 +10,39 @@ from giskardpy.tasks.task import Task, WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_
 from giskardpy.goals.pointing import Pointing
 from giskardpy.goals.align_planes import AlignPlanes
 
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Union
 
 
-class PerpendicularFeatureFunction(Goal):
+class FeatureFunctionGoal(Goal):
+    def __init__(self,
+                 tip_link: str, root_link: str,
+                 world_feature: Union[PointStamped, Vector3Stamped],
+                 robot_feature: Union[PointStamped, Vector3Stamped],
+                 name: Optional[str] = None
+                 ):
+        self.root = god_map.world.search_for_link_name(root_link, None)
+        self.tip = god_map.world.search_for_link_name(tip_link, None)
+        if name is None:
+            name = f'{self.__class__.__name__}/{self.root}/{self.tip}'
+        super().__init__(name)
+        world_feature.header.frame_id = god_map.world.search_for_link_name(world_feature.header.frame_id, None)
+        root_world_feature = god_map.world.transform_msg(self.root, world_feature)
+        robot_feature.header.frame_id = god_map.world.search_for_link_name(robot_feature.header.frame_id, None)
+        tip_robot_feature = god_map.world.transform_msg(self.tip, robot_feature)
+
+        root_T_tip = god_map.world.compose_fk_expression(self.root, self.tip)
+        if type(robot_feature) == PointStamped:
+            self.root_P_robot_feature = root_T_tip.dot(cas.Point3(tip_robot_feature))
+        elif type(robot_feature) == Vector3Stamped:
+            self.root_V_robot_feature = root_T_tip.dot(cas.Vector3(tip_robot_feature))
+
+        if type(world_feature) == PointStamped:
+            self.root_P_world_feature = cas.Point3(root_world_feature)
+        if type(world_feature) == Vector3Stamped:
+            self.root_V_world_feature = cas.Vector3(root_world_feature)
+
+
+class PerpendicularFeatureFunction(FeatureFunctionGoal):
     def __init__(self, tip_link: str, root_link: str,
                  world_feature: Vector3Stamped,
                  robot_feature: Vector3Stamped,
@@ -24,21 +53,10 @@ class PerpendicularFeatureFunction(Goal):
                  hold_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.TrueSymbol
                  ):
-        self.root_link = god_map.world.search_for_link_name(root_link, None)
-        self.tip_link = god_map.world.search_for_link_name(tip_link, None)
-        if name is None:
-            name = f'{self.__class__.__name__}/{self.root_link}/{self.tip_link}'
-        super().__init__(name)
-        world_feature.header.frame_id = god_map.world.search_for_link_name(world_feature.header.frame_id, None)
-        root_world_feature = god_map.world.transform_msg(self.root_link, world_feature)
-        robot_feature.header.frame_id = god_map.world.search_for_link_name(robot_feature.header.frame_id, None)
-        tip_robot_feature = god_map.world.transform_msg(self.tip_link, robot_feature)
+        super().__init__(tip_link=tip_link, root_link=root_link, world_feature=world_feature,
+                         robot_feature=robot_feature, name=name)
 
-        root_T_tip = god_map.world.compose_fk_expression(self.root_link, self.tip_link)
-        root_V_robot_feature = root_T_tip.dot(cas.Vector3(tip_robot_feature))
-        root_V_world_feature = cas.Vector3(root_world_feature)
-
-        expr = cas.dot(root_V_world_feature[:3], root_V_robot_feature[:3])
+        expr = cas.dot(self.root_V_world_feature[:3], self.root_V_robot_feature[:3])
 
         task = self.create_and_add_task()
         task.add_equality_constraint(reference_velocity=max_vel,
@@ -49,7 +67,7 @@ class PerpendicularFeatureFunction(Goal):
         self.connect_monitors_to_all_tasks(start_condition, hold_condition, end_condition)
 
 
-class HeightFeatureFunction(Goal):
+class HeightFeatureFunction(FeatureFunctionGoal):
     def __init__(self, tip_link: str, root_link: str,
                  world_feature: PointStamped,
                  robot_feature: PointStamped,
@@ -62,21 +80,10 @@ class HeightFeatureFunction(Goal):
                  hold_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.TrueSymbol
                  ):
-        self.root_link = god_map.world.search_for_link_name(root_link, None)
-        self.tip_link = god_map.world.search_for_link_name(tip_link, None)
-        if name is None:
-            name = f'{self.__class__.__name__}/{self.root_link}/{self.tip_link}'
-        super().__init__(name)
-        world_feature.header.frame_id = god_map.world.search_for_link_name(world_feature.header.frame_id, None)
-        root_world_feature = god_map.world.transform_msg(self.root_link, world_feature)
-        robot_feature.header.frame_id = god_map.world.search_for_link_name(robot_feature.header.frame_id, None)
-        tip_robot_feature = god_map.world.transform_msg(self.tip_link, robot_feature)
+        super().__init__(tip_link=tip_link, root_link=root_link, world_feature=world_feature,
+                         robot_feature=robot_feature, name=name)
 
-        root_T_tip = god_map.world.compose_fk_expression(self.root_link, self.tip_link)
-        root_P_robot_feature = root_T_tip.dot(cas.Point3(tip_robot_feature))
-        root_P_world_feature = cas.Point3(root_world_feature)
-
-        distance = root_P_robot_feature - root_P_world_feature
+        distance = self.root_P_robot_feature - self.root_P_world_feature
 
         height_vector = cas.Vector3([0, 0, 1])
 
@@ -93,7 +100,7 @@ class HeightFeatureFunction(Goal):
         self.connect_monitors_to_all_tasks(start_condition, hold_condition, end_condition)
 
 
-class DistanceFeatureFunction(Goal):
+class DistanceFeatureFunction(FeatureFunctionGoal):
     def __init__(self, tip_link: str, root_link: str,
                  world_feature: PointStamped,
                  robot_feature: PointStamped,
@@ -106,22 +113,11 @@ class DistanceFeatureFunction(Goal):
                  hold_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.TrueSymbol
                  ):
-        self.root_link = god_map.world.search_for_link_name(root_link, None)
-        self.tip_link = god_map.world.search_for_link_name(tip_link, None)
-        if name is None:
-            name = f'{self.__class__.__name__}/{self.root_link}/{self.tip_link}'
-        super().__init__(name)
-        world_feature.header.frame_id = god_map.world.search_for_link_name(world_feature.header.frame_id, None)
-        root_world_feature = god_map.world.transform_msg(self.root_link, world_feature)
-        robot_feature.header.frame_id = god_map.world.search_for_link_name(robot_feature.header.frame_id, None)
-        tip_robot_feature = god_map.world.transform_msg(self.tip_link, robot_feature)
-
-        root_T_tip = god_map.world.compose_fk_expression(self.root_link, self.tip_link)
-        root_P_robot_feature = root_T_tip.dot(cas.Point3(tip_robot_feature))
-        root_P_world_feature = cas.Point3(root_world_feature)
+        super().__init__(tip_link=tip_link, root_link=root_link, world_feature=world_feature,
+                         robot_feature=robot_feature, name=name)
 
         # distance between the two feature points
-        distance = root_P_robot_feature - root_P_world_feature
+        distance = self.root_P_robot_feature - self.root_P_world_feature
 
         # normal vector defining the x-y plane
         height_vector = cas.Vector3([0, 0, 1])
@@ -206,7 +202,7 @@ class AlignFeatureFunction(Goal):
                                                  end_condition=end_condition))
 
 
-class AngleFeatureFunction(Goal):
+class AngleFeatureFunction(FeatureFunctionGoal):
     def __init__(self, tip_link: str, root_link: str,
                  world_feature: Vector3Stamped,
                  robot_feature: Vector3Stamped,
@@ -219,21 +215,10 @@ class AngleFeatureFunction(Goal):
                  hold_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.TrueSymbol
                  ):
-        self.root_link = god_map.world.search_for_link_name(root_link, None)
-        self.tip_link = god_map.world.search_for_link_name(tip_link, None)
-        if name is None:
-            name = f'{self.__class__.__name__}/{self.root_link}/{self.tip_link}'
-        super().__init__(name)
-        world_feature.header.frame_id = god_map.world.search_for_link_name(world_feature.header.frame_id, None)
-        root_world_feature = god_map.world.transform_msg(self.root_link, world_feature)
-        robot_feature.header.frame_id = god_map.world.search_for_link_name(robot_feature.header.frame_id, None)
-        tip_robot_feature = god_map.world.transform_msg(self.tip_link, robot_feature)
+        super().__init__(tip_link=tip_link, root_link=root_link, world_feature=world_feature,
+                         robot_feature=robot_feature, name=name)
 
-        root_T_tip = god_map.world.compose_fk_expression(self.root_link, self.tip_link)
-        root_V_robot_feature = root_T_tip.dot(cas.Vector3(tip_robot_feature))
-        root_V_world_feature = cas.Vector3(root_world_feature)
-
-        expr = cas.angle_between_vector(root_V_world_feature, root_V_robot_feature)
+        expr = cas.angle_between_vector(self.root_V_world_feature, self.root_V_robot_feature)
 
         task = self.create_and_add_task()
         task.add_inequality_constraint(reference_velocity=max_vel,

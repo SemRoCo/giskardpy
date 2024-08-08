@@ -43,9 +43,7 @@ from giskardpy.utils.math import compare_points
 from utils_for_tests import compare_poses, publish_marker_vector, \
     GiskardTestWrapper, pr2_urdf
 from giskardpy.goals.weight_scaling_goals import MaxManipulabilityLinWeight, BaseArmWeightScaling
-from giskardpy.goals.feature_functions import DistanceFeatureFunction, PointingFeatureFunction, \
-    PerpendicularFeatureFunction, HeightFeatureFunction, AlignFeatureFunction
-from giskardpy.monitors.feature_monitors import HeightFeatureMonitor
+
 
 # scopes = ['module', 'class', 'function']
 pocky_pose = {'r_elbow_flex_joint': -1.29610152504,
@@ -4659,11 +4657,11 @@ class TestFeatureFunctions:
         robot_feature.header.frame_id = zero_pose.r_tip
         robot_feature.vector.x = 1
 
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class='PerpendicularFeatureFunction',
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class='AlignPerpendicular',
                                                root_link='map',
                                                tip_link=zero_pose.r_tip,
-                                               world_feature=world_feature,
-                                               robot_feature=robot_feature)
+                                               reference_normal=world_feature,
+                                               tip_normal=robot_feature)
 
         zero_pose.add_default_end_motion_conditions()
         zero_pose.execute()
@@ -4677,11 +4675,11 @@ class TestFeatureFunctions:
         robot_feature.header.frame_id = zero_pose.r_tip
         robot_feature.vector.z = 1
 
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class='AngleFeatureFunction',
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class='AngleGoal',
                                                root_link='map',
                                                tip_link=zero_pose.r_tip,
-                                               world_feature=world_feature,
-                                               robot_feature=robot_feature,
+                                               reference_vector=world_feature,
+                                               tip_vector=robot_feature,
                                                lower_angle=0.6,
                                                upper_angle=0.9)
 
@@ -4695,11 +4693,11 @@ class TestFeatureFunctions:
         robot_feature = PointStamped()
         robot_feature.header.frame_id = zero_pose.r_tip
 
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class='HeightFeatureFunction',
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class='HeightGoal',
                                                root_link='map',
                                                tip_link=zero_pose.r_tip,
-                                               world_feature=world_feature,
-                                               robot_feature=robot_feature,
+                                               reference_point=world_feature,
+                                               tip_point=robot_feature,
                                                lower_limit=1,
                                                upper_limit=2)
 
@@ -4713,11 +4711,11 @@ class TestFeatureFunctions:
         robot_feature = PointStamped()
         robot_feature.header.frame_id = zero_pose.r_tip
 
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class='DistanceFeatureFunction',
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class='DistanceGoal',
                                                root_link='map',
                                                tip_link=zero_pose.r_tip,
-                                               world_feature=world_feature,
-                                               robot_feature=robot_feature,
+                                               reference_point=world_feature,
+                                               tip_point=robot_feature,
                                                lower_limit=2,
                                                upper_limit=2,
                                                max_vel=0.3
@@ -4726,23 +4724,6 @@ class TestFeatureFunctions:
         zero_pose.add_default_end_motion_conditions()
         zero_pose.execute()
 
-    def test_feature_pointing(self, zero_pose: PR2TestWrapper):
-        world_feature = PointStamped()
-        world_feature.header.frame_id = 'map'
-
-        robot_feature = Vector3Stamped()
-        robot_feature.header.frame_id = zero_pose.r_tip
-        robot_feature.vector.x = 1
-
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class='PointingFeatureFunction',
-                                               root_link='map',
-                                               tip_link=zero_pose.r_tip,
-                                               world_feature=world_feature,
-                                               robot_feature=robot_feature,
-                                               )
-
-        zero_pose.add_default_end_motion_conditions()
-        zero_pose.execute()
 
 
 # kernprof -lv py.test -s test/test_integration_pr2.py

@@ -508,7 +508,7 @@ class TestActionGoals:
         env_owl = '/home/huerkamp/workspace/new_giskard_ws/environment.owl'
         env_owl_ind_name = 'world'
         env_urdf = '/home/huerkamp/workspace/new_giskard_ws/new_world_cups.urdf'
-        agent_owl = '/home/huerkamp/workspace/new_giskard_ws/src/knowrob/owl/robots/hsrb.owl'
+        agent_owl = '/home/huerkamp/workspace/new_giskard_ws/src/knowrob/owl/robots/PR2.owl'
         agent_owl_ind_name = 'robotHSR'
         agent_urdf = '/home/huerkamp/workspace/new_giskard_ws/src/mujoco_robots/hsr_robot/hsr_description/hsr_description/robots/hsrb4s.urdf'
         ni.start_episode(task_type=task_type, env_owl=env_owl, env_owl_ind_name=env_owl_ind_name, env_urdf=env_urdf,

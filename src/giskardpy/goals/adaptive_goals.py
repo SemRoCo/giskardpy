@@ -1,5 +1,7 @@
 from __future__ import division
 
+import time
+
 from geometry_msgs.msg import PointStamped, PoseStamped, QuaternionStamped
 from geometry_msgs.msg import Vector3Stamped
 from giskardpy import casadi_wrapper as cas
@@ -16,6 +18,8 @@ import math
 from typing import Optional, List
 import numpy as np
 from giskardpy.monitors.monitors import ExpressionMonitor
+from neem_interface_python.neem_interface import NEEMInterface
+import time
 
 
 # Todo: instead of relying on predefined poses model the motion as relations between the objects
@@ -23,7 +27,7 @@ from giskardpy.monitors.monitors import ExpressionMonitor
 class PouringAdaptiveTilt(Goal):
     def __init__(self, root, tip, pouring_pose: PoseStamped, tilt_angle: float, tilt_axis: Vector3Stamped,
                  use_local_min=False, max_vel=0.3, weight=WEIGHT_COLLISION_AVOIDANCE, pre_tilt=False,
-                 name: Optional[str] = None, with_feedback=True,
+                 name: Optional[str] = None, with_feedback=True, parent_action=None, agent_iri=None,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.TrueSymbol):
@@ -57,6 +61,13 @@ class PouringAdaptiveTilt(Goal):
         self.z_rot_2 = False
         self.up = False
         self.down = False
+
+        self.ni = NEEMInterface()
+        self.start_time = time.time()
+        self.memory = 'pos'
+        self.parent_action = parent_action
+        self.agent_iri = agent_iri
+        self.once = True
 
         root_T_tip = god_map.world.compose_fk_expression(self.root_link, self.tip_link)
         tip_V_tilt_axis = cas.Vector3(self.tilt_axis.vector)
@@ -224,8 +235,8 @@ class PouringAdaptiveTilt(Goal):
         is_y_back = symbol_manager.get_symbol(f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\'].move_y_back')
         is_up = symbol_manager.get_symbol(f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\'].up')
         is_down = symbol_manager.get_symbol(f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\'].down')
-        root_V_adapt = cas.Vector3([0.002 * is_x - 0.002 * is_x_back,
-                                    0.002 * is_y - 0.002 * is_y_back,
+        root_V_adapt = cas.Vector3([0.02 * is_x - 0.02 * is_x_back,
+                                    0.02 * is_y - 0.02 * is_y_back,
                                     0.01 * is_up - 0.01 * is_down,
                                     ])
         adapt_pos_task.add_equality_constraint_vector(reference_velocities=[self.max_vel] * 3,
@@ -264,19 +275,53 @@ class PouringAdaptiveTilt(Goal):
         god_map.debug_expression_manager.add_debug_expression('rot2', is_rot_2)
 
     def callback(self, action_string: String):
+        if self.memory != '' and self.parent_action is not None and self.once:
+            end_time = time.time()
+            if 'pos' in self.memory:
+                action_iri = self.ni.add_subaction_with_task(parent_action=self.parent_action,
+                                                             task_type='soma:Positioning',
+                                                             start_time=self.start_time, end_time=end_time)
+                self.ni.assert_task_and_roles(action_iri=action_iri, task_type='MovingTo',
+                                              source_iri='http://knowrob.org/kb/environment.owl#free_cup',
+                                              dest_iri='http://knowrob.org/kb/environment.owl#free_cup2',
+                                              agent_iri=self.agent_iri)
+            if 'back' in self.memory:
+                action_iri = self.ni.add_subaction_with_task(parent_action=self.parent_action,
+                                                             task_type='soma:TiltBackward',
+                                                             start_time=self.start_time, end_time=end_time)
+                self.ni.assert_task_and_roles(action_iri=action_iri, task_type='TiltBackward',
+                                              source_iri='http://knowrob.org/kb/environment.owl#free_cup',
+                                              dest_iri='http://knowrob.org/kb/environment.owl#free_cup2',
+                                              agent_iri=self.agent_iri)
+            if 'forw' in self.memory:
+                action_iri = self.ni.add_subaction_with_task(parent_action=self.parent_action,
+                                                             task_type='soma:TiltForward',
+                                                             start_time=self.start_time, end_time=end_time)
+                self.ni.assert_task_and_roles(action_iri=action_iri, task_type='TiltForward',
+                                              source_iri='http://knowrob.org/kb/environment.owl#free_cup',
+                                              dest_iri='http://knowrob.org/kb/environment.owl#free_cup2',
+                                              agent_iri=self.agent_iri)
+            self.start_time = end_time
+            self.memory = ''
+            self.once = False
+
         self.action_string = action_string.data
         if 'increase' in action_string.data and 'decrease' in action_string.data:
             self.forward = False
             self.backward = True
+            self.memory += 'back'
         elif 'decrease' in action_string.data:
             self.forward = False
             self.backward = True
+            self.memory += 'back'
         elif 'increase' in action_string.data:
             self.backward = False
             self.forward = True
+            self.memory += 'forw'
         else:
             self.forward = False
             self.backward = False
+            # self.memory = ''
 
         self.move_x = False
         self.move_x_back = False
@@ -296,6 +341,9 @@ class PouringAdaptiveTilt(Goal):
             self.up = True
         if 'moveDown' in action_string.data:
             self.down = True
+
+        if self.move_x or self.move_y or self.move_y_back or self.move_x_back or self.up or self.down:
+            self.memory += 'pos'
 
         self.z_rot_2 = False
         self.z_rot_1 = False
@@ -598,7 +646,7 @@ class PouringAdaptiveTilt2(Goal):
         current_z = root_T_tip.to_position()[2]
         self.pos_task.add_inequality_constraint_vector(reference_velocities=[max_vel] * 3,
                                                        lower_errors=[l1, l2, min_height - current_z],
-                                                       upper_errors=[u1, u2, 2*min_height - current_z],
+                                                       upper_errors=[u1, u2, 2 * min_height - current_z],
                                                        weights=[weight] * 3,
                                                        task_expression=root_T_tip.to_position()[:3],
                                                        names=[f'{name}/x',

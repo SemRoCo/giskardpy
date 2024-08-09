@@ -4682,8 +4682,16 @@ class TestFeatureFunctions:
                                                tip_vector=robot_feature,
                                                lower_angle=0.6,
                                                upper_angle=0.9)
-
-        zero_pose.add_default_end_motion_conditions()
+        mon = zero_pose.monitors.add_monitor(monitor_class='AngleFeatureMonitor',
+                                             lower_limit=0.6,
+                                             upper_limit=0.9,
+                                             root_link='map',
+                                             tip_link=zero_pose.r_tip,
+                                             reference_vector=world_feature,
+                                             tip_vector=robot_feature,
+                                             name='angleMonitor')
+        zero_pose.monitors.add_end_motion(mon)
+        # zero_pose.add_default_end_motion_conditions()
         zero_pose.execute()
 
     def test_feature_height(self, zero_pose: PR2TestWrapper):

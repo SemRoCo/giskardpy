@@ -95,7 +95,7 @@ class DistanceFeatureMonitor(FeatureMonitor):
 
 class AngleFeatureMonitor(FeatureMonitor):
     def __init__(self, tip_link: str, root_link: str,
-                 referenec_vector: Vector3Stamped,
+                 reference_vector: Vector3Stamped,
                  tip_vector: Vector3Stamped,
                  lower_limit: float,
                  upper_limit: float,
@@ -103,7 +103,7 @@ class AngleFeatureMonitor(FeatureMonitor):
                  stay_true: bool = True,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  ):
-        super().__init__(tip_link=tip_link, root_link=root_link, reference_feature=referenec_vector,
+        super().__init__(tip_link=tip_link, root_link=root_link, reference_feature=reference_vector,
                          controlled_feature=tip_vector, name=name, stay_true=stay_true, start_condition=start_condition)
 
         expr = cas.angle_between_vector(self.root_V_reference_feature, self.root_V_controlled_feature)

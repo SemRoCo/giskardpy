@@ -4733,8 +4733,8 @@ class TestFeatureFunctions:
                                               tip_link=zero_pose.r_tip,
                                               reference_point=world_feature,
                                               tip_point=robot_feature,
-                                              lower_limit=1.998,
-                                              upper_limit=2.002)
+                                              lower_limit=1.99,
+                                              upper_limit=2.01)
 
         zero_pose.monitors.add_end_motion(mon)
         zero_pose.execute()

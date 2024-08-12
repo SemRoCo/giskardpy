@@ -93,7 +93,7 @@ jobs:
         with:
           path: 'ros_ws/src/giskard_msgs'
           repository: SemRoCo/giskard_msgs
-          ref: devel
+          ref: monitor_result_feedback
       - name: Checkout iai_maps
         uses: actions/checkout@v3
         with:

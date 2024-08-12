@@ -407,12 +407,12 @@ class OmniDrive(MovableJoint, VirtualFreeVariables):
     def update_transform(self, new_parent_T_child: cas.TransMatrix) -> None:
         position = new_parent_T_child.to_position()
         roll, pitch, yaw = new_parent_T_child.to_rotation().to_rpy()
-        god_map.world.state[self.x.name].position = position.x
-        god_map.world.state[self.y.name].position = position.y
-        god_map.world.state[self.z.name].position = position.z
-        god_map.world.state[self.roll.name].position = roll
-        god_map.world.state[self.pitch.name].position = pitch
-        god_map.world.state[self.yaw.name].position = yaw
+        god_map.world.state[self.x.name].position = position.x.to_np()
+        god_map.world.state[self.y.name].position = position.y.to_np()
+        god_map.world.state[self.z.name].position = position.z.to_np()
+        god_map.world.state[self.roll.name].position = roll.to_np()
+        god_map.world.state[self.pitch.name].position = pitch.to_np()
+        god_map.world.state[self.yaw.name].position = yaw.to_np()
 
     def update_state(self, dt: float) -> None:
         state = god_map.world.state

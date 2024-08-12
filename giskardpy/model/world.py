@@ -241,6 +241,19 @@ class WorldTree(WorldTreeInterface):
     def search_for_joint_of_type(self, joint_types: Tuple[Type[Joint]]) -> List[Joint]:
         return [j for j in self.joints.values() if isinstance(j, joint_types)]
 
+    def get_drive_joint(self, possible_types: Tuple[Type[Joint]] = (OmniDrive, DiffDrive),
+                        joint_name: Optional[PrefixName] = None) -> Joint:
+        if joint_name is None:
+            joints = self.search_for_joint_of_type(possible_types)
+            if len(joints) == 1:
+                return joints[0]
+            elif len(joints) == 0:
+                raise ValueError('No joints found')
+            else:
+                raise ValueError(f'Multiple joints found: {joints}')
+        else:
+            return self.joints[joint_name]
+
     @modifies_world
     def rename_link(self, old_name: PrefixName, new_name: PrefixName):
         if old_name not in self.link_names:

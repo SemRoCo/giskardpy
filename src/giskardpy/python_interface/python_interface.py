@@ -39,6 +39,7 @@ from giskardpy.monitors.payload_monitors import Print, Sleep, SetMaxTrajectoryLe
 from giskardpy.utils.utils import kwargs_to_json, get_all_classes_in_package
 from giskardpy.goals.feature_functions import AlignPerpendicular, HeightGoal, AngleGoal, DistanceGoal
 from giskardpy.monitors.feature_monitors import PerpendicularMonitor, AngleMonitor, HeightMonitor, DistanceMonitor
+from giskard_msgs.msg import ExecutionState
 
 
 class WorldWrapper:
@@ -1927,6 +1928,7 @@ class MonitorWrapper:
 
 class GiskardWrapper:
     last_feedback: MoveFeedback = None
+    last_execution_state: ExecutionState = None
 
     def __init__(self, node_name: str = 'giskard', avoid_name_conflict: bool = False):
         """
@@ -1987,7 +1989,9 @@ class GiskardWrapper:
         :param wait: this function blocks if wait=True
         :return: result from giskard
         """
-        return self._send_action_goal(MoveGoal.EXECUTE, wait)
+        result = self._send_action_goal(MoveGoal.EXECUTE, wait)
+        self.last_execution_state = result.execution_state
+        return result
 
     def projection(self, wait: bool = True) -> MoveResult:
         """
@@ -1995,7 +1999,9 @@ class GiskardWrapper:
         :param wait: this function blocks if wait=True
         :return: result from Giskard
         """
-        return self._send_action_goal(MoveGoal.PROJECTION, wait)
+        result = self._send_action_goal(MoveGoal.PROJECTION, wait)
+        self.last_execution_state = result.execution_state
+        return result
 
     def _send_action_goal(self, goal_type: int, wait: bool = True) -> Optional[MoveResult]:
         """
@@ -2043,3 +2049,54 @@ class GiskardWrapper:
 
     def _feedback_cb(self, msg: MoveFeedback):
         self.last_feedback = msg
+
+    def get_end_motion_reason(self, move_result: MoveResult = None, show_all=False):
+        if not move_result and not self.last_execution_state:
+            raise Exception('No MoveResult available to analyze')
+        elif not move_result:
+            execution_state = self.last_execution_state
+        else:
+            execution_state = move_result.execution_state
+
+        result = {}
+
+        endMotion_idx = 0
+        cancelMotion_idx = 0
+        idx = 0
+        for monitor in execution_state.monitors:
+            if monitor.monitor_class == 'CancelMotion':
+                cancelMotion_idx = idx
+            if monitor.monitor_class == 'EndMotion':
+                endMotion_idx = idx
+            idx += 1
+
+        if execution_state.monitor_state[endMotion_idx] == 1:
+            # the end motion was successful
+            return result
+
+        if show_all:
+            for monitor, state in zip(execution_state.monitors, execution_state.monitor_state):
+                result[monitor.name] = state
+            return result
+
+        def search_for_monitor_values_in_start_condition(start_condition: str):
+            res = []
+            for monitor, state in zip(execution_state.monitors, execution_state.monitor_state):
+                if monitor.name in start_condition and state == 0:
+                    res.append(monitor)
+            return res
+
+        start_condition = execution_state.monitors[endMotion_idx].start_condition
+        false_monitors = search_for_monitor_values_in_start_condition(start_condition=start_condition)
+        idx = 0
+        # repeatedly search for all inactive monitors in all start_conditions directly
+        # connected to the endMotion start_condition
+        while idx < len(false_monitors):
+            if false_monitors[idx].start_condition != '1.0':
+                false_monitors.extend(search_for_monitor_values_in_start_condition(false_monitors[idx].start_condition))
+            idx += 1
+
+        for mon in false_monitors:
+            result[mon.name] = False
+
+        return result

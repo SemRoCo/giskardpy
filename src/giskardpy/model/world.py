@@ -3,6 +3,7 @@ from __future__ import annotations
 import abc
 import hashlib
 from abc import ABC
+from collections import OrderedDict
 from copy import deepcopy
 from functools import cached_property, wraps
 from itertools import combinations
@@ -10,8 +11,10 @@ from typing import Dict, Union, Tuple, Set, Optional, List, Callable, Sequence, 
 from xml.etree.ElementTree import ParseError
 
 import numpy as np
+import rospy
 import urdf_parser_py.urdf as up
-from geometry_msgs.msg import PoseStamped, Pose, PointStamped, Point, Vector3Stamped, Vector3, QuaternionStamped
+from geometry_msgs.msg import PoseStamped, Pose, PointStamped, Point, Vector3Stamped, Vector3, QuaternionStamped, \
+    TransformStamped
 from std_msgs.msg import ColorRGBA
 from tf2_msgs.msg import TFMessage
 
@@ -33,7 +36,8 @@ from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.next_command import NextCommands
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils import logging
-from giskardpy.utils.tfwrapper import homo_matrix_to_pose, np_to_pose, msg_to_homogeneous_matrix, make_transform
+from giskardpy.utils.tfwrapper import homo_matrix_to_pose, np_to_pose, msg_to_homogeneous_matrix, make_transform, \
+    create_tf_message_batch
 from giskardpy.utils.utils import suppress_stderr, clear_cached_properties
 from giskardpy.utils.decorators import memoize, copy_memoize, clear_memo
 
@@ -1262,48 +1266,59 @@ class WorldTree(WorldTreeInterface):
         Create a tfmessage for the whole world tree.
         """
         tf_msg = TFMessage()
-        for joint_name, joint in self.joints.items():
-            p_T_c = self.compute_fk_pose(root=joint.parent_link_name, tip=joint.child_link_name)
-            if include_prefix:
-                parent_link_name = joint.parent_link_name
-                child_link_name = joint.child_link_name
-            else:
-                parent_link_name = joint.parent_link_name.short_name
-                child_link_name = joint.child_link_name.short_name
-            p_T_c = make_transform(parent_frame=parent_link_name,
-                                   child_frame=child_link_name,
-                                   pose=p_T_c.pose,
-                                   normalize_quaternion=False)
-            tf_msg.transforms.append(p_T_c)
+        tf = self._fk_computer.compute_tf()
+        current_time = rospy.get_rostime()
+        tf_msg.transforms = create_tf_message_batch(len(self._fk_computer.tf))
+        for i, (parent_link_name, child_link_name) in enumerate(self._fk_computer.tf):
+            pose = tf[i]
+            if not include_prefix:
+                parent_link_name = parent_link_name.short_name
+                child_link_name = child_link_name.short_name
+
+            p_T_c = tf_msg.transforms[i]
+            p_T_c.header.frame_id = str(parent_link_name)
+            p_T_c.header.stamp = current_time
+            p_T_c.child_frame_id = str(child_link_name)
+            p_T_c.transform.translation.x = pose[0]
+            p_T_c.transform.translation.y = pose[1]
+            p_T_c.transform.translation.z = pose[2]
+            p_T_c.transform.rotation.x = pose[3]
+            p_T_c.transform.rotation.y = pose[4]
+            p_T_c.transform.rotation.z = pose[5]
+            p_T_c.transform.rotation.w = pose[6]
         return tf_msg
 
     @profile
     def compute_all_collision_fks(self):
-        params = symbol_manager.resolve_symbols(self._fk_computer.fast_collision_fks.str_params)
-        return self._fk_computer.fast_collision_fks.fast_call(params)
+        return self._fk_computer.compiled_collision_fks.fast_call(self._fk_computer.subs)
 
     @profile
     def init_all_fks(self):
         class ExpressionCompanion(TravelCompanion):
             idx_start: Dict[PrefixName, int]
-            fast_collision_fks: CompiledFunction
-            fast_all_fks: CompiledFunction
+            compiled_collision_fks: CompiledFunction
+            compiled_all_fks: CompiledFunction
             str_params: List[str]
 
             def __init__(self, world: WorldTree):
                 self.world = world
                 self.fks = {self.world.root_link_name: w.TransMatrix()}
+                self.tf = OrderedDict()
 
             @profile
             def joint_call(self, joint_name: my_string) -> bool:
                 joint = self.world.joints[joint_name]
                 map_T_parent = self.fks[joint.parent_link_name]
                 self.fks[joint.child_link_name] = map_T_parent.dot(joint.parent_T_child)
+                position = joint.parent_T_child.to_position()[:3]
+                orientation = joint.parent_T_child.to_rotation().to_quaternion()
+                self.tf[(joint.parent_link_name, joint.child_link_name)] = w.vstack([position, orientation]).T
                 return False
 
             @profile
             def compile_fks(self):
                 all_fks = w.vstack([self.fks[link_name] for link_name in self.world.link_names_as_set])
+                tf = w.vstack([pose for pose in self.tf.values()])
                 collision_fks = []
                 # collision_ids = []
                 for link_name in sorted(self.world.link_names_with_collisions):
@@ -1321,14 +1336,19 @@ class WorldTree(WorldTreeInterface):
                 params.update(collision_fks.free_symbols())
                 params = list(params)
                 self.str_params = [str(v) for v in params]
-                self.fast_all_fks = all_fks.compile(parameters=params)
-                self.fast_collision_fks = collision_fks.compile(parameters=params)
+                self.compiled_all_fks = all_fks.compile(parameters=params)
+                self.compiled_collision_fks = collision_fks.compile(parameters=params)
+                self.compiled_tf = tf.compile(parameters=params)
                 self.idx_start = {link_name: i * 4 for i, link_name in enumerate(god_map.world.link_names_as_set)}
 
             @profile
             def recompute(self):
                 self.compute_fk_np.memo.clear()
-                self.fks = self.fast_all_fks.fast_call(symbol_manager.resolve_symbols(self.fast_all_fks.str_params))
+                self.subs = symbol_manager.resolve_symbols(self.compiled_all_fks.str_params)
+                self.fks = self.compiled_all_fks.fast_call(self.subs)
+
+            def compute_tf(self):
+                return self.compiled_tf.fast_call(self.subs)
 
             @memoize
             @profile

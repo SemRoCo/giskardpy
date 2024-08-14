@@ -31,7 +31,7 @@ class CleanUp(GiskardBehavior):
         if self.clear_markers_:
             self.clear_markers()
         god_map.giskard.set_defaults()
-        god_map.world.fast_all_fks = None
+        god_map.world.compiled_all_fks = None
         god_map.collision_scene.reset_cache()
         god_map.collision_scene.clear_collision_matrix()
         god_map.closest_point = Collisions(1)

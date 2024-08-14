@@ -229,41 +229,42 @@ class WorldWithOmniDriveRobot(WorldConfig):
     drive_joint_name: str
 
     def __init__(self,
+                 urdf: str,
                  map_name: str = 'map',
                  localization_joint_name: str = 'localization',
                  odom_link_name: str = 'odom',
                  drive_joint_name: str = 'brumbrum'):
         super().__init__()
+        self.urdf = urdf
         self.map_name = map_name
         self.localization_joint_name = localization_joint_name
         self.odom_link_name = odom_link_name
         self.drive_joint_name = drive_joint_name
 
-    def setup(self, robot_urdf: str, robot_name: Optional[str] = None):
-        with self.world.modify_world():
-            self.set_default_limits({Derivatives.velocity: 1,
-                                     Derivatives.acceleration: np.inf,
-                                     Derivatives.jerk: 30})
-            self.add_empty_link(PrefixName(self.map_name))
-            self.add_empty_link(PrefixName(self.odom_link_name))
-            self.add_6dof_joint(parent_link=self.map_name, child_link=self.odom_link_name,
-                                joint_name=self.localization_joint_name)
-            self.add_robot_urdf(robot_urdf, robot_name)
-            root_link_name = self.get_root_link_of_group(self.robot_group_name)
-            self.add_omni_drive_joint(name=self.drive_joint_name,
-                                      parent_link_name=self.odom_link_name,
-                                      child_link_name=root_link_name,
-                                      translation_limits={
-                                          Derivatives.velocity: 0.2,
-                                          Derivatives.acceleration: 1,
-                                          Derivatives.jerk: 5,
-                                      },
-                                      rotation_limits={
-                                          Derivatives.velocity: 0.2,
-                                          Derivatives.acceleration: 1,
-                                          Derivatives.jerk: 5
-                                      },
-                                      robot_group_name=self.robot_group_name)
+    def setup(self, robot_name: Optional[str] = None):
+        self.set_default_limits({Derivatives.velocity: 1,
+                                 Derivatives.acceleration: np.inf,
+                                 Derivatives.jerk: 30})
+        self.add_empty_link(PrefixName(self.map_name))
+        self.add_empty_link(PrefixName(self.odom_link_name))
+        self.add_6dof_joint(parent_link=self.map_name, child_link=self.odom_link_name,
+                            joint_name=self.localization_joint_name)
+        self.add_robot_urdf(self.urdf, robot_name)
+        root_link_name = self.get_root_link_of_group(self.robot_group_name)
+        self.add_omni_drive_joint(name=self.drive_joint_name,
+                                  parent_link_name=self.odom_link_name,
+                                  child_link_name=root_link_name,
+                                  translation_limits={
+                                      Derivatives.velocity: 0.2,
+                                      Derivatives.acceleration: 1,
+                                      Derivatives.jerk: 5,
+                                  },
+                                  rotation_limits={
+                                      Derivatives.velocity: 0.2,
+                                      Derivatives.acceleration: 1,
+                                      Derivatives.jerk: 5
+                                  },
+                                  robot_group_name=self.robot_group_name)
 
 
 class WorldWithDiffDriveRobot(WorldConfig):

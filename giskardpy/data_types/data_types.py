@@ -21,7 +21,7 @@ class PrefixName:
         else:
             self.short_name = name
             self.prefix = prefix
-        if prefix:
+        if self.prefix:
             self.long_name = f'{self.prefix}{self.primary_separator}{self.short_name}'
         else:
             self.long_name = name

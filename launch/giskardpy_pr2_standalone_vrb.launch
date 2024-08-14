@@ -2,6 +2,6 @@
 
     <include file="$(find pr2_description)/robots/upload_pr2.launch"/>
 
-    <node pkg="giskardpy" type="pr2_standalone.py" name="giskard" output="screen"/>
+    <node pkg="giskardpy" type="pr2_standalone_vrb.py" name="giskard" output="screen"/>
 
 </launch>

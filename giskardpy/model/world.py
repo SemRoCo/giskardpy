@@ -252,7 +252,9 @@ class WorldTree(WorldTreeInterface):
             else:
                 raise ValueError(f'Multiple joints found: {joints}')
         else:
-            return self.joints[joint_name]
+            joint = self.joints[joint_name]
+            assert isinstance(joint, possible_types)
+            return joint
 
     @modifies_world
     def rename_link(self, old_name: PrefixName, new_name: PrefixName):

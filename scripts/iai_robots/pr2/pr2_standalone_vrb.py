@@ -34,7 +34,7 @@ if __name__ == '__main__':
                               drive_joint_name,
                           ]
                       ),
-                      behavior_tree_config=StandAloneBTConfig(publish_tf=False, publish_js=False, debug_mode=True,
+                      behavior_tree_config=StandAloneBTConfig(publish_tf=True, publish_js=False, debug_mode=True,
                                                               simulation_max_hz=10),
                       qp_controller_config=QPControllerConfig(qp_solver=SupportedQPSolver.qpSWIFT))
     giskard.live()

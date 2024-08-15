@@ -1,6 +1,7 @@
 from typing import Optional
 
 from giskardpy.god_map import god_map
+from giskardpy.model.ros_msg_visualization import VisualizationMode
 from giskardpy.tree.behaviors.collision_checker import CollisionChecker
 from giskardpy.tree.behaviors.evaluate_debug_expressions import EvaluateDebugExpressions
 from giskardpy.tree.behaviors.evaluate_monitors import EvaluateMonitors
@@ -95,7 +96,7 @@ class ControlLoop(AsyncBehavior):
         self.remove_child(self.projection_synchronization)
         self.remove_child(self.time)
         self.remove_child(self.kin_sim)
-        self.publish_state.remove_visualization_marker_behavior()
+        # self.publish_state.remove_visualization_marker_behavior()
 
     def remove_closed_loop_behaviors(self):
         self.remove_child(self.closed_loop_synchronization)
@@ -104,7 +105,7 @@ class ControlLoop(AsyncBehavior):
         self.remove_child(self.send_controls)
 
     def add_projection_behaviors(self):
-        self.publish_state.add_visualization_marker_behavior()
+        # self.publish_state.add_visualization_marker_behavior(mode=VisualizationMode.CollisionsDecomposed)
         self.insert_child(self.projection_synchronization, 1)
         self.insert_child(self.time, -2)
         self.insert_child(self.kin_sim, -2)

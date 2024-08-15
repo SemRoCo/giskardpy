@@ -767,10 +767,12 @@ class CarryMyBullshit(Goal):
                                                               queue_size=10)
             rospy.sleep(0.5)
             for i in range(int(wait_for_patrick_timeout)):
+                if god_map.move_action_server.is_preempt_requested() or not god_map.move_action_server.is_client_alive():
+                    raise GoalInitalizationException('goal canceled while waiting for target points')
                 if CarryMyBullshit.trajectory.shape[0] > 5:
                     break
                 print(f'waiting for at least 5 traj points, current length {len(CarryMyBullshit.trajectory)}')
-                rospy.sleep(1)
+                rospy.sleep(0.5)
             else:
                 raise GoalInitalizationException(
                     f'didn\'t receive enough points after {wait_for_patrick_timeout}s')

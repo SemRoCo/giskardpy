@@ -3,6 +3,7 @@ from typing import Optional
 
 from giskardpy.exceptions import SetupException
 from giskardpy.god_map import god_map
+from giskardpy.model.ros_msg_visualization import VisualizationMode
 from giskardpy.tree.behaviors.tf_publisher import TfPublishingModes
 from giskardpy.tree.branches.giskard_bt import GiskardBT
 from giskardpy.tree.control_modes import ControlModes
@@ -47,9 +48,9 @@ class BehaviorTreeConfig(ABC):
         self.tree_tick_rate = rate
 
     def add_visualization_marker_publisher(self,
+                                           mode: VisualizationMode,
                                            add_to_sync: Optional[bool] = None,
-                                           add_to_control_loop: Optional[bool] = None,
-                                           use_decomposed_meshes: bool = True):
+                                           add_to_control_loop: Optional[bool] = None):
         """
 
         :param add_to_sync: Markers are published while waiting for a goal.
@@ -59,10 +60,9 @@ class BehaviorTreeConfig(ABC):
                                       False: use meshes defined in urdf.
         """
         if add_to_sync:
-            self.tree.wait_for_goal.publish_state.add_visualization_marker_behavior(use_decomposed_meshes)
+            self.tree.wait_for_goal.publish_state.add_visualization_marker_behavior(mode)
         if add_to_control_loop:
-            self.tree.control_loop_branch.publish_state.add_visualization_marker_behavior(
-                use_decomposed_meshes)
+            self.tree.control_loop_branch.publish_state.add_visualization_marker_behavior(mode)
 
     def add_qp_data_publisher(self, publish_lb: bool = False, publish_ub: bool = False,
                               publish_lbA: bool = False, publish_ubA: bool = False,
@@ -109,6 +109,9 @@ class BehaviorTreeConfig(ABC):
                      False: Plot is generated in a separate thread to not slow down Giskard.
         """
         self.tree.cleanup_control_loop.add_plot_trajectory(normalize_position, wait)
+
+    def add_trajectory_visualizer(self):
+        self.tree.cleanup_control_loop.add_visualize_trajectory()
 
     def add_debug_trajectory_plotter(self, normalize_position: bool = False, wait: bool = False):
         """
@@ -183,6 +186,7 @@ class StandAloneBTConfig(BehaviorTreeConfig):
     def __init__(self,
                  debug_mode: bool = False,
                  publish_js: bool = False,
+                 visualization_mode: VisualizationMode = VisualizationMode.VisualsFrameLocked,
                  publish_free_variables: bool = False,
                  publish_tf: bool = True,
                  include_prefix: bool = False,
@@ -196,6 +200,7 @@ class StandAloneBTConfig(BehaviorTreeConfig):
         :param include_prefix: whether to include the robot name prefix when publishing joint states or tf
         """
         self.include_prefix = include_prefix
+        self.visualization_mode = visualization_mode
         if is_running_in_pytest():
             if god_map.is_in_github_workflow():
                 publish_js = False
@@ -211,13 +216,15 @@ class StandAloneBTConfig(BehaviorTreeConfig):
             raise SetupException('publish_js and publish_free_variables cannot be True at the same time.')
 
     def setup(self):
-        self.add_visualization_marker_publisher(add_to_sync=True, add_to_control_loop=True)
+        self.add_visualization_marker_publisher(add_to_sync=True, add_to_control_loop=True,
+                                                mode=self.visualization_mode)
         if self.publish_tf:
             self.add_tf_publisher(include_prefix=self.include_prefix, mode=TfPublishingModes.all)
         self.add_gantt_chart_plotter()
         self.add_goal_graph_plotter()
         if self.debug_mode:
             self.add_trajectory_plotter(wait=True)
+            # self.add_trajectory_visualizer()
             self.add_debug_trajectory_plotter(wait=True)
             self.add_debug_marker_publisher()
         # self.add_debug_marker_publisher()
@@ -228,7 +235,10 @@ class StandAloneBTConfig(BehaviorTreeConfig):
 
 
 class OpenLoopBTConfig(BehaviorTreeConfig):
-    def __init__(self, debug_mode: bool = False, control_loop_max_hz: float = 50,
+    def __init__(self,
+                 debug_mode: bool = False,
+                 control_loop_max_hz: float = 50,
+                 visualization_mode: VisualizationMode = VisualizationMode.CollisionsDecomposed,
                  simulation_max_hz: Optional[float] = None):
         """
         The default behavior tree for Giskard in open-loop mode. It will first plan the trajectory in simulation mode
@@ -242,9 +252,11 @@ class OpenLoopBTConfig(BehaviorTreeConfig):
         if god_map.is_in_github_workflow():
             debug_mode = False
         self.debug_mode = debug_mode
+        self.visualization_mode = visualization_mode
 
     def setup(self):
-        self.add_visualization_marker_publisher(add_to_sync=True, add_to_control_loop=True)
+        self.add_visualization_marker_publisher(add_to_sync=True, add_to_control_loop=True,
+                                                mode=self.visualization_mode)
         self.add_gantt_chart_plotter()
         self.add_goal_graph_plotter()
         if self.debug_mode:
@@ -260,7 +272,9 @@ class OpenLoopBTConfig(BehaviorTreeConfig):
 
 
 class ClosedLoopBTConfig(BehaviorTreeConfig):
-    def __init__(self, debug_mode: bool = False, control_loop_max_hz: float = 50,
+    def __init__(self, debug_mode: bool = False,
+                 control_loop_max_hz: float = 50,
+                 visualization_mode: VisualizationMode = VisualizationMode.CollisionsDecomposed,
                  simulation_max_hz: Optional[float] = None):
         """
         The default configuration for Giskard in closed loop mode. Make use to set up the robot interface accordingly.
@@ -272,9 +286,11 @@ class ClosedLoopBTConfig(BehaviorTreeConfig):
         if god_map.is_in_github_workflow():
             debug_mode = False
         self.debug_mode = debug_mode
+        self.visualization_mode = visualization_mode
 
     def setup(self):
-        self.add_visualization_marker_publisher(add_to_sync=True, add_to_control_loop=False)
+        self.add_visualization_marker_publisher(add_to_sync=True, add_to_control_loop=False,
+                                                mode=self.visualization_mode)
         # self.add_qp_data_publisher(publish_xdot=True, publish_lb=True, publish_ub=True)
         self.add_gantt_chart_plotter()
         self.add_goal_graph_plotter()

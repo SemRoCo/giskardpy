@@ -2,6 +2,7 @@ from typing import Optional
 
 from py_trees import Sequence
 
+from giskardpy.model.ros_msg_visualization import VisualizationMode
 from giskardpy.tree.behaviors.debug_marker_publisher import DebugMarkerPublisher
 from giskardpy.tree.behaviors.publish_debug_expressions import PublishDebugExpressions
 from giskardpy.tree.behaviors.publish_feedback import PublishFeedback
@@ -19,9 +20,9 @@ class PublishState(Sequence):
         self.visualization_behavior = None
 
     @toggle_on('visualization_marker_behavior')
-    def add_visualization_marker_behavior(self, use_decomposed_meshes: bool = True):
+    def add_visualization_marker_behavior(self, mode: VisualizationMode):
         if self.visualization_behavior is None:
-            self.visualization_behavior = VisualizationBehavior(use_decomposed_meshes=use_decomposed_meshes)
+            self.visualization_behavior = VisualizationBehavior(mode)
         self.add_child(self.visualization_behavior)
 
     @toggle_off('visualization_marker_behavior')

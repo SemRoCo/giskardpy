@@ -19,6 +19,7 @@ class TfPublishingModes(Enum):
     world_objects = 4
     attached_and_world_objects = 6
 
+
 class TFPublisher(GiskardBehavior):
     """
     Published tf for attached and environment objects.

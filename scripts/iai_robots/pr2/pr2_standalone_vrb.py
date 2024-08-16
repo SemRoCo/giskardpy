@@ -35,6 +35,6 @@ if __name__ == '__main__':
                           ]
                       ),
                       behavior_tree_config=StandAloneBTConfig(publish_tf=True, publish_js=False, debug_mode=True,
-                                                              simulation_max_hz=10),
+                                                              simulation_max_hz=20),
                       qp_controller_config=QPControllerConfig(qp_solver=SupportedQPSolver.qpSWIFT))
     giskard.live()

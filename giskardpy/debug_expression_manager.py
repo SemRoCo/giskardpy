@@ -9,7 +9,7 @@ from giskardpy.god_map import god_map
 from giskardpy.model.trajectory import Trajectory
 from giskardpy.data_types.data_types import PrefixName
 from giskardpy.symbol_manager import symbol_manager
-from giskardpy.middleware import middleware
+from giskardpy.middleware import get_middleware
 
 
 class DebugExpressionManager:
@@ -49,7 +49,7 @@ class DebugExpressionManager:
             self.compiled_debug_expressions[name] = expr.compile(free_symbols)
         num_debug_expressions = len(self.compiled_debug_expressions)
         if num_debug_expressions > 0:
-            middleware.loginfo(f'Compiled {len(self.compiled_debug_expressions)} debug expressions.')
+            get_middleware().loginfo(f'Compiled {len(self.compiled_debug_expressions)} debug expressions.')
 
     @profile
     def eval_debug_expressions(self, log_traj: bool = True):  # renamed

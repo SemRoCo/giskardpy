@@ -8,7 +8,7 @@ import giskardpy.casadi_wrapper as cas
 from giskardpy.data_types.exceptions import MaxTrajectoryLengthException
 from giskardpy.data_types.exceptions import MonitorInitalizationException
 from giskardpy.god_map import god_map
-from giskardpy.middleware import middleware
+from giskardpy.middleware import get_middleware
 from giskardpy.motion_graph.monitors.monitors import PayloadMonitor, CancelMotion
 
 
@@ -76,7 +76,7 @@ class Print(PayloadMonitor):
                          run_call_in_thread=False)
 
     def __call__(self):
-        middleware.loginfo(self.message)
+        get_middleware().loginfo(self.message)
         self.state = True
 
 

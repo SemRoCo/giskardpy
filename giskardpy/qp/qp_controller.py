@@ -21,7 +21,7 @@ from giskardpy.qp.pos_in_vel_limits import b_profile, implicit_vel_profile
 from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.qp.qp_solver_ids import SupportedQPSolver
 from giskardpy.symbol_manager import symbol_manager
-from giskardpy.middleware import middleware
+from giskardpy.middleware import get_middleware
 from giskardpy.utils.utils import create_path, get_all_classes_in_package
 from giskardpy.utils.decorators import memoize
 import giskardpy.utils.math as giskard_math
@@ -324,7 +324,7 @@ class FreeVariableBounds(ProblemDataPart):
             error_msg = f'Free variable "{v.name}" can\'t reach velocity limit of "{upper_velocity_limit}". ' \
                         f'Maximum reachable with prediction horizon = "{self.prediction_horizon}", ' \
                         f'jerk limit = "{upper_jerk_limit}" and dt = "{self.dt}" is "{max_reachable_vel}".'
-            middleware.logerr(error_msg)
+            get_middleware().logerr(error_msg)
             raise VelocityLimitUnreachableException(error_msg)
 
         if not v.has_position_limits():
@@ -355,7 +355,7 @@ class FreeVariableBounds(ProblemDataPart):
                     error_msg = f'Free variable "{v.name}" can\'t reach velocity limit of "{upper_velocity_limit}". ' \
                                 f'Maximum reachable with prediction horizon = "{self.prediction_horizon}", ' \
                                 f'jerk limit = "{upper_jerk_limit}" and dt = "{self.dt}" is "{max_reachable_vel}".'
-                    middleware.logerr(error_msg)
+                    get_middleware().logerr(error_msg)
                     raise VelocityLimitUnreachableException(error_msg)
                 else:
                     raise
@@ -1028,7 +1028,7 @@ class QPController:
 
         self.set_qp_solver(solver_id)
 
-        middleware.loginfo(f'Initialized QP Controller:\n'
+        get_middleware().loginfo(f'Initialized QP Controller:\n'
                         f'sample period: "{self.sample_period}"s\n'
                         f'max derivative: "{self.max_derivative.name}"\n'
                         f'prediction horizon: "{self.prediction_horizon}"\n'
@@ -1047,7 +1047,7 @@ class QPController:
             else:
                 raise QPSolverException(f'No qp solver found')
         if print_later:
-            middleware.loginfo(f'QP Solver set to "{self.qp_solver_class.solver_id.name}"')
+            get_middleware().loginfo(f'QP Solver set to "{self.qp_solver_class.solver_id.name}"')
 
     def reset(self):
         self.free_variables = []
@@ -1125,14 +1125,14 @@ class QPController:
             raise ValueError(f'Control horizon of {constraint.name} is {constraint.control_horizon}, '
                              f'it has to be an integer 1 <= control horizon <= prediction horizon')
         elif constraint.control_horizon > self.prediction_horizon:
-            middleware.logwarn(f'Specified control horizon of {constraint.name} is bigger than prediction horizon.'
+            get_middleware().logwarn(f'Specified control horizon of {constraint.name} is bigger than prediction horizon.'
                             f'Reducing control horizon of {constraint.control_horizon} '
                             f'to prediction horizon of {self.prediction_horizon}')
             constraint.control_horizon = self.prediction_horizon
 
     @profile
     def compile(self, default_limits: bool = False) -> None:
-        middleware.loginfo('Creating controller')
+        get_middleware().loginfo('Creating controller')
         kwargs = {'free_variables': self.free_variables,
                   'equality_constraints': self.equality_constraints,
                   'inequality_constraints': self.inequality_constraints,
@@ -1157,10 +1157,10 @@ class QPController:
         self.qp_solver = self.qp_solver_class(weights=weights, g=g, lb=lb, ub=ub,
                                          E=E, E_slack=E_slack, bE=bE,
                                          A=A, A_slack=A_slack, lbA=lbA, ubA=ubA)
-        middleware.loginfo('Done compiling controller:')
-        middleware.loginfo(f'  #free variables: {weights.shape[0]}')
-        middleware.loginfo(f'  #equality constraints: {bE.shape[0]}')
-        middleware.loginfo(f'  #inequality constraints: {lbA.shape[0]}')
+        get_middleware().loginfo('Done compiling controller:')
+        get_middleware().loginfo(f'  #free variables: {weights.shape[0]}')
+        get_middleware().loginfo(f'  #equality constraints: {bE.shape[0]}')
+        get_middleware().loginfo(f'  #inequality constraints: {lbA.shape[0]}')
 
     def get_parameter_names(self):
         return self.qp_solver.free_symbols_str
@@ -1224,7 +1224,7 @@ class QPController:
                 raise HardConstraintsViolatedException(error_message)
         except AttributeError:
             pass
-        middleware.loginfo('No slack limit violation detected.')
+        get_middleware().loginfo('No slack limit violation detected.')
 
     def _viz_mpc(self, joint_name):
         def pad(a, desired_length, pad_value):
@@ -1236,7 +1236,7 @@ class QPController:
         try:
             start_pos = god_map.world.state[joint_name].position
         except KeyError:
-            middleware.loginfo('start position not found in state')
+            get_middleware().loginfo('start position not found in state')
             start_pos = 0
         ts = np.array([(i + 1) * self.sample_period for i in range(self.prediction_horizon)])
         filtered_x = self.p_xdot.filter(like=f'/{joint_name}/', axis=0)
@@ -1367,23 +1367,23 @@ class QPController:
     def _print_iis(self):
         result = self.qp_solver.analyze_infeasibility()
         if result is None:
-            middleware.loginfo(f'Can only compute possible causes with gurobi, '
+            get_middleware().loginfo(f'Can only compute possible causes with gurobi, '
                             f'but current solver is {self.qp_solver_class.solver_id.name}.')
             return
         lb_ids, ub_ids, eq_ids, lbA_ids, ubA_ids = result
         b_ids = lb_ids | ub_ids
         with pd.option_context('display.max_rows', None, 'display.max_columns', None, 'display.width', None):
-            middleware.loginfo('Irreducible Infeasible Subsystem:')
-            middleware.loginfo('  Free variable bounds')
+            get_middleware().loginfo('Irreducible Infeasible Subsystem:')
+            get_middleware().loginfo('  Free variable bounds')
             free_variables = self.p_lb[b_ids]
             free_variables['ub'] = self.p_ub[b_ids]
             free_variables = free_variables.rename(columns={'data': 'lb'})
             print(free_variables)
-            middleware.loginfo('  Equality constraints:')
+            get_middleware().loginfo('  Equality constraints:')
             self._print_iis_matrix(eq_ids, b_ids, self.p_E, self.p_bE)
-            middleware.loginfo('  Inequality constraint lower bounds:')
+            get_middleware().loginfo('  Inequality constraint lower bounds:')
             self._print_iis_matrix(lbA_ids, b_ids, self.p_A, self.p_lbA)
-            middleware.loginfo('  Inequality constraint upper bounds:')
+            get_middleware().loginfo('  Inequality constraint upper bounds:')
             self._print_iis_matrix(ubA_ids, b_ids, self.p_A, self.p_ubA)
 
     def _print_iis_matrix(self, row_filter: np.ndarray, column_filter: np.ndarray, matrix: pd.DataFrame,

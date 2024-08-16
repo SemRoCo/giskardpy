@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING, List, Dict, Tuple
 
-from giskardpy.middleware import middleware
+from giskardpy.middleware import get_middleware
 from giskardpy.utils.utils import create_path
 
 if TYPE_CHECKING:
@@ -69,7 +69,7 @@ class GodMap:
 
     def to_tmp_path(self, file_name: str) -> str:
         path = god_map.tmp_folder
-        return middleware.resolve_iri(f'{path}{file_name}')
+        return get_middleware().resolve_iri(f'{path}{file_name}')
 
     def write_to_tmp(self, file_name: str, file_str: str) -> str:
         """

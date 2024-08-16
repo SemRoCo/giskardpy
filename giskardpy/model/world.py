@@ -26,7 +26,7 @@ from giskardpy.data_types.data_types import PrefixName, Derivatives, derivative_
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.next_command import NextCommands
 from giskardpy.symbol_manager import symbol_manager
-from giskardpy.middleware import middleware
+from giskardpy.middleware import get_middleware
 from giskardpy.utils.utils import suppress_stderr, clear_cached_properties
 from giskardpy.utils.decorators import memoize, copy_memoize, clear_memo
 
@@ -288,7 +288,7 @@ class WorldTree(WorldTreeInterface):
         raise TypeError(f'get_joint_position_symbol is only supported for OneDofJoint, not {type(joint)}')
 
     def get_link_name(self, link_name: str, group_name: Optional[str] = None) -> PrefixName:
-        middleware.logwarn(f'Deprecated warning: use \'search_for_link_name\' instead of \'get_link_name\'.')
+        get_middleware().logwarn(f'Deprecated warning: use \'search_for_link_name\' instead of \'get_link_name\'.')
         return self.search_for_link_name(link_name, group_name)
 
     def search_for_link_name(self, link_name: str, group_name: Optional[str] = None) -> PrefixName:
@@ -974,7 +974,7 @@ class WorldTree(WorldTreeInterface):
             for group_name in list(self.groups.keys()):
                 if self.groups[group_name].root_link_name == link_name:
                     del self.groups[group_name]
-                    middleware.loginfo(f'Deleted group \'{group_name}\', because it\'s root link got removed.')
+                    get_middleware().loginfo(f'Deleted group \'{group_name}\', because it\'s root link got removed.')
             for child_joint_name in link.child_joint_names:
                 child_joint = self.joints.pop(child_joint_name)  # type: Joint
                 helper(child_joint.child_link_name)

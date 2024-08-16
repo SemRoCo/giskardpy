@@ -9,7 +9,7 @@ from scipy import sparse
 
 from giskardpy.data_types.exceptions import QPSolverException, InfeasibleException
 from giskardpy.qp.qp_solver import QPSWIFTFormatter
-from giskardpy.middleware import middleware
+from giskardpy.middleware import get_middleware
 from giskardpy.qp.qp_solver_ids import SupportedQPSolver
 
 gurobipy.setParam(gurobipy.GRB.Param.LogToConsole, False)
@@ -75,7 +75,7 @@ class QPSolverGurobi(QPSWIFTFormatter):
 
     def print_debug(self):
         gurobipy.setParam(gurobipy.GRB.Param.LogToConsole, True)
-        middleware.logwarn(error_info[self.qpProblem.status])
+        get_middleware().logwarn(error_info[self.qpProblem.status])
         self.qpProblem.reset()
         self.qpProblem.optimize()
         self.qpProblem.printStats()
@@ -108,7 +108,7 @@ class QPSolverGurobi(QPSWIFTFormatter):
         success = self.qpProblem.status
         if success in {gurobipy.GRB.OPTIMAL, gurobipy.GRB.SUBOPTIMAL}:
             if success == gurobipy.GRB.SUBOPTIMAL:
-                middleware.logwarn('warning, suboptimal solution!')
+                get_middleware().logwarn('warning, suboptimal solution!')
             return np.array(self.qpProblem.X)
         if success in {gurobipy.GRB.INFEASIBLE, gurobipy.GRB.INF_OR_UNBD, gurobipy.GRB.NUMERIC}:
             raise InfeasibleException(self.STATUS_VALUE_DICT[success])

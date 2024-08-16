@@ -1,6 +1,6 @@
 from typing import Union, Optional
 
-from giskardpy.middleware import middleware
+from giskardpy.middleware import get_middleware
 from giskardpy.qp.qp_solver_ids import SupportedQPSolver
 import giskardpy.casadi_wrapper as cas
 from giskardpy.data_types.exceptions import MonitorInitalizationException
@@ -29,7 +29,7 @@ class SetPredictionHorizon(PayloadMonitor):
         self.new_prediction_horizon = prediction_horizon
 
         if self.new_prediction_horizon < 7:
-            middleware.logwarn('Prediction horizon must be >= 7.')
+            get_middleware().logwarn('Prediction horizon must be >= 7.')
         god_map.qp_controller.prediction_horizon = self.new_prediction_horizon
 
     def __call__(self):

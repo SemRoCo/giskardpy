@@ -10,7 +10,7 @@ from giskardpy.motion_graph.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_COLLISION_
 from giskardpy.god_map import god_map
 from giskardpy.data_types.data_types import PrefixName
 from giskardpy.symbol_manager import symbol_manager
-from giskardpy.middleware import middleware
+from giskardpy.middleware import get_middleware
 
 
 class ExternalCollisionAvoidance(Goal):
@@ -407,7 +407,7 @@ class CollisionAvoidance(Goal):
                                                                             hold_condition=self.hold_condition,
                                                                             end_condition=self.end_condition))
                     num_constrains += 1
-        middleware.loginfo(f'Adding {num_constrains} external collision avoidance constraints.')
+        get_middleware().loginfo(f'Adding {num_constrains} external collision avoidance constraints.')
 
     @profile
     def add_self_collision_avoidance_constraints(self):
@@ -475,4 +475,4 @@ class CollisionAvoidance(Goal):
                                                                     hold_condition=self.hold_condition,
                                                                     end_condition=self.end_condition))
                 num_constr += 1
-        middleware.loginfo(f'Adding {num_constr} self collision avoidance constraints.')
+        get_middleware().loginfo(f'Adding {num_constr} self collision avoidance constraints.')

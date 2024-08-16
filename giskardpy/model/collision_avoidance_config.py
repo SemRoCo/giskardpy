@@ -10,7 +10,7 @@ from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer, C
     CollisionAvoidanceThresholds
 from giskardpy.model.world import WorldTree
 from giskardpy.data_types.data_types import PrefixName
-from giskardpy.middleware import middleware
+from giskardpy.middleware import get_middleware
 
 
 class CollisionAvoidanceConfig(abc.ABC):
@@ -48,15 +48,15 @@ class CollisionAvoidanceConfig(abc.ABC):
             raise KeyError(f'Unknown collision checker {collision_checker}. '
                            f'Collision avoidance is disabled')
         if collision_checker == CollisionCheckerLib.bpb:
-            middleware.loginfo('Using betterpybullet for collision checking.')
+            get_middleware().loginfo('Using betterpybullet for collision checking.')
             try:
                 from giskardpy.model.better_pybullet_syncer import BetterPyBulletSyncer
                 god_map.collision_scene = BetterPyBulletSyncer()
                 return
             except ImportError as e:
-                middleware.logerr(f'{e}; turning off collision avoidance.')
+                get_middleware().logerr(f'{e}; turning off collision avoidance.')
                 self._collision_checker = CollisionCheckerLib.none
-        middleware.logwarn('Using no collision checking.')
+        get_middleware().logwarn('Using no collision checking.')
         from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
         god_map.collision_scene = CollisionWorldSynchronizer()
 

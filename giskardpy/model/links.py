@@ -6,7 +6,7 @@ from typing import List, Optional, Union, Tuple, Callable
 import urdf_parser_py.urdf as up
 
 from giskardpy.data_types.exceptions import CorruptMeshException
-from giskardpy.middleware import middleware
+from giskardpy.middleware import get_middleware
 from giskardpy.model.utils import cube_volume, cube_surface, sphere_volume, cylinder_volume, cylinder_surface
 from giskardpy.data_types.data_types import PrefixName, ColorRGBA
 from giskardpy.utils.utils import get_file_hash
@@ -74,8 +74,9 @@ class MeshGeometry(LinkGeometry):
         super().__init__(link_T_geometry, color)
         self._file_name_ros_iris = file_name
         self.set_collision_file_name(self.file_name_absolute)
-        if not os.path.isfile(middleware.resolve_iri(file_name)):
-            raise CorruptMeshException(f'Can\'t find file {file_name}')
+        resolved_file_name = get_middleware().resolve_iri(file_name)
+        if not os.path.isfile(resolved_file_name):
+            raise CorruptMeshException(f'Can\'t find file {resolved_file_name}')
         self.scale = scale or (1.0, 1.0, 1.0)
 
     def set_collision_file_name(self, new_file_name: str) -> None:
@@ -83,7 +84,7 @@ class MeshGeometry(LinkGeometry):
 
     @property
     def file_name_absolute(self) -> str:
-        return middleware.resolve_iri(self._file_name_ros_iris)
+        return get_middleware().resolve_iri(self._file_name_ros_iris)
 
     @property
     def file_name_ros_iris(self) -> str:

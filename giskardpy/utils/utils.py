@@ -15,7 +15,7 @@ from contextlib import contextmanager
 from functools import cached_property
 from typing import Type, Optional, Dict, Any
 
-from giskardpy.middleware import middleware
+from giskardpy.middleware import get_middleware
 
 
 @contextmanager
@@ -66,7 +66,7 @@ def get_all_classes_in_package(package_name: str, parent_class: Optional[Type] =
             new_classes = get_all_classes_in_module(f'{package.__name__}.{module_name}', parent_class)
         except Exception as e:
             if not silent:
-                middleware.logwarn(f'Failed to load {module_name}: {str(e)}')
+                get_middleware().logwarn(f'Failed to load {module_name}: {str(e)}')
             continue
         classes.update(new_classes)
     return classes
@@ -163,7 +163,7 @@ def clear_cached_properties(instance: Any):
 
 
 def fix_obj(file_name):
-    middleware.loginfo(f'Attempting to fix {file_name}.')
+    get_middleware().loginfo(f'Attempting to fix {file_name}.')
     with open(file_name, 'r') as f:
         lines = f.readlines()
         fixed_obj = ''
@@ -231,6 +231,6 @@ def resolve_ros_iris_in_urdf(input_urdf):
     """
     output_urdf = ''
     for line in input_urdf.split('\n'):
-        output_urdf += middleware.resolve_iri(line)
+        output_urdf += get_middleware().resolve_iri(line)
         output_urdf += '\n'
     return output_urdf

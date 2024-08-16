@@ -5,7 +5,7 @@ import betterpybullet as bpb
 
 from giskardpy.data_types.data_types import PrefixName
 from giskardpy.god_map import god_map
-from giskardpy.middleware import middleware
+from giskardpy.middleware import get_middleware
 from giskardpy.model.bpb_wrapper import create_shape_from_link, to_giskard_collision
 from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer, Collisions
 from giskardpy.model.collision_world_syncer import CollisionCheckerLib
@@ -88,7 +88,7 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
         super().sync()
         if self.has_world_changed():
             self.reset_cache()
-            middleware.logdebug('hard sync')
+            get_middleware().logdebug('hard sync')
             for o in self.kw.collision_objects:
                 self.kw.remove_collision_object(o)
             self.object_name_to_id = {}

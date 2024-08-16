@@ -6,7 +6,7 @@ from qpoases import PyReturnValue
 
 from giskardpy.data_types.exceptions import QPSolverException, InfeasibleException, HardConstraintsViolatedException
 from giskardpy.qp.qp_solver import QPSolver
-from giskardpy.middleware import middleware
+from giskardpy.middleware import get_middleware
 from giskardpy.qp.qp_solver_ids import SupportedQPSolver
 from giskardpy.utils.decorators import record_time
 
@@ -91,7 +91,7 @@ class QPSolverQPOases(QPSolver):
                 return self.solve(weights, g, A, lb, ub, lbA, ubA)
             except QPSolverException as e:
                 if number_of_retries == 0:
-                    middleware.loginfo(f'{e}; retrying with A rounded to {self.on_fail_round_to} decimal places')
+                    get_middleware().loginfo(f'{e}; retrying with A rounded to {self.on_fail_round_to} decimal places')
                     weights = np.round(weights, self.on_fail_round_to)
                     A = np.round(A, self.on_fail_round_to)
                     lb = np.round(lb, self.on_fail_round_to)
@@ -99,7 +99,7 @@ class QPSolverQPOases(QPSolver):
                     lbA = np.round(lbA, self.on_fail_round_to)
                     ubA = np.round(ubA, self.on_fail_round_to)
                 elif isinstance(e, InfeasibleException) and not relaxed:
-                    middleware.loginfo(f'{e}; retrying with relaxed hard constraints')
+                    get_middleware().loginfo(f'{e}; retrying with relaxed hard constraints')
                     try:
                         weights, lb, ub = self.compute_relaxed_hard_constraints(weights, g, A, lb, ub, lbA, ubA)
                         relaxed = True
@@ -109,5 +109,5 @@ class QPSolverQPOases(QPSolver):
                         raise e
                 else:
                     self.mode = QPoasesModes(self.mode + 1)
-                    middleware.loginfo(f'{e}; retrying with {repr(self.mode)} mode.')
+                    get_middleware().loginfo(f'{e}; retrying with {repr(self.mode)} mode.')
         raise e

@@ -8,7 +8,7 @@ import numpy as np
 
 import giskardpy.casadi_wrapper as cas
 from giskardpy.data_types.exceptions import HardConstraintsViolatedException, InfeasibleException, QPSolverException
-from giskardpy.middleware import middleware
+from giskardpy.middleware import get_middleware
 from giskardpy.qp.qp_solver_ids import SupportedQPSolver
 from giskardpy.utils.decorators import memoize
 
@@ -35,7 +35,7 @@ def record_solver_call_time(function):
                    self.num_slack_variables)
             self._times[key].append(time_delta)
         else:
-            middleware.loginfo('skipped record time because hard constraints were violated')
+            get_middleware().loginfo('skipped record time because hard constraints were violated')
         return result
 
     return wrapper
@@ -117,10 +117,10 @@ class QPSolver(ABC):
             return self.solve(substitutions)
         except QPSolverException as e:
             try:
-                middleware.loginfo(f'{e}; retrying with relaxed constraints.')
+                get_middleware().loginfo(f'{e}; retrying with relaxed constraints.')
                 return self.solve(substitutions, relax_hard_constraints=True)
             except InfeasibleException as e2:
-                middleware.loginfo('Failed to relax constraints.')
+                get_middleware().loginfo('Failed to relax constraints.')
                 if isinstance(e2, HardConstraintsViolatedException):
                     raise e2
                 raise e

@@ -17,7 +17,7 @@ from giskardpy.data_types.exceptions import UnknownGroupException, UnknownLinkEx
 from giskardpy.god_map import god_map
 from giskardpy.model.world import WorldBranch
 from giskardpy.qp.free_variable import FreeVariable
-from giskardpy.middleware import middleware
+from giskardpy.middleware import get_middleware
 
 np.random.seed(1337)
 
@@ -389,12 +389,12 @@ class CollisionWorldSynchronizer:
         if not self.is_collision_checking_enabled:
             return {}, set()
         if group_name not in self.self_collision_matrix_cache:
-            path_to_srdf = middleware.resolve_iri(path)
+            path_to_srdf = get_middleware().resolve_iri(path)
             if not os.path.exists(path_to_srdf):
                 path_to_srdf = resource_filename('giskardpy', '../' + path)
                 if not os.path.exists(path_to_srdf):
                     raise AttributeError(f'file {path_to_srdf} does not exist')
-            middleware.loginfo(f'loading self collision matrix: {path_to_srdf}')
+            get_middleware().loginfo(f'loading self collision matrix: {path_to_srdf}')
             srdf = etree.parse(path_to_srdf)
             srdf_root = srdf.getroot()
             self_collision_matrix = {}
@@ -408,7 +408,7 @@ class CollisionWorldSynchronizer:
                             link_a = god_map.world.search_for_link_name(link_a)
                             link_b = god_map.world.search_for_link_name(link_b)
                         except UnknownLinkException as e:
-                            middleware.logwarn(e)
+                            get_middleware().logwarn(e)
                             continue
                         reason_id = child.attrib['reason']
                         if link_a not in god_map.world.link_names_with_collisions \
@@ -424,7 +424,7 @@ class CollisionWorldSynchronizer:
                         try:
                             link_name = god_map.world.search_for_link_name(child.attrib['link'])
                         except UnknownLinkException as e:
-                            middleware.logwarn(e)
+                            get_middleware().logwarn(e)
                             continue
                         self.disabled_links.add(link_name)
 
@@ -434,7 +434,7 @@ class CollisionWorldSynchronizer:
             link_combinations = {god_map.world.sort_links(*x) for x in link_combinations}
             _, matrix_updates = self.compute_self_collision_matrix_adjacent(link_combinations, group)
             self_collision_matrix.update(matrix_updates)
-            middleware.loginfo(f'Loaded self collision matrix: {path_to_srdf}')
+            get_middleware().loginfo(f'Loaded self collision matrix: {path_to_srdf}')
         else:
             path_to_srdf, self_collision_matrix, disabled_links = self.self_collision_matrix_cache[group_name]
             self.disabled_links = deepcopy(disabled_links)
@@ -713,7 +713,7 @@ class CollisionWorldSynchronizer:
 
         if file_name is None:
             file_name = self.get_path_to_self_collision_matrix(group.name)
-        middleware.loginfo(f'Saved self collision matrix for {group.name} in {file_name}.')
+        get_middleware().loginfo(f'Saved self collision matrix for {group.name} in {file_name}.')
         tree.write(file_name, pretty_print=True, xml_declaration=True, encoding=tree.docinfo.encoding)
         self.self_collision_matrix_cache[group.name] = (file_name,
                                                         deepcopy(self_collision_matrix),

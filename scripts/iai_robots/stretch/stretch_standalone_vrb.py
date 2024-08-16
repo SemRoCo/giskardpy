@@ -13,7 +13,7 @@ if __name__ == '__main__':
     giskard = Giskard(world_config=WorldWithDiffDriveRobot(),
                       collision_avoidance_config=StretchCollisionAvoidanceConfig(),
                       robot_interface_config=StretchStandaloneInterface(),
-                      behavior_tree_config=StandAloneBTConfig(publish_js=False, publish_tf=False, simulation_max_hz=20,
+                      behavior_tree_config=StandAloneBTConfig(publish_js=False, publish_tf=True, simulation_max_hz=20,
                                                               debug_mode=True),
                       qp_controller_config=QPControllerConfig(qp_solver=SupportedQPSolver.qpSWIFT))
     giskard.live()

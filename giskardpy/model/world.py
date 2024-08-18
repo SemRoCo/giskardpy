@@ -3,6 +3,7 @@ from __future__ import annotations
 import abc
 import hashlib
 from abc import ABC
+from collections import OrderedDict
 from copy import deepcopy
 from functools import cached_property, wraps
 from itertools import combinations
@@ -1193,31 +1194,35 @@ class WorldTree(WorldTreeInterface):
 
     @profile
     def compute_all_collision_fks(self):
-        params = symbol_manager.resolve_symbols(self._fk_computer.fast_collision_fks.str_params)
-        return self._fk_computer.fast_collision_fks.fast_call(params)
+        return self._fk_computer.compiled_collision_fks.fast_call(self._fk_computer.subs)
 
     @profile
     def init_all_fks(self):
         class ExpressionCompanion(TravelCompanion):
             idx_start: Dict[PrefixName, int]
-            fast_collision_fks: CompiledFunction
-            fast_all_fks: CompiledFunction
+            compiled_collision_fks: CompiledFunction
+            compiled_all_fks: CompiledFunction
             str_params: List[str]
 
             def __init__(self, world: WorldTree):
                 self.world = world
                 self.fks = {self.world.root_link_name: cas.TransMatrix()}
+                self.tf = OrderedDict()
 
             @profile
             def joint_call(self, joint_name: PrefixName) -> bool:
                 joint = self.world.joints[joint_name]
                 map_T_parent = self.fks[joint.parent_link_name]
                 self.fks[joint.child_link_name] = map_T_parent.dot(joint.parent_T_child)
+                position = joint.parent_T_child.to_position()[:3]
+                orientation = joint.parent_T_child.to_rotation().to_quaternion()
+                self.tf[(joint.parent_link_name, joint.child_link_name)] = cas.vstack([position, orientation]).T
                 return False
 
             @profile
             def compile_fks(self):
                 all_fks = cas.vstack([self.fks[link_name] for link_name in self.world.link_names_as_set])
+                tf = cas.vstack([pose for pose in self.tf.values()])
                 collision_fks = []
                 for link_name in sorted(self.world.link_names_with_collisions):
                     if link_name == self.world.root_link_name:
@@ -1229,14 +1234,19 @@ class WorldTree(WorldTreeInterface):
                 params.update(collision_fks.free_symbols())
                 params = list(params)
                 self.str_params = [str(v) for v in params]
-                self.fast_all_fks = all_fks.compile(parameters=params)
-                self.fast_collision_fks = collision_fks.compile(parameters=params)
+                self.compiled_all_fks = all_fks.compile(parameters=params)
+                self.compiled_collision_fks = collision_fks.compile(parameters=params)
+                self.compiled_tf = tf.compile(parameters=params)
                 self.idx_start = {link_name: i * 4 for i, link_name in enumerate(self.world.link_names_as_set)}
 
             @profile
             def recompute(self):
                 self.compute_fk_np.memo.clear()
-                self.fks = self.fast_all_fks.fast_call(symbol_manager.resolve_symbols(self.fast_all_fks.str_params))
+                self.subs = symbol_manager.resolve_symbols(self.compiled_all_fks.str_params)
+                self.fks = self.compiled_all_fks.fast_call(self.subs)
+
+            def compute_tf(self):
+                return self.compiled_tf.fast_call(self.subs)
 
             @memoize
             @profile

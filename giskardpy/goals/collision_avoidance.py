@@ -364,7 +364,7 @@ class CollisionAvoidance(Goal):
                                      not god_map.collision_scene.is_allow_all_self_collision(collision_entries[-1])):
             self.add_self_collision_avoidance_constraints()
         if not cas.is_true(start_condition):
-            payload_monitor = CollisionMatrixUpdater(name='update collision matrix',
+            payload_monitor = CollisionMatrixUpdater(name=f'{self.name}/update collision matrix',
                                                      start_condition=start_condition,
                                                      new_collision_matrix=self.collision_matrix)
             god_map.monitor_manager.add_monitor(payload_monitor)

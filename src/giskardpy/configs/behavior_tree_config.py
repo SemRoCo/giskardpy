@@ -110,6 +110,9 @@ class BehaviorTreeConfig(ABC):
         """
         self.tree.cleanup_control_loop.add_plot_trajectory(normalize_position, wait)
 
+    def add_trajectory_visualizer(self):
+        self.tree.cleanup_control_loop.add_visualize_trajectory()
+
     def add_debug_trajectory_plotter(self, normalize_position: bool = False, wait: bool = False):
         """
         Plots debug expressions defined in goals.
@@ -221,6 +224,7 @@ class StandAloneBTConfig(BehaviorTreeConfig):
         self.add_goal_graph_plotter()
         if self.debug_mode:
             self.add_trajectory_plotter(wait=True)
+            # self.add_trajectory_visualizer()
             self.add_debug_trajectory_plotter(wait=True)
             self.add_debug_marker_publisher()
         # self.add_debug_marker_publisher()

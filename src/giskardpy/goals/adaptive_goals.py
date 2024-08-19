@@ -18,8 +18,8 @@ import math
 from typing import Optional, List
 import numpy as np
 from giskardpy.monitors.monitors import ExpressionMonitor
-from neem_interface_python.neem_interface import NEEMInterface
-import time
+# from neem_interface_python.neem_interface import NEEMInterface
+# import time
 
 
 # Todo: instead of relying on predefined poses model the motion as relations between the objects
@@ -62,12 +62,12 @@ class PouringAdaptiveTilt(Goal):
         self.up = False
         self.down = False
 
-        self.ni = NEEMInterface()
-        self.start_time = time.time()
-        self.memory = 'pos'
-        self.parent_action = parent_action
-        self.agent_iri = agent_iri
-        self.once = True
+        # self.ni = NEEMInterface()
+        # self.start_time = time.time()
+        # self.memory = 'pos'
+        # self.parent_action = parent_action
+        # self.agent_iri = agent_iri
+        # self.once = True
 
         root_T_tip = god_map.world.compose_fk_expression(self.root_link, self.tip_link)
         tip_V_tilt_axis = cas.Vector3(self.tilt_axis.vector)
@@ -275,49 +275,49 @@ class PouringAdaptiveTilt(Goal):
         god_map.debug_expression_manager.add_debug_expression('rot2', is_rot_2)
 
     def callback(self, action_string: String):
-        if self.memory != '' and self.parent_action is not None and self.once:
-            end_time = time.time()
-            if 'pos' in self.memory:
-                action_iri = self.ni.add_subaction_with_task(parent_action=self.parent_action,
-                                                             task_type='soma:Positioning',
-                                                             start_time=self.start_time, end_time=end_time)
-                self.ni.assert_task_and_roles(action_iri=action_iri, task_type='MovingTo',
-                                              source_iri='http://knowrob.org/kb/environment.owl#free_cup',
-                                              dest_iri='http://knowrob.org/kb/environment.owl#free_cup2',
-                                              agent_iri=self.agent_iri)
-            if 'back' in self.memory:
-                action_iri = self.ni.add_subaction_with_task(parent_action=self.parent_action,
-                                                             task_type='soma:TiltBackward',
-                                                             start_time=self.start_time, end_time=end_time)
-                self.ni.assert_task_and_roles(action_iri=action_iri, task_type='TiltBackward',
-                                              source_iri='http://knowrob.org/kb/environment.owl#free_cup',
-                                              dest_iri='http://knowrob.org/kb/environment.owl#free_cup2',
-                                              agent_iri=self.agent_iri)
-            if 'forw' in self.memory:
-                action_iri = self.ni.add_subaction_with_task(parent_action=self.parent_action,
-                                                             task_type='soma:TiltForward',
-                                                             start_time=self.start_time, end_time=end_time)
-                self.ni.assert_task_and_roles(action_iri=action_iri, task_type='TiltForward',
-                                              source_iri='http://knowrob.org/kb/environment.owl#free_cup',
-                                              dest_iri='http://knowrob.org/kb/environment.owl#free_cup2',
-                                              agent_iri=self.agent_iri)
-            self.start_time = end_time
-            self.memory = ''
-            self.once = False
+        # if self.memory != '' and self.parent_action is not None and self.once:
+        #     end_time = time.time()
+        #     if 'pos' in self.memory:
+        #         action_iri = self.ni.add_subaction_with_task(parent_action=self.parent_action,
+        #                                                      task_type='soma:Positioning',
+        #                                                      start_time=self.start_time, end_time=end_time)
+        #         self.ni.assert_task_and_roles(action_iri=action_iri, task_type='MovingTo',
+        #                                       source_iri='http://knowrob.org/kb/environment.owl#free_cup',
+        #                                       dest_iri='http://knowrob.org/kb/environment.owl#free_cup2',
+        #                                       agent_iri=self.agent_iri)
+        #     if 'back' in self.memory:
+        #         action_iri = self.ni.add_subaction_with_task(parent_action=self.parent_action,
+        #                                                      task_type='soma:TiltBackward',
+        #                                                      start_time=self.start_time, end_time=end_time)
+        #         self.ni.assert_task_and_roles(action_iri=action_iri, task_type='TiltBackward',
+        #                                       source_iri='http://knowrob.org/kb/environment.owl#free_cup',
+        #                                       dest_iri='http://knowrob.org/kb/environment.owl#free_cup2',
+        #                                       agent_iri=self.agent_iri)
+        #     if 'forw' in self.memory:
+        #         action_iri = self.ni.add_subaction_with_task(parent_action=self.parent_action,
+        #                                                      task_type='soma:TiltForward',
+        #                                                      start_time=self.start_time, end_time=end_time)
+        #         self.ni.assert_task_and_roles(action_iri=action_iri, task_type='TiltForward',
+        #                                       source_iri='http://knowrob.org/kb/environment.owl#free_cup',
+        #                                       dest_iri='http://knowrob.org/kb/environment.owl#free_cup2',
+        #                                       agent_iri=self.agent_iri)
+        #     self.start_time = end_time
+        #     self.memory = ''
+        #     self.once = False
 
         self.action_string = action_string.data
         if 'increase' in action_string.data and 'decrease' in action_string.data:
             self.forward = False
             self.backward = True
-            self.memory += 'back'
+            # self.memory += 'back'
         elif 'decrease' in action_string.data:
             self.forward = False
             self.backward = True
-            self.memory += 'back'
+            # self.memory += 'back'
         elif 'increase' in action_string.data:
             self.backward = False
             self.forward = True
-            self.memory += 'forw'
+            # self.memory += 'forw'
         else:
             self.forward = False
             self.backward = False
@@ -342,8 +342,8 @@ class PouringAdaptiveTilt(Goal):
         if 'moveDown' in action_string.data:
             self.down = True
 
-        if self.move_x or self.move_y or self.move_y_back or self.move_x_back or self.up or self.down:
-            self.memory += 'pos'
+        # if self.move_x or self.move_y or self.move_y_back or self.move_x_back or self.up or self.down:
+        #     self.memory += 'pos'
 
         self.z_rot_2 = False
         self.z_rot_1 = False

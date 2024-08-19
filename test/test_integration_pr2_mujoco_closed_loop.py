@@ -27,6 +27,7 @@ from giskardpy.goals.adaptive_goals import CloseGripper, PouringAdaptiveTilt, Po
 from neem_interface_python.neem_interface import NEEMInterface
 import time
 
+
 class PR2TestWrapperMujoco(PR2TestWrapper):
     better_pose = {'r_shoulder_pan_joint': -1.7125,
                    'r_shoulder_lift_joint': -0.25672,
@@ -833,12 +834,12 @@ class TestPouring:
         ni = NEEMInterface()
         task_type = 'soma:Pouring'
         env_owl = '/home/huerkamp/workspace/new_giskard_ws/environment.owl'
-        env_owl_ind_name = 'world'
+        env_owl_ind_name = 'world' #'/home/huerkamp/workspace/new_giskard_ws/environment.owl#world'
         env_urdf = '/home/huerkamp/workspace/new_giskard_ws/new_world_cups.urdf'
         agent_owl = '/home/huerkamp/workspace/new_giskard_ws/src/knowrob/owl/robots/PR2.owl'
-        # agent_owl_ind_name = 'kb_project(new_iri(P, "http://knowrob.org/kb/knowrob.owl#PR2"), has_type(P, "http://knowrob.org/kb/knowrob.owl#PR2"))'
+        agent_owl_ind_name = 'pr2'
         agent_urdf = '/home/huerkamp/workspace/new_giskard_ws/src/iai_pr2/iai_pr2_description/robots/pr2_calibrated_with_ft2_without_virtual_joints.urdf'
-        agent_owl_ind_name, _ = ni.get_agent_and_ee_individual()
+        # agent_owl_ind_name, _ = ni.get_agent_and_ee_individual()
 
         parent_action = ni.start_episode(task_type=task_type, env_owl=env_owl, env_owl_ind_name=env_owl_ind_name,
                                          env_urdf=env_urdf,
@@ -862,6 +863,7 @@ class TestPouring:
                                                as_open=True)
         zero_pose.execute()
 
+        start_time_grasp = time.time()
         goal_pose = PoseStamped()
         goal_pose.header.frame_id = 'map'
         goal_pose.pose.orientation = Quaternion(*quaternion_from_matrix([[1, 0, 0, 0],
@@ -903,6 +905,15 @@ class TestPouring:
                                                effort_threshold=-0.14,
                                                effort=-180)
         zero_pose.execute()
+        action_iri = ni.add_subaction_with_task(parent_action=parent_action,
+                                                task_type='soma:Grasping',
+                                                # start_time=start_time_grasp, end_time=time.time()
+                                                )
+        ni.assert_task_and_roles(action_iri=action_iri, task_type='MovingTo',
+                                 source_iri='http://knowrob.org/kb/environment.owl#free_cup',
+                                 dest_iri='http://knowrob.org/kb/environment.owl#free_cup2',
+                                 agent_iri=agent_owl_ind_name)
+        start_time_transporting = time.time()
 
         cup_pose = PoseStamped()
         cup_pose.header.frame_id = 'free_cup'
@@ -936,13 +947,16 @@ class TestPouring:
         zero_pose.add_default_end_motion_conditions()
         zero_pose.allow_all_collisions()
         zero_pose.execute()
+        action_iri = ni.add_subaction_with_task(parent_action=parent_action,
+                                                task_type='soma:Transporting',
+                                                # start_time=start_time_transporting, end_time=time.time()
+                                                )
+        ni.assert_task_and_roles(action_iri=action_iri, task_type='MovingTo',
+                                 source_iri='http://knowrob.org/kb/environment.owl#free_cup',
+                                 dest_iri='http://knowrob.org/kb/environment.owl#free_cup2',
+                                 agent_iri=agent_owl_ind_name)
+        start_time_pouring = time.time()
 
-        # start_time = time.time()
-        # ni.add_subaction_with_task(parent_action=parent_action, task_type='soma:Positioning')
-        # parent_action = ni.start_episode(task_type=task_type, env_owl=env_owl, env_owl_ind_name=env_owl_ind_name,
-        #                                  env_urdf=env_urdf,
-        #                                  agent_owl=agent_owl, agent_owl_ind_name=agent_owl_ind_name,
-        #                                  agent_urdf=agent_urdf)
         goal_pose = PoseStamped()
         goal_pose.header.frame_id = 'map'
         goal_pose.pose.orientation = Quaternion(*quaternion_from_matrix([[1, 0, 0, 0],
@@ -959,16 +973,24 @@ class TestPouring:
                                                name='pouring',
                                                tip=zero_pose.l_tip,
                                                root='map',
-                                               tilt_angle=0.5,
+                                               tilt_angle=1.2,
                                                pouring_pose=goal_pose,
                                                tilt_axis=tilt_axis,
                                                pre_tilt=True,
-                                               parent_action=parent_action,
-                                               agent_iri=agent_owl_ind_name)
+                                               parent_action=None,
+                                               agent_iri=None)
         zero_pose.allow_all_collisions()
         zero_pose.avoid_collision(0.01, zero_pose.l_gripper_group, 'cup2')
         # zero_pose.set_cart_goal(goal_pose2, zero_pose.r_tip, 'map', add_monitor=False)
-        zero_pose.execute(add_local_minimum_reached=False)
+        zero_pose.execute(add_local_minimum_reached=True)
+        action_iri = ni.add_subaction_with_task(parent_action=parent_action,
+                                                task_type='soma:Pouring',
+                                                # start_time=start_time_pouring, end_time=time.time()
+                                                )
+        ni.assert_task_and_roles(action_iri=action_iri, task_type='TiltForward',
+                                 source_iri='http://knowrob.org/kb/environment.owl#free_cup',
+                                 dest_iri='http://knowrob.org/kb/environment.owl#free_cup2',
+                                 agent_iri=agent_owl_ind_name)
         ni.stop_episode('/home/huerkamp/workspace/new_giskard_ws')
 
     def test_complete_pouring(self, zero_pose: PR2TestWrapperMujoco):

@@ -13,5 +13,5 @@ if __name__ == '__main__':
                       collision_avoidance_config=HSRCollisionAvoidanceConfig(),
                       robot_interface_config=HSRMujocoVelocityInterface(),
                       behavior_tree_config=ClosedLoopBTConfig(),
-                      qp_controller_config=QPControllerConfig(max_trajectory_length=300, qp_solver=SupportedQPSolver.gurobi))
+                      qp_controller_config=QPControllerConfig(max_trajectory_length=300, qp_solver=SupportedQPSolver.qpalm))
     giskard.live()

@@ -9,7 +9,7 @@ from giskardpy.data_types.data_types import Derivatives
 class JointGoalReached(ExpressionMonitor):
     def __init__(self,
                  goal_state: Dict[str, float],
-                 threshold: float,
+                 threshold: float = 0.01,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,

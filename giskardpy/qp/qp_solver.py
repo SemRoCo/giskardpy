@@ -6,6 +6,7 @@ from typing import Tuple, List, Optional, Union, Dict
 import scipy.sparse as sp
 import numpy as np
 
+
 import giskardpy.casadi_wrapper as cas
 from giskardpy.data_types.exceptions import HardConstraintsViolatedException, InfeasibleException, QPSolverException
 from giskardpy.middleware import get_middleware
@@ -13,7 +14,7 @@ from giskardpy.qp.qp_solver_ids import SupportedQPSolver
 from giskardpy.utils.decorators import memoize
 
 from giskardpy.utils.utils import is_running_in_pytest
-
+from line_profiler import profile
 
 def record_solver_call_time(function):
     if not is_running_in_pytest():

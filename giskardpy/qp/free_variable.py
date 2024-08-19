@@ -6,6 +6,7 @@ from giskardpy.data_types.data_types import Derivatives, PrefixName
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils.decorators import memoize
 
+from line_profiler import profile
 
 class FreeVariable:
 

@@ -3,7 +3,7 @@ import scs
 from scipy import sparse
 
 from giskardpy.qp.qp_solver import QPSolver
-
+from line_profiler import profile
 
 class QPSolverSuperSCS(QPSolver):
     """

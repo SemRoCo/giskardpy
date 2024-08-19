@@ -2,6 +2,7 @@ import cvxpy
 import numpy as np
 
 from giskardpy.qp.qp_solver import QPSolver
+from line_profiler import profile
 
 
 class QPSolverCVXPY(QPSolver):

@@ -5,6 +5,7 @@ from typing import Tuple, Dict
 import numpy as np
 import qpalm
 from scipy import sparse as sp
+from line_profiler import profile
 
 from giskardpy.data_types.exceptions import QPSolverException, InfeasibleException, HardConstraintsViolatedException
 from giskardpy.qp.qp_solver import QPSolver

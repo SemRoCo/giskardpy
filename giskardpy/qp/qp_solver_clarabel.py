@@ -1,7 +1,7 @@
 import numpy as np
 from clarabel import clarabel
 from scipy import sparse
-
+from line_profiler import profile
 from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.qp.qp_solver_ids import SupportedQPSolver
 from giskardpy.utils.decorators import record_time

@@ -2,11 +2,12 @@ from __future__ import annotations
 from typing import List, Dict
 import numpy as np
 
+
 from giskardpy.data_types.data_types import Derivatives, PrefixName
 from giskardpy.qp.free_variable import FreeVariable
 import giskardpy.utils.math as giskard_math
 from giskardpy.utils.decorators import memoize
-
+from line_profiler import profile
 
 @memoize
 @profile

@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+
 import giskardpy.casadi_wrapper as cas
 from giskardpy.data_types.exceptions import HardConstraintsViolatedException, QPSolverException, InfeasibleException, \
     VelocityLimitUnreachableException
@@ -26,7 +27,7 @@ from giskardpy.utils.utils import create_path, get_all_classes_in_package
 from giskardpy.utils.decorators import memoize
 import giskardpy.utils.math as giskard_math
 from giskardpy.qp.weight_gain import QuadraticWeightGain, LinearWeightGain
-
+from line_profiler import profile
 # used for saving pandas in the same folder every time within a run
 date_str = datetime.datetime.now().strftime('%Yy-%mm-%dd--%Hh-%Mm-%Ss')
 

@@ -30,7 +30,7 @@ from giskardpy.symbol_manager import symbol_manager
 from giskardpy.middleware import get_middleware
 from giskardpy.utils.utils import suppress_stderr, clear_cached_properties
 from giskardpy.utils.decorators import memoize, copy_memoize, clear_memo
-
+from line_profiler import profile
 
 class TravelCompanion:
     def link_call(self, link_name: PrefixName) -> bool:

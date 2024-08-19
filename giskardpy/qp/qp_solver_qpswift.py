@@ -8,6 +8,7 @@ from giskardpy.data_types.exceptions import QPSolverException, InfeasibleExcepti
 from giskardpy.qp.qp_solver import QPSWIFTFormatter
 import qpSWIFT
 import scipy.sparse as sp
+from line_profiler import profile
 
 from giskardpy.qp.qp_solver_ids import SupportedQPSolver
 

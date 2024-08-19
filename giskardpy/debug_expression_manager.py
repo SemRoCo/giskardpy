@@ -2,6 +2,7 @@ from typing import Dict, Optional
 
 import numpy as np
 import pandas as pd
+from line_profiler import profile
 
 import giskardpy.casadi_wrapper as cas
 from giskardpy.data_types.data_types import JointStates, ColorRGBA

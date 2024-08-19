@@ -5,7 +5,7 @@ from giskardpy.data_types.data_types import PrefixName, TaskState
 from giskardpy.god_map import god_map
 from giskardpy.motion_graph.graph_node import MotionGraphNode
 import giskardpy.casadi_wrapper as cas
-
+from line_profiler import profile
 
 @profile
 def compile_graph_node_state_updater(graph_nodes: Dict[PrefixName, MotionGraphNode]) -> CompiledFunction:

@@ -6,6 +6,7 @@ import numpy as np
 from gurobipy import GRB
 from gurobipy.gurobipy import GurobiError
 from scipy import sparse
+from line_profiler import profile
 
 from giskardpy.data_types.exceptions import QPSolverException, InfeasibleException
 from giskardpy.qp.qp_solver import QPSWIFTFormatter

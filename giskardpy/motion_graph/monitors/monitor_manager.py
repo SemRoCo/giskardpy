@@ -2,6 +2,7 @@ import ast
 from collections import OrderedDict
 from functools import cached_property
 from typing import List, Tuple, Dict, Optional, Callable, Union, Iterable
+from line_profiler import profile
 
 import numpy as np
 

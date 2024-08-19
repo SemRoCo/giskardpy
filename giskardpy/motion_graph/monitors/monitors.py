@@ -4,6 +4,7 @@ import abc
 from abc import ABC
 from functools import cached_property
 from typing import Optional
+from line_profiler import profile
 
 import numpy as np
 

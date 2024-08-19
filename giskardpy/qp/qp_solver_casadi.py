@@ -1,6 +1,7 @@
 import numpy as np
 from casadi import casadi
 
+from line_profiler import profile
 from giskardpy.qp.qp_solver import QPSolver
 
 

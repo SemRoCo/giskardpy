@@ -5,7 +5,7 @@ from scipy import sparse
 from giskardpy.data_types.exceptions import QPSolverException, InfeasibleException, HardConstraintsViolatedException
 from giskardpy.qp.qp_solver import QPSolver
 import osqp
-
+from line_profiler import profile
 from giskardpy.qp.qp_solver_ids import SupportedQPSolver
 from giskardpy.utils.decorators import record_time
 

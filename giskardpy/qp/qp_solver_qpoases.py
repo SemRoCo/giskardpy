@@ -3,6 +3,7 @@ from enum import IntEnum
 import numpy as np
 import qpoases
 from qpoases import PyReturnValue
+from line_profiler import profile
 
 from giskardpy.data_types.exceptions import QPSolverException, InfeasibleException, HardConstraintsViolatedException
 from giskardpy.qp.qp_solver import QPSolver

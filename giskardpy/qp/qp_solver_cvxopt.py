@@ -5,6 +5,7 @@ import mosek
 import numpy as np
 from cvxopt import solvers
 from scipy import sparse
+from line_profiler import profile
 
 from giskardpy.qp.qp_solver import QPSolver
 

@@ -12,7 +12,7 @@ from giskardpy.data_types.data_types import derivative_map, PrefixName, Derivati
 from giskardpy.god_map import god_map
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.symbol_manager import symbol_manager
-
+from line_profiler import profile
 
 def urdf_joint_to_class(urdf_joint: up.Joint) -> Union[Type[FixedJoint], Type[RevoluteJoint], Type[PrismaticJoint]]:
     if urdf_joint.type == 'fixed':

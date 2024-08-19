@@ -18,6 +18,7 @@ from giskardpy.god_map import god_map
 from giskardpy.model.world import WorldBranch
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.middleware import get_middleware
+from line_profiler import profile
 
 np.random.seed(1337)
 

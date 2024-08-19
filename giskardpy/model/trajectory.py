@@ -9,6 +9,7 @@ import numpy as np
 import matplotlib.colors as mcolors
 import pylab as plt
 from sortedcontainers import SortedDict
+from line_profiler import profile
 
 from giskardpy.data_types.data_types import JointStates
 from giskardpy.god_map import god_map

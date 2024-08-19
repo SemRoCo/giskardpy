@@ -10,6 +10,7 @@ from giskardpy.data_types.exceptions import MonitorInitalizationException
 from giskardpy.god_map import god_map
 from giskardpy.middleware import get_middleware
 from giskardpy.motion_graph.monitors.monitors import PayloadMonitor, CancelMotion
+from line_profiler import profile
 
 
 class WorldUpdatePayloadMonitor(PayloadMonitor):

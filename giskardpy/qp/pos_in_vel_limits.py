@@ -4,6 +4,7 @@ import numpy as np
 import giskardpy.casadi_wrapper as cas
 import giskardpy.utils.math as gm
 from giskardpy.utils.decorators import memoize
+from line_profiler import profile
 
 
 def shifted_velocity_profile(vel_profile, acc_profile, distance, dt):

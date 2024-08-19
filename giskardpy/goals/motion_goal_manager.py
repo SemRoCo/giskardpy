@@ -13,6 +13,7 @@ from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, De
 from giskardpy.motion_graph.tasks.task import Task
 from giskardpy.utils.utils import get_all_classes_in_package, ImmutableDict
 from giskardpy.qp.weight_gain import QuadraticWeightGain, LinearWeightGain
+from line_profiler import profile
 
 
 class MotionGoalManager:

@@ -1,6 +1,6 @@
 import sys
 from copy import deepcopy
-
+from line_profiler import profile
 import mosek
 import numpy as np
 from scipy import sparse

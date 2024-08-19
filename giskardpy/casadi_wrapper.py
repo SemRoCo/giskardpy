@@ -5,7 +5,7 @@ from copy import copy
 from enum import IntEnum
 from typing import Union, TypeVar, Optional
 import math
-
+from line_profiler import profile
 import casadi
 import casadi as ca  # type: ignore
 import numpy as np

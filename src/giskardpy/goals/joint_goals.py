@@ -9,7 +9,7 @@ from giskardpy.goals.goal import Goal
 from giskardpy.god_map import god_map
 from giskardpy.model.joints import OneDofJoint
 from giskardpy.symbol_manager import symbol_manager
-from giskardpy.tasks.task import WEIGHT_BELOW_CA
+from giskardpy.motion_graph.tasks.task import WEIGHT_BELOW_CA
 
 
 class JointVelocityLimit(Goal):

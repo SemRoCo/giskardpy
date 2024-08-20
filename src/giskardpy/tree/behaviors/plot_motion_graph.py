@@ -8,12 +8,13 @@ import giskard_msgs.msg as giskard_msgs
 from giskard_msgs.msg import ExecutionState
 from giskardpy.data_types import TaskState
 from giskardpy.god_map import god_map
-from giskardpy.monitors.monitors import EndMotion, CancelMotion
+from giskardpy.motion_graph.monitors.payload_monitors import CancelMotion
+from giskardpy.motion_graph.monitors.monitor_manager import EndMotion
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.tree.behaviors.publish_feedback import giskard_state_to_execution_state
 from giskardpy.utils import logging
 from giskardpy.utils.decorators import record_time, catch_and_raise_to_blackboard
-from giskardpy.utils.utils import create_path
+from giskardpy.utils.utils import create_path, json_str_to_kwargs
 
 
 def extract_monitor_names_from_condition(condition: str) -> List[str]:
@@ -25,25 +26,25 @@ def search_for_monitor(monitor_name: str, execution_state: ExecutionState) -> gi
 
 
 task_state_to_color: Dict[TaskState, str] = {
-    TaskState.not_started: 'black',
+    TaskState.not_started: 'gray',
     TaskState.running: 'green',
-    TaskState.on_hold: 'gray',
+    TaskState.on_hold: 'orange',
     TaskState.succeeded: 'palegreen',
-    TaskState.failed: 'tomato'
+    TaskState.failed: 'red'
 }
 
 monitor_state_to_color: Dict[Tuple[TaskState, int], str] = {
-    (TaskState.not_started, 1): 'black',  # doesn't exist
+    (TaskState.not_started, 1): 'darkgreen',
     (TaskState.running, 1): 'green',
-    (TaskState.on_hold, 1): 'gray',
+    (TaskState.on_hold, 1): 'turquoise',
     (TaskState.succeeded, 1): 'palegreen',
-    (TaskState.failed, 1): 'red',
+    (TaskState.failed, 1): 'gray',
 
-    (TaskState.not_started, 0): 'black',
-    (TaskState.running, 0): 'orange',
-    (TaskState.on_hold, 0): 'gray',
-    (TaskState.succeeded, 0): 'palegreen',
-    (TaskState.failed, 0): 'red'
+    (TaskState.not_started, 0): 'darkred',
+    (TaskState.running, 0): 'red',
+    (TaskState.on_hold, 0): 'orange',
+    (TaskState.succeeded, 0): 'lightpink',
+    (TaskState.failed, 0): 'black'
 }
 
 
@@ -54,12 +55,19 @@ def format_condition(condition: str) -> str:
     condition = condition.replace('0.0', 'False')
     return condition
 
+
 def format_monitor_msg(msg: giskard_msgs.Monitor) -> str:
     start_condition = format_condition(msg.start_condition)
+    kwargs = json_str_to_kwargs(msg.kwargs)
+    hold_condition = format_condition(kwargs['hold_condition'])
+    end_condition = format_condition(kwargs['end_condition'])
     return (f'"\'{msg.name}\'\n'
-            f'class: {msg.monitor_class}\n'
             f'----------start_condition:----------\n'
-            f'{start_condition}"')
+            f'{start_condition}\n'
+            f'----------hold_condition:-----------\n'
+            f'{hold_condition}\n'
+            f'-----------end_condition:-----------\n'
+            f'{end_condition}"')
 
 
 def format_task_msg(msg: giskard_msgs.MotionGoal) -> str:
@@ -107,6 +115,9 @@ def execution_state_to_dot_graph(execution_state: ExecutionState) -> pydot.Dot:
 
     # Process monitors and their start_condition
     for i, monitor in enumerate(execution_state.monitors):
+        kwargs = json_str_to_kwargs(monitor.kwargs)
+        hold_condition = format_condition(kwargs['hold_condition'])
+        end_condition = format_condition(kwargs['end_condition'])
         monitor_node = add_or_get_node(monitor)
         monitor_node.obj_dict['attributes']['color'] = monitor_state_to_color[
             (execution_state.monitor_life_cycle_state[i],
@@ -116,6 +127,17 @@ def execution_state_to_dot_graph(execution_state: ExecutionState) -> pydot.Dot:
             sub_monitor = search_for_monitor(sub_monitor_name, execution_state)
             sub_monitor_node = add_or_get_node(sub_monitor)
             graph.add_edge(pydot.Edge(sub_monitor_node, monitor_node, color='green'))
+        free_symbols = extract_monitor_names_from_condition(hold_condition)
+        for sub_monitor_name in free_symbols:
+            sub_monitor = search_for_monitor(sub_monitor_name, execution_state)
+            sub_monitor_node = add_or_get_node(sub_monitor)
+            graph.add_edge(pydot.Edge(sub_monitor_node, monitor_node, color='orange'))
+        free_symbols = extract_monitor_names_from_condition(end_condition)
+        for sub_monitor_name in free_symbols:
+            sub_monitor = search_for_monitor(sub_monitor_name, execution_state)
+            sub_monitor_node = add_or_get_node(sub_monitor)
+            graph.add_edge(pydot.Edge(sub_monitor_node, monitor_node, color='red', arrowhead='none', arrowtail='normal',
+                                      dir='both'))
 
     # Process goals and their connections
     for i, task in enumerate(execution_state.tasks):

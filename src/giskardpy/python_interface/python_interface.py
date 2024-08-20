@@ -40,7 +40,7 @@ from giskardpy.motion_graph.monitors.payload_monitors import Print, Sleep, SetMa
     PayloadAlternator
 from giskardpy.utils.utils import kwargs_to_json, get_all_classes_in_package
 from giskardpy.goals.feature_functions import AlignPerpendicular, HeightGoal, AngleGoal, DistanceGoal
-from giskardpy.monitors.feature_monitors import PerpendicularMonitor, AngleMonitor, HeightMonitor, DistanceMonitor
+from giskardpy.motion_graph.monitors.feature_monitors import PerpendicularMonitor, AngleMonitor, HeightMonitor, DistanceMonitor
 from giskard_msgs.msg import ExecutionState
 
 

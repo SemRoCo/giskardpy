@@ -6,7 +6,7 @@ from giskardpy import casadi_wrapper as cas
 from giskardpy.goals.goal import Goal
 from giskardpy.god_map import god_map
 from giskardpy.symbol_manager import symbol_manager
-from giskardpy.tasks.task import Task, WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE
+from giskardpy.motion_graph.tasks.task import Task, WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE
 from giskardpy.goals.pointing import Pointing
 from giskardpy.goals.align_planes import AlignPlanes
 

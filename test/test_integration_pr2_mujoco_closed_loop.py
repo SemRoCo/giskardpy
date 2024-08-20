@@ -907,7 +907,7 @@ class TestPouring:
         zero_pose.execute()
         action_iri = ni.add_subaction_with_task(parent_action=parent_action,
                                                 task_type='soma:Grasping',
-                                                # start_time=start_time_grasp, end_time=time.time()
+                                                start_time=start_time_grasp, end_time=time.time()
                                                 )
         ni.assert_task_and_roles(action_iri=action_iri, task_type='MovingTo',
                                  source_iri='http://knowrob.org/kb/environment.owl#free_cup',
@@ -949,7 +949,7 @@ class TestPouring:
         zero_pose.execute()
         action_iri = ni.add_subaction_with_task(parent_action=parent_action,
                                                 task_type='soma:Transporting',
-                                                # start_time=start_time_transporting, end_time=time.time()
+                                                start_time=start_time_transporting, end_time=time.time()
                                                 )
         ni.assert_task_and_roles(action_iri=action_iri, task_type='MovingTo',
                                  source_iri='http://knowrob.org/kb/environment.owl#free_cup',
@@ -985,7 +985,7 @@ class TestPouring:
         zero_pose.execute(add_local_minimum_reached=True)
         action_iri = ni.add_subaction_with_task(parent_action=parent_action,
                                                 task_type='soma:Pouring',
-                                                # start_time=start_time_pouring, end_time=time.time()
+                                                start_time=start_time_pouring, end_time=time.time()
                                                 )
         ni.assert_task_and_roles(action_iri=action_iri, task_type='TiltForward',
                                  source_iri='http://knowrob.org/kb/environment.owl#free_cup',

@@ -27,7 +27,7 @@ from giskardpy.goals.caster import Circle, Wave
 from giskardpy.goals.collision_avoidance import CollisionAvoidanceHint
 from giskardpy.goals.goals_tests import DebugGoal, CannotResolveSymbol
 from giskardpy.goals.joint_goals import JointVelocityLimit, UnlimitedJointGoal
-from giskardpy.monitors.set_prediction_horizon import SetQPSolver
+from giskardpy.motion_graph.monitors.set_prediction_horizon import SetQPSolver
 from giskardpy.goals.tracebot import InsertCylinder
 from giskardpy.god_map import god_map
 from giskardpy.model.better_pybullet_syncer import BetterPyBulletSyncer
@@ -35,7 +35,7 @@ from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
 from giskardpy.model.utils import make_world_body_box, hacky_urdf_parser_fix
 from giskardpy.model.world import WorldTree
 from giskardpy.data_types import PrefixName
-from giskardpy.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE
+from giskardpy.motion_graph.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE
 from giskardpy.python_interface.old_python_interface import OldGiskardWrapper
 from giskardpy.utils.utils import launch_launchfile, suppress_stderr, resolve_ros_iris
 from giskardpy.utils.math import compare_points
@@ -402,6 +402,34 @@ class TestJointGoals:
 
 
 class TestMonitors:
+    def test_cart_goal_sequence_interrupt(self, zero_pose: PR2TestWrapper):
+        pose1 = PoseStamped()
+        pose1.header.frame_id = 'map'
+        pose1.pose.position.x = 10
+        pose1.pose.orientation.w = 1
+
+        pose2 = PoseStamped()
+        pose2.header.frame_id = 'base_footprint'
+        pose2.pose.position.y = 1
+        pose2.pose.orientation.w = 1
+
+        sleep = zero_pose.monitors.add_sleep(3)
+        zero_pose.motion_goals.add_cartesian_pose(goal_pose=pose1,
+                                                  tip_link='base_footprint',
+                                                  root_link='map',
+                                                  end_condition=sleep,
+                                                  name='pose1')
+        zero_pose.motion_goals.add_cartesian_pose(goal_pose=pose2,
+                                                  tip_link='base_footprint',
+                                                  root_link='map',
+                                                  start_condition=sleep,
+                                                  absolute=True,
+                                                  name='pose2')
+        local_min = zero_pose.monitors.add_local_minimum_reached()
+        zero_pose.monitors.add_end_motion(start_condition=local_min)
+        zero_pose.allow_all_collisions()
+        zero_pose.execute(add_local_minimum_reached=False)
+
     def test_start_of_expression_monitor(self, zero_pose: PR2TestWrapper):
         time_above = zero_pose.monitors.add_time_above(threshold=5)
         local_min = zero_pose.monitors.add_local_minimum_reached(start_condition=time_above)
@@ -874,7 +902,7 @@ class TestMonitors:
                                                   hold_condition=f'not {alternator}',
                                                   end_condition=base_monitor)
 
-        local_min = zero_pose.monitors.add_local_minimum_reached(stay_true=False)
+        local_min = zero_pose.monitors.add_local_minimum_reached(end_condition='')
         end = zero_pose.monitors.add_end_motion(start_condition=' and '.join([local_min,
                                                                               sleep2,
                                                                               right_monitor,
@@ -927,7 +955,7 @@ class TestMonitors:
         stayed_put = zero_pose.monitors.add_cartesian_pose(goal_pose=current_base,
                                                            tip_link='base_footprint',
                                                            root_link='map',
-                                                           stay_true=False,
+                                                           end_condition='',
                                                            name='goal reached')
 
         zero_pose.motion_goals.add_cartesian_pose(goal_pose=base_goal,
@@ -943,6 +971,50 @@ class TestMonitors:
         end = zero_pose.monitors.add_end_motion(start_condition=f'{local_min} and {stayed_put} and {joint_reached}')
         zero_pose.motion_goals.allow_all_collisions()
         zero_pose.set_max_traj_length(30)
+        zero_pose.execute(add_local_minimum_reached=False)
+
+    def test_hold_condition_of_monitor(self, zero_pose: PR2TestWrapper):
+        sleep = zero_pose.monitors.add_sleep(2, name='sleep')
+        joint_goal = zero_pose.monitors.add_joint_position(name='joint reached',
+                                                           goal_state=zero_pose.better_pose,
+                                                           hold_condition=f'not {sleep}')
+
+        zero_pose.motion_goals.add_joint_position(goal_state=zero_pose.better_pose)
+        zero_pose.monitors.add_end_motion(start_condition=joint_goal)
+        zero_pose.execute(add_local_minimum_reached=False)
+
+    def test_hold_condition_of_monitor2(self, zero_pose: PR2TestWrapper):
+        sleep = zero_pose.monitors.add_sleep(1, name='sleep')
+        sleep2 = zero_pose.monitors.add_sleep(1, name='sleep2', start_condition=sleep)
+        joint_goal = zero_pose.monitors.add_joint_position(name='joint reached',
+                                                           goal_state=zero_pose.better_pose)
+        teleport = zero_pose.monitors.add_set_seed_configuration(seed_configuration=zero_pose.default_pose)
+        joint_goal2 = zero_pose.monitors.add_joint_position(name='joint reached2',
+                                                            goal_state=zero_pose.default_pose,
+                                                            threshold=0.03,
+                                                            start_condition=teleport,
+                                                            hold_condition=f'{sleep}',
+                                                            end_condition='')
+
+        zero_pose.motion_goals.add_joint_position(goal_state=zero_pose.better_pose,
+                                                  start_condition=sleep2)
+        zero_pose.monitors.add_end_motion(start_condition=joint_goal)
+        zero_pose.monitors.add_cancel_motion(start_condition=f'not {joint_goal2} and {sleep2}', error_message='fail')
+        zero_pose.monitors.add_max_trajectory_length(30)
+        zero_pose.execute(add_local_minimum_reached=False)
+
+    def test_end_plus_false_monitor(self, zero_pose: PR2TestWrapper):
+        sleep = zero_pose.monitors.add_sleep(0.5, name='sleep')
+        joint_goal = zero_pose.monitors.add_joint_position(name='joint reached',
+                                                           goal_state=zero_pose.better_pose)
+        joint_goal2 = zero_pose.monitors.add_joint_position(name='joint reached2',
+                                                            goal_state=zero_pose.better_pose,
+                                                            end_condition=sleep)
+
+        zero_pose.motion_goals.add_joint_position(goal_state=zero_pose.better_pose,
+                                                  start_condition=sleep)
+        zero_pose.monitors.add_end_motion(start_condition=f'{joint_goal} and not {joint_goal2}')
+        zero_pose.monitors.add_cancel_motion(start_condition=f'{joint_goal} and {joint_goal2}', error_message='fail')
         zero_pose.execute(add_local_minimum_reached=False)
 
     def test_only_payload_monitors(self, zero_pose: PR2TestWrapper):

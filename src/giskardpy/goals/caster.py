@@ -1,7 +1,7 @@
 from geometry_msgs.msg import PointStamped
 import giskardpy.casadi_wrapper as cas
 from giskardpy.goals.goal import Goal
-from giskardpy.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
+from giskardpy.motion_graph.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
 from giskardpy.god_map import god_map
 from giskardpy.data_types import PrefixName
 

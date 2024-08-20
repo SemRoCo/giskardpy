@@ -1,4 +1,5 @@
 import traceback
+from copy import copy
 from typing import List, Dict, Tuple, Optional
 
 import matplotlib.pyplot as plt
@@ -6,9 +7,9 @@ import numpy as np
 from py_trees import Status
 from giskardpy.goals.collision_avoidance import CollisionAvoidance
 from giskardpy.goals.goal import Goal
-from giskardpy.monitors.monitors import Monitor, EndMotion, CancelMotion
+from giskardpy.motion_graph.monitors.monitors import Monitor, EndMotion, CancelMotion
 from giskardpy.god_map import god_map
-from giskardpy.tasks.task import TaskState
+from giskardpy.motion_graph.tasks.task import TaskState
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
 from giskardpy.utils.decorators import record_time
@@ -22,7 +23,7 @@ class PlotGanttChart(GiskardBehavior):
         super().__init__(name)
 
     def plot_gantt_chart(self, goals: List[Goal], monitors: List[Monitor], file_name: str):
-        monitor_plot_filter = np.array([monitor.plot for monitor in god_map.monitor_manager.monitors])
+        monitor_plot_filter = np.array([monitor.plot for monitor in god_map.monitor_manager.monitors.values()])
         tasks = [task for g in goals for task in g.tasks]
         task_plot_filter = np.array([not isinstance(g, CollisionAvoidance) for g in goals for _ in g.tasks])
 
@@ -83,6 +84,7 @@ class PlotGanttChart(GiskardBehavior):
         god_map.monitor_manager.evaluate_monitors()
         monitor_history: List[Tuple[float, List[Optional[TaskState]]]] = []
         for time_id, (time, (state, life_cycle_state)) in enumerate(god_map.monitor_manager.state_history):
+            life_cycle_state = copy(life_cycle_state)
             for monitor_id in range(len(state)):
                 if not state[monitor_id] and life_cycle_state[monitor_id] == TaskState.running:
                     life_cycle_state[monitor_id] = TaskState.on_hold
@@ -103,7 +105,7 @@ class PlotGanttChart(GiskardBehavior):
             return Status.SUCCESS
         try:
             goals = list(god_map.motion_goal_manager.motion_goals.values())
-            monitors = god_map.monitor_manager.monitors
+            monitors = list(god_map.monitor_manager.monitors.values())
             file_name = god_map.giskard.tmp_folder + f'gantt_charts/goal_{god_map.move_action_server.goal_id}.pdf'
             self.plot_gantt_chart(goals, monitors, file_name)
         except Exception as e:

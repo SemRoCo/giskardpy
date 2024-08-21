@@ -59,7 +59,7 @@ class HeightMonitor(FeatureMonitor):
                  hold_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol):
         super().__init__(tip_link=tip_link, root_link=root_link, reference_feature=reference_point,
-                         controlled_feature=tip_point, name=name, stay_true=stay_true, start_condition=start_condition,
+                         controlled_feature=tip_point, name=name, start_condition=start_condition,
                          hold_condition=hold_condition,
                          end_condition=end_condition,
                          root_group=root_group, tip_group=tip_group)
@@ -84,7 +84,7 @@ class PerpendicularMonitor(FeatureMonitor):
                  end_condition: cas.Expression = cas.FalseSymbol
                  ):
         super().__init__(tip_link=tip_link, root_link=root_link, reference_feature=reference_normal,
-                         controlled_feature=tip_normal, name=name, stay_true=stay_true, start_condition=start_condition,
+                         controlled_feature=tip_normal, name=name, start_condition=start_condition,
                          hold_condition=hold_condition,
                          end_condition=end_condition,
                          root_group=root_group, tip_group=tip_group)
@@ -108,7 +108,7 @@ class DistanceMonitor(FeatureMonitor):
                  end_condition: cas.Expression = cas.FalseSymbol
                  ):
         super().__init__(tip_link=tip_link, root_link=root_link, reference_feature=reference_point,
-                         controlled_feature=tip_point, name=name, stay_true=stay_true, start_condition=start_condition,
+                         controlled_feature=tip_point, name=name, start_condition=start_condition,
                          hold_condition=hold_condition,
                          end_condition=end_condition,
                          root_group=root_group, tip_group=tip_group)
@@ -134,7 +134,7 @@ class AngleMonitor(FeatureMonitor):
                  end_condition: cas.Expression = cas.FalseSymbol
                  ):
         super().__init__(tip_link=tip_link, root_link=root_link, reference_feature=reference_vector,
-                         controlled_feature=tip_vector, name=name, stay_true=stay_true, start_condition=start_condition,
+                         controlled_feature=tip_vector, name=name, start_condition=start_condition,
                          hold_condition=hold_condition,
                          end_condition=end_condition,
                          root_group=root_group, tip_group=tip_group)

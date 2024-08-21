@@ -1879,6 +1879,8 @@ class MonitorWrapper:
                                   tip_normal: Vector3Stamped,
                                   name: Optional[str] = None,
                                   start_condition: str = '',
+                                  hold_condition: str = '',
+                                  end_condition: Optional[str] = None,
                                   root_group: Optional[str] = None,
                                   tip_group: Optional[str] = None,
                                   threshold: float = 0.01) -> str:
@@ -1892,6 +1894,8 @@ class MonitorWrapper:
                                 reference_normal=reference_normal,
                                 tip_normal=tip_normal,
                                 start_condition=start_condition,
+                                hold_condition=hold_condition,
+                                end_condition=end_condition,
                                 root_group=root_group,
                                 tip_group=tip_group,
                                 threshold=threshold)
@@ -1905,6 +1909,8 @@ class MonitorWrapper:
                   upper_angle: float,
                   name: Optional[str] = None,
                   start_condition: str = '',
+                  hold_condition: str = '',
+                  end_condition: Optional[str] = None,
                   root_group: Optional[str] = None,
                   tip_group: Optional[str] = None) -> str:
         """
@@ -1919,6 +1925,8 @@ class MonitorWrapper:
                                 lower_limit=lower_angle,
                                 upper_limit=upper_angle,
                                 start_condition=start_condition,
+                                hold_condition=hold_condition,
+                                end_condition=end_condition,
                                 root_group=root_group,
                                 tip_group=tip_group)
 
@@ -1931,6 +1939,8 @@ class MonitorWrapper:
                    upper_limit: float,
                    name: Optional[str] = None,
                    start_condition: str = '',
+                   hold_condition: str = '',
+                   end_condition: Optional[str] = None,
                    root_group: Optional[str] = None,
                    tip_group: Optional[str] = None) -> str:
         """
@@ -1946,6 +1956,8 @@ class MonitorWrapper:
                                 lower_limit=lower_limit,
                                 upper_limit=upper_limit,
                                 start_condition=start_condition,
+                                hold_condition=hold_condition,
+                                end_condition=end_condition,
                                 root_group=root_group,
                                 tip_group=tip_group)
 
@@ -1958,6 +1970,8 @@ class MonitorWrapper:
                      upper_limit: float,
                      name: Optional[str] = None,
                      start_condition: str = '',
+                     hold_condition: str = '',
+                     end_condition: Optional[str] = None,
                      root_group: Optional[str] = None,
                      tip_group: Optional[str] = None) -> str:
         """
@@ -1973,6 +1987,8 @@ class MonitorWrapper:
                                 lower_limit=lower_limit,
                                 upper_limit=upper_limit,
                                 start_condition=start_condition,
+                                hold_condition=hold_condition,
+                                end_condition=end_condition,
                                 root_group=root_group,
                                 tip_group=tip_group)
 

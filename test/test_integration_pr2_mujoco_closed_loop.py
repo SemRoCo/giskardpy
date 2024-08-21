@@ -831,20 +831,22 @@ class TestPouring:
         zero_pose.execute(add_local_minimum_reached=False)
 
     def test_pour_two_cups(self, zero_pose: PR2TestWrapper):
-        ni = NEEMInterface()
-        task_type = 'soma:Pouring'
+        record_neem = True
+        if record_neem:
+            ni = NEEMInterface()
+        task_type = "http://www.ease-crc.org/ont/SOMA.owl#Pouring"
         env_owl = '/home/huerkamp/workspace/new_giskard_ws/environment.owl'
-        env_owl_ind_name = 'world' #'/home/huerkamp/workspace/new_giskard_ws/environment.owl#world'
+        env_owl_ind_name = 'world'  # '/home/huerkamp/workspace/new_giskard_ws/environment.owl#world'
         env_urdf = '/home/huerkamp/workspace/new_giskard_ws/new_world_cups.urdf'
         agent_owl = '/home/huerkamp/workspace/new_giskard_ws/src/knowrob/owl/robots/PR2.owl'
         agent_owl_ind_name = 'pr2'
         agent_urdf = '/home/huerkamp/workspace/new_giskard_ws/src/iai_pr2/iai_pr2_description/robots/pr2_calibrated_with_ft2_without_virtual_joints.urdf'
         # agent_owl_ind_name, _ = ni.get_agent_and_ee_individual()
-
-        parent_action = ni.start_episode(task_type=task_type, env_owl=env_owl, env_owl_ind_name=env_owl_ind_name,
-                                         env_urdf=env_urdf,
-                                         agent_owl=agent_owl, agent_owl_ind_name=agent_owl_ind_name,
-                                         agent_urdf=agent_urdf)
+        if record_neem:
+            parent_action = ni.start_episode(task_type=task_type, env_owl=env_owl, env_owl_ind_name=env_owl_ind_name,
+                                             env_urdf=env_urdf,
+                                             agent_owl=agent_owl, agent_owl_ind_name=agent_owl_ind_name,
+                                             agent_urdf=agent_urdf)
         zero_pose.motion_goals.add_motion_goal(motion_goal_class=CloseGripper.__name__,
                                                name='closeGripperLeft',
                                                pub_topic='/pr2/l_gripper_controller/command',
@@ -886,6 +888,14 @@ class TestPouring:
         goal_pose2.pose.position.z = 0.5
 
         # zero_pose.set_cart_goal(goal_pose2, zero_pose.r_tip, 'map')
+        # zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulability.__name__,
+        #                                        root_link='torso_lift_link',
+        #                                        tip_link='r_gripper_tool_frame',
+        #                                        gain=3)
+        # zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulability.__name__,
+        #                                        root_link='torso_lift_link',
+        #                                        tip_link='l_gripper_tool_frame',
+        #                                        gain=3)
         zero_pose.add_default_end_motion_conditions()
         zero_pose.allow_all_collisions()
         zero_pose.execute()
@@ -905,14 +915,15 @@ class TestPouring:
                                                effort_threshold=-0.14,
                                                effort=-180)
         zero_pose.execute()
-        action_iri = ni.add_subaction_with_task(parent_action=parent_action,
-                                                task_type='soma:Grasping',
-                                                start_time=start_time_grasp, end_time=time.time()
-                                                )
-        ni.assert_task_and_roles(action_iri=action_iri, task_type='MovingTo',
-                                 source_iri='http://knowrob.org/kb/environment.owl#free_cup',
-                                 dest_iri='http://knowrob.org/kb/environment.owl#free_cup2',
-                                 agent_iri=agent_owl_ind_name)
+        if record_neem:
+            action_iri = ni.add_subaction_with_task(parent_action=parent_action,
+                                                    task_type="http://www.ease-crc.org/ont/SOMA.owl#Grasping",
+                                                    start_time=start_time_grasp, end_time=time.time()
+                                                    )
+            ni.assert_task_and_roles(action_iri=action_iri, task_type='holding',
+                                     source_iri='http://knowrob.org/kb/environment.owl#free_cup',
+                                     dest_iri='http://knowrob.org/kb/environment.owl#free_cup2',
+                                     agent_iri=agent_owl_ind_name)
         start_time_transporting = time.time()
 
         cup_pose = PoseStamped()
@@ -947,14 +958,15 @@ class TestPouring:
         zero_pose.add_default_end_motion_conditions()
         zero_pose.allow_all_collisions()
         zero_pose.execute()
-        action_iri = ni.add_subaction_with_task(parent_action=parent_action,
-                                                task_type='soma:Transporting',
-                                                start_time=start_time_transporting, end_time=time.time()
-                                                )
-        ni.assert_task_and_roles(action_iri=action_iri, task_type='MovingTo',
-                                 source_iri='http://knowrob.org/kb/environment.owl#free_cup',
-                                 dest_iri='http://knowrob.org/kb/environment.owl#free_cup2',
-                                 agent_iri=agent_owl_ind_name)
+        if record_neem:
+            action_iri = ni.add_subaction_with_task(parent_action=parent_action,
+                                                    task_type="http://www.ease-crc.org/ont/SOMA.owl#Transporting",
+                                                    start_time=start_time_transporting, end_time=time.time()
+                                                    )
+            ni.assert_task_and_roles(action_iri=action_iri, task_type='MovingTo',
+                                     source_iri='http://knowrob.org/kb/environment.owl#free_cup',
+                                     dest_iri='http://knowrob.org/kb/environment.owl#free_cup2',
+                                     agent_iri=agent_owl_ind_name)
         start_time_pouring = time.time()
 
         goal_pose = PoseStamped()
@@ -980,18 +992,42 @@ class TestPouring:
                                                parent_action=None,
                                                agent_iri=None)
         zero_pose.allow_all_collisions()
-        zero_pose.avoid_collision(0.01, zero_pose.l_gripper_group, 'cup2')
+        # zero_pose.avoid_collision(0.01, zero_pose.l_gripper_group, 'cup2')
         # zero_pose.set_cart_goal(goal_pose2, zero_pose.r_tip, 'map', add_monitor=False)
         zero_pose.execute(add_local_minimum_reached=True)
-        action_iri = ni.add_subaction_with_task(parent_action=parent_action,
-                                                task_type='soma:Pouring',
-                                                start_time=start_time_pouring, end_time=time.time()
-                                                )
-        ni.assert_task_and_roles(action_iri=action_iri, task_type='TiltForward',
-                                 source_iri='http://knowrob.org/kb/environment.owl#free_cup',
-                                 dest_iri='http://knowrob.org/kb/environment.owl#free_cup2',
-                                 agent_iri=agent_owl_ind_name)
-        ni.stop_episode('/home/huerkamp/workspace/new_giskard_ws')
+
+        if record_neem:
+            action_iri = ni.add_subaction_with_task(parent_action=parent_action,
+                                                    task_type="http://www.ease-crc.org/ont/SOMA.owl#Pouring",
+                                                    start_time=start_time_pouring, end_time=time.time()
+                                                    )
+            ni.assert_task_and_roles(action_iri=action_iri, task_type='TiltForward',
+                                     source_iri='http://knowrob.org/kb/environment.owl#free_cup',
+                                     dest_iri='http://knowrob.org/kb/environment.owl#free_cup2',
+                                     agent_iri=agent_owl_ind_name)
+        # place cup back on table
+        goal_pose.header.frame_id = 'map'
+        goal_pose.pose.position.x = 2
+        goal_pose.pose.position.y = -0.2
+        goal_pose.pose.position.z = 0.55
+
+        zero_pose.set_cart_goal(goal_pose, zero_pose.l_tip, 'map')
+        zero_pose.allow_all_collisions()
+        zero_pose.execute()
+
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class=CloseGripper.__name__,
+                                               name='closeGripperLeft',
+                                               pub_topic='/pr2/l_gripper_controller/command',
+                                               joint_state_topic='pr2/joint_states',
+                                               alibi_joint_name='l_gripper_l_finger_joint',
+                                               effort_threshold=-0.14,
+                                               effort=100,
+                                               as_open=True)
+        zero_pose.allow_all_collisions()
+        zero_pose.execute()
+
+        if record_neem:
+            ni.stop_episode('/home/huerkamp/workspace/new_giskard_ws')
 
     def test_complete_pouring(self, zero_pose: PR2TestWrapperMujoco):
         # first start related scripts for BB detection and scene action reasoning

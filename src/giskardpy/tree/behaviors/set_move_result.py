@@ -6,6 +6,7 @@ from giskardpy.god_map import god_map
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils import logging
 from giskardpy.utils.decorators import record_time
+from giskardpy.tree.behaviors.publish_feedback import giskard_state_to_execution_state
 
 
 class SetMoveResult(GiskardBehavior):
@@ -39,5 +40,8 @@ class SetMoveResult(GiskardBehavior):
                     logging.loginfo(f'{self.context} succeeded.')
                 else:
                     logging.logwarn(f'{self.context} failed: {move_result.error.msg}.')
+
+        move_result.execution_state = giskard_state_to_execution_state()
+
         god_map.move_action_server.result_msg = move_result
         return Status.SUCCESS

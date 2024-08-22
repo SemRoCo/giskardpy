@@ -2246,3 +2246,15 @@ def is_constant(expr):
 
 def det(expr):
     return Expression(ca.det(expr.s))
+
+
+def distance_projected_on_vector(point1, point2, vector):
+    dist = point1 - point2
+    projection = dot(dist, vector)
+    return projection
+
+
+def distance_vector_projected_on_plane(point1, point2, normal_vector):
+    dist = point1 - point2
+    projection = dist - dot(dist, normal_vector) * normal_vector
+    return projection

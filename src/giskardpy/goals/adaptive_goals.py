@@ -354,7 +354,7 @@ class PouringAdaptiveTilt(Goal):
 
         if '{}' in action_string.data or action_string.data == '':
             self.stop_counter += 1
-            if self.stop_counter > 10:
+            if self.stop_counter > 2:
                 self.stop = 1
         else:
             self.stop_counter = 0

@@ -998,7 +998,7 @@ class TestPouring:
 
         if record_neem:
             action_iri = ni.add_subaction_with_task(parent_action=parent_action,
-                                                    task_type="http://www.ease-crc.org/ont/SOMA.owl#Pouring",
+                                                    task_type="http://www.ease-crc.org/ont/SOMA.owl#Tilting",
                                                     start_time=start_time_pouring, end_time=time.time()
                                                     )
             ni.assert_task_and_roles(action_iri=action_iri, task_type='TiltForward',

@@ -4862,7 +4862,39 @@ class TestEndMotionReason:
         assert len(reason) == 3 and list(reason.keys())[0] == 'M2 DistanceMonitor' \
                and list(reason.keys())[2] == 'M0 sleep1' and list(reason.keys())[1] == 'M1 sleep2'
 
-# kernprof -lv py.test -s test/test_integration_pr2.py
+    def test_multiple_end_motion_monitors(self, zero_pose: PR2TestWrapper):
+        goal_point = PointStamped()
+        goal_point.header.frame_id = 'map'
+        goal_point.point = Point(2, 2, 2)
+        controlled_point = PointStamped()
+        controlled_point.header.frame_id = zero_pose.r_tip
+
+        mon_sleep1 = zero_pose.monitors.add_sleep(10, name='sleep1')
+        mon_sleep2 = zero_pose.monitors.add_sleep(10, start_condition=mon_sleep1, name='sleep2')
+        mon_distance = zero_pose.monitors.add_distance(root_link='map', tip_link=zero_pose.r_tip,
+                                                       reference_point=goal_point,
+                                                       tip_point=controlled_point, lower_limit=0, upper_limit=0,
+                                                       start_condition=mon_sleep2)
+        zero_pose.motion_goals.add_distance(root_link='base_link', tip_link=zero_pose.r_tip, reference_point=goal_point,
+                                            tip_point=controlled_point, lower_limit=0, upper_limit=0)
+
+        mon_trajectory = zero_pose.monitors.add_max_trajectory_length(max_trajectory_length=1)
+        zero_pose.monitors.add_cancel_motion(mon_trajectory, error_message='stop motion')
+        zero_pose.monitors.add_end_motion(mon_distance)
+
+        mon_sleep3 = zero_pose.monitors.add_sleep(20, name='sleep3')
+        mon_sleep4 = zero_pose.monitors.add_sleep(20, start_condition=mon_sleep3, name='sleep4')
+        zero_pose.monitors.add_end_motion(mon_sleep4)
+
+        result = zero_pose.execute(expected_error_code=GiskardError.MAX_TRAJECTORY_LENGTH,
+                                   add_local_minimum_reached=False)
+        reason = zero_pose.get_end_motion_reason(move_result=result)
+        print(reason)
+        assert len(reason) == 5 and list(reason.keys())[0] == 'M2 DistanceMonitor' \
+               and list(reason.keys())[1] == 'M1 sleep2' and list(reason.keys())[2] == 'M0 sleep1' and \
+               list(reason.keys())[3] == 'M7 sleep4' and list(reason.keys())[4] == 'M6 sleep3'
+
+    # kernprof -lv py.test -s test/test_integration_pr2.py
 # time: [1-9][1-9]*.[1-9]* s
 # import pytest
 # pytest.main(['-s', __file__ + '::TestManipulability::test_manip1'])

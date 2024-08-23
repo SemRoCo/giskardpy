@@ -689,6 +689,24 @@ class TestPouring:
         zero_pose.execute(add_local_minimum_reached=False)
 
     def test_pour_pot(self, zero_pose: PR2TestWrapper):
+        record_neem = True
+        if record_neem:
+            ni = NEEMInterface()
+        task_type = "http://www.ease-crc.org/ont/SOMA.owl#Pouring"
+        env_owl = '/home/huerkamp/workspace/new_giskard_ws/environment.owl' #TODO change to draining one
+        env_owl_ind_name = 'world'  # '/home/huerkamp/workspace/new_giskard_ws/environment.owl#world'
+        env_urdf = '/home/huerkamp/workspace/new_giskard_ws/new_world_pot_bowl.urdf'
+        agent_owl = '/home/huerkamp/workspace/new_giskard_ws/src/knowrob/owl/robots/PR2.owl'
+        agent_owl_ind_name = 'pr2'
+        agent_urdf = '/home/huerkamp/workspace/new_giskard_ws/src/iai_pr2/iai_pr2_description/robots/pr2_calibrated_with_ft2_without_virtual_joints.urdf'
+        # agent_owl_ind_name, _ = ni.get_agent_and_ee_individual()
+        if record_neem:
+            parent_action = ni.start_episode(task_type=task_type, env_owl=env_owl, env_owl_ind_name=env_owl_ind_name,
+                                             env_urdf=env_urdf,
+                                             agent_owl=agent_owl, agent_owl_ind_name=agent_owl_ind_name,
+                                             agent_urdf=agent_urdf)
+        start_time_grasp = time.time()
+
         p = PoseStamped()
         p.header.stamp = rospy.get_rostime()
         p.header.frame_id = 'map'
@@ -768,6 +786,16 @@ class TestPouring:
         zero_pose.set_cart_goal(p2, zero_pose.l_tip, 'map')
         zero_pose.allow_all_collisions()
         zero_pose.execute(add_local_minimum_reached=True)
+        if record_neem:
+            action_iri = ni.add_subaction_with_task(parent_action=parent_action,
+                                                    task_type="http://www.ease-crc.org/ont/SOMA.owl#Grasping",
+                                                    start_time=start_time_grasp, end_time=time.time()
+                                                    )
+            ni.assert_task_and_roles(action_iri=action_iri, task_type='holding',
+                                     source_iri='http://knowrob.org/kb/environment.owl#pot',
+                                     dest_iri='http://knowrob.org/kb/environment.owl#bowl',
+                                     agent_iri=agent_owl_ind_name)
+        start_time_transporting = time.time()
         ####################################################
         # current pose of the pot in simulation
         pot_pose = PoseStamped()
@@ -795,6 +823,16 @@ class TestPouring:
         zero_pose.set_cart_goal(pot_pose, 'dummy', 'map')
         zero_pose.set_cart_goal(l_pose, zero_pose.l_tip, zero_pose.r_tip, add_monitor=False)
         zero_pose.execute(add_local_minimum_reached=True)
+        if record_neem:
+            action_iri = ni.add_subaction_with_task(parent_action=parent_action,
+                                                    task_type="http://www.ease-crc.org/ont/SOMA.owl#Transporting",
+                                                    start_time=start_time_transporting, end_time=time.time()
+                                                    )
+            ni.assert_task_and_roles(action_iri=action_iri, task_type='MovingTo',
+                                     source_iri='http://knowrob.org/kb/environment.owl#pot',
+                                     dest_iri='http://knowrob.org/kb/environment.owl#bowl',
+                                     agent_iri=agent_owl_ind_name)
+        start_time_draining = time.time()
         ###############################################################
         pot_pose = PoseStamped()
         pot_pose.header.frame_id = 'map'
@@ -829,6 +867,16 @@ class TestPouring:
                                                tip_link='l_gripper_tool_frame',
                                                gain=3)
         zero_pose.execute(add_local_minimum_reached=False)
+        if record_neem:
+            action_iri = ni.add_subaction_with_task(parent_action=parent_action,
+                                                    task_type="http://www.ease-crc.org/ont/SOMA.owl#Draining",
+                                                    start_time=start_time_draining, end_time=time.time()
+                                                    )
+            ni.assert_task_and_roles(action_iri=action_iri, task_type='TiltForward',
+                                     source_iri='http://knowrob.org/kb/environment.owl#pot',
+                                     dest_iri='http://knowrob.org/kb/environment.owl#bowl',
+                                     agent_iri=agent_owl_ind_name)
+            ni.stop_episode('/home/huerkamp/workspace/new_giskard_ws')
 
     def test_pour_two_cups(self, zero_pose: PR2TestWrapper):
         record_neem = True

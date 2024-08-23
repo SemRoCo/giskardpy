@@ -14,6 +14,7 @@ from giskardpy.utils.decorators import toggle_on, toggle_off
 
 class PublishState(Sequence):
     visualization_behavior: Optional[VisualizationBehavior]
+    debug_marker_publisher: Optional[DebugMarkerPublisher]
 
     def __init__(self, name: str = 'publish state'):
         super().__init__(name)
@@ -30,7 +31,8 @@ class PublishState(Sequence):
         self.remove_child(self.visualization_behavior)
 
     def add_debug_marker_publisher(self):
-        self.add_child(DebugMarkerPublisher())
+        self.debug_marker_publisher = DebugMarkerPublisher()
+        self.add_child(self.debug_marker_publisher)
 
     def add_publish_feedback(self):
         self.add_child(PublishFeedback())

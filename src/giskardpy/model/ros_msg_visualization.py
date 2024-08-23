@@ -144,10 +144,10 @@ class ROSMsgVisualization:
         return [m]
 
     @profile
-    def publish_markers(self, world_ns: str = 'world', collision_ns: str = 'collisions') -> None:
+    def publish_markers(self, world_ns: str = 'world', collision_ns: str = 'collisions', force: bool = False) -> None:
         if not self.mode == VisualizationMode.Nothing:
             marker_array = MarkerArray()
-            if not self.frame_locked or self.frame_locked and self.has_world_changed():
+            if force or (not self.frame_locked or self.frame_locked and self.has_world_changed()):
                 self.clear_marker(world_ns)
                 marker_array.markers.extend(self.create_world_markers(name_space=world_ns))
             marker_array.markers.extend(self.create_collision_markers(name_space=collision_ns))

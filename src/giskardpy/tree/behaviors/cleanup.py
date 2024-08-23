@@ -30,6 +30,9 @@ class CleanUp(GiskardBehavior):
     def initialise(self):
         if self.clear_markers_:
             self.clear_markers()
+        if god_map.tree.control_loop_branch.publish_state.debug_marker_publisher is not None:
+            self.clear_markers()
+            god_map.ros_visualizer.publish_markers(force=True)
         god_map.giskard.set_defaults()
         god_map.world.compiled_all_fks = None
         god_map.collision_scene.reset_cache()

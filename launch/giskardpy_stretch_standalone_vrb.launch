@@ -1,0 +1,7 @@
+<launch>
+
+    <param name="robot_description" command="xacro $(find stretch_description)/urdf/stretch_description_dex.xacro" />
+
+    <node pkg="giskardpy" type="stretch_standalone_vrb.py" name="giskard" output="screen"/>
+
+</launch>

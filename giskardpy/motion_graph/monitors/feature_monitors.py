@@ -120,8 +120,8 @@ class AngleMonitor(FeatureMonitor):
                  root_link: PrefixName,
                  reference_vector: cas.Vector3,
                  tip_vector: cas.Vector3,
-                 lower_limit: float,
-                 upper_limit: float,
+                 lower_angle: float,
+                 upper_angle: float,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
@@ -136,4 +136,4 @@ class AngleMonitor(FeatureMonitor):
                          end_condition=end_condition)
 
         expr = cas.angle_between_vector(self.root_V_reference_feature, self.root_V_controlled_feature)
-        self.expression = cas.logic_and(cas.greater(expr, lower_limit), cas.less(expr, upper_limit))
+        self.expression = cas.logic_and(cas.greater(expr, lower_angle), cas.less(expr, upper_angle))

@@ -30,7 +30,10 @@ class PouringAdaptiveTilt(Goal):
                  name: Optional[str] = None, with_feedback=True, parent_action=None, agent_iri=None,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.TrueSymbol):
+                 end_condition: cas.Expression = cas.TrueSymbol,
+                 gain_translation: float = 0.02,
+                 gain_tilt_forward: float = 0.02,
+                 gain_tilt_backward: float = 0.02):
         super().__init__(name)
         self.action_sub = rospy.Subscriber('/reasoner/concluded_behaviors', String, self.callback)
         self.root_link = god_map.world.search_for_link_name(root, None)
@@ -159,12 +162,12 @@ class PouringAdaptiveTilt(Goal):
         angle = cas.rotational_error(root_R_tip, root_R_tip_desired_pre)
         # TODO: how can the speed of a rotation be controlled from the outside?
         if self.tilt_angle < 0:
-            angle_a = -0.02 * is_forward + 0.5 * is_backward
+            angle_a = -gain_tilt_forward * is_forward + gain_tilt_backward * is_backward
             stop_to_large = cas.logic_any(
                 cas.Expression([cas.if_greater(angle, 3, 0, 1), cas.if_greater(angle_a, 0, 1, 0)]))
             stop_to_small = cas.if_less(angle, 0.1, 0, 1)
         else:
-            angle_a = 0.03 * is_forward - 1 * is_backward
+            angle_a = gain_tilt_forward * is_forward - gain_tilt_backward * is_backward
             stop_to_large = cas.logic_any(
                 cas.Expression([cas.if_greater(angle, 3, 0, 1), cas.if_less(angle_a, 0, 1, 0)]))
             stop_to_small = cas.logic_any(
@@ -235,9 +238,10 @@ class PouringAdaptiveTilt(Goal):
         is_y_back = symbol_manager.get_symbol(f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\'].move_y_back')
         is_up = symbol_manager.get_symbol(f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\'].up')
         is_down = symbol_manager.get_symbol(f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\'].down')
-        root_V_adapt = cas.Vector3([0.02 * is_x - 0.02 * is_x_back,
-                                    0.02 * is_y - 0.02 * is_y_back,
-                                    0.01 * is_up - 0.01 * is_down,
+        g = gain_translation
+        root_V_adapt = cas.Vector3([g * is_x - g * is_x_back,
+                                    g * is_y - g * is_y_back,
+                                    g * is_up - g * is_down,
                                     ])
         adapt_pos_task.add_equality_constraint_vector(reference_velocities=[self.max_vel] * 3,
                                                       equality_bounds=root_V_adapt[:3],

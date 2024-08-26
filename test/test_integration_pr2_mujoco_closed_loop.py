@@ -693,7 +693,7 @@ class TestPouring:
         if record_neem:
             ni = NEEMInterface()
         task_type = "http://www.ease-crc.org/ont/SOMA.owl#Pouring"
-        env_owl = '/home/huerkamp/workspace/new_giskard_ws/environment.owl' #TODO change to draining one
+        env_owl = '/home/huerkamp/workspace/new_giskard_ws/environment-pot-bowl.owl'
         env_owl_ind_name = 'world'  # '/home/huerkamp/workspace/new_giskard_ws/environment.owl#world'
         env_urdf = '/home/huerkamp/workspace/new_giskard_ws/new_world_pot_bowl.urdf'
         agent_owl = '/home/huerkamp/workspace/new_giskard_ws/src/knowrob/owl/robots/PR2.owl'

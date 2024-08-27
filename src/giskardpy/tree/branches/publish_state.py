@@ -19,6 +19,7 @@ class PublishState(Sequence):
     def __init__(self, name: str = 'publish state'):
         super().__init__(name)
         self.visualization_behavior = None
+        self.debug_marker_publisher = None
 
     @toggle_on('visualization_marker_behavior')
     def add_visualization_marker_behavior(self, mode: VisualizationMode):

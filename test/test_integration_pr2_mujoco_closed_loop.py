@@ -689,10 +689,10 @@ class TestPouring:
         zero_pose.execute(add_local_minimum_reached=False)
 
     def test_pour_pot(self, zero_pose: PR2TestWrapper):
-        record_neem = True
+        record_neem = False
         if record_neem:
             ni = NEEMInterface()
-        task_type = "http://www.ease-crc.org/ont/SOMA.owl#Pouring"
+        task_type = "http://www.ease-crc.org/ont/SOMA.owl#Draining"
         env_owl = '/home/huerkamp/workspace/new_giskard_ws/environment-pot-bowl.owl'
         env_owl_ind_name = 'world'  # '/home/huerkamp/workspace/new_giskard_ws/environment.owl#world'
         env_urdf = '/home/huerkamp/workspace/new_giskard_ws/new_world_pot_bowl.urdf'
@@ -822,6 +822,14 @@ class TestPouring:
         pot_pose.pose.position = Point(0, 0, 0.2)
         zero_pose.set_cart_goal(pot_pose, 'dummy', 'map')
         zero_pose.set_cart_goal(l_pose, zero_pose.l_tip, zero_pose.r_tip, add_monitor=False)
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulability.__name__,
+                                               root_link='torso_lift_link',
+                                               tip_link='r_gripper_tool_frame',
+                                               gain=3)
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulability.__name__,
+                                               root_link='torso_lift_link',
+                                               tip_link='l_gripper_tool_frame',
+                                               gain=3)
         zero_pose.execute(add_local_minimum_reached=True)
         if record_neem:
             action_iri = ni.add_subaction_with_task(parent_action=parent_action,
@@ -851,7 +859,10 @@ class TestPouring:
                                                tilt_angle=0.7,
                                                pouring_pose=pot_pose,
                                                tilt_axis=tilt_axis,
-                                               pre_tilt=False)
+                                               pre_tilt=False,
+                                               gain_translation=0.02,
+                                               gain_tilt_forward=0.02,
+                                               gain_tilt_backward=1)
         # rot1 = quaternion_about_axis(0.2, (0, 1, 0))
         # pot_pose.pose.orientation = Quaternion(*rot1)
         # zero_pose.set_cart_goal(pot_pose, 'dummy', 'map')
@@ -869,7 +880,7 @@ class TestPouring:
         zero_pose.execute(add_local_minimum_reached=False)
         if record_neem:
             action_iri = ni.add_subaction_with_task(parent_action=parent_action,
-                                                    task_type="http://www.ease-crc.org/ont/SOMA.owl#Draining",
+                                                    task_type="http://www.ease-crc.org/ont/SOMA.owl#Tilting",
                                                     start_time=start_time_draining, end_time=time.time()
                                                     )
             ni.assert_task_and_roles(action_iri=action_iri, task_type='TiltForward',

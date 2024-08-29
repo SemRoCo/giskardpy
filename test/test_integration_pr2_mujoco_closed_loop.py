@@ -877,7 +877,7 @@ class TestPouring:
                                                root_link='torso_lift_link',
                                                tip_link='l_gripper_tool_frame',
                                                gain=3)
-        zero_pose.execute(add_local_minimum_reached=False)
+        zero_pose.execute(add_local_minimum_reached=False, expected_error_code=GiskardError.PREEMPTED)
         if record_neem:
             action_iri = ni.add_subaction_with_task(parent_action=parent_action,
                                                     task_type="http://www.ease-crc.org/ont/SOMA.owl#Tilting",

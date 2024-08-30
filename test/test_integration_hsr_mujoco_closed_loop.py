@@ -17,6 +17,8 @@ from giskardpy.configs.qp_controller_config import QPControllerConfig
 from giskardpy.god_map import god_map
 from giskardpy.utils.utils import launch_launchfile
 from utils_for_tests import compare_poses, GiskardTestWrapper
+from giskardpy.goals.adaptive_goals import CloseGripper, PouringAdaptiveTilt
+from giskard_msgs.msg import GiskardError
 
 
 class HSRTestWrapper(GiskardTestWrapper):
@@ -424,3 +426,99 @@ class TestAddObject:
 
         zero_pose.set_joint_goal({'arm_flex_joint': -0.7})
         zero_pose.plan_and_execute()
+
+
+class TestAdaptiveGoals:
+    def test_complete_pouring(self, zero_pose):
+        # first start related scripts for BB detection and scene action reasoning
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class=CloseGripper.__name__,
+                                               name='openGripper',
+                                               as_open=True,
+                                               velocity_threshold=100,
+                                               effort_threshold=1,
+                                               effort=100)
+        zero_pose.allow_all_collisions()
+        zero_pose.execute()
+
+        goal_pose = PoseStamped()
+        goal_pose.header.frame_id = 'map'
+        goal_pose.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 0, 1, 0],
+                                                                         [0, -1, 0, 0],
+                                                                         [1, 0, 0, 0],
+                                                                         [0, 0, 0, 1]]))
+        goal_pose.pose.position.x = 1.95
+        goal_pose.pose.position.y = -0.2
+        goal_pose.pose.position.z = 0.3
+
+        zero_pose.set_cart_goal(goal_pose, 'hand_palm_link', 'map')
+        zero_pose.allow_all_collisions()
+        zero_pose.execute()
+
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class=CloseGripper.__name__,
+                                               name='closeGripper', effort=-220)
+        zero_pose.allow_all_collisions()
+        zero_pose.execute()
+
+        cup_pose = PoseStamped()
+        cup_pose.header.frame_id = 'free_cup'
+        cup_pose.pose.position = Point(0, 0, 0)
+        cup_pose.pose.orientation.w = 1
+
+        # add a new object at the pose of the pot and attach it to the right tip
+        zero_pose.add_box('cup1', (0.07, 0.07, 0.28), pose=cup_pose, parent_link='hand_palm_link')
+        cup_pose.header.frame_id = 'free_cup2'
+        zero_pose.add_box('cup2', (0.07, 0.07, 0.18), pose=cup_pose, parent_link='map')
+
+        # goal_pose.pose.position.x = 1.85
+        # goal_pose.pose.position.y = -0.7
+        # goal_pose.pose.position.z = 0.54
+        # goal_pose.pose.position.x = 1.75
+        # goal_pose.pose.position.y = -0.4
+        # goal_pose.pose.position.z = 0.6
+        goal_pose.header.frame_id = 'cup2'
+        goal_pose.pose.position = Point(-0.3, 0.2, 0.3)
+        # goal_pose.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 0, 1, 0],
+        #                                                                  [0, -1, 0, 0],
+        #                                                                  [1, 0, 0, 0],
+        #                                                                  [0, 0, 0, 1]]))
+        tilt_axis = Vector3Stamped()
+        tilt_axis.header.frame_id = 'hand_palm_link'
+        tilt_axis.vector.z = 1
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class=PouringAdaptiveTilt.__name__,
+                                               name='pouring',
+                                               tip='hand_palm_link',
+                                               root='map',
+                                               tilt_angle=0.3,
+                                               pouring_pose=goal_pose,
+                                               tilt_axis=tilt_axis,
+                                               pre_tilt=False)
+        zero_pose.allow_all_collisions()
+        zero_pose.avoid_collision(0.01, 'cup1', 'cup2')
+        zero_pose.set_max_traj_length(30)
+        zero_pose.execute(add_local_minimum_reached=False)
+
+        goal_pose.header.frame_id = 'map'
+        goal_pose.pose.position.x = 1.93
+        goal_pose.pose.position.y = -0.2
+        goal_pose.pose.position.z = 0.3
+
+        zero_pose.set_cart_goal(goal_pose, 'hand_palm_link', 'map')
+        zero_pose.allow_all_collisions()
+        zero_pose.execute()
+
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class=CloseGripper.__name__,
+                                               name='openGripper',
+                                               as_open=True,
+                                               velocity_threshold=100,
+                                               effort_threshold=1,
+                                               effort=100)
+        zero_pose.allow_all_collisions()
+        zero_pose.execute()
+
+        goal_pose.pose.position.x = 1.4
+        goal_pose.pose.position.y = -0.2
+        goal_pose.pose.position.z = 0.4
+
+        zero_pose.set_cart_goal(goal_pose, 'hand_palm_link', 'map')
+        zero_pose.allow_all_collisions()
+        zero_pose.execute()

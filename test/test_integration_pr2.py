@@ -1521,7 +1521,7 @@ class TestConstraints:
                                 weight=WEIGHT_BELOW_CA)
         zero_pose.plan_and_execute()
 
-        for time, state in god_map.debug_expression_manager.debug_trajectory.items():
+        for time, state in god_map.debug_expression_manager.raw_traj_to_traj().items():
             key = f'trans_error'
             assert key in state
             assert state[key].position <= base_linear_velocity + 2e3

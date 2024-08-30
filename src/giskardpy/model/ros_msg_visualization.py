@@ -192,6 +192,33 @@ class ROSMsgVisualization:
                     marker_array.markers.extend(deepcopy(markers))
         self.publisher.publish(marker_array)
 
+    def publish_debug_trajectory(self,
+                                 debug_expressions: Dict[PrefixName, Union[cas.TransMatrix,
+                                 cas.Point3,
+                                 cas.Vector3,
+                                 cas.Quaternion]],
+                                 raw_debug_trajectory: List[Dict[PrefixName, np.ndarray]],
+                                 every_x: int = 10,
+                                 start_alpha: float = 0.5, stop_alpha: float = 1.0,
+                                 namespace: str = 'debug_trajectory') -> None:
+        self.clear_marker(namespace)
+        marker_array = MarkerArray()
+
+        def compute_alpha(i):
+            if i < 0 or i >= len(raw_debug_trajectory):
+                raise ValueError("Index i is out of range")
+            return start_alpha + i * (stop_alpha - start_alpha) / (len(raw_debug_trajectory) - 1)
+
+        for point_id, point in enumerate(raw_debug_trajectory):
+            if point_id % every_x == 0 or point_id == len(raw_debug_trajectory) - 1:
+                markers = self.debug_state_to_vectors_markers(debug_expressions=debug_expressions,
+                                                              debug_values=point,
+                                                              marker_id_offset=len(marker_array.markers))
+                for m in markers:
+                    m.color.a = compute_alpha(point_id)
+                marker_array.markers.extend(deepcopy(markers))
+        self.publisher.publish(marker_array)
+
     def clear_marker(self, ns: str):
         msg = MarkerArray()
         for i in self.marker_ids.values():
@@ -205,11 +232,12 @@ class ROSMsgVisualization:
 
     def debug_state_to_vectors_markers(self,
                                        debug_expressions: Dict[PrefixName, Union[cas.TransMatrix,
-                                                                                 cas.Point3,
-                                                                                 cas.Vector3,
-                                                                                 cas.Quaternion]],
+                                       cas.Point3,
+                                       cas.Vector3,
+                                       cas.Quaternion]],
                                        debug_values: Dict[PrefixName, np.ndarray],
-                                       width: float = 0.05) -> List[Marker]:
+                                       width: float = 0.05,
+                                       marker_id_offset: int = 0) -> List[Marker]:
         ms = []
         color_counter = 0
         for (name, expr), (_, value) in zip(debug_expressions.items(), debug_values.items()):
@@ -229,8 +257,8 @@ class ROSMsgVisualization:
                 mx = Marker()
                 mx.action = mx.ADD
                 mx.header.frame_id = self.tf_root
-                mx.ns = f'debug{name}'
-                mx.id = 0
+                mx.ns = f'debug/{name}'
+                mx.id = 0 + marker_id_offset
                 mx.type = mx.CYLINDER
                 mx.pose.position.x = map_P_d[0][0] + map_V_x_offset[0]
                 mx.pose.position.y = map_P_d[1][0] + map_V_x_offset[1]
@@ -249,8 +277,8 @@ class ROSMsgVisualization:
                 my = Marker()
                 my.action = my.ADD
                 my.header.frame_id = self.tf_root
-                my.ns = f'debug{name}'
-                my.id = 1
+                my.ns = f'debug/{name}'
+                my.id = 1+ marker_id_offset
                 my.type = my.CYLINDER
                 my.pose.position.x = map_P_d[0][0] + map_V_y_offset[0]
                 my.pose.position.y = map_P_d[1][0] + map_V_y_offset[1]
@@ -269,8 +297,8 @@ class ROSMsgVisualization:
                 mz = Marker()
                 mz.action = mz.ADD
                 mz.header.frame_id = self.tf_root
-                mz.ns = f'debug{name}'
-                mz.id = 2
+                mz.ns = f'debug/{name}'
+                mz.id = 2+ marker_id_offset
                 mz.type = mz.CYLINDER
                 mz.pose.position.x = map_P_d[0][0] + map_V_z_offset[0]
                 mz.pose.position.y = map_P_d[1][0] + map_V_z_offset[1]
@@ -285,7 +313,7 @@ class ROSMsgVisualization:
                 m = Marker()
                 m.action = m.ADD
                 m.ns = f'debug/{name}'
-                m.id = 0
+                m.id = 0+ marker_id_offset
                 m.header.frame_id = self.tf_root
                 m.pose.orientation.w = 1
                 if isinstance(expr, cas.Vector3):

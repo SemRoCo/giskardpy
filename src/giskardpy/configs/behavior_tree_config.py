@@ -228,7 +228,7 @@ class StandAloneBTConfig(BehaviorTreeConfig):
         if self.debug_mode:
             self.add_trajectory_plotter(wait=True)
             # self.add_trajectory_visualizer()
-            self.add_debug_trajectory_visualizer()
+            # self.add_debug_trajectory_visualizer()
             self.add_debug_trajectory_plotter(wait=True)
             self.add_debug_marker_publisher()
         # self.add_debug_marker_publisher()

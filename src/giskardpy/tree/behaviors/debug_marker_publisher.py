@@ -73,5 +73,6 @@ class DebugMarkerPublisherTrajectory(GiskardBehavior):
             debug_traj = god_map.debug_expression_manager._raw_debug_trajectory
             god_map.ros_visualizer.publish_debug_trajectory(debug_expressions=debug_exprs,
                                                             raw_debug_trajectory=debug_traj,
+                                                            joint_space_traj=god_map.trajectory,
                                                             every_x=self.every_x)
         return Status.SUCCESS

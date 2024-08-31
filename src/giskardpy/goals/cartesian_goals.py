@@ -116,7 +116,11 @@ class CartesianOrientation(Goal):
             point = transform_msg_and_turn_to_expr(self.root_link, point_of_debug_matrix, update_condition)
         debug_trans_matrix = cas.TransMatrix.from_point_rotation_matrix(point=point,
                                                                         rotation_matrix=root_R_goal)
+        debug_current_trans_matrix = cas.TransMatrix.from_point_rotation_matrix(point=r_T_c.to_position(),
+                                                                                rotation_matrix=r_R_c)
         god_map.debug_expression_manager.add_debug_expression(f'{self.name}/goal_orientation', debug_trans_matrix)
+        god_map.debug_expression_manager.add_debug_expression(f'{self.name}/current_orientation',
+                                                              debug_current_trans_matrix)
         self.connect_monitors_to_all_tasks(start_condition, hold_condition, end_condition)
 
 

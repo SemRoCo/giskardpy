@@ -1,6 +1,7 @@
 from py_trees import Sequence
 
 from giskardpy.tree.behaviors.append_zero_velocity import SetZeroVelocity
+from giskardpy.tree.behaviors.debug_marker_publisher import DebugMarkerPublisherTrajectory
 from giskardpy.tree.behaviors.delete_monitors_behaviors import DeleteMonitors
 from giskardpy.tree.behaviors.goal_cleanup import GoalCleanUp
 from giskardpy.tree.behaviors.log_trajectory import LogTrajPlugin
@@ -38,6 +39,9 @@ class CleanupControlLoop(Sequence):
 
     def add_visualize_trajectory(self):
         self.add_child(VisualizeTrajectory())
+
+    def add_debug_visualize_trajectory(self):
+        self.add_child(DebugMarkerPublisherTrajectory())
 
     def add_plot_gantt_chart(self):
         self.insert_child(PlotGanttChart(), 0)

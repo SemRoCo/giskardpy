@@ -45,7 +45,7 @@ class PlotDebugExpressions(PlotTrajectory):
         return new_traj
 
     def plot(self):
-        trajectory = god_map.debug_expression_manager.debug_trajectory
+        trajectory = god_map.debug_expression_manager.raw_traj_to_traj()
         if trajectory and len(trajectory.items()) > 0:
             sample_period = god_map.qp_controller_config.sample_period
             traj = self.split_traj(trajectory)

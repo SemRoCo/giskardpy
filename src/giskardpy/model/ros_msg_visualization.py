@@ -1,13 +1,17 @@
 from copy import deepcopy
 from enum import Enum
-from typing import Optional, List
+from typing import Optional, List, Dict, Union
 
+from tf.transformations import rotation_matrix, quaternion_from_matrix
+
+import giskardpy.casadi_wrapper as cas
 import numpy as np
 import rospy
-from geometry_msgs.msg import Vector3, Point
+from geometry_msgs.msg import Vector3, Point, Quaternion
 from std_msgs.msg import ColorRGBA
 from visualization_msgs.msg import MarkerArray, Marker
 
+from giskardpy.data_types import JointStates, PrefixName
 from giskardpy.god_map import god_map
 from giskardpy.model.collision_world_syncer import Collisions, Collision
 from giskardpy.model.trajectory import Trajectory
@@ -27,6 +31,16 @@ class ROSMsgVisualization:
     red = ColorRGBA(1.0, 0.0, 0.0, 1.0)
     yellow = ColorRGBA(1.0, 1.0, 0.0, 1.0)
     green = ColorRGBA(0.0, 1.0, 0.0, 1.0)
+    colors = [
+        red,  # red
+        ColorRGBA(r=0.0, g=0.0, b=1.0, a=1.0),  # blue
+        yellow,  # yellow
+        ColorRGBA(r=1.0, g=0.0, b=1.0, a=1.0),  # violet
+        ColorRGBA(r=0.0, g=1.0, b=1.0, a=1.0),  # cyan
+        green,  # green
+        ColorRGBA(r=1.0, g=1.0, b=1.0, a=1.0),  # white
+        ColorRGBA(r=0.0, g=0.0, b=0.0, a=1.0),  # black
+    ]
     mode: VisualizationMode
     frame_locked: bool
     world_version: int
@@ -160,8 +174,8 @@ class ROSMsgVisualization:
         marker_array = MarkerArray()
 
         def compute_alpha(i):
-            if i < 0 or i >= len(trajectory):
-                raise ValueError("Index i is out of range")
+            if i < 0 or i > len(trajectory):
+                raise ValueError(f'Index {i} is out of range {len(trajectory)}')
             return start_alpha + i * (stop_alpha - start_alpha) / (len(trajectory) - 1)
 
         with god_map.world.reset_joint_state_context():
@@ -178,6 +192,40 @@ class ROSMsgVisualization:
                     marker_array.markers.extend(deepcopy(markers))
         self.publisher.publish(marker_array)
 
+    def publish_debug_trajectory(self,
+                                 debug_expressions: Dict[PrefixName, Union[cas.TransMatrix,
+                                 cas.Point3,
+                                 cas.Vector3,
+                                 cas.Quaternion]],
+                                 raw_debug_trajectory: List[Dict[PrefixName, np.ndarray]],
+                                 joint_space_traj: Trajectory,
+                                 every_x: int = 10,
+                                 start_alpha: float = 0.5, stop_alpha: float = 1.0,
+                                 namespace: str = 'debug_trajectory') -> None:
+        self.clear_marker(namespace)
+        marker_array = MarkerArray()
+
+        def compute_alpha(i):
+            if i < 0 or i >= len(raw_debug_trajectory):
+                raise ValueError("Index i is out of range")
+            return start_alpha + i * (stop_alpha - start_alpha) / (len(raw_debug_trajectory) - 1)
+
+        with god_map.world.reset_joint_state_context():
+            for point_id, point in enumerate(raw_debug_trajectory):
+                joint_state = joint_space_traj.get_exact(point_id)
+                god_map.world.state = joint_state
+                god_map.world.notify_state_change()
+                if self.mode not in [VisualizationMode.Visuals, VisualizationMode.VisualsFrameLocked]:
+                    god_map.collision_scene.sync()
+                if point_id % every_x == 0 or point_id == len(raw_debug_trajectory) - 1:
+                    markers = self.debug_state_to_vectors_markers(debug_expressions=debug_expressions,
+                                                                  debug_values=point,
+                                                                  marker_id_offset=len(marker_array.markers))
+                    for m in markers:
+                        m.color.a = compute_alpha(point_id)
+                    marker_array.markers.extend(deepcopy(markers))
+        self.publisher.publish(marker_array)
+
     def clear_marker(self, ns: str):
         msg = MarkerArray()
         for i in self.marker_ids.values():
@@ -188,3 +236,129 @@ class ROSMsgVisualization:
             msg.markers.append(marker)
         self.publisher.publish(msg)
         self.marker_ids = {}
+
+    def debug_state_to_vectors_markers(self,
+                                       debug_expressions: Dict[PrefixName, Union[cas.TransMatrix,
+                                       cas.Point3,
+                                       cas.Vector3,
+                                       cas.Quaternion]],
+                                       debug_values: Dict[PrefixName, np.ndarray],
+                                       width: float = 0.05,
+                                       marker_id_offset: int = 0) -> List[Marker]:
+        ms = []
+        color_counter = 0
+        for (name, expr), (_, value) in zip(debug_expressions.items(), debug_values.items()):
+            if not hasattr(expr, 'reference_frame'):
+                continue
+            if expr.reference_frame is not None:
+                map_T_ref = god_map.world.compute_fk_np(god_map.world.root_link_name, expr.reference_frame)
+            else:
+                map_T_ref = np.eye(4)
+            if isinstance(expr, cas.TransMatrix):
+                ref_T_d = value
+                map_T_d = np.dot(map_T_ref, ref_T_d)
+                map_P_d = map_T_d[:4, 3:]
+                # x
+                d_V_x_offset = np.array([width, 0, 0, 0])
+                map_V_x_offset = np.dot(map_T_d, d_V_x_offset)
+                mx = Marker()
+                mx.action = mx.ADD
+                mx.header.frame_id = self.tf_root
+                mx.ns = f'debug/{name}'
+                mx.id = 0 + marker_id_offset
+                mx.type = mx.CYLINDER
+                mx.pose.position.x = map_P_d[0][0] + map_V_x_offset[0]
+                mx.pose.position.y = map_P_d[1][0] + map_V_x_offset[1]
+                mx.pose.position.z = map_P_d[2][0] + map_V_x_offset[2]
+                d_R_x = rotation_matrix(np.pi / 2, [0, 1, 0])
+                map_R_x = np.dot(map_T_d, d_R_x)
+                mx.pose.orientation = Quaternion(*quaternion_from_matrix(map_R_x))
+                mx.color = ColorRGBA(1, 0, 0, 1)
+                mx.scale.x = width / 4
+                mx.scale.y = width / 4
+                mx.scale.z = width * 2
+                ms.append(mx)
+                # y
+                d_V_y_offset = np.array([0, width, 0, 0])
+                map_V_y_offset = np.dot(map_T_d, d_V_y_offset)
+                my = Marker()
+                my.action = my.ADD
+                my.header.frame_id = self.tf_root
+                my.ns = f'debug/{name}'
+                my.id = 1 + marker_id_offset
+                my.type = my.CYLINDER
+                my.pose.position.x = map_P_d[0][0] + map_V_y_offset[0]
+                my.pose.position.y = map_P_d[1][0] + map_V_y_offset[1]
+                my.pose.position.z = map_P_d[2][0] + map_V_y_offset[2]
+                d_R_y = rotation_matrix(-np.pi / 2, [1, 0, 0])
+                map_R_y = np.dot(map_T_d, d_R_y)
+                my.pose.orientation = Quaternion(*quaternion_from_matrix(map_R_y))
+                my.color = ColorRGBA(0, 1, 0, 1)
+                my.scale.x = width / 4
+                my.scale.y = width / 4
+                my.scale.z = width * 2
+                ms.append(my)
+                # z
+                d_V_z_offset = np.array([0, 0, width, 0])
+                map_V_z_offset = np.dot(map_T_d, d_V_z_offset)
+                mz = Marker()
+                mz.action = mz.ADD
+                mz.header.frame_id = self.tf_root
+                mz.ns = f'debug/{name}'
+                mz.id = 2 + marker_id_offset
+                mz.type = mz.CYLINDER
+                mz.pose.position.x = map_P_d[0][0] + map_V_z_offset[0]
+                mz.pose.position.y = map_P_d[1][0] + map_V_z_offset[1]
+                mz.pose.position.z = map_P_d[2][0] + map_V_z_offset[2]
+                mz.pose.orientation = Quaternion(*quaternion_from_matrix(map_T_d))
+                mz.color = ColorRGBA(0, 0, 1, 1)
+                mz.scale.x = width / 4
+                mz.scale.y = width / 4
+                mz.scale.z = width * 2
+                ms.append(mz)
+            else:
+                m = Marker()
+                m.action = m.ADD
+                m.ns = f'debug/{name}'
+                m.id = 0 + marker_id_offset
+                m.header.frame_id = self.tf_root
+                m.pose.orientation.w = 1
+                if isinstance(expr, cas.Vector3):
+                    ref_V_d = value
+                    if expr.vis_frame is not None:
+                        map_T_vis = god_map.world.compute_fk_np(god_map.world.root_link_name, expr.vis_frame)
+                    else:
+                        map_T_vis = np.eye(4)
+                    map_V_d = np.dot(map_T_ref, ref_V_d)
+                    map_P_vis = map_T_vis[:4, 3:].T[0]
+                    map_P_p1 = map_P_vis
+                    map_P_p2 = map_P_vis + map_V_d * 0.5
+                    m.points.append(Point(map_P_p1[0], map_P_p1[1], map_P_p1[2]))
+                    m.points.append(Point(map_P_p2[0], map_P_p2[1], map_P_p2[2]))
+                    m.type = m.ARROW
+                    if expr.color is None:
+                        m.color = self.colors[color_counter]
+                    else:
+                        m.color = expr.color
+                    m.scale.x = width / 2
+                    m.scale.y = width
+                    m.scale.z = 0
+                    color_counter += 1
+                elif isinstance(expr, cas.Point3):
+                    ref_P_d = value
+                    map_P_d = np.dot(map_T_ref, ref_P_d)
+                    m.pose.position.x = map_P_d[0]
+                    m.pose.position.y = map_P_d[1]
+                    m.pose.position.z = map_P_d[2]
+                    m.pose.orientation.w = 1
+                    m.type = m.SPHERE
+                    if expr.color is None:
+                        m.color = self.colors[color_counter]
+                    else:
+                        m.color = expr.color
+                    m.scale.x = width
+                    m.scale.y = width
+                    m.scale.z = width
+                    color_counter += 1
+                ms.append(m)
+        return ms

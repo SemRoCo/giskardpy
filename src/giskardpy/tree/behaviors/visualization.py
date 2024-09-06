@@ -38,7 +38,7 @@ class VisualizeTrajectory(GiskardBehavior):
                  ensure_publish: bool = False):
         super().__init__(name)
         self.ensure_publish = ensure_publish
-        self.visualizer = ROSMsgVisualization(mode=mode)
+        self.visualizer = god_map.ros_visualizer
         self.every_x = 10
 
     @catch_and_raise_to_blackboard

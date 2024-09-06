@@ -44,7 +44,7 @@ class CleanupControlLoop(Sequence):
         self.add_child(DebugMarkerPublisherTrajectory())
 
     def add_plot_gantt_chart(self):
-        self.insert_child(PlotGanttChart(), 0)
+        self.insert_child(PlotGanttChart(), 2)
 
     @toggle_on('has_reset_world_state')
     def add_reset_world_state(self):

@@ -341,7 +341,7 @@ class PouringAdaptiveTilt(Goal):
                                                   task_expression=root_T_tip.to_position()[2],
                                                   name='moveDown')
         # Define end conditions
-        external_end_monitor = ExpressionMonitor(name='EffectAchieved')
+        external_end_monitor = ExpressionMonitor(name='cupFilled')
         self.add_monitor(external_end_monitor)
         external_end_monitor.expression = symbol_manager.get_symbol(
             f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\'].stop')

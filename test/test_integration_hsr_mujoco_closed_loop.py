@@ -430,6 +430,7 @@ class TestAddObject:
 
 class TestAdaptiveGoals:
     def test_complete_pouring(self, zero_pose):
+        zero_pose.set_avoid_name_conflict(False)
         # first start related scripts for BB detection and scene action reasoning
         zero_pose.motion_goals.add_motion_goal(motion_goal_class=CloseGripper.__name__,
                                                name='openGripper',
@@ -485,7 +486,7 @@ class TestAdaptiveGoals:
         tilt_axis.header.frame_id = 'hand_palm_link'
         tilt_axis.vector.z = 1
         zero_pose.motion_goals.add_motion_goal(motion_goal_class=PouringAdaptiveTilt.__name__,
-                                               name='pouring',
+                                               name='Pouring',
                                                tip='hand_palm_link',
                                                root='map',
                                                tilt_angle=0.3,

@@ -37,11 +37,14 @@ class MySvgWidget(QSvgWidget):
 
 
 class DotGraphViewer(QWidget):
+    last_goal_id: int
+
     def __init__(self):
         super().__init__()
+        self.last_goal_id = -1
 
         # Initialize the ROS node
-        rospy.init_node('dot_graph_viewer', anonymous=True)
+        rospy.init_node('motion_graph_viewer', anonymous=True)
 
         # Set up the GUI components
         self.svg_widget = MySvgWidget(self)
@@ -91,7 +94,7 @@ class DotGraphViewer(QWidget):
         layout.addLayout(nav_layout)
         self.setLayout(layout)
 
-        self.setWindowTitle('DOT Graph Viewer')
+        self.setWindowTitle('Motion Graph Viewer')
         self.resize(800, 600)
 
         # Initialize graph history and goal tracking
@@ -128,21 +131,24 @@ class DotGraphViewer(QWidget):
     def on_topic_selected(self, index: int) -> None:
         topic_name = self.topic_selector.currentText()
         if topic_name:
-            rospy.Subscriber(topic_name, ExecutionState, self.on_new_message_received, queue_size=20)
+            rospy.Subscriber(topic_name, ExecutionState, self.on_new_message_received, queue_size=50)
 
     def on_new_message_received(self, msg: ExecutionState) -> None:
         if len(self.goals) > 0:
-            navigator_at_end = (self.current_goal_index == len(self.goals) - 1
+            navigator_at_end = (self.current_goal_index == self.goals[-1]
                                 and self.current_message_index == len(self.graphs_by_goal[self.goals[-1]]) - 1)
         else:
             navigator_at_end = True
         # Extract goal_id and group graphs by goal_id
-        goal_id = msg.goal_id  # Adjust based on the actual structure of goal_id
-        graph = execution_state_to_dot_graph(msg, use_state_color=True)
-
-        if goal_id not in self.graphs_by_goal:
+        if self.last_goal_id == msg.goal_id:
+            goal_id = self.goals[-1]
+        else:
+            self.last_goal_id = msg.goal_id
+            goal_id = len(self.goals)
             self.graphs_by_goal[goal_id] = []
             self.goals.append(goal_id)
+
+        graph = execution_state_to_dot_graph(msg, use_state_color=True)
 
         self.graphs_by_goal[goal_id].append(graph)
 
@@ -150,22 +156,26 @@ class DotGraphViewer(QWidget):
         if navigator_at_end:
             self.current_goal_index = len(self.goals) - 1
             self.current_message_index = len(self.graphs_by_goal[goal_id]) - 1
-            self.display_graph(self.current_goal_index, self.current_message_index, update_position_label=False)
+
         self.update_position_label()
+
+        if navigator_at_end:
+            self.display_graph(self.current_goal_index, self.current_message_index, update_position_label=False)
 
     def display_graph(self, goal_index: int, message_index: int, update_position_label: bool = True) -> None:
         # Display the graph based on goal and message index
         goal_id = self.goals[goal_index]
         graph = self.graphs_by_goal[goal_id][message_index]
-        svg_path = 'graph.svg'
-        graph.write_svg(svg_path)
-        graph.write_pdf('graph.pdf')
-        with QMutexLocker(self.svg_widget.mutex):  # Lock the mutex during SVG loading
-            self.svg_widget.load(svg_path)
-
         # Update the position label
         if update_position_label:
             self.update_position_label()
+
+        svg_path = 'graph.svg'
+        graph.write_svg(svg_path)
+        # graph.write_pdf('graph.pdf')
+        with QMutexLocker(self.svg_widget.mutex):  # Lock the mutex during SVG loading
+            self.svg_widget.load(svg_path)
+
 
     def update_position_label(self) -> None:
         goal_count = len(self.goals)
@@ -176,6 +186,7 @@ class DotGraphViewer(QWidget):
         goal_id = self.goals[self.current_goal_index]
         message_count = len(self.graphs_by_goal[goal_id])
         position_text = f'goal {self.current_goal_index + 1}/{goal_count}, update {self.current_message_index + 1}/{message_count}'
+        # print(position_text)
         self.position_label.setText(position_text)
 
     def show_first_image(self) -> None:

@@ -16,18 +16,19 @@ from giskardpy.utils import logging
 from giskardpy.utils.decorators import record_time, catch_and_raise_to_blackboard
 from giskardpy.utils.utils import create_path, json_str_to_kwargs
 
-MyBLUE = '#0000B4'
+MyBLUE = '#0000DD'
 MyGREEN = '#006600'
 MyORANGE = '#996900'
 MyRED = '#993000'
 MyGRAY = '#E0E0E0'
-MonitorTrueGreen = '#CDEACD'
-MonitorFalseRed = '#EACDCD'
+MonitorTrueGreen = '#B6E5A0'
+MonitorFalseRed = '#FF8961'
 FONT = 'sans-serif'
 LineWidth = 6
 ArrowSize = 1.5
 Fontsize = 25
 ConditionFont = 'monospace'
+NotStartedColor = '#9F9F9F'
 
 
 def extract_monitor_names_from_condition(condition: str) -> List[str]:
@@ -39,7 +40,7 @@ def search_for_monitor(monitor_name: str, execution_state: ExecutionState) -> gi
 
 
 task_state_to_color: Dict[TaskState, Tuple[str, str]] = {
-    TaskState.not_started: ('black', MyGRAY),
+    TaskState.not_started: (NotStartedColor, MyGRAY),
     TaskState.running: (MyBLUE, MyGRAY),
     TaskState.on_hold: (MyORANGE, MyGRAY),
     TaskState.succeeded: (MyGREEN, MyGRAY),
@@ -47,13 +48,13 @@ task_state_to_color: Dict[TaskState, Tuple[str, str]] = {
 }
 
 monitor_state_to_color: Dict[Tuple[TaskState, int], Tuple[str, str]] = {
-    (TaskState.not_started, 1): ('black', MonitorTrueGreen),
+    (TaskState.not_started, 1): (NotStartedColor, MonitorTrueGreen),
     (TaskState.running, 1): (MyBLUE, MonitorTrueGreen),
     (TaskState.on_hold, 1): (MyORANGE, MonitorTrueGreen),
     (TaskState.succeeded, 1): (MyGREEN, MonitorTrueGreen),
     (TaskState.failed, 1): ('red', MonitorTrueGreen),
 
-    (TaskState.not_started, 0): ('black', MonitorFalseRed),
+    (TaskState.not_started, 0): (NotStartedColor, MonitorFalseRed),
     (TaskState.running, 0): (MyBLUE, MonitorFalseRed),
     (TaskState.on_hold, 0): (MyORANGE, MonitorFalseRed),
     (TaskState.succeeded, 0): (MyGREEN, MonitorFalseRed),

@@ -128,7 +128,7 @@ class DotGraphViewer(QWidget):
     def on_topic_selected(self, index: int) -> None:
         topic_name = self.topic_selector.currentText()
         if topic_name:
-            rospy.Subscriber(topic_name, ExecutionState, self.on_new_message_received)
+            rospy.Subscriber(topic_name, ExecutionState, self.on_new_message_received, queue_size=20)
 
     def on_new_message_received(self, msg: ExecutionState) -> None:
         if len(self.goals) > 0:
@@ -157,8 +157,9 @@ class DotGraphViewer(QWidget):
         # Display the graph based on goal and message index
         goal_id = self.goals[goal_index]
         graph = self.graphs_by_goal[goal_id][message_index]
-        svg_path = '../../../rqt_giskard/scripts/graph.svg'
+        svg_path = 'graph.svg'
         graph.write_svg(svg_path)
+        graph.write_pdf('graph.pdf')
         with QMutexLocker(self.svg_widget.mutex):  # Lock the mutex during SVG loading
             self.svg_widget.load(svg_path)
 

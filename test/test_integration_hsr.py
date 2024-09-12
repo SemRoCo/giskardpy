@@ -3,7 +3,7 @@ from typing import Optional
 
 import numpy as np
 import pytest
-from geometry_msgs.msg import PoseStamped, Point, Quaternion, PointStamped, Vector3Stamped
+from geometry_msgs.msg import PoseStamped, Point, Quaternion, PointStamped, Vector3Stamped, Vector3
 from numpy import pi
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
@@ -27,6 +27,7 @@ class HSRTestWrapper(GiskardTestWrapper):
         'head_tilt_joint': 0.0,
         'wrist_flex_joint': 0.0,
         'wrist_roll_joint': 0.0,
+        'hand_motor_joint': 0.8
     }
     better_pose = default_pose
 
@@ -37,8 +38,9 @@ class HSRTestWrapper(GiskardTestWrapper):
                               collision_avoidance_config=HSRCollisionAvoidanceConfig(),
                               robot_interface_config=HSRStandaloneInterface(),
                               behavior_tree_config=StandAloneBTConfig(debug_mode=True,
-                                                                      publish_tf=False,
-                                                                      publish_js=False),
+                                                                      publish_tf=True,
+                                                                      publish_js=False,
+                                                                      simulation_max_hz=20),
                               qp_controller_config=QPControllerConfig())
         super().__init__(giskard)
         self.gripper_group = 'gripper'
@@ -496,3 +498,158 @@ class TestAddObject:
 
         zero_pose.set_joint_goal({'arm_flex_joint': -0.7})
         zero_pose.plan_and_execute()
+
+    def test_grasp_from_table(self, zero_pose: HSRTestWrapper):
+        z_offset = 0.3
+        x_offset = -1
+        box_pose = PoseStamped()
+        box_pose.header.frame_id = 'map'
+        box_pose.pose.position = Point(2 + x_offset, 0, 0.8 + z_offset)
+        box_pose.pose.orientation.w = 1
+        zero_pose.add_box_to_world('box', size=(0.2, 0.05, 0.3), pose=box_pose, parent_link='map')
+
+        table_pose = PoseStamped()
+        table_pose.header.frame_id = 'map'
+        table_pose.pose.position = Point(2 + x_offset, 0, 0.625 + z_offset)
+        table_pose.pose.orientation.w = 1
+        zero_pose.add_box_to_world('table', size=(0.5, 0.5, 0.05), pose=table_pose, parent_link='map')
+
+        goal_pose = PoseStamped()
+        goal_pose.header.frame_id = 'box'
+        goal_pose.pose.position = Point(-0.15, 0, -0.05)
+        goal_pose.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 0, 1, 0],
+                                                                         [0, -1, 0, 0],
+                                                                         [1, 0, 0, 0],
+                                                                         [0, 0, 0, 1]]))
+        zero_pose.motion_goals.add_cartesian_pose(goal_pose=goal_pose, tip_link='hand_palm_link', root_link='map')
+
+        zero_pose.motion_goals.avoid_all_collisions(min_distance=0.07)
+        zero_pose.motion_goals.allow_collision(group1='gripper')
+        zero_pose.set_max_traj_length(30)
+        zero_pose.execute()
+
+    def test_gpt(self, zero_pose: HSRTestWrapper):
+        giskard = zero_pose
+        bowl_pose = PoseStamped()
+        bowl_pose.header.frame_id = 'map'
+        bowl_pose.pose.orientation.w = 1
+        bowl_pose.pose.position = Point(1, 0, 0.4)  # Set bowl position (e.g., on a table)
+        giskard.world.add_cylinder(name='bowl', height=0.1, radius=0.15, pose=bowl_pose, parent_link='map')
+
+        # Define cup pose (initially above the bowl)
+        # cup_pose = PoseStamped()
+        # cup_pose.header.frame_id = 'map'
+        # cup_pose.pose.orientation.w = 1
+        # cup_pose.pose.position = Point(0, 0, 0.7)  # Set the cup 20 cm above the bowl
+        # giskard.world.add_cylinder(name='cup', height=0.15, radius=0.05, pose=cup_pose, parent_link='map')
+
+        # Define the robot's cup feature (position and orientation)
+        robot_cup_feature = PointStamped()
+        robot_cup_feature.header.frame_id = 'hand_palm_link'
+        robot_cup_feature.point = Point(0, 0, 0)
+
+        robot_gripper_z_axis_feature = Vector3Stamped()
+        robot_gripper_z_axis_feature.header.frame_id = 'hand_palm_link'
+        robot_gripper_z_axis_feature.vector = Vector3(1, 0, 0)
+
+        # Define the world features (center and z-axis of the bowl)
+        world_bowl_center_feature = PointStamped()
+        world_bowl_center_feature.header.frame_id = 'bowl'
+        world_bowl_center_feature.point = Point(0, 0, 0)
+
+        world_bowl_z_axis_feature = Vector3Stamped()
+        world_bowl_z_axis_feature.header.frame_id = 'bowl'
+        world_bowl_z_axis_feature.vector = Vector3(0, 0, 1)
+
+        # Maintain height between the cup and the bowl (along the z-axis)
+        mon_initial_height = giskard.monitors.add_height(
+            root_link='map',
+            tip_link='hand_palm_link',
+            reference_point=world_bowl_center_feature,
+            tip_point=robot_cup_feature,
+            lower_limit=0.1,  # Maintain 10 cm above the bowl initially
+            upper_limit=0.1+0.01
+        )
+        giskard.motion_goals.add_height(
+            root_link='map',
+            tip_link='hand_palm_link',
+            reference_point=world_bowl_center_feature,
+            tip_point=robot_cup_feature,
+            lower_limit=0.1,
+            upper_limit=0.1,
+            end_condition=mon_initial_height
+        )
+
+        # Maintain distance between the cup and the bowl in the x-y plane
+        mon_distance = giskard.monitors.add_distance(
+            root_link='map',
+            tip_link='hand_palm_link',
+            reference_point=world_bowl_center_feature,
+            tip_point=robot_cup_feature,
+            lower_limit=0,  # Align cup exactly over the bowl horizontally
+            upper_limit=0+0.01
+        )
+        giskard.motion_goals.add_distance(
+            root_link='map',
+            tip_link='hand_palm_link',
+            reference_point=world_bowl_center_feature,
+            tip_point=robot_cup_feature,
+            lower_limit=0,
+            upper_limit=0,
+            end_condition=mon_distance
+        )
+
+        # Align the cup's z-axis with the bowl's z-axis for pouring
+        mon_align = giskard.monitors.add_vectors_aligned(
+            root_link='map',
+            tip_link='hand_palm_link',
+            goal_normal=world_bowl_z_axis_feature,
+            tip_normal=robot_gripper_z_axis_feature
+        )
+        giskard.motion_goals.add_align_planes(
+            root_link='map',
+            tip_link='hand_palm_link',
+            goal_normal=world_bowl_z_axis_feature,
+            tip_normal=robot_gripper_z_axis_feature,
+            end_condition=mon_align
+        )
+
+        # --- New Motion Goals to Raise Cup ---
+        # Monitor to check if the new height (20 cm above the bowl) is met
+        mon_new_height = giskard.monitors.add_height(
+            root_link='map',
+            tip_link='hand_palm_link',
+            reference_point=world_bowl_center_feature,
+            tip_point=robot_cup_feature,
+            lower_limit=0.2-0.01,  # Desired new height 20 cm
+            upper_limit=0.2+0.01,
+            start_condition=f'{mon_initial_height} and {mon_distance} and {mon_align}'
+        )
+        giskard.motion_goals.add_height(
+            root_link='map',
+            tip_link='hand_palm_link',
+            reference_point=world_bowl_center_feature,
+            tip_point=robot_cup_feature,
+            lower_limit=0.2,
+            upper_limit=0.2,
+            start_condition=f'{mon_initial_height} and {mon_distance} and {mon_align}',
+            # Start when initial conditions are met
+            end_condition=mon_new_height  # End motion when the cup is 20 cm above the bowl
+        )
+
+        # Monitor and execute the motion
+        giskard.monitors.add_end_motion(
+            start_condition=mon_new_height  # End motion when the new height is reached
+        )
+        giskard.monitors.add_cancel_motion(
+            giskard.monitors.add_local_minimum_reached(),
+            error_message='local minimum reached while monitors are not satisfied'
+        )
+
+        giskard.motion_goals.allow_all_collisions()
+        # Execute the motion
+        result = giskard.execute(add_local_minimum_reached=False)
+        if result.error.code != GiskardError.SUCCESS:
+            print(giskard.get_end_motion_reason(move_result=result, show_all=False))
+        else:
+            print("Cup successfully positioned above the bowl for pouring.")

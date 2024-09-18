@@ -2,6 +2,7 @@ from inspect import currentframe, getframeinfo
 
 import rospkg
 import rospy
+from line_profiler import profile
 
 from giskardpy.middleware import MiddlewareWrapper
 

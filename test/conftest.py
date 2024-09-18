@@ -4,8 +4,9 @@ from geometry_msgs.msg import PoseStamped
 
 import giskardpy_ros.ros1.tfwrapper as tf
 from giskardpy.god_map import god_map
-from giskardpy.middleware import middleware
+from giskardpy.middleware import middleware, set_middleware
 from giskardpy.model.joints import OneDofJoint
+from giskardpy_ros import ROS1Wrapper
 from giskardpy_ros.tree.blackboard_utils import GiskardBlackboard
 from utils_for_tests import launch_launchfile
 
@@ -16,6 +17,7 @@ from utils_for_tests import GiskardTestWrapper
 def ros(request):
     middleware.loginfo('init ros')
     rospy.init_node('tests')
+    set_middleware(ROS1Wrapper())
     tf.init(60)
 
     def kill_ros():

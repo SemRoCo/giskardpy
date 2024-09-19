@@ -234,9 +234,9 @@ class WorldTree(WorldTreeInterface):
             if joint_name == internal_joint_name or joint_name == internal_joint_name.short_name:
                 matches.append(internal_joint_name)
         if len(matches) > 1:
-            raise ValueError(f'Multiple matches for \'{joint_name}\' found: \'{matches}\'.')
+            raise UnknownJointException(f'Multiple matches for \'{joint_name}\' found: \'{matches}\'.')
         if len(matches) == 0:
-            raise ValueError(f'No matches for \'{joint_name}\' found: \'{matches}\'.')
+            raise UnknownJointException(f'No matches for \'{joint_name}\' found: \'{matches}\'.')
         return matches[0]
 
     def search_for_joint_of_type(self, joint_types: Tuple[Type[Joint]]) -> List[Joint]:

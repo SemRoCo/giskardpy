@@ -8,7 +8,7 @@ class StretchCollisionAvoidanceConfig(CollisionAvoidanceConfig):
         self.drive_joint_name = drive_joint_name
 
     def setup(self):
-        self.load_self_collision_matrix('package://giskardpy/self_collision_matrices/iai/stretch.srdf')
+        self.load_self_collision_matrix('package://giskardpy_ros/self_collision_matrices/iai/stretch.srdf')
         self.overwrite_external_collision_avoidance(self.drive_joint_name,
                                                     number_of_repeller=2,
                                                     soft_threshold=0.2,

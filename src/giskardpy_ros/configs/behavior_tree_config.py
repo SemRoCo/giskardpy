@@ -150,8 +150,8 @@ class BehaviorTreeConfig(ABC):
                                                                mode=mode)
         if GiskardBlackboard().tree.is_standalone():
             self.tree.control_loop_branch.publish_state.add_tf_publisher(include_prefix=include_prefix,
-                                                                   tf_topic=tf_topic,
-                                                                   mode=mode)
+                                                                         tf_topic=tf_topic,
+                                                                         mode=mode)
 
     def add_evaluate_debug_expressions(self):
         self.tree.prepare_control_loop.add_compile_debug_expressions()
@@ -167,23 +167,25 @@ class BehaviorTreeConfig(ABC):
         """
         Publishes joint states for Giskard's internal state.
         """
-        GiskardBlackboard().tree.control_loop_branch.publish_state.add_joint_state_publisher(include_prefix=include_prefix,
-                                                                                 topic_name=topic_name,
-                                                                                 only_prismatic_and_revolute=True)
+        GiskardBlackboard().tree.control_loop_branch.publish_state.add_joint_state_publisher(
+            include_prefix=include_prefix,
+            topic_name=topic_name,
+            only_prismatic_and_revolute=True)
         GiskardBlackboard().tree.wait_for_goal.publish_state.add_joint_state_publisher(include_prefix=include_prefix,
-                                                                           topic_name=topic_name,
-                                                                           only_prismatic_and_revolute=True)
+                                                                                       topic_name=topic_name,
+                                                                                       only_prismatic_and_revolute=True)
 
     def add_free_variable_publisher(self, topic_name: Optional[str] = None, include_prefix: bool = False):
         """
         Publishes joint states for Giskard's internal state.
         """
-        GiskardBlackboard().tree.control_loop_branch.publish_state.add_joint_state_publisher(include_prefix=include_prefix,
-                                                                                 topic_name=topic_name,
-                                                                                 only_prismatic_and_revolute=False)
+        GiskardBlackboard().tree.control_loop_branch.publish_state.add_joint_state_publisher(
+            include_prefix=include_prefix,
+            topic_name=topic_name,
+            only_prismatic_and_revolute=False)
         GiskardBlackboard().tree.wait_for_goal.publish_state.add_joint_state_publisher(include_prefix=include_prefix,
-                                                                           topic_name=topic_name,
-                                                                           only_prismatic_and_revolute=False)
+                                                                                       topic_name=topic_name,
+                                                                                       only_prismatic_and_revolute=False)
 
 
 class StandAloneBTConfig(BehaviorTreeConfig):
@@ -211,6 +213,7 @@ class StandAloneBTConfig(BehaviorTreeConfig):
                 publish_tf = False
                 debug_mode = False
                 simulation_max_hz = None
+                self.visualization_mode = VisualizationMode.Nothing
         super().__init__(ControlModes.standalone, simulation_max_hz=simulation_max_hz)
         self.debug_mode = debug_mode
         self.publish_js = publish_js
@@ -220,8 +223,9 @@ class StandAloneBTConfig(BehaviorTreeConfig):
             raise SetupException('publish_js and publish_free_variables cannot be True at the same time.')
 
     def setup(self):
-        self.add_visualization_marker_publisher(add_to_sync=True, add_to_control_loop=True,
-                                                mode=self.visualization_mode)
+        if self.visualization_mode != VisualizationMode.Nothing:
+            self.add_visualization_marker_publisher(add_to_sync=True, add_to_control_loop=True,
+                                                    mode=self.visualization_mode)
         if self.publish_tf:
             self.add_tf_publisher(include_prefix=self.include_prefix, mode=TfPublishingModes.all)
         self.add_gantt_chart_plotter()

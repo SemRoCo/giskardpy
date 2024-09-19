@@ -16,7 +16,7 @@ class TracyWorldConfig(WorldWithFixedRobot):
 
 class TracyCollisionAvoidanceConfig(LoadSelfCollisionMatrixConfig):
     def __init__(self, collision_checker: CollisionCheckerLib = CollisionCheckerLib.bpb):
-        super().__init__('package://giskardpy/self_collision_matrices/iai/tracy.srdf',
+        super().__init__('package://giskardpy_ros/self_collision_matrices/iai/tracy.srdf',
                          collision_checker)
 
 

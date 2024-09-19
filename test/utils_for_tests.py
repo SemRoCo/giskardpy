@@ -24,7 +24,7 @@ import giskard_msgs.msg as giskard_msgs
 import giskardpy.casadi_wrapper as cas
 import giskardpy_ros.ros1.msg_converter as msg_converter
 import giskardpy_ros.ros1.tfwrapper as tf
-from giskard_msgs.msg import GiskardError
+from giskard_msgs.msg import GiskardError, LinkName
 from giskard_msgs.srv import DyeGroupResponse
 from giskardpy.data_types.data_types import KeyDefaultDict
 from giskardpy.data_types.data_types import PrefixName, Derivatives
@@ -461,7 +461,10 @@ class GiskardTestWrapper(OldGiskardWrapper):
         self.monitors.add_end_motion(start_condition=done)
         self.execute(add_local_minimum_reached=False)
 
-    def set_keep_hand_in_workspace(self, tip_link, map_frame=None, base_footprint=None):
+    def set_keep_hand_in_workspace(self, tip_link: Union[str, giskard_msgs.LinkName], map_frame=None,
+                                   base_footprint=None):
+        if isinstance(tip_link, str):
+            tip_link = giskard_msgs.LinkName(name=tip_link)
         self.motion_goals.add_motion_goal(motion_goal_class=KeepHandInWorkspace.__name__,
                                           tip_link=tip_link,
                                           map_frame=map_frame,

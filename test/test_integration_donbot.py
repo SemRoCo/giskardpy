@@ -8,6 +8,7 @@ from tf.transformations import quaternion_about_axis, quaternion_matrix, rotatio
 
 import giskardpy_ros.ros1.tfwrapper as tf
 from giskard_msgs.msg import GiskardError
+from giskardpy.data_types.exceptions import GoalInitalizationException
 from giskardpy_ros.configs.behavior_tree_config import StandAloneBTConfig
 from giskardpy_ros.configs.iai_robots.donbot import WorldWithBoxyBaseConfig, DonbotCollisionAvoidanceConfig, DonbotStandaloneInterfaceConfig
 from giskardpy_ros.configs.giskard import Giskard
@@ -168,7 +169,7 @@ class TestJointGoals:
             'ur5_wrist_3_joint': -2.5249870459186,
         })
         zero_pose.set_joint_goal({})
-        zero_pose.execute(expected_error_code=GiskardError.GOAL_INITIALIZATION_ERROR)
+        zero_pose.execute(expected_error_type=GoalInitalizationException)
 
     def test_joint_movement2(self, zero_pose: DonbotTestWrapper):
         js = {

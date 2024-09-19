@@ -19,7 +19,7 @@ import tf2_msgs.msg as tf2_msgs
 import giskard_msgs.msg as giskard_msgs
 from giskard_msgs.msg import GiskardError
 from giskardpy.data_types.data_types import JointStates, PrefixName, _JointState, ColorRGBA
-from giskardpy.data_types.exceptions import GiskardException, CorruptShapeException
+from giskardpy.data_types.exceptions import GiskardException, CorruptShapeException, UnknownLinkException
 from giskardpy.god_map import god_map
 from giskardpy.model.collision_world_syncer import CollisionEntry
 from giskardpy.model.joints import MovableJoint
@@ -334,7 +334,10 @@ def error_msg_to_exception(msg: giskard_msgs.GiskardError) -> Optional[Exception
 
 
 def link_name_msg_to_prefix_name(msg: giskard_msgs.LinkName, world: WorldTree) -> PrefixName:
-    return world.search_for_link_name(msg.name, msg.group_name)
+    try:
+        return world.search_for_link_name(msg.name, msg.group_name)
+    except UnknownLinkException:
+        return world.search_for_joint_name(msg.name, msg.group_name)
 
 
 def replace_prefix_name_with_str(d: dict) -> dict:

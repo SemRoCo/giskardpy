@@ -19,7 +19,8 @@ import tf2_msgs.msg as tf2_msgs
 import giskard_msgs.msg as giskard_msgs
 from giskard_msgs.msg import GiskardError
 from giskardpy.data_types.data_types import JointStates, PrefixName, _JointState, ColorRGBA
-from giskardpy.data_types.exceptions import GiskardException, CorruptShapeException, UnknownLinkException
+from giskardpy.data_types.exceptions import GiskardException, CorruptShapeException, UnknownLinkException, \
+    UnknownJointException
 from giskardpy.god_map import god_map
 from giskardpy.model.collision_world_syncer import CollisionEntry
 from giskardpy.model.joints import MovableJoint
@@ -334,10 +335,11 @@ def error_msg_to_exception(msg: giskard_msgs.GiskardError) -> Optional[Exception
 
 
 def link_name_msg_to_prefix_name(msg: giskard_msgs.LinkName, world: WorldTree) -> PrefixName:
-    try:
-        return world.search_for_link_name(msg.name, msg.group_name)
-    except UnknownLinkException:
-        return world.search_for_joint_name(msg.name, msg.group_name)
+    return world.search_for_link_name(msg.name, msg.group_name)
+
+
+def joint_name_msg_to_prefix_name(msg: giskard_msgs.LinkName, world: WorldTree) -> PrefixName:
+    return world.search_for_joint_name(msg.name, msg.group_name)
 
 
 def replace_prefix_name_with_str(d: dict) -> dict:
@@ -423,7 +425,13 @@ def ros_msg_to_giskard_obj(msg, world: WorldTree):
     elif isinstance(msg, giskard_msgs.CollisionEntry):
         return collision_entry_msg_to_giskard(msg)
     elif isinstance(msg, giskard_msgs.LinkName):
-        return link_name_msg_to_prefix_name(msg, world)
+        try:
+            return link_name_msg_to_prefix_name(msg, world)
+        except UnknownLinkException as e:
+            try:
+                return link_name_msg_to_prefix_name(msg, world)
+            except UnknownJointException:
+                raise e
     elif isinstance(msg, GiskardError):
         return error_msg_to_exception(msg)
     return msg

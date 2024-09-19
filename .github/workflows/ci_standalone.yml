@@ -51,18 +51,17 @@ jobs:
       robot: pr2
       test1: test_integration_pr2.py::TestConstraints
       test2: test_integration_pr2.py::TestCartGoals
-      test3: test_integration_pr2.py::TestWorldManipulation
-      test4: test_integration_pr2.py::TestManipulability::test_manip1
-      test5: test_integration_pr2.py::TestWeightScaling
-      test6: test_integration_pr2.py::TestFeatureFunctions
-      test7: test_integration_pr2.py::TestEndMotionReason
+      test3: test_integration_pr2.py::TestManipulability::test_manip1
+      test4: test_integration_pr2.py::TestWeightScaling
+      test5: test_integration_pr2.py::TestFeatureFunctions
+      test6: test_integration_pr2.py::TestEndMotionReason
   pr2_part2:
     needs: [ build_dependencies ]
     uses: ./.github/workflows/reusable_robot_ci.yml
     with:
       robot: pr2
       test1: test_integration_pr2.py::TestCollisionAvoidanceGoals
-      test2: test_integration_pr2.py::TestWorld
+      test2: test_integration_pr2.py::TestWorldManipulation
       test3: test_integration_pr2.py::TestSelfCollisionAvoidance
       test4: test_integration_pr2.py::TestInfoServices
       test5: test_integration_pr2.py::TestJointGoals

@@ -210,7 +210,7 @@ class StandAloneBTConfig(BehaviorTreeConfig):
         if is_running_in_pytest():
             if god_map.is_in_github_workflow():
                 publish_js = False
-                publish_tf = False
+                publish_tf = True
                 debug_mode = False
                 simulation_max_hz = None
                 self.visualization_mode = VisualizationMode.Nothing

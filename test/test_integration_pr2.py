@@ -1030,7 +1030,7 @@ class TestMonitors:
         zero_pose.motion_goals.add_joint_position(goal_state=zero_pose.better_pose,
                                                   start_condition=sleep)
         zero_pose.monitors.add_end_motion(start_condition=f'{joint_goal} and not {joint_goal2}')
-        zero_pose.monitors.add_cancel_motion(start_condition=f'{joint_goal} and {joint_goal2}', error_message='fail')
+        zero_pose.monitors.add_cancel_motion(start_condition=f'{joint_goal} and {joint_goal2}', error=Exception('fail'))
         zero_pose.execute(add_local_minimum_reached=False)
 
     def test_only_payload_monitors(self, zero_pose: PR2TestWrapper):

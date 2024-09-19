@@ -1,4 +1,4 @@
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 
 import numpy as np
 import pandas as pd
@@ -15,16 +15,16 @@ from giskardpy.middleware import get_middleware
 
 class DebugExpressionManager:
     debug_expressions: Dict[PrefixName, cas.Expression]
-    compiled_debug_expressions: Dict[str, cas.CompiledFunction]
-    evaluated_debug_expressions: Dict[str, np.ndarray]
-    _debug_trajectory: Trajectory
+    compiled_debug_expressions: Dict[PrefixName, cas.CompiledFunction]
+    evaluated_debug_expressions: Dict[PrefixName, np.ndarray]
+    _raw_debug_trajectory: List[Dict[PrefixName, np.ndarray]]
 
     def __init__(self):
         self.reset()
 
     def reset(self):
         self.debug_expressions = {}
-        self._debug_trajectory = Trajectory()
+        self._raw_debug_trajectory = []
         self.compiled_debug_expressions = {}
         self.evaluated_debug_expressions = {}
 
@@ -32,10 +32,6 @@ class DebugExpressionManager:
         if isinstance(expression, cas.Symbol_):
             expression.color = color
         self.debug_expressions[PrefixName(name, prefix='')] = expression
-
-    @property
-    def debug_trajectory(self):
-        return self._debug_trajectory
 
     def compile_debug_expressions(self):
         for name, expr in self.debug_expressions.items():
@@ -64,12 +60,16 @@ class DebugExpressionManager:
 
     def log_debug_expressions(self):
         if len(self.evaluated_debug_expressions) > 0:
-            control_cycle_counter = god_map.control_cycle_counter - 1
+            self._raw_debug_trajectory.append(self.evaluated_debug_expressions)
+
+    def raw_traj_to_traj(self) -> Trajectory:
+        debug_trajectory = Trajectory()
+        for control_cycle_counter, evaluated_debug_expressions in enumerate(self._raw_debug_trajectory):
             last_mjs = None
             if control_cycle_counter >= 1:
-                last_mjs = self._debug_trajectory.get_exact(control_cycle_counter - 1)
+                last_mjs = debug_trajectory.get_exact(control_cycle_counter - 1)
             js = JointStates()
-            for name, value in self.evaluated_debug_expressions.items():
+            for name, value in evaluated_debug_expressions.items():
                 if len(value) > 1:
                     if len(value.shape) == 2:
                         for x in range(value.shape[0]):
@@ -82,7 +82,8 @@ class DebugExpressionManager:
                             self.evaluated_expr_to_js(tmp_name, last_mjs, js, value[x])
                 else:
                     self.evaluated_expr_to_js(name, last_mjs, js, value)
-            self._debug_trajectory.set(control_cycle_counter, js)
+            debug_trajectory.set(control_cycle_counter, js)
+        return debug_trajectory
 
     def evaluated_expr_to_js(self, name, last_js, next_js: JointStates, value):
         if last_js is not None:

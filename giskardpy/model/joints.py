@@ -306,7 +306,7 @@ class PrismaticJoint(OneDofJoint):
                          multiplier=multiplier,
                          offset=offset)
         motor_expression = self.free_variable.get_symbol(Derivatives.position) * self.multiplier + self.offset
-        translation_axis = cas.Point3(self.axis) * motor_expression
+        translation_axis = cas.Vector3(self.axis) * motor_expression
         parent_T_child = cas.TransMatrix.from_xyz_rpy(x=translation_axis[0],
                                                       y=translation_axis[1],
                                                       z=translation_axis[2])

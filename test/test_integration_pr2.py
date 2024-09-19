@@ -19,7 +19,8 @@ from giskardpy.data_types.exceptions import GiskardException, VelocityLimitUnrea
     MaxTrajectoryLengthException, UnknownGoalException, GoalInitalizationException, LocalMinimumException, \
     DuplicateNameException, CorruptMeshException, UnknownGroupException, UnknownLinkException, \
     InvalidWorldOperationException, CorruptShapeException, TransformException, CorruptURDFException, \
-    SelfCollisionViolatedException, HardConstraintsViolatedException, SetupException, EmptyProblemException
+    SelfCollisionViolatedException, HardConstraintsViolatedException, SetupException, EmptyProblemException, \
+    UnknownJointException
 from giskardpy.goals.cartesian_goals import RelativePositionSequence
 from giskardpy.goals.collision_avoidance import CollisionAvoidanceHint
 from giskardpy.goals.goals_tests import DebugGoal, CannotResolveSymbol
@@ -1876,7 +1877,7 @@ class TestConstraints:
         goal_state = {5432: 'muh'}
         kwargs = {'goal_state': goal_state}
         zero_pose.motion_goals.add_motion_goal(motion_goal_class='JointPositionList', **kwargs)
-        zero_pose.execute(expected_error_type=GoalInitalizationException)
+        zero_pose.execute(expected_error_type=UnknownJointException)
 
     def test_wrong_params2(self, zero_pose: PR2TestWrapper):
         goal_state = {'r_elbow_flex_joint': 'muh'}

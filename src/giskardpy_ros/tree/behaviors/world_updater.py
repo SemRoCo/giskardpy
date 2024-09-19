@@ -82,8 +82,7 @@ class ProcessWorldUpdate(GiskardBehavior):
         try:
             god_map.world.dye_group(req.group_name, req.color)
             res.error_codes = DyeGroupResponse.SUCCESS
-            for link_name in god_map.world.groups[req.group_name].links:
-                god_map.world.links[link_name].reset_cache()
+            GiskardBlackboard().ros_visualizer.clear_marker_cache()
             get_middleware().loginfo(
                 f'dyed group \'{req.group_name}\' to r:{req.color.r} g:{req.color.g} b:{req.color.b} a:{req.color.a}')
         except UnknownGroupException:

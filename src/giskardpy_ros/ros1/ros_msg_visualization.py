@@ -17,7 +17,7 @@ from giskardpy.god_map import god_map
 from giskardpy.model.collision_world_syncer import Collisions, Collision
 import giskardpy_ros.ros1.msg_converter as msg_converter
 from giskardpy.model.links import Link
-from giskardpy.utils.decorators import memoize
+from giskardpy.utils.decorators import memoize, clear_memo
 from giskardpy_ros.ros1.ros1_interface import wait_for_publisher, wait_for_topic_to_appear
 from giskardpy_ros.ros1.visualization_mode import VisualizationMode
 from giskardpy_ros.tree.blackboard_utils import GiskardBlackboard
@@ -60,6 +60,9 @@ class ROSMsgVisualization:
     @memoize
     def link_to_marker(self, link: Link) -> List[Marker]:
         return msg_converter.link_to_visualization_marker(data=link, mode=self.mode).markers
+
+    def clear_marker_cache(self) -> None:
+        clear_memo(self.link_to_marker)
 
     def has_world_changed(self) -> bool:
         if self.world_version != god_map.world.model_version:

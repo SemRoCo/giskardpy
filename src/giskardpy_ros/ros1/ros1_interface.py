@@ -7,7 +7,7 @@ from geometry_msgs.msg import PoseStamped, Point, Quaternion
 from rospy import ROSException
 from rostopic import ROSTopicException
 
-from giskardpy.middleware import middleware
+from giskardpy.middleware import get_middleware
 
 
 def wait_for_topic_to_appear(topic_name: str,
@@ -17,7 +17,7 @@ def wait_for_topic_to_appear(topic_name: str,
     waiting_message = f'Waiting for topic \'{topic_name}\' to appear...'
     msg_type = None
     while msg_type is None and not rospy.is_shutdown():
-        middleware.loginfo(waiting_message)
+        get_middleware().loginfo(waiting_message)
         try:
             rostopic.get_info_text(topic_name)
             msg_type, _, _ = rostopic.get_topic_class(topic_name)
@@ -27,7 +27,7 @@ def wait_for_topic_to_appear(topic_name: str,
                 raise TypeError(f'Topic of type \'{msg_type}\' is not supported. '
                                 f'Must be one of: \'{supported_types}\'')
             else:
-                middleware.loginfo(f'\'{topic_name}\' appeared.')
+                get_middleware().loginfo(f'\'{topic_name}\' appeared.')
                 return msg_type
         except (ROSException, ROSTopicException) as e:
             rospy.sleep(sleep_time)

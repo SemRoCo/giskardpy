@@ -1,6 +1,7 @@
 from collections import defaultdict
 from copy import deepcopy
-from typing import Any, Type
+from itertools import zip_longest
+from typing import Any, Type, Tuple
 
 import numpy as np
 import pydot
@@ -22,7 +23,7 @@ from giskardpy_ros.tree.composites.async_composite import AsyncBehavior
 from giskardpy_ros.tree.composites.better_parallel import Parallel
 from giskardpy_ros.tree.control_modes import ControlModes
 from giskardpy_ros.tree.decorators import failure_is_success
-from giskardpy.middleware import middleware
+from giskardpy.middleware import get_middleware
 from giskardpy.utils.decorators import toggle_on, toggle_off
 from giskardpy.utils.utils import create_path
 
@@ -114,14 +115,14 @@ class GiskardBT(BehaviourTree):
 
     def live(self):
         sleeper = rospy.Rate(1 / self.tick_rate)
-        middleware.loginfo('giskard is ready')
+        get_middleware().loginfo('giskard is ready')
         while not rospy.is_shutdown():
             try:
                 self.tick()
                 sleeper.sleep()
             except KeyboardInterrupt:
                 break
-        middleware.loginfo('giskard died')
+        get_middleware().loginfo('giskard died')
 
     def kill_all_services(self):
         self.blackboard_exchange.get_blackboard_variables_srv.shutdown()
@@ -173,7 +174,7 @@ def render_dot_tree(root, visibility_level=common.VisibilityLevel.DETAIL, name=N
     """
     graph = generate_pydot_graph(root, visibility_level)
     filename_wo_extension = root.name.lower().replace(" ", "_") if name is None else name
-    middleware.loginfo(f"Writing {filename_wo_extension}.dot/svg/png")
+    get_middleware().loginfo(f"Writing {filename_wo_extension}.dot/svg/png")
     # graph.write(filename_wo_extension + '.dot')
     graph.write_png(filename_wo_extension + '.png')
     # graph.write_svg(filename_wo_extension + '.svg')
@@ -227,6 +228,7 @@ def generate_pydot_graph(root, visibility_level):
         #     attributes = (attributes[0], 'gray20', blackbox_font_colours[node.blackbox_level])
         return attributes
 
+    add_children_stats_to_parent(root)
     fontsize = 11
     fontname = 'Courier'
     graph = pydot.Dot(graph_type='digraph')
@@ -236,11 +238,11 @@ def generate_pydot_graph(root, visibility_level):
     graph.set_node_defaults(fontname='times-roman')
     graph.set_edge_defaults(fontname='times-roman')
     (node_shape, node_colour, node_font_colour) = get_node_attributes(root, visibility_level)
-    node_root = pydot.Node(root.name, shape=node_shape, style="filled", fillcolor=node_colour, fontsize=fontsize,
+    root_name, _ = add_stats_to_name(root, root.name)
+    node_root = pydot.Node(root_name, shape=node_shape, style="filled", fillcolor=node_colour, fontsize=fontsize,
                            fontcolor=node_font_colour, fontname=fontname)
     graph.add_node(node_root)
-    names = [root.name]
-    add_children_stats_to_parent(root)
+    names = [root_name]
 
     def add_edges(root, root_dot_name, visibility_level):
         if visibility_level < root.blackbox_level:
@@ -251,33 +253,9 @@ def generate_pydot_graph(root, visibility_level):
                 proposed_dot_name = name
                 if hasattr(c, 'original'):
                     proposed_dot_name += f'\n{type(c).__name__}'
-                color = 'black'
                 original_c = get_original_node(c)
 
-                # %% add run time stats to proposed dot name
-                function_name_padding = 20
-                entry_name_padding = 8
-                number_padding = function_name_padding - entry_name_padding
-                if hasattr(original_c, '__times'):
-                    time_dict = original_c.__times
-                else:
-                    time_dict = {}
-                for function_name in time_function_names:
-                    if function_name in time_dict:
-                        times = time_dict[function_name]
-                        average_time = np.average(times)
-                        std_time = np.std(times)
-                        total_time = np.sum(times)
-                        if total_time > 1:
-                            color = 'red'
-                        proposed_dot_name += f'\n{function_name.ljust(function_name_padding, "-")}' \
-                                             f'\n{"  #calls".ljust(entry_name_padding)}{f"={len(times)}".ljust(number_padding)}' \
-                                             f'\n{"  avg".ljust(entry_name_padding)}{f"={average_time:.7f}".ljust(number_padding)}' \
-                                             f'\n{"  std".ljust(entry_name_padding)}{f"={std_time:.7f}".ljust(number_padding)}' \
-                                             f'\n{"  max".ljust(entry_name_padding)}{f"={max(times):.7f}".ljust(number_padding)}' \
-                                             f'\n{"  sum".ljust(entry_name_padding)}{f"={total_time:.7f}".ljust(number_padding)}'
-                    else:
-                        proposed_dot_name += f'\n{function_name.ljust(function_name_padding, "-")}'
+                proposed_dot_name, color = add_stats_to_name(original_c, proposed_dot_name)
                 while proposed_dot_name in names:
                     proposed_dot_name = proposed_dot_name + "*"
 
@@ -291,9 +269,37 @@ def generate_pydot_graph(root, visibility_level):
                 if (hasattr(c, 'children') and c.children != []) or (hasattr(c, '_children') and c._children != []):
                     add_edges(c, proposed_dot_name, visibility_level)
 
-    add_edges(root, root.name, visibility_level)
+    add_edges(root, root_name, visibility_level)
     return graph
 
+
+def add_stats_to_name(behavior: Behaviour, name: str) -> Tuple[str, str]:
+    # %% add run time stats to proposed dot name
+    color = 'black'
+    function_name_padding = 20
+    entry_name_padding = 8
+    number_padding = function_name_padding - entry_name_padding
+    if hasattr(behavior, '__times'):
+        time_dict = behavior.__times
+    else:
+        time_dict = {}
+    for function_name in time_function_names:
+        if function_name in time_dict:
+            times = time_dict[function_name]
+            average_time = np.average(times)
+            std_time = np.std(times)
+            total_time = np.sum(times)
+            if total_time > 1:
+                color = 'red'
+            name += f'\n{function_name.ljust(function_name_padding, "-")}' \
+                                 f'\n{"  #calls".ljust(entry_name_padding)}{f"={len(times)}".ljust(number_padding)}' \
+                                 f'\n{"  avg".ljust(entry_name_padding)}{f"={average_time:.7f}".ljust(number_padding)}' \
+                                 f'\n{"  std".ljust(entry_name_padding)}{f"={std_time:.7f}".ljust(number_padding)}' \
+                                 f'\n{"  max".ljust(entry_name_padding)}{f"={max(times):.7f}".ljust(number_padding)}' \
+                                 f'\n{"  sum".ljust(entry_name_padding)}{f"={total_time:.7f}".ljust(number_padding)}'
+        else:
+            name += f'\n{function_name.ljust(function_name_padding, "-")}'
+    return name, color
 
 def add_children_stats_to_parent(parent: Composite) -> None:
     if ((hasattr(parent, 'children') and parent.children != [])
@@ -314,11 +320,9 @@ def add_children_stats_to_parent(parent: Composite) -> None:
                 time_dict = {}
             for function_name in time_function_names:
                 if function_name in time_dict:
-                    if function_name not in parent.__times:
-                        parent.__times = deepcopy(time_dict)
-                    else:
-                        for i, (v1, v2) in enumerate(zip(parent.__times[function_name], time_dict[function_name])):
-                            if i > len(parent.__times[function_name]):
-                                parent.__times[function_name].append(v2)
-                            else:
-                                parent.__times[function_name][i] = v1 + v2
+                    parent_len = len(parent.__times[function_name])
+                    child_len = len(time_dict[function_name])
+                    max_len = max(parent_len, child_len)
+                    parent_padded = np.pad(parent.__times[function_name], (0, max_len - parent_len), 'constant')
+                    child_padded = np.pad(time_dict[function_name], (0, max_len - child_len), 'constant')
+                    parent.__times[function_name] = parent_padded + child_padded

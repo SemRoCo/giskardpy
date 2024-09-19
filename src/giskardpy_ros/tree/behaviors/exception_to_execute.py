@@ -1,3 +1,4 @@
+from line_profiler import profile
 from py_trees import Status
 
 from giskardpy_ros.tree.behaviors.plugin import GiskardBehavior

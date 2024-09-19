@@ -4,10 +4,11 @@ from typing import Any
 import actionlib
 import rosnode
 import rospy
+from line_profiler import profile
 
 from giskard_msgs.msg import MoveGoal
 from giskardpy.data_types.exceptions import GiskardException
-from giskardpy.middleware import middleware
+from giskardpy.middleware import get_middleware
 from giskardpy.utils.decorators import record_time
 
 
@@ -58,7 +59,7 @@ class ActionServerHandler:
         client_name = self._as.current_goal.goal.goal_id.id.split('-')[0]
         self.client_alive = rosnode.rosnode_ping(client_name, max_count=1)
         if not self.client_alive:
-            middleware.logerr(f'Lost connection to Client "{client_name}".')
+            get_middleware().logerr(f'Lost connection to Client "{client_name}".')
             self.client_alive_checker.shutdown()
 
     def accept_goal(self) -> None:

@@ -11,7 +11,7 @@ from giskardpy.data_types.data_types import PrefixName, Derivatives
 from giskardpy.data_types.exceptions import GoalInitalizationException, ExecutionException
 from giskardpy.goals.goal import Goal
 from giskardpy.god_map import god_map
-from giskardpy.middleware import middleware
+from giskardpy.middleware import get_middleware
 from giskardpy.model.joints import OmniDrive
 from giskardpy.motion_graph.monitors.monitors import ExpressionMonitor, EndMotion
 from giskardpy.symbol_manager import symbol_manager
@@ -97,7 +97,7 @@ class CarryMyBullshit(Goal):
                  end_condition: cas.Expression = cas.FalseSymbol):
         super().__init__(name=name)
         if drive_back:
-            middleware.loginfo('driving back')
+            get_middleware().loginfo('driving back')
         self.end_of_traj_reached = False
         self.enable_laser_avoidance = enable_laser_avoidance
         if CarryMyBullshit.pub is None:
@@ -157,7 +157,7 @@ class CarryMyBullshit(Goal):
             CarryMyBullshit.traj_data = [self.get_current_point()]
         if clear_path:
             CarryMyBullshit.traj_flipped = False
-            middleware.loginfo('cleared old path')
+            get_middleware().loginfo('cleared old path')
         if CarryMyBullshit.laser_sub is None:
             CarryMyBullshit.laser_sub = rospy.Subscriber(self.laser_topic_name, LaserScan, self.laser_cb, queue_size=10)
         if CarryMyBullshit.point_cloud_laser_sub is None and self.point_cloud_laser_topic_name is not None:
@@ -179,9 +179,9 @@ class CarryMyBullshit(Goal):
             else:
                 raise GoalInitalizationException(
                     f'didn\'t receive enough points after {wait_for_patrick_timeout}s')
-            middleware.loginfo(f'waiting for one more target point for {wait_for_patrick_timeout}s')
+            get_middleware().loginfo(f'waiting for one more target point for {wait_for_patrick_timeout}s')
             rospy.wait_for_message(patrick_topic_name, PointStamped, rospy.Duration(wait_for_patrick_timeout))
-            middleware.loginfo('received target point.')
+            get_middleware().loginfo('received target point.')
 
         else:
             if not CarryMyBullshit.traj_flipped:
@@ -500,13 +500,13 @@ class CarryMyBullshit(Goal):
         current_time = rospy.get_rostime().to_sec()
         base_laser_age = current_time - self.last_scan.header.stamp.to_sec()
         if base_laser_age > self.laser_scan_age_threshold:
-            middleware.logwarn(f'last base laser scan is too old: {base_laser_age}')
+            get_middleware().logwarn(f'last base laser scan is too old: {base_laser_age}')
             self.closest_laser_left = self.laser_distance_threshold_width
             self.closest_laser_right = -self.laser_distance_threshold_width
             self.closest_laser_reading = 0
         point_cloud_laser_age = current_time - self.last_scan_pc.header.stamp.to_sec()
         if point_cloud_laser_age > self.laser_scan_age_threshold and CarryMyBullshit.point_cloud_laser_sub is not None:
-            middleware.logwarn(f'last point cloud laser scan is too old: {point_cloud_laser_age}')
+            get_middleware().logwarn(f'last point cloud laser scan is too old: {point_cloud_laser_age}')
             self.closest_laser_left_pc = self.laser_distance_threshold_width
             self.closest_laser_right_pc = -self.laser_distance_threshold_width
             self.closest_laser_reading_pc = 0
@@ -533,7 +533,7 @@ class CarryMyBullshit(Goal):
                 m_line.points.append(p)
             ms.markers.append(m_line)
         except Exception as e:
-            middleware.logwarn('failed to create traj marker')
+            get_middleware().logwarn('failed to create traj marker')
         self.pub.publish(ms)
 
     def publish_laser_thresholds(self):
@@ -645,7 +645,7 @@ class CarryMyBullshit(Goal):
             CarryMyBullshit.trajectory = np.array(CarryMyBullshit.traj_data)
             self.human_point = point
         except Exception as e:
-            middleware.logwarn(f'rejected new target because: {e}')
+            get_middleware().logwarn(f'rejected new target because: {e}')
         self.publish_trajectory()
 
 class FollowNavPath(Goal):
@@ -728,7 +728,31 @@ class FollowNavPath(Goal):
             cb = lambda scan: self.laser_cb(scan, i)
             self.laser_subs.append(rospy.Subscriber(laser_topic, LaserScan, cb, queue_size=10))
         self.publish_tracking_radius()
-        self.path_to_trajectory(path=path)
+        self.publish_distance_to_target()
+        if not self.drive_back:
+            if CarryMyBullshit.target_sub is None:
+                CarryMyBullshit.target_sub = rospy.Subscriber(patrick_topic_name, PointStamped, self.target_cb,
+                                                              queue_size=10)
+            rospy.sleep(0.5)
+            for i in range(int(wait_for_patrick_timeout)):
+                if god_map.move_action_server.is_preempt_requested() or not god_map.move_action_server.is_client_alive():
+                    raise GoalInitalizationException('goal canceled while waiting for target points')
+                if CarryMyBullshit.trajectory.shape[0] > 5:
+                    break
+                print(f'waiting for at least 5 traj points, current length {len(CarryMyBullshit.trajectory)}')
+                rospy.sleep(0.5)
+            else:
+                raise GoalInitalizationException(
+                    f'didn\'t receive enough points after {wait_for_patrick_timeout}s')
+            logging.loginfo(f'waiting for one more target point for {wait_for_patrick_timeout}s')
+            rospy.wait_for_message(patrick_topic_name, PointStamped, rospy.Duration(wait_for_patrick_timeout))
+            logging.loginfo('received target point.')
+
+        else:
+            if not CarryMyBullshit.traj_flipped:
+                CarryMyBullshit.trajectory = np.flip(CarryMyBullshit.trajectory, axis=0)
+                CarryMyBullshit.traj_flipped = True
+            self.publish_trajectory()
 
         # %% real shit
         root_T_bf = god_map.world.compose_fk_expression(self.root, self.tip)

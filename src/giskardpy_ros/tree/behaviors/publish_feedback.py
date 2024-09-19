@@ -1,5 +1,8 @@
 from copy import deepcopy
 from typing import Optional
+
+from line_profiler import profile
+
 import giskardpy_ros.ros1.msg_converter as msg_converter
 import numpy as np
 import rospy

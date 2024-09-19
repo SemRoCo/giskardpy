@@ -35,10 +35,14 @@ from giskardpy.motion_graph.monitors.monitors import LocalMinimumReached, TimeAb
 from giskardpy.motion_graph.monitors.overwrite_state_monitors import SetOdometry, SetSeedConfiguration
 from giskardpy.motion_graph.monitors.payload_monitors import Print, Sleep, SetMaxTrajectoryLength, \
     PayloadAlternator
-from giskardpy.utils.utils import get_all_classes_in_package
 from giskardpy_ros.ros1 import msg_converter
 from giskardpy_ros.ros1.msg_converter import kwargs_to_json
 from giskardpy_ros.utils.utils import make_world_body_box
+from giskardpy.utils.utils import get_all_classes_in_package
+from giskardpy.goals.feature_functions import AlignPerpendicular, HeightGoal, AngleGoal, DistanceGoal
+from giskardpy.motion_graph.monitors.feature_monitors import PerpendicularMonitor, AngleMonitor, HeightMonitor, \
+    DistanceMonitor
+from giskard_msgs.msg import ExecutionState
 
 
 class WorldWrapper:
@@ -1286,6 +1290,138 @@ class MotionGoalWrapper:
                              end_condition=end_condition,
                              **kwargs)
 
+    def add_align_perpendicular(self,
+                                reference_normal: Vector3Stamped,
+                                tip_link: str,
+                                tip_normal: Vector3Stamped,
+                                root_link: str,
+                                tip_group: str = None,
+                                root_group: str = None,
+                                reference_velocity: Optional[float] = None,
+                                weight: Optional[float] = None,
+                                name: Optional[str] = None,
+                                start_condition: str = '',
+                                hold_condition: str = '',
+                                end_condition: str = '',
+                                **kwargs: goal_parameter):
+
+        self.add_motion_goal(motion_goal_class=AlignPerpendicular.__name__,
+                             tip_normal=tip_normal,
+                             reference_normal=reference_normal,
+                             tip_link=tip_link,
+                             root_link=root_link,
+                             tip_group=tip_group,
+                             root_group=root_group,
+                             max_vel=reference_velocity,
+                             weight=weight,
+                             name=name,
+                             start_condition=start_condition,
+                             hold_condition=hold_condition,
+                             end_condition=end_condition,
+                             **kwargs)
+
+    def add_height(self,
+                   reference_point: PointStamped,
+                   tip_point: PointStamped,
+                   tip_link: str,
+                   root_link: str,
+                   lower_limit: float,
+                   upper_limit: float,
+                   tip_group: str = None,
+                   root_group: str = None,
+                   reference_velocity: Optional[float] = None,
+                   weight: Optional[float] = None,
+                   name: Optional[str] = None,
+                   start_condition: str = '',
+                   hold_condition: str = '',
+                   end_condition: str = '',
+                   **kwargs: goal_parameter):
+
+        self.add_motion_goal(motion_goal_class=HeightGoal.__name__,
+                             tip_point=tip_point,
+                             reference_point=reference_point,
+                             tip_link=tip_link,
+                             root_link=root_link,
+                             lower_limit=lower_limit,
+                             upper_limit=upper_limit,
+                             tip_group=tip_group,
+                             root_group=root_group,
+                             max_vel=reference_velocity,
+                             weight=weight,
+                             name=name,
+                             start_condition=start_condition,
+                             hold_condition=hold_condition,
+                             end_condition=end_condition,
+                             **kwargs)
+
+    def add_distance(self,
+                     reference_point: PointStamped,
+                     tip_point: PointStamped,
+                     tip_link: str,
+                     root_link: str,
+                     lower_limit: float,
+                     upper_limit: float,
+                     tip_group: str = None,
+                     root_group: str = None,
+                     reference_velocity: Optional[float] = None,
+                     weight: Optional[float] = None,
+                     name: Optional[str] = None,
+                     start_condition: str = '',
+                     hold_condition: str = '',
+                     end_condition: str = '',
+                     **kwargs: goal_parameter):
+
+        self.add_motion_goal(motion_goal_class=DistanceGoal.__name__,
+                             tip_point=tip_point,
+                             reference_point=reference_point,
+                             tip_link=tip_link,
+                             root_link=root_link,
+                             lower_limit=lower_limit,
+                             upper_limit=upper_limit,
+                             tip_group=tip_group,
+                             root_group=root_group,
+                             max_vel=reference_velocity,
+                             weight=weight,
+                             name=name,
+                             start_condition=start_condition,
+                             hold_condition=hold_condition,
+                             end_condition=end_condition,
+                             **kwargs)
+
+    def add_angle(self,
+                  reference_vector: Vector3Stamped,
+                  tip_link: str,
+                  tip_vector: Vector3Stamped,
+                  root_link: str,
+                  lower_angle: float,
+                  upper_angle: float,
+                  tip_group: str = None,
+                  root_group: str = None,
+                  reference_velocity: Optional[float] = None,
+                  weight: Optional[float] = None,
+                  name: Optional[str] = None,
+                  start_condition: str = '',
+                  hold_condition: str = '',
+                  end_condition: str = '',
+                  **kwargs: goal_parameter):
+
+        self.add_motion_goal(motion_goal_class=AngleGoal.__name__,
+                             tip_vector=tip_vector,
+                             reference_vector=reference_vector,
+                             tip_link=tip_link,
+                             root_link=root_link,
+                             lower_angle=lower_angle,
+                             upper_angle=upper_angle,
+                             tip_group=tip_group,
+                             root_group=root_group,
+                             max_vel=reference_velocity,
+                             weight=weight,
+                             name=name,
+                             start_condition=start_condition,
+                             hold_condition=hold_condition,
+                             end_condition=end_condition,
+                             **kwargs)
+
 
 class MonitorWrapper:
     _monitors: List[Monitor]
@@ -1717,9 +1853,130 @@ class MonitorWrapper:
                                 end_condition=end_condition,
                                 mod=mod)
 
+    def add_vectors_perpendicular(self,
+                                  root_link: str,
+                                  tip_link: str,
+                                  reference_normal: Vector3Stamped,
+                                  tip_normal: Vector3Stamped,
+                                  name: Optional[str] = None,
+                                  start_condition: str = '',
+                                  hold_condition: str = '',
+                                  end_condition: Optional[str] = None,
+                                  root_group: Optional[str] = None,
+                                  tip_group: Optional[str] = None,
+                                  threshold: float = 0.01) -> str:
+        """
+        True if tip_normal of tip_link is perpendicular to goal_normal within threshold.
+        """
+        return self.add_monitor(monitor_class=PerpendicularMonitor.__name__,
+                                name=name,
+                                root_link=root_link,
+                                tip_link=tip_link,
+                                reference_normal=reference_normal,
+                                tip_normal=tip_normal,
+                                start_condition=start_condition,
+                                hold_condition=hold_condition,
+                                end_condition=end_condition,
+                                root_group=root_group,
+                                tip_group=tip_group,
+                                threshold=threshold)
+
+    def add_angle(self,
+                  root_link: str,
+                  tip_link: str,
+                  reference_vector: Vector3Stamped,
+                  tip_vector: Vector3Stamped,
+                  lower_angle: float,
+                  upper_angle: float,
+                  name: Optional[str] = None,
+                  start_condition: str = '',
+                  hold_condition: str = '',
+                  end_condition: Optional[str] = None,
+                  root_group: Optional[str] = None,
+                  tip_group: Optional[str] = None) -> str:
+        """
+        True if angle between tip_vector and reference_vector is within lower and upper angle.
+        """
+        return self.add_monitor(monitor_class=AngleMonitor.__name__,
+                                name=name,
+                                root_link=root_link,
+                                tip_link=tip_link,
+                                reference_vector=reference_vector,
+                                tip_vector=tip_vector,
+                                lower_angle=lower_angle,
+                                upper_angle=upper_angle,
+                                start_condition=start_condition,
+                                hold_condition=hold_condition,
+                                end_condition=end_condition,
+                                root_group=root_group,
+                                tip_group=tip_group)
+
+    def add_height(self,
+                   root_link: str,
+                   tip_link: str,
+                   reference_point: PointStamped,
+                   tip_point: PointStamped,
+                   lower_limit: float,
+                   upper_limit: float,
+                   name: Optional[str] = None,
+                   start_condition: str = '',
+                   hold_condition: str = '',
+                   end_condition: Optional[str] = None,
+                   root_group: Optional[str] = None,
+                   tip_group: Optional[str] = None) -> str:
+        """
+        True if distance along the z-axis of root_link between tip_point and reference_point
+        is within lower and upper limit.
+        """
+        return self.add_monitor(monitor_class=HeightMonitor.__name__,
+                                name=name,
+                                root_link=root_link,
+                                tip_link=tip_link,
+                                reference_point=reference_point,
+                                tip_point=tip_point,
+                                lower_limit=lower_limit,
+                                upper_limit=upper_limit,
+                                start_condition=start_condition,
+                                hold_condition=hold_condition,
+                                end_condition=end_condition,
+                                root_group=root_group,
+                                tip_group=tip_group)
+
+    def add_distance(self,
+                     root_link: str,
+                     tip_link: str,
+                     reference_point: PointStamped,
+                     tip_point: PointStamped,
+                     lower_limit: float,
+                     upper_limit: float,
+                     name: Optional[str] = None,
+                     start_condition: str = '',
+                     hold_condition: str = '',
+                     end_condition: Optional[str] = None,
+                     root_group: Optional[str] = None,
+                     tip_group: Optional[str] = None) -> str:
+        """
+        True if distance between tip_point and reference_point on the plane (that has the z-axis of
+        root_link as a normal vector) is within lower and upper limit.
+        """
+        return self.add_monitor(monitor_class=DistanceMonitor.__name__,
+                                name=name,
+                                root_link=root_link,
+                                tip_link=tip_link,
+                                reference_point=reference_point,
+                                tip_point=tip_point,
+                                lower_limit=lower_limit,
+                                upper_limit=upper_limit,
+                                start_condition=start_condition,
+                                hold_condition=hold_condition,
+                                end_condition=end_condition,
+                                root_group=root_group,
+                                tip_group=tip_group)
+
 
 class GiskardWrapper:
     last_feedback: MoveFeedback = None
+    last_execution_state: ExecutionState = None
 
     def __init__(self, node_name: str = 'giskard', avoid_name_conflict: bool = False):
         """
@@ -1802,7 +2059,9 @@ class GiskardWrapper:
         goal.type = goal_type
         if wait:
             self._client.send_goal_and_wait(goal)
-            return self._client.get_result()
+            result = self._client.get_result()
+            self.last_execution_state = result
+            return result
         else:
             self._client.send_goal(goal, feedback_cb=self._feedback_cb)
 
@@ -1836,3 +2095,55 @@ class GiskardWrapper:
 
     def _feedback_cb(self, msg: MoveFeedback):
         self.last_feedback = msg
+
+    def get_end_motion_reason(self, move_result: Optional[MoveResult] = None, show_all: bool = False) -> Dict[
+        str, bool]:
+        """
+        Analyzes a MoveResult msg to return a list of all monitors that hindered the EndMotion Monitors from becoming active.
+        Uses the last received MoveResult msg from execute() or projection() when not explicitly given.
+        :param move_result: the move_result msg to analyze
+        :param show_all: returns the state of all monitors when show_all==True
+        :return: Dict with monitor name as key and True or False as value
+        """
+        if not move_result and not self.last_execution_state:
+            raise Exception('No MoveResult available to analyze')
+        elif not move_result:
+            execution_state = self.last_execution_state
+        else:
+            execution_state = move_result.execution_state
+
+        result = {}
+        if show_all:
+            return {monitor.name: state for monitor, state in
+                    zip(execution_state.monitors, execution_state.monitor_state)}
+
+        failedEndMotion_ids = []
+        for idx, monitor in enumerate(execution_state.monitors):
+            if monitor.monitor_class == 'EndMotion' and execution_state.monitor_state[idx] == 0:
+                failedEndMotion_ids.append(idx)
+
+        if len(failedEndMotion_ids) == 0:
+            # the end motion was successful
+            return result
+
+        def search_for_monitor_values_in_start_condition(start_condition: str):
+            res = []
+            for monitor, state in zip(execution_state.monitors, execution_state.monitor_state):
+                if f'\'{monitor.name}\'' in start_condition and state == 0:
+                    res.append(monitor)
+            return res
+
+        for endMotion_idx in failedEndMotion_ids:
+            start_condition = execution_state.monitors[endMotion_idx].start_condition
+            false_monitors = search_for_monitor_values_in_start_condition(start_condition=start_condition)
+            # repeatedly search for all inactive monitors in all start_conditions directly
+            # connected to the endMotion start_condition
+            for idx, false_monitor in enumerate(false_monitors):
+                if false_monitors[idx].start_condition != '1.0':
+                    false_monitors.extend(
+                        search_for_monitor_values_in_start_condition(false_monitor.start_condition))
+
+            for mon in false_monitors:
+                result[mon.name] = False
+
+        return result

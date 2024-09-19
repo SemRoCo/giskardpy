@@ -3,6 +3,7 @@ from copy import deepcopy
 from typing import Optional
 
 import rospy
+from line_profiler import profile
 from sensor_msgs.msg import JointState
 from py_trees import Status
 

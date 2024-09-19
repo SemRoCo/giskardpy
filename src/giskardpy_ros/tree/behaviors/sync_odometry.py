@@ -1,5 +1,6 @@
 import rospy
 from geometry_msgs.msg import PoseWithCovarianceStamped
+from line_profiler import profile
 from nav_msgs.msg import Odometry
 from py_trees import Status
 

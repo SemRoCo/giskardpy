@@ -55,6 +55,8 @@ jobs:
       test3: test/test_integration_pr2.py::TestWorldManipulation
       test4: test/test_integration_pr2.py::TestManipulability::test_manip1
       test5: test/test_integration_pr2.py::TestWeightScaling
+      test6: test/test_integration_pr2.py::TestFeatureFunctions
+      test7: test/test_integration_pr2.py::TestEndMotionReason
   pr2_part2:
     needs: [ build_dependencies ]
     uses: ./.github/workflows/reusable_robot_ci.yml

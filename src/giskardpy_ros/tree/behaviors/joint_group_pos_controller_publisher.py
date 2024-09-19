@@ -1,6 +1,7 @@
 from copy import deepcopy
 
 import rospy
+from line_profiler import profile
 from std_msgs.msg import Float64MultiArray
 
 from giskardpy.data_types.data_types import Derivatives

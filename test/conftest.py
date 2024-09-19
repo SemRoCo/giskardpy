@@ -4,9 +4,9 @@ from geometry_msgs.msg import PoseStamped
 
 import giskardpy_ros.ros1.tfwrapper as tf
 from giskardpy.god_map import god_map
-from giskardpy.middleware import middleware, set_middleware
+from giskardpy.middleware import get_middleware, set_middleware
 from giskardpy.model.joints import OneDofJoint
-from giskardpy_ros import ROS1Wrapper
+from giskardpy_ros.ros1.interface import ROS1Wrapper
 from giskardpy_ros.tree.blackboard_utils import GiskardBlackboard
 from utils_for_tests import launch_launchfile
 
@@ -15,7 +15,7 @@ from utils_for_tests import GiskardTestWrapper
 
 @pytest.fixture(scope='module')
 def ros(request):
-    middleware.loginfo('init ros')
+    get_middleware().loginfo('init ros')
     rospy.init_node('tests')
     set_middleware(ROS1Wrapper())
     tf.init(60)
@@ -24,8 +24,8 @@ def ros(request):
         try:
             GiskardBlackboard().tree.render()
         except KeyError as e:
-            middleware.logerr(f'Failed to render behavior tree.')
-        middleware.loginfo('shutdown ros')
+            get_middleware().logerr(f'Failed to render behavior tree.')
+        get_middleware().loginfo('shutdown ros')
         rospy.signal_shutdown('die')
 
     try:
@@ -34,20 +34,20 @@ def ros(request):
         try:
             launch_launchfile('package://iai_kitchen/launch/upload_kitchen_obj.launch')
         except:
-            middleware.logwarn('iai_apartment not found')
+            get_middleware().logwarn('iai_apartment not found')
     try:
         rospy.get_param('apartment_description')
     except:
         try:
             launch_launchfile('package://iai_apartment/launch/upload_apartment.launch')
         except:
-            middleware.logwarn('iai_kitchen not found')
+            get_middleware().logwarn('iai_kitchen not found')
     request.addfinalizer(kill_ros)
 
 
 @pytest.fixture()
 def resetted_giskard(giskard: GiskardTestWrapper) -> GiskardTestWrapper:
-    middleware.loginfo('resetting giskard')
+    get_middleware().loginfo('resetting giskard')
     giskard.restart_ticking()
     giskard.clear_motion_goals_and_monitors()
     if GiskardBlackboard().tree.is_standalone() and giskard.has_odometry_joint():

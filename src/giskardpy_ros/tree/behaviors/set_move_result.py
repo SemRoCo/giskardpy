@@ -1,3 +1,4 @@
+from line_profiler import profile
 from py_trees import Status
 
 from giskard_msgs.msg import MoveResult, GiskardError
@@ -5,7 +6,7 @@ from giskardpy.data_types.exceptions import *
 from giskardpy.goals.collision_avoidance import CollisionAvoidance
 from giskardpy.god_map import god_map
 from giskardpy_ros.tree.behaviors.plugin import GiskardBehavior
-from giskardpy.middleware import middleware
+from giskardpy.middleware import get_middleware
 from giskardpy_ros.tree.blackboard_utils import GiskardBlackboard
 from giskardpy.utils.decorators import record_time
 import giskardpy_ros.ros1.msg_converter as msg_converter
@@ -36,12 +37,12 @@ class SetMoveResult(GiskardBehavior):
                                                                             start_time=0,
                                                                             joints=joints)
         if isinstance(e, PreemptedException):
-            middleware.logwarn(f'Goal preempted: \'{move_result.error.msg}\'.')
+            get_middleware().logwarn(f'Goal preempted: \'{move_result.error.msg}\'.')
         else:
             if self.print:
                 if move_result.error.type == GiskardError.SUCCESS:
-                    middleware.loginfo(f'{self.context} succeeded.')
+                    get_middleware().loginfo(f'{self.context} succeeded.')
                 else:
-                    middleware.logwarn(f'{self.context} failed: {move_result.error.msg}.')
+                    get_middleware().logwarn(f'{self.context} failed: {move_result.error.msg}.')
         GiskardBlackboard().move_action_server.result_msg = move_result
         return Status.SUCCESS

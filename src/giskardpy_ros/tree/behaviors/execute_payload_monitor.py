@@ -1,5 +1,6 @@
 from threading import Thread
 
+from line_profiler import profile
 from py_trees import Status
 
 from giskardpy.motion_graph.monitors.payload_monitors import PayloadMonitor

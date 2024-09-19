@@ -6,13 +6,14 @@ import rospy
 import yaml
 from geometry_msgs.msg import PoseStamped, Vector3Stamped, PointStamped, TransformStamped, Pose, Quaternion, Point, \
     Vector3, QuaternionStamped, Transform, TwistStamped
+from line_profiler import profile
 from tf2_geometry_msgs import do_transform_pose, do_transform_vector3, do_transform_point
 from tf2_kdl import do_transform_twist
 from tf2_py import InvalidArgumentException
 from tf2_ros import Buffer, TransformListener
 
 from giskardpy.data_types.data_types import PrefixName
-from giskardpy.middleware import middleware
+from giskardpy.middleware import get_middleware
 from giskardpy.utils.decorators import memoize
 from giskardpy.utils.math import rotation_matrix_from_quaternion
 
@@ -33,7 +34,7 @@ def init(tf_buffer_size: float = 15) -> None:
     try:
         get_tf_root()
     except AssertionError as e:
-        middleware.logwarn(e)
+        get_middleware().logwarn(e)
 
 
 def get_tf_buffer() -> Buffer:

@@ -1,6 +1,7 @@
 from itertools import chain
 from typing import Dict, List
 
+from line_profiler import profile
 from py_trees import Status
 
 import giskardpy.casadi_wrapper as w

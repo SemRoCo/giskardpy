@@ -4,10 +4,11 @@ from typing import Optional
 import numpy as np
 import rospy
 from geometry_msgs.msg import Twist
+from line_profiler import profile
 from py_trees import Status
 
 from giskardpy.god_map import god_map
-from giskardpy.middleware import middleware
+from giskardpy.middleware import get_middleware
 from giskardpy_ros.ros1.ros1_interface import wait_for_topic_to_appear
 from giskardpy.model.joints import OmniDrive, DiffDrive
 from giskardpy_ros.tree.behaviors.plugin import GiskardBehavior
@@ -44,7 +45,7 @@ class SendCmdVel(GiskardBehavior, ABC):
             joint_name = god_map.world.search_for_joint_name(joint_name)
             self.joint = god_map.world.joints[joint_name]
         god_map.world.register_controlled_joints([self.joint.name])
-        middleware.loginfo(f'Received controlled joints from \'{cmd_vel_topic}\'.')
+        get_middleware().loginfo(f'Received controlled joints from \'{cmd_vel_topic}\'.')
 
     def __str__(self):
         return f'{super().__str__()} ({self.cmd_vel_topic})'

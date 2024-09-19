@@ -2,6 +2,7 @@ import traceback
 from typing import List, Union
 
 import genpy
+from line_profiler import profile
 from py_trees import Status
 
 import giskard_msgs.msg as giskard_msgs
@@ -11,14 +12,15 @@ from giskardpy.data_types.exceptions import InvalidGoalException, UnknownGoalExc
 from giskardpy.goals.base_traj_follower import BaseTrajFollower
 from giskardpy.goals.goal import Goal
 from giskardpy.god_map import god_map
-from giskardpy.middleware import middleware
+from giskardpy.middleware import get_middleware
 from giskardpy.model.joints import OmniDrive, DiffDrive
 from giskardpy.motion_graph.monitors.monitors import TimeAbove, LocalMinimumReached, EndMotion, CancelMotion
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils.decorators import record_time
-from giskardpy_ros.ros1.msg_converter import json_str_to_kwargs
+from giskardpy_ros.ros1.msg_converter import json_str_to_giskard_kwargs
 from giskardpy_ros.tree.behaviors.plugin import GiskardBehavior
 from giskardpy_ros.tree.blackboard_utils import catch_and_raise_to_blackboard, GiskardBlackboard
+from line_profiler import profile
 
 
 class ParseActionGoal(GiskardBehavior):
@@ -32,7 +34,7 @@ class ParseActionGoal(GiskardBehavior):
     @profile
     def update(self):
         move_goal = GiskardBlackboard().move_action_server.goal_msg
-        middleware.loginfo(f'Parsing goal #{GiskardBlackboard().move_action_server.goal_id} message.')
+        get_middleware().loginfo(f'Parsing goal #{GiskardBlackboard().move_action_server.goal_id} message.')
         try:
             self.parse_monitors(move_goal.monitors)
             self.parse_motion_goals(move_goal.goals)
@@ -44,28 +46,28 @@ class ParseActionGoal(GiskardBehavior):
         self.sanity_check()
         # if god_map.is_collision_checking_enabled():
         #     god_map.motion_goal_manager.parse_collision_entries(move_goal.collisions)
-        middleware.loginfo('Done parsing goal message.')
+        get_middleware().loginfo('Done parsing goal message.')
         return Status.SUCCESS
 
     def sanity_check(self) -> None:
         if (not god_map.monitor_manager.has_end_motion_monitor()
                 and not god_map.monitor_manager.has_cancel_motion_monitor()):
-            middleware.logwarn(f'No {EndMotion.__name__} or {CancelMotion.__name__} monitor specified. '
+            get_middleware().logwarn(f'No {EndMotion.__name__} or {CancelMotion.__name__} monitor specified. '
                                f'Motion will not stop unless cancelled externally.')
             return
         if not god_map.monitor_manager.has_end_motion_monitor():
-            middleware.logwarn(f'No {EndMotion.__name__} monitor specified. Motion can\'t end successfully.')
+            get_middleware().logwarn(f'No {EndMotion.__name__} monitor specified. Motion can\'t end successfully.')
 
     @profile
     def parse_monitors(self, monitor_msgs: List[giskard_msgs.Monitor]):
         for monitor_msg in monitor_msgs:
             try:
-                middleware.loginfo(f'Adding monitor of type: \'{monitor_msg.monitor_class}\'')
+                get_middleware().loginfo(f'Adding monitor of type: \'{monitor_msg.monitor_class}\'')
                 C = god_map.monitor_manager.allowed_monitor_types[monitor_msg.monitor_class]
             except KeyError:
                 raise UnknownMonitorException(f'unknown monitor type: \'{monitor_msg.monitor_class}\'.')
             try:
-                kwargs = json_str_to_kwargs(monitor_msg.kwargs, god_map.world)
+                kwargs = json_str_to_giskard_kwargs(monitor_msg.kwargs, god_map.world)
                 hold_condition = kwargs.pop('hold_condition')
                 end_condition = kwargs.pop('end_condition')
                 monitor_name_to_state_expr = {str(key): value.get_state_expression() for key, value in
@@ -96,13 +98,13 @@ class ParseActionGoal(GiskardBehavior):
     def parse_motion_goals(self, motion_goals: List[giskard_msgs.MotionGoal]):
         for motion_goal in motion_goals:
             try:
-                middleware.loginfo(
+                get_middleware().loginfo(
                     f'Adding motion goal of type: \'{motion_goal.motion_goal_class}\' named: \'{motion_goal.name}\'')
                 C = god_map.motion_goal_manager.allowed_motion_goal_types[motion_goal.motion_goal_class]
             except KeyError:
                 raise UnknownGoalException(f'unknown constraint {motion_goal.motion_goal_class}.')
             try:
-                params = json_str_to_kwargs(motion_goal.kwargs, god_map.world)
+                params = json_str_to_giskard_kwargs(motion_goal.kwargs, god_map.world)
                 if motion_goal.name == '':
                     motion_goal.name = None
                 start_condition = god_map.monitor_manager.logic_str_to_expr(motion_goal.start_condition,
@@ -145,7 +147,7 @@ class SetExecutionMode(GiskardBehavior):
     @record_time
     @profile
     def update(self):
-        middleware.loginfo(
+        get_middleware().loginfo(
             f'Goal is of type {get_ros_msgs_constant_name_by_value(type(GiskardBlackboard().move_action_server.goal_msg), GiskardBlackboard().move_action_server.goal_msg.type)}')
         if GiskardBlackboard().move_action_server.is_goal_msg_type_projection():
             GiskardBlackboard().tree.switch_to_projection()

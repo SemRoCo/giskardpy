@@ -4,6 +4,7 @@ from time import time
 from typing import Optional
 
 import rospy
+from line_profiler import profile
 from py_trees import Status, Composite, Behaviour
 
 from giskardpy_ros.tree.behaviors.plugin import GiskardBehavior

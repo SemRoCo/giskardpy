@@ -1,4 +1,6 @@
 from typing import Tuple, Dict, Optional
+
+from line_profiler import profile
 from py_trees import Status
 
 from giskardpy.god_map import god_map

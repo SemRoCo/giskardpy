@@ -15,7 +15,7 @@ from visualization_msgs.msg._InteractiveMarkerControl import InteractiveMarkerCo
 from visualization_msgs.msg._InteractiveMarkerFeedback import InteractiveMarkerFeedback
 from visualization_msgs.msg._Marker import Marker
 
-from giskardpy.middleware import middleware
+from giskardpy.middleware import get_middleware
 from giskardpy_ros.python_interface.old_python_interface import OldGiskardWrapper
 from giskardpy.utils.math import qv_mult
 
@@ -180,7 +180,7 @@ class IMServer(object):
 
         def __call__(self, feedback):
             if feedback.event_type == InteractiveMarkerFeedback.MOUSE_UP:
-                middleware.loginfo('got interactive goal update')
+                get_middleware().loginfo('got interactive goal update')
 
                 p = PoseStamped()
                 p.header.frame_id = feedback.header.frame_id

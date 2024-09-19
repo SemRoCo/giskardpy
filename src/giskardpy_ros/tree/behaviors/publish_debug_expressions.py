@@ -1,5 +1,6 @@
 import numpy as np
 import rospy
+from line_profiler import profile
 from py_trees import Status
 from sensor_msgs.msg import JointState
 

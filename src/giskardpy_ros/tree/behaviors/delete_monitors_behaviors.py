@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
 
+from line_profiler import profile
 from py_trees import Status
 
 from giskardpy.data_types.data_types import TaskState

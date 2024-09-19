@@ -19,7 +19,7 @@ from shape_msgs.msg import SolidPrimitive
 
 from giskard_msgs.msg import WorldBody
 from giskardpy.god_map import god_map
-from giskardpy.middleware import middleware
+from giskardpy.middleware import get_middleware
 
 
 def make_world_body_box(x_length: float = 1, y_length: float = 1, z_length: float = 1) -> WorldBody:

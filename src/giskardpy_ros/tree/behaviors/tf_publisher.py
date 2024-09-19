@@ -2,6 +2,7 @@ from enum import Enum
 
 import rospy
 from geometry_msgs.msg import TransformStamped
+from line_profiler import profile
 from py_trees import Status
 from tf2_msgs.msg import TFMessage
 
@@ -18,6 +19,7 @@ class TfPublishingModes(Enum):
 
     world_objects = 4
     attached_and_world_objects = 6
+
 
 class TFPublisher(GiskardBehavior):
     """

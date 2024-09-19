@@ -2,6 +2,7 @@ import re
 from typing import List, Union, Dict, Tuple
 
 import pydot
+from line_profiler import profile
 from py_trees import Status
 
 import giskard_msgs.msg as giskard_msgs
@@ -11,7 +12,7 @@ from giskardpy.god_map import god_map
 from giskardpy.motion_graph.monitors.monitors import EndMotion, CancelMotion
 from giskardpy_ros.tree.behaviors.plugin import GiskardBehavior
 from giskardpy_ros.tree.behaviors.publish_feedback import giskard_state_to_execution_state
-from giskardpy.middleware import middleware
+from giskardpy.middleware import get_middleware
 from giskardpy.utils.decorators import record_time
 from giskardpy_ros.tree.blackboard_utils import catch_and_raise_to_blackboard, GiskardBlackboard
 from giskardpy.utils.utils import create_path
@@ -157,5 +158,5 @@ class PlotTaskMonitorGraph(GiskardBehavior):
         graph = execution_state_to_dot_graph(execution_state)
         create_path(file_name)
         graph.write_png(file_name)
-        middleware.loginfo(f'Saved task graph at {file_name}.')
+        get_middleware().loginfo(f'Saved task graph at {file_name}.')
         return Status.SUCCESS

@@ -429,7 +429,7 @@ def ros_msg_to_giskard_obj(msg, world: WorldTree):
             return link_name_msg_to_prefix_name(msg, world)
         except UnknownLinkException as e:
             try:
-                return link_name_msg_to_prefix_name(msg, world)
+                return joint_name_msg_to_prefix_name(msg, world)
             except UnknownJointException:
                 raise e
     elif isinstance(msg, GiskardError):

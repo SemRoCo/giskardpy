@@ -95,7 +95,7 @@ class WorldConfig(ABC):
 
     def add_robot_urdf(self,
                        urdf: str,
-                       group_name: str) -> str:
+                       group_name: Optional[str] = None) -> str:
         """
         Add a robot urdf to the world.
         :param urdf: robot urdf as string, not the path

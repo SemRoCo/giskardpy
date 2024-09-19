@@ -1725,12 +1725,13 @@ class MonitorWrapper:
 
     def add_cancel_motion(self,
                           start_condition: str,
-                          error: GiskardError,
+                          error: Exception,
                           name: Optional[str] = None) -> str:
         """
         Cancels the motion if all start_condition are True and will make Giskard return the specified error code.
         Use this to describe when failure conditions.
         """
+        error = msg_converter.exception_to_error_msg(error)
         return self.add_monitor(monitor_class=CancelMotion.__name__,
                                 name=name,
                                 start_condition=start_condition,

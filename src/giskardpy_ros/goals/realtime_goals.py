@@ -1,9 +1,10 @@
 from __future__ import division
 import numpy as np
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Tuple
 
 import rospy
 from geometry_msgs.msg import PointStamped, Point, Vector3
+from nav_msgs.msg import Path
 from sensor_msgs.msg import LaserScan
 from visualization_msgs.msg import MarkerArray, Marker
 
@@ -50,6 +51,7 @@ class RealTimePointing(Pointing):
         data = msg_converter.ros_msg_to_giskard_obj(data, god_map.world)
         data = god_map.world.transform(self.root, data).to_np()
         self.root_P_goal_point = data
+
 
 class CarryMyBullshit(Goal):
     trajectory: np.ndarray = np.array([])
@@ -224,7 +226,6 @@ class CarryMyBullshit(Goal):
         # tangent = root_P_goal_point - root_P_closest_point
         # root_V_tangent = cas.Vector3([tangent.x, tangent.y, 0])
         tip_V_pointing_axis = cas.Vector3(self.tip_V_pointing_axis)
-
 
         if self.drive_back:
             map_P_human = root_P_goal_point
@@ -648,6 +649,7 @@ class CarryMyBullshit(Goal):
             get_middleware().logwarn(f'rejected new target because: {e}')
         self.publish_trajectory()
 
+
 class FollowNavPath(Goal):
     trajectory: np.ndarray
     traj_data: List[np.ndarray]
@@ -728,31 +730,7 @@ class FollowNavPath(Goal):
             cb = lambda scan: self.laser_cb(scan, i)
             self.laser_subs.append(rospy.Subscriber(laser_topic, LaserScan, cb, queue_size=10))
         self.publish_tracking_radius()
-        self.publish_distance_to_target()
-        if not self.drive_back:
-            if CarryMyBullshit.target_sub is None:
-                CarryMyBullshit.target_sub = rospy.Subscriber(patrick_topic_name, PointStamped, self.target_cb,
-                                                              queue_size=10)
-            rospy.sleep(0.5)
-            for i in range(int(wait_for_patrick_timeout)):
-                if god_map.move_action_server.is_preempt_requested() or not god_map.move_action_server.is_client_alive():
-                    raise GoalInitalizationException('goal canceled while waiting for target points')
-                if CarryMyBullshit.trajectory.shape[0] > 5:
-                    break
-                print(f'waiting for at least 5 traj points, current length {len(CarryMyBullshit.trajectory)}')
-                rospy.sleep(0.5)
-            else:
-                raise GoalInitalizationException(
-                    f'didn\'t receive enough points after {wait_for_patrick_timeout}s')
-            logging.loginfo(f'waiting for one more target point for {wait_for_patrick_timeout}s')
-            rospy.wait_for_message(patrick_topic_name, PointStamped, rospy.Duration(wait_for_patrick_timeout))
-            logging.loginfo('received target point.')
-
-        else:
-            if not CarryMyBullshit.traj_flipped:
-                CarryMyBullshit.trajectory = np.flip(CarryMyBullshit.trajectory, axis=0)
-                CarryMyBullshit.traj_flipped = True
-            self.publish_trajectory()
+        self.path_to_trajectory(path=path)
 
         # %% real shit
         root_T_bf = god_map.world.compose_fk_expression(self.root, self.tip)

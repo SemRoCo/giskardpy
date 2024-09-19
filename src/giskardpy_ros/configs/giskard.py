@@ -62,7 +62,7 @@ class Giskard:
             qp_controller_config = QPControllerConfig()
         self.qp_controller_config = qp_controller_config
         if additional_goal_package_paths is None:
-            additional_goal_package_paths = set()
+            additional_goal_package_paths = {'giskardpy_ros.goals'}
         for additional_path in additional_goal_package_paths:
             self.add_goal_package_name(additional_path)
         if additional_monitor_package_paths is None:
@@ -115,14 +115,14 @@ class Giskard:
         if len(new_goals) == 0:
             raise SetupException(f'No classes of type \'{Goal.__name__}\' found in {package_name}.')
         get_middleware().loginfo(f'Made goal classes {new_goals} available Giskard.')
-        god_map.motion_goal_manager.goal_package_paths.add(package_name)
+        god_map.motion_goal_manager.add_goal_package_path(package_name)
 
     def add_monitor_package_name(self, package_name: str) -> None:
         new_monitors = get_all_classes_in_package(package_name, Monitor)
         if len(new_monitors) == 0:
             raise SetupException(f'No classes of type \'{Monitor.__name__}\' found in \'{package_name}\'.')
         get_middleware().loginfo(f'Made Monitor classes \'{new_monitors}\' available Giskard.')
-        god_map.monitor_manager.monitor_package_paths.add(package_name)
+        god_map.monitor_manager.add_monitor_package_path(package_name)
 
     def live(self):
         """

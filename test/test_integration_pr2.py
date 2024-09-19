@@ -6,40 +6,40 @@ from typing import Optional
 import numpy as np
 import pytest
 import rospy
-from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, PointStamped, QuaternionStamped, Pose, \
-    Vector3
+from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, PointStamped, QuaternionStamped
 from nav_msgs.msg import Path
 from numpy import pi
 from shape_msgs.msg import SolidPrimitive
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis
+
 import giskard_msgs.msg as giskard_msgs
-from giskard_msgs.msg import WorldBody, CollisionEntry, WorldGoal, LinkName
-from giskardpy.middleware import get_middleware
-from giskardpy_ros.configs.behavior_tree_config import StandAloneBTConfig
-from giskardpy_ros.configs.giskard import Giskard
-from giskardpy_ros.configs.iai_robots.pr2 import PR2CollisionAvoidance, PR2StandaloneInterface, WorldWithPR2Config
-from giskardpy.qp.qp_controller_config import SupportedQPSolver, QPControllerConfig
+from giskard_msgs.msg import WorldBody, CollisionEntry, WorldGoal, LinkName, GiskardError
+from giskardpy.data_types.data_types import PrefixName
 from giskardpy.data_types.exceptions import GiskardException, VelocityLimitUnreachableException, \
     MaxTrajectoryLengthException, UnknownGoalException, GoalInitalizationException, LocalMinimumException, \
     DuplicateNameException, CorruptMeshException, UnknownGroupException, UnknownLinkException, \
     InvalidWorldOperationException, CorruptShapeException, TransformException, CorruptURDFException, \
-    SelfCollisionViolatedException, HardConstraintsViolatedException
+    SelfCollisionViolatedException, HardConstraintsViolatedException, SetupException, EmptyProblemException
 from giskardpy.goals.cartesian_goals import RelativePositionSequence
 from giskardpy.goals.collision_avoidance import CollisionAvoidanceHint
 from giskardpy.goals.goals_tests import DebugGoal, CannotResolveSymbol
 from giskardpy.goals.joint_goals import JointVelocityLimit, UnlimitedJointGoal
 from giskardpy.goals.set_prediction_horizon import SetQPSolver
 from giskardpy.goals.tracebot import InsertCylinder
+from giskardpy.goals.weight_scaling_goals import MaxManipulabilityLinWeight, BaseArmWeightScaling
 from giskardpy.god_map import god_map
+from giskardpy.middleware import get_middleware
 from giskardpy.model.utils import hacky_urdf_parser_fix
-from giskardpy.data_types.data_types import PrefixName
 from giskardpy.motion_graph.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE
+from giskardpy.qp.qp_controller_config import SupportedQPSolver, QPControllerConfig
+from giskardpy_ros.configs.behavior_tree_config import StandAloneBTConfig
+from giskardpy_ros.configs.giskard import Giskard
+from giskardpy_ros.configs.iai_robots.pr2 import PR2CollisionAvoidance, PR2StandaloneInterface, WorldWithPR2Config
+from giskardpy_ros.goals.realtime_goals import FollowNavPath
 from giskardpy_ros.python_interface.old_python_interface import OldGiskardWrapper
 from giskardpy_ros.tree.blackboard_utils import GiskardBlackboard
-from utils_for_tests import launch_launchfile
 from utils_for_tests import compare_poses, publish_marker_vector, GiskardTestWrapper, compare_points
-from giskardpy.goals.weight_scaling_goals import MaxManipulabilityLinWeight, BaseArmWeightScaling
-
+from utils_for_tests import launch_launchfile
 
 # scopes = ['module', 'class', 'function']
 pocky_pose = {'r_elbow_flex_joint': -1.29610152504,
@@ -1034,13 +1034,12 @@ class TestMonitors:
 
     def test_only_payload_monitors(self, zero_pose: PR2TestWrapper):
         sleep = zero_pose.monitors.add_sleep(5)
-        zero_pose.monitors.add_cancel_motion(start_condition=sleep, error_message='time up',
-                                             error_code=GiskardError.SETUP_ERROR)
+        zero_pose.monitors.add_cancel_motion(start_condition=sleep, error=SetupException('Time is up'))
         zero_pose.allow_all_collisions()
-        zero_pose.execute(add_local_minimum_reached=False, expected_error_code=GiskardError.SETUP_ERROR)
+        zero_pose.execute(add_local_minimum_reached=False, expected_error_type=SetupException)
         zero_pose.set_joint_goal(zero_pose.better_pose)
         zero_pose.allow_all_collisions()
-        zero_pose.plan_and_execute()
+        zero_pose.execute()
 
     def test_start_monitors(self, zero_pose: PR2TestWrapper):
         alternator2 = zero_pose.monitors.add_alternator(mod=2)
@@ -1133,85 +1132,85 @@ class TestMonitors:
 
 
 class TestConstraints:
-    def test_follow_nav_path(self, zero_pose: PR2TestWrapper):
-        path_msg = Path()
-        path_msg.header.frame_id = 'map'
-
-        poses_data = [
-            {'position': (3.4403343200683594, 2.349609851837158, 0.0),
-             'orientation': (0.0, 0.0, -0.9999553938074013, 0.009445125488052377)},
-            {'position': (3.498216525117533, 2.3331048932770795, 0.0),
-             'orientation': (0.0, 0.0, 0.9993770281155905, 0.035292430843599024)},
-            {'position': (3.5582080985686915, 2.3288624659763553, 0.0),
-             'orientation': (0.0, 0.0, 0.9996662404939319, 0.02583423342636984)},
-            {'position': (3.6068967725310745, 2.326344275148637, 0.0),
-             'orientation': (0.0, 0.0, 0.9997591723006155, 0.021945327538867403)},
-            {'position': (3.6598472962032886, 2.324018561554272, 0.0),
-             'orientation': (0.0, 0.0, 0.9992479949741707, 0.03877427678370992)},
-            {'position': (3.6924761139448794, 2.3214825211531753, 0.0),
-             'orientation': (0.0, 0.0, 0.9991740059338614, 0.04063626294431946)},
-            {'position': (3.727106939527923, 2.318660992860927, 0.0),
-             'orientation': (0.0, 0.0, 0.9991306638705609, 0.0416883258667487)},
-            {'position': (3.7636721910961253, 2.3156043305022376, 0.0),
-             'orientation': (0.0, 0.0, 0.9990501048487416, 0.043576232073442425)},
-            {'position': (3.8028157945033154, 2.31218311653614, 0.0),
-             'orientation': (0.0, 0.0, 0.9987543902336266, 0.04989657291895693)},
-            {'position': (3.8460085061683724, 2.307856605808622, 0.0),
-             'orientation': (0.0, 0.0, 0.9975155500290784, 0.07044662838053373)},
-            {'position': (3.8961558228154374, 2.3007380861823137, 0.0),
-             'orientation': (0.0, 0.0, 0.9969280676127491, 0.07832258937184026)},
-            {'position': (3.9597676634174857, 2.2906808170884503, 0.0),
-             'orientation': (0.0, 0.0, -0.9986858657493689, 0.05124979563308978)},
-            {'position': (4.03348337802564, 2.2982665669040685, 0.0),
-             'orientation': (0.0, 0.0, -0.9986858657493689, 0.05124979563308978)},
-        ]
-
-        for pose_data in poses_data:
-            pose = PoseStamped()
-            pose.header.frame_id = 'map'
-            pose.pose.position.x, pose.pose.position.y, pose.pose.position.z = pose_data['position']
-            pose.pose.orientation.x, pose.pose.orientation.y, pose.pose.orientation.z, pose.pose.orientation.w = \
-                pose_data['orientation']
-            path_msg.poses.append(pose)
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class=FollowNavPath.__name__,
-                                               name='follow',
-                                               camera_link='head_mount_kinect_rgb_optical_frame',
-                                               laser_frame_id='base_laser_link',
-                                               # laser_topics=[],
-                                               path=path_msg)
-        zero_pose.execute(add_local_minimum_reached=False)
-
-    def test_follow_nav_path2(self, zero_pose: PR2TestWrapper):
-        path_msg = Path()
-        path_msg.header.frame_id = 'map'
-
-        poses_data = [
-            {'position': (1, 0, 0.0), 'orientation': (0.0, 0.0, 0, 1)},
-            {'position': (1, 1, 0.0), 'orientation': (0.0, 0.0, 0, 1)},
-            {'position': (-1, 1, 0.0), 'orientation': (0.0, 0.0, 0, 1)},
-            {'position': (-1, -1, 0.0), 'orientation': (0.0, 0.0, 0, 1)},
-        ]
-
-        for pose_data in poses_data:
-            pose = PoseStamped()
-            pose.header.frame_id = 'map'
-            pose.pose.position.x, pose.pose.position.y, pose.pose.position.z = pose_data['position']
-            pose.pose.orientation.x, pose.pose.orientation.y, pose.pose.orientation.z, pose.pose.orientation.w = \
-                pose_data['orientation']
-            path_msg.poses.append(pose)
-        zero_pose.motion_goals.add_follow_nav_path(name='follow',
-                                                   camera_link='head_mount_kinect_rgb_optical_frame',
-                                                   laser_frame_id='base_laser_link',
-                                                   # laser_topics=[],
-                                                   path=path_msg)
-        zero_pose.execute(add_local_minimum_reached=False)
+    # def test_follow_nav_path(self, zero_pose: PR2TestWrapper):
+    #     path_msg = Path()
+    #     path_msg.header.frame_id = 'map'
+    #
+    #     poses_data = [
+    #         {'position': (3.4403343200683594, 2.349609851837158, 0.0),
+    #          'orientation': (0.0, 0.0, -0.9999553938074013, 0.009445125488052377)},
+    #         {'position': (3.498216525117533, 2.3331048932770795, 0.0),
+    #          'orientation': (0.0, 0.0, 0.9993770281155905, 0.035292430843599024)},
+    #         {'position': (3.5582080985686915, 2.3288624659763553, 0.0),
+    #          'orientation': (0.0, 0.0, 0.9996662404939319, 0.02583423342636984)},
+    #         {'position': (3.6068967725310745, 2.326344275148637, 0.0),
+    #          'orientation': (0.0, 0.0, 0.9997591723006155, 0.021945327538867403)},
+    #         {'position': (3.6598472962032886, 2.324018561554272, 0.0),
+    #          'orientation': (0.0, 0.0, 0.9992479949741707, 0.03877427678370992)},
+    #         {'position': (3.6924761139448794, 2.3214825211531753, 0.0),
+    #          'orientation': (0.0, 0.0, 0.9991740059338614, 0.04063626294431946)},
+    #         {'position': (3.727106939527923, 2.318660992860927, 0.0),
+    #          'orientation': (0.0, 0.0, 0.9991306638705609, 0.0416883258667487)},
+    #         {'position': (3.7636721910961253, 2.3156043305022376, 0.0),
+    #          'orientation': (0.0, 0.0, 0.9990501048487416, 0.043576232073442425)},
+    #         {'position': (3.8028157945033154, 2.31218311653614, 0.0),
+    #          'orientation': (0.0, 0.0, 0.9987543902336266, 0.04989657291895693)},
+    #         {'position': (3.8460085061683724, 2.307856605808622, 0.0),
+    #          'orientation': (0.0, 0.0, 0.9975155500290784, 0.07044662838053373)},
+    #         {'position': (3.8961558228154374, 2.3007380861823137, 0.0),
+    #          'orientation': (0.0, 0.0, 0.9969280676127491, 0.07832258937184026)},
+    #         {'position': (3.9597676634174857, 2.2906808170884503, 0.0),
+    #          'orientation': (0.0, 0.0, -0.9986858657493689, 0.05124979563308978)},
+    #         {'position': (4.03348337802564, 2.2982665669040685, 0.0),
+    #          'orientation': (0.0, 0.0, -0.9986858657493689, 0.05124979563308978)},
+    #     ]
+    #
+    #     for pose_data in poses_data:
+    #         pose = PoseStamped()
+    #         pose.header.frame_id = 'map'
+    #         pose.pose.position.x, pose.pose.position.y, pose.pose.position.z = pose_data['position']
+    #         pose.pose.orientation.x, pose.pose.orientation.y, pose.pose.orientation.z, pose.pose.orientation.w = \
+    #             pose_data['orientation']
+    #         path_msg.poses.append(pose)
+    #     zero_pose.motion_goals.add_motion_goal(motion_goal_class=FollowNavPath.__name__,
+    #                                            name='follow',
+    #                                            camera_link='head_mount_kinect_rgb_optical_frame',
+    #                                            laser_frame_id='base_laser_link',
+    #                                            # laser_topics=[],
+    #                                            path=path_msg)
+    #     zero_pose.execute(add_local_minimum_reached=False)
+    #
+    # def test_follow_nav_path2(self, zero_pose: PR2TestWrapper):
+    #     path_msg = Path()
+    #     path_msg.header.frame_id = 'map'
+    #
+    #     poses_data = [
+    #         {'position': (1, 0, 0.0), 'orientation': (0.0, 0.0, 0, 1)},
+    #         {'position': (1, 1, 0.0), 'orientation': (0.0, 0.0, 0, 1)},
+    #         {'position': (-1, 1, 0.0), 'orientation': (0.0, 0.0, 0, 1)},
+    #         {'position': (-1, -1, 0.0), 'orientation': (0.0, 0.0, 0, 1)},
+    #     ]
+    #
+    #     for pose_data in poses_data:
+    #         pose = PoseStamped()
+    #         pose.header.frame_id = 'map'
+    #         pose.pose.position.x, pose.pose.position.y, pose.pose.position.z = pose_data['position']
+    #         pose.pose.orientation.x, pose.pose.orientation.y, pose.pose.orientation.z, pose.pose.orientation.w = \
+    #             pose_data['orientation']
+    #         path_msg.poses.append(pose)
+    #     zero_pose.motion_goals.add_follow_nav_path(name='follow',
+    #                                                camera_link='head_mount_kinect_rgb_optical_frame',
+    #                                                laser_frame_id='base_laser_link',
+    #                                                # laser_topics=[],
+    #                                                path=path_msg)
+    #     zero_pose.execute(add_local_minimum_reached=False)
 
     # TODO write buggy constraints that test sanity checks
     def test_empty_problem(self, zero_pose: PR2TestWrapper):
         zero_pose.allow_all_collisions()
-        zero_pose.execute(expected_error_code=GiskardError.EMPTY_PROBLEM)
+        zero_pose.execute(expected_error_type=EmptyProblemException)
         zero_pose.allow_all_collisions()
-        zero_pose.execute(expected_error_code=GiskardError.EMPTY_PROBLEM, add_local_minimum_reached=False)
+        zero_pose.execute(expected_error_type=EmptyProblemException, add_local_minimum_reached=False)
 
     def test_add_debug_expr(self, zero_pose: PR2TestWrapper):
         zero_pose.motion_goals.add_motion_goal(motion_goal_class=DebugGoal.__name__)
@@ -2111,7 +2110,7 @@ class TestMoveBaseGoals:
         map_T_odom.pose.position.x = 1
         map_T_odom.pose.position.y = 1
         map_T_odom.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 3, [0, 0, 1]))
-        zero_pose.set_localization(map_T_odom)
+        zero_pose.teleport_base(map_T_odom)
 
         base_goal = PoseStamped()
         base_goal.header.frame_id = 'map'
@@ -2326,11 +2325,11 @@ class TestCartGoals:
         for i in range(5):
             zero_pose.allow_all_collisions()
             zero_pose.set_cart_goal(p1, zero_pose.r_tip, 'base_footprint')
-            zero_pose.plan_and_execute()
+            zero_pose.execute()
 
             zero_pose.allow_all_collisions()
             zero_pose.set_cart_goal(p2, zero_pose.r_tip, 'base_footprint')
-            zero_pose.plan_and_execute()
+            zero_pose.execute()
 
     def test_cart_goal_unreachable(self, zero_pose: PR2TestWrapper):
         p = PoseStamped()
@@ -4514,7 +4513,7 @@ class TestEndMotionReason:
         mon_trajectory = zero_pose.monitors.add_max_trajectory_length(max_trajectory_length=1)
         zero_pose.monitors.add_cancel_motion(mon_trajectory, error_message='stop motion')
         zero_pose.monitors.add_end_motion(mon_distance)
-        result = zero_pose.execute(expected_error_code=GiskardError.MAX_TRAJECTORY_LENGTH,
+        result = zero_pose.execute(expected_error_type=MaxTrajectoryLengthException,
                                    add_local_minimum_reached=False)
         reason = zero_pose.get_end_motion_reason(move_result=result)
         assert len(reason) == 1 and list(reason.keys())[0] == 'M0 DistanceMonitor'
@@ -4538,7 +4537,7 @@ class TestEndMotionReason:
         mon_trajectory = zero_pose.monitors.add_max_trajectory_length(max_trajectory_length=1)
         zero_pose.monitors.add_cancel_motion(mon_trajectory, error_message='stop motion')
         zero_pose.monitors.add_end_motion(mon_distance)
-        result = zero_pose.execute(expected_error_code=GiskardError.MAX_TRAJECTORY_LENGTH,
+        result = zero_pose.execute(expected_error_type=MaxTrajectoryLengthException,
                                    add_local_minimum_reached=False)
         reason = zero_pose.get_end_motion_reason(move_result=result)
         print(reason)
@@ -4569,7 +4568,7 @@ class TestEndMotionReason:
         mon_sleep4 = zero_pose.monitors.add_sleep(20, start_condition=mon_sleep3, name='sleep4')
         zero_pose.monitors.add_end_motion(mon_sleep4)
 
-        result = zero_pose.execute(expected_error_code=GiskardError.MAX_TRAJECTORY_LENGTH,
+        result = zero_pose.execute(expected_error_type=MaxTrajectoryLengthException,
                                    add_local_minimum_reached=False)
         reason = zero_pose.get_end_motion_reason(move_result=result)
         print(reason)

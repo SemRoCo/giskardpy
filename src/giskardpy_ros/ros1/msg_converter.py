@@ -423,8 +423,7 @@ def ros_msg_to_giskard_obj(msg, world: WorldTree):
         return link_name_msg_to_prefix_name(msg, world)
     elif isinstance(msg, GiskardError):
         return error_msg_to_exception(msg)
-    else:
-        raise ValueError(f'Can\'t convert msg of type \'{type(msg)}\'')
+    return msg
 
 
 def ros_joint_state_to_giskard_joint_state(msg: sensor_msgs.JointState, prefix: Optional[str] = None) -> JointStates:

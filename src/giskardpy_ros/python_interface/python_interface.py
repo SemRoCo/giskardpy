@@ -2016,8 +2016,7 @@ class GiskardWrapper:
                 goal.end_condition = local_min_reached_monitor_name
         self.monitors.add_end_motion(start_condition=self.monitors.get_anded_monitor_names())
         self.monitors.add_cancel_motion(start_condition=local_min_reached_monitor_name,
-                                        error=GiskardError(type=LocalMinimumException.__name__,
-                                                           msg=f'local minimum reached'))
+                                        error=LocalMinimumException(f'local minimum reached'))
         if not self.monitors.max_trajectory_length_set:
             self.monitors.add_max_trajectory_length()
         self.monitors.max_trajectory_length_set = False

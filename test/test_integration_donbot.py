@@ -7,7 +7,6 @@ from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, Po
 from tf.transformations import quaternion_about_axis, quaternion_matrix, rotation_from_matrix
 
 import giskardpy_ros.ros1.tfwrapper as tf
-from giskard_msgs.msg import GiskardError
 from giskardpy.data_types.exceptions import GoalInitalizationException
 from giskardpy_ros.configs.behavior_tree_config import StandAloneBTConfig
 from giskardpy_ros.configs.iai_robots.donbot import WorldWithBoxyBaseConfig, DonbotCollisionAvoidanceConfig, DonbotStandaloneInterfaceConfig
@@ -222,7 +221,7 @@ class TestJointGoals:
 class TestConstraints:
     def test_pointing(self, better_pose: DonbotTestWrapper):
         tip = 'rs_camera_link'
-        goal_point = god_map.world.compute_fk_point('map', 'base_footprint')
+        goal_point = better_pose.compute_fk_point('map', 'base_footprint')
         z = Vector3Stamped()
         z.header.frame_id = 'rs_camera_link'
         z.vector.z = 1
@@ -230,7 +229,7 @@ class TestConstraints:
                                       root_link=better_pose.default_root)
         better_pose.execute()
 
-        goal_point = god_map.world.compute_fk_point('map', tip)
+        goal_point = better_pose.compute_fk_point('map', tip)
         better_pose.set_pointing_goal(goal_point=goal_point, tip_link=tip, pointing_axis=z,
                                       root_link=tip)
         better_pose.execute()

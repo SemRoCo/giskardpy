@@ -33,7 +33,7 @@ class WorldWithBoxyBaseConfig(WorldConfig):
 class DonbotCollisionAvoidanceConfig(CollisionAvoidanceConfig):
     def setup(self):
         self.load_self_collision_matrix(
-            'package://giskardpy/self_collision_matrices/iai/iai_donbot.srdf')
+            'package://giskardpy_ros/self_collision_matrices/iai/iai_donbot.srdf')
         self.set_default_external_collision_avoidance(soft_threshold=0.1,
                                                       hard_threshold=0.0)
         self.overwrite_external_collision_avoidance('odom_z_joint',

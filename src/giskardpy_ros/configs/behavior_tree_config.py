@@ -223,9 +223,8 @@ class StandAloneBTConfig(BehaviorTreeConfig):
             raise SetupException('publish_js and publish_free_variables cannot be True at the same time.')
 
     def setup(self):
-        if self.visualization_mode != VisualizationMode.Nothing:
-            self.add_visualization_marker_publisher(add_to_sync=True, add_to_control_loop=True,
-                                                    mode=self.visualization_mode)
+        self.add_visualization_marker_publisher(add_to_sync=True, add_to_control_loop=True,
+                                                mode=self.visualization_mode)
         if self.publish_tf:
             self.add_tf_publisher(include_prefix=self.include_prefix, mode=TfPublishingModes.all)
         self.add_gantt_chart_plotter()

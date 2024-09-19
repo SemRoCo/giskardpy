@@ -1,11 +1,11 @@
 from copy import copy
-from typing import Optional
 
 import numpy as np
 import pytest
 from geometry_msgs.msg import PoseStamped, Quaternion, Vector3Stamped, PointStamped
 from tf.transformations import quaternion_from_matrix
 
+from giskard_msgs.msg import LinkName
 from giskardpy_ros.configs.behavior_tree_config import StandAloneBTConfig
 from giskardpy_ros.configs.iai_robots.boxy import BoxyCollisionAvoidanceConfig, BoxyStandaloneInterfaceConfig
 from giskardpy_ros.configs.iai_robots.donbot import WorldWithBoxyBaseConfig
@@ -93,11 +93,9 @@ class BoxyTestWrapper(GiskardTestWrapper):
         self.open_l_gripper()
         self.open_r_gripper()
         self.register_group('l_gripper',
-                            root_link_group_name=self.robot_name,
-                            root_link_name='left_gripper_tool_frame')
+                            root_link_name=LinkName('left_gripper_tool_frame', self.robot_name))
         self.register_group('r_gripper',
-                            root_link_group_name=self.robot_name,
-                            root_link_name='right_gripper_tool_frame')
+                            root_link_name=LinkName('right_gripper_tool_frame', self.robot_name))
 
 
 @pytest.fixture(scope='module')
@@ -120,7 +118,7 @@ class TestJointGoals:
 class TestConstraints:
     def test_pointing(self, better_pose: BoxyTestWrapper):
         tip = 'head_mount_kinect2_rgb_optical_frame'
-        goal_point = god_map.world.compute_fk_point('map', better_pose.r_tip)
+        goal_point = better_pose.compute_fk_point('map', better_pose.r_tip)
         z = Vector3Stamped()
         z.header.frame_id = tip
         z.vector.z = 1
@@ -135,7 +133,7 @@ class TestConstraints:
         np.testing.assert_almost_equal(expected_x.point.y, 0, 2)
         np.testing.assert_almost_equal(expected_x.point.x, 0, 2)
 
-        goal_point = god_map.world.compute_fk_point('map', better_pose.r_tip)
+        goal_point = better_pose.compute_fk_point('map', better_pose.r_tip)
         better_pose.set_pointing_goal(goal_point=goal_point, tip_link=tip, pointing_axis=z, root_link=better_pose.r_tip)
 
         r_goal = PoseStamped()
@@ -156,7 +154,7 @@ class TestConstraints:
         current_x.header.frame_id = tip
         current_x.vector.z = 1
 
-        expected_x = god_map.world.compute_fk_point(tip, better_pose.r_tip)
+        expected_x = better_pose.compute_fk_point(tip, better_pose.r_tip)
         np.testing.assert_almost_equal(expected_x.point.y, 0, 2)
         np.testing.assert_almost_equal(expected_x.point.x, 0, 2)
 

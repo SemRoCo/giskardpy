@@ -1015,7 +1015,7 @@ class TestMonitors:
         zero_pose.motion_goals.add_joint_position(goal_state=zero_pose.better_pose,
                                                   start_condition=sleep2)
         zero_pose.monitors.add_end_motion(start_condition=joint_goal)
-        zero_pose.monitors.add_cancel_motion(start_condition=f'not {joint_goal2} and {sleep2}', error_message='fail')
+        zero_pose.monitors.add_cancel_motion(start_condition=f'not {joint_goal2} and {sleep2}', error=Exception('fail'))
         zero_pose.monitors.add_max_trajectory_length(30)
         zero_pose.execute(add_local_minimum_reached=False)
 

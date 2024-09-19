@@ -7,7 +7,8 @@ from geometry_msgs.msg import PoseStamped, Point, Quaternion, PointStamped, Vect
 from numpy import pi
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
-from giskard_msgs.msg import GiskardError
+from giskard_msgs.msg import LinkName, GiskardError
+from giskardpy.data_types.exceptions import EmptyProblemException
 from giskardpy_ros.configs.behavior_tree_config import StandAloneBTConfig
 from giskardpy_ros.configs.giskard import Giskard
 from giskardpy_ros.configs.iai_robots.hsr import HSRCollisionAvoidanceConfig, WorldWithHSRConfig, HSRStandaloneInterface
@@ -36,7 +37,7 @@ class HSRTestWrapper(GiskardTestWrapper):
                               collision_avoidance_config=HSRCollisionAvoidanceConfig(),
                               robot_interface_config=HSRStandaloneInterface(),
                               behavior_tree_config=StandAloneBTConfig(debug_mode=True,
-                                                                      publish_tf=False,
+                                                                      publish_tf=True,
                                                                       publish_js=False),
                               qp_controller_config=QPControllerConfig())
         super().__init__(giskard)
@@ -58,9 +59,9 @@ class HSRTestWrapper(GiskardTestWrapper):
         self.execute()
 
     def reset(self):
-        self.register_group('gripper',
-                            root_link_group_name=self.robot_name,
-                            root_link_name='hand_palm_link')
+        self.register_group(new_group_name='gripper',
+                            root_link_name=LinkName(name='hand_palm_link',
+                                                    group_name=self.robot_name))
 
 
 @pytest.fixture(scope='module')
@@ -89,7 +90,7 @@ class TestJointGoals:
     def test_mimic_joints(self, zero_pose: HSRTestWrapper):
         arm_lift_joint = god_map.world.search_for_joint_name('arm_lift_joint')
         zero_pose.open_gripper()
-        hand_T_finger_current = god_map.world.compute_fk('hand_palm_link', 'hand_l_distal_link')
+        hand_T_finger_current = zero_pose.compute_fk_pose('hand_palm_link', 'hand_l_distal_link')
         hand_T_finger_expected = PoseStamped()
         hand_T_finger_expected.header.frame_id = 'hand_palm_link'
         hand_T_finger_expected.pose.position.x = -0.01675
@@ -115,7 +116,7 @@ class TestJointGoals:
         base_T_torso.pose.orientation.y = 0
         base_T_torso.pose.orientation.z = 0
         base_T_torso.pose.orientation.w = 1
-        base_T_torso2 = god_map.world.compute_fk('base_footprint', 'torso_lift_link')
+        base_T_torso2 = zero_pose.compute_fk_pose('base_footprint', 'torso_lift_link')
         compare_poses(base_T_torso2.pose, base_T_torso.pose)
 
     def test_mimic_joints2(self, zero_pose: HSRTestWrapper):
@@ -141,7 +142,7 @@ class TestJointGoals:
         base_T_torso.pose.orientation.y = 0
         base_T_torso.pose.orientation.z = 0
         base_T_torso.pose.orientation.w = 1
-        base_T_torso2 = god_map.world.compute_fk('base_footprint', 'torso_lift_link')
+        base_T_torso2 = zero_pose.compute_fk_pose('base_footprint', 'torso_lift_link')
         compare_poses(base_T_torso2.pose, base_T_torso.pose)
 
     def test_mimic_joints3(self, zero_pose: HSRTestWrapper):
@@ -165,7 +166,7 @@ class TestJointGoals:
         base_T_torso.pose.orientation.y = 0
         base_T_torso.pose.orientation.z = 0
         base_T_torso.pose.orientation.w = 1
-        base_T_torso2 = god_map.world.compute_fk('base_footprint', 'torso_lift_link')
+        base_T_torso2 = zero_pose.compute_fk_pose('base_footprint', 'torso_lift_link')
         compare_poses(base_T_torso2.pose, base_T_torso.pose)
 
     def test_mimic_joints4(self, zero_pose: HSRTestWrapper):
@@ -191,8 +192,7 @@ class TestCartGoals:
         kitchen_setup.add_box_to_world(name=box1_name,
                                        size=(1, 1, 1),
                                        pose=pose,
-                                       parent_link='hand_palm_link',
-                                       parent_link_group='hsrb')
+                                       parent_link='hand_palm_link')
         god_map.world.save_graph_pdf(god_map.tmp_folder)
 
     def test_move_base(self, zero_pose: HSRTestWrapper):
@@ -303,7 +303,7 @@ class TestConstraints:
         kitchen_setup.allow_all_collisions()
         # kitchen_setup.add_json_goal('AvoidJointLimits', percentage=10)
         kitchen_setup.execute()
-        current_pose = god_map.world.compute_fk(root_link='map', tip_link=kitchen_setup.tip)
+        current_pose = kitchen_setup.compute_fk_pose(root_link='map', tip_link=kitchen_setup.tip)
 
         kitchen_setup.set_open_container_goal(tip_link=kitchen_setup.tip,
                                               environment_link=handle_name,
@@ -403,7 +403,7 @@ class TestCollisionAvoidanceGoals:
 
     def test_self_collision_avoidance_empty(self, zero_pose: HSRTestWrapper):
         zero_pose.allow_all_collisions()
-        zero_pose.execute(expected_error_code=GiskardError.EMPTY_PROBLEM)
+        zero_pose.execute(expected_error_type=EmptyProblemException)
         current_state = god_map.world.state.to_position_dict()
         current_state = {k.short_name: v for k, v in current_state.items()}
         zero_pose.compare_joint_state(current_state, zero_pose.default_pose)

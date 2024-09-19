@@ -1,4 +1,5 @@
 import numpy as np
+import rospy
 
 from giskardpy.model.collision_avoidance_config import CollisionAvoidanceConfig
 from giskardpy.model.world_config import WorldConfig
@@ -30,11 +31,11 @@ class WorldWithHSRConfig(WorldConfig):
         self.set_default_limits({Derivatives.velocity: 1,
                                  Derivatives.acceleration: np.inf,
                                  Derivatives.jerk: 30})
-        self.add_empty_link(self.map_name)
+        self.add_empty_link(PrefixName(self.map_name))
         self.add_6dof_joint(parent_link=self.map_name, child_link=self.odom_link_name,
                             joint_name=self.localization_joint_name)
-        self.add_empty_link(self.odom_link_name)
-        self.add_robot_from_parameter_server(parameter_name=self.robot_description_name)
+        self.add_empty_link(PrefixName(self.odom_link_name))
+        self.add_robot_urdf(urdf=rospy.get_param(self.robot_description_name))
         root_link_name = self.get_root_link_of_group(self.robot_group_name)
         self.add_omni_drive_joint(parent_link_name=self.odom_link_name,
                                   child_link_name=root_link_name,
@@ -65,7 +66,7 @@ class HSRCollisionAvoidanceConfig(CollisionAvoidanceConfig):
         self.drive_joint_name = drive_joint_name
 
     def setup(self):
-        self.load_self_collision_matrix('package://giskardpy/self_collision_matrices/iai/hsrb.srdf')
+        self.load_self_collision_matrix('package://giskardpy_ros/self_collision_matrices/iai/hsrb.srdf')
         self.set_default_external_collision_avoidance(soft_threshold=0.05,
                                                       hard_threshold=0.0)
         self.overwrite_external_collision_avoidance('wrist_roll_joint',

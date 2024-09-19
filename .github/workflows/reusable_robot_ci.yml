@@ -175,50 +175,50 @@ jobs:
         uses: lhotari/action-upterm@v1
       - name: run ${{ inputs.test1 }}
         run: |
-          roscd giskardpy_ros
+          roscd giskardpy_ros/test
           python3 -m pytest -s ${{ inputs.test1 }}
       - if: ${{ inputs.test2 != '' }}
         name: run ${{ inputs.test2 }}
         run: |
-          roscd giskardpy_ros
+          roscd giskardpy_ros/test
           python3 -m pytest -s ${{ inputs.test2 }}
       - if: ${{ inputs.test3 != '' }}
         name: run ${{ inputs.test3 }}
         run: |
-          roscd giskardpy_ros
+          roscd giskardpy_ros/test
           python3 -m pytest -s ${{ inputs.test3 }}
       - if: ${{ inputs.test4 != '' }}
         name: run ${{ inputs.test4 }}
         run: |
-          roscd giskardpy_ros
+          roscd giskardpy_ros/test
           python3 -m pytest -s ${{ inputs.test4 }}
       - if: ${{ inputs.test5 != '' }}
         name: run ${{ inputs.test5 }}
         run: |
-          roscd giskardpy_ros
+          roscd giskardpy_ros/test
           python3 -m pytest -s ${{ inputs.test5 }}
       - if: ${{ inputs.test6 != '' }}
         name: run ${{ inputs.test6 }}
         run: |
-          roscd giskardpy_ros
+          roscd giskardpy_ros/test
           python3 -m pytest -s ${{ inputs.test6 }}
       - if: ${{ inputs.test7 != '' }}
         name: run ${{ inputs.test7 }}
         run: |
-          roscd giskardpy_ros
+          roscd giskardpy_ros/test
           python3 -m pytest -s ${{ inputs.test7 }}
       - if: ${{ inputs.test8 != '' }}
         name: run ${{ inputs.test8 }}
         run: |
-          roscd giskardpy_ros
+          roscd giskardpy_ros/test
           python3 -m pytest -s ${{ inputs.test8 }}
       - if: ${{ inputs.test9 != '' }}
         name: run ${{ inputs.test9 }}
         run: |
-          roscd giskardpy_ros
+          roscd giskardpy_ros/test
           python3 -m pytest -s ${{ inputs.test9 }}
       - if: ${{ inputs.test10 != '' }}
         name: run ${{ inputs.test10 }}
         run: |
-          roscd giskardpy_ros
+          roscd giskardpy_ros/test
           python3 -m pytest -s ${{ inputs.test10 }}

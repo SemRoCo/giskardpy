@@ -32,9 +32,9 @@ class FeatureFunctionGoal(Goal):
             god_map.debug_expression_manager.add_debug_expression('root_P_controlled_feature',
                                                                   self.root_P_controlled_feature,
                                                                   color=ColorRGBA(r=1, g=0, b=0, a=1))
-        elif isinstance(controlled_feature, Vector3Stamped):
+        elif isinstance(controlled_feature, cas.Vector3):
             self.root_V_controlled_feature = root_T_tip.dot(cas.Vector3(tip_controlled_feature))
-            self.root_V_controlled_feature.vis_frame = controlled_feature.header.frame_id
+            self.root_V_controlled_feature.vis_frame = controlled_feature.vis_frame
             god_map.debug_expression_manager.add_debug_expression('root_V_controlled_feature',
                                                                   self.root_V_controlled_feature,
                                                                   color=ColorRGBA(r=1, g=0, b=0, a=1))
@@ -44,9 +44,9 @@ class FeatureFunctionGoal(Goal):
             god_map.debug_expression_manager.add_debug_expression('root_P_reference_feature',
                                                                   self.root_P_reference_feature,
                                                                   color=ColorRGBA(r=0, g=1, b=0, a=1))
-        if isinstance(reference_feature, Vector3Stamped):
+        if isinstance(reference_feature, cas.Vector3):
             self.root_V_reference_feature = cas.Vector3(root_reference_feature)
-            self.root_V_reference_feature.vis_frame = controlled_feature.header.frame_id
+            self.root_V_reference_feature.vis_frame = controlled_feature.vis_frame
             god_map.debug_expression_manager.add_debug_expression('root_V_reference_feature',
                                                                   self.root_V_reference_feature,
                                                                   color=ColorRGBA(r=0, g=1, b=0, a=1))

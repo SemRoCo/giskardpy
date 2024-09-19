@@ -205,6 +205,8 @@ class Link:
         if self.has_collisions():
             for collision in self.collisions:
                 collision.color = color
+            for visual in self.visuals:
+                visual.color = color
 
     def as_urdf(self) -> str:
         r = up.Robot(self.name)

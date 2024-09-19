@@ -7,6 +7,7 @@ from giskardpy.goals.collision_avoidance import CollisionAvoidance
 from giskardpy.god_map import god_map
 from giskardpy_ros.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.middleware import get_middleware
+from giskardpy_ros.tree.behaviors.publish_feedback import giskard_state_to_execution_state
 from giskardpy_ros.tree.blackboard_utils import GiskardBlackboard
 from giskardpy.utils.decorators import record_time
 import giskardpy_ros.ros1.msg_converter as msg_converter
@@ -45,4 +46,5 @@ class SetMoveResult(GiskardBehavior):
                 else:
                     get_middleware().logwarn(f'{self.context} failed: {move_result.error.msg}.')
         GiskardBlackboard().move_action_server.result_msg = move_result
+        move_result.execution_state = giskard_state_to_execution_state()
         return Status.SUCCESS

@@ -2642,7 +2642,7 @@ class TestWorldManipulation:
         p.header.frame_id = zero_pose.r_tip
         p.pose.position = Point(0.1, 0, 0)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
-        zero_pose.add_mesh_to_world(object_name, mesh='package://giskardpy/test/urdfs/meshes/bowl_21.obj', pose=p)
+        zero_pose.add_mesh_to_world(object_name, mesh='package://giskardpy_ros/test/urdfs/meshes/bowl_21.obj', pose=p)
 
     def test_add_non_existing_mesh(self, zero_pose: PR2TestWrapper):
         object_name = 'muh'
@@ -2650,7 +2650,7 @@ class TestWorldManipulation:
         p.header.frame_id = zero_pose.r_tip
         p.pose.position = Point(0.1, 0, 0)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
-        zero_pose.add_mesh_to_world(object_name, mesh='package://giskardpy/test/urdfs/meshes/muh.obj', pose=p,
+        zero_pose.add_mesh_to_world(object_name, mesh='package://giskardpy_ros/test/urdfs/meshes/muh.obj', pose=p,
                                     expected_error_type=CorruptMeshException)
         zero_pose.clear_world()
 
@@ -4512,7 +4512,7 @@ class TestEndMotionReason:
                                             tip_point=controlled_point, lower_limit=0, upper_limit=0)
 
         mon_trajectory = zero_pose.monitors.add_max_trajectory_length(max_trajectory_length=1)
-        zero_pose.monitors.add_cancel_motion(mon_trajectory, error_message='stop motion')
+        zero_pose.monitors.add_cancel_motion(mon_trajectory, error=Exception('stop motion'))
         zero_pose.monitors.add_end_motion(mon_distance)
         result = zero_pose.execute(expected_error_type=MaxTrajectoryLengthException,
                                    add_local_minimum_reached=False)
@@ -4536,7 +4536,7 @@ class TestEndMotionReason:
                                             tip_point=controlled_point, lower_limit=0, upper_limit=0)
 
         mon_trajectory = zero_pose.monitors.add_max_trajectory_length(max_trajectory_length=1)
-        zero_pose.monitors.add_cancel_motion(mon_trajectory, error_message='stop motion')
+        zero_pose.monitors.add_cancel_motion(mon_trajectory, error=Exception('stop motion'))
         zero_pose.monitors.add_end_motion(mon_distance)
         result = zero_pose.execute(expected_error_type=MaxTrajectoryLengthException,
                                    add_local_minimum_reached=False)
@@ -4562,7 +4562,7 @@ class TestEndMotionReason:
                                             tip_point=controlled_point, lower_limit=0, upper_limit=0)
 
         mon_trajectory = zero_pose.monitors.add_max_trajectory_length(max_trajectory_length=1)
-        zero_pose.monitors.add_cancel_motion(mon_trajectory, error_message='stop motion')
+        zero_pose.monitors.add_cancel_motion(mon_trajectory, error=Exception('stop motion'))
         zero_pose.monitors.add_end_motion(mon_distance)
 
         mon_sleep3 = zero_pose.monitors.add_sleep(20, name='sleep3')

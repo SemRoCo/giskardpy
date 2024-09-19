@@ -35,13 +35,14 @@ class MonitorManager:
     triggers: Dict[int, Callable]  # id -> updater callback
     trigger_conditions: List[cas.Expression]  # id -> condition
     compiled_trigger_conditions: cas.CompiledFunction  # stacked compiled function which returns array of evaluated conditions
-    monitor_package_paths = {'giskardpy.motion_graph.monitors'}
 
     def __init__(self):
         self.allowed_monitor_types = {}
-        for path in self.monitor_package_paths:
-            self.allowed_monitor_types.update(get_all_classes_in_package(path, Monitor))
+        self.add_monitor_package_path('giskardpy.motion_graph.monitors')
         self.reset()
+
+    def add_monitor_package_path(self, path: str) -> None:
+        self.allowed_monitor_types.update(get_all_classes_in_package(path, Monitor))
 
     def reset(self):
         try:

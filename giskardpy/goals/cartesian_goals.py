@@ -320,7 +320,7 @@ class DiffDriveBaseGoal(Goal):
 
         map_T_base_current = god_map.world.compute_fk(self.map, self.base_footprint)
         map_T_odom_current = god_map.world.compute_fk(self.map, self.odom)
-        map_odom_angle, _ = map_T_odom_current.to_rotation().to_axis_angle()
+        _, map_odom_angle = map_T_odom_current.to_rotation().to_axis_angle()
         map_R_base_current = map_T_base_current.to_rotation()
         axis_start, angle_start = map_R_base_current.to_axis_angle()
         angle_start = cas.if_greater_zero(axis_start[2], angle_start, -angle_start)

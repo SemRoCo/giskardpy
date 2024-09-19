@@ -27,7 +27,7 @@ class DiffDriveTangentialToPoint(Goal):
             name = f'{self.__class__.__name__}/{self.root}/{self.tip}'
         super().__init__(name)
         self.goal_point = god_map.world.transform(god_map.world.root_link_name, goal_point)
-        self.goal_point.point.z = 0
+        self.goal_point.z = 0
         self.weight = weight
         self.drive = drive
         if forward is not None:

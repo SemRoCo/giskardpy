@@ -5,8 +5,7 @@ defaults:
 on:
   push:
     branches:
-      - master
-      - devel
+      - ros1-noetic-main
   pull_request:
 #    branches:
 #      - master

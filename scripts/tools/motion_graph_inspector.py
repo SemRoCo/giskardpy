@@ -1,13 +1,13 @@
 import sys
 import rospy
-import pydot
 from PyQt5.QtGui import QPainter
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QComboBox, QHBoxLayout, QPushButton, QSizePolicy, QLabel
 from PyQt5.QtSvg import QSvgWidget
 from PyQt5.QtCore import Qt, QTimer, QRectF
 from giskard_msgs.msg import ExecutionState
-from giskardpy.tree.behaviors.plot_motion_graph import execution_state_to_dot_graph
 from PyQt5.QtCore import QMutex, QMutexLocker
+
+from giskardpy_ros.tree.behaviors.plot_motion_graph import execution_state_to_dot_graph
 
 
 class MySvgWidget(QSvgWidget):

@@ -368,6 +368,14 @@ class MotionGraphNodeWrapper:
         self._motion_graph_nodes.append(motion_goal)
         return name
 
+    def get_anded_nodes(self) -> str:
+        nodes = []
+        for node in self.motion_graph_nodes:
+            if node.class_name not in get_all_classes_in_package('giskardpy.motion_graph.monitors',
+                                                                 CancelMotion):
+                nodes.append(f'\'{node.name}\'')
+        return ' and '.join(nodes)
+
 
 class MotionGoalWrapper(MotionGraphNodeWrapper):
     _name_prefix = 'G'
@@ -1484,14 +1492,6 @@ class MonitorWrapper(MotionGraphNodeWrapper):
         super().reset()
         self.max_trajectory_length_set = False
 
-    def get_anded_monitor_names(self) -> str:
-        non_cancel_monitors = []
-        for monitor in self.motion_graph_nodes:
-            if monitor.class_name not in get_all_classes_in_package('giskardpy.motion_graph.monitors',
-                                                                    CancelMotion):
-                non_cancel_monitors.append(f'\'{monitor.name}\'')
-        return ' and '.join(non_cancel_monitors)
-
     def add_monitor(self, *,
                     monitor_class: str,
                     name: Optional[str] = None,
@@ -2038,12 +2038,12 @@ class GiskardWrapper:
         4. Adds a max trajectory length monitor, if one wasn't added already.
         """
         local_min_reached_monitor_name = self.monitors.add_local_minimum_reached()
-        for goal in self.motion_goals.motion_graph_nodes:
-            if goal.end_condition:
-                goal.end_condition = f'({goal.end_condition}) and {local_min_reached_monitor_name}'
+        for task in self.tasks.motion_graph_nodes:
+            if task.end_condition:
+                task.end_condition = f'({task.end_condition}) and {local_min_reached_monitor_name}'
             else:
-                goal.end_condition = local_min_reached_monitor_name
-        self.monitors.add_end_motion(start_condition=self.monitors.get_anded_monitor_names())
+                task.end_condition = local_min_reached_monitor_name
+        self.monitors.add_end_motion(start_condition=f'{self.monitors.get_anded_nodes()} and {self.tasks.get_anded_nodes()}')
         self.monitors.add_cancel_motion(start_condition=local_min_reached_monitor_name,
                                         error=LocalMinimumException(f'local minimum reached'))
         if not self.monitors.max_trajectory_length_set:

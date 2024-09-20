@@ -523,3 +523,134 @@ class TestAdaptiveGoals:
         zero_pose.set_cart_goal(goal_pose, 'hand_palm_link', 'map')
         zero_pose.allow_all_collisions()
         zero_pose.execute()
+
+    def test_mixing(self, zero_pose):
+        zero_pose.set_avoid_name_conflict(False)
+        # zero_pose.motion_goals.add_motion_goal(motion_goal_class=CloseGripper.__name__,
+        #                                        name='openGripper',
+        #                                        as_open=True,
+        #                                        velocity_threshold=100,
+        #                                        effort_threshold=1,
+        #                                        effort=100)
+        # zero_pose.allow_all_collisions()
+        # zero_pose.execute()
+
+        goal_pose = PoseStamped()
+        goal_pose.header.frame_id = 'map'
+        goal_pose.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 0, 1, 0],
+                                                                         [0, -1, 0, 0],
+                                                                         [1, 0, 0, 0],
+                                                                         [0, 0, 0, 1]]))
+        goal_pose.pose.position.x = 1.95
+        goal_pose.pose.position.y = -0.6
+        goal_pose.pose.position.z = 0.35
+
+        # zero_pose.set_cart_goal(goal_pose, 'hand_palm_link', 'map')
+        # zero_pose.allow_all_collisions()
+        # zero_pose.execute()
+
+        # zero_pose.motion_goals.add_motion_goal(motion_goal_class=CloseGripper.__name__,
+        #                                        name='closeGripper', effort=-220)
+        # zero_pose.allow_all_collisions()
+        # zero_pose.execute()
+
+        goal_pose.pose.position.z = 0.5
+        zero_pose.set_cart_goal(goal_pose, 'hand_palm_link', 'map')
+        zero_pose.allow_all_collisions()
+        zero_pose.execute()
+
+        #######
+        robot_feature = PointStamped()
+        robot_feature.header.frame_id = 'hand_palm_link'
+        robot_feature.point = Point(0, 0, 0)
+
+        robot_up_axis = Vector3Stamped()
+        robot_up_axis.header.frame_id = 'hand_palm_link'
+        robot_up_axis.vector.x = 1
+
+        robot_pointing_axis = Vector3Stamped()
+        robot_pointing_axis.header.frame_id = 'hand_palm_link'
+        robot_pointing_axis.vector.z = 1
+
+        # Define the world features (center and z-axis of the bowl)
+
+        world_feature2 = PointStamped()
+        world_feature2.header.frame_id = 'map'
+        world_feature2.point = Point(2, -0.2, 0.29)
+
+        world_up_axis = Vector3Stamped()
+        world_up_axis.header.frame_id = 'map'
+        world_up_axis.vector.z = 1
+
+        start_spiral = PointStamped()
+        start_spiral.header.frame_id = 'map'
+        start_spiral.point = Point(2, -0.2, 0.45)
+
+        seq = [
+            [
+                ['distance', world_feature2, robot_feature, 0.00, 0.02],
+                ['height', world_feature2, robot_feature, 0.25, 0.30],
+                ['align', world_up_axis, robot_up_axis]
+            ],
+            [
+                ['height', world_feature2, robot_feature, 0.15, 0.16],
+                ['mixing', start_spiral, world_up_axis, 0.05, 25],
+                ['angle', world_up_axis, robot_up_axis, 0.0, 0.4],
+                ['force', 2, '/mujoco/sensors_3D']
+            ],
+            [
+                ['distance', world_feature2, robot_feature, 0.00, 0.05],
+                ['height', world_feature2, robot_feature, 0.25, 0.3],
+                ['align', world_up_axis, robot_up_axis]
+            ],
+        ]
+
+        zero_pose.create_tcmp_controller(tip_link='hand_palm_link', root_link='map',
+                                         sequence=seq, max_vel=0.2)
+
+        zero_pose.set_max_traj_length(60)
+        zero_pose.execute(add_local_minimum_reached=False)
+
+    def test_force(self, zero_pose):
+
+        #######
+        robot_feature = PointStamped()
+        robot_feature.header.frame_id = 'hand_palm_link'
+        robot_feature.point = Point(0, 0, 0)
+
+        robot_up_axis = Vector3Stamped()
+        robot_up_axis.header.frame_id = 'hand_palm_link'
+        robot_up_axis.vector.x = 1
+
+        robot_pointing_axis = Vector3Stamped()
+        robot_pointing_axis.header.frame_id = 'hand_palm_link'
+        robot_pointing_axis.vector.z = 1
+
+        # Define the world features (center and z-axis of the bowl)
+
+        world_feature2 = PointStamped()
+        world_feature2.header.frame_id = 'map'
+        world_feature2.point = Point(2, -0.6, 0.3)
+
+        world_up_axis = Vector3Stamped()
+        world_up_axis.header.frame_id = 'map'
+        world_up_axis.vector.z = 1
+
+        start_spiral = PointStamped()
+        start_spiral.header.frame_id = 'map'
+        start_spiral.point = Point(2, -0.2, 0.49)
+
+        seq = [
+            [
+                ['distance', world_feature2, robot_feature, 0.00, 0.02],
+                ['height', world_feature2, robot_feature, 0.0, 0.01],
+                ['align', world_up_axis, robot_up_axis],
+                ['force', 10, '/mujoco/sensors_3D']
+            ]
+        ]
+
+        zero_pose.create_tcmp_controller(tip_link='hand_palm_link', root_link='map',
+                                         sequence=seq, max_vel=0.2)
+
+        zero_pose.set_max_traj_length(60)
+        zero_pose.execute(add_local_minimum_reached=False)

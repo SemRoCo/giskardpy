@@ -1,5 +1,5 @@
 from collections import defaultdict
-from typing import Dict, Tuple, Optional, List
+from typing import Dict, Tuple, Optional, List, Union
 import numpy as np
 import rospy
 from actionlib import SimpleActionClient
@@ -39,7 +39,8 @@ from giskardpy.motion_graph.monitors.monitors import LocalMinimumReached, TimeAb
 from giskardpy.motion_graph.monitors.payload_monitors import Print, Sleep, SetMaxTrajectoryLength, \
     PayloadAlternator
 from giskardpy.utils.utils import kwargs_to_json, get_all_classes_in_package
-from giskardpy.goals.feature_functions import AlignPerpendicular, HeightGoal, AngleGoal, DistanceGoal
+from giskardpy.goals.feature_functions import AlignPerpendicular, HeightGoal, AngleGoal, DistanceGoal, \
+    MixingMovementFunction, ForceConstraint
 from giskardpy.motion_graph.monitors.feature_monitors import PerpendicularMonitor, AngleMonitor, HeightMonitor, \
     DistanceMonitor
 from giskard_msgs.msg import ExecutionState
@@ -1443,6 +1444,74 @@ class MotionGoalWrapper:
                              end_condition=end_condition,
                              **kwargs)
 
+    def add_mixing_spiral_motion(self,
+                                 tip_link: str,
+                                 root_link: str,
+                                 start_position: PointStamped,
+                                 plane_normal: Vector3Stamped = None,
+                                 radius_growth: float = 0.01,
+                                 angle_growth: float = 1,
+                                 max_radius: float = 0.1,
+                                 tip_group: str = None,
+                                 root_group: str = None,
+                                 reference_velocity: Optional[float] = None,
+                                 weight: Optional[float] = None,
+                                 name: Optional[str] = None,
+                                 start_condition: str = '',
+                                 hold_condition: str = '',
+                                 end_condition: str = '',
+                                 **kwargs: goal_parameter
+                                 ):
+        self.add_motion_goal(motion_goal_class=MixingMovementFunction.__name__,
+                             tip_link=tip_link,
+                             root_link=root_link,
+                             start_position=start_position,
+                             plane_normal=plane_normal,
+                             radius_growth=radius_growth,
+                             angle_growth=angle_growth,
+                             max_radius=max_radius,
+                             tip_group=tip_group,
+                             root_group=root_group,
+                             max_vel=reference_velocity,
+                             weight=weight,
+                             name=name,
+                             start_condition=start_condition,
+                             hold_condition=hold_condition,
+                             end_condition=end_condition,
+                             **kwargs
+                             )
+
+    def add_force_constraint(self,
+                             tip_link: str,
+                             root_link: str,
+                             threshold: float,
+                             sensor_topic: str,
+                             tip_group: str = None,
+                             root_group: str = None,
+                             reference_velocity: Optional[float] = None,
+                             weight: Optional[float] = None,
+                             name: Optional[str] = None,
+                             start_condition: str = '',
+                             hold_condition: str = '',
+                             end_condition: str = '',
+                             **kwargs: goal_parameter
+                             ):
+        self.add_motion_goal(motion_goal_class=ForceConstraint.__name__,
+                             tip_link=tip_link,
+                             root_link=root_link,
+                             threshold=threshold,
+                             sensor_topic=sensor_topic,
+                             tip_group=tip_group,
+                             root_group=root_group,
+                             max_vel=reference_velocity,
+                             weight=weight,
+                             name=name,
+                             start_condition=start_condition,
+                             hold_condition=hold_condition,
+                             end_condition=end_condition,
+                             **kwargs
+                             )
+
 
 class MonitorWrapper:
     _monitors: List[Monitor]
@@ -2167,3 +2236,148 @@ class GiskardWrapper:
                 result[mon.name] = False
 
         return result
+
+    def create_tcmp_controller(self,
+                               tip_link: str, root_link: str, name: str = None,
+                               max_vel: float = 0.2,
+                               sequence: List[
+                                   List[List[Union[str, float, PoseStamped, PointStamped, Vector3Stamped]]]] = None
+                               ):
+        """
+            List
+                -  List of constraints
+                    - constraint 1
+                        - constraint function
+                        - param1 optional
+                        - param2 optional
+                    - constraint 2
+                - List of next phase constraints
+                    - constraint 1
+                        -
+                        -
+        """
+        if len(sequence) == 0:
+            raise Exception('Received an empty sequence')
+
+        def create_condition(monitors: List[str]):
+            con = f'{monitors[0]}'
+            for idx, mon in enumerate(monitors):
+                if idx == 0:
+                    continue
+                con += f' and {mon}'
+            return con
+
+        old_monitors: List[str] = []
+        for idx, phase_list in enumerate(sequence):
+            # create a motion phase of constraints
+            # First create al necessary monitors
+            monitors: List[str] = []
+            # create start condition
+            start_condition = '' if len(old_monitors) == 0 else create_condition(old_monitors)
+            for constraint in phase_list:
+                mon = None
+                if constraint[0] == 'distance':
+                    mon = self.monitors.add_distance(root_link=root_link, tip_link=tip_link,
+                                                     reference_point=constraint[1], tip_point=constraint[2],
+                                                     lower_limit=constraint[3], upper_limit=constraint[4],
+                                                     start_condition=start_condition,
+                                                     name=f'distance{idx}')
+                elif constraint[0] == 'height':
+                    mon = self.monitors.add_height(root_link=root_link, tip_link=tip_link,
+                                                   reference_point=constraint[1], tip_point=constraint[2],
+                                                   lower_limit=constraint[3], upper_limit=constraint[4],
+                                                   start_condition=start_condition,
+                                                   name=f'height{idx}')
+                elif constraint[0] == 'angle':
+                    mon = self.monitors.add_angle(root_link=root_link, tip_link=tip_link,
+                                                  reference_vector=constraint[1], tip_vector=constraint[2],
+                                                  lower_angle=constraint[3], upper_angle=constraint[4],
+                                                  start_condition=start_condition,
+                                                  name=f'angle{idx}')
+                elif constraint[0] == 'align':
+                    mon = self.monitors.add_vectors_aligned(root_link=root_link, tip_link=tip_link,
+                                                            goal_normal=constraint[1], tip_normal=constraint[2],
+                                                            start_condition=start_condition,
+                                                            name=f'align{idx}')
+                elif constraint[0] == 'pointing':
+                    mon = self.monitors.add_pointing_at(root_link=root_link, tip_link=tip_link,
+                                                        goal_point=constraint[1], pointing_axis=constraint[2],
+                                                        start_condition=start_condition,
+                                                        name=f'pointing{idx}')
+                elif constraint[0] == 'perpendicular':
+                    mon = self.monitors.add_vectors_perpendicular(root_link=root_link, tip_link=tip_link,
+                                                                  reference_normal=constraint[1],
+                                                                  tip_normal=constraint[2],
+                                                                  start_condition=start_condition,
+                                                                  name=f'perpendicular{idx}')
+                elif constraint[0] == 'mixing':
+                    mon = self.monitors.add_sleep(seconds=constraint[4], start_condition=start_condition, name=f'sleep{idx}')
+                else:
+                    continue
+                monitors.append(mon)
+
+            end_condition = create_condition(monitors)
+            # loop again through all constraints to create all tasks with end condition of these monitors and
+            # start conditions of the previous ones, if they exist
+            for constraint in phase_list:
+                if constraint[0] == 'distance':
+                    self.motion_goals.add_distance(root_link=root_link, tip_link=tip_link,
+                                                   reference_point=constraint[1], tip_point=constraint[2],
+                                                   lower_limit=constraint[3], upper_limit=constraint[4],
+                                                   start_condition=start_condition, end_condition=end_condition,
+                                                   name=f'distance{idx}',
+                                                   reference_velocity=max_vel)
+                elif constraint[0] == 'height':
+                    self.motion_goals.add_height(root_link=root_link, tip_link=tip_link,
+                                                 reference_point=constraint[1], tip_point=constraint[2],
+                                                 lower_limit=constraint[3], upper_limit=constraint[4],
+                                                 start_condition=start_condition, end_condition=end_condition,
+                                                 name=f'height{idx}',
+                                                 reference_velocity=max_vel)
+                elif constraint[0] == 'angle':
+                    self.motion_goals.add_angle(root_link=root_link, tip_link=tip_link,
+                                                reference_vector=constraint[1], tip_vector=constraint[2],
+                                                lower_angle=constraint[3], upper_angle=constraint[4],
+                                                start_condition=start_condition, end_condition=end_condition,
+                                                name=f'angle{idx}',
+                                                reference_velocity=max_vel)
+                elif constraint[0] == 'align':
+                    self.motion_goals.add_align_planes(root_link=root_link, tip_link=tip_link,
+                                                       goal_normal=constraint[1], tip_normal=constraint[2],
+                                                       start_condition=start_condition, end_condition=end_condition,
+                                                       name=f'align{idx}',
+                                                       reference_velocity=max_vel)
+                elif constraint[0] == 'pointing':
+                    self.motion_goals.add_pointing(root_link=root_link, tip_link=tip_link,
+                                                   goal_point=constraint[1], pointing_axis=constraint[2],
+                                                   start_condition=start_condition, end_condition=end_condition,
+                                                   name=f'pointing{idx}',
+                                                   reference_velocity=max_vel)
+                elif constraint[0] == 'perpendicular':
+                    self.motion_goals.add_align_perpendicular(root_link=root_link, tip_link=tip_link,
+                                                              reference_normal=constraint[1],
+                                                              tip_normal=constraint[2],
+                                                              start_condition=start_condition,
+                                                              end_condition=end_condition,
+                                                              name=f'perpendicular{idx}',
+                                                              reference_velocity=max_vel)
+                elif constraint[0] == 'mixing':
+                    self.motion_goals.add_mixing_spiral_motion(root_link=root_link, tip_link=tip_link,
+                                                               start_position=constraint[1], plane_normal=constraint[2],
+                                                               max_radius=constraint[3],
+                                                               start_condition=start_condition,
+                                                               end_condition=end_condition,
+                                                               name=f'mixing{idx}',
+                                                               reference_velocity=max_vel
+                                                               )
+                elif constraint[0] == 'force':
+                    self.motion_goals.add_force_constraint(root_link=root_link, tip_link=tip_link,
+                                                           threshold=constraint[1], sensor_topic=constraint[2],
+                                                           start_condition=start_condition,
+                                                           end_condition=end_condition,
+                                                           name=f'force{idx}',
+                                                           reference_velocity=max_vel
+                                                           )
+
+            old_monitors = monitors
+        self.monitors.add_end_motion(start_condition=create_condition(old_monitors))

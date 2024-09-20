@@ -16,6 +16,8 @@ from giskardpy.god_map import god_map
 from giskardpy.utils.utils import launch_launchfile
 from utils_for_tests import compare_poses, GiskardTestWrapper
 import giskardpy.utils.tfwrapper as tf
+from giskardpy.symbol_manager import symbol_manager
+from giskardpy import casadi_wrapper as cas
 
 
 class HSRTestWrapper(GiskardTestWrapper):
@@ -40,7 +42,7 @@ class HSRTestWrapper(GiskardTestWrapper):
                               behavior_tree_config=StandAloneBTConfig(debug_mode=True,
                                                                       publish_tf=True,
                                                                       publish_js=False,
-                                                                      simulation_max_hz=20),
+                                                                      simulation_max_hz=50),
                               qp_controller_config=QPControllerConfig())
         super().__init__(giskard)
         self.gripper_group = 'gripper'
@@ -568,7 +570,7 @@ class TestAddObject:
             reference_point=world_bowl_center_feature,
             tip_point=robot_cup_feature,
             lower_limit=0.1,  # Maintain 10 cm above the bowl initially
-            upper_limit=0.1+0.01
+            upper_limit=0.1 + 0.01
         )
         giskard.motion_goals.add_height(
             root_link='map',
@@ -587,7 +589,7 @@ class TestAddObject:
             reference_point=world_bowl_center_feature,
             tip_point=robot_cup_feature,
             lower_limit=0,  # Align cup exactly over the bowl horizontally
-            upper_limit=0+0.01
+            upper_limit=0 + 0.01
         )
         giskard.motion_goals.add_distance(
             root_link='map',
@@ -621,8 +623,8 @@ class TestAddObject:
             tip_link='hand_palm_link',
             reference_point=world_bowl_center_feature,
             tip_point=robot_cup_feature,
-            lower_limit=0.2-0.01,  # Desired new height 20 cm
-            upper_limit=0.2+0.01,
+            lower_limit=0.2 - 0.01,  # Desired new height 20 cm
+            upper_limit=0.2 + 0.01,
             start_condition=f'{mon_initial_height} and {mon_distance} and {mon_align}'
         )
         giskard.motion_goals.add_height(
@@ -653,3 +655,77 @@ class TestAddObject:
             print(giskard.get_end_motion_reason(move_result=result, show_all=False))
         else:
             print("Cup successfully positioned above the bowl for pouring.")
+
+    def test_tcmp(self, zero_pose: HSRTestWrapper):
+        robot_feature = PointStamped()
+        robot_feature.header.frame_id = 'hand_palm_link'
+        robot_feature.point = Point(0, 0, 0)
+
+        robot_up_axis = Vector3Stamped()
+        robot_up_axis.header.frame_id = 'hand_palm_link'
+        robot_up_axis.vector.x = 1
+
+        robot_pointing_axis = Vector3Stamped()
+        robot_pointing_axis.header.frame_id = 'hand_palm_link'
+        robot_pointing_axis.vector.z = 1
+
+        # Define the world features (center and z-axis of the bowl)
+        world_feature = PointStamped()
+        world_feature.header.frame_id = 'map'
+        world_feature.point = Point(2, 0, 0.5)
+
+        world_feature2 = PointStamped()
+        world_feature2.header.frame_id = 'map'
+        world_feature2.point = Point(2, 1, 1)
+
+        world_up_axis = Vector3Stamped()
+        world_up_axis.header.frame_id = 'map'
+        world_up_axis.vector.z = 1
+
+        seq = [
+            [
+                ['distance', world_feature, robot_feature, 0.1, 0.15],
+                ['height', world_feature, robot_feature, 0.1, 0.15],
+                ['align', world_up_axis, robot_up_axis]
+            ],
+            [
+                ['distance', world_feature2, robot_feature, 0.00, 0.02],
+                ['height', world_feature2, robot_feature, 0.05, 0.08],
+                ['align', world_up_axis, robot_up_axis]
+            ],
+            [
+                ['height', world_feature2, robot_feature, 0.01, 0.03],
+                ['mixing', world_feature2, world_up_axis, 0.2],
+                ['align', world_up_axis, robot_up_axis],
+            ],
+            [
+                ['distance', world_feature2, robot_feature, 0.00, 0.05],
+                ['height', world_feature2, robot_feature, 0.1, 0.11],
+                ['align', world_up_axis, robot_up_axis]
+            ],
+        ]
+
+        zero_pose.create_tcmp_controller(tip_link='hand_palm_link', root_link='map',
+                                         sequence=seq)
+
+        zero_pose.set_max_traj_length(60)
+        zero_pose.execute(add_local_minimum_reached=False)
+
+        # print(cas.sin(symbol_manager.get_symbol(f'god_map.time') * 3) * 0.05)
+
+    def test_mixing(self, zero_pose: HSRTestWrapper):
+        pos = PointStamped()
+        pos.header.frame_id = 'map'
+        pos.point = Point(1, 0, 1)
+
+        normal = Vector3Stamped()
+        normal.header.frame_id = 'map'
+        normal.vector.x = 1
+
+        zero_pose.motion_goals.add_motion_goal(motion_goal_class='MixingMovementFunction',
+                                               root_link='map',
+                                               tip_link='hand_palm_link',
+                                               start_position=pos,
+                                               plane_normal=normal)
+        zero_pose.set_max_traj_length(30)
+        zero_pose.execute(add_local_minimum_reached=False)

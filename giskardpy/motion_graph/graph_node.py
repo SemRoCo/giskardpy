@@ -11,6 +11,7 @@ class MotionGraphNode:
     _reset_condition: cas.Expression
     _pause_condition: cas.Expression
     _end_condition: cas.Expression
+    _expression: cas.Expression
     _name: str
     _id: int
     plot: bool
@@ -27,6 +28,7 @@ class MotionGraphNode:
         self._reset_condition = reset_condition
         self._pause_condition = pause_condition
         self._end_condition = end_condition
+        self._expression = cas.FalseSymbol
         self.plot = plot
         self._id = -1
         self._name = name
@@ -55,6 +57,14 @@ class MotionGraphNode:
         if quoted:
             return '"' + result + '"'
         return result
+
+    @property
+    def expression(self) -> cas.Expression:
+        return self._expression
+
+    @expression.setter
+    def expression(self, expression: cas.Expression) -> None:
+        self._expression = expression
 
     @property
     def id(self) -> int:

@@ -117,8 +117,6 @@ class CancelMotion(PayloadMonitor):
 
 
 class ExpressionMonitor(Monitor):
-    _expression: cas.Expression
-
     def __init__(self, *,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
@@ -129,22 +127,11 @@ class ExpressionMonitor(Monitor):
         A Monitor whose state is determined by its expression.
         Override this method, create an expression and assign its expression at the end.
         """
-        self.substitution_values = []
-        self.substitution_keys = []
-        self._expression = None
         super().__init__(name=name,
                          start_condition=start_condition,
                          pause_condition=pause_condition,
                          end_condition=end_condition,
                          plot=plot)
-
-    @property
-    def expression(self) -> cas.Expression:
-        return self._expression
-
-    @expression.setter
-    def expression(self, expression: cas.Expression) -> None:
-        self._expression = expression
 
 
 class LocalMinimumReached(ExpressionMonitor):

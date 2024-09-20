@@ -11,6 +11,7 @@ from giskardpy.motion_graph.tasks.task import Task, WEIGHT_BELOW_CA
 class JointPositionList(Task):
     def __init__(self, *,
                  goal_state: Dict[PrefixName, float],
+                 group_name: Optional[str] = None,
                  threshold: float = 0.01,
                  weight: float = WEIGHT_BELOW_CA,
                  max_velocity: float = 1,
@@ -19,22 +20,25 @@ class JointPositionList(Task):
                  pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol,
                  plot: bool = True):
-        self.current_positions = []
-        self.goal_positions = []
-        self.velocity_limits = []
-        self.joint_names = list(sorted(goal_state.keys()))
-        name = name or f'{self.__class__.__name__} {self.joint_names}'
         super().__init__(name=name,
                          start_condition=start_condition,
                          pause_condition=pause_condition,
                          end_condition=end_condition,
                          plot=plot)
 
+        self.current_positions = []
+        self.goal_positions = []
+        self.velocity_limits = []
+        self.joint_names = []
         self.max_velocity = max_velocity
         self.weight = weight
         if len(goal_state) == 0:
             raise GoalInitalizationException(f'Can\'t initialize {self} with no joints.')
+
         for joint_name, goal_position in goal_state.items():
+            joint_name = god_map.world.search_for_joint_name(joint_name, group_name)
+            self.joint_names.append(joint_name)
+
             ll_pos, ul_pos = god_map.world.compute_joint_limits(joint_name, Derivatives.position)
             if ll_pos is not None:
                 goal_position = min(ul_pos, max(ll_pos, goal_position))
@@ -59,3 +63,4 @@ class JointPositionList(Task):
                                          equality_bound=error,
                                          weight=self.weight,
                                          task_expression=current)
+

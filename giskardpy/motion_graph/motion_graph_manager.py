@@ -225,6 +225,8 @@ class MotionGraphManager:
 
     def get_observation_state_symbols(self) -> List[cas.Symbol]:
         symbols = []
+        for monitor in self.tasks.values():
+            symbols.append(monitor.get_state_expression())
         for monitor in self.monitors.values():
             symbols.append(monitor.get_state_expression())
         return symbols
@@ -246,10 +248,13 @@ class MotionGraphManager:
                 self.monitor_life_cycle_state[monitor.id] = LifeCycleState.not_started
 
     def get_monitor_from_state_expr(self, expr: cas.Expression) -> Monitor:
+        for task in self.tasks.values():
+            if cas.is_true(task.get_state_expression() == expr):
+                return task
         for monitor in self.monitors.values():
             if cas.is_true(monitor.get_state_expression() == expr):
                 return monitor
-        raise GiskardException('No monitor found.')
+        raise GiskardException(f'No task/monitor found for {str(expr)}.')
 
     def is_monitor_registered(self, monitor_state_expr: cas.Expression) -> bool:
         try:

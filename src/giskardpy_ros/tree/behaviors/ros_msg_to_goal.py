@@ -80,78 +80,6 @@ class ParseActionGoal(GiskardBehavior):
             get_middleware().logwarn(f'No {EndMotion.__name__} monitor specified. Motion can\'t end successfully.')
 
     @profile
-    def parse_tasks(self, motion_graph_node_msgs: List[giskard_msgs.MotionGraphNode]):
-        for task in motion_graph_node_msgs:
-            try:
-                get_middleware().loginfo(f'Adding monitor of type: \'{task.class_name}\'')
-                C = god_map.motion_graph_manager.allowed_monitor_types[task.class_name]
-            except KeyError:
-                raise UnknownMonitorException(f'unknown monitor type: \'{task.class_name}\'.')
-            try:
-                kwargs = json_str_to_giskard_kwargs(task.kwargs, god_map.world)
-                pause_condition = task.pause_condition
-                end_condition = task.end_condition
-                monitor_name_to_state_expr = {str(key): value.get_state_expression() for key, value in
-                                              god_map.motion_graph_manager.monitors.items()}
-                monitor_name_to_state_expr[task.name] = symbol_manager.get_symbol(
-                    f'god_map.motion_graph_manager.state[{len(god_map.motion_graph_manager.monitors)}]')
-                start_condition = god_map.motion_graph_manager.logic_str_to_expr(task.start_condition,
-                                                                            default=cas.TrueSymbol,
-                                                                            monitor_name_to_state_expr=monitor_name_to_state_expr)
-                pause_condition = god_map.motion_graph_manager.logic_str_to_expr(pause_condition, default=cas.FalseSymbol,
-                                                                            monitor_name_to_state_expr=monitor_name_to_state_expr)
-                end_condition = god_map.motion_graph_manager.logic_str_to_expr(end_condition, default=cas.FalseSymbol,
-                                                                          monitor_name_to_state_expr=monitor_name_to_state_expr)
-                monitor = C(name=task.name,
-                            start_condition=start_condition,
-                            pause_condition=pause_condition,
-                            end_condition=end_condition,
-                            **kwargs)
-                god_map.motion_graph_manager.add_monitor(monitor)
-            except Exception as e:
-                traceback.print_exc()
-                error_msg = f'Initialization of \'{C.__name__}\' monitor failed: \n {e} \n'
-                if not isinstance(e, GiskardException):
-                    raise MonitorInitalizationException(error_msg)
-                raise e
-
-    @profile
-    def parse_monitors(self, monitor_msgs: List[giskard_msgs.MotionGraphNode]):
-        for monitor_msg in monitor_msgs:
-            try:
-                get_middleware().loginfo(f'Adding monitor of type: \'{monitor_msg.class_name}\'')
-                C = god_map.motion_graph_manager.allowed_monitor_types[monitor_msg.class_name]
-            except KeyError:
-                raise UnknownMonitorException(f'unknown monitor type: \'{monitor_msg.class_name}\'.')
-            try:
-                kwargs = json_str_to_giskard_kwargs(monitor_msg.kwargs, god_map.world)
-                pause_condition = monitor_msg.pause_condition
-                end_condition = monitor_msg.end_condition
-                monitor_name_to_state_expr = {str(key): value.get_state_expression() for key, value in
-                                              god_map.motion_graph_manager.monitors.items()}
-                monitor_name_to_state_expr[monitor_msg.name] = symbol_manager.get_symbol(
-                    f'god_map.motion_graph_manager.state[{len(god_map.motion_graph_manager.monitors)}]')
-                start_condition = god_map.motion_graph_manager.logic_str_to_expr(monitor_msg.start_condition,
-                                                                            default=cas.TrueSymbol,
-                                                                            monitor_name_to_state_expr=monitor_name_to_state_expr)
-                pause_condition = god_map.motion_graph_manager.logic_str_to_expr(pause_condition, default=cas.FalseSymbol,
-                                                                            monitor_name_to_state_expr=monitor_name_to_state_expr)
-                end_condition = god_map.motion_graph_manager.logic_str_to_expr(end_condition, default=cas.FalseSymbol,
-                                                                          monitor_name_to_state_expr=monitor_name_to_state_expr)
-                monitor = C(name=monitor_msg.name,
-                            start_condition=start_condition,
-                            pause_condition=pause_condition,
-                            end_condition=end_condition,
-                            **kwargs)
-                god_map.motion_graph_manager.add_monitor(monitor)
-            except Exception as e:
-                traceback.print_exc()
-                error_msg = f'Initialization of \'{C.__name__}\' monitor failed: \n {e} \n'
-                if not isinstance(e, GiskardException):
-                    raise MonitorInitalizationException(error_msg)
-                raise e
-
-    @profile
     def parse_motion_goals(self, motion_goals: List[giskard_msgs.MotionGraphNode]):
         for motion_goal in motion_goals:
             try:
@@ -165,11 +93,11 @@ class ParseActionGoal(GiskardBehavior):
                 if motion_goal.name == '':
                     motion_goal.name = None
                 start_condition = god_map.motion_graph_manager.logic_str_to_expr(motion_goal.start_condition,
-                                                                            default=cas.TrueSymbol)
+                                                                                 default=cas.TrueSymbol)
                 pause_condition = god_map.motion_graph_manager.logic_str_to_expr(motion_goal.pause_condition,
-                                                                            default=cas.FalseSymbol)
+                                                                                 default=cas.FalseSymbol)
                 end_condition = god_map.motion_graph_manager.logic_str_to_expr(motion_goal.end_condition,
-                                                                          default=cas.FalseSymbol)
+                                                                               default=cas.FalseSymbol)
                 c: Goal = C(name=motion_goal.name,
                             start_condition=start_condition,
                             pause_condition=pause_condition,

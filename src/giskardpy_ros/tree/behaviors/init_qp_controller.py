@@ -37,7 +37,7 @@ class InitQPController(GiskardBehavior):
             quadratic_weight_gains=quadratic_weight_gains,
             linear_weight_gains=linear_weight_gains,
         )
-        god_map.qp_controller.pre_compile()
+        god_map.qp_controller.compile()
         return Status.SUCCESS
 
     def get_active_free_symbols(self,

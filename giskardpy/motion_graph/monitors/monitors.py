@@ -21,7 +21,7 @@ class Monitor(MotionGraphNode):
     def __init__(self, *,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol,
                  plot: bool = True):
         """
@@ -33,7 +33,7 @@ class Monitor(MotionGraphNode):
         """
         self.name = PrefixName(name or self.__class__.__name__)
         super().__init__(name=name,
-                         start_condition=start_condition, hold_condition=hold_condition, end_condition=end_condition,
+                         start_condition=start_condition, pause_condition=pause_condition, end_condition=end_condition,
                          plot=plot)
         self.start_condition = start_condition
 
@@ -59,7 +59,7 @@ class PayloadMonitor(Monitor, ABC):
                  run_call_in_thread: bool,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol):
         """
         A monitor which executes its __call__ function when start_condition becomes True.
@@ -71,7 +71,7 @@ class PayloadMonitor(Monitor, ABC):
         self.run_call_in_thread = run_call_in_thread
         super().__init__(name=name,
                          start_condition=start_condition,
-                         hold_condition=hold_condition,
+                         pause_condition=pause_condition,
                          end_condition=end_condition)
 
     def get_state(self) -> bool:
@@ -86,11 +86,11 @@ class EndMotion(PayloadMonitor):
     def __init__(self,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol):
         super().__init__(name=name,
                          start_condition=start_condition,
-                         hold_condition=hold_condition,
+                         pause_condition=pause_condition,
                          end_condition=end_condition,
                          run_call_in_thread=False)
 
@@ -106,11 +106,11 @@ class CancelMotion(PayloadMonitor):
                  exception: Exception = GiskardException,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol):
         super().__init__(name=name,
                          start_condition=start_condition,
-                         hold_condition=hold_condition,
+                         pause_condition=pause_condition,
                          end_condition=end_condition,
                          run_call_in_thread=False)
         self.exception = exception
@@ -130,7 +130,7 @@ class ExpressionMonitor(Monitor):
     def __init__(self, *,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol,
                  plot: bool = True):
         """
@@ -142,7 +142,7 @@ class ExpressionMonitor(Monitor):
         self._expression = None
         super().__init__(name=name,
                          start_condition=start_condition,
-                         hold_condition=hold_condition,
+                         pause_condition=pause_condition,
                          end_condition=end_condition,
                          plot=plot)
 
@@ -170,11 +170,11 @@ class LocalMinimumReached(ExpressionMonitor):
                  joint_convergence_threshold: float = 0.01,
                  windows_size: int = 1,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol):
         super().__init__(name=name,
                          start_condition=start_condition,
-                         hold_condition=hold_condition,
+                         pause_condition=pause_condition,
                          end_condition=end_condition)
         self.joint_convergence_threshold = joint_convergence_threshold
         self.min_cut_off = min_cut_off
@@ -206,11 +206,11 @@ class TimeAbove(ExpressionMonitor):
                  threshold: float,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol):
         super().__init__(name=name,
                          start_condition=start_condition,
-                         hold_condition=hold_condition,
+                         pause_condition=pause_condition,
                          end_condition=end_condition)
         if threshold is None:
             threshold = god_map.qp_controller_config.max_trajectory_length
@@ -224,13 +224,13 @@ class Alternator(ExpressionMonitor):
     def __init__(self,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol,
                  mod: int = 2,
                  plot: bool = True):
         super().__init__(name=name,
                          start_condition=start_condition,
-                         hold_condition=hold_condition,
+                         pause_condition=pause_condition,
                          end_condition=end_condition,
                          plot=plot)
         time = symbol_manager.time

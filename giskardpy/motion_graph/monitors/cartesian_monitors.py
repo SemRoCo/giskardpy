@@ -16,11 +16,11 @@ class PoseReached(ExpressionMonitor):
                  absolute: bool = False,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol):
         super().__init__(name=name,
                          start_condition=start_condition,
-                         hold_condition=hold_condition,
+                         pause_condition=pause_condition,
                          end_condition=end_condition)
         if absolute or cas.is_true(start_condition):
             root_T_goal = god_map.world.transform(root_link, goal_pose)
@@ -53,11 +53,11 @@ class PositionReached(ExpressionMonitor):
                  absolute: bool = False,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol):
         super().__init__(name=name,
                          start_condition=start_condition,
-                         hold_condition=hold_condition,
+                         pause_condition=pause_condition,
                          end_condition=end_condition)
         if absolute or cas.is_true(start_condition):
             root_P_goal = god_map.world.transform(root_link, goal_point)
@@ -80,11 +80,11 @@ class OrientationReached(ExpressionMonitor):
                  absolute: bool = False,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol):
         super().__init__(name=name,
                          start_condition=start_condition,
-                         hold_condition=hold_condition,
+                         pause_condition=pause_condition,
                          end_condition=end_condition)
         if absolute or cas.is_true(start_condition):
             r_R_g = god_map.world.transform(root_link, goal_orientation)
@@ -107,11 +107,11 @@ class PointingAt(ExpressionMonitor):
                  threshold: float = 0.01,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol):
         super().__init__(name=name,
                          start_condition=start_condition,
-                         hold_condition=hold_condition,
+                         pause_condition=pause_condition,
                          end_condition=end_condition)
         self.root = root_link
         self.tip = tip_link
@@ -140,11 +140,11 @@ class VectorsAligned(ExpressionMonitor):
                  threshold: float = 0.01,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol):
         super().__init__(name=name,
                          start_condition=start_condition,
-                         hold_condition=hold_condition,
+                         pause_condition=pause_condition,
                          end_condition=end_condition)
         self.root = root_link
         self.tip = tip_link
@@ -172,11 +172,11 @@ class DistanceToLine(ExpressionMonitor):
                  threshold: float = 0.01,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol):
         super().__init__(name=name,
                          start_condition=start_condition,
-                         hold_condition=hold_condition,
+                         pause_condition=pause_condition,
                          end_condition=end_condition)
         self.root = root_link
         self.tip = tip_link

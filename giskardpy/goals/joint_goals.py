@@ -21,7 +21,7 @@ class JointVelocityLimit(Goal):
                  hard: bool = False,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol):
         """
         Limits the joint velocity of a revolute joint.
@@ -63,7 +63,7 @@ class JointVelocityLimit(Goal):
                                              weight=self.weight,
                                              task_expression=current_joint,
                                              velocity_limit=max_velocity)
-        self.connect_monitors_to_all_tasks(start_condition, hold_condition, end_condition)
+        self.connect_monitors_to_all_tasks(start_condition, pause_condition, end_condition)
 
 
 class AvoidJointLimits(Goal):
@@ -74,7 +74,7 @@ class AvoidJointLimits(Goal):
                  weight: float = WEIGHT_BELOW_CA,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol
                  ):
         """
@@ -127,7 +127,7 @@ class AvoidJointLimits(Goal):
                                                upper_error=upper_err,
                                                weight=weight,
                                                task_expression=joint_symbol)
-        self.connect_monitors_to_all_tasks(start_condition, hold_condition, end_condition)
+        self.connect_monitors_to_all_tasks(start_condition, pause_condition, end_condition)
 
 
 class JointPositionList(Goal):
@@ -138,7 +138,7 @@ class JointPositionList(Goal):
                  max_velocity: float = 1,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol):
         """
         Calls JointPosition for a list of joints.
@@ -190,7 +190,7 @@ class JointPositionList(Goal):
                                          weight=self.weight,
                                          task_expression=current)
 
-        self.connect_monitors_to_all_tasks(start_condition, hold_condition, end_condition)
+        self.connect_monitors_to_all_tasks(start_condition, pause_condition, end_condition)
 
 
 class JointSignWave(Goal):
@@ -198,9 +198,9 @@ class JointSignWave(Goal):
                  frequency: float,
                  amp_percentage: float,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol):
-        super().__init__(name=name, start_condition=start_condition, hold_condition=hold_condition,
+        super().__init__(name=name, start_condition=start_condition, pause_condition=pause_condition,
                          end_condition=end_condition)
         joint_name = god_map.world.search_for_joint_name(joint_name)
         t = self.create_and_add_task('task')
@@ -215,14 +215,14 @@ class JointSignWave(Goal):
                                   reference_velocity=max_vel,
                                   weight=WEIGHT_BELOW_CA)
         god_map.debug_expression_manager.add_debug_expression('goal', goal_position)
-        self.connect_monitors_to_all_tasks(start_condition, hold_condition, end_condition)
+        self.connect_monitors_to_all_tasks(start_condition, pause_condition, end_condition)
 
 
 class UnlimitedJointGoal(Goal):
     def __init__(self, name: str, joint_name: str, goal_position: float,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol, end_condition: cas.Expression = cas.FalseSymbol):
-        super().__init__(name=name, start_condition=start_condition, hold_condition=hold_condition,
+                 pause_condition: cas.Expression = cas.FalseSymbol, end_condition: cas.Expression = cas.FalseSymbol):
+        super().__init__(name=name, start_condition=start_condition, pause_condition=pause_condition,
                          end_condition=end_condition)
         joint_name = god_map.world.search_for_joint_name(joint_name)
         t = self.create_and_add_task('task')
@@ -231,4 +231,4 @@ class UnlimitedJointGoal(Goal):
                                   expr_goal=goal_position,
                                   reference_velocity=2,
                                   weight=WEIGHT_BELOW_CA)
-        self.connect_monitors_to_all_tasks(start_condition, hold_condition, end_condition)
+        self.connect_monitors_to_all_tasks(start_condition, pause_condition, end_condition)

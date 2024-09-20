@@ -22,7 +22,7 @@ class Goal(ABC):
     def __init__(self,
                  name: str,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol):
         """
         This is where you specify goal parameters and save them as self attributes.
@@ -71,12 +71,12 @@ class Goal(ABC):
             else:
                 task.start_condition = cas.logic_and(task.start_condition, condition)
 
-    def connect_hold_condition_to_all_tasks(self, condition: cas.Expression) -> None:
+    def connect_pause_condition_to_all_tasks(self, condition: cas.Expression) -> None:
         for task in self.tasks:
-            if cas.is_false(task.hold_condition):
-                task.hold_condition = condition
+            if cas.is_false(task.pause_condition):
+                task.pause_condition = condition
             else:
-                task.hold_condition = cas.logic_or(task.hold_condition, condition)
+                task.pause_condition = cas.logic_or(task.pause_condition, condition)
 
     def connect_end_condition_to_all_tasks(self, condition: cas.Expression) -> None:
         for task in self.tasks:
@@ -87,10 +87,10 @@ class Goal(ABC):
 
     def connect_monitors_to_all_tasks(self,
                                       start_condition: cas.Expression,
-                                      hold_condition: cas.Expression,
+                                      pause_condition: cas.Expression,
                                       end_condition: cas.Expression):
         self.connect_start_condition_to_all_tasks(start_condition)
-        self.connect_hold_condition_to_all_tasks(hold_condition)
+        self.connect_pause_condition_to_all_tasks(pause_condition)
         self.connect_end_condition_to_all_tasks(end_condition)
 
     @property

@@ -22,7 +22,7 @@ class InsertCylinder(Goal):
                  get_straight_after: float = 0.02,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol):
         self.cylinder_name = cylinder_name
         self.get_straight_after = get_straight_after
@@ -123,7 +123,7 @@ class InsertCylinder(Goal):
         tilt_straight_task.start_condition = bottom_reached_monitor.get_state_expression()
         tilt_straight_task.end_condition = tilt_monitor.get_state_expression()
         self.connect_start_condition_to_all_tasks(start_condition)
-        self.connect_hold_condition_to_all_tasks(hold_condition)
+        self.connect_pause_condition_to_all_tasks(pause_condition)
         # for task in self.tasks:
         #     task.end_condition = cas.logic_or(task.end_condition, end_condition)
         tilt_straight_task.end_condition = cas.logic_and(tilt_monitor.get_state_expression(),

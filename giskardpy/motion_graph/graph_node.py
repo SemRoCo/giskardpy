@@ -6,7 +6,7 @@ from giskardpy.utils.utils import string_shortener
 
 class MotionGraphNode:
     _start_condition: cas.Expression
-    _hold_condition: cas.Expression
+    _pause_condition: cas.Expression
     _end_condition: cas.Expression
     _name: str
     _id: int
@@ -14,11 +14,11 @@ class MotionGraphNode:
 
     def __init__(self, name: str,
                  start_condition: cas.Expression,
-                 hold_condition: cas.Expression,
+                 pause_condition: cas.Expression,
                  end_condition: cas.Expression,
                  plot: bool = True):
         self._start_condition = start_condition
-        self._hold_condition = hold_condition
+        self._pause_condition = pause_condition
         self._end_condition = end_condition
         self.plot = plot
         self._id = -1
@@ -31,8 +31,8 @@ class MotionGraphNode:
         result = (f'{formatted_name}\n'
                   f'----start_condition----\n'
                   f'{god_map.monitor_manager.format_condition(self.start_condition)}\n'
-                  f'----hold_condition----\n'
-                  f'{god_map.monitor_manager.format_condition(self.hold_condition)}\n'
+                  f'----pause_condition----\n'
+                  f'{god_map.monitor_manager.format_condition(self.pause_condition)}\n'
                   f'----end_condition----\n'
                   f'{god_map.monitor_manager.format_condition(self.end_condition)}')
         if quoted:
@@ -63,15 +63,15 @@ class MotionGraphNode:
         self._start_condition = value
 
     @property
-    def hold_condition(self) -> cas.Expression:
-        return self._hold_condition
+    def pause_condition(self) -> cas.Expression:
+        return self._pause_condition
 
-    @hold_condition.setter
-    def hold_condition(self, value: cas.Expression) -> None:
+    @pause_condition.setter
+    def pause_condition(self, value: cas.Expression) -> None:
         for monitor_state_expr in value.free_symbols():
             if not god_map.monitor_manager.is_monitor_registered(monitor_state_expr):
                 raise GiskardException(f'No monitor found for this state expr: "{monitor_state_expr}".')
-        self._hold_condition = value
+        self._pause_condition = value
 
     @property
     def end_condition(self) -> cas.Expression:

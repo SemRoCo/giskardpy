@@ -18,7 +18,7 @@ class DiffDriveTangentialToPoint(Goal):
                  reference_velocity: float = 0.5, weight: bool = WEIGHT_ABOVE_CA, drive: bool = False,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol
                  ):
         self.tip = god_map.world.search_for_link_name('base_footprint', group_name)
@@ -80,7 +80,7 @@ class KeepHandInWorkspace(Goal):
                  weight: float = WEIGHT_ABOVE_CA,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol
                  ):
         if base_footprint is None:
@@ -126,4 +126,4 @@ class KeepHandInWorkspace(Goal):
                                        weight=weight,
                                        task_expression=angle_error,
                                        name='/rot')
-        self.connect_monitors_to_all_tasks(start_condition, hold_condition, end_condition)
+        self.connect_monitors_to_all_tasks(start_condition, pause_condition, end_condition)

@@ -32,7 +32,7 @@ class Task(MotionGraphNode):
         else:
             self._name = name
         super().__init__(name=name,
-                         start_condition=cas.TrueSymbol, hold_condition=cas.FalseSymbol, end_condition=cas.FalseSymbol)
+                         start_condition=cas.TrueSymbol, pause_condition=cas.FalseSymbol, end_condition=cas.FalseSymbol)
         self._parent_goal_name = parent_goal_name
         self.eq_constraints = {}
         self.neq_constraints = {}

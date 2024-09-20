@@ -20,7 +20,7 @@ class Open(Goal):
                  weight: float = WEIGHT_ABOVE_CA,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol):
         """
         Open a container in an environment.
@@ -74,7 +74,7 @@ class Open(Goal):
                                            weight=self.weight)
 
         self.connect_monitors_to_all_tasks(start_condition=start_condition,
-                                           hold_condition=hold_condition,
+                                           pause_condition=pause_condition,
                                            end_condition=end_condition)
 
         goal_state = {self.joint_name.short_name: goal_joint_state}
@@ -82,7 +82,7 @@ class Open(Goal):
                                                        max_velocity=max_velocity,
                                                        weight=WEIGHT_BELOW_CA,
                                                        start_condition=start_condition,
-                                                       hold_condition=hold_condition,
+                                                       pause_condition=pause_condition,
                                                        end_condition=end_condition,
                                                        name=f'{self.name}/{self.joint_name.short_name}'))
 
@@ -95,7 +95,7 @@ class Close(Goal):
                  weight: float = WEIGHT_ABOVE_CA,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol):
         """
         Same as Open, but will use minimum value as default for goal_joint_state
@@ -116,5 +116,5 @@ class Close(Goal):
                                           goal_joint_state=goal_joint_state,
                                           weight=weight,
                                           start_condition=start_condition,
-                                          hold_condition=hold_condition,
+                                          pause_condition=pause_condition,
                                           end_condition=end_condition))

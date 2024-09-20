@@ -11,7 +11,7 @@ from giskardpy.motion_graph.monitors.monitors import PayloadMonitor
 class SetPredictionHorizon(PayloadMonitor):
     def __init__(self, prediction_horizon: int, name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol):
         """
         Will overwrite the prediction horizon for a single goal.
@@ -24,7 +24,7 @@ class SetPredictionHorizon(PayloadMonitor):
             name = self.__class__.__name__
         super().__init__(run_call_in_thread=False, name=name,
                          start_condition=start_condition,
-                         hold_condition=hold_condition,
+                         pause_condition=pause_condition,
                          end_condition=end_condition)
         self.new_prediction_horizon = prediction_horizon
 
@@ -40,7 +40,7 @@ class SetQPSolver(PayloadMonitor):
 
     def __init__(self, qp_solver_id: Union[SupportedQPSolver, int], name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol):
         if not cas.is_true(start_condition):
             raise MonitorInitalizationException(f'{self.__class__.__name__}: start_condition must be True.')
@@ -48,7 +48,7 @@ class SetQPSolver(PayloadMonitor):
             name = self.__class__.__name__
         super().__init__(run_call_in_thread=False, name=name,
                          start_condition=start_condition,
-                         hold_condition=hold_condition,
+                         pause_condition=pause_condition,
                          end_condition=end_condition)
         qp_solver_id = SupportedQPSolver(qp_solver_id)
         god_map.qp_controller.set_qp_solver(qp_solver_id)

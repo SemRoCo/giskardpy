@@ -19,11 +19,11 @@ class WorldUpdatePayloadMonitor(PayloadMonitor):
     def __init__(self, *,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol):
         super().__init__(name=name,
                          start_condition=start_condition,
-                         hold_condition=hold_condition,
+                         pause_condition=pause_condition,
                          end_condition=end_condition,
                          run_call_in_thread=True)
 
@@ -44,7 +44,7 @@ class SetMaxTrajectoryLength(CancelMotion):
                  length: float,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol):
         if not (start_condition == cas.TrueSymbol).to_np():
             raise MonitorInitalizationException(f'Cannot set start_condition for {SetMaxTrajectoryLength.__name__}')
@@ -53,7 +53,7 @@ class SetMaxTrajectoryLength(CancelMotion):
         super().__init__(name=name,
                          exception=MaxTrajectoryLengthException(error_message),
                          start_condition=start_condition,
-                         hold_condition=hold_condition,
+                         pause_condition=pause_condition,
                          end_condition=end_condition)
 
     @profile
@@ -67,12 +67,12 @@ class Print(PayloadMonitor):
                  message: str,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol):
         self.message = message
         super().__init__(name=name,
                          start_condition=start_condition,
-                         hold_condition=hold_condition,
+                         pause_condition=pause_condition,
                          end_condition=end_condition,
                          run_call_in_thread=False)
 
@@ -88,12 +88,12 @@ class Sleep(PayloadMonitor):
                  seconds: float,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol):
         self.seconds = seconds
         super().__init__(name=name,
                          start_condition=start_condition,
-                         hold_condition=hold_condition,
+                         pause_condition=pause_condition,
                          end_condition=end_condition,
                          run_call_in_thread=False)
         self.start_time = None
@@ -111,11 +111,11 @@ class CollisionMatrixUpdater(PayloadMonitor):
                  new_collision_matrix: Dict[Tuple[str, str], float],
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol):
         super().__init__(name=name,
                          start_condition=start_condition,
-                         hold_condition=hold_condition,
+                         pause_condition=pause_condition,
                          end_condition=end_condition,
                          run_call_in_thread=False)
         self.collision_matrix = new_collision_matrix
@@ -133,11 +133,11 @@ class PayloadAlternator(PayloadMonitor):
                  mod: int = 2,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol):
         super().__init__(name=name,
                          start_condition=start_condition,
-                         hold_condition=hold_condition,
+                         pause_condition=pause_condition,
                          end_condition=end_condition,
                          run_call_in_thread=False)
         self.mod = mod

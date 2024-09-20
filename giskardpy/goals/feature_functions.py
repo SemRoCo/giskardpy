@@ -62,7 +62,7 @@ class AlignPerpendicular(FeatureFunctionGoal):
                  weight: int = WEIGHT_BELOW_CA,
                  max_vel: float = 0.2,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol
                  ):
         super().__init__(tip_link=tip_link,
@@ -78,7 +78,7 @@ class AlignPerpendicular(FeatureFunctionGoal):
                                      weight=weight,
                                      task_expression=expr,
                                      name=f'{self.name}_constraint')
-        self.connect_monitors_to_all_tasks(start_condition, hold_condition, end_condition)
+        self.connect_monitors_to_all_tasks(start_condition, pause_condition, end_condition)
 
 
 class HeightGoal(FeatureFunctionGoal):
@@ -93,7 +93,7 @@ class HeightGoal(FeatureFunctionGoal):
                  weight: int = WEIGHT_BELOW_CA,
                  max_vel: float = 0.2,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol
                  ):
         super().__init__(tip_link=tip_link,
@@ -112,7 +112,7 @@ class HeightGoal(FeatureFunctionGoal):
                                        weight=weight,
                                        task_expression=expr,
                                        name=f'{self.name}_constraint')
-        self.connect_monitors_to_all_tasks(start_condition, hold_condition, end_condition)
+        self.connect_monitors_to_all_tasks(start_condition, pause_condition, end_condition)
 
 
 class DistanceGoal(FeatureFunctionGoal):
@@ -127,7 +127,7 @@ class DistanceGoal(FeatureFunctionGoal):
                  weight: int = WEIGHT_BELOW_CA,
                  max_vel: float = 0.2,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol):
         super().__init__(tip_link=tip_link,
                          root_link=root_link,
@@ -154,7 +154,7 @@ class DistanceGoal(FeatureFunctionGoal):
                                               weights=[weight] * 3,
                                               task_expression=projected_vector[:3],
                                               names=[f'{self.name}_extra1', f'{self.name}_extra2', f'{self.name}_extra3'])
-        self.connect_monitors_to_all_tasks(start_condition, hold_condition, end_condition)
+        self.connect_monitors_to_all_tasks(start_condition, pause_condition, end_condition)
 
 
 class AngleGoal(FeatureFunctionGoal):
@@ -169,7 +169,7 @@ class AngleGoal(FeatureFunctionGoal):
                  weight: int = WEIGHT_BELOW_CA,
                  max_vel: float = 0.2,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol
                  ):
         super().__init__(tip_link=tip_link,
@@ -187,4 +187,4 @@ class AngleGoal(FeatureFunctionGoal):
                                        weight=weight,
                                        task_expression=expr,
                                        name=f'{self.name}_constraint')
-        self.connect_monitors_to_all_tasks(start_condition, hold_condition, end_condition)
+        self.connect_monitors_to_all_tasks(start_condition, pause_condition, end_condition)

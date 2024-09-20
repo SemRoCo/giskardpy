@@ -16,7 +16,7 @@ class BaseTrajFollower(Goal):
                  track_only_velocity: bool = False,
                  weight: float = WEIGHT_ABOVE_CA,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol):
         self.weight = weight
         self.joint_name = joint_name
@@ -30,7 +30,7 @@ class BaseTrajFollower(Goal):
         self.trajectory_length = len(trajectory.items())
         self.add_trans_constraints()
         self.add_rot_constraints()
-        self.connect_monitors_to_all_tasks(start_condition, hold_condition, end_condition)
+        self.connect_monitors_to_all_tasks(start_condition, pause_condition, end_condition)
 
     @profile
     def x_symbol(self, t: int, free_variable_name: PrefixName, derivative: Derivatives = Derivatives.position) \

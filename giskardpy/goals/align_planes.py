@@ -18,7 +18,7 @@ class AlignPlanes(Goal):
                  weight: float = WEIGHT_ABOVE_CA,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol,
                  **kwargs):
         """
@@ -66,4 +66,4 @@ class AlignPlanes(Goal):
         god_map.debug_expression_manager.add_debug_expression(f'{self.name}/goal_normal',
                                                               self.root_V_root_normal,
                                                               color=ColorRGBA(r=0, g=0, b=1, a=1))
-        self.connect_monitors_to_all_tasks(start_condition, hold_condition, end_condition)
+        self.connect_monitors_to_all_tasks(start_condition, pause_condition, end_condition)

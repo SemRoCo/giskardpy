@@ -26,7 +26,7 @@ class CartesianPosition(Goal):
                  absolute: bool = False,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol):
         """
         See CartesianPose.
@@ -56,7 +56,7 @@ class CartesianPosition(Goal):
                                                               color=ColorRGBA(r=1, g=0, b=0, a=1))
         god_map.debug_expression_manager.add_debug_expression(f'{self.name}/goal_point', root_P_goal,
                                                               color=ColorRGBA(r=0, g=0, b=1, a=1))
-        self.connect_monitors_to_all_tasks(start_condition=start_condition, hold_condition=hold_condition,
+        self.connect_monitors_to_all_tasks(start_condition=start_condition, pause_condition=pause_condition,
                                            end_condition=end_condition)
 
 
@@ -72,7 +72,7 @@ class CartesianOrientation(Goal):
                  name: Optional[str] = None,
                  absolute: bool = False,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol,
                  point_of_debug_matrix: Optional[cas.Point3] = None):
         """
@@ -121,7 +121,7 @@ class CartesianOrientation(Goal):
         god_map.debug_expression_manager.add_debug_expression(f'{self.name}/goal_orientation', debug_trans_matrix)
         god_map.debug_expression_manager.add_debug_expression(f'{self.name}/current_orientation',
                                                               debug_current_trans_matrix)
-        self.connect_monitors_to_all_tasks(start_condition, hold_condition, end_condition)
+        self.connect_monitors_to_all_tasks(start_condition, pause_condition, end_condition)
 
 
 class CartesianPositionStraight(Goal):
@@ -134,7 +134,7 @@ class CartesianPositionStraight(Goal):
                  absolute: bool = False,
                  weight: float = WEIGHT_ABOVE_CA,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol):
         """
         Same as CartesianPosition, but tries to move the tip_link in a straight line to the goal_point.
@@ -193,7 +193,7 @@ class CartesianPositionStraight(Goal):
                                                               color=ColorRGBA(r=1, g=0, b=0, a=1))
         god_map.debug_expression_manager.add_debug_expression(f'{self.name}/goal_point', root_P_goal,
                                                               color=ColorRGBA(r=0, g=0, b=1, a=1))
-        self.connect_monitors_to_all_tasks(start_condition, hold_condition, end_condition)
+        self.connect_monitors_to_all_tasks(start_condition, pause_condition, end_condition)
 
 
 class CartesianPose(Goal):
@@ -207,7 +207,7 @@ class CartesianPose(Goal):
                  absolute: bool = False,
                  weight=WEIGHT_ABOVE_CA,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol):
         """
         This goal will use the kinematic chain between root and tip link to move tip link into the goal pose.
@@ -243,7 +243,7 @@ class CartesianPose(Goal):
                                                        name=position_name,
                                                        absolute=absolute,
                                                        start_condition=start_condition,
-                                                       hold_condition=hold_condition,
+                                                       pause_condition=pause_condition,
                                                        end_condition=end_condition))
 
         self.add_constraints_of_goal(CartesianOrientation(root_link=root_link,
@@ -254,7 +254,7 @@ class CartesianPose(Goal):
                                                           name=orientation_name,
                                                           absolute=absolute,
                                                           start_condition=start_condition,
-                                                          hold_condition=hold_condition,
+                                                          pause_condition=pause_condition,
                                                           end_condition=end_condition,
                                                           point_of_debug_matrix=goal_pose.to_position()))
 
@@ -274,7 +274,7 @@ class DiffDriveBaseGoal(Goal):
                  always_forward: bool = False,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol):
         """
         Like a CartesianPose, but specifically for differential drives. It will achieve the goal in 3 phases.
@@ -395,7 +395,7 @@ class DiffDriveBaseGoal(Goal):
                                      weight=weight_final_rotation,
                                      task_expression=map_current_angle,
                                      name='/rot2')
-        self.connect_monitors_to_all_tasks(start_condition, hold_condition, end_condition)
+        self.connect_monitors_to_all_tasks(start_condition, pause_condition, end_condition)
 
 
 class CartesianPoseStraight(Goal):
@@ -409,7 +409,7 @@ class CartesianPoseStraight(Goal):
                  absolute: bool = False,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol):
         """
         See CartesianPose. In contrast to it, this goal will try to move tip_link in a straight line.
@@ -426,7 +426,7 @@ class CartesianPoseStraight(Goal):
                                                                weight=weight,
                                                                absolute=absolute,
                                                                start_condition=start_condition,
-                                                               hold_condition=hold_condition,
+                                                               pause_condition=pause_condition,
                                                                end_condition=end_condition))
         self.add_constraints_of_goal(CartesianOrientation(root_link=root_link,
                                                           tip_link=tip_link,
@@ -435,7 +435,7 @@ class CartesianPoseStraight(Goal):
                                                           absolute=absolute,
                                                           weight=weight,
                                                           start_condition=start_condition,
-                                                          hold_condition=hold_condition,
+                                                          pause_condition=pause_condition,
                                                           end_condition=end_condition,
                                                           point_of_debug_matrix=goal_pose.to_position()))
 
@@ -444,7 +444,7 @@ class TranslationVelocityLimit(Goal):
     def __init__(self, root_link: str, tip_link: str, root_group: Optional[str] = None, tip_group: Optional[str] = None,
                  weight=WEIGHT_ABOVE_CA, max_velocity=0.1, hard=True, name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol):
         """
         See CartesianVelocityLimit
@@ -469,14 +469,14 @@ class TranslationVelocityLimit(Goal):
                                                   max_velocity=self.max_velocity,
                                                   weight=self.weight,
                                                   max_violation=0)
-        self.connect_monitors_to_all_tasks(start_condition, hold_condition, end_condition)
+        self.connect_monitors_to_all_tasks(start_condition, pause_condition, end_condition)
 
 
 class RotationVelocityLimit(Goal):
     def __init__(self, root_link: str, tip_link: str, root_group: Optional[str] = None, tip_group: Optional[str] = None,
                  weight=WEIGHT_ABOVE_CA, max_velocity=0.5, hard=True, name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol):
         """
         See CartesianVelocityLimit
@@ -503,7 +503,7 @@ class RotationVelocityLimit(Goal):
                                                max_velocity=self.max_velocity,
                                                weight=self.weight,
                                                max_violation=0)
-        self.connect_monitors_to_all_tasks(start_condition, hold_condition, end_condition)
+        self.connect_monitors_to_all_tasks(start_condition, pause_condition, end_condition)
 
 
 class CartesianVelocityLimit(Goal):
@@ -518,7 +518,7 @@ class CartesianVelocityLimit(Goal):
                  hard: bool = False,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol):
         """
         This goal will use put a strict limit on the Cartesian velocity. This will require a lot of constraints, thus
@@ -545,7 +545,7 @@ class CartesianVelocityLimit(Goal):
                                                               weight=weight,
                                                               hard=hard,
                                                               start_condition=start_condition,
-                                                              hold_condition=hold_condition,
+                                                              pause_condition=pause_condition,
                                                               end_condition=end_condition))
         self.add_constraints_of_goal(RotationVelocityLimit(root_link=root_link,
                                                            root_group=root_group,
@@ -555,7 +555,7 @@ class CartesianVelocityLimit(Goal):
                                                            weight=weight,
                                                            hard=hard,
                                                            start_condition=start_condition,
-                                                           hold_condition=hold_condition,
+                                                           pause_condition=pause_condition,
                                                            end_condition=end_condition))
 
 
@@ -567,7 +567,7 @@ class RelativePositionSequence(Goal):
                  tip_link: str,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol):
         """
         Only meant for testing.
@@ -618,5 +618,5 @@ class RelativePositionSequence(Goal):
                                               weight=self.weight)
 
         self.connect_start_condition_to_all_tasks(start_condition)
-        self.connect_hold_condition_to_all_tasks(hold_condition)
+        self.connect_pause_condition_to_all_tasks(pause_condition)
         self.step2.end_condition = cas.logic_and(self.step2.end_condition, end_condition)

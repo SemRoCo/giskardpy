@@ -11,7 +11,7 @@ class DebugGoal(Goal):
     def __init__(self,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol):
         if name is None:
             name = self.__class__.__name__
@@ -46,8 +46,8 @@ class DebugGoal(Goal):
 class CannotResolveSymbol(Goal):
 
     def __init__(self, name: str, joint_name: str, start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol, end_condition: cas.Expression = cas.FalseSymbol):
-        super().__init__(name=name, start_condition=start_condition, hold_condition=hold_condition,
+                 pause_condition: cas.Expression = cas.FalseSymbol, end_condition: cas.Expression = cas.FalseSymbol):
+        super().__init__(name=name, start_condition=start_condition, pause_condition=pause_condition,
                          end_condition=end_condition)
         self.data = {}
         s = symbol_manager.get_symbol(self + '.data[2]')

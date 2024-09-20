@@ -14,10 +14,10 @@ class FeatureMonitor(ExpressionMonitor):
                  controlled_feature: Union[cas.Point3, cas.Vector3],
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol):
         super().__init__(name=name, start_condition=start_condition,
-                         hold_condition=hold_condition,
+                         pause_condition=pause_condition,
                          end_condition=end_condition)
         self.root = root_link
         self.tip = tip_link
@@ -47,7 +47,7 @@ class HeightMonitor(FeatureMonitor):
                  upper_limit: float,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol):
         super().__init__(tip_link=tip_link,
                          root_link=root_link,
@@ -55,7 +55,7 @@ class HeightMonitor(FeatureMonitor):
                          controlled_feature=tip_point,
                          name=name,
                          start_condition=start_condition,
-                         hold_condition=hold_condition,
+                         pause_condition=pause_condition,
                          end_condition=end_condition)
 
         distance = cas.distance_projected_on_vector(self.root_P_controlled_feature, self.root_P_reference_feature,
@@ -72,7 +72,7 @@ class PerpendicularMonitor(FeatureMonitor):
                  threshold: float = 0.01,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol):
         super().__init__(tip_link=tip_link,
                          root_link=root_link,
@@ -80,7 +80,7 @@ class PerpendicularMonitor(FeatureMonitor):
                          controlled_feature=tip_normal,
                          name=name,
                          start_condition=start_condition,
-                         hold_condition=hold_condition,
+                         pause_condition=pause_condition,
                          end_condition=end_condition)
 
         expr = cas.dot(self.root_V_reference_feature[:3], self.root_V_controlled_feature[:3])
@@ -97,7 +97,7 @@ class DistanceMonitor(FeatureMonitor):
                  upper_limit: float,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol):
         super().__init__(tip_link=tip_link,
                          root_link=root_link,
@@ -105,7 +105,7 @@ class DistanceMonitor(FeatureMonitor):
                          controlled_feature=tip_point,
                          name=name,
                          start_condition=start_condition,
-                         hold_condition=hold_condition,
+                         pause_condition=pause_condition,
                          end_condition=end_condition)
 
         distance = cas.norm(cas.distance_vector_projected_on_plane(self.root_P_controlled_feature,
@@ -124,7 +124,7 @@ class AngleMonitor(FeatureMonitor):
                  upper_angle: float,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol):
         super().__init__(tip_link=tip_link,
                          root_link=root_link,
@@ -132,7 +132,7 @@ class AngleMonitor(FeatureMonitor):
                          controlled_feature=tip_vector,
                          name=name,
                          start_condition=start_condition,
-                         hold_condition=hold_condition,
+                         pause_condition=pause_condition,
                          end_condition=end_condition)
 
         expr = cas.angle_between_vector(self.root_V_reference_feature, self.root_V_controlled_feature)

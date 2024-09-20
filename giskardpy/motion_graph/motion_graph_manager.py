@@ -247,7 +247,7 @@ class MotionGraphManager:
             else:
                 self.monitor_life_cycle_state[monitor.id] = LifeCycleState.not_started
 
-    def get_monitor_from_state_expr(self, expr: cas.Expression) -> Monitor:
+    def get_node_from_state_expr(self, expr: cas.Expression) -> MotionGraphNode:
         for task in self.tasks.values():
             if cas.is_true(task.get_state_expression() == expr):
                 return task
@@ -258,7 +258,7 @@ class MotionGraphManager:
 
     def is_monitor_registered(self, monitor_state_expr: cas.Expression) -> bool:
         try:
-            self.get_monitor_from_state_expr(monitor_state_expr)
+            self.get_node_from_state_expr(monitor_state_expr)
             return True
         except GiskardException as e:
             return False
@@ -271,7 +271,7 @@ class MotionGraphManager:
         if not free_symbols:
             return str(cas.is_true(condition))
         condition = str(condition)
-        state_to_monitor_map = {str(x): f'\'{self.get_monitor_from_state_expr(x).name}\'' for x in free_symbols}
+        state_to_monitor_map = {str(x): f'\'{self.get_node_from_state_expr(x).name}\'' for x in free_symbols}
         state_to_monitor_map['&&'] = f'{new_line}and '
         state_to_monitor_map['||'] = f'{new_line}or '
         state_to_monitor_map['!'] = 'not '

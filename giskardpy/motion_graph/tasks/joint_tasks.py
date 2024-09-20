@@ -5,12 +5,13 @@ from giskardpy.data_types.data_types import Derivatives, PrefixName
 from giskardpy.data_types.exceptions import GoalInitalizationException
 from giskardpy.god_map import god_map
 from giskardpy.model.joints import OneDofJoint
+from giskardpy.motion_graph.monitors.joint_monitors import JointGoalReached
 from giskardpy.motion_graph.tasks.task import Task, WEIGHT_BELOW_CA
 
 
 class JointPositionList(Task):
     def __init__(self, *,
-                 goal_state: Dict[PrefixName, float],
+                 goal_state: Dict[str, float],
                  group_name: Optional[str] = None,
                  threshold: float = 0.01,
                  weight: float = WEIGHT_BELOW_CA,
@@ -63,4 +64,6 @@ class JointPositionList(Task):
                                          equality_bound=error,
                                          weight=self.weight,
                                          task_expression=current)
-
+        joint_monitor = JointGoalReached(goal_state=goal_state,
+                                         threshold=threshold)
+        self.expression = joint_monitor.expression

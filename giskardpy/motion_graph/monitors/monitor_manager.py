@@ -8,7 +8,7 @@ import numpy as np
 
 import giskardpy.casadi_wrapper as cas
 from giskardpy.casadi_wrapper import CompiledFunction
-from giskardpy.data_types.data_types import TaskState, PrefixName
+from giskardpy.data_types.data_types import LifeCycleState, PrefixName
 from giskardpy.data_types.exceptions import GiskardException, MonitorInitalizationException
 from giskardpy.god_map import god_map
 from giskardpy.motion_graph.helpers import compile_graph_node_state_updater
@@ -108,9 +108,9 @@ class MonitorManager:
     def set_initial_life_cycle_state(self):
         for monitor in self.monitors.values():
             if cas.is_true(monitor.start_condition):
-                self.life_cycle_state[monitor.id] = TaskState.running
+                self.life_cycle_state[monitor.id] = LifeCycleState.running
             else:
-                self.life_cycle_state[monitor.id] = TaskState.not_started
+                self.life_cycle_state[monitor.id] = LifeCycleState.not_started
 
     def get_monitor_from_state_expr(self, expr: cas.Expression) -> Monitor:
         for monitor in self.monitors.values():
@@ -148,8 +148,8 @@ class MonitorManager:
             state_symbol = monitor.get_state_expression()
 
             if isinstance(monitor, ExpressionMonitor):
-                monitor.compile()
-                state_f = cas.if_eq(monitor.get_life_cycle_state_expression(), int(TaskState.running),
+                monitor.pre_compile()
+                state_f = cas.if_eq(monitor.get_life_cycle_state_expression(), int(LifeCycleState.running),
                                     if_result=monitor.expression,
                                     else_result=state_symbol)
             else:
@@ -176,7 +176,7 @@ class MonitorManager:
         monitor.id = len(self.monitors) - 1
 
     def get_state_dict(self) -> Dict[str, Tuple[str, bool]]:
-        return OrderedDict((monitor.name, (str(TaskState(self.life_cycle_state[i])), bool(self.state[i])))
+        return OrderedDict((monitor.name, (str(LifeCycleState(self.life_cycle_state[i])), bool(self.state[i])))
                            for i, monitor in enumerate(self.monitors.values()))
 
     @profile
@@ -211,13 +211,13 @@ class MonitorManager:
     def _register_expression_update_triggers(self):
         for updater_id, values in self.substitution_values.items():
             class Callback:
-                def __init__(self, updater_id: int, values, monitor_manager: MonitorManager):
+                def __init__(self, updater_id: int, values, motion_graph_manager: MonitorManager):
                     self.updater_id = updater_id
                     self.keys = list(values.keys())
-                    self.monitor_manager = monitor_manager
+                    self.motion_graph_manager = motion_graph_manager
 
                 def __call__(self):
-                    return self.monitor_manager.update_substitution_values(self.updater_id, self.keys)
+                    return self.motion_graph_manager.update_substitution_values(self.updater_id, self.keys)
 
             self.triggers[updater_id] = Callback(updater_id, values, self)
         expr = cas.Expression(self.trigger_conditions)
@@ -233,7 +233,7 @@ class MonitorManager:
     @profile
     def get_substitution_key(self, updater_id: int, original_expr: str) -> cas.Symbol:
         return symbol_manager.get_symbol(
-            f'god_map.monitor_manager.substitution_values[{updater_id}]["{original_expr}"]')
+            f'god_map.motion_graph_manager.substitution_values[{updater_id}]["{original_expr}"]')
 
     @profile
     def trigger_update_triggers(self, state: np.ndarray):
@@ -261,7 +261,7 @@ class MonitorManager:
             self.state[self.payload_monitor_filter] = self.evaluate_payload_monitors()
         self.trigger_update_triggers(self.state)
         self.state_history.append((god_map.time, (self.state.copy(), self.life_cycle_state.copy())))
-        god_map.motion_goal_manager.update_task_state(self.state)
+        god_map.motion_graph_manager.update_task_state(self.state)
 
     def evaluate_payload_monitors(self) -> np.ndarray:
         next_state = np.zeros(len(self.payload_monitors))

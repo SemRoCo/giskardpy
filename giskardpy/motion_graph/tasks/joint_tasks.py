@@ -1,0 +1,61 @@
+from typing import Optional, Dict
+
+from giskardpy import casadi_wrapper as cas
+from giskardpy.data_types.data_types import Derivatives, PrefixName
+from giskardpy.data_types.exceptions import GoalInitalizationException
+from giskardpy.god_map import god_map
+from giskardpy.model.joints import OneDofJoint
+from giskardpy.motion_graph.tasks.task import Task, WEIGHT_BELOW_CA
+
+
+class JointPositionList(Task):
+    def __init__(self, *,
+                 goal_state: Dict[PrefixName, float],
+                 threshold: float = 0.01,
+                 weight: float = WEIGHT_BELOW_CA,
+                 max_velocity: float = 1,
+                 name: Optional[str] = None,
+                 start_condition: cas.Expression = cas.TrueSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
+                 end_condition: cas.Expression = cas.FalseSymbol,
+                 plot: bool = True):
+        self.current_positions = []
+        self.goal_positions = []
+        self.velocity_limits = []
+        self.joint_names = list(sorted(goal_state.keys()))
+        name = name or f'{self.__class__.__name__} {self.joint_names}'
+        super().__init__(name=name,
+                         start_condition=start_condition,
+                         pause_condition=pause_condition,
+                         end_condition=end_condition,
+                         plot=plot)
+
+        self.max_velocity = max_velocity
+        self.weight = weight
+        if len(goal_state) == 0:
+            raise GoalInitalizationException(f'Can\'t initialize {self} with no joints.')
+        for joint_name, goal_position in goal_state.items():
+            ll_pos, ul_pos = god_map.world.compute_joint_limits(joint_name, Derivatives.position)
+            if ll_pos is not None:
+                goal_position = min(ul_pos, max(ll_pos, goal_position))
+
+            ll_vel, ul_vel = god_map.world.compute_joint_limits(joint_name, Derivatives.velocity)
+            velocity_limit = min(ul_vel, max(ll_vel, max_velocity))
+
+            joint: OneDofJoint = god_map.world.joints[joint_name]
+            self.current_positions.append(joint.get_symbol(Derivatives.position))
+            self.goal_positions.append(goal_position)
+            self.velocity_limits.append(velocity_limit)
+
+        for name, current, goal, velocity_limit in zip(self.joint_names, self.current_positions,
+                                                       self.goal_positions, self.velocity_limits):
+            if god_map.world.is_joint_continuous(name):
+                error = cas.shortest_angular_distance(current, goal)
+            else:
+                error = goal - current
+
+            self.add_equality_constraint(name=name,
+                                         reference_velocity=velocity_limit,
+                                         equality_bound=error,
+                                         weight=self.weight,
+                                         task_expression=current)

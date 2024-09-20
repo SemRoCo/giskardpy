@@ -368,7 +368,7 @@ class CollisionAvoidance(Goal):
             payload_monitor = CollisionMatrixUpdater(name=f'{self.name}/update collision matrix',
                                                      start_condition=start_condition,
                                                      new_collision_matrix=self.collision_matrix)
-            god_map.monitor_manager.add_monitor(payload_monitor)
+            god_map.motion_graph_manager.add_monitor(payload_monitor)
         else:
             god_map.collision_scene.set_collision_matrix(self.collision_matrix)
 

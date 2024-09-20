@@ -21,34 +21,26 @@ class Monitor(MotionGraphNode):
     def __init__(self, *,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
+                 reset_condition: cas.Expression = cas.FalseSymbol,
                  pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol,
                  plot: bool = True):
-        """
-        Every class inheriting from this can be called via the ROS interface.
-        :param name: name of the monitor
-        :param start_condition: A logical casadi expression using monitor variables, "not", "and" and "or". This monitor
-                                 will only get executed once this condition becomes True.
-        :param plot: If true, this monitor will not be plotted in the gantt chart and task graph.
-        """
-        self.name = PrefixName(name or self.__class__.__name__)
         super().__init__(name=name,
-                         start_condition=start_condition, pause_condition=pause_condition, end_condition=end_condition,
+                         start_condition=start_condition,
+                         reset_condition=reset_condition,
+                         pause_condition=pause_condition,
+                         end_condition=end_condition,
                          plot=plot)
-        self.start_condition = start_condition
 
     @cached_property
     def state_filter(self) -> np.ndarray:
-        return god_map.monitor_manager.to_state_filter(self.start_condition)
+        return god_map.motion_graph_manager.to_state_filter(self.start_condition)
 
     def get_state_expression(self):
-        return symbol_manager.get_symbol(f'god_map.monitor_manager.state[{self.id}]')
+        return symbol_manager.get_symbol(f'god_map.motion_graph_manager.monitor_observation_state[{self.id}]')
 
     def get_life_cycle_state_expression(self):
-        return symbol_manager.get_symbol(f'god_map.monitor_manager.life_cycle_state[{self.id}]')
-
-    def __repr__(self) -> str:
-        return str(self.name)
+        return symbol_manager.get_symbol(f'god_map.motion_graph_manager.monitor_life_cycle_state[{self.id}]')
 
 
 class PayloadMonitor(Monitor, ABC):
@@ -154,13 +146,6 @@ class ExpressionMonitor(Monitor):
     def expression(self, expression: cas.Expression) -> None:
         self._expression = expression
 
-    def compile(self) -> None:
-        """
-        Use this if you need to do stuff, after the qp controller has been initialized.
-        I only needed this once, so you probably don't either.
-        """
-        pass
-
 
 class LocalMinimumReached(ExpressionMonitor):
     def __init__(self,
@@ -181,7 +166,7 @@ class LocalMinimumReached(ExpressionMonitor):
         self.max_cut_off = max_cut_off
         self.windows_size = windows_size
 
-    def compile(self):
+    def pre_compile(self):
         condition_list = []
         traj_length_in_sec = symbol_manager.time
         condition_list.append(cas.greater(traj_length_in_sec, 1))

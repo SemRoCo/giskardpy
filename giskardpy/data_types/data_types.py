@@ -323,7 +323,7 @@ class BiDict(dict):
         super().__delitem__(key)
 
 
-class TaskState(IntEnum):
+class LifeCycleState(IntEnum):
     not_started = 0
     running = 1
     on_hold = 2

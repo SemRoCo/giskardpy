@@ -191,10 +191,10 @@ class TestWorld:
 
         joint_goal = JointPositionList(goal_state={joint_name: goal})
 
-        god_map.motion_goal_manager.add_motion_goal(joint_goal)
-        god_map.motion_goal_manager.init_task_state()
+        god_map.motion_graph_manager.add_motion_goal(joint_goal)
+        god_map.motion_graph_manager.init_task_state()
 
-        eq, neq, neqd, lin_weight, quad_weight = god_map.motion_goal_manager.get_constraints_from_goals()
+        eq, neq, neqd, lin_weight, quad_weight = god_map.motion_graph_manager.get_constraints_from_goals()
         controller = QPController(sample_period=dt)
         controller.init(free_variables=list(box_world_prismatic.free_variables.values()),
                         equality_constraints=eq)
@@ -225,10 +225,10 @@ class TestWorld:
                                   goal_pose=cas.TransMatrix.from_xyz_rpy(x=goal[0], y=goal[1], z=goal[2],
                                                                          reference_frame=box_world.root_link_name))
 
-        god_map.motion_goal_manager.add_motion_goal(cart_goal)
-        god_map.motion_goal_manager.init_task_state()
+        god_map.motion_graph_manager.add_motion_goal(cart_goal)
+        god_map.motion_graph_manager.init_task_state()
 
-        eq, neq, neqd, lin_weight, quad_weight = god_map.motion_goal_manager.get_constraints_from_goals()
+        eq, neq, neqd, lin_weight, quad_weight = god_map.motion_graph_manager.get_constraints_from_goals()
         controller = QPController(sample_period=dt)
         controller.init(free_variables=list(box_world.free_variables.values()),
                         equality_constraints=eq)
@@ -257,7 +257,7 @@ class TestWorld:
                                    root_link=box_world.root_link_name,
                                    tip_link=box_name,
                                    goal_pose=goal1)
-        god_map.monitor_manager.add_monitor(cart_monitor)
+        god_map.motion_graph_manager.add_monitor(cart_monitor)
 
         cart_goal1 = CartesianPose(name='g1',
                                    root_link=box_world.root_link_name,
@@ -271,13 +271,13 @@ class TestWorld:
                                    absolute=True,
                                    start_condition=cart_monitor.get_state_expression())
 
-        god_map.motion_goal_manager.add_motion_goal(cart_goal1)
-        god_map.motion_goal_manager.add_motion_goal(cart_goal2)
+        god_map.motion_graph_manager.add_motion_goal(cart_goal1)
+        god_map.motion_graph_manager.add_motion_goal(cart_goal2)
 
-        god_map.monitor_manager.compile_monitors()
-        god_map.motion_goal_manager.init_task_state()
+        god_map.motion_graph_manager.compile_monitors()
+        god_map.motion_graph_manager.init_task_state()
 
-        eq, neq, neqd, lin_weight, quad_weight = god_map.motion_goal_manager.get_constraints_from_goals()
+        eq, neq, neqd, lin_weight, quad_weight = god_map.motion_graph_manager.get_constraints_from_goals()
         controller = QPController(sample_period=dt)
         controller.init(free_variables=list(box_world.free_variables.values()),
                         equality_constraints=eq)
@@ -293,7 +293,7 @@ class TestWorld:
             box_world.update_state(next_cmd, dt, Derivatives.jerk)
             box_world.notify_state_change()
 
-            god_map.monitor_manager.evaluate_monitors()
+            god_map.motion_graph_manager.evaluate_monitors()
             traj.append(box_world.state[joint_name].position)
             god_map.time += controller.sample_period
             god_map.control_cycle_counter += 1
@@ -312,7 +312,7 @@ class TestWorld:
                                    root_link=box_world.root_link_name,
                                    tip_link=box_name,
                                    goal_pose=goal1)
-        god_map.monitor_manager.add_monitor(cart_monitor)
+        god_map.motion_graph_manager.add_monitor(cart_monitor)
 
         cart_goal1 = CartesianPose(name='g1',
                                    root_link=box_world.root_link_name,
@@ -325,13 +325,13 @@ class TestWorld:
                                    goal_pose=goal2,
                                    start_condition=cart_monitor.get_state_expression())
 
-        god_map.motion_goal_manager.add_motion_goal(cart_goal1)
-        god_map.motion_goal_manager.add_motion_goal(cart_goal2)
+        god_map.motion_graph_manager.add_motion_goal(cart_goal1)
+        god_map.motion_graph_manager.add_motion_goal(cart_goal2)
 
-        god_map.monitor_manager.compile_monitors()
-        god_map.motion_goal_manager.init_task_state()
+        god_map.motion_graph_manager.compile_monitors()
+        god_map.motion_graph_manager.init_task_state()
 
-        eq, neq, neqd, lin_weight, quad_weight = god_map.motion_goal_manager.get_constraints_from_goals()
+        eq, neq, neqd, lin_weight, quad_weight = god_map.motion_graph_manager.get_constraints_from_goals()
         controller = QPController(sample_period=dt)
         controller.init(free_variables=list(box_world.free_variables.values()),
                         equality_constraints=eq)
@@ -345,7 +345,7 @@ class TestWorld:
             next_cmd = controller.get_cmd(substitutions)
             box_world.update_state(next_cmd, dt, Derivatives.jerk)
             box_world.notify_state_change()
-            god_map.monitor_manager.evaluate_monitors()
+            god_map.motion_graph_manager.evaluate_monitors()
             traj.append((box_world.state[box_world.joints[joint_name].x_name].position,
                          box_world.state[box_world.joints[joint_name].y_name].position))
             god_map.time += controller.sample_period

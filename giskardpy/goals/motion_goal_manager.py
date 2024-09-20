@@ -3,7 +3,7 @@ from typing import List, Dict, Tuple
 import giskardpy.casadi_wrapper as cas
 import numpy as np
 
-from giskardpy.data_types.data_types import PrefixName, TaskState
+from giskardpy.data_types.data_types import PrefixName, LifeCycleState
 from giskardpy.data_types.exceptions import GoalInitalizationException, \
     DuplicateNameException
 from giskardpy.goals.goal import Goal
@@ -40,9 +40,9 @@ class MotionGoalManager:
         self.task_state = np.zeros(len(self.tasks))
         for task in self.tasks.values():
             if cas.is_true(task.start_condition):
-                self.task_state[task.id] = TaskState.running
+                self.task_state[task.id] = LifeCycleState.running
             else:
-                self.task_state[task.id] = TaskState.not_started
+                self.task_state[task.id] = LifeCycleState.not_started
         self.compile_task_state_updater()
 
     def add_motion_goal(self, goal: Goal) -> None:

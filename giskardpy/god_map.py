@@ -13,8 +13,7 @@ if TYPE_CHECKING:
     from giskardpy.model.trajectory import Trajectory
     from giskardpy.qp.qp_controller import QPController
     from giskardpy.data_types.data_types import PrefixName
-    from giskardpy.motion_graph.monitors.monitor_manager import MonitorManager
-    from giskardpy.goals.motion_goal_manager import MotionGoalManager
+    from giskardpy.motion_graph.motion_graph_manager import MotionGraphManager
     from giskardpy.debug_expression_manager import DebugExpressionManager
     from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer, Collisions
 
@@ -26,8 +25,7 @@ class GodMap:
     qp_controller: QPController
 
     # %% managers
-    monitor_manager: MonitorManager
-    motion_goal_manager: MotionGoalManager
+    motion_graph_manager: MotionGraphManager
     debug_expression_manager: DebugExpressionManager
 
     # %% controller datatypes
@@ -49,12 +47,9 @@ class GodMap:
         if item == 'world':
             from giskardpy.model.world import WorldTree
             self.world = WorldTree()
-        elif item == 'motion_goal_manager':
-            from giskardpy.goals.motion_goal_manager import MotionGoalManager
-            self.motion_goal_manager = MotionGoalManager()
-        elif item == 'monitor_manager':
-            from giskardpy.motion_graph.monitors.monitor_manager import MonitorManager
-            self.monitor_manager = MonitorManager()
+        elif item == 'motion_graph_manager':
+            from giskardpy.motion_graph.motion_graph_manager import MotionGraphManager
+            self.motion_graph_manager = MotionGraphManager()
         elif item == 'debug_expression_manager':
             from giskardpy.debug_expression_manager import DebugExpressionManager
             self.debug_expression_manager = DebugExpressionManager()

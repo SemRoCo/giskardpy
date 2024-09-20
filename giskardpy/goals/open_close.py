@@ -49,7 +49,7 @@ class Open(Goal):
 
         if not cas.is_true(start_condition):
             handle_T_tip = god_map.world.compose_fk_expression(self.handle_link, self.tip_link)
-            handle_T_tip = god_map.monitor_manager.register_expression_updater(handle_T_tip,
+            handle_T_tip = god_map.motion_graph_manager.register_expression_updater(handle_T_tip,
                                                                                start_condition)
         else:
             handle_T_tip = cas.TransMatrix(god_map.world.compute_fk(self.handle_link, self.tip_link))

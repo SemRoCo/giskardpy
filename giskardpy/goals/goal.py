@@ -98,7 +98,7 @@ class Goal(ABC):
         """
         A string referring to self on the god_map. Used with symbol manager.
         """
-        return f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\']'
+        return f'god_map.motion_graph_manager.motion_goals[\'{str(self)}\']'
 
     def __add__(self, other: str) -> str:
         if isinstance(other, str):
@@ -151,4 +151,4 @@ class Goal(ABC):
         return task
 
     def add_monitor(self, monitor: Monitor) -> None:
-        god_map.monitor_manager.add_monitor(monitor)
+        god_map.motion_graph_manager.add_monitor(monitor)

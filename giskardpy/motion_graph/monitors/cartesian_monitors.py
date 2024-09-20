@@ -27,7 +27,7 @@ class PoseReached(ExpressionMonitor):
         else:
             root_T_x = god_map.world.compose_fk_expression(root_link, goal_pose.reference_frame)
             root_T_goal = root_T_x.dot(goal_pose)
-            root_T_goal = god_map.monitor_manager.register_expression_updater(root_T_goal, start_condition)
+            root_T_goal = god_map.motion_graph_manager.register_expression_updater(root_T_goal, start_condition)
 
         # %% position error
         r_P_g = root_T_goal.to_position()
@@ -64,7 +64,7 @@ class PositionReached(ExpressionMonitor):
         else:
             root_P_x = god_map.world.compose_fk_expression(root_link, goal_point.reference_frame)
             root_P_goal = root_P_x.dot(goal_point)
-            root_P_goal = god_map.monitor_manager.register_expression_updater(root_P_goal, start_condition)
+            root_P_goal = god_map.motion_graph_manager.register_expression_updater(root_P_goal, start_condition)
 
         r_P_c = god_map.world.compose_fk_expression(root_link, tip_link).to_position()
         distance_to_goal = cas.euclidean_distance(root_P_goal, r_P_c)
@@ -91,7 +91,7 @@ class OrientationReached(ExpressionMonitor):
         else:
             root_T_x = god_map.world.compose_fk_expression(root_link, goal_orientation.reference_frame)
             root_R_goal = root_T_x.dot(goal_orientation)
-            r_R_g = god_map.monitor_manager.register_expression_updater(root_R_goal, start_condition)
+            r_R_g = god_map.motion_graph_manager.register_expression_updater(root_R_goal, start_condition)
 
         r_R_c = god_map.world.compose_fk_expression(root_link, tip_link).to_rotation()
         rotation_error = cas.rotational_error(r_R_c, r_R_g)

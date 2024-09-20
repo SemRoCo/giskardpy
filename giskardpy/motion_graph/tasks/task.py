@@ -3,7 +3,7 @@ from typing import Optional, List, Union, Dict, Callable, Iterable, overload, De
 import giskardpy.casadi_wrapper as cas
 from giskardpy.data_types.exceptions import GoalInitalizationException, DuplicateNameException
 from giskardpy.god_map import god_map
-from giskardpy.data_types.data_types import Derivatives, PrefixName, TaskState
+from giskardpy.data_types.data_types import Derivatives, LifeCycleState
 from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.motion_graph.graph_node import MotionGraphNode
@@ -21,19 +21,23 @@ class Task(MotionGraphNode):
     """
     Tasks are a set of constraints with the same predicates.
     """
-    eq_constraints: Dict[PrefixName, EqualityConstraint]
-    neq_constraints: Dict[PrefixName, InequalityConstraint]
-    derivative_constraints: Dict[PrefixName, DerivativeInequalityConstraint]
-    _parent_goal_name: str
+    eq_constraints: Dict[str, EqualityConstraint]
+    neq_constraints: Dict[str, InequalityConstraint]
+    derivative_constraints: Dict[str, DerivativeInequalityConstraint]
 
-    def __init__(self, parent_goal_name: str, name: Optional[str] = None):
-        if name is None:
-            self._name = str(self.__class__.__name__)
-        else:
-            self._name = name
+    def __init__(self, *,
+                 name: Optional[str] = None,
+                 start_condition: cas.Expression = cas.TrueSymbol,
+                 reset_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
+                 end_condition: cas.Expression = cas.FalseSymbol,
+                 plot: bool = True):
         super().__init__(name=name,
-                         start_condition=cas.TrueSymbol, pause_condition=cas.FalseSymbol, end_condition=cas.FalseSymbol)
-        self._parent_goal_name = parent_goal_name
+                         start_condition=start_condition,
+                         reset_condition=reset_condition,
+                         pause_condition=pause_condition,
+                         end_condition=end_condition,
+                         plot=plot)
         self.eq_constraints = {}
         self.neq_constraints = {}
         self.derivative_constraints = {}
@@ -41,15 +45,11 @@ class Task(MotionGraphNode):
         self.quadratic_gains = []
         self.linear_weight_gains = []
 
-    @property
-    def name(self) -> PrefixName:
-        return PrefixName(self._name, self._parent_goal_name)
+    def get_state_expression(self):
+        return symbol_manager.get_symbol(f'god_map.motion_graph_manager.task_observation_state[{self.id}]')
 
-    def __str__(self):
-        return self.name
-
-    def get_life_cycle_state_expression(self) -> cas.Symbol:
-        return symbol_manager.get_symbol(f'god_map.motion_goal_manager.task_state[{self.id}]')
+    def get_life_cycle_state_expression(self):
+        return symbol_manager.get_symbol(f'god_map.motion_graph_manager.task_life_cycle_state[{self.id}]')
 
     def get_eq_constraints(self) -> List[EqualityConstraint]:
         return self._apply_monitors_to_constraints(self.eq_constraints.values())
@@ -84,7 +84,7 @@ class Task(MotionGraphNode):
     def _apply_monitors_to_constraints(self, constraints):
         output_constraints = []
         for constraint in constraints:
-            is_running = cas.if_eq(self.get_life_cycle_state_expression(), int(TaskState.running),
+            is_running = cas.if_eq(self.get_life_cycle_state_expression(), int(LifeCycleState.running),
                                    if_result=1,
                                    else_result=0)
             constraint.quadratic_weight *= is_running

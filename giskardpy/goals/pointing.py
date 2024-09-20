@@ -46,7 +46,7 @@ class Pointing(Goal):
         self.tip_V_pointing_axis.scale(1)
 
         root_T_tip = god_map.world.compose_fk_expression(self.root, self.tip)
-        root_P_goal_point = symbol_manager.get_expr(f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\']'
+        root_P_goal_point = symbol_manager.get_expr(f'god_map.motion_graph_manager.motion_goals[\'{str(self)}\']'
                                                     f'.root_P_goal_point',
                                                     input_type_hint=np.ndarray,
                                                     output_type_hint=cas.Point3)

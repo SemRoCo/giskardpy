@@ -45,7 +45,7 @@ class CartesianPosition(Goal):
         else:
             root_T_x = god_map.world.compose_fk_expression(self.root_link, goal_point.reference_frame)
             root_P_goal = root_T_x.dot(goal_point)
-            root_P_goal = god_map.monitor_manager.register_expression_updater(root_P_goal, start_condition)
+            root_P_goal = god_map.motion_graph_manager.register_expression_updater(root_P_goal, start_condition)
         r_P_c = god_map.world.compose_fk_expression(self.root_link, self.tip_link).to_position()
         task = self.create_and_add_task()
         task.add_point_goal_constraints(frame_P_goal=root_P_goal,
@@ -93,7 +93,7 @@ class CartesianOrientation(Goal):
         else:
             root_T_x = god_map.world.compose_fk_expression(self.root_link, goal_orientation.reference_frame)
             root_R_goal = root_T_x.dot(goal_orientation)
-            root_R_goal = god_map.monitor_manager.register_expression_updater(root_R_goal, start_condition)
+            root_R_goal = god_map.motion_graph_manager.register_expression_updater(root_R_goal, start_condition)
 
         r_T_c = god_map.world.compose_fk_expression(self.root_link, self.tip_link)
         r_R_c = r_T_c.to_rotation()
@@ -113,7 +113,7 @@ class CartesianOrientation(Goal):
             else:
                 root_T_x = god_map.world.compose_fk_expression(self.root_link, point_of_debug_matrix.reference_frame)
                 point = root_T_x.dot(point_of_debug_matrix)
-                point = god_map.monitor_manager.register_expression_updater(point, start_condition)
+                point = god_map.motion_graph_manager.register_expression_updater(point, start_condition)
         debug_trans_matrix = cas.TransMatrix.from_point_rotation_matrix(point=point,
                                                                         rotation_matrix=root_R_goal)
         debug_current_trans_matrix = cas.TransMatrix.from_point_rotation_matrix(point=r_T_c.to_position(),
@@ -150,7 +150,7 @@ class CartesianPositionStraight(Goal):
         else:
             root_T_x = god_map.world.compose_fk_expression(self.root_link, goal_point.reference_frame)
             root_P_goal = root_T_x.dot(goal_point)
-            root_P_goal = god_map.monitor_manager.register_expression_updater(root_P_goal, start_condition)
+            root_P_goal = god_map.motion_graph_manager.register_expression_updater(root_P_goal, start_condition)
         if name is None:
             name = f'{self.__class__.__name__}/{self.root_link}/{self.tip_link}'
         super().__init__(name)
@@ -598,7 +598,7 @@ class RelativePositionSequence(Goal):
         error2_monitor.end_condition = error2_monitor.get_state_expression()
 
         root_T_goal2_cached = root_T_tip.dot(self.tip_P_goal2)
-        root_P_goal2_cached = god_map.monitor_manager.register_expression_updater(root_T_goal2_cached,
+        root_P_goal2_cached = god_map.motion_graph_manager.register_expression_updater(root_T_goal2_cached,
                                                                                   error1_monitor.get_state_expression())
 
         error2 = cas.euclidean_distance(root_P_goal2_cached, root_P_current)

@@ -1,3 +1,4 @@
+from __future__ import annotations
 from collections import defaultdict
 from typing import Dict, Tuple, Optional, List, Union
 
@@ -307,37 +308,35 @@ class WorldWrapper:
         return self._send_goal_and_wait(req)
 
 
-class MotionGoalWrapper:
-    _goals: List[MotionGraphNode]
-    _collision_entries: Dict[Tuple[str, str, str], List[CollisionEntry]]
+class MotionGraphNodeWrapper:
+    _motion_graph_nodes: List[MotionGraphNode]
     avoid_name_conflict: bool
+    _name_prefix = ''
+    giskard_wrapper: GiskardWrapper
 
-    def __init__(self, robot_name: str, avoid_name_conflict: bool = False):
-        self.robot_name = robot_name
-        self.reset()
+    def __init__(self, giskard_wrapper: GiskardWrapper, avoid_name_conflict: bool = False):
+        self.giskard_wrapper = giskard_wrapper
         self.avoid_name_conflict = avoid_name_conflict
+        self.reset()
+
+    @property
+    def robot_name(self) -> str:
+        return self.giskard_wrapper.robot_name
+
+    @property
+    def motion_graph_nodes(self) -> List[MotionGraphNode]:
+        return self._motion_graph_nodes
 
     def reset(self):
-        """
-        Clears all goals.
-        """
-        self._goals = []
-        self._collision_entries = defaultdict(list)
+        self._motion_graph_nodes = []
 
-    def get_goals(self) -> List[MotionGraphNode]:
-        self._add_collision_entries_as_goals()
-        return self._goals
-
-    def number_of_goals(self) -> int:
-        return len(self._goals)
-
-    def add_motion_goal(self, *,
-                        motion_goal_class: str,
-                        name: Optional[str] = None,
-                        start_condition: str = '',
-                        pause_condition: str = '',
-                        end_condition: str = '',
-                        **kwargs):
+    def _add_motion_graph_node(self, *,
+                               class_name: str,
+                               name: Optional[str] = None,
+                               start_condition: str = '',
+                               pause_condition: str = '',
+                               end_condition: Optional[str] = None,
+                               **kwargs) -> str:
         """
         Generic function to add a motion goal.
         :param motion_goal_class: Name of a class defined in src/giskardpy/goals
@@ -348,17 +347,59 @@ class MotionGoalWrapper:
         :param end_condition: a logical expression. Goal will become inactive when this becomes True.
         :param kwargs: kwargs for __init__ function of motion_goal_class
         """
-        name = name or motion_goal_class
+        # todo use self?
+        name = name or class_name
         if self.avoid_name_conflict:
-            name = f'G{self.number_of_goals()} {name}'
+            name = f'{self._name_prefix}{len(self._motion_graph_nodes)} {name}'
+        if not self.avoid_name_conflict and [x for x in self.motion_graph_nodes if x.name == name]:
+            raise ValueError(f'Motion graph node named {name} already exists.')
         motion_goal = MotionGraphNode()
         motion_goal.name = name
-        motion_goal.class_name = motion_goal_class
+        if not name.startswith('\'') and not name.startswith('"'):
+            name = f'\'{name}\''  # put all monitor names in quotes so that the user doesn't have to
+        motion_goal.class_name = class_name
         motion_goal.start_condition = start_condition
         motion_goal.pause_condition = pause_condition
-        motion_goal.end_condition = end_condition
+        if end_condition is None:  # everything ends themselves by default
+            motion_goal.end_condition = name
+        else:
+            motion_goal.end_condition = end_condition
         motion_goal.kwargs = kwargs_to_json(kwargs)
-        self._goals.append(motion_goal)
+        self._motion_graph_nodes.append(motion_goal)
+        return name
+
+
+class MotionGoalWrapper(MotionGraphNodeWrapper):
+    _name_prefix = 'G'
+    _collision_entries: Dict[Tuple[str, str, str], List[CollisionEntry]]
+
+    def reset(self):
+        super().reset()
+        self._collision_entries = defaultdict(list)
+
+    def add_motion_goal(self, *,
+                        motion_goal_class: str,
+                        name: Optional[str] = None,
+                        start_condition: str = '',
+                        pause_condition: str = '',
+                        end_condition: Optional[str] = None,
+                        **kwargs) -> str:
+        """
+        Generic function to add a motion goal.
+        :param motion_goal_class: Name of a class defined in src/giskardpy/goals
+        :param name: a unique name for the goal, will use class name by default
+        :param start_condition: a logical expression to define the start condition for this monitor. e.g.
+                                    not 'monitor1' and ('monitor2' or 'monitor3')
+        :param pause_condition: a logical expression. Goal will be on hold if it is True and active otherwise
+        :param end_condition: a logical expression. Goal will become inactive when this becomes True.
+        :param kwargs: kwargs for __init__ function of motion_goal_class
+        """
+        return super()._add_motion_graph_node(class_name=motion_goal_class,
+                                              name=name,
+                                              start_condition=start_condition,
+                                              pause_condition=pause_condition,
+                                              end_condition=end_condition,
+                                              **kwargs)
 
     def _add_collision_avoidance(self,
                                  collisions: List[CollisionEntry],
@@ -477,31 +518,6 @@ class MotionGoalWrapper:
                                       start_condition=start_condition,
                                       pause_condition=pause_condition,
                                       end_condition=end_condition)
-
-    def add_joint_position(self,
-                           goal_state: Dict[str, float],
-                           weight: Optional[float] = None,
-                           max_velocity: Optional[float] = None,
-                           name: Optional[str] = None,
-                           start_condition: str = '',
-                           pause_condition: str = '',
-                           end_condition: str = '',
-                           **kwargs: goal_parameter):
-        """
-        Sets joint position goals for all pairs in goal_state
-        :param goal_state: maps joint_name to goal position
-        :param weight: None = use default weight
-        :param max_velocity: will be applied to all joints
-        """
-        self.add_motion_goal(motion_goal_class=JointPositionList.__name__,
-                             goal_state=goal_state,
-                             weight=weight,
-                             max_velocity=max_velocity,
-                             name=name,
-                             start_condition=start_condition,
-                             pause_condition=pause_condition,
-                             end_condition=end_condition,
-                             **kwargs)
 
     def add_cartesian_pose(self,
                            goal_pose: PoseStamped,
@@ -1417,30 +1433,64 @@ class MotionGoalWrapper:
                              **kwargs)
 
 
-class MonitorWrapper:
-    _monitors: List[MotionGraphNode]
+class TaskWrapper(MotionGraphNodeWrapper):
+    _name_prefix = 'T'
+
+    def add_task(self, *,
+                 task_class: str,
+                 name: Optional[str] = None,
+                 start_condition: str = '',
+                 pause_condition: str = '',
+                 end_condition: Optional[str] = None,
+                 **kwargs) -> str:
+        return super()._add_motion_graph_node(class_name=task_class,
+                                              name=name,
+                                              start_condition=start_condition,
+                                              pause_condition=pause_condition,
+                                              end_condition=end_condition,
+                                              **kwargs)
+
+    def add_joint_position(self,
+                           goal_state: Dict[str, float],
+                           weight: Optional[float] = None,
+                           max_velocity: Optional[float] = None,
+                           name: Optional[str] = None,
+                           start_condition: str = '',
+                           pause_condition: str = '',
+                           end_condition: str = '',
+                           **kwargs: goal_parameter):
+        """
+        Sets joint position goals for all pairs in goal_state
+        :param goal_state: maps joint_name to goal position
+        :param weight: None = use default weight
+        :param max_velocity: will be applied to all joints
+        """
+        self.add_task(task_class=JointPositionList.__name__,
+                      goal_state=goal_state,
+                      weight=weight,
+                      max_velocity=max_velocity,
+                      name=name,
+                      start_condition=start_condition,
+                      pause_condition=pause_condition,
+                      end_condition=end_condition,
+                      **kwargs)
+
+
+class MonitorWrapper(MotionGraphNodeWrapper):
     max_trajectory_length_set: bool
-    avoid_name_conflict: bool
+    _name_prefix = 'M'
 
-    def __init__(self, robot_name: str, avoid_name_conflict: bool = False):
-        self._robot_name = robot_name
-        self.avoid_name_conflict = avoid_name_conflict
+    def reset(self):
+        super().reset()
         self.max_trajectory_length_set = False
-        self.reset()
-
-    def get_monitors(self) -> List[MotionGraphNode]:
-        return self._monitors
 
     def get_anded_monitor_names(self) -> str:
         non_cancel_monitors = []
-        for monitor in self._monitors:
-            if monitor.class_name not in get_all_classes_in_package('giskardpy_ros.motion_graph.monitors',
+        for monitor in self.motion_graph_nodes:
+            if monitor.class_name not in get_all_classes_in_package('giskardpy.motion_graph.monitors',
                                                                     CancelMotion):
                 non_cancel_monitors.append(f'\'{monitor.name}\'')
         return ' and '.join(non_cancel_monitors)
-
-    def reset(self):
-        self._monitors = []
 
     def add_monitor(self, *,
                     monitor_class: str,
@@ -1460,28 +1510,12 @@ class MonitorWrapper:
         :param kwargs: kwargs for __init__ function of motion_goal_class
         :return: the name of the monitor with added quotes to be used in logical expressions for conditions.
         """
-        name = name or monitor_class
-        if self.avoid_name_conflict:
-            name = f'M{str(len(self._monitors))} {name}'
-        if [x for x in self._monitors if x.name == name]:
-            raise KeyError(f'monitor named {name} already exists.')
-
-        monitor = giskard_msgs.MotionGraphNode()
-        monitor.name = name
-        if not name.startswith('\'') and not name.startswith('"'):
-            name = f'\'{name}\''  # put all monitor names in quotes so that the user doesn't have to
-
-        if end_condition is None:
-            end_condition = name
-        monitor.class_name = monitor_class
-        monitor.start_condition = start_condition
-        monitor.pause_condition = pause_condition
-        monitor.end_condition = end_condition
-        monitor.kwargs = kwargs_to_json(kwargs)
-        self._monitors.append(monitor)
-        if not name.startswith('\'') and not name.startswith('"'):
-            name = f'\'{name}\''  # put all monitor names in quotes so that the user doesn't have to
-        return name
+        return super()._add_motion_graph_node(class_name=monitor_class,
+                                              name=name,
+                                              start_condition=start_condition,
+                                              pause_condition=pause_condition,
+                                              end_condition=end_condition,
+                                              **kwargs)
 
     def add_local_minimum_reached(self,
                                   name: Optional[str] = None,
@@ -1981,8 +2015,9 @@ class GiskardWrapper:
                                     conflicts.
         """
         self.world = WorldWrapper(node_name)
-        self.monitors = MonitorWrapper(self.robot_name, avoid_name_conflict=avoid_name_conflict)
-        self.motion_goals = MotionGoalWrapper(self.robot_name, avoid_name_conflict=avoid_name_conflict)
+        self.monitors = MonitorWrapper(self, avoid_name_conflict=avoid_name_conflict)
+        self.tasks = TaskWrapper(self, avoid_name_conflict=avoid_name_conflict)
+        self.motion_goals = MotionGoalWrapper(self, avoid_name_conflict=avoid_name_conflict)
         self.clear_motion_goals_and_monitors()
         giskard_topic = f'{node_name}/command'
         self._client = SimpleActionClient(giskard_topic, MoveAction)
@@ -2003,7 +2038,7 @@ class GiskardWrapper:
         4. Adds a max trajectory length monitor, if one wasn't added already.
         """
         local_min_reached_monitor_name = self.monitors.add_local_minimum_reached()
-        for goal in self.motion_goals._goals:
+        for goal in self.motion_goals.motion_graph_nodes:
             if goal.end_condition:
                 goal.end_condition = f'({goal.end_condition}) and {local_min_reached_monitor_name}'
             else:
@@ -2025,6 +2060,7 @@ class GiskardWrapper:
         """
         self.motion_goals.reset()
         self.monitors.reset()
+        self.tasks.reset()
 
     def execute(self, wait: bool = True) -> MoveResult:
         """
@@ -2061,8 +2097,9 @@ class GiskardWrapper:
 
     def _create_action_goal(self) -> MoveGoal:
         action_goal = MoveGoal()
-        action_goal.monitors = self.monitors.get_monitors()
-        action_goal.goals = self.motion_goals.get_goals()
+        action_goal.monitors = self.monitors.motion_graph_nodes
+        action_goal.tasks = self.tasks.motion_graph_nodes
+        action_goal.goals = self.motion_goals.motion_graph_nodes
         self.clear_motion_goals_and_monitors()
         return action_goal
 

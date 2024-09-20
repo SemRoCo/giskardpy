@@ -290,9 +290,9 @@ def motion_graph_node_to_ros_msg(motion_graph_node: Union[Monitor, Task]) -> gis
     msg = giskard_msgs.MotionGraphNode()
     msg.name = str(motion_graph_node.name)
     msg.class_name = motion_graph_node.__class__.__name__
-    msg.start_condition = god_map.monitor_manager.format_condition(motion_graph_node.start_condition, new_line=' ')
-    msg.pause_condition = god_map.monitor_manager.format_condition(motion_graph_node.pause_condition, new_line=' ')
-    msg.end_condition = god_map.monitor_manager.format_condition(motion_graph_node.end_condition, new_line=' ')
+    msg.start_condition = god_map.motion_graph_manager.format_condition(motion_graph_node.start_condition, new_line=' ')
+    msg.pause_condition = god_map.motion_graph_manager.format_condition(motion_graph_node.pause_condition, new_line=' ')
+    msg.end_condition = god_map.motion_graph_manager.format_condition(motion_graph_node.end_condition, new_line=' ')
     return msg
 
 

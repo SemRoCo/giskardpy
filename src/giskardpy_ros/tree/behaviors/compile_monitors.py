@@ -17,13 +17,13 @@ class CompileMonitors(GiskardBehavior):
     @catch_and_raise_to_blackboard
     @record_time
     def update(self):
-        god_map.monitor_manager.compile_monitors()
+        god_map.motion_graph_manager.compile_monitors()
         self.add_payload_monitors_to_behavior_tree(traj_tracking=self.traj_tracking)
         return Status.SUCCESS
 
     @profile
     def add_payload_monitors_to_behavior_tree(self, traj_tracking: bool = False) -> None:
-        payload_monitors = sorted(god_map.monitor_manager.payload_monitors, key=lambda x: isinstance(x, CancelMotion))
+        payload_monitors = sorted(god_map.motion_graph_manager.payload_monitors, key=lambda x: isinstance(x, CancelMotion))
         for monitor in payload_monitors:
             if traj_tracking:
                 GiskardBlackboard().tree.execute_traj.base_closed_loop.check_monitors.add_monitor(monitor)

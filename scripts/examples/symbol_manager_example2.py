@@ -20,7 +20,7 @@ print(pose)
 #  [@6, @6, @6, 1]]
 
 
-pose_compiled = pose.compile()
+pose_compiled = pose.pre_compile()
 args = symbol_manager.resolve_symbols(pose_compiled.str_params)
 print(pose_compiled.fast_call(args))
 # [[1. 0. 0. 0.]

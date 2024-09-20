@@ -7,11 +7,11 @@ from py_trees import Status
 
 import giskard_msgs.msg as giskard_msgs
 from giskard_msgs.msg import ExecutionState
-from giskardpy.data_types.data_types import TaskState
+from giskardpy.data_types.data_types import LifeCycleState
 from giskardpy.god_map import god_map
 from giskardpy.middleware import get_middleware
+from giskardpy.motion_graph.monitors.monitors import EndMotion
 from giskardpy.motion_graph.monitors.payload_monitors import CancelMotion
-from giskardpy.motion_graph.monitors.monitor_manager import EndMotion
 from giskardpy.utils.decorators import record_time
 from giskardpy.utils.utils import create_path
 from giskardpy_ros.tree.behaviors.plugin import GiskardBehavior
@@ -41,26 +41,26 @@ def search_for_monitor(monitor_name: str, execution_state: ExecutionState) -> gi
     return [m for m in execution_state.monitors if m.name == monitor_name][0]
 
 
-task_state_to_color: Dict[TaskState, Tuple[str, str]] = {
-    TaskState.not_started: (NotStartedColor, MyGRAY),
-    TaskState.running: (MyBLUE, MyGRAY),
-    TaskState.on_hold: (MyORANGE, MyGRAY),
-    TaskState.succeeded: (MyGREEN, MyGRAY),
-    TaskState.failed: ('red', MyGRAY)
+task_state_to_color: Dict[LifeCycleState, Tuple[str, str]] = {
+    LifeCycleState.not_started: (NotStartedColor, MyGRAY),
+    LifeCycleState.running: (MyBLUE, MyGRAY),
+    LifeCycleState.on_hold: (MyORANGE, MyGRAY),
+    LifeCycleState.succeeded: (MyGREEN, MyGRAY),
+    LifeCycleState.failed: ('red', MyGRAY)
 }
 
-monitor_state_to_color: Dict[Tuple[TaskState, int], Tuple[str, str]] = {
-    (TaskState.not_started, 1): (NotStartedColor, MonitorTrueGreen),
-    (TaskState.running, 1): (MyBLUE, MonitorTrueGreen),
-    (TaskState.on_hold, 1): (MyORANGE, MonitorTrueGreen),
-    (TaskState.succeeded, 1): (MyGREEN, MonitorTrueGreen),
-    (TaskState.failed, 1): ('red', MonitorTrueGreen),
+monitor_state_to_color: Dict[Tuple[LifeCycleState, int], Tuple[str, str]] = {
+    (LifeCycleState.not_started, 1): (NotStartedColor, MonitorTrueGreen),
+    (LifeCycleState.running, 1): (MyBLUE, MonitorTrueGreen),
+    (LifeCycleState.on_hold, 1): (MyORANGE, MonitorTrueGreen),
+    (LifeCycleState.succeeded, 1): (MyGREEN, MonitorTrueGreen),
+    (LifeCycleState.failed, 1): ('red', MonitorTrueGreen),
 
-    (TaskState.not_started, 0): (NotStartedColor, MonitorFalseRed),
-    (TaskState.running, 0): (MyBLUE, MonitorFalseRed),
-    (TaskState.on_hold, 0): (MyORANGE, MonitorFalseRed),
-    (TaskState.succeeded, 0): (MyGREEN, MonitorFalseRed),
-    (TaskState.failed, 0): ('red', MonitorFalseRed),
+    (LifeCycleState.not_started, 0): (NotStartedColor, MonitorFalseRed),
+    (LifeCycleState.running, 0): (MyBLUE, MonitorFalseRed),
+    (LifeCycleState.on_hold, 0): (MyORANGE, MonitorFalseRed),
+    (LifeCycleState.succeeded, 0): (MyGREEN, MonitorFalseRed),
+    (LifeCycleState.failed, 0): ('red', MonitorFalseRed),
 }
 
 
@@ -201,7 +201,7 @@ class PlotMotionGraph(GiskardBehavior):
     @record_time
     @profile
     def update(self):
-        file_name = god_map.tmp_folder + f'task_graphs/goal_{GiskardBlackboard().move_action_server.goal_id}.png'
+        file_name = god_map.tmp_folder + f'task_graphs/goal_{GiskardBlackboard().move_action_server.goal_id}.pdf'
         execution_state = giskard_state_to_execution_state()
         graph = execution_state_to_dot_graph(execution_state)
         create_path(file_name)

@@ -28,8 +28,9 @@ class OldGiskardWrapper(GiskardWrapper):
         if not self.motion_goals._collision_entries:
             self.motion_goals.avoid_all_collisions()
         action_goal = MoveGoal()
-        action_goal.monitors = self.monitors.get_monitors()
-        action_goal.goals = self.motion_goals.get_goals()
+        action_goal.monitors = self.monitors.motion_graph_nodes
+        action_goal.tasks = self.tasks.motion_graph_nodes
+        action_goal.goals = self.motion_goals.motion_graph_nodes
         self.clear_motion_goals_and_monitors()
         return action_goal
 
@@ -49,16 +50,12 @@ class OldGiskardWrapper(GiskardWrapper):
         :param add_monitor: if True, adds a monitor as end_condition to check if the goal was reached.
         :param max_velocity: will be applied to all joints
         """
-        if add_monitor:
-            end_condition = self.monitors.add_joint_position(goal_state=goal_state)
-        else:
-            end_condition = ''
-        self.motion_goals.add_joint_position(goal_state=goal_state,
-                                             group_name=group_name,
-                                             weight=weight,
-                                             max_velocity=max_velocity,
-                                             end_condition=end_condition,
-                                             **kwargs)
+        self.tasks.add_joint_position(goal_state=goal_state,
+                                      group_name=group_name,
+                                      weight=weight,
+                                      max_velocity=max_velocity,
+                                      end_condition=None if add_monitor else '',
+                                      **kwargs)
 
     def set_cart_goal(self,
                       goal_pose: PoseStamped,
@@ -826,8 +823,8 @@ class OldGiskardWrapper(GiskardWrapper):
         :return: WorldResult
         """
         return self.world.register_group(new_group_name=new_group_name,
-                                   root_link_name=root_link_name,
-                                   root_link_group_name=root_link_group_name)
+                                         root_link_name=root_link_name,
+                                         root_link_group_name=root_link_group_name)
 
     def clear_world(self) -> WorldResult:
         """

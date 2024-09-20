@@ -11,7 +11,7 @@ from giskardpy.goals.goal import Goal
 from giskardpy.middleware import get_middleware
 from giskardpy.motion_graph.monitors.monitors import Monitor, EndMotion, CancelMotion
 from giskardpy.god_map import god_map
-from giskardpy.motion_graph.tasks.task import TaskState
+from giskardpy.motion_graph.tasks.task import LifeCycleState
 from giskardpy_ros.tree.behaviors import plot_motion_graph
 from giskardpy_ros.tree.behaviors.plugin import GiskardBehavior
 from giskardpy_ros.tree.blackboard_utils import GiskardBlackboard
@@ -26,7 +26,7 @@ class PlotGanttChart(GiskardBehavior):
         super().__init__(name)
 
     def plot_gantt_chart(self, goals: List[Goal], monitors: List[Monitor], file_name: str):
-        monitor_plot_filter = np.array([monitor.plot for monitor in god_map.monitor_manager.monitors.values()])
+        monitor_plot_filter = np.array([monitor.plot for monitor in god_map.motion_graph_manager.monitors.values()])
         tasks = [task for g in goals for task in g.tasks]
         task_plot_filter = np.array([not isinstance(g, CollisionAvoidance) for g in goals for _ in g.tasks])
 
@@ -59,11 +59,11 @@ class PlotGanttChart(GiskardBehavior):
         get_middleware().loginfo(f'Saved gantt chart to {file_name}.')
 
     def plot_task_history(self,
-                          history: List[Tuple[float, List[Optional[TaskState]]]],
+                          history: List[Tuple[float, List[Optional[LifeCycleState]]]],
                           things, filter: np.ndarray,
                           bar_height: float = 0.8):
         color_map = plot_motion_graph.task_state_to_color
-        state: Dict[str, Tuple[float, TaskState]] = {t.name: (0, TaskState.not_started) for t in things}
+        state: Dict[str, Tuple[float, LifeCycleState]] = {t.name: (0, LifeCycleState.not_started) for t in things}
         for end_time, history_state in history:
             for thing_id, status in enumerate(history_state):
                 if not filter[thing_id]:
@@ -81,7 +81,7 @@ class PlotGanttChart(GiskardBehavior):
                              filter: np.ndarray,
                              bar_height: float = 0.8):
         color_map = plot_motion_graph.monitor_state_to_color
-        state = {t.name: (0, 0, TaskState.not_started) for t in things}
+        state = {t.name: (0, 0, LifeCycleState.not_started) for t in things}
         for end_time, (bool_states, history_states) in history:
             for thing_id, status in enumerate(history_states):
                 bool_status = bool_states[thing_id]
@@ -99,17 +99,17 @@ class PlotGanttChart(GiskardBehavior):
 
     def get_new_history(self) \
             -> Tuple[List[Tuple[float, Tuple[np.ndarray, np.ndarray]]],
-            List[Tuple[float, List[Optional[TaskState]]]]]:
+            List[Tuple[float, List[Optional[LifeCycleState]]]]]:
         # because the monitor state doesn't get updated after the final end motion becomes true
-        god_map.monitor_manager.evaluate_monitors()
+        god_map.motion_graph_manager.evaluate_monitors()
 
         # add Nones to make sure all bars gets "ended"
         new_end_time = god_map.time + god_map.qp_controller.sample_period
 
-        monitor_history = copy(god_map.monitor_manager.state_history)
+        monitor_history = copy(god_map.motion_graph_manager.state_history)
         monitor_history.append((new_end_time, ([None] * len(monitor_history[0][1][0]), [None] * len(monitor_history[0][1][0]))))
 
-        task_history = copy(god_map.motion_goal_manager.state_history)
+        task_history = copy(god_map.motion_graph_manager.state_history)
         task_history.append((new_end_time, [None] * len(task_history[0][1])))
 
         return monitor_history, task_history
@@ -117,15 +117,15 @@ class PlotGanttChart(GiskardBehavior):
     @record_time
     @profile
     def update(self):
-        if not god_map.monitor_manager.state_history:
-            return Status.SUCCESS
-        try:
-            goals = list(god_map.motion_goal_manager.motion_goals.values())
-            monitors = list(god_map.monitor_manager.monitors.values())
-            file_name = god_map.tmp_folder + f'gantt_charts/goal_{GiskardBlackboard().move_action_server.goal_id}.pdf'
-            self.plot_gantt_chart(goals, monitors, file_name)
-        except Exception as e:
-            get_middleware().logwarn(f'Failed to create goal gantt chart: {e}.')
-            traceback.print_exc()
+        # if not god_map.motion_graph_manager.monitor_state_history:
+        #     return Status.SUCCESS
+        # try:
+        #     goals = list(god_map.motion_graph_manager.motion_goals.values())
+        #     monitors = list(god_map.motion_graph_manager.monitors.values())
+        #     file_name = god_map.tmp_folder + f'gantt_charts/goal_{GiskardBlackboard().move_action_server.goal_id}.pdf'
+        #     self.plot_gantt_chart(goals, monitors, file_name)
+        # except Exception as e:
+        #     get_middleware().logwarn(f'Failed to create goal gantt chart: {e}.')
+        #     traceback.print_exc()
 
         return Status.SUCCESS

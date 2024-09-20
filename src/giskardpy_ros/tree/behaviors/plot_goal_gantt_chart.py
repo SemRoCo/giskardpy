@@ -63,7 +63,7 @@ class PlotGanttChart(GiskardBehavior):
                      things,
                      filter: np.ndarray,
                      bar_height: float = 0.8):
-        color_map = plot_motion_graph.monitor_state_to_color
+        color_map = plot_motion_graph.node_state_to_color
         state = {t.name: (0, 0, LifeCycleState.not_started) for t in things}
         for end_time, (bool_states, history_states) in history:
             for thing_id, status in enumerate(history_states):

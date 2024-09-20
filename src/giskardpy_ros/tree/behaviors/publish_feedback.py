@@ -28,17 +28,15 @@ def giskard_state_to_execution_state() -> ExecutionState:
     try:
         msg.task_state = god_map.motion_graph_manager.task_state_history[-1][1][0][task_filter].tolist()
         msg.task_life_cycle_state = god_map.motion_graph_manager.task_state_history[-1][1][1][task_filter].tolist()
+    except Exception as e:  # state not initialized yet
+        msg.task_state = [0] * len(msg.tasks)
+        msg.task_life_cycle_state = [LifeCycleState.not_started] * len(msg.tasks)
+    try:
         msg.monitor_state = god_map.motion_graph_manager.monitor_state_history[-1][1][0][monitor_filter].tolist()
         msg.monitor_life_cycle_state = god_map.motion_graph_manager.monitor_state_history[-1][1][1][monitor_filter].tolist()
-        # if len(task_filter) > 0:
-        #     msg.task_state = god_map.motion_graph_manager.task_observation_state[task_filter].tolist()
-        # if len(monitor_filter) > 0:
-        #     msg.monitor_state = god_map.motion_graph_manager.monitor_observation_state[monitor_filter].tolist()
     except Exception as e:  # state not initialized yet
         msg.monitor_state = [0] * len(msg.monitors)
         msg.monitor_life_cycle_state = [LifeCycleState.not_started] * len(msg.monitors)
-        msg.task_state = [0] * len(msg.tasks)
-        msg.task_life_cycle_state = [LifeCycleState.not_started] * len(msg.tasks)
     return msg
 
 

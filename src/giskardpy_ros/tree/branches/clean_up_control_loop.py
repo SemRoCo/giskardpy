@@ -21,8 +21,8 @@ class CleanupControlLoop(Sequence):
 
     def __init__(self, name: str = 'clean up control loop'):
         super().__init__(name)
-        self.add_child(PublishFeedback())
         self.add_child(TimePlugin())
+        self.add_child(PublishFeedback())
         self.add_child(SetZeroVelocity('set zero vel 1'))
         self.add_child(LogTrajPlugin('log post processing'))
         self.add_child(GoalCleanUp('clean up goals'))
@@ -44,7 +44,7 @@ class CleanupControlLoop(Sequence):
         self.add_child(DebugMarkerPublisherTrajectory())
 
     def add_plot_gantt_chart(self):
-        self.insert_child(PlotGanttChart(), 2)
+        self.insert_child(PlotGanttChart(), 1)
 
     @toggle_on('has_reset_world_state')
     def add_reset_world_state(self):

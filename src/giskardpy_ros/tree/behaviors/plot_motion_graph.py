@@ -41,15 +41,7 @@ def search_for_monitor(monitor_name: str, execution_state: ExecutionState) -> gi
     return [m for m in execution_state.monitors if m.name == monitor_name][0]
 
 
-task_state_to_color: Dict[LifeCycleState, Tuple[str, str]] = {
-    LifeCycleState.not_started: (NotStartedColor, MyGRAY),
-    LifeCycleState.running: (MyBLUE, MyGRAY),
-    LifeCycleState.on_hold: (MyORANGE, MyGRAY),
-    LifeCycleState.succeeded: (MyGREEN, MyGRAY),
-    LifeCycleState.failed: ('red', MyGRAY)
-}
-
-monitor_state_to_color: Dict[Tuple[LifeCycleState, int], Tuple[str, str]] = {
+node_state_to_color: Dict[Tuple[LifeCycleState, int], Tuple[str, str]] = {
     (LifeCycleState.not_started, 1): (NotStartedColor, MonitorTrueGreen),
     (LifeCycleState.running, 1): (MyBLUE, MonitorTrueGreen),
     (LifeCycleState.on_hold, 1): (MyORANGE, MonitorTrueGreen),
@@ -115,22 +107,18 @@ def add_boarder_to_node(graph: pydot.Graph, node: pydot.Node, num: int, color: s
 def execution_state_to_dot_graph(execution_state: ExecutionState, use_state_color: bool = False) -> pydot.Dot:
     graph = pydot.Dot(graph_type='digraph', ranksep=1.)
 
-    def add_node(thing: giskard_msgs.MotionGraphNode, color: str, bg_color: str) \
+    def add_node(node_msg: giskard_msgs.MotionGraphNode, style: str, color: str, bg_color: str) \
             -> pydot.Node:
         num_extra_boarders = 0
-        node_id = str(thing.name)
+        node_id = str(node_msg.name)
         boarder_style = 'rounded'
-        if isinstance(thing, giskard_msgs.MotionGraphNode):
-            style = 'filled, rounded'
-            if thing.class_name == EndMotion.__name__:
-                num_extra_boarders = 1
-                boarder_style = 'rounded'
-            elif thing.class_name == CancelMotion.__name__:
-                num_extra_boarders = 1
-                boarder_style = 'dashed, rounded'
-        else:  # isinstance(thing, Task)
-            style = 'filled, diagonals'
-        label = format_motion_graph_node_msg(thing, color)
+        if node_msg.class_name == EndMotion.__name__:
+            num_extra_boarders = 1
+            boarder_style = 'rounded'
+        elif node_msg.class_name == CancelMotion.__name__:
+            num_extra_boarders = 1
+            boarder_style = 'dashed, rounded'
+        label = format_motion_graph_node_msg(node_msg, color)
         node = pydot.Node(node_id,
                           label=label,
                           shape='rectangle',
@@ -146,15 +134,16 @@ def execution_state_to_dot_graph(execution_state: ExecutionState, use_state_colo
         return node
 
     # Process monitors and their conditions
+    style = 'filled, rounded'
     for i, monitor in enumerate(execution_state.monitors):
         if use_state_color:
-            color, bg_color = monitor_state_to_color[(execution_state.monitor_life_cycle_state[i],
-                                                      execution_state.monitor_state[i])]
+            color, bg_color = node_state_to_color[(execution_state.monitor_life_cycle_state[i],
+                                                   execution_state.monitor_state[i])]
         else:
             color, bg_color = 'black', 'white'
         pause_condition = monitor.pause_condition
         end_condition = monitor.end_condition
-        monitor_node = add_node(monitor, color, bg_color)
+        monitor_node = add_node(node_msg=monitor, style=style, color=color, bg_color=bg_color)
         free_symbols = extract_monitor_names_from_condition(monitor.start_condition)
         for sub_monitor_name in free_symbols:
             graph.add_edge(pydot.Edge(sub_monitor_name, monitor_node, penwidth=LineWidth, color=MyGREEN,
@@ -170,13 +159,15 @@ def execution_state_to_dot_graph(execution_state: ExecutionState, use_state_colo
                                       dir='both', arrowsize=ArrowSize))
 
     # Process goals and their connections
+    style = 'filled, diagonals'
     for i, task in enumerate(execution_state.tasks):
         # TODO add one collision avoidance task?
         if use_state_color:
-            color, bg_color = task_state_to_color[execution_state.task_state[i]]
+            color, bg_color = node_state_to_color[(execution_state.task_life_cycle_state[i],
+                                                   execution_state.task_state[i])]
         else:
             color, bg_color = 'black', MyGRAY
-        goal_node = add_node(task, color, bg_color)
+        goal_node = add_node(node_msg=task, style=style, color=color, bg_color=bg_color)
         for monitor_name in extract_monitor_names_from_condition(task.start_condition):
             graph.add_edge(pydot.Edge(monitor_name, goal_node, penwidth=LineWidth, color=MyGREEN, arrowsize=ArrowSize))
 

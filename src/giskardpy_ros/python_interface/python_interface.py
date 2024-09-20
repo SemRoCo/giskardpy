@@ -9,8 +9,8 @@ from nav_msgs.msg import Path
 from shape_msgs.msg import SolidPrimitive
 
 import giskard_msgs.msg as giskard_msgs
-from giskard_msgs.msg import MoveAction, MoveGoal, WorldBody, CollisionEntry, MoveResult, MoveFeedback, MotionGoal, \
-    Monitor, WorldGoal, WorldAction, WorldResult, GiskardError
+from giskard_msgs.msg import (MoveAction, MoveGoal, WorldBody, CollisionEntry, MoveResult, MoveFeedback,
+                              WorldGoal, WorldAction, WorldResult, MotionGraphNode)
 from giskard_msgs.srv import DyeGroupRequest, DyeGroup, GetGroupInfoRequest, DyeGroupResponse
 from giskard_msgs.srv import GetGroupInfo, GetGroupNames
 from giskard_msgs.srv import GetGroupNamesResponse, GetGroupInfoResponse
@@ -35,6 +35,7 @@ from giskardpy.motion_graph.monitors.monitors import LocalMinimumReached, TimeAb
 from giskardpy.motion_graph.monitors.overwrite_state_monitors import SetOdometry, SetSeedConfiguration
 from giskardpy.motion_graph.monitors.payload_monitors import Print, Sleep, SetMaxTrajectoryLength, \
     PayloadAlternator
+from giskardpy_ros.goals.realtime_goals import CarryMyBullshit, RealTimePointing, FollowNavPath
 from giskardpy_ros.ros1 import msg_converter
 from giskardpy_ros.ros1.msg_converter import kwargs_to_json
 from giskardpy_ros.utils.utils import make_world_body_box
@@ -194,7 +195,6 @@ class WorldWrapper:
         The object will not move relative to the world's root link in this process.
         :param name: name of the group
         :param parent_link: name of the new parent link
-        :param timeout: how long to wait in case Giskard is busy processing a goal.
         :return: result message
         """
         if isinstance(parent_link, str):
@@ -308,7 +308,7 @@ class WorldWrapper:
 
 
 class MotionGoalWrapper:
-    _goals: List[MotionGoal]
+    _goals: List[MotionGraphNode]
     _collision_entries: Dict[Tuple[str, str, str], List[CollisionEntry]]
     avoid_name_conflict: bool
 
@@ -324,7 +324,7 @@ class MotionGoalWrapper:
         self._goals = []
         self._collision_entries = defaultdict(list)
 
-    def get_goals(self) -> List[MotionGoal]:
+    def get_goals(self) -> List[MotionGraphNode]:
         self._add_collision_entries_as_goals()
         return self._goals
 
@@ -335,7 +335,7 @@ class MotionGoalWrapper:
                         motion_goal_class: str,
                         name: Optional[str] = None,
                         start_condition: str = '',
-                        hold_condition: str = '',
+                        pause_condition: str = '',
                         end_condition: str = '',
                         **kwargs):
         """
@@ -344,18 +344,18 @@ class MotionGoalWrapper:
         :param name: a unique name for the goal, will use class name by default
         :param start_condition: a logical expression to define the start condition for this monitor. e.g.
                                     not 'monitor1' and ('monitor2' or 'monitor3')
-        :param hold_condition: a logical expression. Goal will be on hold if it is True and active otherwise
+        :param pause_condition: a logical expression. Goal will be on hold if it is True and active otherwise
         :param end_condition: a logical expression. Goal will become inactive when this becomes True.
         :param kwargs: kwargs for __init__ function of motion_goal_class
         """
         name = name or motion_goal_class
         if self.avoid_name_conflict:
             name = f'G{self.number_of_goals()} {name}'
-        motion_goal = MotionGoal()
+        motion_goal = MotionGraphNode()
         motion_goal.name = name
-        motion_goal.motion_goal_class = motion_goal_class
+        motion_goal.class_name = motion_goal_class
         motion_goal.start_condition = start_condition
-        motion_goal.hold_condition = hold_condition
+        motion_goal.pause_condition = pause_condition
         motion_goal.end_condition = end_condition
         motion_goal.kwargs = kwargs_to_json(kwargs)
         self._goals.append(motion_goal)
@@ -363,28 +363,28 @@ class MotionGoalWrapper:
     def _add_collision_avoidance(self,
                                  collisions: List[CollisionEntry],
                                  start_condition: str = '',
-                                 hold_condition: str = '',
+                                 pause_condition: str = '',
                                  end_condition: str = ''):
-        key = (start_condition, hold_condition, end_condition)
+        key = (start_condition, pause_condition, end_condition)
         self._collision_entries[key].extend(collisions)
 
     def _add_collision_entries_as_goals(self):
-        for (start_condition, hold_condition, end_condition), collision_entries in self._collision_entries.items():
+        for (start_condition, pause_condition, end_condition), collision_entries in self._collision_entries.items():
             name = 'collision avoidance'
-            if start_condition or hold_condition or end_condition:
-                name += f'{start_condition}, {hold_condition}, {end_condition}'
+            if start_condition or pause_condition or end_condition:
+                name += f'{start_condition}, {pause_condition}, {end_condition}'
             self.add_motion_goal(motion_goal_class=CollisionAvoidance.__name__,
                                  name=name,
                                  collision_entries=collision_entries,
                                  start_condition=start_condition,
-                                 hold_condition=hold_condition,
+                                 pause_condition=pause_condition,
                                  end_condition=end_condition)
 
     def allow_collision(self,
                         group1: str = CollisionEntry.ALL,
                         group2: str = CollisionEntry.ALL,
                         start_condition: str = '',
-                        hold_condition: str = '',
+                        pause_condition: str = '',
                         end_condition: str = ''):
         """
         Tell Giskard to allow collision between group1 and group2. Use CollisionEntry.ALL to allow collision with all
@@ -398,7 +398,7 @@ class MotionGoalWrapper:
         collision_entry.group2 = str(group2)
         self._add_collision_avoidance(collisions=[collision_entry],
                                       start_condition=start_condition,
-                                      hold_condition=hold_condition,
+                                      pause_condition=pause_condition,
                                       end_condition=end_condition)
 
     def avoid_collision(self,
@@ -406,7 +406,7 @@ class MotionGoalWrapper:
                         group1: str = CollisionEntry.ALL,
                         group2: str = CollisionEntry.ALL,
                         start_condition: str = '',
-                        hold_condition: str = '',
+                        pause_condition: str = '',
                         end_condition: str = ''):
         """
         Tell Giskard to avoid collision between group1 and group2. Use CollisionEntry.ALL to allow collision with all
@@ -424,24 +424,24 @@ class MotionGoalWrapper:
         collision_entry.group2 = group2
         self._add_collision_avoidance(collisions=[collision_entry],
                                       start_condition=start_condition,
-                                      hold_condition=hold_condition,
+                                      pause_condition=pause_condition,
                                       end_condition=end_condition)
 
     def allow_all_collisions(self,
                              start_condition: str = '',
-                             hold_condition: str = '',
+                             pause_condition: str = '',
                              end_condition: str = ''):
         collision_entry = CollisionEntry()
         collision_entry.type = CollisionEntry.ALLOW_COLLISION
         self._add_collision_avoidance(collisions=[collision_entry],
                                       start_condition=start_condition,
-                                      hold_condition=hold_condition,
+                                      pause_condition=pause_condition,
                                       end_condition=end_condition)
 
     def avoid_all_collisions(self,
                              min_distance: Optional[float] = None,
                              start_condition: str = '',
-                             hold_condition: str = '',
+                             pause_condition: str = '',
                              end_condition: str = ''):
         """
         If you don't want to override the distance, don't call this function. Avoid all is the default, if you don't
@@ -455,13 +455,13 @@ class MotionGoalWrapper:
         collision_entry.distance = min_distance
         self._add_collision_avoidance(collisions=[collision_entry],
                                       start_condition=start_condition,
-                                      hold_condition=hold_condition,
+                                      pause_condition=pause_condition,
                                       end_condition=end_condition)
 
     def allow_self_collision(self,
                              robot_name: Optional[str] = None,
                              start_condition: str = '',
-                             hold_condition: str = '',
+                             pause_condition: str = '',
                              end_condition: str = ''):
         """
         Allows the collision of the robot with itself for the next goal.
@@ -475,7 +475,7 @@ class MotionGoalWrapper:
         collision_entry.group2 = robot_name
         self._add_collision_avoidance(collisions=[collision_entry],
                                       start_condition=start_condition,
-                                      hold_condition=hold_condition,
+                                      pause_condition=pause_condition,
                                       end_condition=end_condition)
 
     def add_joint_position(self,
@@ -484,7 +484,7 @@ class MotionGoalWrapper:
                            max_velocity: Optional[float] = None,
                            name: Optional[str] = None,
                            start_condition: str = '',
-                           hold_condition: str = '',
+                           pause_condition: str = '',
                            end_condition: str = '',
                            **kwargs: goal_parameter):
         """
@@ -499,7 +499,7 @@ class MotionGoalWrapper:
                              max_velocity=max_velocity,
                              name=name,
                              start_condition=start_condition,
-                             hold_condition=hold_condition,
+                             pause_condition=pause_condition,
                              end_condition=end_condition,
                              **kwargs)
 
@@ -513,7 +513,7 @@ class MotionGoalWrapper:
                            weight: Optional[float] = None,
                            name: Optional[str] = None,
                            start_condition: str = '',
-                           hold_condition: str = '',
+                           pause_condition: str = '',
                            end_condition: str = '',
                            **kwargs: goal_parameter):
         """
@@ -543,7 +543,7 @@ class MotionGoalWrapper:
                              name=name,
                              absolute=absolute,
                              start_condition=start_condition,
-                             hold_condition=hold_condition,
+                             pause_condition=pause_condition,
                              end_condition=end_condition,
                              **kwargs)
 
@@ -556,7 +556,7 @@ class MotionGoalWrapper:
                          weight: Optional[float] = None,
                          name: Optional[str] = None,
                          start_condition: str = '',
-                         hold_condition: str = '',
+                         pause_condition: str = '',
                          end_condition: str = '',
                          **kwargs: goal_parameter):
         """
@@ -581,7 +581,7 @@ class MotionGoalWrapper:
                              weight=weight,
                              name=name,
                              start_condition=start_condition,
-                             hold_condition=hold_condition,
+                             pause_condition=pause_condition,
                              end_condition=end_condition,
                              **kwargs)
 
@@ -591,7 +591,7 @@ class MotionGoalWrapper:
                                weight: Optional[float] = None,
                                name: Optional[str] = None,
                                start_condition: str = '',
-                               hold_condition: str = '',
+                               pause_condition: str = '',
                                end_condition: str = ''):
         """
         This goal will push joints away from their position limits. For example if percentage is 15 and the joint
@@ -603,7 +603,7 @@ class MotionGoalWrapper:
                              joint_list=joint_list,
                              name=name,
                              start_condition=start_condition,
-                             hold_condition=hold_condition,
+                             pause_condition=pause_condition,
                              end_condition=end_condition)
 
     def add_close_container(self,
@@ -613,7 +613,7 @@ class MotionGoalWrapper:
                             weight: Optional[float] = None,
                             name: Optional[str] = None,
                             start_condition: str = '',
-                            hold_condition: str = '',
+                            pause_condition: str = '',
                             end_condition: str = ''):
         """
         Same as Open, but will use minimum value as default for goal_joint_state
@@ -629,7 +629,7 @@ class MotionGoalWrapper:
                              weight=weight,
                              name=name,
                              start_condition=start_condition,
-                             hold_condition=hold_condition,
+                             pause_condition=pause_condition,
                              end_condition=end_condition)
 
     def add_open_container(self,
@@ -639,7 +639,7 @@ class MotionGoalWrapper:
                            weight: Optional[float] = None,
                            name: Optional[str] = None,
                            start_condition: str = '',
-                           hold_condition: str = '',
+                           pause_condition: str = '',
                            end_condition: str = ''):
         """
         Open a container in an environment.
@@ -648,8 +648,6 @@ class MotionGoalWrapper:
         Can only handle containers with 1 dof, e.g. drawers or doors.
         :param tip_link: end effector that is grasping the handle
         :param environment_link: name of the handle that was grasped
-        :param tip_group: if tip_link is not unique, search in this group for matches
-        :param environment_group: if environment_link is not unique, search in this group for matches
         :param goal_joint_state: goal state for the container. default is maximum joint state.
         :param weight:
         """
@@ -664,7 +662,7 @@ class MotionGoalWrapper:
                              weight=weight,
                              name=name,
                              start_condition=start_condition,
-                             hold_condition=hold_condition,
+                             pause_condition=pause_condition,
                              end_condition=end_condition)
 
     def add_align_to_push_door(self,
@@ -678,7 +676,7 @@ class MotionGoalWrapper:
                                root_group: Optional[str] = None,
                                name: Optional[str] = None,
                                start_condition: str = '',
-                               hold_condition: str = '',
+                               pause_condition: str = '',
                                end_condition: str = ''):
         """
         Aligns the tip_link with the door_object to push it open. Only works if the door object is part of the urdf.
@@ -703,7 +701,7 @@ class MotionGoalWrapper:
                              weight=weight,
                              name=name,
                              start_condition=start_condition,
-                             hold_condition=hold_condition,
+                             pause_condition=pause_condition,
                              end_condition=end_condition)
 
     def add_pre_push_door(self,
@@ -718,7 +716,7 @@ class MotionGoalWrapper:
                           reference_angular_velocity: Optional[float] = None,
                           name: Optional[str] = None,
                           start_condition: str = '',
-                          hold_condition: str = '',
+                          pause_condition: str = '',
                           end_condition: str = ''):
         """
         Positions the gripper in contact with the door before pushing to open.
@@ -741,7 +739,7 @@ class MotionGoalWrapper:
                              reference_linear_velocity=reference_linear_velocity,
                              reference_angular_velocity=reference_angular_velocity,
                              start_condition=start_condition,
-                             hold_condition=hold_condition,
+                             pause_condition=pause_condition,
                              end_condition=end_condition)
 
     def add_diff_drive_base(self,
@@ -753,7 +751,7 @@ class MotionGoalWrapper:
                             weight: Optional[float] = None,
                             name: Optional[str] = None,
                             start_condition: str = '',
-                            hold_condition: str = '',
+                            pause_condition: str = '',
                             end_condition: str = '',
                             **kwargs: goal_parameter):
         """
@@ -781,7 +779,7 @@ class MotionGoalWrapper:
                              weight=weight,
                              name=name,
                              start_condition=start_condition,
-                             hold_condition=hold_condition,
+                             pause_condition=pause_condition,
                              end_condition=end_condition,
                              **kwargs)
 
@@ -797,7 +795,7 @@ class MotionGoalWrapper:
                       weight: Optional[float] = None,
                       name: Optional[str] = None,
                       start_condition: str = '',
-                      hold_condition: str = '',
+                      pause_condition: str = '',
                       end_condition: str = '',
                       **kwargs: goal_parameter):
         """
@@ -829,7 +827,7 @@ class MotionGoalWrapper:
                              weight=weight,
                              name=name,
                              start_condition=start_condition,
-                             hold_condition=hold_condition,
+                             pause_condition=pause_condition,
                              end_condition=end_condition,
                              **kwargs)
 
@@ -842,7 +840,7 @@ class MotionGoalWrapper:
                                      hard: bool = False,
                                      name: Optional[str] = None,
                                      start_condition: str = '',
-                                     hold_condition: str = '',
+                                     pause_condition: str = '',
                                      end_condition: str = '',
                                      **kwargs: goal_parameter):
         """
@@ -867,7 +865,7 @@ class MotionGoalWrapper:
                              hard=hard,
                              name=name,
                              start_condition=start_condition,
-                             hold_condition=hold_condition,
+                             pause_condition=pause_condition,
                              end_condition=end_condition,
                              **kwargs)
 
@@ -880,7 +878,7 @@ class MotionGoalWrapper:
                      weight: Optional[float] = None,
                      name: Optional[str] = None,
                      start_condition: str = '',
-                     hold_condition: str = '',
+                     pause_condition: str = '',
                      end_condition: str = '',
                      **kwargs: goal_parameter):
         """
@@ -904,7 +902,7 @@ class MotionGoalWrapper:
                              weight=weight,
                              name=name,
                              start_condition=start_condition,
-                             hold_condition=hold_condition,
+                             pause_condition=pause_condition,
                              end_condition=end_condition,
                              **kwargs)
 
@@ -919,7 +917,7 @@ class MotionGoalWrapper:
                                weight: Optional[float] = None,
                                name: Optional[str] = None,
                                start_condition: str = '',
-                               hold_condition: str = '',
+                               pause_condition: str = '',
                                end_condition: str = '',
                                **kwargs: goal_parameter):
         """
@@ -943,7 +941,7 @@ class MotionGoalWrapper:
                              weight=weight,
                              name=name,
                              start_condition=start_condition,
-                             hold_condition=hold_condition,
+                             pause_condition=pause_condition,
                              end_condition=end_condition,
                              **kwargs)
 
@@ -975,7 +973,7 @@ class MotionGoalWrapper:
                              drive_back: bool = False,
                              enable_laser_avoidance: bool = True,
                              start_condition: str = '',
-                             hold_condition: str = '',
+                             pause_condition: str = '',
                              end_condition: str = ''):
         """
         :param name: name of the goal
@@ -1010,7 +1008,7 @@ class MotionGoalWrapper:
         :param drive_back: follow the saved path to drive back
         :param enable_laser_avoidance:
         :param start_condition:
-        :param hold_condition:
+        :param pause_condition:
         :param end_condition:
         """
         self.add_motion_goal(motion_goal_class=CarryMyBullshit.__name__,
@@ -1041,7 +1039,7 @@ class MotionGoalWrapper:
                              drive_back=drive_back,
                              enable_laser_avoidance=enable_laser_avoidance,
                              start_condition=start_condition,
-                             hold_condition=hold_condition,
+                             pause_condition=pause_condition,
                              end_condition=end_condition)
 
     def add_follow_nav_path(self,
@@ -1065,7 +1063,7 @@ class MotionGoalWrapper:
                             height_for_camera_target: float = 1,
                             laser_frame_id: str = 'base_range_sensor_link',
                             start_condition: str = '',
-                            hold_condition: str = '',
+                            pause_condition: str = '',
                             end_condition: str = ''):
         """
         Will follow the path, orienting itself and the head towards the next points in the list.
@@ -1092,7 +1090,7 @@ class MotionGoalWrapper:
         :param height_for_camera_target: target tracking with head will ignore the published height, but use this instead
         :param laser_frame_id: frame_id of the laser scanner
         :param start_condition:
-        :param hold_condition:
+        :param pause_condition:
         :param end_condition:
         """
         self.add_motion_goal(motion_goal_class=FollowNavPath.__name__,
@@ -1115,7 +1113,7 @@ class MotionGoalWrapper:
                              height_for_camera_target=height_for_camera_target,
                              laser_frame_id=laser_frame_id,
                              start_condition=start_condition,
-                             hold_condition=hold_condition,
+                             pause_condition=pause_condition,
                              end_condition=end_condition)
 
     def add_cartesian_orientation(self,
@@ -1127,7 +1125,7 @@ class MotionGoalWrapper:
                                   absolute: bool = False,
                                   name: Optional[str] = None,
                                   start_condition: str = '',
-                                  hold_condition: str = '',
+                                  pause_condition: str = '',
                                   end_condition: str = '',
                                   **kwargs: goal_parameter):
         """
@@ -1153,7 +1151,7 @@ class MotionGoalWrapper:
                              absolute=absolute,
                              name=name,
                              start_condition=start_condition,
-                             hold_condition=hold_condition,
+                             pause_condition=pause_condition,
                              end_condition=end_condition,
                              **kwargs)
 
@@ -1186,7 +1184,7 @@ class MotionGoalWrapper:
                                     absolute: bool = False,
                                     name: Optional[str] = None,
                                     start_condition: str = '',
-                                    hold_condition: str = '',
+                                    pause_condition: str = '',
                                     end_condition: str = '',
                                     **kwargs: goal_parameter):
         """
@@ -1216,7 +1214,7 @@ class MotionGoalWrapper:
                              name=name,
                              absolute=absolute,
                              start_condition=start_condition,
-                             hold_condition=hold_condition,
+                             pause_condition=pause_condition,
                              end_condition=end_condition,
                              **kwargs)
 
@@ -1229,7 +1227,7 @@ class MotionGoalWrapper:
                                absolute: bool = False,
                                name: Optional[str] = None,
                                start_condition: str = '',
-                               hold_condition: str = '',
+                               pause_condition: str = '',
                                end_condition: str = '',
                                **kwargs: goal_parameter):
         """
@@ -1254,7 +1252,7 @@ class MotionGoalWrapper:
                              absolute=absolute,
                              name=name,
                              start_condition=start_condition,
-                             hold_condition=hold_condition,
+                             pause_condition=pause_condition,
                              end_condition=end_condition,
                              **kwargs)
 
@@ -1267,7 +1265,7 @@ class MotionGoalWrapper:
                                         absolute: bool = False,
                                         name: Optional[str] = None,
                                         start_condition: str = '',
-                                        hold_condition: str = '',
+                                        pause_condition: str = '',
                                         end_condition: str = '',
                                         **kwargs: goal_parameter):
         """
@@ -1286,7 +1284,7 @@ class MotionGoalWrapper:
                              name=name,
                              absolute=absolute,
                              start_condition=start_condition,
-                             hold_condition=hold_condition,
+                             pause_condition=pause_condition,
                              end_condition=end_condition,
                              **kwargs)
 
@@ -1299,7 +1297,7 @@ class MotionGoalWrapper:
                                 weight: Optional[float] = None,
                                 name: Optional[str] = None,
                                 start_condition: str = '',
-                                hold_condition: str = '',
+                                pause_condition: str = '',
                                 end_condition: str = '',
                                 **kwargs: goal_parameter):
         if isinstance(root_link, str):
@@ -1315,7 +1313,7 @@ class MotionGoalWrapper:
                              weight=weight,
                              name=name,
                              start_condition=start_condition,
-                             hold_condition=hold_condition,
+                             pause_condition=pause_condition,
                              end_condition=end_condition,
                              **kwargs)
 
@@ -1330,7 +1328,7 @@ class MotionGoalWrapper:
                    weight: Optional[float] = None,
                    name: Optional[str] = None,
                    start_condition: str = '',
-                   hold_condition: str = '',
+                   pause_condition: str = '',
                    end_condition: str = '',
                    **kwargs: goal_parameter):
         if isinstance(root_link, str):
@@ -1348,7 +1346,7 @@ class MotionGoalWrapper:
                              weight=weight,
                              name=name,
                              start_condition=start_condition,
-                             hold_condition=hold_condition,
+                             pause_condition=pause_condition,
                              end_condition=end_condition,
                              **kwargs)
 
@@ -1363,7 +1361,7 @@ class MotionGoalWrapper:
                      weight: Optional[float] = None,
                      name: Optional[str] = None,
                      start_condition: str = '',
-                     hold_condition: str = '',
+                     pause_condition: str = '',
                      end_condition: str = '',
                      **kwargs: goal_parameter):
         if isinstance(root_link, str):
@@ -1381,7 +1379,7 @@ class MotionGoalWrapper:
                              weight=weight,
                              name=name,
                              start_condition=start_condition,
-                             hold_condition=hold_condition,
+                             pause_condition=pause_condition,
                              end_condition=end_condition,
                              **kwargs)
 
@@ -1396,7 +1394,7 @@ class MotionGoalWrapper:
                   weight: Optional[float] = None,
                   name: Optional[str] = None,
                   start_condition: str = '',
-                  hold_condition: str = '',
+                  pause_condition: str = '',
                   end_condition: str = '',
                   **kwargs: goal_parameter):
         if isinstance(root_link, str):
@@ -1414,13 +1412,13 @@ class MotionGoalWrapper:
                              weight=weight,
                              name=name,
                              start_condition=start_condition,
-                             hold_condition=hold_condition,
+                             pause_condition=pause_condition,
                              end_condition=end_condition,
                              **kwargs)
 
 
 class MonitorWrapper:
-    _monitors: List[Monitor]
+    _monitors: List[MotionGraphNode]
     max_trajectory_length_set: bool
     avoid_name_conflict: bool
 
@@ -1430,14 +1428,14 @@ class MonitorWrapper:
         self.max_trajectory_length_set = False
         self.reset()
 
-    def get_monitors(self) -> List[Monitor]:
+    def get_monitors(self) -> List[MotionGraphNode]:
         return self._monitors
 
     def get_anded_monitor_names(self) -> str:
         non_cancel_monitors = []
         for monitor in self._monitors:
-            if monitor.monitor_class not in get_all_classes_in_package('giskardpy_ros.motion_graph.monitors',
-                                                                       CancelMotion):
+            if monitor.class_name not in get_all_classes_in_package('giskardpy_ros.motion_graph.monitors',
+                                                                    CancelMotion):
                 non_cancel_monitors.append(f'\'{monitor.name}\'')
         return ' and '.join(non_cancel_monitors)
 
@@ -1448,7 +1446,7 @@ class MonitorWrapper:
                     monitor_class: str,
                     name: Optional[str] = None,
                     start_condition: str = '',
-                    hold_condition: str = '',
+                    pause_condition: str = '',
                     end_condition: Optional[str] = None,
                     **kwargs) -> str:
         """
@@ -1457,7 +1455,7 @@ class MonitorWrapper:
         :param name: a unique name for the goal, will use class name by default
         :param start_condition: a logical expression to define the start condition for this monitor. e.g.
                                     not 'monitor1' and ('monitor2' or 'monitor3')
-        :param hold_condition: a logical expression to define the hold condition for this monitor.
+        :param pause_condition: a logical expression to define the hold condition for this monitor.
         :param end_condition: a logical expression to define the end condition for this monitor.
         :param kwargs: kwargs for __init__ function of motion_goal_class
         :return: the name of the monitor with added quotes to be used in logical expressions for conditions.
@@ -1468,17 +1466,17 @@ class MonitorWrapper:
         if [x for x in self._monitors if x.name == name]:
             raise KeyError(f'monitor named {name} already exists.')
 
-        monitor = giskard_msgs.Monitor()
+        monitor = giskard_msgs.MotionGraphNode()
         monitor.name = name
         if not name.startswith('\'') and not name.startswith('"'):
             name = f'\'{name}\''  # put all monitor names in quotes so that the user doesn't have to
 
         if end_condition is None:
             end_condition = name
-        monitor.monitor_class = monitor_class
+        monitor.class_name = monitor_class
         monitor.start_condition = start_condition
-        kwargs['hold_condition'] = hold_condition
-        kwargs['end_condition'] = end_condition
+        monitor.pause_condition = pause_condition
+        monitor.end_condition = end_condition
         monitor.kwargs = kwargs_to_json(kwargs)
         self._monitors.append(monitor)
         if not name.startswith('\'') and not name.startswith('"'):
@@ -1488,7 +1486,7 @@ class MonitorWrapper:
     def add_local_minimum_reached(self,
                                   name: Optional[str] = None,
                                   start_condition: str = '',
-                                  hold_condition: str = '',
+                                  pause_condition: str = '',
                                   end_condition: Optional[str] = None):
         """
         True if the world is currently in a local minimum.
@@ -1496,14 +1494,14 @@ class MonitorWrapper:
         return self.add_monitor(monitor_class=LocalMinimumReached.__name__,
                                 name=name,
                                 start_condition=start_condition,
-                                hold_condition=hold_condition,
+                                pause_condition=pause_condition,
                                 end_condition=end_condition)
 
     def add_time_above(self,
                        threshold: float,
                        name: Optional[str] = None,
                        start_condition: str = '',
-                       hold_condition: str = '',
+                       pause_condition: str = '',
                        end_condition: Optional[str] = None):
         """
         True if the length of the trajectory is above threshold
@@ -1511,7 +1509,7 @@ class MonitorWrapper:
         return self.add_monitor(monitor_class=TimeAbove.__name__,
                                 name=name,
                                 start_condition=start_condition,
-                                hold_condition=hold_condition,
+                                pause_condition=pause_condition,
                                 end_condition=end_condition,
                                 threshold=threshold)
 
@@ -1520,7 +1518,7 @@ class MonitorWrapper:
                            threshold: float = 0.01,
                            name: Optional[str] = None,
                            start_condition: str = '',
-                           hold_condition: str = '',
+                           pause_condition: str = '',
                            end_condition: Optional[str] = None) -> str:
         """
         True if all joints in goal_state are closer than threshold to their respective value.
@@ -1530,7 +1528,7 @@ class MonitorWrapper:
                                 goal_state=goal_state,
                                 threshold=threshold,
                                 start_condition=start_condition,
-                                hold_condition=hold_condition,
+                                pause_condition=pause_condition,
                                 end_condition=end_condition)
 
     def add_cartesian_pose(self,
@@ -1542,7 +1540,7 @@ class MonitorWrapper:
                            absolute: bool = False,
                            name: Optional[str] = None,
                            start_condition: str = '',
-                           hold_condition: str = '',
+                           pause_condition: str = '',
                            end_condition: Optional[str] = None):
         """
         True if tip_link is closer than the thresholds to goal_pose.
@@ -1558,7 +1556,7 @@ class MonitorWrapper:
                                 goal_pose=goal_pose,
                                 absolute=absolute,
                                 start_condition=start_condition,
-                                hold_condition=hold_condition,
+                                pause_condition=pause_condition,
                                 end_condition=end_condition,
                                 position_threshold=position_threshold,
                                 orientation_threshold=orientation_threshold)
@@ -1571,7 +1569,7 @@ class MonitorWrapper:
                                absolute: bool = False,
                                name: Optional[str] = None,
                                start_condition: str = '',
-                               hold_condition: str = '',
+                               pause_condition: str = '',
                                end_condition: Optional[str] = None) -> str:
         """
         True if tip_link is closer than threshold to goal_point.
@@ -1586,7 +1584,7 @@ class MonitorWrapper:
                                 tip_link=tip_link,
                                 goal_point=goal_point,
                                 start_condition=start_condition,
-                                hold_condition=hold_condition,
+                                pause_condition=pause_condition,
                                 end_condition=end_condition,
                                 absolute=absolute,
                                 threshold=threshold)
@@ -1600,7 +1598,7 @@ class MonitorWrapper:
                              name: Optional[str] = None,
                              stay_true: bool = True,
                              start_condition: str = '',
-                             hold_condition: str = '',
+                             pause_condition: str = '',
                              end_condition: Optional[str] = None,
                              threshold: float = 0.01):
         """
@@ -1618,7 +1616,7 @@ class MonitorWrapper:
                                 root_link=root_link,
                                 tip_link=tip_link,
                                 start_condition=start_condition,
-                                hold_condition=hold_condition,
+                                pause_condition=pause_condition,
                                 end_condition=end_condition,
                                 threshold=threshold)
 
@@ -1630,7 +1628,7 @@ class MonitorWrapper:
                                   absolute: bool = False,
                                   name: Optional[str] = None,
                                   start_condition: str = '',
-                                  hold_condition: str = '',
+                                  pause_condition: str = '',
                                   end_condition: Optional[str] = None):
         """
         True if tip_link is closer than threshold to goal_orientation
@@ -1646,7 +1644,7 @@ class MonitorWrapper:
                                 goal_orientation=goal_orientation,
                                 absolute=absolute,
                                 start_condition=start_condition,
-                                hold_condition=hold_condition,
+                                pause_condition=pause_condition,
                                 end_condition=end_condition,
                                 threshold=threshold)
 
@@ -1657,7 +1655,7 @@ class MonitorWrapper:
                         root_link: Union[str, giskard_msgs.LinkName],
                         name: Optional[str] = None,
                         start_condition: str = '',
-                        hold_condition: str = '',
+                        pause_condition: str = '',
                         end_condition: Optional[str] = None,
                         threshold: float = 0.01) -> str:
         """
@@ -1673,7 +1671,7 @@ class MonitorWrapper:
                                 goal_point=goal_point,
                                 root_link=root_link,
                                 start_condition=start_condition,
-                                hold_condition=hold_condition,
+                                pause_condition=pause_condition,
                                 end_condition=end_condition,
                                 pointing_axis=pointing_axis,
                                 threshold=threshold)
@@ -1685,7 +1683,7 @@ class MonitorWrapper:
                             tip_normal: Vector3Stamped,
                             name: Optional[str] = None,
                             start_condition: str = '',
-                            hold_condition: str = '',
+                            pause_condition: str = '',
                             end_condition: Optional[str] = None,
                             threshold: float = 0.01) -> str:
         """
@@ -1702,7 +1700,7 @@ class MonitorWrapper:
                                 goal_normal=goal_normal,
                                 tip_normal=tip_normal,
                                 start_condition=start_condition,
-                                hold_condition=hold_condition,
+                                pause_condition=pause_condition,
                                 end_condition=end_condition,
                                 threshold=threshold)
 
@@ -1716,7 +1714,7 @@ class MonitorWrapper:
         return self.add_monitor(monitor_class=EndMotion.__name__,
                                 name=name,
                                 start_condition=start_condition,
-                                hold_condition='',
+                                pause_condition='',
                                 end_condition='')
 
     def add_cancel_motion(self,
@@ -1731,7 +1729,7 @@ class MonitorWrapper:
         return self.add_monitor(monitor_class=CancelMotion.__name__,
                                 name=name,
                                 start_condition=start_condition,
-                                hold_condition='',
+                                pause_condition='',
                                 end_condition='',
                                 exception=error)
 
@@ -1745,7 +1743,7 @@ class MonitorWrapper:
                                 monitor_class=SetMaxTrajectoryLength.__name__,
                                 length=max_trajectory_length,
                                 start_condition='',
-                                hold_condition='',
+                                pause_condition='',
                                 end_condition='')
 
     def add_print(self,
@@ -1814,7 +1812,7 @@ class MonitorWrapper:
 
     def add_alternator(self,
                        start_condition: str = '',
-                       hold_condition: str = '',
+                       pause_condition: str = '',
                        end_condition: str = '',
                        name: Optional[str] = None,
                        mod: int = 2) -> str:
@@ -1827,13 +1825,13 @@ class MonitorWrapper:
         return self.add_monitor(monitor_class=Alternator.__name__,
                                 name=name,
                                 start_condition=start_condition,
-                                hold_condition=hold_condition,
+                                pause_condition=pause_condition,
                                 end_condition=end_condition,
                                 mod=mod)
 
     def add_payload_alternator(self,
                                start_condition: str = '',
-                               hold_condition: str = '',
+                               pause_condition: str = '',
                                end_condition: Optional[str] = None,
                                name: Optional[str] = None,
                                mod: int = 2) -> str:
@@ -1846,7 +1844,7 @@ class MonitorWrapper:
         return self.add_monitor(monitor_class=Alternator.__name__,
                                 name=name,
                                 start_condition=start_condition,
-                                hold_condition=hold_condition,
+                                pause_condition=pause_condition,
                                 end_condition=end_condition,
                                 mod=mod)
 
@@ -1857,7 +1855,7 @@ class MonitorWrapper:
                                   tip_normal: Vector3Stamped,
                                   name: Optional[str] = None,
                                   start_condition: str = '',
-                                  hold_condition: str = '',
+                                  pause_condition: str = '',
                                   end_condition: Optional[str] = None,
                                   threshold: float = 0.01) -> str:
         """
@@ -1874,7 +1872,7 @@ class MonitorWrapper:
                                 reference_normal=reference_normal,
                                 tip_normal=tip_normal,
                                 start_condition=start_condition,
-                                hold_condition=hold_condition,
+                                pause_condition=pause_condition,
                                 end_condition=end_condition,
                                 threshold=threshold)
 
@@ -1887,7 +1885,7 @@ class MonitorWrapper:
                   upper_angle: float,
                   name: Optional[str] = None,
                   start_condition: str = '',
-                  hold_condition: str = '',
+                  pause_condition: str = '',
                   end_condition: Optional[str] = None) -> str:
         """
         True if angle between tip_vector and reference_vector is within lower and upper angle.
@@ -1905,7 +1903,7 @@ class MonitorWrapper:
                                 lower_angle=lower_angle,
                                 upper_angle=upper_angle,
                                 start_condition=start_condition,
-                                hold_condition=hold_condition,
+                                pause_condition=pause_condition,
                                 end_condition=end_condition)
 
     def add_height(self,
@@ -1917,7 +1915,7 @@ class MonitorWrapper:
                    upper_limit: float,
                    name: Optional[str] = None,
                    start_condition: str = '',
-                   hold_condition: str = '',
+                   pause_condition: str = '',
                    end_condition: Optional[str] = None) -> str:
         """
         True if distance along the z-axis of root_link between tip_point and reference_point
@@ -1936,7 +1934,7 @@ class MonitorWrapper:
                                 lower_limit=lower_limit,
                                 upper_limit=upper_limit,
                                 start_condition=start_condition,
-                                hold_condition=hold_condition,
+                                pause_condition=pause_condition,
                                 end_condition=end_condition)
 
     def add_distance(self,
@@ -1948,7 +1946,7 @@ class MonitorWrapper:
                      upper_limit: float,
                      name: Optional[str] = None,
                      start_condition: str = '',
-                     hold_condition: str = '',
+                     pause_condition: str = '',
                      end_condition: Optional[str] = None) -> str:
         """
         True if distance between tip_point and reference_point on the plane (that has the z-axis of
@@ -1967,7 +1965,7 @@ class MonitorWrapper:
                                 lower_limit=lower_limit,
                                 upper_limit=upper_limit,
                                 start_condition=start_condition,
-                                hold_condition=hold_condition,
+                                pause_condition=pause_condition,
                                 end_condition=end_condition)
 
 

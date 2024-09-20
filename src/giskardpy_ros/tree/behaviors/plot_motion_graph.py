@@ -1,5 +1,5 @@
 import re
-from typing import List, Union, Dict, Tuple, Optional
+from typing import List, Dict, Tuple, Optional
 
 import pydot
 from line_profiler import profile
@@ -16,7 +16,7 @@ from giskardpy.utils.decorators import record_time
 from giskardpy.utils.utils import create_path
 from giskardpy_ros.tree.behaviors.plugin import GiskardBehavior
 from giskardpy_ros.tree.behaviors.publish_feedback import giskard_state_to_execution_state
-from giskardpy_ros.tree.blackboard_utils import catch_and_raise_to_blackboard
+from giskardpy_ros.tree.blackboard_utils import catch_and_raise_to_blackboard, GiskardBlackboard
 
 MyBLUE = '#0000DD'
 MyGREEN = '#006600'
@@ -37,7 +37,7 @@ def extract_monitor_names_from_condition(condition: str) -> List[str]:
     return re.findall(r"'(.*?)'", condition)
 
 
-def search_for_monitor(monitor_name: str, execution_state: ExecutionState) -> giskard_msgs.Monitor:
+def search_for_monitor(monitor_name: str, execution_state: ExecutionState) -> giskard_msgs.MotionGraphNode:
     return [m for m in execution_state.monitors if m.name == monitor_name][0]
 
 
@@ -72,22 +72,14 @@ def format_condition(condition: str) -> str:
     return condition
 
 
-def format_monitor_msg(msg: giskard_msgs.Monitor, color: str) -> str:
+def format_motion_graph_node_msg(msg: giskard_msgs.MotionGraphNode, color: str) -> str:
     start_condition = format_condition(msg.start_condition)
-    kwargs = json_str_to_kwargs(msg.kwargs)
-    hold_condition = format_condition(kwargs['hold_condition'])
-    end_condition = format_condition(kwargs['end_condition'])
-    if msg.monitor_class in {EndMotion.__name__, CancelMotion.__name__}:
-        hold_condition = None
-        end_condition = None
-    return conditions_to_str(msg.name, start_condition, hold_condition, end_condition, color)
-
-
-def format_task_msg(msg: giskard_msgs.MotionGoal, color: str) -> str:
-    start_condition = format_condition(msg.start_condition)
-    hold_condition = format_condition(msg.hold_condition)
+    pause_condition = format_condition(msg.pause_condition)
     end_condition = format_condition(msg.end_condition)
-    return conditions_to_str(msg.name, start_condition, hold_condition, end_condition, color)
+    if msg.class_name in {EndMotion.__name__, CancelMotion.__name__}:
+        pause_condition = None
+        end_condition = None
+    return conditions_to_str(msg.name, start_condition, pause_condition, end_condition, color)
 
 
 def conditions_to_str(name: str, start_condition: str, pause_condition: Optional[str], end_condition: Optional[str],
@@ -107,12 +99,6 @@ def conditions_to_str(name: str, start_condition: str, pause_condition: Optional
     return label
 
 
-def format_msg(msg: Union[giskard_msgs.Monitor, giskard_msgs.MotionGoal], color: str) -> str:
-    if isinstance(msg, giskard_msgs.MotionGoal):
-        return format_task_msg(msg, color)
-    return format_monitor_msg(msg, color)
-
-
 def add_boarder_to_node(graph: pydot.Graph, node: pydot.Node, num: int, color: str, style: str) -> None:
     child = node
     for i in range(num):
@@ -129,22 +115,22 @@ def add_boarder_to_node(graph: pydot.Graph, node: pydot.Node, num: int, color: s
 def execution_state_to_dot_graph(execution_state: ExecutionState, use_state_color: bool = False) -> pydot.Dot:
     graph = pydot.Dot(graph_type='digraph', ranksep=1.)
 
-    def add_node(thing: Union[giskard_msgs.Monitor, giskard_msgs.MotionGoal], color: str, bg_color: str) \
+    def add_node(thing: giskard_msgs.MotionGraphNode, color: str, bg_color: str) \
             -> pydot.Node:
         num_extra_boarders = 0
         node_id = str(thing.name)
         boarder_style = 'rounded'
-        if isinstance(thing, giskard_msgs.Monitor):
+        if isinstance(thing, giskard_msgs.MotionGraphNode):
             style = 'filled, rounded'
-            if thing.monitor_class == EndMotion.__name__:
+            if thing.class_name == EndMotion.__name__:
                 num_extra_boarders = 1
                 boarder_style = 'rounded'
-            elif thing.monitor_class == CancelMotion.__name__:
+            elif thing.class_name == CancelMotion.__name__:
                 num_extra_boarders = 1
                 boarder_style = 'dashed, rounded'
         else:  # isinstance(thing, Task)
             style = 'filled, diagonals'
-        label = format_msg(thing, color)
+        label = format_motion_graph_node_msg(thing, color)
         node = pydot.Node(node_id,
                           label=label,
                           shape='rectangle',
@@ -166,15 +152,14 @@ def execution_state_to_dot_graph(execution_state: ExecutionState, use_state_colo
                                                       execution_state.monitor_state[i])]
         else:
             color, bg_color = 'black', 'white'
-        kwargs = json_str_to_kwargs(monitor.kwargs)
-        hold_condition = format_condition(kwargs['hold_condition'])
-        end_condition = format_condition(kwargs['end_condition'])
+        pause_condition = monitor.pause_condition
+        end_condition = monitor.end_condition
         monitor_node = add_node(monitor, color, bg_color)
         free_symbols = extract_monitor_names_from_condition(monitor.start_condition)
         for sub_monitor_name in free_symbols:
             graph.add_edge(pydot.Edge(sub_monitor_name, monitor_node, penwidth=LineWidth, color=MyGREEN,
                                       arrowsize=ArrowSize))
-        free_symbols = extract_monitor_names_from_condition(hold_condition)
+        free_symbols = extract_monitor_names_from_condition(pause_condition)
         for sub_monitor_name in free_symbols:
             graph.add_edge(pydot.Edge(sub_monitor_name, monitor_node, penwidth=LineWidth, color=MyORANGE,
                                       arrowsize=ArrowSize))
@@ -195,7 +180,7 @@ def execution_state_to_dot_graph(execution_state: ExecutionState, use_state_colo
         for monitor_name in extract_monitor_names_from_condition(task.start_condition):
             graph.add_edge(pydot.Edge(monitor_name, goal_node, penwidth=LineWidth, color=MyGREEN, arrowsize=ArrowSize))
 
-        for monitor_name in extract_monitor_names_from_condition(task.hold_condition):
+        for monitor_name in extract_monitor_names_from_condition(task.pause_condition):
             graph.add_edge(pydot.Edge(monitor_name, goal_node, penwidth=LineWidth, color=MyORANGE, arrowsize=ArrowSize))
 
         for monitor_name in extract_monitor_names_from_condition(task.end_condition):
@@ -206,7 +191,7 @@ def execution_state_to_dot_graph(execution_state: ExecutionState, use_state_colo
     return graph
 
 
-class PlotTaskMonitorGraph(GiskardBehavior):
+class PlotMotionGraph(GiskardBehavior):
 
     @profile
     def __init__(self, name: str = 'plot task graph'):
@@ -216,7 +201,7 @@ class PlotTaskMonitorGraph(GiskardBehavior):
     @record_time
     @profile
     def update(self):
-        file_name = god_map.giskard.tmp_folder + f'task_graphs/goal_{god_map.move_action_server.goal_id}.pdf'
+        file_name = god_map.tmp_folder + f'task_graphs/goal_{GiskardBlackboard().move_action_server.goal_id}.png'
         execution_state = giskard_state_to_execution_state()
         graph = execution_state_to_dot_graph(execution_state)
         create_path(file_name)

@@ -87,12 +87,12 @@ base_monitor = giskard_wrapper.monitors.add_cartesian_pose(root_link='map',
                                                            goal_pose=base_goal)
 
 # and then we define a motion goal for it.
-# The hold_condition causes the motion goal to hold as long as the condition is True.
+# The pause_condition causes the motion goal to hold as long as the condition is True.
 # In this case, the cart pose is halted if time % 2 == 1 and active if time % 2 == 0.
 giskard_wrapper.motion_goals.add_cartesian_pose(root_link='map',
                                                 tip_link='base_footprint',
                                                 goal_pose=base_goal,
-                                                hold_condition=f'not {alternator}',
+                                                pause_condition=f'not {alternator}',
                                                 end_condition=base_monitor)
 
 # %% Define when the motion should end.

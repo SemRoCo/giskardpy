@@ -59,17 +59,17 @@ class ParseActionGoal(GiskardBehavior):
             get_middleware().logwarn(f'No {EndMotion.__name__} monitor specified. Motion can\'t end successfully.')
 
     @profile
-    def parse_monitors(self, monitor_msgs: List[giskard_msgs.Monitor]):
+    def parse_monitors(self, monitor_msgs: List[giskard_msgs.MotionGraphNode]):
         for monitor_msg in monitor_msgs:
             try:
-                get_middleware().loginfo(f'Adding monitor of type: \'{monitor_msg.monitor_class}\'')
-                C = god_map.monitor_manager.allowed_monitor_types[monitor_msg.monitor_class]
+                get_middleware().loginfo(f'Adding monitor of type: \'{monitor_msg.class_name}\'')
+                C = god_map.monitor_manager.allowed_monitor_types[monitor_msg.class_name]
             except KeyError:
-                raise UnknownMonitorException(f'unknown monitor type: \'{monitor_msg.monitor_class}\'.')
+                raise UnknownMonitorException(f'unknown monitor type: \'{monitor_msg.class_name}\'.')
             try:
                 kwargs = json_str_to_giskard_kwargs(monitor_msg.kwargs, god_map.world)
-                hold_condition = kwargs.pop('hold_condition')
-                end_condition = kwargs.pop('end_condition')
+                pause_condition = monitor_msg.pause_condition
+                end_condition = monitor_msg.end_condition
                 monitor_name_to_state_expr = {str(key): value.get_state_expression() for key, value in
                                               god_map.monitor_manager.monitors.items()}
                 monitor_name_to_state_expr[monitor_msg.name] = symbol_manager.get_symbol(
@@ -77,13 +77,13 @@ class ParseActionGoal(GiskardBehavior):
                 start_condition = god_map.monitor_manager.logic_str_to_expr(monitor_msg.start_condition,
                                                                             default=cas.TrueSymbol,
                                                                             monitor_name_to_state_expr=monitor_name_to_state_expr)
-                hold_condition = god_map.monitor_manager.logic_str_to_expr(hold_condition, default=cas.FalseSymbol,
+                pause_condition = god_map.monitor_manager.logic_str_to_expr(pause_condition, default=cas.FalseSymbol,
                                                                            monitor_name_to_state_expr=monitor_name_to_state_expr)
                 end_condition = god_map.monitor_manager.logic_str_to_expr(end_condition, default=cas.FalseSymbol,
                                                                           monitor_name_to_state_expr=monitor_name_to_state_expr)
                 monitor = C(name=monitor_msg.name,
                             start_condition=start_condition,
-                            hold_condition=hold_condition,
+                            pause_condition=pause_condition,
                             end_condition=end_condition,
                             **kwargs)
                 god_map.monitor_manager.add_monitor(monitor)
@@ -95,27 +95,27 @@ class ParseActionGoal(GiskardBehavior):
                 raise e
 
     @profile
-    def parse_motion_goals(self, motion_goals: List[giskard_msgs.MotionGoal]):
+    def parse_motion_goals(self, motion_goals: List[giskard_msgs.MotionGraphNode]):
         for motion_goal in motion_goals:
             try:
                 get_middleware().loginfo(
-                    f'Adding motion goal of type: \'{motion_goal.motion_goal_class}\' named: \'{motion_goal.name}\'')
-                C = god_map.motion_goal_manager.allowed_motion_goal_types[motion_goal.motion_goal_class]
+                    f'Adding motion goal of type: \'{motion_goal.class_name}\' named: \'{motion_goal.name}\'')
+                C = god_map.motion_goal_manager.allowed_motion_goal_types[motion_goal.class_name]
             except KeyError:
-                raise UnknownGoalException(f'unknown constraint {motion_goal.motion_goal_class}.')
+                raise UnknownGoalException(f'unknown constraint {motion_goal.class_name}.')
             try:
                 params = json_str_to_giskard_kwargs(motion_goal.kwargs, god_map.world)
                 if motion_goal.name == '':
                     motion_goal.name = None
                 start_condition = god_map.monitor_manager.logic_str_to_expr(motion_goal.start_condition,
                                                                             default=cas.TrueSymbol)
-                hold_condition = god_map.monitor_manager.logic_str_to_expr(motion_goal.hold_condition,
+                pause_condition = god_map.monitor_manager.logic_str_to_expr(motion_goal.pause_condition,
                                                                            default=cas.FalseSymbol)
                 end_condition = god_map.monitor_manager.logic_str_to_expr(motion_goal.end_condition,
                                                                           default=cas.FalseSymbol)
                 c: Goal = C(name=motion_goal.name,
                             start_condition=start_condition,
-                            hold_condition=hold_condition,
+                            pause_condition=pause_condition,
                             end_condition=end_condition,
                             **params)
                 god_map.motion_goal_manager.add_motion_goal(c)

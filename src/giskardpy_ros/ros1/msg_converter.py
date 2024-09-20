@@ -286,25 +286,13 @@ def convert_dictionary_to_ros_message(json):
     return original_convert_dictionary_to_ros_message(json['message_type'], json['message'])
 
 
-def monitor_to_ros_msg(monitor: Monitor) -> giskard_msgs.Monitor:
-    msg = giskard_msgs.Monitor()
-    msg.name = str(monitor.name)
-    msg.monitor_class = monitor.__class__.__name__
-    msg.start_condition = god_map.monitor_manager.format_condition(monitor.start_condition, new_line=' ')
-    msg.kwargs = kwargs_to_json({'hold_condition': god_map.monitor_manager.format_condition(monitor.hold_condition,
-                                                                                            new_line=' '),
-                                 'end_condition': god_map.monitor_manager.format_condition(monitor.end_condition,
-                                                                                           new_line=' ')})
-    return msg
-
-
-def task_to_ros_msg(task: Task) -> giskard_msgs.MotionGoal:
-    msg = giskard_msgs.MotionGoal()
-    msg.name = str(task.name)
-    msg.motion_goal_class = task.__class__.__name__
-    msg.start_condition = god_map.monitor_manager.format_condition(task.start_condition, new_line=' ')
-    msg.hold_condition = god_map.monitor_manager.format_condition(task.hold_condition, new_line=' ')
-    msg.end_condition = god_map.monitor_manager.format_condition(task.end_condition, new_line=' ')
+def motion_graph_node_to_ros_msg(motion_graph_node: Union[Monitor, Task]) -> giskard_msgs.MotionGraphNode:
+    msg = giskard_msgs.MotionGraphNode()
+    msg.name = str(motion_graph_node.name)
+    msg.class_name = motion_graph_node.__class__.__name__
+    msg.start_condition = god_map.monitor_manager.format_condition(motion_graph_node.start_condition, new_line=' ')
+    msg.pause_condition = god_map.monitor_manager.format_condition(motion_graph_node.pause_condition, new_line=' ')
+    msg.end_condition = god_map.monitor_manager.format_condition(motion_graph_node.end_condition, new_line=' ')
     return msg
 
 

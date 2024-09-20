@@ -33,7 +33,7 @@ class RealTimePointing(Pointing):
                  max_velocity: float = 0.3,
                  weight: float = WEIGHT_BELOW_CA,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol):
         initial_goal = cas.Point3((1, 0, 1), reference_frame=god_map.world.search_for_link_name('base_footprint'))
         super().__init__(tip_link=tip_link,
@@ -43,7 +43,7 @@ class RealTimePointing(Pointing):
                          max_velocity=max_velocity,
                          weight=weight,
                          start_condition=start_condition,
-                         hold_condition=hold_condition,
+                         pause_condition=pause_condition,
                          end_condition=end_condition)
         self.sub = rospy.Subscriber('muh', PointStamped, self.cb)
 
@@ -95,7 +95,7 @@ class CarryMyBullshit(Goal):
                  drive_back: bool = False,
                  enable_laser_avoidance: bool = True,
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol):
         super().__init__(name=name)
         if drive_back:
@@ -278,7 +278,7 @@ class CarryMyBullshit(Goal):
         root_V_camera_goal_axis.scale(1)
         look_at_target = self.create_and_add_task('look at target')
         if not self.drive_back:
-            look_at_target.hold_condition = target_lost.get_state_expression()
+            look_at_target.pause_condition = target_lost.get_state_expression()
         look_at_target.add_vector_goal_constraints(frame_V_current=root_V_camera_axis,
                                                    frame_V_goal=root_V_camera_goal_axis,
                                                    reference_velocity=self.max_rotation_velocity_head,
@@ -298,14 +298,14 @@ class CarryMyBullshit(Goal):
             oriented_towards_next.expression = cas.abs(map_angle_error) > self.base_orientation_threshold
             self.add_monitor(oriented_towards_next)
 
-            follow_next_point.hold_condition = (laser_violated.get_state_expression()
+            follow_next_point.pause_condition = (laser_violated.get_state_expression()
                                                 | oriented_towards_next.get_state_expression())
         else:
             target_too_close = ExpressionMonitor(name='target close')
             self.add_monitor(target_too_close)
             target_too_close.expression = cas.less_equal(distance_to_human, self.min_distance_to_target)
 
-            follow_next_point.hold_condition = (laser_violated.get_state_expression() |
+            follow_next_point.pause_condition = (laser_violated.get_state_expression() |
                                                 (~target_lost.get_state_expression()
                                                  & target_too_close.get_state_expression()))
         follow_next_point.add_point_goal_constraints(frame_P_current=root_P_bf,
@@ -342,7 +342,7 @@ class CarryMyBullshit(Goal):
 
             buffer = self.laser_avoidance_sideways_buffer / 2
 
-            laser_avoidance_task.hold_condition = active.get_state_expression()
+            laser_avoidance_task.pause_condition = active.get_state_expression()
             laser_avoidance_task.add_inequality_constraint(reference_velocity=self.max_translation_velocity,
                                                            lower_error=sideways_vel - buffer,
                                                            upper_error=sideways_vel + buffer,
@@ -362,7 +362,7 @@ class CarryMyBullshit(Goal):
             end.start_condition = goal_reached.get_state_expression()
             self.add_monitor(end)
         self.connect_start_condition_to_all_tasks(start_condition)
-        self.connect_hold_condition_to_all_tasks(hold_condition)
+        self.connect_pause_condition_to_all_tasks(pause_condition)
         self.connect_end_condition_to_all_tasks(end_condition)
 
     def clean_up(self):
@@ -679,7 +679,7 @@ class FollowNavPath(Goal):
                  height_for_camera_target: float = 1,
                  laser_frame_id: str = 'base_range_sensor_link',
                  start_condition: cas.Expression = cas.TrueSymbol,
-                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol):
         super().__init__(name=name)
         self.end_of_traj_reached = False
@@ -812,12 +812,12 @@ class FollowNavPath(Goal):
         self.add_monitor(oriented_towards_next)
         oriented_towards_next.expression = cas.abs(map_angle_error) > self.base_orientation_threshold
 
-        follow_next_point.hold_condition = oriented_towards_next.get_state_expression()
+        follow_next_point.pause_condition = oriented_towards_next.get_state_expression()
         if self.enable_laser_avoidance:
             laser_violated = ExpressionMonitor(name='laser violated')
             self.add_monitor(laser_violated)
             laser_violated.expression = cas.less(closest_laser_reading, 0)
-            follow_next_point.hold_condition |= laser_violated.get_state_expression()
+            follow_next_point.pause_condition |= laser_violated.get_state_expression()
         follow_next_point.add_point_goal_constraints(frame_P_current=root_P_bf,
                                                      frame_P_goal=root_P_goal_point,
                                                      reference_velocity=self.max_translation_velocity,
@@ -854,7 +854,7 @@ class FollowNavPath(Goal):
 
             buffer = self.laser_avoidance_sideways_buffer / 2
 
-            laser_avoidance_task.hold_condition = active.get_state_expression()
+            laser_avoidance_task.pause_condition = active.get_state_expression()
             laser_avoidance_task.add_inequality_constraint(reference_velocity=self.max_translation_velocity,
                                                            lower_error=sideways_vel - buffer,
                                                            upper_error=sideways_vel + buffer,
@@ -889,7 +889,7 @@ class FollowNavPath(Goal):
         end.start_condition = orientation_reached.get_state_expression()
         self.add_monitor(end)
         self.connect_start_condition_to_all_tasks(start_condition)
-        self.connect_hold_condition_to_all_tasks(hold_condition)
+        self.connect_pause_condition_to_all_tasks(pause_condition)
         self.connect_end_condition_to_all_tasks(end_condition)
 
     def path_to_trajectory(self, path: Path):

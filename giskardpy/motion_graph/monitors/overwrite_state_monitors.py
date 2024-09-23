@@ -30,10 +30,7 @@ class SetSeedConfiguration(PayloadMonitor):
         self.seed_configuration = seed_configuration
         if name is None:
             name = f'{str(self.__class__.__name__)}/{list(self.seed_configuration.keys())}'
-        super().__init__(run_call_in_thread=False, name=name,
-                         start_condition=start_condition,
-                         pause_condition=pause_condition,
-                         end_condition=end_condition)
+        super().__init__(run_call_in_thread=False, name=name)
         self.group_name = group_name
         if group_name is not None:
             self.seed_configuration = {PrefixName(joint_name, group_name): v for joint_name, v in
@@ -62,10 +59,7 @@ class SetOdometry(PayloadMonitor):
         self.group_name = group_name
         if name is None:
             name = f'{self.__class__.__name__}/{self.group_name}'
-        super().__init__(run_call_in_thread=False, name=name,
-                         start_condition=start_condition,
-                         pause_condition=pause_condition,
-                         end_condition=end_condition)
+        super().__init__(run_call_in_thread=False, name=name)
         self.base_pose = base_pose
         if self.group_name is None:
             drive_joints = god_map.world.search_for_joint_of_type(self.odom_joints)

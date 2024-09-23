@@ -14,10 +14,7 @@ class PoseReached(ExpressionMonitor):
                  position_threshold: float = 0.01,
                  orientation_threshold: float = 0.01,
                  absolute: bool = False,
-                 name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 pause_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol):
+                 name: Optional[str] = None):
         super().__init__(name=name,
                          start_condition=start_condition,
                          pause_condition=pause_condition,

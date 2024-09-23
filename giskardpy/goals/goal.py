@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import abc
 from abc import ABC
-from typing import List, Union
+from typing import List, Union, Optional
 
+from giskardpy.motion_graph.graph_node import MotionGraphNode
 from giskardpy.motion_graph.monitors.monitors import ExpressionMonitor, Monitor
 from giskardpy.god_map import god_map
 from giskardpy.motion_graph.tasks.task import Task
@@ -14,41 +15,10 @@ from giskardpy.data_types.data_types import PrefixName, Derivatives
 import giskardpy.casadi_wrapper as cas
 
 
-class Goal(ABC):
+class Goal(MotionGraphNode):
     tasks: List[Task]
+    monitors: List[Monitor]
     name: str
-
-    @abc.abstractmethod
-    def __init__(self,
-                 name: str,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 pause_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol):
-        """
-        This is where you specify goal parameters and save them as self attributes.
-        """
-        self.tasks = []
-        self.name = name
-
-    def formatted_name(self, quoted: bool = False) -> str:
-        formatted_name = string_shortener(original_str=self.name,
-                                          max_lines=4,
-                                          max_line_length=25)
-        if quoted:
-            return '"' + formatted_name + '"'
-        return formatted_name
-
-    def clean_up(self):
-        pass
-
-    def is_done(self):
-        return None
-
-    def __str__(self) -> str:
-        return self.name
-
-    def __repr__(self) -> str:
-        return self.name
 
     def has_tasks(self) -> bool:
         return len(self.tasks) > 0
@@ -105,34 +75,34 @@ class Goal(ABC):
             return self.ref_str + other
         raise NotImplementedError('Goal can only be added with a string.')
 
-    def get_expr_velocity(self, expr: cas.Expression) -> cas.Expression:
-        """
-        Creates an expressions that computes the total derivative of expr
-        """
-        return cas.total_derivative(expr,
-                                    self.joint_position_symbols,
-                                    self.joint_velocity_symbols)
-
-    @property
-    def joint_position_symbols(self) -> List[Union[cas.Symbol, float]]:
-        position_symbols = []
-        for joint in god_map.world.controlled_joints:
-            position_symbols.extend(god_map.world.joints[joint].free_variables)
-        return [x.get_symbol(Derivatives.position) for x in position_symbols]
-
-    @property
-    def joint_velocity_symbols(self) -> List[Union[cas.Symbol, float]]:
-        velocity_symbols = []
-        for joint in god_map.world.controlled_joints:
-            velocity_symbols.extend(god_map.world.joints[joint].free_variable_list)
-        return [x.get_symbol(Derivatives.velocity) for x in velocity_symbols]
-
-    @property
-    def joint_acceleration_symbols(self) -> List[Union[cas.Symbol, float]]:
-        acceleration_symbols = []
-        for joint in god_map.world.controlled_joints:
-            acceleration_symbols.extend(god_map.world.joints[joint].free_variables)
-        return [x.get_symbol(Derivatives.acceleration) for x in acceleration_symbols]
+    # def get_expr_velocity(self, expr: cas.Expression) -> cas.Expression:
+    #     """
+    #     Creates an expressions that computes the total derivative of expr
+    #     """
+    #     return cas.total_derivative(expr,
+    #                                 self.joint_position_symbols,
+    #                                 self.joint_velocity_symbols)
+    #
+    # @property
+    # def joint_position_symbols(self) -> List[Union[cas.Symbol, float]]:
+    #     position_symbols = []
+    #     for joint in god_map.world.controlled_joints:
+    #         position_symbols.extend(god_map.world.joints[joint].free_variables)
+    #     return [x.get_symbol(Derivatives.position) for x in position_symbols]
+    #
+    # @property
+    # def joint_velocity_symbols(self) -> List[Union[cas.Symbol, float]]:
+    #     velocity_symbols = []
+    #     for joint in god_map.world.controlled_joints:
+    #         velocity_symbols.extend(god_map.world.joints[joint].free_variable_list)
+    #     return [x.get_symbol(Derivatives.velocity) for x in velocity_symbols]
+    #
+    # @property
+    # def joint_acceleration_symbols(self) -> List[Union[cas.Symbol, float]]:
+    #     acceleration_symbols = []
+    #     for joint in god_map.world.controlled_joints:
+    #         acceleration_symbols.extend(god_map.world.joints[joint].free_variables)
+    #     return [x.get_symbol(Derivatives.acceleration) for x in acceleration_symbols]
 
     def _task_sanity_check(self):
         if not self.has_tasks():
@@ -145,10 +115,8 @@ class Goal(ABC):
             else:
                 raise GoalInitalizationException(f'Constraint with name {task.name} already exists.')
 
-    def create_and_add_task(self, task_name: str = '') -> Task:
-        task = Task(name=task_name, parent_goal_name=self.name)
+    def add_task(self, task: Task):
         self.tasks.append(task)
-        return task
 
     def add_monitor(self, monitor: Monitor) -> None:
-        god_map.motion_graph_manager.add_monitor(monitor)
+        self.monitors.append(monitor)

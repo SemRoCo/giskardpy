@@ -17,15 +17,8 @@ class JointPositionList(Task):
                  weight: float = WEIGHT_BELOW_CA,
                  max_velocity: float = 1,
                  name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 pause_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol,
                  plot: bool = True):
-        super().__init__(name=name,
-                         start_condition=start_condition,
-                         pause_condition=pause_condition,
-                         end_condition=end_condition,
-                         plot=plot)
+        super().__init__(name=name, plot=plot)
 
         self.current_positions = []
         self.goal_positions = []

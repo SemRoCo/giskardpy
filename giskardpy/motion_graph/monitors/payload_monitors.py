@@ -13,48 +13,17 @@ from giskardpy.motion_graph.monitors.monitors import PayloadMonitor, CancelMotio
 from line_profiler import profile
 
 
-class WorldUpdatePayloadMonitor(PayloadMonitor):
-    world_lock = Lock()
-
-    def __init__(self, *,
-                 name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 pause_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol):
-        super().__init__(name=name,
-                         start_condition=start_condition,
-                         pause_condition=pause_condition,
-                         end_condition=end_condition,
-                         run_call_in_thread=True)
-
-    @abc.abstractmethod
-    def apply_world_update(self):
-        pass
-
-    def __call__(self):
-        with WorldUpdatePayloadMonitor.world_lock:
-            self.apply_world_update()
-        self.state = True
-
-
 class SetMaxTrajectoryLength(CancelMotion):
     length: float
 
     def __init__(self,
                  length: float,
-                 name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 pause_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol):
-        if not (start_condition == cas.TrueSymbol).to_np():
-            raise MonitorInitalizationException(f'Cannot set start_condition for {SetMaxTrajectoryLength.__name__}')
+                 name: Optional[str] = None):
+        # if not (start_condition == cas.TrueSymbol).to_np():
+        #     raise MonitorInitalizationException(f'Cannot set start_condition for {SetMaxTrajectoryLength.__name__}')
         self.length = length
         error_message = f'Trajectory longer than {self.length}'
-        super().__init__(name=name,
-                         exception=MaxTrajectoryLengthException(error_message),
-                         start_condition=start_condition,
-                         pause_condition=pause_condition,
-                         end_condition=end_condition)
+        super().__init__(name=name, exception=MaxTrajectoryLengthException(error_message))
 
     @profile
     def __call__(self):
@@ -65,16 +34,9 @@ class SetMaxTrajectoryLength(CancelMotion):
 class Print(PayloadMonitor):
     def __init__(self,
                  message: str,
-                 name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 pause_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol):
+                 name: Optional[str] = None):
         self.message = message
-        super().__init__(name=name,
-                         start_condition=start_condition,
-                         pause_condition=pause_condition,
-                         end_condition=end_condition,
-                         run_call_in_thread=False)
+        super().__init__(name=name, run_call_in_thread=False)
 
     def __call__(self):
         get_middleware().loginfo(self.message)

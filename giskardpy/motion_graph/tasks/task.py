@@ -27,16 +27,8 @@ class Task(MotionGraphNode):
 
     def __init__(self, *,
                  name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 reset_condition: cas.Expression = cas.FalseSymbol,
-                 pause_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol,
                  plot: bool = True):
         super().__init__(name=name,
-                         start_condition=start_condition,
-                         reset_condition=reset_condition,
-                         pause_condition=pause_condition,
-                         end_condition=end_condition,
                          plot=plot)
         self.eq_constraints = {}
         self.neq_constraints = {}

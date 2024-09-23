@@ -96,12 +96,6 @@ class MotionGraphManager:
         self.tasks[task.name] = task
         task.id = len(self.tasks) - 1
 
-    # def add_motion_goal(self, motion_goal: Goal) -> None:
-    #     if [x for x in self.monitors.values() if x.name == motion_goal.name]:
-    #         raise MonitorInitalizationException(f'Monitor named {motion_goal.name} already exists.')
-    #     self.monitors[motion_goal.name] = motion_goal
-    #     motion_goal.id = len(self.monitors) - 1
-
     def parse_motion_graph(self, *,
                            tasks: List[Tuple[str, str, str, str, str, str, dict]],
                            monitors: List[Tuple[str, str, str, str, str, str, dict]],
@@ -140,13 +134,10 @@ class MotionGraphManager:
                 logic_str=end,
                 default=cas.FalseSymbol,
                 observation_state_symbols=observation_state_symbols)
-            task: Task = C(name=name,
-                           start_condition=start_condition,
-                           # reset_condition=reset_condition,
-                           pause_condition=pause_condition,
-                           end_condition=end_condition,
-                           **kwargs)
+            task: Task = C(name=name, **kwargs)
+            task.set_conditions(start_condition, reset_condition, pause_condition, end_condition)
             self.add_task(task)
+
         # %% add monitors
         for class_name, name, start, reset, pause, end, kwargs in monitors:
             try:
@@ -170,12 +161,8 @@ class MotionGraphManager:
                 logic_str=end,
                 default=cas.FalseSymbol,
                 observation_state_symbols=observation_state_symbols)
-            monitor: Monitor = C(name=name,
-                                 start_condition=start_condition,
-                                 # reset_condition=reset_condition,
-                                 pause_condition=pause_condition,
-                                 end_condition=end_condition,
-                                 **kwargs)
+            monitor: Monitor = C(name=name, **kwargs)
+            monitor.set_conditions(start_condition, reset_condition, pause_condition, end_condition)
             self.add_monitor(monitor)
 
     def evaluate_expression(self, node,

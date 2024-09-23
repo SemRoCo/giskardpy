@@ -18,20 +18,22 @@ class MotionGraphNode:
 
     def __init__(self, *,
                  name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 reset_condition: cas.Expression = cas.FalseSymbol,
-                 pause_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol,
                  plot: bool = True):
         self._name = name or self.__class__.__name__
-        self._start_condition = start_condition
-        self._reset_condition = reset_condition
-        self._pause_condition = pause_condition
-        self._end_condition = end_condition
         self._expression = cas.FalseSymbol
         self.plot = plot
         self._id = -1
         self._name = name
+
+    def set_conditions(self,
+                       start_condition: cas.Expression = cas.TrueSymbol,
+                       reset_condition: cas.Expression = cas.FalseSymbol,
+                       pause_condition: cas.Expression = cas.FalseSymbol,
+                       end_condition: cas.Expression = cas.FalseSymbol):
+        self._start_condition = start_condition
+        self._reset_condition = reset_condition
+        self._pause_condition = pause_condition
+        self._end_condition = end_condition
 
     @property
     def name(self):
@@ -57,6 +59,9 @@ class MotionGraphNode:
         if quoted:
             return '"' + result + '"'
         return result
+
+    def update_expression_on_enter_running(self, expression: cas.Expression) -> cas.Expression:
+        return expression
 
     @property
     def expression(self) -> cas.Expression:

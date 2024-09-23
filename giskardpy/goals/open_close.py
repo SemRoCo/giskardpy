@@ -3,7 +3,6 @@ from __future__ import division
 from typing import Optional
 
 from giskardpy.data_types.data_types import PrefixName
-from giskardpy.goals.cartesian_goals import CartesianPosition, CartesianOrientation
 from giskardpy.goals.goal import Goal
 from giskardpy.motion_graph.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
 from giskardpy.goals.joint_goals import JointPositionList

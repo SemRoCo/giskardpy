@@ -79,39 +79,6 @@ class ParseActionGoal(GiskardBehavior):
         if not god_map.motion_graph_manager.has_end_motion_monitor():
             get_middleware().logwarn(f'No {EndMotion.__name__} monitor specified. Motion can\'t end successfully.')
 
-    @profile
-    def parse_motion_goals(self, motion_goals: List[giskard_msgs.MotionGraphNode]):
-        for motion_goal in motion_goals:
-            try:
-                get_middleware().loginfo(
-                    f'Adding motion goal of type: \'{motion_goal.class_name}\' named: \'{motion_goal.name}\'')
-                C = god_map.motion_graph_manager.allowed_motion_goal_types[motion_goal.class_name]
-            except KeyError:
-                raise UnknownGoalException(f'unknown constraint {motion_goal.class_name}.')
-            try:
-                params = json_str_to_giskard_kwargs(motion_goal.kwargs, god_map.world)
-                if motion_goal.name == '':
-                    motion_goal.name = None
-                start_condition = god_map.motion_graph_manager.logic_str_to_expr(motion_goal.start_condition,
-                                                                                 default=cas.TrueSymbol)
-                pause_condition = god_map.motion_graph_manager.logic_str_to_expr(motion_goal.pause_condition,
-                                                                                 default=cas.FalseSymbol)
-                end_condition = god_map.motion_graph_manager.logic_str_to_expr(motion_goal.end_condition,
-                                                                               default=cas.FalseSymbol)
-                c: Goal = C(name=motion_goal.name,
-                            start_condition=start_condition,
-                            pause_condition=pause_condition,
-                            end_condition=end_condition,
-                            **params)
-                god_map.motion_graph_manager.add_motion_goal(c)
-            except Exception as e:
-                traceback.print_exc()
-                error_msg = f'Initialization of \'{C.__name__}\' constraint failed: \n {e} \n'
-                if not isinstance(e, GiskardException):
-                    raise GoalInitalizationException(error_msg)
-                raise e
-        god_map.motion_graph_manager.init_task_state()
-
 
 def get_ros_msgs_constant_name_by_value(ros_msg_class: genpy.Message, value: Union[str, int, float]) -> str:
     for attr_name in dir(ros_msg_class):

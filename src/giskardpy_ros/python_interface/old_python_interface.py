@@ -85,19 +85,13 @@ class OldGiskardWrapper(GiskardWrapper):
         """
         root_link = giskard_msgs.LinkName(name=root_link, group_name=root_group)
         tip_link = giskard_msgs.LinkName(name=tip_link, group_name=tip_group)
-        if add_monitor:
-            end_condition = self.monitors.add_cartesian_pose(root_link=root_link,
-                                                             tip_link=tip_link,
-                                                             goal_pose=goal_pose)
-        else:
-            end_condition = ''
         self.motion_goals.add_cartesian_pose(goal_pose=goal_pose,
                                              tip_link=tip_link,
                                              root_link=root_link,
                                              reference_linear_velocity=reference_linear_velocity,
                                              reference_angular_velocity=reference_angular_velocity,
                                              weight=weight,
-                                             end_condition=end_condition,
+                                             end_condition=None if add_monitor else '',
                                              **kwargs)
 
     def set_diff_drive_base_goal(self,
@@ -213,23 +207,15 @@ class OldGiskardWrapper(GiskardWrapper):
         :param weight:
         :param add_monitor: if True, adds a monitor as end_condition to check if the goal was reached.
         """
-        monitor_name = f'{root_link}/{tip_link} position reached'
         root_link = giskard_msgs.LinkName(name=root_link, group_name=root_group)
         tip_link = giskard_msgs.LinkName(name=tip_link, group_name=tip_group)
-        if add_monitor:
-            end_condition = self.monitors.add_cartesian_position(name=monitor_name,
-                                                                 root_link=root_link,
-                                                                 tip_link=tip_link,
-                                                                 goal_point=goal_point)
-        else:
-            end_condition = ''
-        self.motion_goals.add_cartesian_position(end_condition=end_condition,
-                                                 goal_point=goal_point,
-                                                 tip_link=tip_link,
-                                                 root_link=root_link,
-                                                 reference_velocity=reference_velocity,
-                                                 weight=weight,
-                                                 **kwargs)
+        self.tasks.add_cartesian_position(end_condition=None if add_monitor else '',
+                                          goal_point=goal_point,
+                                          tip_link=tip_link,
+                                          root_link=root_link,
+                                          reference_velocity=reference_velocity,
+                                          weight=weight,
+                                          **kwargs)
 
     def set_seed_configuration(self, seed_configuration: Dict[str, float], group_name: Optional[str] = None):
         self.monitors.add_set_seed_configuration(seed_configuration=seed_configuration,
@@ -290,20 +276,13 @@ class OldGiskardWrapper(GiskardWrapper):
         monitor_name = f'{root_link}/{tip_link} orientation reached'
         root_link = giskard_msgs.LinkName(name=root_link, group_name=root_group)
         tip_link = giskard_msgs.LinkName(name=tip_link, group_name=tip_group)
-        if add_monitor:
-            end_condition = self.monitors.add_cartesian_orientation(name=monitor_name,
-                                                                    root_link=root_link,
-                                                                    tip_link=tip_link,
-                                                                    goal_orientation=goal_orientation)
-        else:
-            end_condition = ''
-        self.motion_goals.add_cartesian_orientation(end_condition=end_condition,
-                                                    goal_orientation=goal_orientation,
-                                                    tip_link=tip_link,
-                                                    root_link=root_link,
-                                                    reference_velocity=reference_velocity,
-                                                    weight=weight,
-                                                    **kwargs)
+        self.tasks.add_cartesian_orientation(end_condition=None if add_monitor else '',
+                                             goal_orientation=goal_orientation,
+                                             tip_link=tip_link,
+                                             root_link=root_link,
+                                             reference_velocity=reference_velocity,
+                                             weight=weight,
+                                             **kwargs)
 
     def set_align_planes_goal(self,
                               goal_normal: Vector3Stamped,

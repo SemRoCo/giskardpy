@@ -24,15 +24,17 @@ class Monitor(MotionGraphNode):
         super().__init__(name=name,
                          plot=plot)
 
-    @cached_property
-    def state_filter(self) -> np.ndarray:
-        return god_map.motion_graph_manager.to_state_filter(self.start_condition)
+    def get_observation_state_expression(self) -> cas.Symbol:
+        return symbol_manager.get_symbol(f'god_map'
+                                         f'.motion_graph_manager'
+                                         f'.monitor_state'
+                                         f'.get_observation_state(\'{self.name}\')')
 
-    def get_state_expression(self):
-        return symbol_manager.get_symbol(f'god_map.motion_graph_manager.monitor_observation_state[{self.id}]')
-
-    def get_life_cycle_state_expression(self):
-        return symbol_manager.get_symbol(f'god_map.motion_graph_manager.monitor_life_cycle_state[{self.id}]')
+    def get_life_cycle_state_expression(self) -> cas.Symbol:
+        return symbol_manager.get_symbol(f'god_map'
+                                         f'.motion_graph_manager'
+                                         f'.monitor_state'
+                                         f'.get_life_cycle_state(\'{self.name}\')')
 
 
 class PayloadMonitor(Monitor, ABC):

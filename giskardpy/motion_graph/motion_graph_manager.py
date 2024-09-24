@@ -1,22 +1,21 @@
 import ast
-import itertools
 from collections import OrderedDict
 from functools import cached_property
-from typing import List, Tuple, Dict, Optional, Callable, Union, Iterable, Type
+from typing import List, Tuple, Dict, Optional, Callable, Union, Iterable
 from line_profiler import profile
 
 import numpy as np
 
 import giskardpy.casadi_wrapper as cas
 from giskardpy.casadi_wrapper import CompiledFunction
-from giskardpy.data_types.data_types import LifeCycleState, PrefixName
-from giskardpy.data_types.exceptions import GiskardException, MonitorInitalizationException, UnknownMonitorException, \
-    UnknownTaskException, TaskInitalizationException, GoalInitalizationException
+from giskardpy.data_types.data_types import LifeCycleState
+from giskardpy.data_types.exceptions import GiskardException, UnknownMonitorException, \
+    UnknownTaskException, GoalInitalizationException
 from giskardpy.goals.goal import Goal
 from giskardpy.god_map import god_map
 from giskardpy.middleware import get_middleware
 from giskardpy.motion_graph.graph_node import MotionGraphNode
-from giskardpy.motion_graph.helpers import compile_graph_node_state_updater
+from giskardpy.motion_graph.helpers import compile_graph_node_state_updater, MotionGraphNodeStateManager
 from giskardpy.motion_graph.monitors.monitors import ExpressionMonitor, Monitor, EndMotion
 from giskardpy.motion_graph.monitors.payload_monitors import PayloadMonitor, CancelMotion
 from giskardpy.motion_graph.tasks.task import Task
@@ -31,18 +30,13 @@ def monitor_list_to_monitor_name_tuple(monitors: Iterable[Union[str, ExpressionM
 
 
 class MotionGraphManager:
-    tasks: Dict[PrefixName, Task]
-    monitors: Dict[PrefixName, Monitor]
+    task_state: MotionGraphNodeStateManager[Task]
+    monitor_state: MotionGraphNodeStateManager[Monitor]
 
-    task_observation_state: np.ndarray  # order: ExpressionMonitors, PayloadMonitors
     compiled_task_observation_state: CompiledFunction
-
-    monitor_observation_state: np.ndarray  # order: Tasks, ExpressionMonitors, PayloadMonitors
     compiled_monitor_observation_state: CompiledFunction
 
-    task_life_cycle_state: np.ndarray
     compiled_task_life_cycle_state: CompiledFunction
-    monitor_life_cycle_state: np.ndarray  # order: ExpressionMonitors, PayloadMonitors
     compiled_monitor_life_cycle_state_updater: CompiledFunction
 
     task_state_history: List[Tuple[float, Tuple[np.ndarray, np.ndarray]]]  # time -> (state, life_cycle_state)
@@ -76,8 +70,8 @@ class MotionGraphManager:
             del self.payload_monitor_filter
         except Exception as e:
             pass
-        self.monitors = OrderedDict()
-        self.tasks = OrderedDict()
+        self.task_state = MotionGraphNodeStateManager()
+        self.monitor_state = MotionGraphNodeStateManager()
         self.task_state_history = []
         self.monitor_state_history = []
         self.substitution_values = {}
@@ -85,32 +79,25 @@ class MotionGraphManager:
         self.trigger_conditions = []
 
     def add_monitor(self, monitor: Monitor) -> None:
-        if [x for x in self.monitors.values() if x.name == monitor.name]:
-            raise MonitorInitalizationException(f'Monitor named {monitor.name} already exists.')
-        self.monitors[monitor.name] = monitor
-        monitor.id = len(self.monitors) - 1
+        self.monitor_state.append(monitor)
 
     def add_task(self, task: Task) -> None:
-        if [x for x in self.tasks.values() if x.name == task.name]:
-            raise TaskInitalizationException(f'Task named {task.name} already exists.')
-        self.tasks[task.name] = task
-        task.id = len(self.tasks) - 1
+        self.task_state.append(task)
 
     def parse_motion_graph(self, *,
                            tasks: List[Tuple[str, str, str, str, str, str, dict]],
                            monitors: List[Tuple[str, str, str, str, str, str, dict]],
                            goals: List[Tuple[str, str, str, str, str, str, dict]]) -> None:
-        task_states = {}
-        for task_id, (_, name, _, _, _, _, _) in enumerate(tasks):
-            path = f'god_map.motion_graph_manager.task_observation_state[{task_id}]'
-            symbol = symbol_manager.get_symbol(path)
-            task_states[name] = symbol
-        monitor_states = {}
-        for monitor_id, (_, name, _, _, _, _, _) in enumerate(monitors):
-            path = f'god_map.motion_graph_manager.monitor_observation_state[{monitor_id}]'
-            symbol = symbol_manager.get_symbol(path)
-            monitor_states[name] = symbol
-        observation_state_symbols = {**task_states, **monitor_states}
+        # %% add tasks
+        # for class_name, name, start, reset, pause, end, kwargs in goals:
+        #     try:
+        #         get_middleware().loginfo(f'Adding task of type: \'{class_name}\'')
+        #         C = god_map.motion_graph_manager.allowed_task_types[class_name]
+        #     except KeyError:
+        #         raise UnknownTaskException(f'unknown task type: \'{class_name}\'.')
+        #     task: Task = C(name=name, **kwargs)
+        #     self.add_task(task)
+
         # %% add tasks
         for class_name, name, start, reset, pause, end, kwargs in tasks:
             try:
@@ -118,24 +105,7 @@ class MotionGraphManager:
                 C = god_map.motion_graph_manager.allowed_task_types[class_name]
             except KeyError:
                 raise UnknownTaskException(f'unknown task type: \'{class_name}\'.')
-            start_condition = god_map.motion_graph_manager.logic_str_to_expr(
-                logic_str=start,
-                default=cas.TrueSymbol,
-                observation_state_symbols=observation_state_symbols)
-            reset_condition = god_map.motion_graph_manager.logic_str_to_expr(
-                logic_str=reset,
-                default=cas.FalseSymbol,
-                observation_state_symbols=observation_state_symbols)
-            pause_condition = god_map.motion_graph_manager.logic_str_to_expr(
-                logic_str=pause,
-                default=cas.FalseSymbol,
-                observation_state_symbols=observation_state_symbols)
-            end_condition = god_map.motion_graph_manager.logic_str_to_expr(
-                logic_str=end,
-                default=cas.FalseSymbol,
-                observation_state_symbols=observation_state_symbols)
             task: Task = C(name=name, **kwargs)
-            task.set_conditions(start_condition, reset_condition, pause_condition, end_condition)
             self.add_task(task)
 
         # %% add monitors
@@ -145,36 +115,51 @@ class MotionGraphManager:
                 C = god_map.motion_graph_manager.allowed_monitor_types[class_name]
             except KeyError:
                 raise UnknownMonitorException(f'unknown monitor type: \'{class_name}\'.')
-            start_condition = god_map.motion_graph_manager.logic_str_to_expr(
-                logic_str=start,
-                default=cas.TrueSymbol,
-                observation_state_symbols=observation_state_symbols)
-            reset_condition = god_map.motion_graph_manager.logic_str_to_expr(
-                logic_str=reset,
-                default=cas.FalseSymbol,
-                observation_state_symbols=observation_state_symbols)
-            pause_condition = god_map.motion_graph_manager.logic_str_to_expr(
-                logic_str=pause,
-                default=cas.FalseSymbol,
-                observation_state_symbols=observation_state_symbols)
-            end_condition = god_map.motion_graph_manager.logic_str_to_expr(
-                logic_str=end,
-                default=cas.FalseSymbol,
-                observation_state_symbols=observation_state_symbols)
             monitor: Monitor = C(name=name, **kwargs)
-            monitor.set_conditions(start_condition, reset_condition, pause_condition, end_condition)
             self.add_monitor(monitor)
 
-    def evaluate_expression(self, node,
-                            observation_state_symbols: Dict[str, cas.Expression]) -> cas.Expression:
+        for class_name, name, start, reset, pause, end, kwargs in tasks:
+            start_condition = god_map.motion_graph_manager.logic_str_to_expr(
+                logic_str=start,
+                default=cas.TrueSymbol)
+            reset_condition = god_map.motion_graph_manager.logic_str_to_expr(
+                logic_str=reset,
+                default=cas.FalseSymbol)
+            pause_condition = god_map.motion_graph_manager.logic_str_to_expr(
+                logic_str=pause,
+                default=cas.FalseSymbol)
+            end_condition = god_map.motion_graph_manager.logic_str_to_expr(
+                logic_str=end,
+                default=cas.FalseSymbol)
+            self.task_state.get_node(name).set_conditions(start_condition, reset_condition, pause_condition,
+                                                          end_condition)
+
+        for class_name, name, start, reset, pause, end, kwargs in monitors:
+            start_condition = god_map.motion_graph_manager.logic_str_to_expr(
+                logic_str=start,
+                default=cas.TrueSymbol)
+            reset_condition = god_map.motion_graph_manager.logic_str_to_expr(
+                logic_str=reset,
+                default=cas.FalseSymbol)
+            pause_condition = god_map.motion_graph_manager.logic_str_to_expr(
+                logic_str=pause,
+                default=cas.FalseSymbol)
+            end_condition = god_map.motion_graph_manager.logic_str_to_expr(
+                logic_str=end,
+                default=cas.FalseSymbol)
+            self.monitor_state.get_node(name).set_conditions(start_condition, reset_condition, pause_condition,
+                                                             end_condition)
+
+    def parse_ast_expression(self, node,
+                             observation_state_symbols: Dict[str, cas.Expression]) -> cas.Expression:
         if isinstance(node, ast.BoolOp):
             if isinstance(node.op, ast.And):
-                return cas.logic_and(*[self.evaluate_expression(x, observation_state_symbols) for x in node.values])
+                return cas.logic_and(*[self.parse_ast_expression(x, observation_state_symbols) for x in node.values])
             elif isinstance(node.op, ast.Or):
-                return cas.logic_or(*[self.evaluate_expression(x, observation_state_symbols) for x in node.values])
+                return cas.logic_or(*[self.parse_ast_expression(x, observation_state_symbols) for x in node.values])
         elif isinstance(node, ast.UnaryOp):
             if isinstance(node.op, ast.Not):
-                return cas.logic_not(self.evaluate_expression(node.operand, observation_state_symbols))
+                return cas.logic_not(self.parse_ast_expression(node.operand, observation_state_symbols))
         elif isinstance(node, ast.Str):
             # replace monitor name with its state expression
             return observation_state_symbols[node.value]
@@ -183,14 +168,14 @@ class MotionGraphManager:
     def logic_str_to_expr(self, logic_str: str, default: cas.Expression,
                           observation_state_symbols: Optional[Dict[str, cas.Expression]] = None) -> cas.Expression:
         if observation_state_symbols is None:
-            task_state_symbols = {key: value.get_state_expression() for key, value in self.tasks.items()}
-            monitor_state_symbols = {key: value.get_state_expression() for key, value in self.monitors.items()}
+            task_state_symbols = self.task_state.get_observation_state_symbol_map()
+            monitor_state_symbols = self.monitor_state.get_observation_state_symbol_map()
             observation_state_symbols = {**task_state_symbols, **monitor_state_symbols}
         if logic_str == '':
             return default
         tree = ast.parse(logic_str, mode='eval')
         try:
-            return self.evaluate_expression(tree.body, observation_state_symbols)
+            return self.parse_ast_expression(tree.body, observation_state_symbols)
         except KeyError as e:
             raise GiskardException(f'Unknown symbol {e}')
         except Exception as e:
@@ -205,41 +190,22 @@ class MotionGraphManager:
 
     @profile
     def get_monitor(self, name: str) -> Monitor:
-        for monitor in self.monitors.values():
-            if monitor.name == name:
-                return monitor
-        raise KeyError(f'No monitor of name \'{name}\' found.')
+        return self.monitor_state.get_node(name)
 
     def get_observation_state_symbols(self) -> List[cas.Symbol]:
-        symbols = []
-        for monitor in self.tasks.values():
-            symbols.append(monitor.get_state_expression())
-        for monitor in self.monitors.values():
-            symbols.append(monitor.get_state_expression())
-        return symbols
+        return (list(self.task_state.get_observation_state_symbol_map().values()) +
+                list(self.monitor_state.get_observation_state_symbol_map().values()))
 
     def initialize_states(self) -> None:
-        self.task_observation_state = np.zeros(len(self.tasks))
-        self.monitor_observation_state = np.zeros(len(self.monitors))
-        self.task_life_cycle_state = np.zeros(len(self.tasks))
-        self.monitor_life_cycle_state = np.zeros(len(self.monitors))
-        for task in self.tasks.values():
-            if cas.is_true(task.start_condition):
-                self.task_life_cycle_state[task.id] = LifeCycleState.running
-            else:
-                self.task_life_cycle_state[task.id] = LifeCycleState.not_started
-        for monitor in self.monitors.values():
-            if cas.is_true(monitor.start_condition):
-                self.monitor_life_cycle_state[monitor.id] = LifeCycleState.running
-            else:
-                self.monitor_life_cycle_state[monitor.id] = LifeCycleState.not_started
+        self.task_state.init_states()
+        self.monitor_state.init_states()
 
     def get_node_from_state_expr(self, expr: cas.Expression) -> MotionGraphNode:
-        for task in self.tasks.values():
-            if cas.is_true(task.get_state_expression() == expr):
+        for task in self.task_state.nodes:
+            if cas.is_true(task.get_observation_state_expression() == expr):
                 return task
-        for monitor in self.monitors.values():
-            if cas.is_true(monitor.get_state_expression() == expr):
+        for monitor in self.monitor_state.nodes:
+            if cas.is_true(monitor.get_observation_state_expression() == expr):
                 return monitor
         raise GiskardException(f'No task/monitor found for {str(expr)}.')
 
@@ -270,8 +236,8 @@ class MotionGraphManager:
     def compile_task_state_updater(self) -> None:
         task_state_updater = []
         node: MotionGraphNode
-        for node in self.tasks.values():
-            state_symbol = node.get_state_expression()
+        for node in self.task_state.nodes:
+            state_symbol = node.get_observation_state_expression()
             node.pre_compile()
             state_f = cas.if_eq(node.get_life_cycle_state_expression(), int(LifeCycleState.running),
                                 if_result=node.expression,
@@ -279,13 +245,13 @@ class MotionGraphManager:
             task_state_updater.append(state_f)
         task_state_updater = cas.Expression(task_state_updater)
         self.compiled_task_observation_state = task_state_updater.compile(task_state_updater.free_symbols())
-        self.compiled_task_life_cycle_state = compile_graph_node_state_updater(self.tasks)
+        self.compiled_task_life_cycle_state = compile_graph_node_state_updater(self.task_state)
 
     @profile
     def compile_monitor_state_updater(self) -> None:
         monitor_state_updater = []
-        for node in self.monitors.values():
-            state_symbol = node.get_state_expression()
+        for node in self.monitor_state.nodes:
+            state_symbol = node.get_observation_state_expression()
             if isinstance(node, PayloadMonitor):
                 state_f = state_symbol  # if payload monitor, copy last state
             else:
@@ -296,19 +262,11 @@ class MotionGraphManager:
             monitor_state_updater.append(state_f)
         monitor_state_updater = cas.Expression(monitor_state_updater)
         self.compiled_monitor_observation_state = monitor_state_updater.compile(monitor_state_updater.free_symbols())
-        self.compiled_monitor_life_cycle_state_updater = compile_graph_node_state_updater(self.monitors)
-
-    @property
-    def expression_monitors(self) -> List[ExpressionMonitor]:
-        return [x for x in self.monitors if isinstance(x, ExpressionMonitor)]
+        self.compiled_monitor_life_cycle_state_updater = compile_graph_node_state_updater(self.monitor_state)
 
     @property
     def payload_monitors(self) -> List[PayloadMonitor]:
-        return [x for x in self.monitors.values() if isinstance(x, PayloadMonitor)]
-
-    def get_state_dict(self) -> Dict[str, Tuple[str, bool]]:
-        return OrderedDict((monitor.name, (str(LifeCycleState(self.life_cycle_state[i])), bool(self.state[i])))
-                           for i, monitor in enumerate(self.monitors.values()))
+        return [x for x in self.monitor_state.nodes if isinstance(x, PayloadMonitor)]
 
     @profile
     def register_expression_updater(self, expression: cas.PreservedCasType,
@@ -331,14 +289,6 @@ class MotionGraphManager:
         return new_expression
 
     @profile
-    def to_state_filter(self, monitor_names: List[Union[str, Monitor]]) -> np.ndarray:
-        monitor_names = monitor_list_to_monitor_name_tuple(monitor_names)
-        return np.array([monitor.id for monitor in self.monitors.values() if monitor.name in monitor_names])
-
-    def get_state_expression_symbols(self) -> List[cas.Symbol]:
-        return [m.get_state_expression() for m in self.monitors.values()]
-
-    @profile
     def _register_expression_update_triggers(self):
         for updater_id, values in self.substitution_values.items():
             class Callback:
@@ -352,7 +302,7 @@ class MotionGraphManager:
 
             self.triggers[updater_id] = Callback(updater_id, values, self)
         expr = cas.Expression(self.trigger_conditions)
-        self.compiled_trigger_conditions = expr.compile(self.get_state_expression_symbols())
+        self.compiled_trigger_conditions = expr.compile(self.get_observation_state_symbols())
 
     @profile
     def update_substitution_values(self, updater_id: int, keys: Optional[List[str]] = None):
@@ -376,57 +326,73 @@ class MotionGraphManager:
 
     @cached_property
     def payload_monitor_filter(self):
-        return np.array([i for i, m in enumerate(self.monitors.values()) if isinstance(m, PayloadMonitor)])
+        return np.array([i for i, m in enumerate(self.monitor_state.nodes) if isinstance(m, PayloadMonitor)])
 
     @profile
-    def evaluate_monitors(self):
+    def evaluate_monitors(self) -> bool:
         # %% update monitor state
         args = symbol_manager.resolve_symbols(self.compiled_task_observation_state.str_params)
-        self.task_observation_state = self.compiled_task_observation_state.fast_call(args)
+        self.task_state.observation_state = self.compiled_task_observation_state.fast_call(args)
 
         args = symbol_manager.resolve_symbols(self.compiled_monitor_observation_state.str_params)
-        self.monitor_observation_state = self.compiled_monitor_observation_state.fast_call(args)
+        self.monitor_state.observation_state = self.compiled_monitor_observation_state.fast_call(args)
 
         # %% update life cycle state
-        args = np.concatenate((self.task_life_cycle_state, self.task_observation_state, self.monitor_observation_state))
-        self.task_life_cycle_state = self.compiled_task_life_cycle_state.fast_call(args)
-        args = np.concatenate((self.monitor_life_cycle_state, self.task_observation_state, self.monitor_observation_state))
-        self.monitor_life_cycle_state = self.compiled_monitor_life_cycle_state_updater.fast_call(args)
+        args = np.concatenate((self.task_state.life_cycle_state,
+                               self.task_state.observation_state,
+                               self.monitor_state.observation_state))
+        self.task_state.life_cycle_state = self.compiled_task_life_cycle_state.fast_call(args)
+        args = np.concatenate((self.monitor_state.life_cycle_state,
+                               self.task_state.observation_state,
+                               self.monitor_state.observation_state))
+        self.monitor_state.life_cycle_state = self.compiled_monitor_life_cycle_state_updater.fast_call(args)
 
-        if len(self.payload_monitor_filter) > 0:
-            self.monitor_observation_state[self.payload_monitor_filter] = self.evaluate_payload_monitors()
+        next_state, done = self.evaluate_payload_monitors()
+        self.monitor_state.observation_state[self.payload_monitor_filter] = next_state
         # self.trigger_update_triggers(self.state)
         self.task_state_history.append((god_map.time,
-                                        (self.task_observation_state.copy(),
-                                         self.task_life_cycle_state.copy())))
+                                        (self.task_state.observation_state.copy(),
+                                         self.task_state.life_cycle_state.copy())))
         self.monitor_state_history.append((god_map.time,
-                                           (self.monitor_observation_state.copy(),
-                                            self.monitor_life_cycle_state.copy())))
+                                           (self.monitor_state.observation_state.copy(),
+                                            self.monitor_state.life_cycle_state.copy())))
+        return done
 
-    def evaluate_payload_monitors(self) -> np.ndarray:
+    def evaluate_payload_monitors(self) -> Tuple[np.ndarray, bool]:
+        done = False
         next_state = np.zeros(len(self.payload_monitors))
-        for i in range(len(self.payload_monitors)):
-            next_state[i] = self.payload_monitors[i].get_state()
-        return next_state
+        filtered_life_cycle_state = self.monitor_state.life_cycle_state[self.payload_monitor_filter]
+        for i, payload_monitor in enumerate(self.payload_monitors):
+            if filtered_life_cycle_state[i] == LifeCycleState.running:
+                try:
+                    payload_monitor()
+                except Exception as e:
+                    # the call of cancel motion might trigger exceptions
+                    # only pass it one if no end motion triggered at the same time
+                    if not done:
+                        raise e
+            next_state[i] = payload_monitor.get_state()
+            done = done or (isinstance(payload_monitor, EndMotion) and next_state[i])
+        return next_state, done
 
     @profile
     def search_for_monitors(self, monitor_names: List[str]) -> List[Monitor]:
         return [self.get_monitor(monitor_name) for monitor_name in monitor_names]
 
     def has_end_motion_monitor(self) -> bool:
-        for m in self.monitors.values():
+        for m in self.monitor_state.nodes:
             if isinstance(m, EndMotion):
                 return True
         return False
 
     def has_cancel_motion_monitor(self) -> bool:
-        for m in self.monitors.values():
+        for m in self.monitor_state.nodes:
             if isinstance(m, CancelMotion):
                 return True
         return False
 
     def has_payload_monitors_which_are_not_end_nor_cancel(self) -> bool:
-        for m in self.monitors.values():
+        for m in self.monitor_state.nodes:
             if not isinstance(m, (CancelMotion, EndMotion)) and isinstance(m, PayloadMonitor):
                 return True
         return False
@@ -443,7 +409,7 @@ class MotionGraphManager:
         derivative_constraints = ImmutableDict()
         quadratic_weight_gains = ImmutableDict()
         linear_weight_gains = ImmutableDict()
-        for task_name, task in list(self.tasks.items()):
+        for task in self.task_state.nodes:
             try:
                 new_eq_constraints = OrderedDict()
                 new_neq_constraints = OrderedDict()

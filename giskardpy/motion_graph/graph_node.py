@@ -1,6 +1,7 @@
 from typing import Optional
 
 import giskardpy.casadi_wrapper as cas
+from giskardpy.data_types.data_types import LifeCycleState
 from giskardpy.data_types.exceptions import GiskardException
 from giskardpy.god_map import god_map
 from giskardpy.utils.utils import string_shortener
@@ -60,7 +61,9 @@ class MotionGraphNode:
             return '"' + result + '"'
         return result
 
-    def update_expression_on_enter_running(self, expression: cas.Expression) -> cas.Expression:
+    def update_expression_on_enter_running(self, expression: cas.PreservedCasType) -> cas.PreservedCasType:
+        condition = cas.equal(self.get_life_cycle_state_expression(), LifeCycleState.running)
+        god_map.motion_graph_manager.register_expression_updater(expression, condition)
         return expression
 
     @property
@@ -71,16 +74,7 @@ class MotionGraphNode:
     def expression(self, expression: cas.Expression) -> None:
         self._expression = expression
 
-    @property
-    def id(self) -> int:
-        assert self._id >= 0, f'id of {self._name} is not set.'
-        return self._id
-
-    @id.setter
-    def id(self, new_id: int) -> None:
-        self._id = new_id
-
-    def get_state_expression(self) -> cas.Symbol:
+    def get_observation_state_expression(self) -> cas.Symbol:
         raise NotImplementedError('get_state_expression is not implemented')
 
     def get_life_cycle_state_expression(self) -> cas.Symbol:

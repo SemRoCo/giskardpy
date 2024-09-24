@@ -37,11 +37,11 @@ class Task(MotionGraphNode):
         self.quadratic_gains = []
         self.linear_weight_gains = []
 
-    def get_state_expression(self):
-        return symbol_manager.get_symbol(f'god_map.motion_graph_manager.task_observation_state[{self.id}]')
+    def get_observation_state_expression(self):
+        return symbol_manager.get_symbol(f'god_map.motion_graph_manager.task_state.get_observation_state(\'{self.name}\')')
 
     def get_life_cycle_state_expression(self):
-        return symbol_manager.get_symbol(f'god_map.motion_graph_manager.task_life_cycle_state[{self.id}]')
+        return symbol_manager.get_symbol(f'god_map.motion_graph_manager.task_state.get_life_cycle_state(\'{self.name}\')')
 
     def get_eq_constraints(self) -> List[EqualityConstraint]:
         return self._apply_monitors_to_constraints(self.eq_constraints.values())

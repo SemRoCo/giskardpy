@@ -32,12 +32,13 @@ class CartesianPosition(Task):
             reference_velocity = self.default_reference_velocity
         self.reference_velocity = reference_velocity
         self.weight = weight
-        if absolute or cas.is_true(start_condition):
-            root_P_goal = god_map.world.transform(self.root_link, goal_point)
-        else:
-            root_T_x = god_map.world.compose_fk_expression(self.root_link, goal_point.reference_frame)
-            root_P_goal = root_T_x.dot(goal_point)
-            root_P_goal = god_map.motion_graph_manager.register_expression_updater(root_P_goal, start_condition)
+        # if absolute or cas.is_true(start_condition):
+        #     root_P_goal = god_map.world.transform(self.root_link, goal_point)
+        # else:
+        root_T_x = god_map.world.compose_fk_expression(self.root_link, goal_point.reference_frame)
+        root_P_goal = root_T_x.dot(goal_point)
+        root_P_goal = self.update_expression_on_enter_running(root_P_goal)
+
         r_P_c = god_map.world.compose_fk_expression(self.root_link, self.tip_link).to_position()
         self.add_point_goal_constraints(frame_P_goal=root_P_goal,
                                         frame_P_current=r_P_c,

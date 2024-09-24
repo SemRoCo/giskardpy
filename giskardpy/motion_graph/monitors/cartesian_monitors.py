@@ -15,10 +15,7 @@ class PoseReached(ExpressionMonitor):
                  orientation_threshold: float = 0.01,
                  absolute: bool = False,
                  name: Optional[str] = None):
-        super().__init__(name=name,
-                         start_condition=start_condition,
-                         pause_condition=pause_condition,
-                         end_condition=end_condition)
+        super().__init__(name=name)
         if absolute or cas.is_true(start_condition):
             root_T_goal = god_map.world.transform(root_link, goal_pose)
         else:

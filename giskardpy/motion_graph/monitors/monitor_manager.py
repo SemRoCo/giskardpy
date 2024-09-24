@@ -73,7 +73,7 @@ class MonitorManager:
     def logic_str_to_expr(self, logic_str: str, default: cas.Expression,
                           monitor_name_to_state_expr: Optional[Dict[str, cas.Expression]] = None) -> cas.Expression:
         if monitor_name_to_state_expr is None:
-            monitor_name_to_state_expr = {key: value.get_state_expression() for key, value in self.monitors.items()}
+            monitor_name_to_state_expr = {key: value.get_observation_state_expression() for key, value in self.monitors.items()}
         if logic_str == '':
             return default
         tree = ast.parse(logic_str, mode='eval')
@@ -102,7 +102,7 @@ class MonitorManager:
     def get_monitor_state_expr(self) -> cas.Expression:
         symbols = []
         for monitor in self.monitors.values():
-            symbols.append(monitor.get_state_expression())
+            symbols.append(monitor.get_observation_state_expression())
         return cas.Expression(symbols)
 
     def set_initial_life_cycle_state(self):
@@ -114,7 +114,7 @@ class MonitorManager:
 
     def get_monitor_from_state_expr(self, expr: cas.Expression) -> Monitor:
         for monitor in self.monitors.values():
-            if cas.is_true(monitor.get_state_expression() == expr):
+            if cas.is_true(monitor.get_observation_state_expression() == expr):
                 return monitor
         raise GiskardException('No monitor found.')
 
@@ -145,7 +145,7 @@ class MonitorManager:
     def compile_monitor_state_updater(self) -> None:
         state_updater = []
         for monitor in self.monitors.values():
-            state_symbol = monitor.get_state_expression()
+            state_symbol = monitor.get_observation_state_expression()
 
             if isinstance(monitor, ExpressionMonitor):
                 monitor.pre_compile()
@@ -205,7 +205,7 @@ class MonitorManager:
         return np.array([monitor.id for monitor in self.monitors.values() if monitor.name in monitor_names])
 
     def get_state_expression_symbols(self) -> List[cas.Symbol]:
-        return [m.get_state_expression() for m in self.monitors.values()]
+        return [m.get_observation_state_expression() for m in self.monitors.values()]
 
     @profile
     def _register_expression_update_triggers(self):

@@ -263,13 +263,13 @@ class TestWorld:
                                    root_link=box_world.root_link_name,
                                    tip_link=box_name,
                                    goal_pose=goal1,
-                                   end_condition=cart_monitor.get_state_expression())
+                                   end_condition=cart_monitor.get_observation_state_expression())
         cart_goal2 = CartesianPose(name='g2',
                                    root_link=box_world.root_link_name,
                                    tip_link=box_name,
                                    goal_pose=goal2,
                                    absolute=True,
-                                   start_condition=cart_monitor.get_state_expression())
+                                   start_condition=cart_monitor.get_observation_state_expression())
 
         god_map.motion_graph_manager.add_motion_goal(cart_goal1)
         god_map.motion_graph_manager.add_motion_goal(cart_goal2)
@@ -318,12 +318,12 @@ class TestWorld:
                                    root_link=box_world.root_link_name,
                                    tip_link=box_name,
                                    goal_pose=goal1,
-                                   end_condition=cart_monitor.get_state_expression())
+                                   end_condition=cart_monitor.get_observation_state_expression())
         cart_goal2 = CartesianPose(name='g2',
                                    root_link=box_world.root_link_name,
                                    tip_link=box_name,
                                    goal_pose=goal2,
-                                   start_condition=cart_monitor.get_state_expression())
+                                   start_condition=cart_monitor.get_observation_state_expression())
 
         god_map.motion_graph_manager.add_motion_goal(cart_goal1)
         god_map.motion_graph_manager.add_motion_goal(cart_goal2)

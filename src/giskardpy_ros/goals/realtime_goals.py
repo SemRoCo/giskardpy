@@ -278,7 +278,7 @@ class CarryMyBullshit(Goal):
         root_V_camera_goal_axis.scale(1)
         look_at_target = self.create_and_add_task('look at target')
         if not self.drive_back:
-            look_at_target.pause_condition = target_lost.get_state_expression()
+            look_at_target.pause_condition = target_lost.get_observation_state_expression()
         look_at_target.add_vector_goal_constraints(frame_V_current=root_V_camera_axis,
                                                    frame_V_goal=root_V_camera_goal_axis,
                                                    reference_velocity=self.max_rotation_velocity_head,
@@ -298,16 +298,16 @@ class CarryMyBullshit(Goal):
             oriented_towards_next.expression = cas.abs(map_angle_error) > self.base_orientation_threshold
             self.add_monitor(oriented_towards_next)
 
-            follow_next_point.pause_condition = (laser_violated.get_state_expression()
-                                                | oriented_towards_next.get_state_expression())
+            follow_next_point.pause_condition = (laser_violated.get_observation_state_expression()
+                                                 | oriented_towards_next.get_observation_state_expression())
         else:
             target_too_close = ExpressionMonitor(name='target close')
             self.add_monitor(target_too_close)
             target_too_close.expression = cas.less_equal(distance_to_human, self.min_distance_to_target)
 
-            follow_next_point.pause_condition = (laser_violated.get_state_expression() |
-                                                (~target_lost.get_state_expression()
-                                                 & target_too_close.get_state_expression()))
+            follow_next_point.pause_condition = (laser_violated.get_observation_state_expression() |
+                                                 (~target_lost.get_observation_state_expression()
+                                                  & target_too_close.get_observation_state_expression()))
         follow_next_point.add_point_goal_constraints(frame_P_current=root_P_bf,
                                                      frame_P_goal=root_P_goal_point,
                                                      reference_velocity=self.max_translation_velocity,
@@ -342,7 +342,7 @@ class CarryMyBullshit(Goal):
 
             buffer = self.laser_avoidance_sideways_buffer / 2
 
-            laser_avoidance_task.pause_condition = active.get_state_expression()
+            laser_avoidance_task.pause_condition = active.get_observation_state_expression()
             laser_avoidance_task.add_inequality_constraint(reference_velocity=self.max_translation_velocity,
                                                            lower_error=sideways_vel - buffer,
                                                            upper_error=sideways_vel + buffer,
@@ -357,9 +357,9 @@ class CarryMyBullshit(Goal):
             goal_reached = ExpressionMonitor(name='goal reached?')
             self.add_monitor(goal_reached)
             goal_reached.expression = cas.euclidean_distance(first_point, root_P_bf) < self.traj_tracking_radius
-            self.connect_end_condition_to_all_tasks(goal_reached.get_state_expression())
+            self.connect_end_condition_to_all_tasks(goal_reached.get_observation_state_expression())
             end = EndMotion(name='done')
-            end.start_condition = goal_reached.get_state_expression()
+            end.start_condition = goal_reached.get_observation_state_expression()
             self.add_monitor(end)
         self.connect_start_condition_to_all_tasks(start_condition)
         self.connect_pause_condition_to_all_tasks(pause_condition)
@@ -812,12 +812,12 @@ class FollowNavPath(Goal):
         self.add_monitor(oriented_towards_next)
         oriented_towards_next.expression = cas.abs(map_angle_error) > self.base_orientation_threshold
 
-        follow_next_point.pause_condition = oriented_towards_next.get_state_expression()
+        follow_next_point.pause_condition = oriented_towards_next.get_observation_state_expression()
         if self.enable_laser_avoidance:
             laser_violated = ExpressionMonitor(name='laser violated')
             self.add_monitor(laser_violated)
             laser_violated.expression = cas.less(closest_laser_reading, 0)
-            follow_next_point.pause_condition |= laser_violated.get_state_expression()
+            follow_next_point.pause_condition |= laser_violated.get_observation_state_expression()
         follow_next_point.add_point_goal_constraints(frame_P_current=root_P_bf,
                                                      frame_P_goal=root_P_goal_point,
                                                      reference_velocity=self.max_translation_velocity,
@@ -854,7 +854,7 @@ class FollowNavPath(Goal):
 
             buffer = self.laser_avoidance_sideways_buffer / 2
 
-            laser_avoidance_task.pause_condition = active.get_state_expression()
+            laser_avoidance_task.pause_condition = active.get_observation_state_expression()
             laser_avoidance_task.add_inequality_constraint(reference_velocity=self.max_translation_velocity,
                                                            lower_error=sideways_vel - buffer,
                                                            upper_error=sideways_vel + buffer,
@@ -866,7 +866,7 @@ class FollowNavPath(Goal):
         goal_reached = ExpressionMonitor(name='goal reached?')
         self.add_monitor(goal_reached)
         goal_reached.expression = cas.euclidean_distance(last_point, root_P_bf) < 0.03
-        self.connect_end_condition_to_all_tasks(goal_reached.get_state_expression())
+        self.connect_end_condition_to_all_tasks(goal_reached.get_observation_state_expression())
 
         final_orientation = self.create_and_add_task('final orientation')
         frame_R_current = root_T_bf.to_rotation()
@@ -877,16 +877,16 @@ class FollowNavPath(Goal):
                                                         current_R_frame_eval=current_R_frame_eval,
                                                         reference_velocity=self.max_rotation_velocity,
                                                         weight=self.weight)
-        final_orientation.start_condition = goal_reached.get_state_expression()
+        final_orientation.start_condition = goal_reached.get_observation_state_expression()
 
         orientation_reached = ExpressionMonitor(name='final orientation reached',
-                                                start_condition=goal_reached.get_state_expression())
+                                                start_condition=goal_reached.get_observation_state_expression())
         self.add_monitor(orientation_reached)
         rotation_error = cas.rotational_error(frame_R_current, frame_R_goal)
         orientation_reached.expression = cas.less(cas.abs(rotation_error), 0.01)
 
         end = EndMotion(name='done')
-        end.start_condition = orientation_reached.get_state_expression()
+        end.start_condition = orientation_reached.get_observation_state_expression()
         self.add_monitor(end)
         self.connect_start_condition_to_all_tasks(start_condition)
         self.connect_pause_condition_to_all_tasks(pause_condition)

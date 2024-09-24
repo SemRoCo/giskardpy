@@ -11,7 +11,6 @@ from giskardpy_ros.tree.behaviors.log_trajectory import LogTrajPlugin
 from giskardpy_ros.tree.behaviors.real_kinematic_sim import RealKinSimPlugin
 from giskardpy_ros.tree.behaviors.time import TimePlugin, RosTime, ControlCycleCounter
 from giskardpy_ros.tree.blackboard_utils import GiskardBlackboard
-from giskardpy_ros.tree.branches.check_monitors import CheckMonitors
 from giskardpy_ros.tree.branches.publish_state import PublishState
 from giskardpy_ros.tree.branches.send_controls import SendControls
 from giskardpy_ros.tree.branches.synchronization import Synchronization
@@ -24,7 +23,6 @@ class ControlLoop(AsyncBehavior):
     publish_state: PublishState
     projection_synchronization: Synchronization
     closed_loop_synchronization: Synchronization
-    check_monitors: CheckMonitors
     debug_added: bool = False
     in_projection: bool
     controller_active: bool = True
@@ -36,6 +34,7 @@ class ControlLoop(AsyncBehavior):
     send_controls: SendControls
     log_traj: LogTrajPlugin
     controller_plugin: ControllerPlugin
+    evaluate_monitors: EvaluateMonitors
 
     def __init__(self, name: str = 'control_loop', log_traj: bool = True, max_hz: Optional[float] = None):
         name = f'{name}\nmax_hz: {max_hz}'
@@ -43,7 +42,6 @@ class ControlLoop(AsyncBehavior):
         self.publish_state = success_is_running(PublishState)('publish state 2')
         self.publish_state.add_publish_feedback()
         self.projection_synchronization = success_is_running(Synchronization)()
-        self.check_monitors = CheckMonitors()
         # projection plugins
         self.time = success_is_running(TimePlugin)()
         self.kin_sim = success_is_running(KinSimPlugin)('kin sim')
@@ -52,14 +50,14 @@ class ControlLoop(AsyncBehavior):
         self.real_kin_sim = success_is_running(RealKinSimPlugin)('real kin sim')
         self.send_controls = success_is_running(SendControls)()
         self.closed_loop_synchronization = success_is_running(Synchronization)()
+        self.evaluate_monitors = EvaluateMonitors()
 
         self.add_child(failure_is_running(GoalCanceled)(GiskardBlackboard().move_action_server))
 
         if god_map.is_collision_checking_enabled():
             self.add_child(CollisionChecker('collision checker'))
 
-        self.add_child(success_is_running(EvaluateMonitors)())
-        self.add_child(self.check_monitors)
+        self.add_child(self.evaluate_monitors)
         self.controller_plugin = ControllerPlugin('controller')
         self.add_child(self.controller_plugin)
 
@@ -84,7 +82,7 @@ class ControlLoop(AsyncBehavior):
 
     @toggle_on('controller_active')
     def add_qp_controller(self):
-        self.insert_behind(self.controller_plugin, self.check_monitors)
+        self.insert_behind(self.controller_plugin, self.evaluate_monitors)
         self.insert_behind(self.kin_sim, self.time)
 
     @toggle_off('controller_active')

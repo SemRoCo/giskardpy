@@ -18,13 +18,13 @@ from giskardpy_ros.tree.blackboard_utils import catch_and_raise_to_blackboard, G
 
 
 def giskard_state_to_execution_state() -> ExecutionState:
-    task_filter = np.array([task.plot for task in god_map.motion_graph_manager.tasks.values()])
-    monitor_filter = np.array([monitor.plot for monitor in god_map.motion_graph_manager.monitors.values()])
+    task_filter = np.array([task.plot for task in god_map.motion_graph_manager.task_state.nodes])
+    monitor_filter = np.array([monitor.plot for monitor in god_map.motion_graph_manager.monitor_state.nodes])
     msg = ExecutionState()
     msg.header.stamp = rospy.Time.now()
     msg.goal_id = GiskardBlackboard().move_action_server.goal_id
-    msg.tasks = [msg_converter.motion_graph_node_to_ros_msg(t) for t in god_map.motion_graph_manager.tasks.values() if t.plot]
-    msg.monitors = [msg_converter.motion_graph_node_to_ros_msg(m) for m in god_map.motion_graph_manager.monitors.values() if m.plot]
+    msg.tasks = [msg_converter.motion_graph_node_to_ros_msg(t) for t in god_map.motion_graph_manager.task_state.nodes if t.plot]
+    msg.monitors = [msg_converter.motion_graph_node_to_ros_msg(m) for m in god_map.motion_graph_manager.monitor_state.nodes if m.plot]
     try:
         msg.task_state = god_map.motion_graph_manager.task_state_history[-1][1][0][task_filter].tolist()
         msg.task_life_cycle_state = god_map.motion_graph_manager.task_state_history[-1][1][1][task_filter].tolist()

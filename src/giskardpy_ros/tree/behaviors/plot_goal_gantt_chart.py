@@ -27,7 +27,7 @@ class PlotGanttChart(GiskardBehavior):
         super().__init__(name)
 
     def plot_gantt_chart(self, tasks: List[MotionGraphNode], monitors: List[MotionGraphNode], file_name: str):
-        monitor_plot_filter = np.array([monitor.plot for monitor in god_map.motion_graph_manager.monitors.values()])
+        monitor_plot_filter = np.array([monitor.plot for monitor in god_map.motion_graph_manager.monitor_state.nodes])
         task_plot_filter = np.array([not isinstance(g, CollisionAvoidance) for g in tasks])
 
         monitor_history, task_history = self.get_new_history()
@@ -104,8 +104,8 @@ class PlotGanttChart(GiskardBehavior):
         if not god_map.motion_graph_manager.monitor_state_history:
             return Status.SUCCESS
         try:
-            tasks = list(god_map.motion_graph_manager.tasks.values())
-            monitors = list(god_map.motion_graph_manager.monitors.values())
+            tasks = god_map.motion_graph_manager.task_state.nodes
+            monitors = god_map.motion_graph_manager.monitor_state.nodes
             file_name = god_map.tmp_folder + f'gantt_charts/goal_{GiskardBlackboard().move_action_server.goal_id}.pdf'
             self.plot_gantt_chart(tasks, monitors, file_name)
         except Exception as e:

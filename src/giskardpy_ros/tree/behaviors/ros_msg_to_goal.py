@@ -127,13 +127,13 @@ class AddBaseTrajFollowerGoal(GiskardBehavior):
         time_monitor = TimeAbove(threshold=god_map.trajectory.length_in_seconds)
         god_map.motion_graph_manager.add_monitor(time_monitor)
 
-        end_motion = EndMotion(start_condition=cas.logic_and(local_min.get_state_expression(),
-                                                             time_monitor.get_state_expression()))
+        end_motion = EndMotion(start_condition=cas.logic_and(local_min.get_observation_state_expression(),
+                                                             time_monitor.get_observation_state_expression()))
         god_map.motion_graph_manager.add_monitor(end_motion)
 
         goal = BaseTrajFollower(self.joint.name, track_only_velocity=True,
-                                end_condition=local_min.get_state_expression())
-        goal.connect_end_condition_to_all_tasks(time_monitor.get_state_expression())
+                                end_condition=local_min.get_observation_state_expression())
+        goal.connect_end_condition_to_all_tasks(time_monitor.get_observation_state_expression())
         god_map.motion_graph_manager.add_motion_goal(goal)
         god_map.motion_graph_manager.init_task_state()
         return Status.SUCCESS

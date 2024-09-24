@@ -356,10 +356,13 @@ class MotionGraphManager:
         self.monitor_state_history.append((god_map.time,
                                            (self.monitor_state.observation_state.copy(),
                                             self.monitor_state.life_cycle_state.copy())))
+        if isinstance(done, Exception):
+            raise done
         return done
 
-    def evaluate_payload_monitors(self) -> Tuple[np.ndarray, bool]:
+    def evaluate_payload_monitors(self) -> Tuple[np.ndarray, Union[bool, Exception]]:
         done = False
+        cancel_exception = None
         next_state = np.zeros(len(self.payload_monitors))
         filtered_life_cycle_state = self.monitor_state.life_cycle_state[self.payload_monitor_filter]
         for i, payload_monitor in enumerate(self.payload_monitors):
@@ -368,11 +371,12 @@ class MotionGraphManager:
                     payload_monitor()
                 except Exception as e:
                     # the call of cancel motion might trigger exceptions
-                    # only pass it one if no end motion triggered at the same time
-                    if not done:
-                        raise e
+                    # only raise it if no end motion triggered at the same time
+                    cancel_exception = e
             next_state[i] = payload_monitor.get_state()
             done = done or (isinstance(payload_monitor, EndMotion) and next_state[i])
+        if not done and cancel_exception is not None:
+            done = cancel_exception
         return next_state, done
 
     @profile

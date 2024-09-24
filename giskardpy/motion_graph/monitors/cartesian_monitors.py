@@ -45,20 +45,14 @@ class PositionReached(ExpressionMonitor):
                  goal_point: cas.Point3,
                  threshold: float = 0.01,
                  absolute: bool = False,
-                 name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 pause_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol):
-        super().__init__(name=name,
-                         start_condition=start_condition,
-                         pause_condition=pause_condition,
-                         end_condition=end_condition)
-        if absolute or cas.is_true(start_condition):
+                 name: Optional[str] = None):
+        super().__init__(name=name)
+        if absolute:
             root_P_goal = god_map.world.transform(root_link, goal_point)
         else:
             root_P_x = god_map.world.compose_fk_expression(root_link, goal_point.reference_frame)
             root_P_goal = root_P_x.dot(goal_point)
-            root_P_goal = god_map.motion_graph_manager.register_expression_updater(root_P_goal, start_condition)
+            root_P_goal = self.update_expression_on_enter_running(root_P_goal)
 
         r_P_c = god_map.world.compose_fk_expression(root_link, tip_link).to_position()
         distance_to_goal = cas.euclidean_distance(root_P_goal, r_P_c)

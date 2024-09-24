@@ -63,8 +63,7 @@ class MotionGraphNode:
 
     def update_expression_on_enter_running(self, expression: cas.PreservedCasType) -> cas.PreservedCasType:
         condition = cas.equal(self.get_life_cycle_state_expression(), LifeCycleState.running)
-        god_map.motion_graph_manager.register_expression_updater(expression, condition)
-        return expression
+        return god_map.motion_graph_manager.register_expression_updater(expression, condition)
 
     @property
     def expression(self) -> cas.Expression:

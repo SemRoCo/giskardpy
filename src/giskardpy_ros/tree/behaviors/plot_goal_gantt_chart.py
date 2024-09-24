@@ -84,7 +84,11 @@ class PlotGanttChart(GiskardBehavior):
             -> Tuple[List[Tuple[float, Tuple[np.ndarray, np.ndarray]]],
             List[Tuple[float, Tuple[np.ndarray, np.ndarray]]]]:
         # because the monitor state doesn't get updated after the final end motion becomes true
-        god_map.motion_graph_manager.evaluate_monitors()
+        try:
+            god_map.motion_graph_manager.evaluate_monitors()
+        except Exception as e:
+            # if the motion was cancelled, this call will cause an exception
+            pass
 
         # add Nones to make sure all bars gets "ended"
         new_end_time = god_map.time + god_map.qp_controller.sample_period

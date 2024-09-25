@@ -138,7 +138,7 @@ def belong_to_same_cluster(node1: str, node2: str, graph: pydot.Graph) -> bool:
 
 
 def execution_state_to_dot_graph(execution_state: ExecutionState, use_state_color: bool = False) -> pydot.Dot:
-    graph = pydot.Dot(graph_type='digraph', ranksep=1.)
+    graph = pydot.Dot(graph_type='digraph', ranksep=1., compound=True)
 
     def add_node(node_msg: giskard_msgs.MotionGraphNode, style: str, color: str, bg_color: str) \
             -> pydot.Node:
@@ -198,10 +198,10 @@ def execution_state_to_dot_graph(execution_state: ExecutionState, use_state_colo
         goal_cluster_node = add_node(goal, style, 'black', 'white')
         goal_cluster.add_node(goal_cluster_node)
         goal_obj = god_map.motion_graph_manager.goal_state.get_node(goal.name)
-        for task in goal_obj.tasks:
-            goal_cluster.add_node(graph.get_node(f'"{task.name}"')[0])
-        for monitor in goal_obj.monitors:
-            goal_cluster.add_node(graph.get_node(f'"{monitor.name}"')[0])
+        for node in goal_obj.tasks + goal_obj.monitors:
+            graph_node = graph.get_node(f'"{node.name}"')[0]
+            goal_cluster.add_node(graph_node)
+            goal_cluster.add_edge(pydot.Edge(goal_cluster_node, graph_node, style='invis'))
         graph.add_subgraph(goal_cluster)
 
     # %% add edges
@@ -211,12 +211,12 @@ def execution_state_to_dot_graph(execution_state: ExecutionState, use_state_colo
 
 def should_draw_edge(node1_name: str, node1_cluster: str, node2_name: str, node2_cluster: str, graph: pydot.Graph) \
         -> bool:
-    return (node1_cluster is None and node2_cluster is None
-            or node1_cluster is None and is_cluster_root_node(node2_name, graph)
-            or is_cluster_root_node(node1_name, graph) and node2_cluster is None
-            or is_cluster_root_node(node1_name, graph) and is_cluster_root_node(node2_name, graph)
-            or node1_cluster == node2_cluster)
-
+    return (node1_cluster is None and node2_cluster is None  # both outside of cluster
+            or node1_cluster is None and is_cluster_root_node(node2_name, graph)  # one in cluster
+            or is_cluster_root_node(node1_name, graph) and node2_cluster is None  # one in cluster
+            or is_cluster_root_node(node1_name, graph) and is_cluster_root_node(node2_name, graph)  # both cluster root
+            or (node1_cluster == node2_cluster and  # both in cluster but both not roots
+                (not is_cluster_root_node(node1_name, graph) and not is_cluster_root_node(node2_name, graph))))
 
 def add_edges(graph: pydot.Graph, execution_state: ExecutionState) -> pydot.Graph:
     for i, node in enumerate(execution_state.monitors + execution_state.tasks + execution_state.goals):
@@ -226,8 +226,13 @@ def add_edges(graph: pydot.Graph, execution_state: ExecutionState) -> pydot.Grap
         for sub_node_name in free_symbols:
             sub_node_cluster = get_cluster_of_node(sub_node_name, graph)
             if should_draw_edge(node_name, node_cluster, sub_node_name, sub_node_cluster, graph):
+                if (node_cluster is not None and is_cluster_root_node(node_name, graph)
+                        and sub_node_cluster is not None and is_cluster_root_node(sub_node_name, graph)):
+                    kwargs = {'lhead': node_cluster, 'ltail': sub_node_cluster}
+                else:
+                    kwargs = {}
                 graph.add_edge(pydot.Edge(src=sub_node_name, dst=node_name, penwidth=LineWidth, color=MyGREEN,
-                                          arrowsize=ArrowSize))
+                                          arrowsize=ArrowSize, **kwargs))
         free_symbols = extract_node_names_from_condition(node.pause_condition)
         for sub_node_name in free_symbols:
             sub_node_cluster = get_cluster_of_node(sub_node_name, graph)

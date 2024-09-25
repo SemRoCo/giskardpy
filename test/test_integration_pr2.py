@@ -532,33 +532,22 @@ class TestMonitors:
         root_link = 'map'
         tip_link = 'base_footprint'
 
-        monitor1 = zero_pose.monitors.add_cartesian_pose(name='pose1',
-                                                         root_link=root_link,
-                                                         tip_link=tip_link,
-                                                         goal_pose=pose1)
-
-        monitor2 = zero_pose.monitors.add_cartesian_pose(name='pose2',
-                                                         root_link=root_link,
-                                                         tip_link=tip_link,
-                                                         goal_pose=pose2,
-                                                         absolute=True,
-                                                         start_condition=monitor1)
         end_monitor = zero_pose.monitors.add_local_minimum_reached()
 
-        zero_pose.motion_goals.add_cartesian_pose(goal_pose=pose1,
-                                                  name='g1',
-                                                  root_link=root_link,
-                                                  tip_link=tip_link,
-                                                  end_condition=monitor1)
-        zero_pose.motion_goals.add_cartesian_pose(goal_pose=pose2,
-                                                  name='g2',
-                                                  root_link=root_link,
-                                                  tip_link=tip_link,
-                                                  absolute=True,
-                                                  start_condition=monitor1,
-                                                  end_condition=f'{monitor2} and {end_monitor}')
+        pose1 = zero_pose.motion_goals.add_cartesian_pose(goal_pose=pose1,
+                                                          name='g1',
+                                                          root_link=root_link,
+                                                          tip_link=tip_link,
+                                                          end_condition=None)
+        pose2 = zero_pose.motion_goals.add_cartesian_pose(goal_pose=pose2,
+                                                          name='g2',
+                                                          root_link=root_link,
+                                                          tip_link=tip_link,
+                                                          absolute=True,
+                                                          start_condition=pose1,
+                                                          end_condition=None)
         zero_pose.allow_all_collisions()
-        zero_pose.monitors.add_end_motion(start_condition=' and '.join([end_monitor, monitor2]))
+        zero_pose.monitors.add_end_motion(start_condition=' and '.join([pose2, end_monitor]))
         zero_pose.set_max_traj_length(30)
         zero_pose.execute(add_local_minimum_reached=False)
 
@@ -1066,22 +1055,27 @@ class TestMonitors:
         zero_pose.execute(add_local_minimum_reached=False)
 
     def test_RelativePositionSequence(self, zero_pose: PR2TestWrapper):
-        goal1 = PointStamped()
-        goal1.header.frame_id = 'base_footprint'
-        goal1.point.x = 1
+        pose1 = PoseStamped()
+        pose1.header.frame_id = 'map'
+        pose1.pose.position.x = 1
+        pose1.pose.orientation.w = 1
 
-        goal2 = PointStamped()
-        goal2.header.frame_id = 'base_footprint'
-        goal2.point.y = 1
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class=RelativePositionSequence.__name__,
-                                               goal1=goal1,
-                                               goal2=goal2,
-                                               root_link='map',
-                                               tip_link='base_footprint')
+        pose2 = PoseStamped()
+        pose2.header.frame_id = 'base_footprint'
+        pose2.pose.position.y = 1
+        pose2.pose.orientation.w = 1
+
+        done = zero_pose.motion_goals.add_motion_goal(motion_goal_class=RelativePositionSequence.__name__,
+                                               goal1=pose1,
+                                               goal2=pose2,
+                                               root_link=LinkName(name='map'),
+                                               tip_link=LinkName(name='base_footprint'))
         zero_pose.allow_all_collisions()
-        zero_pose.execute()
+        zero_pose.monitors.add_end_motion(start_condition=done)
+        zero_pose.set_max_traj_length(30)
+        zero_pose.execute(add_local_minimum_reached=False)
         current_pose = zero_pose.compute_fk_pose(root_link='map', tip_link='base_footprint')
-        np.testing.assert_almost_equal(current_pose.pose.position.x, 1, decimal=2)
+        np.testing.assert_almost_equal(current_pose.pose.position.x, 0, decimal=2)
         np.testing.assert_almost_equal(current_pose.pose.position.y, 1, decimal=2)
 
     def test_print_event(self, zero_pose: PR2TestWrapper):

@@ -274,7 +274,7 @@ class TestWorld:
         god_map.motion_graph_manager.add_motion_goal(cart_goal1)
         god_map.motion_graph_manager.add_motion_goal(cart_goal2)
 
-        god_map.motion_graph_manager.compile_monitors()
+        god_map.motion_graph_manager.compile_node_state_updaters()
         god_map.motion_graph_manager.init_task_state()
 
         eq, neq, neqd, lin_weight, quad_weight = god_map.motion_graph_manager.get_constraints_from_goals()
@@ -293,7 +293,7 @@ class TestWorld:
             box_world.update_state(next_cmd, dt, Derivatives.jerk)
             box_world.notify_state_change()
 
-            god_map.motion_graph_manager.evaluate_monitors()
+            god_map.motion_graph_manager.evaluate_node_states()
             traj.append(box_world.state[joint_name].position)
             god_map.time += controller.sample_period
             god_map.control_cycle_counter += 1
@@ -328,7 +328,7 @@ class TestWorld:
         god_map.motion_graph_manager.add_motion_goal(cart_goal1)
         god_map.motion_graph_manager.add_motion_goal(cart_goal2)
 
-        god_map.motion_graph_manager.compile_monitors()
+        god_map.motion_graph_manager.compile_node_state_updaters()
         god_map.motion_graph_manager.init_task_state()
 
         eq, neq, neqd, lin_weight, quad_weight = god_map.motion_graph_manager.get_constraints_from_goals()
@@ -345,7 +345,7 @@ class TestWorld:
             next_cmd = controller.get_cmd(substitutions)
             box_world.update_state(next_cmd, dt, Derivatives.jerk)
             box_world.notify_state_change()
-            god_map.motion_graph_manager.evaluate_monitors()
+            god_map.motion_graph_manager.evaluate_node_states()
             traj.append((box_world.state[box_world.joints[joint_name].x_name].position,
                          box_world.state[box_world.joints[joint_name].y_name].position))
             god_map.time += controller.sample_period

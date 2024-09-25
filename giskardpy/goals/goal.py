@@ -8,6 +8,7 @@ from giskardpy.motion_graph.graph_node import MotionGraphNode
 from giskardpy.motion_graph.monitors.monitors import ExpressionMonitor, Monitor
 from giskardpy.god_map import god_map
 from giskardpy.motion_graph.tasks.task import Task
+from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils.utils import string_shortener
 from giskardpy.data_types.exceptions import GoalInitalizationException
 from giskardpy.model.joints import OneDofJoint
@@ -18,7 +19,25 @@ import giskardpy.casadi_wrapper as cas
 class Goal(MotionGraphNode):
     tasks: List[Task]
     monitors: List[Monitor]
-    name: str
+    goals: List[Goal]
+
+    def __init__(self, *, name: Optional[str] = None, plot: bool = True):
+        super().__init__(name=name, plot=plot)
+        self.tasks = []
+        self.monitors = []
+        self.goals = []
+
+    def get_observation_state_expression(self):
+        return symbol_manager.get_symbol(f'god_map'
+                                         f'.motion_graph_manager'
+                                         f'.goal_state'
+                                         f'.get_observation_state(\'{self.name}\')')
+
+    def get_life_cycle_state_expression(self):
+        return symbol_manager.get_symbol(f'god_map'
+                                         f'.motion_graph_manager'
+                                         f'.goal_state'
+                                         f'.get_life_cycle_state(\'{self.name}\')')
 
     def has_tasks(self) -> bool:
         return len(self.tasks) > 0

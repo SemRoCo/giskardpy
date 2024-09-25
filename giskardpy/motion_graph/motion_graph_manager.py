@@ -32,9 +32,11 @@ def monitor_list_to_monitor_name_tuple(monitors: Iterable[Union[str, ExpressionM
 class MotionGraphManager:
     task_state: MotionGraphNodeStateManager[Task]
     monitor_state: MotionGraphNodeStateManager[Monitor]
+    goal_state: MotionGraphNodeStateManager[Goal]
 
     compiled_task_observation_state: CompiledFunction
     compiled_monitor_observation_state: CompiledFunction
+    compiled_goal_observation_state: CompiledFunction
 
     compiled_task_life_cycle_state: CompiledFunction
     compiled_monitor_life_cycle_state_updater: CompiledFunction
@@ -72,6 +74,7 @@ class MotionGraphManager:
             pass
         self.task_state = MotionGraphNodeStateManager()
         self.monitor_state = MotionGraphNodeStateManager()
+        self.goal_state = MotionGraphNodeStateManager()
         self.task_state_history = []
         self.monitor_state_history = []
         self.substitution_values = {}
@@ -84,19 +87,28 @@ class MotionGraphManager:
     def add_task(self, task: Task) -> None:
         self.task_state.append(task)
 
+    def add_goal(self, goal: Goal) -> None:
+        self.goal_state.append(goal)
+        for task in goal.tasks:
+            self.add_task(task)
+        for monitor in goal.monitors:
+            self.add_monitor(monitor)
+
     def parse_motion_graph(self, *,
                            tasks: List[Tuple[str, str, str, str, str, str, dict]],
                            monitors: List[Tuple[str, str, str, str, str, str, dict]],
                            goals: List[Tuple[str, str, str, str, str, str, dict]]) -> None:
-        # %% add tasks
-        # for class_name, name, start, reset, pause, end, kwargs in goals:
-        #     try:
-        #         get_middleware().loginfo(f'Adding task of type: \'{class_name}\'')
-        #         C = god_map.motion_graph_manager.allowed_task_types[class_name]
-        #     except KeyError:
-        #         raise UnknownTaskException(f'unknown task type: \'{class_name}\'.')
-        #     task: Task = C(name=name, **kwargs)
-        #     self.add_task(task)
+        # %% add goals
+        new_tasks = []
+        new_monitors = []
+        for class_name, name, start, reset, pause, end, kwargs in goals:
+            try:
+                get_middleware().loginfo(f'Adding task of type: \'{class_name}\'')
+                C = god_map.motion_graph_manager.allowed_goal_types[class_name]
+            except KeyError:
+                raise UnknownTaskException(f'unknown task type: \'{class_name}\'.')
+            goal: Goal = C(name=name, **kwargs)
+            self.add_goal(goal)
 
         # %% add tasks
         for class_name, name, start, reset, pause, end, kwargs in tasks:
@@ -118,37 +130,79 @@ class MotionGraphManager:
             monitor: Monitor = C(name=name, **kwargs)
             self.add_monitor(monitor)
 
+        task_state_symbols = self.task_state.get_observation_state_symbol_map()
+        monitor_state_symbols = self.monitor_state.get_observation_state_symbol_map()
+        goal_state_symbols = self.goal_state.get_observation_state_symbol_map()
+        observation_state_symbols = {**task_state_symbols, **monitor_state_symbols, **goal_state_symbols}
+
         for class_name, name, start, reset, pause, end, kwargs in tasks:
             start_condition = god_map.motion_graph_manager.logic_str_to_expr(
                 logic_str=start,
-                default=cas.TrueSymbol)
+                default=cas.TrueSymbol,
+                observation_state_symbols=observation_state_symbols)
             reset_condition = god_map.motion_graph_manager.logic_str_to_expr(
                 logic_str=reset,
-                default=cas.FalseSymbol)
+                default=cas.FalseSymbol,
+                observation_state_symbols=observation_state_symbols)
             pause_condition = god_map.motion_graph_manager.logic_str_to_expr(
                 logic_str=pause,
-                default=cas.FalseSymbol)
+                default=cas.FalseSymbol,
+                observation_state_symbols=observation_state_symbols)
             end_condition = god_map.motion_graph_manager.logic_str_to_expr(
                 logic_str=end,
-                default=cas.FalseSymbol)
+                default=cas.FalseSymbol,
+                observation_state_symbols=observation_state_symbols)
             self.task_state.get_node(name).set_conditions(start_condition, reset_condition, pause_condition,
                                                           end_condition)
 
         for class_name, name, start, reset, pause, end, kwargs in monitors:
             start_condition = god_map.motion_graph_manager.logic_str_to_expr(
                 logic_str=start,
-                default=cas.TrueSymbol)
+                default=cas.TrueSymbol,
+                observation_state_symbols=observation_state_symbols)
             reset_condition = god_map.motion_graph_manager.logic_str_to_expr(
                 logic_str=reset,
-                default=cas.FalseSymbol)
+                default=cas.FalseSymbol,
+                observation_state_symbols=observation_state_symbols)
             pause_condition = god_map.motion_graph_manager.logic_str_to_expr(
                 logic_str=pause,
-                default=cas.FalseSymbol)
+                default=cas.FalseSymbol,
+                observation_state_symbols=observation_state_symbols)
             end_condition = god_map.motion_graph_manager.logic_str_to_expr(
                 logic_str=end,
-                default=cas.FalseSymbol)
+                default=cas.FalseSymbol,
+                observation_state_symbols=observation_state_symbols)
             self.monitor_state.get_node(name).set_conditions(start_condition, reset_condition, pause_condition,
                                                              end_condition)
+
+        for class_name, name, start, reset, pause, end, kwargs in goals:
+            start_condition = god_map.motion_graph_manager.logic_str_to_expr(
+                logic_str=start,
+                default=cas.TrueSymbol,
+                observation_state_symbols=observation_state_symbols)
+            reset_condition = god_map.motion_graph_manager.logic_str_to_expr(
+                logic_str=reset,
+                default=cas.FalseSymbol,
+                observation_state_symbols=observation_state_symbols)
+            pause_condition = god_map.motion_graph_manager.logic_str_to_expr(
+                logic_str=pause,
+                default=cas.FalseSymbol,
+                observation_state_symbols=observation_state_symbols)
+            end_condition = god_map.motion_graph_manager.logic_str_to_expr(
+                logic_str=end,
+                default=cas.FalseSymbol,
+                observation_state_symbols=observation_state_symbols)
+            self.goal_state.get_node(name).set_conditions(start_condition, reset_condition, pause_condition,
+                                                          end_condition)
+
+        # %% apply goal conditions to sub nodes
+        for goal in self.goal_state.nodes:
+            for task in goal.tasks:
+                if cas.is_true(task.start_condition):
+                    task.start_condition = goal.start_condition
+                task.reset_condition = cas.logic_or(task.reset_condition, goal.reset_condition)
+                task.pause_condition = cas.logic_or(task.pause_condition, goal.pause_condition)
+                task.end_condition = cas.logic_or(task.end_condition, goal.end_condition)
 
     def parse_ast_expression(self, node,
                              observation_state_symbols: Dict[str, cas.Expression]) -> cas.Expression:
@@ -166,11 +220,7 @@ class MotionGraphManager:
         raise Exception(f'failed to parse {node}')
 
     def logic_str_to_expr(self, logic_str: str, default: cas.Expression,
-                          observation_state_symbols: Optional[Dict[str, cas.Expression]] = None) -> cas.Expression:
-        if observation_state_symbols is None:
-            task_state_symbols = self.task_state.get_observation_state_symbol_map()
-            monitor_state_symbols = self.monitor_state.get_observation_state_symbol_map()
-            observation_state_symbols = {**task_state_symbols, **monitor_state_symbols}
+                          observation_state_symbols: Dict[str, cas.Expression]) -> cas.Expression:
         if logic_str == '':
             return default
         tree = ast.parse(logic_str, mode='eval')
@@ -182,10 +232,11 @@ class MotionGraphManager:
             raise GiskardException(str(e))
 
     @profile
-    def compile_monitors(self) -> None:
+    def compile_node_state_updaters(self) -> None:
         self.initialize_states()
         self.compile_task_state_updater()
         self.compile_monitor_state_updater()
+        self.compile_goal_state_updater()
         # self._register_expression_update_triggers()
 
     @profile
@@ -194,11 +245,13 @@ class MotionGraphManager:
 
     def get_observation_state_symbols(self) -> List[cas.Symbol]:
         return (list(self.task_state.get_observation_state_symbol_map().values()) +
-                list(self.monitor_state.get_observation_state_symbol_map().values()))
+                list(self.monitor_state.get_observation_state_symbol_map().values()) +
+                list(self.goal_state.get_observation_state_symbol_map().values()))
 
     def initialize_states(self) -> None:
         self.task_state.init_states()
         self.monitor_state.init_states()
+        self.goal_state.init_states()
 
     def get_node_from_state_expr(self, expr: cas.Expression) -> MotionGraphNode:
         for task in self.task_state.nodes:
@@ -207,9 +260,12 @@ class MotionGraphManager:
         for monitor in self.monitor_state.nodes:
             if cas.is_true(monitor.get_observation_state_expression() == expr):
                 return monitor
-        raise GiskardException(f'No task/monitor found for {str(expr)}.')
+        for goal in self.goal_state.nodes:
+            if cas.is_true(goal.get_observation_state_expression() == expr):
+                return goal
+        raise GiskardException(f'No goal/task/monitor found for {str(expr)}.')
 
-    def is_monitor_registered(self, monitor_state_expr: cas.Expression) -> bool:
+    def is_node_registered(self, monitor_state_expr: cas.Expression) -> bool:
         try:
             self.get_node_from_state_expr(monitor_state_expr)
             return True
@@ -263,6 +319,21 @@ class MotionGraphManager:
         monitor_state_updater = cas.Expression(monitor_state_updater)
         self.compiled_monitor_observation_state = monitor_state_updater.compile(monitor_state_updater.free_symbols())
         self.compiled_monitor_life_cycle_state_updater = compile_graph_node_state_updater(self.monitor_state)
+
+    @profile
+    def compile_goal_state_updater(self) -> None:
+        observation_state_updater = []
+        for node in self.goal_state.nodes:
+            state_symbol = node.get_observation_state_expression()
+            node.pre_compile()
+            state_f = cas.if_eq(node.get_life_cycle_state_expression(), int(LifeCycleState.running),
+                                if_result=node.expression,
+                                else_result=state_symbol)
+            observation_state_updater.append(state_f)
+        observation_state_updater = cas.Expression(observation_state_updater)
+        self.compiled_goal_observation_state = observation_state_updater.compile(
+            observation_state_updater.free_symbols())
+        self.compiled_goal_life_cycle_state_updater = compile_graph_node_state_updater(self.goal_state)
 
     @property
     def payload_monitors(self) -> List[PayloadMonitor]:
@@ -329,7 +400,7 @@ class MotionGraphManager:
         return np.array([i for i, m in enumerate(self.monitor_state.nodes) if isinstance(m, PayloadMonitor)])
 
     @profile
-    def evaluate_monitors(self) -> bool:
+    def evaluate_node_states(self) -> bool:
         # %% update monitor state
         args = symbol_manager.resolve_symbols(self.compiled_task_observation_state.str_params)
         self.task_state.observation_state = self.compiled_task_observation_state.fast_call(args)
@@ -337,15 +408,25 @@ class MotionGraphManager:
         args = symbol_manager.resolve_symbols(self.compiled_monitor_observation_state.str_params)
         self.monitor_state.observation_state = self.compiled_monitor_observation_state.fast_call(args)
 
+        args = symbol_manager.resolve_symbols(self.compiled_goal_observation_state.str_params)
+        self.goal_state.observation_state = self.compiled_goal_observation_state.fast_call(args)
+
         # %% update life cycle state
         args = np.concatenate((self.task_state.life_cycle_state,
                                self.task_state.observation_state,
-                               self.monitor_state.observation_state))
+                               self.monitor_state.observation_state,
+                               self.goal_state.observation_state))
         self.task_state.life_cycle_state = self.compiled_task_life_cycle_state.fast_call(args)
         args = np.concatenate((self.monitor_state.life_cycle_state,
                                self.task_state.observation_state,
-                               self.monitor_state.observation_state))
+                               self.monitor_state.observation_state,
+                               self.goal_state.observation_state))
         self.monitor_state.life_cycle_state = self.compiled_monitor_life_cycle_state_updater.fast_call(args)
+        args = np.concatenate((self.goal_state.life_cycle_state,
+                               self.task_state.observation_state,
+                               self.monitor_state.observation_state,
+                               self.goal_state.observation_state))
+        self.goal_state.life_cycle_state = self.compiled_goal_life_cycle_state_updater.fast_call(args)
 
         next_state, done = self.evaluate_payload_monitors()
         self.monitor_state.observation_state[self.payload_monitor_filter] = next_state
@@ -378,10 +459,6 @@ class MotionGraphManager:
         if not done and cancel_exception is not None:
             done = cancel_exception
         return next_state, done
-
-    @profile
-    def search_for_monitors(self, monitor_names: List[str]) -> List[Monitor]:
-        return [self.get_monitor(monitor_name) for monitor_name in monitor_names]
 
     def has_end_motion_monitor(self) -> bool:
         for m in self.monitor_state.nodes:

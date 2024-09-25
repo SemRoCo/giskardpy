@@ -32,12 +32,12 @@ class CartesianPosition(Task):
             reference_velocity = self.default_reference_velocity
         self.reference_velocity = reference_velocity
         self.weight = weight
-        # if absolute or cas.is_true(start_condition):
-        #     root_P_goal = god_map.world.transform(self.root_link, goal_point)
-        # else:
-        root_T_x = god_map.world.compose_fk_expression(self.root_link, goal_point.reference_frame)
-        root_P_goal = root_T_x.dot(goal_point)
-        root_P_goal = self.update_expression_on_enter_running(root_P_goal)
+        if absolute:
+            root_P_goal = god_map.world.transform(self.root_link, goal_point)
+        else:
+            root_T_x = god_map.world.compose_fk_expression(self.root_link, goal_point.reference_frame)
+            root_P_goal = root_T_x.dot(goal_point)
+            root_P_goal = self.update_expression_on_enter_running(root_P_goal)
 
         r_P_c = god_map.world.compose_fk_expression(self.root_link, self.tip_link).to_position()
         self.add_point_goal_constraints(frame_P_goal=root_P_goal,
@@ -48,12 +48,9 @@ class CartesianPosition(Task):
                                                               color=ColorRGBA(r=1.0, g=0.0, b=0.0, a=1.0))
         god_map.debug_expression_manager.add_debug_expression(f'{self.name}/goal_point', root_P_goal,
                                                               color=ColorRGBA(r=0.0, g=0.0, b=1.0, a=1.0))
-        cart_position_monitor = PositionReached(root_link=root_link,
-                                                tip_link=tip_link,
-                                                goal_point=goal_point,
-                                                threshold=threshold,
-                                                absolute=absolute)
-        self.expression = cart_position_monitor.expression
+
+        distance_to_goal = cas.euclidean_distance(root_P_goal, r_P_c)
+        self.expression = cas.less(distance_to_goal, threshold)
 
 
 class CartesianOrientation(Task):
@@ -68,10 +65,6 @@ class CartesianOrientation(Task):
                  weight: float = WEIGHT_ABOVE_CA,
                  name: Optional[str] = None,
                  absolute: bool = False,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 pause_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol,
-                 plot: bool = True,
                  point_of_debug_matrix: Optional[cas.Point3] = None):
         """
         See CartesianPose.
@@ -80,22 +73,18 @@ class CartesianOrientation(Task):
         self.tip_link = tip_link
         if name is None:
             name = f'{self.__class__.__name__}/{self.root_link}/{self.tip_link}'
-        super().__init__(name=name,
-                         start_condition=start_condition,
-                         pause_condition=pause_condition,
-                         end_condition=end_condition,
-                         plot=plot)
+        super().__init__(name=name)
         if reference_velocity is None:
             reference_velocity = self.default_reference_velocity
         self.reference_velocity = reference_velocity
         self.weight = weight
 
-        if absolute or cas.is_true(start_condition):
+        if absolute:
             root_R_goal = god_map.world.transform(self.root_link, goal_orientation)
         else:
             root_T_x = god_map.world.compose_fk_expression(self.root_link, goal_orientation.reference_frame)
             root_R_goal = root_T_x.dot(goal_orientation)
-            root_R_goal = god_map.motion_graph_manager.register_expression_updater(root_R_goal, start_condition)
+            root_R_goal = self.update_expression_on_enter_running(root_R_goal)
 
         r_T_c = god_map.world.compose_fk_expression(self.root_link, self.tip_link)
         r_R_c = r_T_c.to_rotation()
@@ -109,12 +98,12 @@ class CartesianOrientation(Task):
         if point_of_debug_matrix is None:
             point = r_T_c.to_position()
         else:
-            if absolute or cas.is_true(start_condition):
+            if absolute:
                 point = point_of_debug_matrix
             else:
                 root_T_x = god_map.world.compose_fk_expression(self.root_link, point_of_debug_matrix.reference_frame)
                 point = root_T_x.dot(point_of_debug_matrix)
-                point = god_map.motion_graph_manager.register_expression_updater(point, start_condition)
+                point = self.update_expression_on_enter_running(point)
         debug_trans_matrix = cas.TransMatrix.from_point_rotation_matrix(point=point,
                                                                         rotation_matrix=root_R_goal)
         debug_current_trans_matrix = cas.TransMatrix.from_point_rotation_matrix(point=r_T_c.to_position(),
@@ -123,9 +112,5 @@ class CartesianOrientation(Task):
         god_map.debug_expression_manager.add_debug_expression(f'{self.name}/current_orientation',
                                                               debug_current_trans_matrix)
 
-        orientation_reached = OrientationReached(root_link=root_link,
-                                                 tip_link=tip_link,
-                                                 goal_orientation=goal_orientation,
-                                                 threshold=threshold,
-                                                 absolute=absolute)
-        self.expression = orientation_reached.expression
+        rotation_error = cas.rotational_error(r_R_c, root_R_goal)
+        self.expression = cas.less(cas.abs(rotation_error), threshold)

@@ -33,7 +33,7 @@ ConditionFont = 'monospace'
 NotStartedColor = '#9F9F9F'
 
 
-def extract_monitor_names_from_condition(condition: str) -> List[str]:
+def extract_node_names_from_condition(condition: str) -> List[str]:
     return re.findall(r"'(.*?)'", condition)
 
 
@@ -104,6 +104,39 @@ def add_boarder_to_node(graph: pydot.Graph, node: pydot.Node, num: int, color: s
         graph.add_subgraph(c)
 
 
+def escape_name(name: str) -> str:
+    return f'"{name}"'
+
+
+def is_goal(name: str, execution_state: ExecutionState) -> bool:
+    for goal in execution_state.goals:
+        if goal.name == name:
+            return True
+    return False
+
+
+def get_cluster_of_node(node_name: str, graph: pydot.Graph) -> Optional[str]:
+    node_cluster = None
+    for cluster in graph.get_subgraph_list():
+        if len(cluster.get_node(escape_name(node_name))) == 1:
+            node_cluster = cluster.get_name()
+            break
+    return node_cluster
+
+
+def is_cluster_root_node(node_name: str, graph: pydot.Graph) -> bool:
+    cluster_name = get_cluster_of_node(node_name, graph)
+    if cluster_name is None:
+        return True
+    return escape_name(node_name) == graph.get_subgraph(cluster_name)[0].get_nodes()[0].get_name()
+
+
+def belong_to_same_cluster(node1: str, node2: str, graph: pydot.Graph) -> bool:
+    node1_cluster = get_cluster_of_node(node1, graph)
+    node2_cluster = get_cluster_of_node(node2, graph)
+    return node1_cluster == node2_cluster or node1_cluster is None and node2_cluster is None
+
+
 def execution_state_to_dot_graph(execution_state: ExecutionState, use_state_color: bool = False) -> pydot.Dot:
     graph = pydot.Dot(graph_type='digraph', ranksep=1.)
 
@@ -125,14 +158,15 @@ def execution_state_to_dot_graph(execution_state: ExecutionState, use_state_colo
                           color=color,
                           style=style,
                           margin=0,
-                          fontname=FONT,
                           fillcolor=bg_color,
+                          fontname=FONT,
                           fontsize=Fontsize,
                           penwidth=LineWidth)
         add_boarder_to_node(graph=graph, node=node, num=num_extra_boarders, color=color, style=boarder_style)
         graph.add_node(node)
         return node
 
+    # %% add all nodes
     # Process monitors and their conditions
     style = 'filled, rounded'
     for i, monitor in enumerate(execution_state.monitors):
@@ -141,24 +175,9 @@ def execution_state_to_dot_graph(execution_state: ExecutionState, use_state_colo
                                                    execution_state.monitor_state[i])]
         else:
             color, bg_color = 'black', 'white'
-        pause_condition = monitor.pause_condition
-        end_condition = monitor.end_condition
-        monitor_node = add_node(node_msg=monitor, style=style, color=color, bg_color=bg_color)
-        free_symbols = extract_monitor_names_from_condition(monitor.start_condition)
-        for sub_monitor_name in free_symbols:
-            graph.add_edge(pydot.Edge(sub_monitor_name, monitor_node, penwidth=LineWidth, color=MyGREEN,
-                                      arrowsize=ArrowSize))
-        free_symbols = extract_monitor_names_from_condition(pause_condition)
-        for sub_monitor_name in free_symbols:
-            graph.add_edge(pydot.Edge(sub_monitor_name, monitor_node, penwidth=LineWidth, color=MyORANGE,
-                                      arrowsize=ArrowSize))
-        free_symbols = extract_monitor_names_from_condition(end_condition)
-        for sub_monitor_name in free_symbols:
-            graph.add_edge(pydot.Edge(monitor_node, sub_monitor_name, color=MyRED, penwidth=LineWidth, arrowhead='none',
-                                      arrowtail='normal',
-                                      dir='both', arrowsize=ArrowSize))
+        add_node(node_msg=monitor, style=style, color=color, bg_color=bg_color)
 
-    # Process goals and their connections
+    # Process tasks and their connections
     style = 'filled, diagonals'
     for i, task in enumerate(execution_state.tasks):
         # TODO add one collision avoidance task?
@@ -167,17 +186,62 @@ def execution_state_to_dot_graph(execution_state: ExecutionState, use_state_colo
                                                    execution_state.task_state[i])]
         else:
             color, bg_color = 'black', MyGRAY
-        goal_node = add_node(node_msg=task, style=style, color=color, bg_color=bg_color)
-        for monitor_name in extract_monitor_names_from_condition(task.start_condition):
-            graph.add_edge(pydot.Edge(monitor_name, goal_node, penwidth=LineWidth, color=MyGREEN, arrowsize=ArrowSize))
+        add_node(node_msg=task, style=style, color=color, bg_color=bg_color)
 
-        for monitor_name in extract_monitor_names_from_condition(task.pause_condition):
-            graph.add_edge(pydot.Edge(monitor_name, goal_node, penwidth=LineWidth, color=MyORANGE, arrowsize=ArrowSize))
+    # Process goals and their connections
+    style = 'filled, diagonals'
+    for i, goal in enumerate(execution_state.goals):
+        goal_cluster = pydot.Cluster(graph_name=goal.name,
+                                     fontname=FONT,
+                                     fontsize=Fontsize,
+                                     penwidth=LineWidth)
+        goal_cluster_node = add_node(goal, style, 'black', 'white')
+        goal_cluster.add_node(goal_cluster_node)
+        goal_obj = god_map.motion_graph_manager.goal_state.get_node(goal.name)
+        for task in goal_obj.tasks:
+            goal_cluster.add_node(graph.get_node(f'"{task.name}"')[0])
+        for monitor in goal_obj.monitors:
+            goal_cluster.add_node(graph.get_node(f'"{monitor.name}"')[0])
+        graph.add_subgraph(goal_cluster)
 
-        for monitor_name in extract_monitor_names_from_condition(task.end_condition):
-            graph.add_edge(pydot.Edge(goal_node, monitor_name, color=MyRED, penwidth=LineWidth, arrowhead='none',
-                                      arrowtail='normal',
-                                      dir='both', arrowsize=ArrowSize))
+    # %% add edges
+    add_edges(graph, execution_state)
+    return graph
+
+
+def should_draw_edge(node1_name: str, node1_cluster: str, node2_name: str, node2_cluster: str, graph: pydot.Graph) \
+        -> bool:
+    return (node1_cluster is None and node2_cluster is None
+            or node1_cluster is None and is_cluster_root_node(node2_name, graph)
+            or is_cluster_root_node(node1_name, graph) and node2_cluster is None
+            or is_cluster_root_node(node1_name, graph) and is_cluster_root_node(node2_name, graph)
+            or node1_cluster == node2_cluster)
+
+
+def add_edges(graph: pydot.Graph, execution_state: ExecutionState) -> pydot.Graph:
+    for i, node in enumerate(execution_state.monitors + execution_state.tasks + execution_state.goals):
+        node_name = node.name
+        node_cluster = get_cluster_of_node(node_name, graph)
+        free_symbols = extract_node_names_from_condition(node.start_condition)
+        for sub_node_name in free_symbols:
+            sub_node_cluster = get_cluster_of_node(sub_node_name, graph)
+            if should_draw_edge(node_name, node_cluster, sub_node_name, sub_node_cluster, graph):
+                graph.add_edge(pydot.Edge(src=sub_node_name, dst=node_name, penwidth=LineWidth, color=MyGREEN,
+                                          arrowsize=ArrowSize))
+        free_symbols = extract_node_names_from_condition(node.pause_condition)
+        for sub_node_name in free_symbols:
+            sub_node_cluster = get_cluster_of_node(sub_node_name, graph)
+            if should_draw_edge(node_name, node_cluster, sub_node_name, sub_node_cluster, graph):
+                graph.add_edge(pydot.Edge(sub_node_name, node_name, penwidth=LineWidth, color=MyORANGE,
+                                          arrowsize=ArrowSize))
+        free_symbols = extract_node_names_from_condition(node.end_condition)
+        for sub_node_name in free_symbols:
+            sub_node_cluster = get_cluster_of_node(sub_node_name, graph)
+            if should_draw_edge(node_name, node_cluster, sub_node_name, sub_node_cluster, graph):
+                graph.add_edge(pydot.Edge(node_name, sub_node_name, color=MyRED, penwidth=LineWidth,
+                                          arrowhead='none',
+                                          arrowtail='normal',
+                                          dir='both', arrowsize=ArrowSize))
 
     return graph
 

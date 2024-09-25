@@ -20,11 +20,14 @@ from giskardpy_ros.tree.blackboard_utils import catch_and_raise_to_blackboard, G
 def giskard_state_to_execution_state() -> ExecutionState:
     task_filter = np.array([task.plot for task in god_map.motion_graph_manager.task_state.nodes])
     monitor_filter = np.array([monitor.plot for monitor in god_map.motion_graph_manager.monitor_state.nodes])
+    goal_filter = np.array([goal.plot for goal in god_map.motion_graph_manager.goal_state.nodes])
+
     msg = ExecutionState()
     msg.header.stamp = rospy.Time.now()
     msg.goal_id = GiskardBlackboard().move_action_server.goal_id
     msg.tasks = [msg_converter.motion_graph_node_to_ros_msg(t) for t in god_map.motion_graph_manager.task_state.nodes if t.plot]
     msg.monitors = [msg_converter.motion_graph_node_to_ros_msg(m) for m in god_map.motion_graph_manager.monitor_state.nodes if m.plot]
+    msg.goals = [msg_converter.motion_graph_node_to_ros_msg(m) for m in god_map.motion_graph_manager.goal_state.nodes if m.plot]
     try:
         msg.task_state = god_map.motion_graph_manager.task_state_history[-1][1][0][task_filter].tolist()
         msg.task_life_cycle_state = god_map.motion_graph_manager.task_state_history[-1][1][1][task_filter].tolist()
@@ -37,6 +40,12 @@ def giskard_state_to_execution_state() -> ExecutionState:
     except Exception as e:  # state not initialized yet
         msg.monitor_state = [0] * len(msg.monitors)
         msg.monitor_life_cycle_state = [LifeCycleState.not_started] * len(msg.monitors)
+    try:
+        msg.goal_state = god_map.motion_graph_manager.goal_state_history[-1][1][0][goal_filter].tolist()
+        msg.goal_life_cycle_state = god_map.motion_graph_manager.goal_state_history[-1][1][1][goal_filter].tolist()
+    except Exception as e:  # state not initialized yet
+        msg.goal_state = [0] * len(msg.goals)
+        msg.goal_life_cycle_state = [LifeCycleState.not_started] * len(msg.goals)
     return msg
 
 

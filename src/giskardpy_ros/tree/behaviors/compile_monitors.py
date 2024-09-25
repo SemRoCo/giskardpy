@@ -17,5 +17,5 @@ class CompileMonitors(GiskardBehavior):
     @catch_and_raise_to_blackboard
     @record_time
     def update(self):
-        god_map.motion_graph_manager.compile_monitors()
+        god_map.motion_graph_manager.compile_node_state_updaters()
         return Status.SUCCESS

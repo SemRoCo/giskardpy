@@ -85,7 +85,7 @@ class PlotGanttChart(GiskardBehavior):
             List[Tuple[float, Tuple[np.ndarray, np.ndarray]]]]:
         # because the monitor state doesn't get updated after the final end motion becomes true
         try:
-            god_map.motion_graph_manager.evaluate_monitors()
+            god_map.motion_graph_manager.evaluate_node_states()
         except Exception as e:
             # if the motion was cancelled, this call will cause an exception
             pass

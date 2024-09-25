@@ -578,7 +578,7 @@ class MotionGoalWrapper(MotionGraphNodeWrapper):
                            start_condition: str = '',
                            pause_condition: str = '',
                            end_condition: str = '',
-                           **kwargs: goal_parameter):
+                           **kwargs: goal_parameter) -> str:
         """
         This goal will use the kinematic chain between root and tip link to move tip link to the goal pose.
         The max velocities enforce a strict limit, but require a lot of additional constraints, thus making the
@@ -596,19 +596,19 @@ class MotionGoalWrapper(MotionGraphNodeWrapper):
             root_link = giskard_msgs.LinkName(name=root_link)
         if isinstance(tip_link, str):
             tip_link = giskard_msgs.LinkName(name=tip_link)
-        self.add_motion_goal(motion_goal_class=CartesianPose.__name__,
-                             goal_pose=goal_pose,
-                             tip_link=tip_link,
-                             root_link=root_link,
-                             reference_linear_velocity=reference_linear_velocity,
-                             reference_angular_velocity=reference_angular_velocity,
-                             weight=weight,
-                             name=name,
-                             absolute=absolute,
-                             start_condition=start_condition,
-                             pause_condition=pause_condition,
-                             end_condition=end_condition,
-                             **kwargs)
+        return self.add_motion_goal(motion_goal_class=CartesianPose.__name__,
+                                    goal_pose=goal_pose,
+                                    tip_link=tip_link,
+                                    root_link=root_link,
+                                    reference_linear_velocity=reference_linear_velocity,
+                                    reference_angular_velocity=reference_angular_velocity,
+                                    weight=weight,
+                                    name=name,
+                                    absolute=absolute,
+                                    start_condition=start_condition,
+                                    pause_condition=pause_condition,
+                                    end_condition=end_condition,
+                                    **kwargs)
 
     def add_avoid_joint_limits(self,
                                percentage: int = 15,
@@ -1390,22 +1390,22 @@ class TaskWrapper(MotionGraphNodeWrapper):
                            start_condition: str = '',
                            pause_condition: str = '',
                            end_condition: str = '',
-                           **kwargs: goal_parameter):
+                           **kwargs: goal_parameter) -> str:
         """
         Sets joint position goals for all pairs in goal_state
         :param goal_state: maps joint_name to goal position
         :param weight: None = use default weight
         :param max_velocity: will be applied to all joints
         """
-        self.add_task(task_class=JointPositionList.__name__,
-                      goal_state=goal_state,
-                      weight=weight,
-                      max_velocity=max_velocity,
-                      name=name,
-                      start_condition=start_condition,
-                      pause_condition=pause_condition,
-                      end_condition=end_condition,
-                      **kwargs)
+        return self.add_task(task_class=JointPositionList.__name__,
+                             goal_state=goal_state,
+                             weight=weight,
+                             max_velocity=max_velocity,
+                             name=name,
+                             start_condition=start_condition,
+                             pause_condition=pause_condition,
+                             end_condition=end_condition,
+                             **kwargs)
 
     def add_cartesian_position(self,
                                goal_point: PointStamped,
@@ -1418,7 +1418,7 @@ class TaskWrapper(MotionGraphNodeWrapper):
                                start_condition: str = '',
                                pause_condition: str = '',
                                end_condition: str = '',
-                               **kwargs: goal_parameter):
+                               **kwargs: goal_parameter) -> str:
         """
         Will use kinematic chain between root_link and tip_link to move tip_link to goal_point.
         :param goal_point:
@@ -1432,18 +1432,18 @@ class TaskWrapper(MotionGraphNodeWrapper):
             root_link = giskard_msgs.LinkName(name=root_link)
         if isinstance(tip_link, str):
             tip_link = giskard_msgs.LinkName(name=tip_link)
-        self.add_task(task_class=CartesianPosition.__name__,
-                      goal_point=goal_point,
-                      tip_link=tip_link,
-                      root_link=root_link,
-                      reference_velocity=reference_velocity,
-                      weight=weight,
-                      absolute=absolute,
-                      name=name,
-                      start_condition=start_condition,
-                      pause_condition=pause_condition,
-                      end_condition=end_condition,
-                      **kwargs)
+        return self.add_task(task_class=CartesianPosition.__name__,
+                             goal_point=goal_point,
+                             tip_link=tip_link,
+                             root_link=root_link,
+                             reference_velocity=reference_velocity,
+                             weight=weight,
+                             absolute=absolute,
+                             name=name,
+                             start_condition=start_condition,
+                             pause_condition=pause_condition,
+                             end_condition=end_condition,
+                             **kwargs)
 
     def add_cartesian_orientation(self,
                                   goal_orientation: QuaternionStamped,
@@ -1456,7 +1456,7 @@ class TaskWrapper(MotionGraphNodeWrapper):
                                   start_condition: str = '',
                                   pause_condition: str = '',
                                   end_condition: str = '',
-                                  **kwargs: goal_parameter):
+                                  **kwargs: goal_parameter) -> str:
         """
         Will use kinematic chain between root_link and tip_link to move tip_link to goal_orientation.
         :param goal_orientation:
@@ -1471,18 +1471,18 @@ class TaskWrapper(MotionGraphNodeWrapper):
             root_link = giskard_msgs.LinkName(name=root_link)
         if isinstance(tip_link, str):
             tip_link = giskard_msgs.LinkName(name=tip_link)
-        self.add_task(task_class=CartesianOrientation.__name__,
-                      goal_orientation=goal_orientation,
-                      tip_link=tip_link,
-                      root_link=root_link,
-                      reference_velocity=reference_velocity,
-                      weight=weight,
-                      absolute=absolute,
-                      name=name,
-                      start_condition=start_condition,
-                      pause_condition=pause_condition,
-                      end_condition=end_condition,
-                      **kwargs)
+        return self.add_task(task_class=CartesianOrientation.__name__,
+                             goal_orientation=goal_orientation,
+                             tip_link=tip_link,
+                             root_link=root_link,
+                             reference_velocity=reference_velocity,
+                             weight=weight,
+                             absolute=absolute,
+                             name=name,
+                             start_condition=start_condition,
+                             pause_condition=pause_condition,
+                             end_condition=end_condition,
+                             **kwargs)
 
 
 class MonitorWrapper(MotionGraphNodeWrapper):
@@ -1522,7 +1522,7 @@ class MonitorWrapper(MotionGraphNodeWrapper):
                                   name: Optional[str] = None,
                                   start_condition: str = '',
                                   pause_condition: str = '',
-                                  end_condition: Optional[str] = None):
+                                  end_condition: Optional[str] = None) -> str:
         """
         True if the world is currently in a local minimum.
         """
@@ -1537,7 +1537,7 @@ class MonitorWrapper(MotionGraphNodeWrapper):
                        name: Optional[str] = None,
                        start_condition: str = '',
                        pause_condition: str = '',
-                       end_condition: Optional[str] = None):
+                       end_condition: Optional[str] = None) -> str:
         """
         True if the length of the trajectory is above threshold
         """
@@ -1576,7 +1576,7 @@ class MonitorWrapper(MotionGraphNodeWrapper):
                            name: Optional[str] = None,
                            start_condition: str = '',
                            pause_condition: str = '',
-                           end_condition: Optional[str] = None):
+                           end_condition: Optional[str] = None) -> str:
         """
         True if tip_link is closer than the thresholds to goal_pose.
         """
@@ -1635,7 +1635,7 @@ class MonitorWrapper(MotionGraphNodeWrapper):
                              start_condition: str = '',
                              pause_condition: str = '',
                              end_condition: Optional[str] = None,
-                             threshold: float = 0.01):
+                             threshold: float = 0.01) -> str:
         """
         True if tip_link is closer than threshold to the line defined by center_point, line_axis and line_length.
         """
@@ -1664,7 +1664,7 @@ class MonitorWrapper(MotionGraphNodeWrapper):
                                   name: Optional[str] = None,
                                   start_condition: str = '',
                                   pause_condition: str = '',
-                                  end_condition: Optional[str] = None):
+                                  end_condition: Optional[str] = None) -> str:
         """
         True if tip_link is closer than threshold to goal_orientation
         """
@@ -2026,6 +2026,10 @@ class GiskardWrapper:
         self.clear_motion_goals_and_monitors()
         rospy.sleep(.3)
 
+    @property
+    def motion_graph_nodes(self) -> List[MotionGraphNode]:
+        return self.motion_goals.motion_graph_nodes + self.tasks.motion_graph_nodes + self.monitors.motion_graph_nodes
+
     def set_avoid_name_conflict(self, value: bool):
         self.avoid_name_conflict = value
         self.monitors.avoid_name_conflict = value
@@ -2039,13 +2043,19 @@ class GiskardWrapper:
         4. Adds a max trajectory length monitor, if one wasn't added already.
         """
         local_min_reached_monitor_name = self.monitors.add_local_minimum_reached()
-        for task in self.tasks.motion_graph_nodes:
-            if task.end_condition:
-                task.end_condition = f'({task.end_condition}) and {local_min_reached_monitor_name}'
+        for node in self.motion_graph_nodes:
+            if node.end_condition:
+                node.end_condition = f'({node.end_condition}) and {local_min_reached_monitor_name}'
             else:
-                task.end_condition = local_min_reached_monitor_name
-        self.monitors.add_end_motion(
-            start_condition=f'{self.monitors.get_anded_nodes()} and {self.tasks.get_anded_nodes()}')
+                node.end_condition = local_min_reached_monitor_name
+        end_motion_condition = ''
+        if len(self.monitors.motion_graph_nodes) > 0:
+            end_motion_condition += f'{self.monitors.get_anded_nodes()}'
+        if len(self.tasks.motion_graph_nodes) > 0:
+            end_motion_condition += f'and {self.tasks.get_anded_nodes()}'
+        if len(self.motion_goals.motion_graph_nodes) > 0:
+            end_motion_condition += f'and {self.motion_goals.get_anded_nodes()}'
+        self.monitors.add_end_motion(start_condition=end_motion_condition)
         self.monitors.add_cancel_motion(start_condition=local_min_reached_monitor_name,
                                         error=LocalMinimumException(f'local minimum reached'))
         if not self.monitors.max_trajectory_length_set:

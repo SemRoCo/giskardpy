@@ -134,8 +134,11 @@ class Goal(MotionGraphNode):
             else:
                 raise GoalInitalizationException(f'Constraint with name {task.name} already exists.')
 
-    def add_task(self, task: Task):
+    def add_task(self, task: Task) -> None:
         self.tasks.append(task)
 
     def add_monitor(self, monitor: Monitor) -> None:
         self.monitors.append(monitor)
+
+    def add_goal(self, goal: Goal) -> None:
+        self.goals.append(goal)

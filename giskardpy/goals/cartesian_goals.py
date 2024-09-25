@@ -447,62 +447,31 @@ class CartesianVelocityLimit(Goal):
 
 class RelativePositionSequence(Goal):
     def __init__(self,
-                 goal1: cas.Point3,
-                 goal2: cas.Point3,
-                 root_link: str,
-                 tip_link: str,
-                 name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 pause_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol):
+                 goal1: cas.TransMatrix,
+                 goal2: cas.TransMatrix,
+                 root_link: PrefixName,
+                 tip_link: PrefixName,
+                 name: Optional[str] = None):
         """
         Only meant for testing.
         """
-        self.root_link = god_map.world.search_for_link_name(root_link)
-        self.tip_link = god_map.world.search_for_link_name(tip_link)
         if name is None:
-            name = f'{self.__class__.__name__}/{self.root_link}/{self.tip_link}'
-        super().__init__(name)
-        self.root_P_goal1 = god_map.world.transform(self.root_link, goal1)
-        self.tip_P_goal2 = god_map.world.transform(self.tip_link, goal2)
-        self.max_velocity = 0.1
-        self.weight = WEIGHT_BELOW_CA
-
-        root_T_tip = god_map.world.compose_fk_expression(self.root_link, self.tip_link)
-        root_P_current = root_T_tip.to_position()
-
-        root_P_goal1 = cas.Point3(self.root_P_goal1)
-
-        error1 = cas.euclidean_distance(root_P_goal1, root_P_current)
-        error1_monitor = ExpressionMonitor(name='p1')
-        self.add_monitor(error1_monitor)
-        error1_monitor.end_condition = error1_monitor.get_observation_state_expression()
-        error1_monitor.expression = cas.less(cas.abs(error1), 0.01)
-
-        error2_monitor = ExpressionMonitor(name='p2')
-        self.add_monitor(error2_monitor)
-        error2_monitor.end_condition = error2_monitor.get_observation_state_expression()
-
-        root_T_goal2_cached = root_T_tip.dot(self.tip_P_goal2)
-        root_P_goal2_cached = god_map.motion_graph_manager.register_expression_updater(root_T_goal2_cached,
-                                                                                       error1_monitor.get_observation_state_expression())
-
-        error2 = cas.euclidean_distance(root_P_goal2_cached, root_P_current)
-        error2_monitor.expression = cas.less(cas.abs(error2), 0.01)
-
-        step1 = self.create_and_add_task('step1')
-        step1.end_condition = error1_monitor.get_observation_state_expression()
-        step1.add_point_goal_constraints(root_P_current, root_P_goal1,
-                                         reference_velocity=self.max_velocity,
-                                         weight=self.weight)
-
-        self.step2 = self.create_and_add_task('step2')
-        self.step2.start_condition = error1_monitor.get_observation_state_expression()
-        self.step2.end_condition = error2_monitor.get_observation_state_expression()
-        self.step2.add_point_goal_constraints(root_P_current, root_P_goal2_cached,
-                                              reference_velocity=self.max_velocity,
-                                              weight=self.weight)
-
-        self.connect_start_condition_to_all_tasks(start_condition)
-        self.connect_pause_condition_to_all_tasks(pause_condition)
-        self.step2.end_condition = cas.logic_and(self.step2.end_condition, end_condition)
+            name = f'{self.__class__.__name__}/{root_link}/{tip_link}'
+        super().__init__(name=name)
+        name1 = f'{self.name}/goal1'
+        name2 = f'{self.name}/goal2'
+        goal1 = CartesianPose(root_link=root_link,
+                              tip_link=tip_link,
+                              goal_pose=goal1,
+                              name=name1,
+                              absolute=True)
+        self.add_goal(goal1)
+        goal2 = CartesianPose(root_link=root_link,
+                              tip_link=tip_link,
+                              goal_pose=goal2,
+                              name=name2,
+                              absolute=True)
+        self.add_goal(goal2)
+        goal2.start_condition = goal1.get_observation_state_expression()
+        goal1.end_condition = goal1.get_observation_state_expression()
+        self.expression = goal2.expression

@@ -89,9 +89,9 @@ class MotionGraphNode:
 
     @start_condition.setter
     def start_condition(self, value: cas.Expression) -> None:
-        for monitor_state_expr in value.free_symbols():
-            if not god_map.motion_graph_manager.is_node_registered(monitor_state_expr):
-                raise GiskardException(f'No monitor found for this state expr: "{monitor_state_expr}".')
+        # for monitor_state_expr in value.free_symbols():
+        #     if not god_map.motion_graph_manager.is_node_registered(monitor_state_expr):
+        #         raise GiskardException(f'No monitor found for this state expr: "{monitor_state_expr}".')
         self._start_condition = value
 
     @property
@@ -100,9 +100,9 @@ class MotionGraphNode:
 
     @reset_condition.setter
     def reset_condition(self, value: cas.Expression) -> None:
-        for node_state_expr in value.free_symbols():
-            if not god_map.motion_graph_manager.is_node_registered(node_state_expr):
-                raise GiskardException(f'No monitor found for this state expr: "{node_state_expr}".')
+        # for node_state_expr in value.free_symbols():
+        #     if not god_map.motion_graph_manager.is_node_registered(node_state_expr):
+        #         raise GiskardException(f'No monitor found for this state expr: "{node_state_expr}".')
         self._reset_condition = value
 
     @property
@@ -111,9 +111,9 @@ class MotionGraphNode:
 
     @pause_condition.setter
     def pause_condition(self, value: cas.Expression) -> None:
-        for monitor_state_expr in value.free_symbols():
-            if not god_map.motion_graph_manager.is_node_registered(monitor_state_expr):
-                raise GiskardException(f'No monitor found for this state expr: "{monitor_state_expr}".')
+        # for monitor_state_expr in value.free_symbols():
+        #     if not god_map.motion_graph_manager.is_node_registered(monitor_state_expr):
+        #         raise GiskardException(f'No monitor found for this state expr: "{monitor_state_expr}".')
         self._pause_condition = value
 
     @property
@@ -122,9 +122,9 @@ class MotionGraphNode:
 
     @end_condition.setter
     def end_condition(self, value: cas.Expression) -> None:
-        for monitor_state_expr in value.free_symbols():
-            if not god_map.motion_graph_manager.is_node_registered(monitor_state_expr):
-                raise GiskardException(f'No monitor found for this state expr: "{monitor_state_expr}".')
+        # for monitor_state_expr in value.free_symbols():
+        #     if not god_map.motion_graph_manager.is_node_registered(monitor_state_expr):
+        #         raise GiskardException(f'No monitor found for this state expr: "{monitor_state_expr}".')
         self._end_condition = value
 
     def pre_compile(self) -> None:

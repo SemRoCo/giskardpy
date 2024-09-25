@@ -89,6 +89,8 @@ class MotionGraphManager:
 
     def add_goal(self, goal: Goal) -> None:
         self.goal_state.append(goal)
+        for sub_goal in goal.goals:
+            self.add_goal(sub_goal)
         for task in goal.tasks:
             self.add_task(task)
         for monitor in goal.monitors:

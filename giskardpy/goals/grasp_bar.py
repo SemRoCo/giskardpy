@@ -5,7 +5,7 @@ from typing import Optional
 import giskardpy.casadi_wrapper as cas
 from giskardpy.data_types.data_types import PrefixName
 from giskardpy.goals.goal import Goal
-from giskardpy.motion_graph.tasks.task import WEIGHT_ABOVE_CA
+from giskardpy.motion_graph.tasks.task import WEIGHT_ABOVE_CA, Task
 from giskardpy.god_map import god_map
 
 
@@ -17,13 +17,11 @@ class GraspBar(Goal):
                  bar_center: cas.Point3,
                  bar_axis: cas.Vector3,
                  bar_length: float,
+                 threshold: float = 0.01,
                  reference_linear_velocity: float = 0.1,
                  reference_angular_velocity: float = 0.5,
                  weight: float = WEIGHT_ABOVE_CA,
-                 name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 pause_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol):
+                 name: Optional[str] = None):
         """
         Like a CartesianPose but with more freedom.
         tip_link is allowed to be at any point along bar_axis, that is without bar_center +/- bar_length.
@@ -42,7 +40,7 @@ class GraspBar(Goal):
         self.tip = tip_link
         if name is None:
             name = f'{self.__class__.__name__}/{self.root}/{self.tip}'
-        super().__init__(name)
+        super().__init__(name=name)
 
         bar_center = god_map.world.transform(self.root, bar_center)
 
@@ -68,8 +66,8 @@ class GraspBar(Goal):
         root_T_tip = god_map.world.compose_fk_expression(self.root, self.tip)
         root_V_tip_normal = cas.dot(root_T_tip, tip_V_tip_grasp_axis)
 
-        task = self.create_and_add_task('grasp bar')
-
+        task = Task(name=f'{self.name}/grasp bar')
+        self.add_task(task)
         task.add_vector_goal_constraints(frame_V_current=root_V_tip_normal,
                                          frame_V_goal=root_V_bar_axis,
                                          reference_velocity=self.reference_angular_velocity,
@@ -86,4 +84,5 @@ class GraspBar(Goal):
                                         frame_P_goal=nearest,
                                         reference_velocity=self.reference_linear_velocity,
                                         weight=self.weight)
-        self.connect_monitors_to_all_tasks(start_condition, pause_condition, end_condition)
+
+        self.expression = cas.less_equal(dist, threshold)

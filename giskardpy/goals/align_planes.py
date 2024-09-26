@@ -3,7 +3,7 @@ from typing import Optional
 import giskardpy.casadi_wrapper as cas
 from giskardpy.data_types.data_types import ColorRGBA, PrefixName
 from giskardpy.goals.goal import Goal
-from giskardpy.motion_graph.tasks.task import WEIGHT_ABOVE_CA
+from giskardpy.motion_graph.tasks.task import WEIGHT_ABOVE_CA, Task
 from giskardpy.middleware import get_middleware
 from giskardpy.god_map import god_map
 
@@ -14,12 +14,10 @@ class AlignPlanes(Goal):
                  tip_link: PrefixName,
                  goal_normal: cas.Vector3,
                  tip_normal: cas.Vector3,
+                 threshold: float = 0.01,
                  reference_velocity: float = 0.5,
                  weight: float = WEIGHT_ABOVE_CA,
                  name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 pause_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol,
                  **kwargs):
         """
         This goal will use the kinematic chain between tip and root to align tip_normal with goal_normal.
@@ -49,9 +47,10 @@ class AlignPlanes(Goal):
                    f'_X:{self.tip_V_tip_normal.x:.3f}' \
                    f'_Y:{self.tip_V_tip_normal.y:.3f}' \
                    f'_Z:{self.tip_V_tip_normal.z:.3f}'
-        super().__init__(name)
+        super().__init__(name=name)
 
-        task = self.create_and_add_task('align planes')
+        task = Task(name='align planes')
+        self.add_task(task)
         root_R_tip = god_map.world.compose_fk_expression(self.root, self.tip).to_rotation()
         root_V_tip_normal = root_R_tip.dot(self.tip_V_tip_normal)
         task.add_vector_goal_constraints(frame_V_current=root_V_tip_normal,
@@ -66,4 +65,5 @@ class AlignPlanes(Goal):
         god_map.debug_expression_manager.add_debug_expression(f'{self.name}/goal_normal',
                                                               self.root_V_root_normal,
                                                               color=ColorRGBA(r=0, g=0, b=1, a=1))
-        self.connect_monitors_to_all_tasks(start_condition, pause_condition, end_condition)
+
+        self.expression = cas.less_equal(cas.angle_between_vector(root_V_tip_normal, self.root_V_root_normal), threshold)

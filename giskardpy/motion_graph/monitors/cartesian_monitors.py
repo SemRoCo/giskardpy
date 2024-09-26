@@ -16,12 +16,12 @@ class PoseReached(ExpressionMonitor):
                  absolute: bool = False,
                  name: Optional[str] = None):
         super().__init__(name=name)
-        if absolute or cas.is_true(start_condition):
+        if absolute:
             root_T_goal = god_map.world.transform(root_link, goal_pose)
         else:
             root_T_x = god_map.world.compose_fk_expression(root_link, goal_pose.reference_frame)
             root_T_goal = root_T_x.dot(goal_pose)
-            root_T_goal = god_map.motion_graph_manager.register_expression_updater(root_T_goal, start_condition)
+            root_T_goal = self.update_expression_on_enter_running(root_T_goal)
 
         # %% position error
         r_P_g = root_T_goal.to_position()
@@ -120,14 +120,8 @@ class VectorsAligned(ExpressionMonitor):
                  goal_normal: cas.Vector3,
                  tip_normal: cas.Vector3,
                  threshold: float = 0.01,
-                 name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 pause_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol):
-        super().__init__(name=name,
-                         start_condition=start_condition,
-                         pause_condition=pause_condition,
-                         end_condition=end_condition)
+                 name: Optional[str] = None):
+        super().__init__(name=name)
         self.root = root_link
         self.tip = tip_link
 
@@ -152,14 +146,8 @@ class DistanceToLine(ExpressionMonitor):
                  line_axis: cas.Vector3,
                  line_length: float,
                  threshold: float = 0.01,
-                 name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 pause_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol):
-        super().__init__(name=name,
-                         start_condition=start_condition,
-                         pause_condition=pause_condition,
-                         end_condition=end_condition)
+                 name: Optional[str] = None):
+        super().__init__(name=name)
         self.root = root_link
         self.tip = tip_link
 

@@ -8,7 +8,7 @@ import giskardpy.casadi_wrapper as cas
 from giskardpy.data_types.data_types import ColorRGBA, PrefixName
 from giskardpy.goals.goal import Goal
 from giskardpy.symbol_manager import symbol_manager
-from giskardpy.motion_graph.tasks.task import WEIGHT_BELOW_CA
+from giskardpy.motion_graph.tasks.task import WEIGHT_BELOW_CA, Task
 from giskardpy.god_map import god_map
 
 
@@ -20,10 +20,7 @@ class Pointing(Goal):
                  pointing_axis: cas.Vector3,
                  max_velocity: float = 0.3,
                  weight: float = WEIGHT_BELOW_CA,
-                 name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 pause_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol):
+                 name: Optional[str] = None):
         """
         Will orient pointing_axis at goal_point.
         :param tip_link: tip link of the kinematic chain.
@@ -40,14 +37,14 @@ class Pointing(Goal):
         self.root_P_goal_point = god_map.world.transform(self.root, goal_point).to_np()
         if name is None:
             name = f'{self.__class__.__name__}/{self.root}/{self.tip}'
-        super().__init__(name)
+        super().__init__(name=name)
 
         self.tip_V_pointing_axis = god_map.world.transform(self.tip, pointing_axis)
         self.tip_V_pointing_axis.scale(1)
 
         root_T_tip = god_map.world.compose_fk_expression(self.root, self.tip)
-        root_P_goal_point = symbol_manager.get_expr(f'god_map.motion_graph_manager.motion_goals[\'{str(self)}\']'
-                                                    f'.root_P_goal_point',
+        root_P_goal_point = symbol_manager.get_expr(self.ref_str +
+                                                    '.root_P_goal_point',
                                                     input_type_hint=np.ndarray,
                                                     output_type_hint=cas.Point3)
         root_P_goal_point.reference_frame = self.root
@@ -67,9 +64,10 @@ class Pointing(Goal):
         god_map.debug_expression_manager.add_debug_expression('goal_point',
                                                               root_P_goal_point,
                                                               color=ColorRGBA(r=0, g=0, b=1, a=1))
-        task = self.create_and_add_task('pointing')
+        task = Task(name='pointing')
+        self.add_task(task)
         task.add_vector_goal_constraints(frame_V_current=root_V_pointing_axis,
                                          frame_V_goal=root_V_goal_axis,
                                          reference_velocity=self.max_velocity,
                                          weight=self.weight)
-        self.connect_monitors_to_all_tasks(start_condition, pause_condition, end_condition)
+        self.expression = cas.less_equal(cas.angle_between_vector(root_V_pointing_axis, root_V_goal_axis), 0.01)

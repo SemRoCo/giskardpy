@@ -1,4 +1,4 @@
-from typing import Dict, List, TypeVar, Generic
+from typing import Dict, List, TypeVar, Generic, Set
 
 import numpy as np
 
@@ -22,6 +22,9 @@ class MotionGraphNodeStateManager(Generic[T]):
     def __init__(self):
         self.nodes = []
         self.key_to_idx = {}
+
+    def get_node_names(self) -> Set[str]:
+        return set(self.key_to_idx.keys())
 
     def get_life_cycle_state(self, key: str) -> float:
         idx = self.key_to_idx[key]

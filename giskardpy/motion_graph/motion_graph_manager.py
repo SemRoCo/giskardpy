@@ -1,7 +1,7 @@
 import ast
 from collections import OrderedDict
 from functools import cached_property
-from typing import List, Tuple, Dict, Optional, Callable, Union, Iterable
+from typing import List, Tuple, Dict, Optional, Callable, Union, Iterable, Set
 from line_profiler import profile
 
 import numpy as np
@@ -67,7 +67,7 @@ class MotionGraphManager:
     def add_goal_package_path(self, path: str) -> None:
         self.allowed_goal_types.update(get_all_classes_in_package(path, Goal))
 
-    def get_parent_node_of_node_name(self, node: MotionGraphNode) -> str:
+    def get_parent_node_name_of_node(self, node: MotionGraphNode) -> str:
         for goal in self.goal_state.nodes:
             if node in goal.tasks + goal.monitors + goal.goals:
                 return goal.name
@@ -87,13 +87,19 @@ class MotionGraphManager:
         self.triggers = {}
         self.trigger_conditions = []
 
+    def get_all_node_names(self) -> Set[str]:
+        return self.task_state.get_node_names() | self.monitor_state.get_node_names() | self.goal_state.get_node_names()
+
     def add_monitor(self, monitor: Monitor) -> None:
+        self.check_if_node_name_unique(monitor.name)
         self.monitor_state.append(monitor)
 
     def add_task(self, task: Task) -> None:
+        self.check_if_node_name_unique(task.name)
         self.task_state.append(task)
 
     def add_goal(self, goal: Goal) -> None:
+        self.check_if_node_name_unique(goal.name)
         self.goal_state.append(goal)
         for sub_goal in goal.goals:
             self.add_goal(sub_goal)
@@ -102,13 +108,15 @@ class MotionGraphManager:
         for monitor in goal.monitors:
             self.add_monitor(monitor)
 
+    def check_if_node_name_unique(self, node_name: str) -> None:
+        if node_name in self.get_all_node_names():
+            raise ValueError(f'Node "{node_name}" already exists')
+
     def parse_motion_graph(self, *,
                            tasks: List[Tuple[str, str, str, str, str, str, dict]],
                            monitors: List[Tuple[str, str, str, str, str, str, dict]],
                            goals: List[Tuple[str, str, str, str, str, str, dict]]) -> None:
         # %% add goals
-        new_tasks = []
-        new_monitors = []
         for class_name, name, start, reset, pause, end, kwargs in goals:
             try:
                 get_middleware().loginfo(f'Adding task of type: \'{class_name}\'')
@@ -205,12 +213,18 @@ class MotionGraphManager:
 
         # %% apply goal conditions to sub nodes
         for goal in self.goal_state.nodes:
-            for task in goal.tasks:
-                if cas.is_true(task.start_condition):
-                    task.start_condition = goal.start_condition
-                task.reset_condition = cas.logic_or(task.reset_condition, goal.reset_condition)
-                task.pause_condition = cas.logic_or(task.pause_condition, goal.pause_condition)
-                task.end_condition = cas.logic_or(task.end_condition, goal.end_condition)
+            if self.get_parent_node_name_of_node(goal) == '':
+                self.apply_conditions_to_sub_nodes(goal)
+
+    def apply_conditions_to_sub_nodes(self, goal: Goal):
+        for node in goal.tasks + goal.monitors + goal.goals:
+            if cas.is_true(node.start_condition):
+                node.start_condition = goal.start_condition
+            node.reset_condition = cas.logic_or(node.reset_condition, goal.reset_condition)
+            node.pause_condition = cas.logic_or(node.pause_condition, goal.pause_condition)
+            node.end_condition = cas.logic_or(node.end_condition, goal.end_condition)
+            if isinstance(node, Goal):
+                self.apply_conditions_to_sub_nodes(node)
 
     def parse_ast_expression(self, node,
                              observation_state_symbols: Dict[str, cas.Expression]) -> cas.Expression:
@@ -246,10 +260,6 @@ class MotionGraphManager:
         self.compile_monitor_state_updater()
         self.compile_goal_state_updater()
         # self._register_expression_update_triggers()
-
-    @profile
-    def get_monitor(self, name: str) -> Monitor:
-        return self.monitor_state.get_node(name)
 
     def get_observation_state_symbols(self) -> List[cas.Symbol]:
         return (list(self.task_state.get_observation_state_symbol_map().values()) +

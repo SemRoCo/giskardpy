@@ -160,3 +160,12 @@ class Alternator(ExpressionMonitor):
         time = symbol_manager.time
         expr = cas.equal(cas.fmod(cas.floor(time), mod), 0)
         self.expression = expr
+
+
+class FalseMonitor(ExpressionMonitor):
+    def __init__(self,
+                 name: Optional[str] = None,
+                 plot: bool = True):
+        super().__init__(name=name,
+                         plot=plot)
+        self.expression = cas.FalseSymbol

@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Optional
 
 import giskardpy.casadi_wrapper as cas
@@ -49,6 +50,9 @@ class MotionGraphNode:
 
     def __repr__(self) -> str:
         return str(self)
+
+    def __eq__(self, other: MotionGraphNode) -> bool:
+        return self.name == other.name
 
     def formatted_name(self, quoted: bool = False) -> str:
         formatted_name = string_shortener(original_str=str(self.name),

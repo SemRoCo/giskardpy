@@ -67,6 +67,12 @@ class MotionGraphManager:
     def add_goal_package_path(self, path: str) -> None:
         self.allowed_goal_types.update(get_all_classes_in_package(path, Goal))
 
+    def get_parent_node_of_node_name(self, node: MotionGraphNode) -> str:
+        for goal in self.goal_state.nodes:
+            if node in goal.tasks + goal.monitors + goal.goals:
+                return goal.name
+        return ''
+
     def reset(self):
         try:
             del self.payload_monitor_filter

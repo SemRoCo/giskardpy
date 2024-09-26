@@ -238,9 +238,9 @@ class ExecutionStateToDotParser:
                 sub_node_cluster = self.get_cluster_of_node(sub_node_name, graph)
                 kwargs = {}
                 if node_cluster is not None:
-                    kwargs['lhead'] = node_cluster.get_name()
+                    kwargs['ltail'] = node_cluster.get_name()
                 if sub_node_cluster is not None:
-                    kwargs['ltail'] = sub_node_cluster.get_name()
+                    kwargs['lhead'] = sub_node_cluster.get_name()
                 graph.add_edge(pydot.Edge(node_name, sub_node_name, color=MyRED, penwidth=LineWidth,
                                           arrowhead='none',
                                           arrowtail='normal',

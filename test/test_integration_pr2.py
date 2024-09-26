@@ -1078,6 +1078,30 @@ class TestMonitors:
         np.testing.assert_almost_equal(current_pose.pose.position.x, 0, decimal=2)
         np.testing.assert_almost_equal(current_pose.pose.position.y, 1, decimal=2)
 
+    def test_open_door(self, zero_pose: PR2TestWrapper):
+        pose1 = PoseStamped()
+        pose1.header.frame_id = 'map'
+        pose1.pose.position.x = 1
+        pose1.pose.orientation.w = 1
+
+        pose2 = PoseStamped()
+        pose2.header.frame_id = 'base_footprint'
+        pose2.pose.position.y = 1
+        pose2.pose.orientation.w = 1
+
+        done = zero_pose.motion_goals.add_motion_goal(motion_goal_class=RelativePositionSequence.__name__,
+                                               goal1=pose1,
+                                               goal2=pose2,
+                                               root_link=LinkName(name='map'),
+                                               tip_link=LinkName(name='base_footprint'))
+        zero_pose.allow_all_collisions()
+        zero_pose.monitors.add_end_motion(start_condition=done)
+        zero_pose.set_max_traj_length(30)
+        zero_pose.execute(add_local_minimum_reached=False)
+        current_pose = zero_pose.compute_fk_pose(root_link='map', tip_link='base_footprint')
+        np.testing.assert_almost_equal(current_pose.pose.position.x, 0, decimal=2)
+        np.testing.assert_almost_equal(current_pose.pose.position.y, 1, decimal=2)
+
     def test_print_event(self, zero_pose: PR2TestWrapper):
         monitor_name = zero_pose.monitors.add_joint_position(zero_pose.better_pose, name='goal')
         zero_pose.motion_goals.add_joint_position(zero_pose.better_pose)

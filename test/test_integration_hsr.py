@@ -9,6 +9,7 @@ from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
 from giskard_msgs.msg import LinkName, GiskardError
 from giskardpy.data_types.exceptions import EmptyProblemException
+from giskardpy.motion_graph.monitors.monitors import FalseMonitor
 from giskardpy_ros.configs.behavior_tree_config import StandAloneBTConfig
 from giskardpy_ros.configs.giskard import Giskard
 from giskardpy_ros.configs.iai_robots.hsr import HSRCollisionAvoidanceConfig, WorldWithHSRConfig, HSRStandaloneInterface
@@ -55,7 +56,8 @@ class HSRTestWrapper(GiskardTestWrapper):
 
     def command_gripper(self, width):
         js = {'hand_motor_joint': width}
-        self.set_joint_goal(js)
+        self.monitors.add_set_seed_configuration(seed_configuration=js,
+                                                 name='move gripper')
         self.execute()
 
     def reset(self):
@@ -336,6 +338,7 @@ class TestConstraints:
     def test_open_fridge_sequence(self, kitchen_setup: HSRTestWrapper):
         handle_frame_id = 'iai_kitchen/iai_fridge_door_handle'
         handle_name = 'iai_fridge_door_handle'
+        camera_link = 'head_rgbd_sensor_link'
         kitchen_setup.open_gripper()
         base_goal = PoseStamped()
         base_goal.header.frame_id = 'map'
@@ -356,20 +359,25 @@ class TestConstraints:
         tip_grasp_axis.vector.x = 1
 
         # %% phase 1
-        bar_grasped = kitchen_setup.monitors.add_distance_to_line(name='bar grasped',
-                                                                  root_link=kitchen_setup.default_root,
-                                                                  tip_link=kitchen_setup.tip,
-                                                                  center_point=bar_center,
-                                                                  line_axis=bar_axis,
-                                                                  line_length=.4)
-        kitchen_setup.motion_goals.add_grasp_bar(root_link=kitchen_setup.default_root,
-                                                 tip_link=kitchen_setup.tip,
-                                                 tip_grasp_axis=tip_grasp_axis,
-                                                 bar_center=bar_center,
-                                                 bar_axis=bar_axis,
-                                                 bar_length=.4,
-                                                 name='grasp bar',
-                                                 end_condition=bar_grasped)
+        kitchen_setup.monitors.add_monitor(monitor_class=FalseMonitor.__name__,
+                                           name='laser violated')
+        camera_z = Vector3Stamped()
+        camera_z.header.frame_id = camera_link
+        camera_z.vector.z = 1
+        pointing_at = kitchen_setup.motion_goals.add_pointing(goal_point=bar_center,
+                                                              tip_link=camera_link,
+                                                              name='look at handle',
+                                                              root_link='torso_lift_link',
+                                                              pointing_axis=camera_z)
+
+        bar_grasped = kitchen_setup.motion_goals.add_grasp_bar(root_link=kitchen_setup.default_root,
+                                                               tip_link=kitchen_setup.tip,
+                                                               tip_grasp_axis=tip_grasp_axis,
+                                                               bar_center=bar_center,
+                                                               bar_axis=bar_axis,
+                                                               bar_length=.4,
+                                                               start_condition=pointing_at,
+                                                               name='grasp bar')
         x_gripper = Vector3Stamped()
         x_gripper.header.frame_id = kitchen_setup.tip
         x_gripper.vector.z = 1
@@ -381,7 +389,8 @@ class TestConstraints:
                                                     tip_normal=x_gripper,
                                                     goal_normal=x_goal,
                                                     root_link='map',
-                                                    name='orient to door',
+                                                    name='align gripper',
+                                                    start_condition=pointing_at,
                                                     end_condition=bar_grasped)
 
         # %% phase 2 open door

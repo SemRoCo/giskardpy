@@ -13,7 +13,7 @@ from giskardpy.motion_graph.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
 class OldGiskardWrapper(GiskardWrapper):
 
     def __init__(self, node_name: str = 'giskard'):
-        super().__init__(node_name, avoid_name_conflict=True)
+        super().__init__(node_name)
 
     def execute(self, wait: bool = True, add_default: bool = True) -> MoveResult:
         if add_default:
@@ -28,9 +28,9 @@ class OldGiskardWrapper(GiskardWrapper):
         if not self.motion_goals._collision_entries:
             self.motion_goals.avoid_all_collisions()
         action_goal = MoveGoal()
-        action_goal.monitors = self.monitors.motion_graph_nodes
-        action_goal.tasks = self.tasks.motion_graph_nodes
-        action_goal.goals = self.motion_goals.motion_graph_nodes
+        action_goal.monitors = self._quote_conditions(self.monitors.motion_graph_nodes)
+        action_goal.tasks = self._quote_conditions(self.tasks.motion_graph_nodes)
+        action_goal.goals = self._quote_conditions(self.motion_goals.motion_graph_nodes)
         self.clear_motion_goals_and_monitors()
         return action_goal
 
@@ -309,14 +309,7 @@ class OldGiskardWrapper(GiskardWrapper):
         """
         root_link = giskard_msgs.LinkName(name=root_link, group_name=root_group)
         tip_link = giskard_msgs.LinkName(name=tip_link, group_name=tip_group)
-        if add_monitor:
-            end_condition = self.monitors.add_vectors_aligned(root_link=root_link,
-                                                              tip_link=tip_link,
-                                                              goal_normal=goal_normal,
-                                                              tip_normal=tip_normal)
-        else:
-            end_condition = ''
-        self.motion_goals.add_align_planes(end_condition=end_condition,
+        self.motion_goals.add_align_planes(end_condition='',
                                            tip_link=tip_link,
                                            tip_normal=tip_normal,
                                            root_link=root_link,
@@ -408,19 +401,7 @@ class OldGiskardWrapper(GiskardWrapper):
         """
         root_link = giskard_msgs.LinkName(name=root_link, group_name=root_group)
         tip_link = giskard_msgs.LinkName(name=tip_link, group_name=tip_group)
-        end_condition = ''
-        if add_monitor:
-            monitor_name1 = self.monitors.add_distance_to_line(root_link=root_link,
-                                                               tip_link=tip_link,
-                                                               center_point=bar_center,
-                                                               line_axis=bar_axis,
-                                                               line_length=bar_length)
-            monitor_name2 = self.monitors.add_vectors_aligned(root_link=root_link,
-                                                              tip_link=tip_link,
-                                                              goal_normal=bar_axis,
-                                                              tip_normal=tip_grasp_axis)
-            end_condition = f'{monitor_name1} and {monitor_name2}'
-        self.motion_goals.add_grasp_bar(end_condition=end_condition,
+        self.motion_goals.add_grasp_bar(end_condition='',
                                         root_link=root_link,
                                         tip_link=tip_link,
                                         tip_grasp_axis=tip_grasp_axis,

@@ -416,7 +416,8 @@ class GiskardTestWrapper(OldGiskardWrapper):
         if object_name is None:
             object_name = self.default_env_name
         if GiskardBlackboard().tree.is_standalone():
-            self.set_seed_configuration(joint_state)
+            self.monitors.add_set_seed_configuration(seed_configuration=joint_state,
+                                                     name='set kitchen state')
             self.allow_all_collisions()
             self.execute()
         else:
@@ -920,11 +921,8 @@ class GiskardTestWrapper(OldGiskardWrapper):
 
     def move_base(self, goal_pose) -> None:
         tip = self.get_odometry_joint().child_link_name
-        monitor = self.monitors.add_cartesian_pose(goal_pose=goal_pose, tip_link=tip.short_name, root_link='map',
-                                                   name='base goal')
         self.motion_goals.add_cartesian_pose(goal_pose=goal_pose, tip_link=tip.short_name, root_link='map',
-                                             name='base goal',
-                                             end_condition=monitor)
+                                             name='base goal')
         self.execute()
 
     def reset(self):

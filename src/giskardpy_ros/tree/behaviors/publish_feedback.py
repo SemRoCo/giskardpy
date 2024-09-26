@@ -29,11 +29,11 @@ def giskard_state_to_execution_state() -> ExecutionState:
     msg.header.stamp = rospy.Time.now()
     msg.goal_id = GiskardBlackboard().move_action_server.goal_id
     msg.tasks = [msg_converter.motion_graph_node_to_ros_msg(t) for t in tasks if t.plot]
-    msg.task_parents = [god_map.motion_graph_manager.get_parent_node_of_node_name(node) for node in tasks]
+    msg.task_parents = [god_map.motion_graph_manager.get_parent_node_name_of_node(node) for node in tasks]
     msg.monitors = [msg_converter.motion_graph_node_to_ros_msg(m) for m in monitors if m.plot]
-    msg.monitor_parents = [god_map.motion_graph_manager.get_parent_node_of_node_name(node) for node in monitors]
+    msg.monitor_parents = [god_map.motion_graph_manager.get_parent_node_name_of_node(node) for node in monitors]
     msg.goals = [msg_converter.motion_graph_node_to_ros_msg(m) for m in goals if m.plot]
-    msg.goal_parents = [god_map.motion_graph_manager.get_parent_node_of_node_name(node) for node in goals]
+    msg.goal_parents = [god_map.motion_graph_manager.get_parent_node_name_of_node(node) for node in goals]
     try:
         msg.task_state = god_map.motion_graph_manager.task_state_history[-1][1][0][task_filter].tolist()
         msg.task_life_cycle_state = god_map.motion_graph_manager.task_state_history[-1][1][1][task_filter].tolist()

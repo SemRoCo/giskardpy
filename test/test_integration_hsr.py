@@ -359,8 +359,8 @@ class TestConstraints:
         tip_grasp_axis.vector.x = 1
 
         # %% phase 1
-        kitchen_setup.monitors.add_monitor(monitor_class=FalseMonitor.__name__,
-                                           name='laser violated')
+        laser_violated = kitchen_setup.monitors.add_monitor(monitor_class=FalseMonitor.__name__,
+                                                            name='laser violated')
         camera_z = Vector3Stamped()
         camera_z.header.frame_id = camera_link
         camera_z.vector.z = 1
@@ -377,7 +377,8 @@ class TestConstraints:
                                                                bar_axis=bar_axis,
                                                                bar_length=.4,
                                                                start_condition=pointing_at,
-                                                               name='grasp bar')
+                                                               pause_condition=laser_violated,
+                                                               name='grasp handle')
         x_gripper = Vector3Stamped()
         x_gripper.header.frame_id = kitchen_setup.tip
         x_gripper.vector.z = 1
@@ -394,14 +395,11 @@ class TestConstraints:
                                                     end_condition=bar_grasped)
 
         # %% phase 2 open door
-        door_open = kitchen_setup.monitors.add_local_minimum_reached(name='door open',
-                                                                     start_condition=bar_grasped)
-        kitchen_setup.motion_goals.add_open_container(tip_link=kitchen_setup.tip,
-                                                      environment_link=handle_name,
-                                                      goal_joint_state=1.5,
-                                                      name='open door',
-                                                      start_condition=bar_grasped,
-                                                      end_condition=door_open)
+        door_open = kitchen_setup.motion_goals.add_open_container(tip_link=kitchen_setup.tip,
+                                                                  environment_link=handle_name,
+                                                                  goal_joint_state=1.5,
+                                                                  name='open door',
+                                                                  start_condition=bar_grasped)
 
         kitchen_setup.allow_all_collisions()
         kitchen_setup.monitors.add_end_motion(start_condition=door_open)

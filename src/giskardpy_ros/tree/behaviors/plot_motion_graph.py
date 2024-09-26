@@ -31,6 +31,7 @@ def format_condition(condition: str) -> str:
     return condition
 
 
+NotStartedColor = '#9F9F9F'
 MyBLUE = '#0000DD'
 MyGREEN = '#006600'
 MyORANGE = '#996900'
@@ -39,11 +40,19 @@ MyGRAY = '#E0E0E0'
 MonitorTrueGreen = '#B6E5A0'
 MonitorFalseRed = '#FF8961'
 FONT = 'sans-serif'
-LineWidth = 6
-ArrowSize = 1.5
-Fontsize = 25
+LineWidth = 4
+NodeSep = 0.5
+RankSep = 1
+ArrowSize = 1
+Fontsize = 15
+GoalNodeStyle = 'filled'
+GoalNodeShape = 'none'
+GoalClusterStyle = 'filled'
+MonitorStyle = 'filled, rounded'
+MonitorShape = 'rectangle'
+TaskStyle = 'filled, diagonals'
+TaskShape = 'rectangle'
 ConditionFont = 'monospace'
-NotStartedColor = '#9F9F9F'
 LiftCycleStateToColor: Dict[Tuple[LifeCycleState, int], Tuple[str, str]] = {
     (LifeCycleState.not_started, 1): (NotStartedColor, MonitorTrueGreen),
     (LifeCycleState.running, 1): (MyBLUE, MonitorTrueGreen),
@@ -64,7 +73,7 @@ class ExecutionStateToDotParser:
 
     def __init__(self, execution_state: ExecutionState):
         self.execution_state = execution_state
-        self.graph = pydot.Dot(graph_type='digraph', graph_name='', ranksep=1., compound=True)
+        self.graph = pydot.Dot(graph_type='digraph', graph_name='', ranksep=RankSep, nodesep=NodeSep, compound=True)
 
     def search_for_monitor(self, monitor_name: str) -> giskard_msgs.MotionGraphNode:
         return [m for m in self.execution_state.monitors if m.name == monitor_name][0]
@@ -99,7 +108,7 @@ class ExecutionStateToDotParser:
                             style: str) -> None:
         child = node
         for i in range(num):
-            c = pydot.Cluster(graph_name=f'{node.get_name()}{i}', penwidth=LineWidth, style=style, color=color)
+            c = pydot.Cluster(graph_name=f'{node.get_name()}', penwidth=LineWidth, style=style, color=color)
             if i == 0:
                 c.add_node(child)
             else:
@@ -120,12 +129,12 @@ class ExecutionStateToDotParser:
     def get_cluster_of_node(self, node_name: str, graph: Union[pydot.Graph, pydot.Cluster]) -> Optional[pydot.Cluster]:
         node_cluster = None
         for cluster in graph.get_subgraphs():
-            if len(cluster.get_node(self.escape_name(node_name))) == 1:
+            if len(cluster.get_node(self.escape_name(node_name))) == 1 or len(cluster.get_node(node_name)) == 1:
                 node_cluster = cluster
                 break
         return node_cluster
 
-    def add_node(self, graph: pydot.Graph, node_msg: giskard_msgs.MotionGraphNode, style: str, color: str,
+    def add_node(self, graph: pydot.Graph, node_msg: giskard_msgs.MotionGraphNode, style: str, color: str, shape: str,
                  bg_color: str) \
             -> pydot.Node:
         num_extra_boarders = 0
@@ -140,7 +149,7 @@ class ExecutionStateToDotParser:
         label = self.format_motion_graph_node_msg(node_msg, color)
         node = pydot.Node(node_id,
                           label=label,
-                          shape='rectangle',
+                          shape=shape,
                           color=color,
                           style=style,
                           margin=0,
@@ -149,7 +158,8 @@ class ExecutionStateToDotParser:
                           fontsize=Fontsize,
                           penwidth=LineWidth)
         self.add_boarder_to_node(graph=graph, node=node, num=num_extra_boarders, color=color, style=boarder_style)
-        graph.add_node(node)
+        if num_extra_boarders == 0:
+            graph.add_node(node)
         return node
 
     def cluster_name_to_goal_name(self, name: str) -> str:
@@ -162,7 +172,6 @@ class ExecutionStateToDotParser:
         return self.graph
 
     def add_goal_cluster(self, parent_cluster: Union[pydot.Graph, pydot.Cluster], use_state_color: bool = False):
-        style = 'filled, diagonals'
         my_tasks = []
         for i, task in enumerate(self.execution_state.tasks):
             # TODO add one collision avoidance task?
@@ -172,9 +181,8 @@ class ExecutionStateToDotParser:
                                                              self.execution_state.task_state[i])]
                 else:
                     color, bg_color = 'black', MyGRAY
-                self.add_node(parent_cluster, node_msg=task, style=style, color=color, bg_color=bg_color)
+                self.add_node(parent_cluster, node_msg=task, style=TaskStyle, color=color, bg_color=bg_color, shape=TaskShape)
                 my_tasks.append(task)
-        style = 'filled, rounded'
         my_monitors = []
         for i, monitor in enumerate(self.execution_state.monitors):
             if self.execution_state.monitor_parents[i] == self.cluster_name_to_goal_name(parent_cluster.get_name()):
@@ -183,17 +191,24 @@ class ExecutionStateToDotParser:
                                                              self.execution_state.monitor_state[i])]
                 else:
                     color, bg_color = 'black', 'white'
-                self.add_node(parent_cluster, node_msg=monitor, style=style, color=color, bg_color=bg_color)
+                self.add_node(parent_cluster, node_msg=monitor, style=MonitorStyle, color=color, bg_color=bg_color, shape=MonitorShape)
                 my_monitors.append(monitor)
-        style = 'filled, diagonals'
         my_goals = []
         for i, goal in enumerate(self.execution_state.goals):
             if self.execution_state.goal_parents[i] == self.cluster_name_to_goal_name(parent_cluster.get_name()):
+                if use_state_color:
+                    color, bg_color = LiftCycleStateToColor[(self.execution_state.monitor_life_cycle_state[i],
+                                                             self.execution_state.monitor_state[i])]
+                else:
+                    color, bg_color = 'black', 'white'
                 goal_cluster = pydot.Cluster(graph_name=goal.name,
                                              fontname=FONT,
                                              fontsize=Fontsize,
+                                             style=GoalClusterStyle,
+                                             color=color,
+                                             fillcolor=bg_color,
                                              penwidth=LineWidth)
-                self.add_node(goal_cluster, goal, style, 'black', 'white')
+                self.add_node(graph=goal_cluster, node_msg=goal, style=GoalNodeStyle, color=color, bg_color=bg_color, shape=GoalNodeShape)
                 parent_cluster.add_subgraph(goal_cluster)
                 self.add_goal_cluster(goal_cluster)
                 my_goals.append(goal)
@@ -231,6 +246,7 @@ class ExecutionStateToDotParser:
                 if sub_node_cluster is not None:
                     kwargs['ltail'] = sub_node_cluster.get_name()
                 graph.add_edge(pydot.Edge(sub_node_name, node_name, penwidth=LineWidth, color=MyORANGE,
+                                          minlen=0,
                                           arrowsize=ArrowSize, **kwargs))
             for sub_node_name in extract_node_names_from_condition(node.end_condition):
                 if sub_node_name not in all_node_name:

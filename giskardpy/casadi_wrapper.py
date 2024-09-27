@@ -1661,8 +1661,6 @@ def if_eq_cases(a, b_result_cases, else_result):
         return b_result_cases[0][1]
     elif a == b_result_cases[1][0]:
         return b_result_cases[1][1]
-    elif a == b_result_cases[2][0]:
-        return b_result_cases[2][1]
     ...
     else:
         return else_result
@@ -1674,6 +1672,26 @@ def if_eq_cases(a, b_result_cases, else_result):
         b = _to_sx(b_result_cases[i][0])
         b_result = _to_sx(b_result_cases[i][1])
         result = ca.if_else(ca.eq(a, b), b_result, result)
+    return Expression(result)
+
+
+@profile
+def if_cases(cases, else_result):
+    """
+    if cases[0][0]:
+        return cases[0][1]
+    elif cases[1][0]:
+        return cases[1][1]
+    ...
+    else:
+        return else_result
+    """
+    else_result = _to_sx(else_result)
+    result = _to_sx(else_result)
+    for i in range(len(cases)):
+        case = _to_sx(cases[i][0])
+        case_result = _to_sx(cases[i][1])
+        result = ca.if_else(case, case_result, result)
     return Expression(result)
 
 

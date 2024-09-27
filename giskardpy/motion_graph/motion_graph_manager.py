@@ -151,14 +151,11 @@ class MotionGraphManager:
         goal_state_symbols = self.goal_state.get_observation_state_symbol_map()
         observation_state_symbols = {**task_state_symbols, **monitor_state_symbols, **goal_state_symbols}
 
-        for class_name, name, start, reset, pause, end, kwargs in tasks:
+        for (class_name, name, start, reset, pause, end, kwargs), node in zip(tasks + monitors + goals,
+                                                                              self.task_state.nodes + self.monitor_state.nodes + self.goal_state.nodes):
             start_condition = god_map.motion_graph_manager.logic_str_to_expr(
                 logic_str=start,
                 default=cas.TrueSymbol,
-                observation_state_symbols=observation_state_symbols)
-            reset_condition = god_map.motion_graph_manager.logic_str_to_expr(
-                logic_str=reset,
-                default=cas.FalseSymbol,
                 observation_state_symbols=observation_state_symbols)
             pause_condition = god_map.motion_graph_manager.logic_str_to_expr(
                 logic_str=pause,
@@ -168,48 +165,14 @@ class MotionGraphManager:
                 logic_str=end,
                 default=cas.FalseSymbol,
                 observation_state_symbols=observation_state_symbols)
-            self.task_state.get_node(name).set_conditions(start_condition, reset_condition, pause_condition,
-                                                          end_condition)
-
-        for class_name, name, start, reset, pause, end, kwargs in monitors:
-            start_condition = god_map.motion_graph_manager.logic_str_to_expr(
-                logic_str=start,
-                default=cas.TrueSymbol,
-                observation_state_symbols=observation_state_symbols)
             reset_condition = god_map.motion_graph_manager.logic_str_to_expr(
                 logic_str=reset,
                 default=cas.FalseSymbol,
                 observation_state_symbols=observation_state_symbols)
-            pause_condition = god_map.motion_graph_manager.logic_str_to_expr(
-                logic_str=pause,
-                default=cas.FalseSymbol,
-                observation_state_symbols=observation_state_symbols)
-            end_condition = god_map.motion_graph_manager.logic_str_to_expr(
-                logic_str=end,
-                default=cas.FalseSymbol,
-                observation_state_symbols=observation_state_symbols)
-            self.monitor_state.get_node(name).set_conditions(start_condition, reset_condition, pause_condition,
-                                                             end_condition)
-
-        for class_name, name, start, reset, pause, end, kwargs in goals:
-            start_condition = god_map.motion_graph_manager.logic_str_to_expr(
-                logic_str=start,
-                default=cas.TrueSymbol,
-                observation_state_symbols=observation_state_symbols)
-            reset_condition = god_map.motion_graph_manager.logic_str_to_expr(
-                logic_str=reset,
-                default=cas.FalseSymbol,
-                observation_state_symbols=observation_state_symbols)
-            pause_condition = god_map.motion_graph_manager.logic_str_to_expr(
-                logic_str=pause,
-                default=cas.FalseSymbol,
-                observation_state_symbols=observation_state_symbols)
-            end_condition = god_map.motion_graph_manager.logic_str_to_expr(
-                logic_str=end,
-                default=cas.FalseSymbol,
-                observation_state_symbols=observation_state_symbols)
-            self.goal_state.get_node(name).set_conditions(start_condition, reset_condition, pause_condition,
-                                                          end_condition)
+            node.set_conditions(start_condition=start_condition,
+                                reset_condition=reset_condition,
+                                pause_condition=pause_condition,
+                                end_condition=end_condition)
 
         # %% apply goal conditions to sub nodes
         for goal in self.goal_state.nodes:

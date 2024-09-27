@@ -78,30 +78,28 @@ def compile_graph_node_state_updater(node_state: MotionGraphNodeStateManager) ->
     for node in node_state.nodes:
         state_symbol = node.get_life_cycle_state_expression()
 
-        if cas.is_true(node.start_condition):
-            start_if = LifeCycleState.running  # start right away
-        else:
-            start_if = cas.if_else(node.start_condition,
-                                   if_result=LifeCycleState.running,
-                                   else_result=LifeCycleState.not_started)
-        if cas.is_false(node.pause_condition):
-            pause_if = LifeCycleState.running  # never pause
-        else:
-            pause_if = cas.if_else(node.pause_condition,
-                                   if_result=LifeCycleState.on_hold,
-                                   else_result=LifeCycleState.running)
-        if cas.is_false(node.end_condition):
-            else_result = pause_if  # never end
-        else:
-            else_result = cas.if_else(node.end_condition,
-                                      if_result=LifeCycleState.succeeded,
-                                      else_result=pause_if)
+        not_started_transitions = cas.if_else(condition=node.start_condition,
+                                              if_result=LifeCycleState.running,
+                                              else_result=LifeCycleState.not_started)
+        running_transitions = cas.if_cases(cases=[(node.reset_condition, LifeCycleState.not_started),
+                                                  (node.end_condition, LifeCycleState.succeeded),
+                                                  (node.pause_condition, LifeCycleState.paused)],
+                                           else_result=LifeCycleState.running)
+        pause_transitions = cas.if_cases(cases=[(node.reset_condition, LifeCycleState.not_started),
+                                                (node.end_condition, LifeCycleState.succeeded),
+                                                (cas.logic_not(node.pause_condition), LifeCycleState.running)],
+                                         else_result=LifeCycleState.paused)
+        ended_transitions = cas.if_else(condition=node.reset_condition,
+                                        if_result=LifeCycleState.not_started,
+                                        else_result=LifeCycleState.succeeded)
 
-        state_f = cas.if_eq_cases(a=state_symbol,
-                                  b_result_cases=[(LifeCycleState.not_started, start_if),
-                                                  (LifeCycleState.succeeded, LifeCycleState.succeeded)],
-                                  else_result=else_result)  # running or paused
-        state_updater.append(state_f)
+        state_machine = cas.if_eq_cases(a=state_symbol,
+                                        b_result_cases=[(LifeCycleState.not_started, not_started_transitions),
+                                                        (LifeCycleState.running, running_transitions),
+                                                        (LifeCycleState.paused, pause_transitions),
+                                                        (LifeCycleState.succeeded, ended_transitions)],
+                                        else_result=state_symbol)
+        state_updater.append(state_machine)
     state_updater = cas.Expression(state_updater)
 
     symbols = node_state.get_life_cycle_state_symbols() + god_map.motion_graph_manager.get_observation_state_symbols()

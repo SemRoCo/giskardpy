@@ -93,16 +93,32 @@ class PayloadAlternator(PayloadMonitor):
 
     def __init__(self,
                  mod: int = 2,
-                 name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 pause_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol):
+                 name: Optional[str] = None):
         super().__init__(name=name,
-                         start_condition=start_condition,
-                         pause_condition=pause_condition,
-                         end_condition=end_condition,
                          run_call_in_thread=False)
         self.mod = mod
 
     def __call__(self):
         self.state = np.floor(god_map.time) % self.mod == 0
+
+
+class Counter(PayloadMonitor):
+    def __init__(self, name: str, number: int):
+        super().__init__(name=name, run_call_in_thread=False)
+        self.counter = 0
+        self.number = number
+
+    def __call__(self):
+        self.state = self.counter >= self.number
+        self.counter += 1
+
+
+class Pulse(PayloadMonitor):
+    def __init__(self, name: str, after_ticks: int):
+        super().__init__(name=name, run_call_in_thread=False)
+        self.counter = 0
+        self.after_ticks = after_ticks
+
+    def __call__(self):
+        self.state = self.counter == self.after_ticks
+        self.counter += 1

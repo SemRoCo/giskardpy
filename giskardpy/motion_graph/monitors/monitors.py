@@ -162,6 +162,15 @@ class Alternator(ExpressionMonitor):
         self.expression = expr
 
 
+class TrueMonitor(ExpressionMonitor):
+    def __init__(self,
+                 name: Optional[str] = None,
+                 plot: bool = True):
+        super().__init__(name=name,
+                         plot=plot)
+        self.expression = cas.TrueSymbol
+
+
 class FalseMonitor(ExpressionMonitor):
     def __init__(self,
                  name: Optional[str] = None,

@@ -326,6 +326,6 @@ class BiDict(dict):
 class LifeCycleState(IntEnum):
     not_started = 0
     running = 1
-    on_hold = 2
+    paused = 2
     succeeded = 3
     failed = 4

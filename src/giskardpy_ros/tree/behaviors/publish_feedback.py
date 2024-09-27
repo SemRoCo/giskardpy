@@ -28,30 +28,24 @@ def giskard_state_to_execution_state() -> ExecutionState:
     msg = ExecutionState()
     msg.header.stamp = rospy.Time.now()
     msg.goal_id = GiskardBlackboard().move_action_server.goal_id
+
     msg.tasks = [msg_converter.motion_graph_node_to_ros_msg(t) for t in tasks if t.plot]
     msg.task_parents = [god_map.motion_graph_manager.get_parent_node_name_of_node(node) for node in tasks]
-    msg.monitors = [msg_converter.motion_graph_node_to_ros_msg(m) for m in monitors if m.plot]
-    msg.monitor_parents = [god_map.motion_graph_manager.get_parent_node_name_of_node(node) for node in monitors]
-    msg.goals = [msg_converter.motion_graph_node_to_ros_msg(m) for m in goals if m.plot]
-    msg.goal_parents = [god_map.motion_graph_manager.get_parent_node_name_of_node(node) for node in goals]
-    try:
+    if len(msg.tasks) > 0:
         msg.task_state = god_map.motion_graph_manager.task_state_history[-1][1][0][task_filter].tolist()
         msg.task_life_cycle_state = god_map.motion_graph_manager.task_state_history[-1][1][1][task_filter].tolist()
-    except Exception as e:  # state not initialized yet
-        msg.task_state = [0] * len(msg.tasks)
-        msg.task_life_cycle_state = [LifeCycleState.not_started] * len(msg.tasks)
-    try:
+
+    msg.monitors = [msg_converter.motion_graph_node_to_ros_msg(m) for m in monitors if m.plot]
+    msg.monitor_parents = [god_map.motion_graph_manager.get_parent_node_name_of_node(node) for node in monitors]
+    if len(msg.monitors) > 0:
         msg.monitor_state = god_map.motion_graph_manager.monitor_state_history[-1][1][0][monitor_filter].tolist()
         msg.monitor_life_cycle_state = god_map.motion_graph_manager.monitor_state_history[-1][1][1][monitor_filter].tolist()
-    except Exception as e:  # state not initialized yet
-        msg.monitor_state = [0] * len(msg.monitors)
-        msg.monitor_life_cycle_state = [LifeCycleState.not_started] * len(msg.monitors)
-    try:
+
+    msg.goals = [msg_converter.motion_graph_node_to_ros_msg(m) for m in goals if m.plot]
+    msg.goal_parents = [god_map.motion_graph_manager.get_parent_node_name_of_node(node) for node in goals]
+    if len(msg.goals) > 0:
         msg.goal_state = god_map.motion_graph_manager.goal_state_history[-1][1][0][goal_filter].tolist()
         msg.goal_life_cycle_state = god_map.motion_graph_manager.goal_state_history[-1][1][1][goal_filter].tolist()
-    except Exception as e:  # state not initialized yet
-        msg.goal_state = [0] * len(msg.goals)
-        msg.goal_life_cycle_state = [LifeCycleState.not_started] * len(msg.goals)
     return msg
 
 
@@ -75,6 +69,14 @@ def did_state_change() -> bool:
     last_monitor_state = god_map.motion_graph_manager.monitor_state_history[-2][1][1]
     monitor_state = god_map.motion_graph_manager.monitor_state_history[-1][1][1]
     if np.any(last_monitor_state != monitor_state):
+        return True
+    last_goal_state = god_map.motion_graph_manager.goal_state_history[-2][1][0]
+    goal_state = god_map.motion_graph_manager.goal_state_history[-1][1][0]
+    if np.any(last_goal_state != goal_state):
+        return True
+    last_goal_state = god_map.motion_graph_manager.goal_state_history[-2][1][1]
+    goal_state = god_map.motion_graph_manager.goal_state_history[-1][1][1]
+    if np.any(last_goal_state != goal_state):
         return True
     return False
 

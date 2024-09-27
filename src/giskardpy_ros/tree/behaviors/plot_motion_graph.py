@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 import re
 from typing import List, Dict, Tuple, Optional, Union
 
@@ -42,7 +44,7 @@ ChatGPTGreen = '#28A745'
 ChatGPTOrange = '#E6AC00'
 ChatGPTRed = '#DC3545'
 ChatGPTBlue = '#007BFF'
-ChatGPTGray = '#6C757D'
+ChatGPTGray = '#8F959E'
 
 StartCondColor = ChatGPTGreen
 PauseCondColor = ChatGPTOrange
@@ -50,7 +52,7 @@ EndCondColor = ChatGPTRed
 ResetCondColor = ChatGPTGray
 
 MonitorTrueGreen = '#B6E5A0'
-MonitorFalseRed = '#FF8961'
+MonitorFalseRed = '#FF5024'
 FONT = 'sans-serif'
 LineWidth = 4
 NodeSep = 0.5
@@ -65,18 +67,30 @@ MonitorShape = 'rectangle'
 TaskStyle = 'filled, diagonals'
 TaskShape = 'rectangle'
 ConditionFont = 'monospace'
-LiftCycleStateToColor: Dict[Tuple[LifeCycleState, int], Tuple[str, str]] = {
-    (LifeCycleState.not_started, 1): (ResetCondColor, MonitorTrueGreen),
-    (LifeCycleState.running, 1): (StartCondColor, MonitorTrueGreen),
-    (LifeCycleState.paused, 1): (PauseCondColor, MonitorTrueGreen),
-    (LifeCycleState.succeeded, 1): (EndCondColor, MonitorTrueGreen),
-    (LifeCycleState.failed, 1): ('red', MonitorTrueGreen),
 
-    (LifeCycleState.not_started, 0): (ResetCondColor, MonitorFalseRed),
-    (LifeCycleState.running, 0): (StartCondColor, MonitorFalseRed),
-    (LifeCycleState.paused, 0): (PauseCondColor, MonitorFalseRed),
-    (LifeCycleState.succeeded, 0): (EndCondColor, MonitorFalseRed),
-    (LifeCycleState.failed, 0): ('red', MonitorFalseRed),
+ResetSymbol = '⟲'
+
+ObservationStateToColor: Dict[bool, str] = {
+    True: MonitorTrueGreen,
+    False: MonitorFalseRed
+}
+
+LiftCycleStateToColor: Dict[LifeCycleState, str] = {
+    LifeCycleState.not_started: ResetCondColor,
+    LifeCycleState.running: StartCondColor,
+    LifeCycleState.paused: PauseCondColor,
+    LifeCycleState.succeeded: EndCondColor,
+    LifeCycleState.failed: 'red',
+}
+
+LiftCycleStateToSymbol: Dict[LifeCycleState, str] = {
+    # LifeCycleState.not_started: '○',
+    LifeCycleState.not_started: '—',
+    LifeCycleState.running: '▶',
+    # LifeCycleState.paused: '⏸',
+    LifeCycleState.paused: '<B>||</B>',
+    LifeCycleState.succeeded: '■',
+    LifeCycleState.failed: 'red',
 }
 
 
@@ -90,7 +104,8 @@ class ExecutionStateToDotParser:
     def search_for_monitor(self, monitor_name: str) -> giskard_msgs.MotionGraphNode:
         return [m for m in self.execution_state.monitors if m.name == monitor_name][0]
 
-    def format_motion_graph_node_msg(self, msg: giskard_msgs.MotionGraphNode, color: str) -> str:
+    def format_motion_graph_node_msg(self, msg: giskard_msgs.MotionGraphNode,
+                                     obs_state: bool, life_cycle_state: LifeCycleState) -> str:
         start_condition = format_condition(msg.start_condition)
         pause_condition = format_condition(msg.pause_condition)
         end_condition = format_condition(msg.end_condition)
@@ -103,24 +118,45 @@ class ExecutionStateToDotParser:
                                       pause_condition=pause_condition,
                                       end_condition=end_condition,
                                       reset_condition=reset_condition,
-                                      color=color)
+                                      obs_state=obs_state,
+                                      life_cycle_state=life_cycle_state)
 
     def conditions_to_str(self, name: str, start_condition: str, pause_condition: Optional[str],
                           end_condition: Optional[str], reset_condition: Optional[str],
-                          color: str) -> str:
+                          obs_state: bool, life_cycle_state: LifeCycleState) -> str:
+        line_color = 'black'
+        obs_color = ObservationStateToColor[bool(obs_state)]
+        life_color = LiftCycleStateToColor[life_cycle_state]
+        life_symbol = LiftCycleStateToSymbol[life_cycle_state]
         label = (f'<<TABLE  BORDER="0" CELLBORDER="0" CELLSPACING="0">'
-                 f'<TR><TD WIDTH="100%" HEIGHT="{LineWidth}"></TD></TR>'
-                 f'<TR><TD><B> {name} </B></TD></TR>'
-                 f'<TR><TD WIDTH="100%" BGCOLOR="{color}" HEIGHT="{LineWidth * 1.5}"></TD></TR>'
-                 f'<TR><TD ALIGN="LEFT" BALIGN="LEFT" CELLPADDING="{LineWidth}"><FONT FACE="{ConditionFont}">start:{start_condition}</FONT></TD></TR>')
+                 f'<TR>'
+                 f'  <TD WIDTH="100%" HEIGHT="{LineWidth}"></TD>'
+                 f'</TR>'
+                 f'<TR>'
+                 f'  <TD><B> {name} </B></TD>'
+                 f'</TR>'
+                 f'<TR>'
+                 f'  <TD CELLPADDING="0">'
+                 f'    <TABLE BORDER="0" CELLBORDER="2" CELLSPACING="0" WIDTH="100%">'
+                 f'      <TR>'
+                 f'        <TD BGCOLOR="{life_color}" WIDTH="50%" FIXEDSIZE="FALSE"><FONT FACE="monospace">{life_symbol}</FONT></TD>'
+                 f'        <VR/>'
+                 f'        <TD BGCOLOR="{obs_color}" WIDTH="50%" FIXEDSIZE="FALSE"><FONT FACE="monospace">{bool(obs_state)}</FONT></TD>'
+                 f'      </TR>'
+                 f'    </TABLE>'
+                 f'  </TD>'
+                 f'</TR>'
+                 f'<TR>'
+                 f'  <TD ALIGN="LEFT" BALIGN="LEFT" CELLPADDING="{LineWidth}"><FONT FACE="{ConditionFont}">start:{start_condition}</FONT></TD>'
+                 f'</TR>')
         if pause_condition is not None:
-            label += (f'<TR><TD WIDTH="100%" BGCOLOR="{color}" HEIGHT="{LineWidth}"></TD></TR>'
-                      f'<TR><TD ALIGN="LEFT" BALIGN="LEFT" CELLPADDING="{LineWidth}"><FONT FACE="{ConditionFont}">pause:{pause_condition}</FONT></TD></TR>')
+            label += (f'<TR><TD WIDTH="100%" BGCOLOR="{line_color}" HEIGHT="{LineWidth}"></TD></TR>'
+                      f'<TR><TD ALIGN="LEFT" BALIGN="LEFT" CELLPADDING="{LineWidth}"><FONT FACE="{ConditionFont}"><B>||</B>pause:{pause_condition}</FONT></TD></TR>')
         if end_condition is not None:
-            label += (f'<TR><TD WIDTH="100%" BGCOLOR="{color}" HEIGHT="{LineWidth}"></TD></TR>'
+            label += (f'<TR><TD WIDTH="100%" BGCOLOR="{line_color}" HEIGHT="{LineWidth}"></TD></TR>'
                       f'<TR><TD ALIGN="LEFT" BALIGN="LEFT" CELLPADDING="{LineWidth}"><FONT FACE="{ConditionFont}">end  :{end_condition}</FONT></TD></TR>')
         if reset_condition is not None:
-            label += (f'<TR><TD WIDTH="100%" BGCOLOR="{color}" HEIGHT="{LineWidth}"></TD></TR>'
+            label += (f'<TR><TD WIDTH="100%" BGCOLOR="{line_color}" HEIGHT="{LineWidth}"></TD></TR>'
                       f'<TR><TD ALIGN="LEFT" BALIGN="LEFT" CELLPADDING="{LineWidth}"><FONT FACE="{ConditionFont}">reset:{reset_condition}</FONT></TD></TR>')
         label += f'</TABLE>>'
         return label
@@ -155,8 +191,8 @@ class ExecutionStateToDotParser:
                 break
         return node_cluster
 
-    def add_node(self, graph: pydot.Graph, node_msg: giskard_msgs.MotionGraphNode, style: str, color: str, shape: str,
-                 bg_color: str) \
+    def add_node(self, graph: pydot.Graph, node_msg: giskard_msgs.MotionGraphNode, style: str, shape: str,
+                 obs_state: bool, life_cycle_state: LifeCycleState) \
             -> pydot.Node:
         num_extra_boarders = 0
         node_id = str(node_msg.name)
@@ -167,18 +203,18 @@ class ExecutionStateToDotParser:
         elif node_msg.class_name == CancelMotion.__name__:
             num_extra_boarders = 1
             boarder_style = 'dashed, rounded'
-        label = self.format_motion_graph_node_msg(node_msg, color)
+        label = self.format_motion_graph_node_msg(msg=node_msg, obs_state=obs_state, life_cycle_state=life_cycle_state)
         node = pydot.Node(node_id,
                           label=label,
                           shape=shape,
-                          color=color,
+                          color='black',
                           style=style,
                           margin=0,
-                          fillcolor=bg_color,
+                          fillcolor='white',
                           fontname=FONT,
                           fontsize=Fontsize,
                           penwidth=LineWidth)
-        self.add_boarder_to_node(graph=graph, node=node, num=num_extra_boarders, color=color, style=boarder_style)
+        self.add_boarder_to_node(graph=graph, node=node, num=num_extra_boarders, color='black', style=boarder_style)
         if num_extra_boarders == 0:
             graph.add_node(node)
         return node
@@ -188,51 +224,41 @@ class ExecutionStateToDotParser:
             return name
         return name[9:-1]
 
-    def to_dot_graph(self, use_state_color: bool = False) -> pydot.Graph:
-        self.add_goal_cluster(self.graph, use_state_color)
+    def to_dot_graph(self) -> pydot.Graph:
+        self.add_goal_cluster(self.graph)
         return self.graph
 
-    def add_goal_cluster(self, parent_cluster: Union[pydot.Graph, pydot.Cluster], use_state_color: bool = False):
+    def add_goal_cluster(self, parent_cluster: Union[pydot.Graph, pydot.Cluster]):
         my_tasks = []
         for i, task in enumerate(self.execution_state.tasks):
             # TODO add one collision avoidance task?
             if self.execution_state.task_parents[i] == self.cluster_name_to_goal_name(parent_cluster.get_name()):
-                if use_state_color:
-                    color, bg_color = LiftCycleStateToColor[(self.execution_state.task_life_cycle_state[i],
-                                                             self.execution_state.task_state[i])]
-                else:
-                    color, bg_color = 'black', MyGRAY
-                self.add_node(parent_cluster, node_msg=task, style=TaskStyle, color=color, bg_color=bg_color,
-                              shape=TaskShape)
+                self.add_node(parent_cluster, node_msg=task, style=TaskStyle, shape=TaskShape,
+                              obs_state=self.execution_state.task_state[i],
+                              life_cycle_state=self.execution_state.task_life_cycle_state[i])
                 my_tasks.append(task)
         my_monitors = []
         for i, monitor in enumerate(self.execution_state.monitors):
             if self.execution_state.monitor_parents[i] == self.cluster_name_to_goal_name(parent_cluster.get_name()):
-                if use_state_color:
-                    color, bg_color = LiftCycleStateToColor[(self.execution_state.monitor_life_cycle_state[i],
-                                                             self.execution_state.monitor_state[i])]
-                else:
-                    color, bg_color = 'black', 'white'
-                self.add_node(parent_cluster, node_msg=monitor, style=MonitorStyle, color=color, bg_color=bg_color,
-                              shape=MonitorShape)
+                obs_state = self.execution_state.monitor_state[i]
+                life_cycle_state = self.execution_state.monitor_life_cycle_state[i]
+                self.add_node(parent_cluster, node_msg=monitor, style=MonitorStyle, shape=MonitorShape,
+                              obs_state=obs_state,
+                              life_cycle_state=life_cycle_state)
                 my_monitors.append(monitor)
         my_goals = []
         for i, goal in enumerate(self.execution_state.goals):
             if self.execution_state.goal_parents[i] == self.cluster_name_to_goal_name(parent_cluster.get_name()):
-                if use_state_color:
-                    color, bg_color = LiftCycleStateToColor[(self.execution_state.monitor_life_cycle_state[i],
-                                                             self.execution_state.monitor_state[i])]
-                else:
-                    color, bg_color = 'black', 'white'
                 goal_cluster = pydot.Cluster(graph_name=goal.name,
                                              fontname=FONT,
                                              fontsize=Fontsize,
                                              style=GoalClusterStyle,
-                                             color=color,
-                                             fillcolor=bg_color,
+                                             color='black',
+                                             fillcolor='white',
                                              penwidth=LineWidth)
-                self.add_node(graph=goal_cluster, node_msg=goal, style=GoalNodeStyle, color=color, bg_color=bg_color,
-                              shape=GoalNodeShape)
+                self.add_node(graph=goal_cluster, node_msg=goal, style=GoalNodeStyle, shape=GoalNodeShape,
+                              obs_state=self.execution_state.goal_state[i],
+                              life_cycle_state=self.execution_state.goal_life_cycle_state[i])
                 parent_cluster.add_subgraph(goal_cluster)
                 self.add_goal_cluster(goal_cluster)
                 my_goals.append(goal)

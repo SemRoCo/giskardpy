@@ -149,7 +149,7 @@ class DotGraphViewer(QWidget):
             self.goals.append(goal_id)
 
         parser = ExecutionStateToDotParser(msg)
-        graph = parser.to_dot_graph(use_state_color=True)
+        graph = parser.to_dot_graph()
 
         self.graphs_by_goal[goal_id].append(graph)
 

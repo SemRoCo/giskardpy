@@ -43,6 +43,7 @@ class MotionGraphManager:
 
     task_state_history: List[Tuple[float, Tuple[np.ndarray, np.ndarray]]]  # time -> (state, life_cycle_state)
     monitor_state_history: List[Tuple[float, Tuple[np.ndarray, np.ndarray]]]  # time -> (state, life_cycle_state)
+    goal_state_history: List[Tuple[float, Tuple[np.ndarray, np.ndarray]]]  # time -> (state, life_cycle_state)
 
     substitution_values: Dict[int, Dict[str, float]]  # id -> (old_symbol, value)
     triggers: Dict[int, Callable]  # id -> updater callback
@@ -83,6 +84,7 @@ class MotionGraphManager:
         self.goal_state = MotionGraphNodeStateManager()
         self.task_state_history = []
         self.monitor_state_history = []
+        self.goal_state_history = []
         self.substitution_values = {}
         self.triggers = {}
         self.trigger_conditions = []
@@ -218,10 +220,10 @@ class MotionGraphManager:
 
     @profile
     def compile_node_state_updaters(self) -> None:
-        self.initialize_states()
         self.compile_task_state_updater()
         self.compile_monitor_state_updater()
         self.compile_goal_state_updater()
+        self.initialize_states()
         # self._register_expression_update_triggers()
 
     def get_observation_state_symbols(self) -> List[cas.Symbol]:
@@ -233,6 +235,7 @@ class MotionGraphManager:
         self.task_state.init_states()
         self.monitor_state.init_states()
         self.goal_state.init_states()
+        self.log_states()
 
     def get_node_from_state_expr(self, expr: cas.Expression) -> MotionGraphNode:
         for task in self.task_state.nodes:
@@ -412,15 +415,21 @@ class MotionGraphManager:
         next_state, done = self.evaluate_payload_monitors()
         self.monitor_state.observation_state[self.payload_monitor_filter] = next_state
         # self.trigger_update_triggers(self.state)
+        self.log_states()
+        if isinstance(done, Exception):
+            raise done
+        return done
+
+    def log_states(self) -> None:
         self.task_state_history.append((god_map.time,
                                         (self.task_state.observation_state.copy(),
                                          self.task_state.life_cycle_state.copy())))
         self.monitor_state_history.append((god_map.time,
                                            (self.monitor_state.observation_state.copy(),
                                             self.monitor_state.life_cycle_state.copy())))
-        if isinstance(done, Exception):
-            raise done
-        return done
+        self.goal_state_history.append((god_map.time,
+                                           (self.goal_state.observation_state.copy(),
+                                            self.goal_state.life_cycle_state.copy())))
 
     def evaluate_payload_monitors(self) -> Tuple[np.ndarray, Union[bool, Exception]]:
         done = False
@@ -498,3 +507,4 @@ class MotionGraphManager:
             # logging.loginfo(f'{goal_name} added {len(_constraints)+len(_vel_constraints)} constraints.')
         return (list(eq_constraints.values()), list(neq_constraints.values()), list(derivative_constraints.values()),
                 list(quadratic_weight_gains.values()), list(linear_weight_gains.values()))
+

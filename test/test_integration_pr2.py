@@ -31,6 +31,8 @@ from giskardpy.goals.weight_scaling_goals import MaxManipulabilityLinWeight, Bas
 from giskardpy.god_map import god_map
 from giskardpy.middleware import get_middleware
 from giskardpy.model.utils import hacky_urdf_parser_fix
+from giskardpy.motion_graph.monitors.monitors import TrueMonitor
+from giskardpy.motion_graph.monitors.payload_monitors import Counter, Pulse
 from giskardpy.motion_graph.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE
 from giskardpy.qp.qp_controller_config import SupportedQPSolver, QPControllerConfig
 from giskardpy_ros.configs.behavior_tree_config import StandAloneBTConfig
@@ -471,6 +473,23 @@ class TestMonitors:
                                                   end_condition=f'{end_monitor} and {joint_monitor2}')
         zero_pose.allow_all_collisions()
         zero_pose.monitors.add_end_motion(start_condition=end_monitor)
+        zero_pose.execute(add_local_minimum_reached=False)
+
+    def test_reset(self, zero_pose: PR2TestWrapper):
+        g1 = zero_pose.tasks.add_joint_position(name='g1',
+                                                goal_state=zero_pose.better_pose)
+        g2 = zero_pose.tasks.add_joint_position(name='g2',
+                                                goal_state=pocky_pose,
+                                                start_condition=g1)
+        pulse = zero_pose.monitors.add_monitor(monitor_class=Pulse.__name__,
+                                               name='once',
+                                               after_ticks=1,
+                                               start_condition=g2,
+                                               end_condition='')
+        local_min = zero_pose.monitors.add_local_minimum_reached(name='local min', start_condition=g2)
+        zero_pose.tasks.update_reset_condition(g1, pulse)
+        zero_pose.allow_all_collisions()
+        zero_pose.monitors.add_end_motion(start_condition=local_min)
         zero_pose.execute(add_local_minimum_reached=False)
 
     def test_cart_goal_sequence_relative(self, zero_pose: PR2TestWrapper):
@@ -1066,10 +1085,10 @@ class TestMonitors:
         pose2.pose.orientation.w = 1
 
         done = zero_pose.motion_goals.add_motion_goal(motion_goal_class=RelativePositionSequence.__name__,
-                                               goal1=pose1,
-                                               goal2=pose2,
-                                               root_link=LinkName(name='map'),
-                                               tip_link=LinkName(name='base_footprint'))
+                                                      goal1=pose1,
+                                                      goal2=pose2,
+                                                      root_link=LinkName(name='map'),
+                                                      tip_link=LinkName(name='base_footprint'))
         zero_pose.allow_all_collisions()
         zero_pose.monitors.add_end_motion(start_condition=done)
         zero_pose.set_max_traj_length(30)
@@ -1090,10 +1109,10 @@ class TestMonitors:
         pose2.pose.orientation.w = 1
 
         done = zero_pose.motion_goals.add_motion_goal(motion_goal_class=RelativePositionSequence.__name__,
-                                               goal1=pose1,
-                                               goal2=pose2,
-                                               root_link=LinkName(name='map'),
-                                               tip_link=LinkName(name='base_footprint'))
+                                                      goal1=pose1,
+                                                      goal2=pose2,
+                                                      root_link=LinkName(name='map'),
+                                                      tip_link=LinkName(name='base_footprint'))
         zero_pose.allow_all_collisions()
         zero_pose.monitors.add_end_motion(start_condition=done)
         zero_pose.set_max_traj_length(30)

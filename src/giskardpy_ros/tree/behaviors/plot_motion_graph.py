@@ -37,6 +37,18 @@ MyGREEN = '#006600'
 MyORANGE = '#996900'
 MyRED = '#993000'
 MyGRAY = '#E0E0E0'
+
+ChatGPTGreen = '#28A745'
+ChatGPTOrange = '#E6AC00'
+ChatGPTRed = '#DC3545'
+ChatGPTBlue = '#007BFF'
+ChatGPTGray = '#6C757D'
+
+StartCondColor = ChatGPTGreen
+PauseCondColor = ChatGPTOrange
+EndCondColor = ChatGPTRed
+ResetCondColor = ChatGPTGray
+
 MonitorTrueGreen = '#B6E5A0'
 MonitorFalseRed = '#FF8961'
 FONT = 'sans-serif'
@@ -54,16 +66,16 @@ TaskStyle = 'filled, diagonals'
 TaskShape = 'rectangle'
 ConditionFont = 'monospace'
 LiftCycleStateToColor: Dict[Tuple[LifeCycleState, int], Tuple[str, str]] = {
-    (LifeCycleState.not_started, 1): (NotStartedColor, MonitorTrueGreen),
-    (LifeCycleState.running, 1): (MyBLUE, MonitorTrueGreen),
-    (LifeCycleState.on_hold, 1): (MyORANGE, MonitorTrueGreen),
-    (LifeCycleState.succeeded, 1): (MyGREEN, MonitorTrueGreen),
+    (LifeCycleState.not_started, 1): (ResetCondColor, MonitorTrueGreen),
+    (LifeCycleState.running, 1): (StartCondColor, MonitorTrueGreen),
+    (LifeCycleState.paused, 1): (PauseCondColor, MonitorTrueGreen),
+    (LifeCycleState.succeeded, 1): (EndCondColor, MonitorTrueGreen),
     (LifeCycleState.failed, 1): ('red', MonitorTrueGreen),
 
-    (LifeCycleState.not_started, 0): (NotStartedColor, MonitorFalseRed),
-    (LifeCycleState.running, 0): (MyBLUE, MonitorFalseRed),
-    (LifeCycleState.on_hold, 0): (MyORANGE, MonitorFalseRed),
-    (LifeCycleState.succeeded, 0): (MyGREEN, MonitorFalseRed),
+    (LifeCycleState.not_started, 0): (ResetCondColor, MonitorFalseRed),
+    (LifeCycleState.running, 0): (StartCondColor, MonitorFalseRed),
+    (LifeCycleState.paused, 0): (PauseCondColor, MonitorFalseRed),
+    (LifeCycleState.succeeded, 0): (EndCondColor, MonitorFalseRed),
     (LifeCycleState.failed, 0): ('red', MonitorFalseRed),
 }
 
@@ -82,13 +94,19 @@ class ExecutionStateToDotParser:
         start_condition = format_condition(msg.start_condition)
         pause_condition = format_condition(msg.pause_condition)
         end_condition = format_condition(msg.end_condition)
+        reset_condition = format_condition(msg.reset_condition)
         if msg.class_name in {EndMotion.__name__, CancelMotion.__name__}:
             pause_condition = None
             end_condition = None
-        return self.conditions_to_str(msg.name, start_condition, pause_condition, end_condition, color)
+        return self.conditions_to_str(name=msg.name,
+                                      start_condition=start_condition,
+                                      pause_condition=pause_condition,
+                                      end_condition=end_condition,
+                                      reset_condition=reset_condition,
+                                      color=color)
 
     def conditions_to_str(self, name: str, start_condition: str, pause_condition: Optional[str],
-                          end_condition: Optional[str],
+                          end_condition: Optional[str], reset_condition: Optional[str],
                           color: str) -> str:
         label = (f'<<TABLE  BORDER="0" CELLBORDER="0" CELLSPACING="0">'
                  f'<TR><TD WIDTH="100%" HEIGHT="{LineWidth}"></TD></TR>'
@@ -101,6 +119,9 @@ class ExecutionStateToDotParser:
         if end_condition is not None:
             label += (f'<TR><TD WIDTH="100%" BGCOLOR="{color}" HEIGHT="{LineWidth}"></TD></TR>'
                       f'<TR><TD ALIGN="LEFT" BALIGN="LEFT" CELLPADDING="{LineWidth}"><FONT FACE="{ConditionFont}">end  :{end_condition}</FONT></TD></TR>')
+        if reset_condition is not None:
+            label += (f'<TR><TD WIDTH="100%" BGCOLOR="{color}" HEIGHT="{LineWidth}"></TD></TR>'
+                      f'<TR><TD ALIGN="LEFT" BALIGN="LEFT" CELLPADDING="{LineWidth}"><FONT FACE="{ConditionFont}">reset:{reset_condition}</FONT></TD></TR>')
         label += f'</TABLE>>'
         return label
 
@@ -181,7 +202,8 @@ class ExecutionStateToDotParser:
                                                              self.execution_state.task_state[i])]
                 else:
                     color, bg_color = 'black', MyGRAY
-                self.add_node(parent_cluster, node_msg=task, style=TaskStyle, color=color, bg_color=bg_color, shape=TaskShape)
+                self.add_node(parent_cluster, node_msg=task, style=TaskStyle, color=color, bg_color=bg_color,
+                              shape=TaskShape)
                 my_tasks.append(task)
         my_monitors = []
         for i, monitor in enumerate(self.execution_state.monitors):
@@ -191,7 +213,8 @@ class ExecutionStateToDotParser:
                                                              self.execution_state.monitor_state[i])]
                 else:
                     color, bg_color = 'black', 'white'
-                self.add_node(parent_cluster, node_msg=monitor, style=MonitorStyle, color=color, bg_color=bg_color, shape=MonitorShape)
+                self.add_node(parent_cluster, node_msg=monitor, style=MonitorStyle, color=color, bg_color=bg_color,
+                              shape=MonitorShape)
                 my_monitors.append(monitor)
         my_goals = []
         for i, goal in enumerate(self.execution_state.goals):
@@ -208,7 +231,8 @@ class ExecutionStateToDotParser:
                                              color=color,
                                              fillcolor=bg_color,
                                              penwidth=LineWidth)
-                self.add_node(graph=goal_cluster, node_msg=goal, style=GoalNodeStyle, color=color, bg_color=bg_color, shape=GoalNodeShape)
+                self.add_node(graph=goal_cluster, node_msg=goal, style=GoalNodeStyle, color=color, bg_color=bg_color,
+                              shape=GoalNodeShape)
                 parent_cluster.add_subgraph(goal_cluster)
                 self.add_goal_cluster(goal_cluster)
                 my_goals.append(goal)
@@ -234,7 +258,7 @@ class ExecutionStateToDotParser:
                     kwargs['lhead'] = node_cluster.get_name()
                 if sub_node_cluster is not None:
                     kwargs['ltail'] = sub_node_cluster.get_name()
-                graph.add_edge(pydot.Edge(src=sub_node_name, dst=node_name, penwidth=LineWidth, color=MyGREEN,
+                graph.add_edge(pydot.Edge(src=sub_node_name, dst=node_name, penwidth=LineWidth, color=StartCondColor,
                                           arrowsize=ArrowSize, **kwargs))
             for sub_node_name in extract_node_names_from_condition(node.pause_condition):
                 if sub_node_name not in all_node_name:
@@ -245,7 +269,7 @@ class ExecutionStateToDotParser:
                     kwargs['lhead'] = node_cluster.get_name()
                 if sub_node_cluster is not None:
                     kwargs['ltail'] = sub_node_cluster.get_name()
-                graph.add_edge(pydot.Edge(sub_node_name, node_name, penwidth=LineWidth, color=MyORANGE,
+                graph.add_edge(pydot.Edge(sub_node_name, node_name, penwidth=LineWidth, color=PauseCondColor,
                                           minlen=0,
                                           arrowsize=ArrowSize, **kwargs))
             for sub_node_name in extract_node_names_from_condition(node.end_condition):
@@ -257,9 +281,23 @@ class ExecutionStateToDotParser:
                     kwargs['ltail'] = node_cluster.get_name()
                 if sub_node_cluster is not None:
                     kwargs['lhead'] = sub_node_cluster.get_name()
-                graph.add_edge(pydot.Edge(node_name, sub_node_name, color=MyRED, penwidth=LineWidth,
+                graph.add_edge(pydot.Edge(node_name, sub_node_name, color=EndCondColor, penwidth=LineWidth,
                                           arrowhead='none',
                                           arrowtail='normal',
+                                          dir='both', arrowsize=ArrowSize, **kwargs))
+            for sub_node_name in extract_node_names_from_condition(node.reset_condition):
+                if sub_node_name not in all_node_name:
+                    continue
+                sub_node_cluster = self.get_cluster_of_node(sub_node_name, graph)
+                kwargs = {}
+                if node_cluster is not None:
+                    kwargs['ltail'] = node_cluster.get_name()
+                if sub_node_cluster is not None:
+                    kwargs['lhead'] = sub_node_cluster.get_name()
+                graph.add_edge(pydot.Edge(node_name, sub_node_name, color=ResetCondColor, penwidth=LineWidth,
+                                          arrowhead='none',
+                                          arrowtail='normal',
+                                          constraint=False,
                                           dir='both', arrowsize=ArrowSize, **kwargs))
 
         return graph

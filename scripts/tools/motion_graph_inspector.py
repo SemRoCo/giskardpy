@@ -7,7 +7,7 @@ from PyQt5.QtCore import Qt, QTimer, QRectF
 from giskard_msgs.msg import ExecutionState
 from PyQt5.QtCore import QMutex, QMutexLocker
 
-from giskardpy_ros.tree.behaviors.plot_motion_graph import execution_state_to_dot_graph
+from giskardpy_ros.tree.behaviors.plot_motion_graph import ExecutionStateToDotParser
 
 
 class MySvgWidget(QSvgWidget):
@@ -148,7 +148,8 @@ class DotGraphViewer(QWidget):
             self.graphs_by_goal[goal_id] = []
             self.goals.append(goal_id)
 
-        graph = execution_state_to_dot_graph(msg, use_state_color=True)
+        parser = ExecutionStateToDotParser(msg)
+        graph = parser.to_dot_graph(use_state_color=True)
 
         self.graphs_by_goal[goal_id].append(graph)
 
@@ -175,7 +176,6 @@ class DotGraphViewer(QWidget):
         # graph.write_pdf('graph.pdf')
         with QMutexLocker(self.svg_widget.mutex):  # Lock the mutex during SVG loading
             self.svg_widget.load(svg_path)
-
 
     def update_position_label(self) -> None:
         goal_count = len(self.goals)

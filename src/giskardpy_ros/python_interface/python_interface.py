@@ -335,6 +335,7 @@ class MotionGraphNodeWrapper:
                                start_condition: str = '',
                                pause_condition: str = '',
                                end_condition: Optional[str] = None,
+                               reset_condition: str = '',
                                **kwargs) -> str:
         """
         Generic function to add a motion goal.
@@ -359,6 +360,7 @@ class MotionGraphNodeWrapper:
             self.update_end_condition(node_name=name, condition=name)
         else:
             self.update_end_condition(node_name=name, condition=end_condition)
+        self.update_reset_condition(node_name=name, condition=reset_condition)
         return name
 
     def get_anded_nodes(self) -> str:
@@ -371,6 +373,9 @@ class MotionGraphNodeWrapper:
 
     def update_start_condition(self, node_name: str, condition: str) -> None:
         self._motion_graph_nodes[node_name].start_condition = condition
+
+    def update_reset_condition(self, node_name: str, condition: str) -> None:
+        self._motion_graph_nodes[node_name].reset_condition = condition
 
     def update_pause_condition(self, node_name: str, condition: str) -> None:
         self._motion_graph_nodes[node_name].pause_condition = condition
@@ -1390,7 +1395,7 @@ class TaskWrapper(MotionGraphNodeWrapper):
                            max_velocity: Optional[float] = None,
                            start_condition: str = '',
                            pause_condition: str = '',
-                           end_condition: str = '',
+                           end_condition: Optional[str] = None,
                            **kwargs: goal_parameter) -> str:
         """
         Sets joint position goals for all pairs in goal_state
@@ -1500,6 +1505,7 @@ class MonitorWrapper(MotionGraphNodeWrapper):
                     start_condition: str = '',
                     pause_condition: str = '',
                     end_condition: Optional[str] = None,
+                    reset_condition: str = '',
                     **kwargs) -> str:
         """
         Generic function to add a monitor.
@@ -1517,6 +1523,7 @@ class MonitorWrapper(MotionGraphNodeWrapper):
                                               start_condition=start_condition,
                                               pause_condition=pause_condition,
                                               end_condition=end_condition,
+                                              reset_condition=reset_condition,
                                               **kwargs)
 
     def add_local_minimum_reached(self,
@@ -2124,6 +2131,7 @@ class GiskardWrapper:
             node.start_condition = self.quote_node_names(node.start_condition)
             node.pause_condition = self.quote_node_names(node.pause_condition)
             node.end_condition = self.quote_node_names(node.end_condition)
+            node.reset_condition = self.quote_node_names(node.reset_condition)
             result.append(node)
         return result
 

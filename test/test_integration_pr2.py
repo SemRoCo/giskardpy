@@ -551,7 +551,7 @@ class TestMonitors:
         root_link = 'map'
         tip_link = 'base_footprint'
 
-        end_monitor = zero_pose.monitors.add_local_minimum_reached()
+        end_monitor = zero_pose.monitors.add_local_minimum_reached(name='local min')
 
         pose1 = zero_pose.motion_goals.add_cartesian_pose(goal_pose=pose1,
                                                           name='g1',

@@ -55,7 +55,7 @@ MonitorTrueGreen = '#B6E5A0'
 MonitorFalseRed = '#FF5024'
 FONT = 'sans-serif'
 LineWidth = 4
-NodeSep = 0.5
+NodeSep = 1
 RankSep = 1
 ArrowSize = 1
 Fontsize = 15
@@ -141,9 +141,9 @@ class ExecutionStateToDotParser:
                  f'  <TD CELLPADDING="0">'
                  f'    <TABLE BORDER="0" CELLBORDER="2" CELLSPACING="0" WIDTH="100%">'
                  f'      <TR>'
-                 f'        <TD BGCOLOR="{life_color}" WIDTH="50%" FIXEDSIZE="FALSE"><FONT FACE="monospace">{life_symbol}</FONT></TD>'
-                 f'        <VR/>'
                  f'        <TD BGCOLOR="{obs_color}" WIDTH="50%" FIXEDSIZE="FALSE"><FONT FACE="monospace">{bool(obs_state)}</FONT></TD>'
+                 f'        <VR/>'
+                 f'        <TD BGCOLOR="{life_color}" WIDTH="50%" FIXEDSIZE="FALSE"><FONT FACE="monospace">{life_symbol}</FONT></TD>'
                  f'      </TR>'
                  f'    </TABLE>'
                  f'  </TD>'
@@ -224,7 +224,9 @@ class ExecutionStateToDotParser:
     def cluster_name_to_goal_name(self, name: str) -> str:
         if name == '':
             return name
-        return name[9:-1]
+        if '"' in name:
+            return name[9:-1]
+        return name[8:]
 
     def to_dot_graph(self) -> pydot.Graph:
         obs_states: Dict[str, bool] = {}

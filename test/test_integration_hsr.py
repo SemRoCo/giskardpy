@@ -379,6 +379,7 @@ class TestConstraints:
                                                                start_condition=pointing_at,
                                                                pause_condition=laser_violated,
                                                                name='grasp handle')
+        kitchen_setup.motion_goals.update_end_condition(pointing_at, bar_grasped)
         x_gripper = Vector3Stamped()
         x_gripper.header.frame_id = kitchen_setup.tip
         x_gripper.vector.z = 1

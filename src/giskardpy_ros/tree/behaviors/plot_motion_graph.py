@@ -227,11 +227,11 @@ class ExecutionStateToDotParser:
         return name[9:-1]
 
     def to_dot_graph(self) -> pydot.Graph:
-        self.add_goal_cluster(self.graph)
+        obs_states: Dict[str, bool] = {}
+        self.add_goal_cluster(self.graph, obs_states)
         return self.graph
 
-    def add_goal_cluster(self, parent_cluster: Union[pydot.Graph, pydot.Cluster]):
-        obs_states: Dict[str, bool] = {}
+    def add_goal_cluster(self, parent_cluster: Union[pydot.Graph, pydot.Cluster], obs_states: Dict[str, bool]):
         my_tasks: List[MotionGraphNode] = []
         for i, task in enumerate(self.execution_state.tasks):
             # TODO add one collision avoidance task?
@@ -266,10 +266,10 @@ class ExecutionStateToDotParser:
                 self.add_node(graph=goal_cluster, node_msg=goal, style=GoalNodeStyle, shape=GoalNodeShape,
                               obs_state=obs_state,
                               life_cycle_state=self.execution_state.goal_life_cycle_state[i])
-                parent_cluster.add_subgraph(goal_cluster)
-                self.add_goal_cluster(goal_cluster)
-                my_goals.append(goal)
                 obs_states[goal.name] = obs_state
+                parent_cluster.add_subgraph(goal_cluster)
+                self.add_goal_cluster(goal_cluster, obs_states)
+                my_goals.append(goal)
         # %% add edges
         self.add_edges(parent_cluster, my_tasks, my_monitors, my_goals, obs_states)
 

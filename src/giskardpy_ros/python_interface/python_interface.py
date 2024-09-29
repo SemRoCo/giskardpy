@@ -2083,9 +2083,9 @@ class GiskardWrapper:
         if len(self.monitors.motion_graph_nodes) > 0:
             end_motion_condition += f'{self.monitors.get_anded_nodes()}'
         if len(self.tasks.motion_graph_nodes) > 0:
-            end_motion_condition += f'and {self.tasks.get_anded_nodes()}'
+            end_motion_condition += f' and {self.tasks.get_anded_nodes()}'
         if len(self.motion_goals.motion_graph_nodes) > 0:
-            end_motion_condition += f'and {self.motion_goals.get_anded_nodes()}'
+            end_motion_condition += f' and {self.motion_goals.get_anded_nodes()}'
         self.monitors.add_end_motion(start_condition=end_motion_condition)
         self.monitors.add_cancel_motion(start_condition=local_min_reached_monitor_name,
                                         error=LocalMinimumException(f'local minimum reached'))

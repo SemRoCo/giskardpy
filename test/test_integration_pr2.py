@@ -506,31 +506,21 @@ class TestMonitors:
         root_link = 'map'
         tip_link = 'base_footprint'
 
-        monitor1 = zero_pose.monitors.add_cartesian_pose(name='pose1',
-                                                         root_link=root_link,
-                                                         tip_link=tip_link,
-                                                         goal_pose=pose1)
+        end_monitor = zero_pose.monitors.add_local_minimum_reached(name='local min')
 
-        monitor2 = zero_pose.monitors.add_cartesian_pose(name='pose2',
-                                                         root_link=root_link,
-                                                         tip_link=tip_link,
-                                                         goal_pose=pose2,
-                                                         start_condition=monitor1)
-        end_monitor = zero_pose.monitors.add_local_minimum_reached()
-
-        zero_pose.motion_goals.add_cartesian_pose(goal_pose=pose1,
-                                                  name='g1',
-                                                  root_link=root_link,
-                                                  tip_link=tip_link,
-                                                  end_condition=monitor1)
-        zero_pose.motion_goals.add_cartesian_pose(goal_pose=pose2,
-                                                  name='g2',
-                                                  root_link=root_link,
-                                                  tip_link=tip_link,
-                                                  start_condition=monitor1,
-                                                  end_condition=f'{monitor2} and {end_monitor}')
+        pose1 = zero_pose.motion_goals.add_cartesian_pose(goal_pose=pose1,
+                                                          name='g1',
+                                                          root_link=root_link,
+                                                          tip_link=tip_link,
+                                                          end_condition=None)
+        pose2 = zero_pose.motion_goals.add_cartesian_pose(goal_pose=pose2,
+                                                          name='g2',
+                                                          root_link=root_link,
+                                                          tip_link=tip_link,
+                                                          start_condition=pose1,
+                                                          end_condition=None)
         zero_pose.allow_all_collisions()
-        zero_pose.monitors.add_end_motion(start_condition=' and '.join([end_monitor, monitor2]))
+        zero_pose.monitors.add_end_motion(start_condition=' and '.join([pose2, end_monitor]))
         zero_pose.set_max_traj_length(30)
         zero_pose.execute(add_local_minimum_reached=False)
         current_pose = zero_pose.compute_fk_pose(root_link=root_link, tip_link=tip_link)

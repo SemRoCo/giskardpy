@@ -67,6 +67,7 @@ MonitorShape = 'rectangle'
 TaskStyle = 'filled, diagonals'
 TaskShape = 'rectangle'
 ConditionFont = 'monospace'
+EdgeStyleFalse = 'dashed'
 
 ResetSymbol = '⟲'
 
@@ -113,6 +114,7 @@ class ExecutionStateToDotParser:
         if msg.class_name in {EndMotion.__name__, CancelMotion.__name__}:
             pause_condition = None
             end_condition = None
+            reset_condition = None
         return self.conditions_to_str(name=msg.name,
                                       start_condition=start_condition,
                                       pause_condition=pause_condition,
@@ -151,7 +153,7 @@ class ExecutionStateToDotParser:
                  f'</TR>')
         if pause_condition is not None:
             label += (f'<TR><TD WIDTH="100%" BGCOLOR="{line_color}" HEIGHT="{LineWidth}"></TD></TR>'
-                      f'<TR><TD ALIGN="LEFT" BALIGN="LEFT" CELLPADDING="{LineWidth}"><FONT FACE="{ConditionFont}"><B>||</B>pause:{pause_condition}</FONT></TD></TR>')
+                      f'<TR><TD ALIGN="LEFT" BALIGN="LEFT" CELLPADDING="{LineWidth}"><FONT FACE="{ConditionFont}">pause:{pause_condition}</FONT></TD></TR>')
         if end_condition is not None:
             label += (f'<TR><TD WIDTH="100%" BGCOLOR="{line_color}" HEIGHT="{LineWidth}"></TD></TR>'
                       f'<TR><TD ALIGN="LEFT" BALIGN="LEFT" CELLPADDING="{LineWidth}"><FONT FACE="{ConditionFont}">end  :{end_condition}</FONT></TD></TR>')
@@ -229,15 +231,18 @@ class ExecutionStateToDotParser:
         return self.graph
 
     def add_goal_cluster(self, parent_cluster: Union[pydot.Graph, pydot.Cluster]):
-        my_tasks = []
+        obs_states: Dict[str, bool] = {}
+        my_tasks: List[MotionGraphNode] = []
         for i, task in enumerate(self.execution_state.tasks):
             # TODO add one collision avoidance task?
             if self.execution_state.task_parents[i] == self.cluster_name_to_goal_name(parent_cluster.get_name()):
+                obs_state = self.execution_state.task_state[i]
                 self.add_node(parent_cluster, node_msg=task, style=TaskStyle, shape=TaskShape,
-                              obs_state=self.execution_state.task_state[i],
+                              obs_state=obs_state,
                               life_cycle_state=self.execution_state.task_life_cycle_state[i])
                 my_tasks.append(task)
-        my_monitors = []
+                obs_states[task.name] = obs_state
+        my_monitors: List[MotionGraphNode] = []
         for i, monitor in enumerate(self.execution_state.monitors):
             if self.execution_state.monitor_parents[i] == self.cluster_name_to_goal_name(parent_cluster.get_name()):
                 obs_state = self.execution_state.monitor_state[i]
@@ -246,9 +251,11 @@ class ExecutionStateToDotParser:
                               obs_state=obs_state,
                               life_cycle_state=life_cycle_state)
                 my_monitors.append(monitor)
-        my_goals = []
+                obs_states[monitor.name] = obs_state
+        my_goals: List[MotionGraphNode] = []
         for i, goal in enumerate(self.execution_state.goals):
             if self.execution_state.goal_parents[i] == self.cluster_name_to_goal_name(parent_cluster.get_name()):
+                obs_state = self.execution_state.goal_state[i]
                 goal_cluster = pydot.Cluster(graph_name=goal.name,
                                              fontname=FONT,
                                              fontsize=Fontsize,
@@ -257,19 +264,21 @@ class ExecutionStateToDotParser:
                                              fillcolor='white',
                                              penwidth=LineWidth)
                 self.add_node(graph=goal_cluster, node_msg=goal, style=GoalNodeStyle, shape=GoalNodeShape,
-                              obs_state=self.execution_state.goal_state[i],
+                              obs_state=obs_state,
                               life_cycle_state=self.execution_state.goal_life_cycle_state[i])
                 parent_cluster.add_subgraph(goal_cluster)
                 self.add_goal_cluster(goal_cluster)
                 my_goals.append(goal)
+                obs_states[goal.name] = obs_state
         # %% add edges
-        self.add_edges(parent_cluster, my_tasks, my_monitors, my_goals)
+        self.add_edges(parent_cluster, my_tasks, my_monitors, my_goals, obs_states)
 
     def add_edges(self,
                   graph: Union[pydot.Graph, pydot.Cluster],
                   tasks: List[MotionGraphNode],
                   monitors: List[MotionGraphNode],
-                  goals: List[MotionGraphNode]) -> pydot.Graph:
+                  goals: List[MotionGraphNode],
+                  obs_states: Dict[str, bool]) -> pydot.Graph:
         all_nodes = tasks + monitors + goals
         all_node_name = [node.name for node in all_nodes] + [self.cluster_name_to_goal_name(graph.get_name())]
         for node in all_nodes:
@@ -284,6 +293,8 @@ class ExecutionStateToDotParser:
                     kwargs['lhead'] = node_cluster.get_name()
                 if sub_node_cluster is not None:
                     kwargs['ltail'] = sub_node_cluster.get_name()
+                if not obs_states[sub_node_name]:
+                    kwargs['style'] = EdgeStyleFalse
                 graph.add_edge(pydot.Edge(src=sub_node_name, dst=node_name, penwidth=LineWidth, color=StartCondColor,
                                           arrowsize=ArrowSize, **kwargs))
             for sub_node_name in extract_node_names_from_condition(node.pause_condition):
@@ -295,6 +306,8 @@ class ExecutionStateToDotParser:
                     kwargs['lhead'] = node_cluster.get_name()
                 if sub_node_cluster is not None:
                     kwargs['ltail'] = sub_node_cluster.get_name()
+                if not obs_states[sub_node_name]:
+                    kwargs['style'] = EdgeStyleFalse
                 graph.add_edge(pydot.Edge(sub_node_name, node_name, penwidth=LineWidth, color=PauseCondColor,
                                           minlen=0,
                                           arrowsize=ArrowSize, **kwargs))
@@ -307,6 +320,8 @@ class ExecutionStateToDotParser:
                     kwargs['ltail'] = node_cluster.get_name()
                 if sub_node_cluster is not None:
                     kwargs['lhead'] = sub_node_cluster.get_name()
+                if not obs_states[sub_node_name]:
+                    kwargs['style'] = EdgeStyleFalse
                 graph.add_edge(pydot.Edge(node_name, sub_node_name, color=EndCondColor, penwidth=LineWidth,
                                           arrowhead='none',
                                           arrowtail='normal',
@@ -320,6 +335,8 @@ class ExecutionStateToDotParser:
                     kwargs['ltail'] = node_cluster.get_name()
                 if sub_node_cluster is not None:
                     kwargs['lhead'] = sub_node_cluster.get_name()
+                if not obs_states[sub_node_name]:
+                    kwargs['style'] = EdgeStyleFalse
                 graph.add_edge(pydot.Edge(node_name, sub_node_name, color=ResetCondColor, penwidth=LineWidth,
                                           arrowhead='none',
                                           arrowtail='normal',

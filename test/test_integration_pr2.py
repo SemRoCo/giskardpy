@@ -476,9 +476,9 @@ class TestMonitors:
         zero_pose.execute(add_local_minimum_reached=False)
 
     def test_reset(self, zero_pose: PR2TestWrapper):
-        g1 = zero_pose.tasks.add_joint_position(name='g1',
+        g1 = zero_pose.tasks.add_joint_position(name='joint goal 1',
                                                 goal_state=zero_pose.better_pose)
-        g2 = zero_pose.tasks.add_joint_position(name='g2',
+        g2 = zero_pose.tasks.add_joint_position(name='joint goal 2',
                                                 goal_state=pocky_pose,
                                                 start_condition=g1)
         pulse = zero_pose.monitors.add_monitor(monitor_class=Pulse.__name__,
@@ -891,41 +891,43 @@ class TestMonitors:
         kitchen_setup.execute(add_local_minimum_reached=False)
 
     def test_sleep(self, zero_pose: PR2TestWrapper):
-        alternator = zero_pose.monitors.add_alternator()
-        sleep1 = zero_pose.monitors.add_sleep(1, name='sleep1')
-        print1 = zero_pose.monitors.add_print(message=f'{sleep1} done', start_condition=sleep1)
-        sleep2 = zero_pose.monitors.add_sleep(1.5, name='sleep2', start_condition=f'{print1} or not {sleep1}')
+        alternator = zero_pose.monitors.add_alternator(name='alternator')
+        sleep1 = zero_pose.monitors.add_sleep(name='sleep1', seconds=1)
+        print1 = zero_pose.monitors.add_print(message=f'{sleep1} done', start_condition=sleep1, name='print')
+        sleep2 = zero_pose.monitors.add_sleep(name='sleep2', seconds=1.5, start_condition=f'{print1} or not {sleep1}')
         zero_pose.motion_goals.allow_all_collisions()
 
-        right_monitor = zero_pose.monitors.add_joint_position(zero_pose.better_pose_right,
+        right_monitor = zero_pose.monitors.add_joint_position(goal_state=zero_pose.better_pose_right,
                                                               name='right pose reached',
                                                               start_condition=sleep1)
-        left_monitor = zero_pose.monitors.add_joint_position(zero_pose.better_pose_left,
+        left_monitor = zero_pose.monitors.add_joint_position(goal_state=zero_pose.better_pose_left,
                                                              name='left pose reached',
                                                              start_condition=sleep1)
-        zero_pose.motion_goals.add_joint_position(zero_pose.better_pose_right,
-                                                  name='right pose',
-                                                  start_condition=sleep2,
-                                                  end_condition=right_monitor)
-        zero_pose.motion_goals.add_joint_position(zero_pose.better_pose_left,
-                                                  name='left pose',
-                                                  end_condition=left_monitor)
+        zero_pose.tasks.add_joint_position(goal_state=zero_pose.better_pose_right,
+                                           name='right pose',
+                                           start_condition=sleep2,
+                                           end_condition=right_monitor)
+        zero_pose.tasks.add_joint_position(goal_state=zero_pose.better_pose_left,
+                                           name='left pose',
+                                           end_condition=left_monitor)
 
         base_goal = PoseStamped()
         base_goal.header.frame_id = 'map'
         base_goal.pose.position.x = 2
         base_goal.pose.orientation.w = 1
-        base_monitor = zero_pose.monitors.add_cartesian_pose(root_link='map',
+        base_monitor = zero_pose.monitors.add_cartesian_pose(name='base monitor',
+                                                             root_link='map',
                                                              tip_link='base_footprint',
                                                              goal_pose=base_goal)
 
-        zero_pose.motion_goals.add_cartesian_pose(root_link='map',
+        zero_pose.motion_goals.add_cartesian_pose(name='base goal',
+                                                  root_link='map',
                                                   tip_link='base_footprint',
                                                   goal_pose=base_goal,
                                                   pause_condition=f'not {alternator}',
                                                   end_condition=base_monitor)
 
-        local_min = zero_pose.monitors.add_local_minimum_reached(end_condition='')
+        local_min = zero_pose.monitors.add_local_minimum_reached(end_condition='', name='local min')
         end = zero_pose.monitors.add_end_motion(start_condition=' and '.join([local_min,
                                                                               sleep2,
                                                                               right_monitor,

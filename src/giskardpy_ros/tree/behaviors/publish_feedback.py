@@ -50,9 +50,9 @@ def giskard_state_to_execution_state() -> ExecutionState:
 
 
 def did_state_change() -> bool:
-    if len(god_map.motion_graph_manager.task_state_history) == 0:
-        return False
     if len(god_map.motion_graph_manager.task_state_history) == 1:
+        return False
+    if len(god_map.motion_graph_manager.task_state_history) == 2:
         return True
     last_task_state = god_map.motion_graph_manager.task_state_history[-2][1][0]
     task_state = god_map.motion_graph_manager.task_state_history[-1][1][0]

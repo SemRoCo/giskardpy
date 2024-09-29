@@ -59,7 +59,7 @@ right_monitor = giskard_wrapper.monitors.add_joint_position(goal_state=right_arm
 # You can use add_motion_goal to add any monitor implemented in giskardpy_ros.monitor.
 # All remaining parameters are forwarded to the __init__ function of that class.
 # All specialized add_ functions are just wrappers for add_monitor.
-left_monitor = giskard_wrapper.monitors.add_monitor(monitor_class=JointGoalReached.__name__,
+left_monitor = giskard_wrapper.monitors.add_monitor(class_name=JointGoalReached.__name__,
                                                     goal_state=left_arm_goal,
                                                     name='left pose reached',
                                                     start_condition=sleep1,

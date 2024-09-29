@@ -466,13 +466,13 @@ class GiskardTestWrapper(OldGiskardWrapper):
                                    base_footprint=None):
         if isinstance(tip_link, str):
             tip_link = giskard_msgs.LinkName(name=tip_link)
-        self.motion_goals.add_motion_goal(motion_goal_class=KeepHandInWorkspace.__name__,
+        self.motion_goals.add_motion_goal(class_name=KeepHandInWorkspace.__name__,
                                           tip_link=tip_link,
                                           map_frame=map_frame,
                                           base_footprint=base_footprint)
 
     def set_diff_drive_tangential_to_point(self, goal_point: PointStamped, weight: float = WEIGHT_ABOVE_CA, **kwargs):
-        self.motion_goals.add_motion_goal(motion_goal_class=DiffDriveTangentialToPoint.__name__,
+        self.motion_goals.add_motion_goal(class_name=DiffDriveTangentialToPoint.__name__,
                                           goal_point=goal_point,
                                           weight=weight,
                                           **kwargs)

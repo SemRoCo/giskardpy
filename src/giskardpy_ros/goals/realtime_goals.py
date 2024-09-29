@@ -17,7 +17,7 @@ from giskardpy.model.joints import OmniDrive
 from giskardpy.motion_graph.monitors.monitors import Monitor, EndMotion
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.motion_graph.tasks.task import WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE
-from giskardpy.goals.pointing import Pointing
+from giskardpy.motion_graph.tasks.pointing import Pointing
 import giskardpy.casadi_wrapper as cas
 import giskardpy_ros.ros1.msg_converter as msg_converter
 from giskardpy.utils.decorators import clear_memo, memoize_with_counter

@@ -18,15 +18,15 @@ from giskard_msgs.srv import GetGroupInfo, GetGroupNames
 from giskard_msgs.srv import GetGroupNamesResponse, GetGroupInfoResponse
 from giskardpy.data_types.data_types import goal_parameter
 from giskardpy.data_types.exceptions import LocalMinimumException
-from giskardpy.goals.align_planes import AlignPlanes
+from giskardpy.motion_graph.tasks.align_planes import AlignPlanes
 from giskardpy.goals.align_to_push_door import AlignToPushDoor
 from giskardpy.goals.cartesian_goals import CartesianPose, DiffDriveBaseGoal, CartesianVelocityLimit, \
     CartesianPoseStraight, CartesianPositionStraight
 from giskardpy.goals.collision_avoidance import CollisionAvoidance
-from giskardpy.goals.grasp_bar import GraspBar
+from giskardpy.motion_graph.tasks.grasp_bar import GraspBar
 from giskardpy.goals.joint_goals import JointPositionList, AvoidJointLimits
 from giskardpy.goals.open_close import Close, Open
-from giskardpy.goals.pointing import Pointing
+from giskardpy.motion_graph.tasks.pointing import Pointing
 from giskardpy.goals.pre_push_door import PrePushDoor
 from giskardpy.goals.set_prediction_horizon import SetPredictionHorizon
 from giskardpy.motion_graph.monitors.cartesian_monitors import PoseReached, PositionReached, OrientationReached, \
@@ -36,7 +36,7 @@ from giskardpy.motion_graph.monitors.joint_monitors import JointGoalReached
 from giskardpy.motion_graph.monitors.monitors import LocalMinimumReached, TimeAbove, Alternator, CancelMotion, EndMotion
 from giskardpy.motion_graph.monitors.overwrite_state_monitors import SetOdometry, SetSeedConfiguration
 from giskardpy.motion_graph.monitors.payload_monitors import Print, Sleep, SetMaxTrajectoryLength, \
-    PayloadAlternator
+    PayloadAlternator, Pulse
 from giskardpy.motion_graph.tasks.cartesian_tasks import CartesianPosition, CartesianOrientation
 from giskardpy_ros.goals.realtime_goals import CarryMyBullshit, RealTimePointing, FollowNavPath
 from giskardpy_ros.ros1 import msg_converter
@@ -372,6 +372,16 @@ class MotionGraphNodeWrapper:
                 nodes.append(node.name)
         return ' and '.join(nodes)
 
+    def set_conditions(self, node_name: str,
+                       start_condition: str,
+                       pause_condition: str,
+                       end_condition: str,
+                       reset_condition: str):
+        self.update_start_condition(node_name, start_condition)
+        self.update_pause_condition(node_name, pause_condition)
+        self.update_end_condition(node_name, end_condition)
+        self.update_reset_condition(node_name, reset_condition)
+
     def update_start_condition(self, node_name: str, condition: str) -> None:
         self._motion_graph_nodes[node_name].start_condition = condition
 
@@ -394,7 +404,7 @@ class MotionGoalWrapper(MotionGraphNodeWrapper):
         self._collision_entries = defaultdict(list)
 
     def add_motion_goal(self, *,
-                        motion_goal_class: str,
+                        class_name: str,
                         name: str,
                         start_condition: str = '',
                         pause_condition: str = '',
@@ -402,7 +412,7 @@ class MotionGoalWrapper(MotionGraphNodeWrapper):
                         **kwargs) -> str:
         """
         Generic function to add a motion goal.
-        :param motion_goal_class: Name of a class defined in src/giskardpy/goals
+        :param class_name: Name of a class defined in src/giskardpy/goals
         :param name: a unique name for the goal, will use class name by default
         :param start_condition: a logical expression to define the start condition for this monitor. e.g.
                                     not 'monitor1' and ('monitor2' or 'monitor3')
@@ -410,7 +420,7 @@ class MotionGoalWrapper(MotionGraphNodeWrapper):
         :param end_condition: a logical expression. Goal will become inactive when this becomes True.
         :param kwargs: kwargs for __init__ function of motion_goal_class
         """
-        return super()._add_motion_graph_node(class_name=motion_goal_class,
+        return super()._add_motion_graph_node(class_name=class_name,
                                               name=name,
                                               start_condition=start_condition,
                                               pause_condition=pause_condition,
@@ -430,7 +440,7 @@ class MotionGoalWrapper(MotionGraphNodeWrapper):
             name = 'collision avoidance'
             if start_condition or pause_condition or end_condition:
                 name += f'{start_condition}, {pause_condition}, {end_condition}'
-            self.add_motion_goal(motion_goal_class=CollisionAvoidance.__name__,
+            self.add_motion_goal(class_name=CollisionAvoidance.__name__,
                                  name=name,
                                  collision_entries=collision_entries,
                                  start_condition=start_condition,
@@ -535,44 +545,6 @@ class MotionGoalWrapper(MotionGraphNodeWrapper):
                                       pause_condition=pause_condition,
                                       end_condition=end_condition)
 
-    def add_align_planes(self,
-                         name: str,
-                         goal_normal: Vector3Stamped,
-                         tip_link: Union[str, giskard_msgs.LinkName],
-                         tip_normal: Vector3Stamped,
-                         root_link: Union[str, giskard_msgs.LinkName],
-                         reference_angular_velocity: Optional[float] = None,
-                         weight: Optional[float] = None,
-                         start_condition: str = '',
-                         pause_condition: str = '',
-                         end_condition: str = '',
-                         **kwargs: goal_parameter) -> str:
-        """
-        This goal will use the kinematic chain between tip and root to align tip_normal with goal_normal.
-        :param goal_normal:
-        :param tip_link: tip link of the kinematic chain
-        :param tip_normal:
-        :param root_link: root link of the kinematic chain
-        :param reference_angular_velocity: rad/s
-        :param weight:
-        """
-        if isinstance(root_link, str):
-            root_link = giskard_msgs.LinkName(name=root_link)
-        if isinstance(tip_link, str):
-            tip_link = giskard_msgs.LinkName(name=tip_link)
-        return self.add_motion_goal(motion_goal_class=AlignPlanes.__name__,
-                                    tip_link=tip_link,
-                                    tip_normal=tip_normal,
-                                    root_link=root_link,
-                                    goal_normal=goal_normal,
-                                    max_angular_velocity=reference_angular_velocity,
-                                    weight=weight,
-                                    name=name,
-                                    start_condition=start_condition,
-                                    pause_condition=pause_condition,
-                                    end_condition=end_condition,
-                                    **kwargs)
-
     def add_cartesian_pose(self,
                            name: str,
                            goal_pose: PoseStamped,
@@ -603,7 +575,7 @@ class MotionGoalWrapper(MotionGraphNodeWrapper):
             root_link = giskard_msgs.LinkName(name=root_link)
         if isinstance(tip_link, str):
             tip_link = giskard_msgs.LinkName(name=tip_link)
-        return self.add_motion_goal(motion_goal_class=CartesianPose.__name__,
+        return self.add_motion_goal(class_name=CartesianPose.__name__,
                                     goal_pose=goal_pose,
                                     tip_link=tip_link,
                                     root_link=root_link,
@@ -629,7 +601,7 @@ class MotionGoalWrapper(MotionGraphNodeWrapper):
         This goal will push joints away from their position limits. For example if percentage is 15 and the joint
         limits are 0-100, it will push it into the 15-85 range.
         """
-        return self.add_motion_goal(motion_goal_class=AvoidJointLimits.__name__,
+        return self.add_motion_goal(class_name=AvoidJointLimits.__name__,
                                     percentage=percentage,
                                     weight=weight,
                                     joint_list=joint_list,
@@ -654,7 +626,7 @@ class MotionGoalWrapper(MotionGraphNodeWrapper):
             environment_link = giskard_msgs.LinkName(name=environment_link)
         if isinstance(tip_link, str):
             tip_link = giskard_msgs.LinkName(name=tip_link)
-        return self.add_motion_goal(motion_goal_class=Close.__name__,
+        return self.add_motion_goal(class_name=Close.__name__,
                                     tip_link=tip_link,
                                     environment_link=environment_link,
                                     goal_joint_state=goal_joint_state,
@@ -687,7 +659,7 @@ class MotionGoalWrapper(MotionGraphNodeWrapper):
             environment_link = giskard_msgs.LinkName(name=environment_link)
         if isinstance(tip_link, str):
             tip_link = giskard_msgs.LinkName(name=tip_link)
-        return self.add_motion_goal(motion_goal_class=Open.__name__,
+        return self.add_motion_goal(class_name=Open.__name__,
                                     tip_link=tip_link,
                                     environment_link=environment_link,
                                     goal_joint_state=goal_joint_state,
@@ -722,7 +694,7 @@ class MotionGoalWrapper(MotionGraphNodeWrapper):
         : param tip_gripper_axis: axis of the tip_link that will be aligned along the door rotation axis
         : param object_rotation_axis: door rotation axis w.r.t root
         """
-        return self.add_motion_goal(motion_goal_class=AlignToPushDoor.__name__,
+        return self.add_motion_goal(class_name=AlignToPushDoor.__name__,
                                     root_link=root_link,
                                     tip_link=tip_link,
                                     door_handle=door_handle,
@@ -759,7 +731,7 @@ class MotionGoalWrapper(MotionGraphNodeWrapper):
         : param root_V_object_rotation_axis: door rotation axis w.r.t root
         : param root_V_object_normal: door normal w.r.t root
         """
-        return self.add_motion_goal(motion_goal_class=PrePushDoor.__name__,
+        return self.add_motion_goal(class_name=PrePushDoor.__name__,
                                     root_link=root_link,
                                     tip_link=tip_link,
                                     door_object=door_object,
@@ -802,58 +774,10 @@ class MotionGoalWrapper(MotionGraphNodeWrapper):
             root_link = giskard_msgs.LinkName(name=root_link)
         if isinstance(tip_link, str):
             tip_link = giskard_msgs.LinkName(name=tip_link)
-        return self.add_motion_goal(motion_goal_class=DiffDriveBaseGoal.__name__,
+        return self.add_motion_goal(class_name=DiffDriveBaseGoal.__name__,
                                     goal_pose=goal_pose,
                                     tip_link=tip_link,
                                     root_link=root_link,
-                                    reference_linear_velocity=reference_linear_velocity,
-                                    reference_angular_velocity=reference_angular_velocity,
-                                    weight=weight,
-                                    name=name,
-                                    start_condition=start_condition,
-                                    pause_condition=pause_condition,
-                                    end_condition=end_condition,
-                                    **kwargs)
-
-    def add_grasp_bar(self,
-                      name: str,
-                      bar_center: PointStamped,
-                      bar_axis: Vector3Stamped,
-                      bar_length: float,
-                      tip_link: Union[str, giskard_msgs.LinkName],
-                      tip_grasp_axis: Vector3Stamped,
-                      root_link: Union[str, giskard_msgs.LinkName],
-                      reference_linear_velocity: Optional[float] = None,
-                      reference_angular_velocity: Optional[float] = None,
-                      weight: Optional[float] = None,
-                      start_condition: str = '',
-                      pause_condition: str = '',
-                      end_condition: Optional[str] = None,
-                      **kwargs: goal_parameter) -> str:
-        """
-        Like a CartesianPose but with more freedom.
-        tip_link is allowed to be at any point along bar_axis, that is without bar_center +/- bar_length.
-        It will align tip_grasp_axis with bar_axis, but allows rotation around it.
-        :param root_link: root link of the kinematic chain
-        :param tip_link: tip link of the kinematic chain
-        :param tip_grasp_axis: axis of tip_link that will be aligned with bar_axis
-        :param bar_center: center of the bar to be grasped
-        :param bar_axis: alignment of the bar to be grasped
-        :param bar_length: length of the bar to be grasped
-        :param reference_linear_velocity: m/s
-        :param reference_angular_velocity: rad/s
-        """
-        if isinstance(root_link, str):
-            root_link = giskard_msgs.LinkName(name=root_link)
-        if isinstance(tip_link, str):
-            tip_link = giskard_msgs.LinkName(name=tip_link)
-        return self.add_motion_goal(motion_goal_class=GraspBar.__name__,
-                                    root_link=root_link,
-                                    tip_link=tip_link,
-                                    tip_grasp_axis=tip_grasp_axis,
-                                    bar_center=bar_center,
-                                    bar_axis=bar_axis,
-                                    bar_length=bar_length,
                                     reference_linear_velocity=reference_linear_velocity,
                                     reference_angular_velocity=reference_angular_velocity,
                                     weight=weight,
@@ -888,50 +812,13 @@ class MotionGoalWrapper(MotionGraphNodeWrapper):
             root_link = giskard_msgs.LinkName(name=root_link)
         if isinstance(tip_link, str):
             tip_link = giskard_msgs.LinkName(name=tip_link)
-        return self.add_motion_goal(motion_goal_class=CartesianVelocityLimit.__name__,
+        return self.add_motion_goal(class_name=CartesianVelocityLimit.__name__,
                                     root_link=root_link,
                                     tip_link=tip_link,
                                     weight=weight,
                                     max_linear_velocity=max_linear_velocity,
                                     max_angular_velocity=max_angular_velocity,
                                     hard=hard,
-                                    name=name,
-                                    start_condition=start_condition,
-                                    pause_condition=pause_condition,
-                                    end_condition=end_condition,
-                                    **kwargs)
-
-    def add_pointing(self,
-                     name: str,
-                     goal_point: PointStamped,
-                     tip_link: Union[str, giskard_msgs.LinkName],
-                     pointing_axis: Vector3Stamped,
-                     root_link: Union[str, giskard_msgs.LinkName],
-                     max_velocity: float = 0.3,
-                     weight: Optional[float] = None,
-                     start_condition: str = '',
-                     pause_condition: str = '',
-                     end_condition: str = '',
-                     **kwargs: goal_parameter) -> str:
-        """
-        Will orient pointing_axis at goal_point.
-        :param tip_link: tip link of the kinematic chain.
-        :param goal_point: where to point pointing_axis at.
-        :param root_link: root link of the kinematic chain.
-        :param pointing_axis: the axis of tip_link that will be used for pointing
-        :param max_velocity: rad/s
-        """
-        if isinstance(root_link, str):
-            root_link = giskard_msgs.LinkName(name=root_link)
-        if isinstance(tip_link, str):
-            tip_link = giskard_msgs.LinkName(name=tip_link)
-        return self.add_motion_goal(motion_goal_class=Pointing.__name__,
-                                    tip_link=tip_link,
-                                    goal_point=goal_point,
-                                    root_link=root_link,
-                                    pointing_axis=pointing_axis,
-                                    max_velocity=max_velocity,
-                                    weight=weight,
                                     name=name,
                                     start_condition=start_condition,
                                     pause_condition=pause_condition,
@@ -962,7 +849,7 @@ class MotionGoalWrapper(MotionGraphNodeWrapper):
         :param pointing_axis: the axis of tip_link that will be used for pointing
         :param max_velocity: rad/s
         """
-        return self.add_motion_goal(motion_goal_class=RealTimePointing.__name__,
+        return self.add_motion_goal(class_name=RealTimePointing.__name__,
                                     tip_link=tip_link,
                                     tip_group=tip_group,
                                     root_link=root_link,
@@ -1043,7 +930,7 @@ class MotionGoalWrapper(MotionGraphNodeWrapper):
         :param pause_condition:
         :param end_condition:
         """
-        return self.add_motion_goal(motion_goal_class=CarryMyBullshit.__name__,
+        return self.add_motion_goal(class_name=CarryMyBullshit.__name__,
                                     name=name,
                                     patrick_topic_name=tracked_human_position_topic_name,
                                     laser_topic_name=laser_topic_name,
@@ -1125,7 +1012,7 @@ class MotionGoalWrapper(MotionGraphNodeWrapper):
         :param pause_condition:
         :param end_condition:
         """
-        return self.add_motion_goal(motion_goal_class=FollowNavPath.__name__,
+        return self.add_motion_goal(class_name=FollowNavPath.__name__,
                                     name=name,
                                     path=path,
                                     laser_topics=laser_topics,
@@ -1197,7 +1084,7 @@ class MotionGoalWrapper(MotionGraphNodeWrapper):
             root_link = giskard_msgs.LinkName(name=root_link)
         if isinstance(tip_link, str):
             tip_link = giskard_msgs.LinkName(name=tip_link)
-        return self.add_motion_goal(motion_goal_class=CartesianPoseStraight.__name__,
+        return self.add_motion_goal(class_name=CartesianPoseStraight.__name__,
                                     goal_pose=goal_pose,
                                     tip_link=tip_link,
                                     root_link=root_link,
@@ -1230,7 +1117,7 @@ class MotionGoalWrapper(MotionGraphNodeWrapper):
             root_link = giskard_msgs.LinkName(name=root_link)
         if isinstance(tip_link, str):
             tip_link = giskard_msgs.LinkName(name=tip_link)
-        return self.add_motion_goal(motion_goal_class=CartesianPositionStraight.__name__,
+        return self.add_motion_goal(class_name=CartesianPositionStraight.__name__,
                                     goal_point=goal_point,
                                     tip_link=tip_link,
                                     root_link=root_link,
@@ -1259,7 +1146,7 @@ class MotionGoalWrapper(MotionGraphNodeWrapper):
             root_link = giskard_msgs.LinkName(name=root_link)
         if isinstance(tip_link, str):
             tip_link = giskard_msgs.LinkName(name=tip_link)
-        return self.add_motion_goal(motion_goal_class=AlignPerpendicular.__name__,
+        return self.add_motion_goal(class_name=AlignPerpendicular.__name__,
                                     tip_normal=tip_normal,
                                     reference_normal=reference_normal,
                                     tip_link=tip_link,
@@ -1290,7 +1177,7 @@ class MotionGoalWrapper(MotionGraphNodeWrapper):
             root_link = giskard_msgs.LinkName(name=root_link)
         if isinstance(tip_link, str):
             tip_link = giskard_msgs.LinkName(name=tip_link)
-        return self.add_motion_goal(motion_goal_class=HeightGoal.__name__,
+        return self.add_motion_goal(class_name=HeightGoal.__name__,
                                     tip_point=tip_point,
                                     reference_point=reference_point,
                                     tip_link=tip_link,
@@ -1323,7 +1210,7 @@ class MotionGoalWrapper(MotionGraphNodeWrapper):
             root_link = giskard_msgs.LinkName(name=root_link)
         if isinstance(tip_link, str):
             tip_link = giskard_msgs.LinkName(name=tip_link)
-        return self.add_motion_goal(motion_goal_class=DistanceGoal.__name__,
+        return self.add_motion_goal(class_name=DistanceGoal.__name__,
                                     tip_point=tip_point,
                                     reference_point=reference_point,
                                     tip_link=tip_link,
@@ -1356,7 +1243,7 @@ class MotionGoalWrapper(MotionGraphNodeWrapper):
             root_link = giskard_msgs.LinkName(name=root_link)
         if isinstance(tip_link, str):
             tip_link = giskard_msgs.LinkName(name=tip_link)
-        return self.add_motion_goal(motion_goal_class=AngleGoal.__name__,
+        return self.add_motion_goal(class_name=AngleGoal.__name__,
                                     tip_vector=tip_vector,
                                     reference_vector=reference_vector,
                                     tip_link=tip_link,
@@ -1376,18 +1263,104 @@ class TaskWrapper(MotionGraphNodeWrapper):
     _name_prefix = 'T'
 
     def add_task(self, *,
-                 task_class: str,
+                 class_name: str,
                  name: str,
                  start_condition: str = '',
                  pause_condition: str = '',
                  end_condition: Optional[str] = None,
                  **kwargs) -> str:
-        return super()._add_motion_graph_node(class_name=task_class,
+        return super()._add_motion_graph_node(class_name=class_name,
                                               name=name,
                                               start_condition=start_condition,
                                               pause_condition=pause_condition,
                                               end_condition=end_condition,
                                               **kwargs)
+
+    def add_grasp_bar(self,
+                      name: str,
+                      bar_center: PointStamped,
+                      bar_axis: Vector3Stamped,
+                      bar_length: float,
+                      tip_link: Union[str, giskard_msgs.LinkName],
+                      tip_grasp_axis: Vector3Stamped,
+                      root_link: Union[str, giskard_msgs.LinkName],
+                      reference_linear_velocity: Optional[float] = None,
+                      reference_angular_velocity: Optional[float] = None,
+                      weight: Optional[float] = None,
+                      start_condition: str = '',
+                      pause_condition: str = '',
+                      end_condition: Optional[str] = None,
+                      **kwargs: goal_parameter) -> str:
+        """
+        Like a CartesianPose but with more freedom.
+        tip_link is allowed to be at any point along bar_axis, that is without bar_center +/- bar_length.
+        It will align tip_grasp_axis with bar_axis, but allows rotation around it.
+        :param root_link: root link of the kinematic chain
+        :param tip_link: tip link of the kinematic chain
+        :param tip_grasp_axis: axis of tip_link that will be aligned with bar_axis
+        :param bar_center: center of the bar to be grasped
+        :param bar_axis: alignment of the bar to be grasped
+        :param bar_length: length of the bar to be grasped
+        :param reference_linear_velocity: m/s
+        :param reference_angular_velocity: rad/s
+        """
+        if isinstance(root_link, str):
+            root_link = giskard_msgs.LinkName(name=root_link)
+        if isinstance(tip_link, str):
+            tip_link = giskard_msgs.LinkName(name=tip_link)
+        return self.add_task(class_name=GraspBar.__name__,
+                             root_link=root_link,
+                             tip_link=tip_link,
+                             tip_grasp_axis=tip_grasp_axis,
+                             bar_center=bar_center,
+                             bar_axis=bar_axis,
+                             bar_length=bar_length,
+                             reference_linear_velocity=reference_linear_velocity,
+                             reference_angular_velocity=reference_angular_velocity,
+                             weight=weight,
+                             name=name,
+                             start_condition=start_condition,
+                             pause_condition=pause_condition,
+                             end_condition=end_condition,
+                             **kwargs)
+
+    def add_align_planes(self,
+                         name: str,
+                         goal_normal: Vector3Stamped,
+                         tip_link: Union[str, giskard_msgs.LinkName],
+                         tip_normal: Vector3Stamped,
+                         root_link: Union[str, giskard_msgs.LinkName],
+                         reference_angular_velocity: Optional[float] = None,
+                         weight: Optional[float] = None,
+                         start_condition: str = '',
+                         pause_condition: str = '',
+                         end_condition: str = '',
+                         **kwargs: goal_parameter) -> str:
+        """
+        This goal will use the kinematic chain between tip and root to align tip_normal with goal_normal.
+        :param goal_normal:
+        :param tip_link: tip link of the kinematic chain
+        :param tip_normal:
+        :param root_link: root link of the kinematic chain
+        :param reference_angular_velocity: rad/s
+        :param weight:
+        """
+        if isinstance(root_link, str):
+            root_link = giskard_msgs.LinkName(name=root_link)
+        if isinstance(tip_link, str):
+            tip_link = giskard_msgs.LinkName(name=tip_link)
+        return self.add_task(class_name=AlignPlanes.__name__,
+                             tip_link=tip_link,
+                             tip_normal=tip_normal,
+                             root_link=root_link,
+                             goal_normal=goal_normal,
+                             max_angular_velocity=reference_angular_velocity,
+                             weight=weight,
+                             name=name,
+                             start_condition=start_condition,
+                             pause_condition=pause_condition,
+                             end_condition=end_condition,
+                             **kwargs)
 
     def add_joint_position(self,
                            name: str,
@@ -1404,7 +1377,7 @@ class TaskWrapper(MotionGraphNodeWrapper):
         :param weight: None = use default weight
         :param max_velocity: will be applied to all joints
         """
-        return self.add_task(task_class=JointPositionList.__name__,
+        return self.add_task(class_name=JointPositionList.__name__,
                              goal_state=goal_state,
                              weight=weight,
                              max_velocity=max_velocity,
@@ -1439,7 +1412,7 @@ class TaskWrapper(MotionGraphNodeWrapper):
             root_link = giskard_msgs.LinkName(name=root_link)
         if isinstance(tip_link, str):
             tip_link = giskard_msgs.LinkName(name=tip_link)
-        return self.add_task(task_class=CartesianPosition.__name__,
+        return self.add_task(class_name=CartesianPosition.__name__,
                              goal_point=goal_point,
                              tip_link=tip_link,
                              root_link=root_link,
@@ -1478,13 +1451,52 @@ class TaskWrapper(MotionGraphNodeWrapper):
             root_link = giskard_msgs.LinkName(name=root_link)
         if isinstance(tip_link, str):
             tip_link = giskard_msgs.LinkName(name=tip_link)
-        return self.add_task(task_class=CartesianOrientation.__name__,
+        return self.add_task(class_name=CartesianOrientation.__name__,
                              goal_orientation=goal_orientation,
                              tip_link=tip_link,
                              root_link=root_link,
                              reference_velocity=reference_velocity,
                              weight=weight,
                              absolute=absolute,
+                             name=name,
+                             start_condition=start_condition,
+                             pause_condition=pause_condition,
+                             end_condition=end_condition,
+                             **kwargs)
+
+    def add_pointing(self,
+                     name: str,
+                     goal_point: PointStamped,
+                     tip_link: Union[str, giskard_msgs.LinkName],
+                     pointing_axis: Vector3Stamped,
+                     root_link: Union[str, giskard_msgs.LinkName],
+                     max_velocity: float = 0.3,
+                     threshold: float = 0.01,
+                     weight: Optional[float] = None,
+                     start_condition: str = '',
+                     pause_condition: str = '',
+                     end_condition: str = '',
+                     **kwargs: goal_parameter) -> str:
+        """
+        Will orient pointing_axis at goal_point.
+        :param tip_link: tip link of the kinematic chain.
+        :param goal_point: where to point pointing_axis at.
+        :param root_link: root link of the kinematic chain.
+        :param pointing_axis: the axis of tip_link that will be used for pointing
+        :param max_velocity: rad/s
+        """
+        if isinstance(root_link, str):
+            root_link = giskard_msgs.LinkName(name=root_link)
+        if isinstance(tip_link, str):
+            tip_link = giskard_msgs.LinkName(name=tip_link)
+        return self.add_task(class_name=Pointing.__name__,
+                             tip_link=tip_link,
+                             goal_point=goal_point,
+                             root_link=root_link,
+                             pointing_axis=pointing_axis,
+                             max_velocity=max_velocity,
+                             threshold=threshold,
+                             weight=weight,
                              name=name,
                              start_condition=start_condition,
                              pause_condition=pause_condition,
@@ -1501,7 +1513,7 @@ class MonitorWrapper(MotionGraphNodeWrapper):
         self.max_trajectory_length_set = False
 
     def add_monitor(self, *,
-                    monitor_class: str,
+                    class_name: str,
                     name: str,
                     start_condition: str = '',
                     pause_condition: str = '',
@@ -1510,7 +1522,7 @@ class MonitorWrapper(MotionGraphNodeWrapper):
                     **kwargs) -> str:
         """
         Generic function to add a monitor.
-        :param monitor_class: Name of a class defined in src/giskardpy/monitors
+        :param class_name: Name of a class defined in src/giskardpy/monitors
         :param name: a unique name for the goal, will use class name by default
         :param start_condition: a logical expression to define the start condition for this monitor. e.g.
                                     not 'monitor1' and ('monitor2' or 'monitor3')
@@ -1519,7 +1531,7 @@ class MonitorWrapper(MotionGraphNodeWrapper):
         :param kwargs: kwargs for __init__ function of motion_goal_class
         :return: the name of the monitor with added quotes to be used in logical expressions for conditions.
         """
-        return super()._add_motion_graph_node(class_name=monitor_class,
+        return super()._add_motion_graph_node(class_name=class_name,
                                               name=name,
                                               start_condition=start_condition,
                                               pause_condition=pause_condition,
@@ -1535,7 +1547,7 @@ class MonitorWrapper(MotionGraphNodeWrapper):
         """
         True if the world is currently in a local minimum.
         """
-        return self.add_monitor(monitor_class=LocalMinimumReached.__name__,
+        return self.add_monitor(class_name=LocalMinimumReached.__name__,
                                 name=name,
                                 start_condition=start_condition,
                                 pause_condition=pause_condition,
@@ -1550,7 +1562,7 @@ class MonitorWrapper(MotionGraphNodeWrapper):
         """
         True if the length of the trajectory is above threshold
         """
-        return self.add_monitor(monitor_class=TimeAbove.__name__,
+        return self.add_monitor(class_name=TimeAbove.__name__,
                                 name=name,
                                 start_condition=start_condition,
                                 pause_condition=pause_condition,
@@ -1567,7 +1579,7 @@ class MonitorWrapper(MotionGraphNodeWrapper):
         """
         True if all joints in goal_state are closer than threshold to their respective value.
         """
-        return self.add_monitor(monitor_class=JointGoalReached.__name__,
+        return self.add_monitor(class_name=JointGoalReached.__name__,
                                 name=name,
                                 goal_state=goal_state,
                                 threshold=threshold,
@@ -1593,7 +1605,7 @@ class MonitorWrapper(MotionGraphNodeWrapper):
             root_link = giskard_msgs.LinkName(name=root_link)
         if isinstance(tip_link, str):
             tip_link = giskard_msgs.LinkName(name=tip_link)
-        return self.add_monitor(monitor_class=PoseReached.__name__,
+        return self.add_monitor(class_name=PoseReached.__name__,
                                 name=name,
                                 root_link=root_link,
                                 tip_link=tip_link,
@@ -1622,7 +1634,7 @@ class MonitorWrapper(MotionGraphNodeWrapper):
             root_link = giskard_msgs.LinkName(name=root_link)
         if isinstance(tip_link, str):
             tip_link = giskard_msgs.LinkName(name=tip_link)
-        return self.add_monitor(monitor_class=PositionReached.__name__,
+        return self.add_monitor(class_name=PositionReached.__name__,
                                 name=name,
                                 root_link=root_link,
                                 tip_link=tip_link,
@@ -1652,7 +1664,7 @@ class MonitorWrapper(MotionGraphNodeWrapper):
             root_link = giskard_msgs.LinkName(name=root_link)
         if isinstance(tip_link, str):
             tip_link = giskard_msgs.LinkName(name=tip_link)
-        return self.add_monitor(monitor_class=DistanceToLine.__name__,
+        return self.add_monitor(class_name=DistanceToLine.__name__,
                                 name=name,
                                 center_point=center_point,
                                 line_axis=line_axis,
@@ -1681,7 +1693,7 @@ class MonitorWrapper(MotionGraphNodeWrapper):
             root_link = giskard_msgs.LinkName(name=root_link)
         if isinstance(tip_link, str):
             tip_link = giskard_msgs.LinkName(name=tip_link)
-        return self.add_monitor(monitor_class=OrientationReached.__name__,
+        return self.add_monitor(class_name=OrientationReached.__name__,
                                 name=name,
                                 root_link=root_link,
                                 tip_link=tip_link,
@@ -1709,7 +1721,7 @@ class MonitorWrapper(MotionGraphNodeWrapper):
             root_link = giskard_msgs.LinkName(name=root_link)
         if isinstance(tip_link, str):
             tip_link = giskard_msgs.LinkName(name=tip_link)
-        return self.add_monitor(monitor_class=PointingAt.__name__,
+        return self.add_monitor(class_name=PointingAt.__name__,
                                 name=name,
                                 tip_link=tip_link,
                                 goal_point=goal_point,
@@ -1737,7 +1749,7 @@ class MonitorWrapper(MotionGraphNodeWrapper):
             root_link = giskard_msgs.LinkName(name=root_link)
         if isinstance(tip_link, str):
             tip_link = giskard_msgs.LinkName(name=tip_link)
-        return self.add_monitor(monitor_class=VectorsAligned.__name__,
+        return self.add_monitor(class_name=VectorsAligned.__name__,
                                 name=name,
                                 root_link=root_link,
                                 tip_link=tip_link,
@@ -1756,7 +1768,7 @@ class MonitorWrapper(MotionGraphNodeWrapper):
         Use this to describe when your motion should end.
         """
         name = name or EndMotion.__name__
-        return self.add_monitor(monitor_class=EndMotion.__name__,
+        return self.add_monitor(class_name=EndMotion.__name__,
                                 name=name,
                                 start_condition=start_condition,
                                 pause_condition='',
@@ -1772,7 +1784,7 @@ class MonitorWrapper(MotionGraphNodeWrapper):
         """
         name = name or CancelMotion.__name__
         error = msg_converter.exception_to_error_msg(error)
-        return self.add_monitor(monitor_class=CancelMotion.__name__,
+        return self.add_monitor(class_name=CancelMotion.__name__,
                                 name=name,
                                 start_condition=start_condition,
                                 pause_condition='',
@@ -1786,7 +1798,7 @@ class MonitorWrapper(MotionGraphNodeWrapper):
         """
         self.max_trajectory_length_set = True
         return self.add_monitor(name='max traj length',
-                                monitor_class=SetMaxTrajectoryLength.__name__,
+                                class_name=SetMaxTrajectoryLength.__name__,
                                 length=max_trajectory_length,
                                 start_condition='',
                                 pause_condition='',
@@ -1800,7 +1812,7 @@ class MonitorWrapper(MotionGraphNodeWrapper):
         Debugging Monitor.
         Print a message to the terminal if all start_condition are True.
         """
-        return self.add_monitor(monitor_class=Print.__name__,
+        return self.add_monitor(class_name=Print.__name__,
                                 name=name,
                                 message=message,
                                 start_condition=start_condition)
@@ -1812,7 +1824,7 @@ class MonitorWrapper(MotionGraphNodeWrapper):
         """
         Calls rospy.sleep(seconds) when start_condition are True and turns True itself afterward.
         """
-        return self.add_monitor(monitor_class=Sleep.__name__,
+        return self.add_monitor(class_name=Sleep.__name__,
                                 name=name,
                                 seconds=seconds,
                                 start_condition=start_condition)
@@ -1826,7 +1838,7 @@ class MonitorWrapper(MotionGraphNodeWrapper):
         Only meant for use with projection. Changes the world state to seed_configuration before starting planning,
         without having to plan a motion to it like with add_joint_position
         """
-        return self.add_monitor(monitor_class=SetSeedConfiguration.__name__,
+        return self.add_monitor(class_name=SetSeedConfiguration.__name__,
                                 seed_configuration=seed_configuration,
                                 group_name=group_name,
                                 name=name,
@@ -1840,7 +1852,7 @@ class MonitorWrapper(MotionGraphNodeWrapper):
         """
         Only meant for use with projection. Overwrites the odometry transform with base_pose.
         """
-        return self.add_monitor(monitor_class=SetOdometry.__name__,
+        return self.add_monitor(class_name=SetOdometry.__name__,
                                 group_name=group_name,
                                 base_pose=base_pose,
                                 name=name,
@@ -1852,7 +1864,7 @@ class MonitorWrapper(MotionGraphNodeWrapper):
         Setting it to 1 will turn of acceleration and jerk limits.
         :param prediction_horizon: size of the prediction horizon, a number that should be 1 or above 5.
         """
-        self.add_monitor(monitor_class=SetPredictionHorizon.__name__,
+        self.add_monitor(class_name=SetPredictionHorizon.__name__,
                          prediction_horizon=prediction_horizon,
                          **kwargs)
 
@@ -1868,7 +1880,7 @@ class MonitorWrapper(MotionGraphNodeWrapper):
         """
         if name is None:
             name = Alternator.__name__ + f' % {mod}'
-        return self.add_monitor(monitor_class=Alternator.__name__,
+        return self.add_monitor(class_name=Alternator.__name__,
                                 name=name,
                                 start_condition=start_condition,
                                 pause_condition=pause_condition,
@@ -1887,12 +1899,29 @@ class MonitorWrapper(MotionGraphNodeWrapper):
         """
         if name is None:
             name = PayloadAlternator.__name__ + f' % {mod}'
-        return self.add_monitor(monitor_class=Alternator.__name__,
+        return self.add_monitor(class_name=Alternator.__name__,
                                 name=name,
                                 start_condition=start_condition,
                                 pause_condition=pause_condition,
                                 end_condition=end_condition,
                                 mod=mod)
+
+    def add_pulse(self,
+                  name: str,
+                  after_ticks: int,
+                  start_condition: str = '',
+                  pause_condition: str = '',
+                  end_condition: str = '') -> str:
+        """
+        Testing monitor.
+        Like add_alternator but as a PayloadMonitor.
+        """
+        return self.add_monitor(class_name=Pulse.__name__,
+                                name=name,
+                                after_ticks=after_ticks,
+                                start_condition=start_condition,
+                                pause_condition=pause_condition,
+                                end_condition=end_condition)
 
     def add_vectors_perpendicular(self,
                                   root_link: Union[str, giskard_msgs.LinkName],
@@ -1911,7 +1940,7 @@ class MonitorWrapper(MotionGraphNodeWrapper):
             root_link = giskard_msgs.LinkName(name=root_link)
         if isinstance(tip_link, str):
             tip_link = giskard_msgs.LinkName(name=tip_link)
-        return self.add_monitor(monitor_class=PerpendicularMonitor.__name__,
+        return self.add_monitor(class_name=PerpendicularMonitor.__name__,
                                 name=name,
                                 root_link=root_link,
                                 tip_link=tip_link,
@@ -1940,7 +1969,7 @@ class MonitorWrapper(MotionGraphNodeWrapper):
             root_link = giskard_msgs.LinkName(name=root_link)
         if isinstance(tip_link, str):
             tip_link = giskard_msgs.LinkName(name=tip_link)
-        return self.add_monitor(monitor_class=AngleMonitor.__name__,
+        return self.add_monitor(class_name=AngleMonitor.__name__,
                                 name=name,
                                 root_link=root_link,
                                 tip_link=tip_link,
@@ -1971,7 +2000,7 @@ class MonitorWrapper(MotionGraphNodeWrapper):
             root_link = giskard_msgs.LinkName(name=root_link)
         if isinstance(tip_link, str):
             tip_link = giskard_msgs.LinkName(name=tip_link)
-        return self.add_monitor(monitor_class=HeightMonitor.__name__,
+        return self.add_monitor(class_name=HeightMonitor.__name__,
                                 name=name,
                                 root_link=root_link,
                                 tip_link=tip_link,
@@ -2002,7 +2031,7 @@ class MonitorWrapper(MotionGraphNodeWrapper):
             root_link = giskard_msgs.LinkName(name=root_link)
         if isinstance(tip_link, str):
             tip_link = giskard_msgs.LinkName(name=tip_link)
-        return self.add_monitor(monitor_class=DistanceMonitor.__name__,
+        return self.add_monitor(class_name=DistanceMonitor.__name__,
                                 name=name,
                                 root_link=root_link,
                                 tip_link=tip_link,
@@ -2034,6 +2063,28 @@ class GiskardWrapper:
         self._client.wait_for_server()
         self.clear_motion_goals_and_monitors()
         rospy.sleep(.3)
+
+    def set_conditions(self, node_name: str,
+                       start_condition: str,
+                       pause_condition: str,
+                       end_condition: str,
+                       reset_condition: str):
+        self.update_start_condition(node_name, start_condition)
+        self.update_pause_condition(node_name, pause_condition)
+        self.update_end_condition(node_name, end_condition)
+        self.update_reset_condition(node_name, reset_condition)
+
+    def update_start_condition(self, node_name: str, condition: str) -> None:
+        self.motion_graph_nodes[node_name].start_condition = condition
+
+    def update_reset_condition(self, node_name: str, condition: str) -> None:
+        self.motion_graph_nodes[node_name].reset_condition = condition
+
+    def update_pause_condition(self, node_name: str, condition: str) -> None:
+        self.motion_graph_nodes[node_name].pause_condition = condition
+
+    def update_end_condition(self, node_name: str, condition: str) -> None:
+        self.motion_graph_nodes[node_name].end_condition = condition
 
     def quote_node_names(self, condition: str) -> str:
         operators = {'and', 'or', 'not', '(', ')'}

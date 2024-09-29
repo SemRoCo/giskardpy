@@ -6,19 +6,19 @@ import numpy as np
 
 import giskardpy.casadi_wrapper as cas
 from giskardpy.data_types.data_types import ColorRGBA, PrefixName
-from giskardpy.goals.goal import Goal
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.motion_graph.tasks.task import WEIGHT_BELOW_CA, Task
 from giskardpy.god_map import god_map
 
 
-class Pointing(Goal):
+class Pointing(Task):
     def __init__(self,
                  tip_link: PrefixName,
                  goal_point: cas.Point3,
                  root_link: PrefixName,
                  pointing_axis: cas.Vector3,
                  max_velocity: float = 0.3,
+                 threshold: float = 0.01,
                  weight: float = WEIGHT_BELOW_CA,
                  name: Optional[str] = None):
         """
@@ -55,19 +55,17 @@ class Pointing(Goal):
         root_V_pointing_axis = root_T_tip.dot(tip_V_pointing_axis)
         root_V_pointing_axis.vis_frame = self.tip
         root_V_goal_axis.vis_frame = self.tip
-        # self.add_debug_expr('goal_point', root_P_goal_point)
-        # self.add_debug_expr('root_V_pointing_axis', root_V_pointing_axis)
-        # self.add_debug_expr('root_V_goal_axis', root_V_goal_axis)
         god_map.debug_expression_manager.add_debug_expression('root_V_pointing_axis',
                                                               root_V_pointing_axis,
+                                                              color=ColorRGBA(r=1, g=0, b=0, a=1))
+        god_map.debug_expression_manager.add_debug_expression('root_V_goal_axis',
+                                                              root_V_goal_axis,
                                                               color=ColorRGBA(r=1, g=0, b=0, a=1))
         god_map.debug_expression_manager.add_debug_expression('goal_point',
                                                               root_P_goal_point,
                                                               color=ColorRGBA(r=0, g=0, b=1, a=1))
-        task = Task(name='pointing')
-        self.add_task(task)
-        task.add_vector_goal_constraints(frame_V_current=root_V_pointing_axis,
+        self.add_vector_goal_constraints(frame_V_current=root_V_pointing_axis,
                                          frame_V_goal=root_V_goal_axis,
                                          reference_velocity=self.max_velocity,
                                          weight=self.weight)
-        self.expression = cas.less_equal(cas.angle_between_vector(root_V_pointing_axis, root_V_goal_axis), 0.01)
+        self.expression = cas.less_equal(cas.angle_between_vector(root_V_pointing_axis, root_V_goal_axis), threshold)

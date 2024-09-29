@@ -8,7 +8,7 @@ from giskardpy.middleware import get_middleware
 from giskardpy.god_map import god_map
 
 
-class AlignPlanes(Goal):
+class AlignPlanes(Task):
     def __init__(self,
                  root_link: PrefixName,
                  tip_link: PrefixName,
@@ -49,11 +49,9 @@ class AlignPlanes(Goal):
                    f'_Z:{self.tip_V_tip_normal.z:.3f}'
         super().__init__(name=name)
 
-        task = Task(name='align planes')
-        self.add_task(task)
         root_R_tip = god_map.world.compose_fk_expression(self.root, self.tip).to_rotation()
         root_V_tip_normal = root_R_tip.dot(self.tip_V_tip_normal)
-        task.add_vector_goal_constraints(frame_V_current=root_V_tip_normal,
+        self.add_vector_goal_constraints(frame_V_current=root_V_tip_normal,
                                          frame_V_goal=self.root_V_root_normal,
                                          reference_velocity=self.reference_velocity,
                                          weight=self.weight)

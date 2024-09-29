@@ -1688,7 +1688,7 @@ def if_cases(cases, else_result):
     """
     else_result = _to_sx(else_result)
     result = _to_sx(else_result)
-    for i in range(len(cases)):
+    for i in reversed(range(len(cases))):
         case = _to_sx(cases[i][0])
         case_result = _to_sx(cases[i][1])
         result = ca.if_else(case, case_result, result)

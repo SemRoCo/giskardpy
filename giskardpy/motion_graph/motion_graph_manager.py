@@ -386,14 +386,15 @@ class MotionGraphManager:
 
     @profile
     def evaluate_node_states(self) -> bool:
-        # %% update monitor state
+        # %% update observation state
+        next_state, done = self.evaluate_payload_monitors()
+        self.monitor_state.observation_state[self.payload_monitor_filter] = next_state
+
         args = symbol_manager.resolve_symbols(self.compiled_task_observation_state.str_params)
         self.task_state.observation_state = self.compiled_task_observation_state.fast_call(args)
 
         args = symbol_manager.resolve_symbols(self.compiled_monitor_observation_state.str_params)
         self.monitor_state.observation_state = self.compiled_monitor_observation_state.fast_call(args)
-        next_state, done = self.evaluate_payload_monitors()
-        self.monitor_state.observation_state[self.payload_monitor_filter] = next_state
 
         args = symbol_manager.resolve_symbols(self.compiled_goal_observation_state.str_params)
         self.goal_state.observation_state = self.compiled_goal_observation_state.fast_call(args)

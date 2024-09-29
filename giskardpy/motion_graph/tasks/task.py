@@ -43,6 +43,13 @@ class Task(MotionGraphNode):
     def get_life_cycle_state_expression(self):
         return symbol_manager.get_symbol(f'god_map.motion_graph_manager.task_state.get_life_cycle_state(\'{self.name}\')')
 
+    @property
+    def ref_str(self) -> str:
+        """
+        A string referring to self on the god_map. Used with symbol manager.
+        """
+        return f'god_map.motion_graph_manager.task_state.get_node(\'{str(self)}\')'
+
     def get_eq_constraints(self) -> List[EqualityConstraint]:
         return self._apply_monitors_to_constraints(self.eq_constraints.values())
 

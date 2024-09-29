@@ -9,7 +9,7 @@ from giskardpy.motion_graph.tasks.task import WEIGHT_ABOVE_CA, Task
 from giskardpy.god_map import god_map
 
 
-class GraspBar(Goal):
+class GraspBar(Task):
     def __init__(self,
                  root_link: PrefixName,
                  tip_link: PrefixName,
@@ -66,9 +66,7 @@ class GraspBar(Goal):
         root_T_tip = god_map.world.compose_fk_expression(self.root, self.tip)
         root_V_tip_normal = cas.dot(root_T_tip, tip_V_tip_grasp_axis)
 
-        task = Task(name=f'{self.name}/grasp bar')
-        self.add_task(task)
-        task.add_vector_goal_constraints(frame_V_current=root_V_tip_normal,
+        self.add_vector_goal_constraints(frame_V_current=root_V_tip_normal,
                                          frame_V_goal=root_V_bar_axis,
                                          reference_velocity=self.reference_angular_velocity,
                                          weight=self.weight)
@@ -80,7 +78,7 @@ class GraspBar(Goal):
 
         dist, nearest = cas.distance_point_to_line_segment(root_P_tip, root_P_line_start, root_P_line_end)
 
-        task.add_point_goal_constraints(frame_P_current=root_T_tip.to_position(),
+        self.add_point_goal_constraints(frame_P_current=root_T_tip.to_position(),
                                         frame_P_goal=nearest,
                                         reference_velocity=self.reference_linear_velocity,
                                         weight=self.weight)

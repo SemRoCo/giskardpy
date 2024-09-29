@@ -87,14 +87,8 @@ class PointingAt(Monitor):
                  root_link: PrefixName,
                  pointing_axis: cas.Vector3,
                  threshold: float = 0.01,
-                 name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 pause_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol):
-        super().__init__(name=name,
-                         start_condition=start_condition,
-                         pause_condition=pause_condition,
-                         end_condition=end_condition)
+                 name: Optional[str] = None):
+        super().__init__(name=name)
         self.root = root_link
         self.tip = tip_link
         self.root_P_goal_point = god_map.world.transform(self.root, goal_point)

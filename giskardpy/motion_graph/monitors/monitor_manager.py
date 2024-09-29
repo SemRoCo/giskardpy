@@ -12,13 +12,13 @@ from giskardpy.data_types.data_types import LifeCycleState, PrefixName
 from giskardpy.data_types.exceptions import GiskardException, MonitorInitalizationException
 from giskardpy.god_map import god_map
 from giskardpy.motion_graph.helpers import compile_graph_node_state_updater
-from giskardpy.motion_graph.monitors.monitors import ExpressionMonitor, Monitor, EndMotion
+from giskardpy.motion_graph.monitors.monitors import Monitor, EndMotion
 from giskardpy.motion_graph.monitors.payload_monitors import PayloadMonitor, CancelMotion
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils.utils import get_all_classes_in_package
 
 
-def monitor_list_to_monitor_name_tuple(monitors: Iterable[Union[str, ExpressionMonitor]]) -> Tuple[str, ...]:
+def monitor_list_to_monitor_name_tuple(monitors: Iterable[Union[str, Monitor]]) -> Tuple[str, ...]:
     return tuple(sorted(monitor.name if isinstance(monitor, Monitor) else monitor for monitor in monitors))
 
 
@@ -147,7 +147,7 @@ class MonitorManager:
         for monitor in self.monitors.values():
             state_symbol = monitor.get_observation_state_expression()
 
-            if isinstance(monitor, ExpressionMonitor):
+            if isinstance(monitor, Monitor):
                 monitor.pre_compile()
                 state_f = cas.if_eq(monitor.get_life_cycle_state_expression(), int(LifeCycleState.running),
                                     if_result=monitor.expression,
@@ -162,8 +162,8 @@ class MonitorManager:
         self.compiled_life_cycle_state_updater = compile_graph_node_state_updater(self.monitors)
 
     @property
-    def expression_monitors(self) -> List[ExpressionMonitor]:
-        return [x for x in self.monitors if isinstance(x, ExpressionMonitor)]
+    def expression_monitors(self) -> List[Monitor]:
+        return [x for x in self.monitors if isinstance(x, Monitor)]
 
     @property
     def payload_monitors(self) -> List[PayloadMonitor]:

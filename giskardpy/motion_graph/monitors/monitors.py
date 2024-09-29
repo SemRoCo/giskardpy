@@ -92,19 +92,7 @@ class CancelMotion(PayloadMonitor):
         return self.state
 
 
-class ExpressionMonitor(Monitor):
-    def __init__(self, *,
-                 name: Optional[str] = None,
-                 plot: bool = True):
-        """
-        A Monitor whose state is determined by its expression.
-        Override this method, create an expression and assign its expression at the end.
-        """
-        super().__init__(name=name,
-                         plot=plot)
-
-
-class LocalMinimumReached(ExpressionMonitor):
+class LocalMinimumReached(Monitor):
     def __init__(self,
                  name: Optional[str] = None,
                  min_cut_off: float = 0.01,
@@ -137,7 +125,7 @@ class LocalMinimumReached(ExpressionMonitor):
         self.expression = cas.logic_all(cas.Expression(condition_list))
 
 
-class TimeAbove(ExpressionMonitor):
+class TimeAbove(Monitor):
     def __init__(self,
                  threshold: float,
                  name: Optional[str] = None):
@@ -149,7 +137,7 @@ class TimeAbove(ExpressionMonitor):
         self.expression = condition
 
 
-class Alternator(ExpressionMonitor):
+class Alternator(Monitor):
 
     def __init__(self,
                  name: Optional[str] = None,
@@ -162,7 +150,7 @@ class Alternator(ExpressionMonitor):
         self.expression = expr
 
 
-class TrueMonitor(ExpressionMonitor):
+class TrueMonitor(Monitor):
     def __init__(self,
                  name: Optional[str] = None,
                  plot: bool = True):
@@ -171,7 +159,7 @@ class TrueMonitor(ExpressionMonitor):
         self.expression = cas.TrueSymbol
 
 
-class FalseMonitor(ExpressionMonitor):
+class FalseMonitor(Monitor):
     def __init__(self,
                  name: Optional[str] = None,
                  plot: bool = True):

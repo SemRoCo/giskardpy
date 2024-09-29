@@ -48,15 +48,9 @@ class Sleep(PayloadMonitor):
 
     def __init__(self,
                  seconds: float,
-                 name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 pause_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol):
+                 name: Optional[str] = None):
         self.seconds = seconds
         super().__init__(name=name,
-                         start_condition=start_condition,
-                         pause_condition=pause_condition,
-                         end_condition=end_condition,
                          run_call_in_thread=False)
         self.start_time = None
 
@@ -71,14 +65,8 @@ class CollisionMatrixUpdater(PayloadMonitor):
 
     def __init__(self,
                  new_collision_matrix: Dict[Tuple[str, str], float],
-                 name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 pause_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol):
+                 name: Optional[str] = None):
         super().__init__(name=name,
-                         start_condition=start_condition,
-                         pause_condition=pause_condition,
-                         end_condition=end_condition,
                          run_call_in_thread=False)
         self.collision_matrix = new_collision_matrix
 

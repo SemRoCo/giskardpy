@@ -2,11 +2,11 @@ from typing import Optional, Union
 
 import giskardpy.casadi_wrapper as cas
 from giskardpy.data_types.data_types import PrefixName
-from giskardpy.motion_graph.monitors.monitors import ExpressionMonitor, Monitor
+from giskardpy.motion_graph.monitors.monitors import Monitor
 from giskardpy.god_map import god_map
 
 
-class FeatureMonitor(ExpressionMonitor):
+class FeatureMonitor(Monitor):
     def __init__(self,
                  tip_link: PrefixName,
                  root_link: PrefixName,

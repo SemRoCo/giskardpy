@@ -4,7 +4,7 @@ from typing import Dict, Optional, List
 import giskardpy.casadi_wrapper as cas
 from giskardpy.goals.goal import Goal
 from giskardpy.model.collision_world_syncer import CollisionEntry
-from giskardpy.motion_graph.monitors.monitors import ExpressionMonitor
+from giskardpy.motion_graph.monitors.monitors import Monitor
 from giskardpy.motion_graph.monitors.payload_monitors import CollisionMatrixUpdater
 from giskardpy.motion_graph.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE
 from giskardpy.god_map import god_map
@@ -92,7 +92,7 @@ class ExternalCollisionAvoidance(Goal):
 
         weight = cas.save_division(WEIGHT_COLLISION_AVOIDANCE,  # divide by number of active repeller per link
                                    cas.min(number_of_external_collisions, self.num_repeller))
-        distance_monitor = ExpressionMonitor(name=f'collision distance {self.name}', plot=False)
+        distance_monitor = Monitor(name=f'collision distance {self.name}', plot=False)
         distance_monitor.expression = cas.greater(actual_distance, 50)
         self.add_monitor(distance_monitor)
         task = self.create_and_add_task('stay away')
@@ -203,7 +203,7 @@ class SelfCollisionAvoidance(Goal):
 
         weight = cas.save_division(WEIGHT_COLLISION_AVOIDANCE,  # divide by number of active repeller per link
                                    cas.min(number_of_self_collisions, self.num_repeller))
-        distance_monitor = ExpressionMonitor(name=f'collision distance {self.name}', plot=False)
+        distance_monitor = Monitor(name=f'collision distance {self.name}', plot=False)
         distance_monitor.expression = cas.greater(actual_distance, 50)
         self.add_monitor(distance_monitor)
         task = self.create_and_add_task('stay away')

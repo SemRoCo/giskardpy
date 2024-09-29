@@ -3,10 +3,10 @@ from typing import Optional
 import giskardpy.casadi_wrapper as cas
 from giskardpy.data_types.data_types import PrefixName
 from giskardpy.god_map import god_map
-from giskardpy.motion_graph.monitors.monitors import ExpressionMonitor
+from giskardpy.motion_graph.monitors.monitors import Monitor
 
 
-class PoseReached(ExpressionMonitor):
+class PoseReached(Monitor):
     def __init__(self,
                  root_link: PrefixName,
                  tip_link: PrefixName,
@@ -38,7 +38,7 @@ class PoseReached(ExpressionMonitor):
         self.expression = cas.logic_and(position_reached, orientation_reached)
 
 
-class PositionReached(ExpressionMonitor):
+class PositionReached(Monitor):
     def __init__(self,
                  root_link: PrefixName,
                  tip_link: PrefixName,
@@ -59,7 +59,7 @@ class PositionReached(ExpressionMonitor):
         self.expression = cas.less(distance_to_goal, threshold)
 
 
-class OrientationReached(ExpressionMonitor):
+class OrientationReached(Monitor):
     def __init__(self,
                  root_link: PrefixName,
                  tip_link: PrefixName,
@@ -80,7 +80,7 @@ class OrientationReached(ExpressionMonitor):
         self.expression = cas.less(cas.abs(rotation_error), threshold)
 
 
-class PointingAt(ExpressionMonitor):
+class PointingAt(Monitor):
     def __init__(self,
                  tip_link: PrefixName,
                  goal_point: cas.Point3,
@@ -113,7 +113,7 @@ class PointingAt(ExpressionMonitor):
         self.expression = expr
 
 
-class VectorsAligned(ExpressionMonitor):
+class VectorsAligned(Monitor):
     def __init__(self,
                  root_link: PrefixName,
                  tip_link: PrefixName,
@@ -138,7 +138,7 @@ class VectorsAligned(ExpressionMonitor):
         self.expression = expr
 
 
-class DistanceToLine(ExpressionMonitor):
+class DistanceToLine(Monitor):
     def __init__(self,
                  root_link: PrefixName,
                  tip_link: PrefixName,

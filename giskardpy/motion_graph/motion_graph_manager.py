@@ -16,7 +16,7 @@ from giskardpy.god_map import god_map
 from giskardpy.middleware import get_middleware
 from giskardpy.motion_graph.graph_node import MotionGraphNode
 from giskardpy.motion_graph.helpers import compile_graph_node_state_updater, MotionGraphNodeStateManager
-from giskardpy.motion_graph.monitors.monitors import ExpressionMonitor, Monitor, EndMotion
+from giskardpy.motion_graph.monitors.monitors import Monitor, Monitor, EndMotion
 from giskardpy.motion_graph.monitors.payload_monitors import PayloadMonitor, CancelMotion
 from giskardpy.motion_graph.tasks.task import Task
 from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint
@@ -25,7 +25,7 @@ from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils.utils import get_all_classes_in_package, ImmutableDict
 
 
-def monitor_list_to_monitor_name_tuple(monitors: Iterable[Union[str, ExpressionMonitor]]) -> Tuple[str, ...]:
+def monitor_list_to_monitor_name_tuple(monitors: Iterable[Union[str, Monitor]]) -> Tuple[str, ...]:
     return tuple(sorted(monitor.name if isinstance(monitor, Monitor) else monitor for monitor in monitors))
 
 
@@ -39,7 +39,8 @@ class MotionGraphManager:
     compiled_goal_observation_state: CompiledFunction
 
     compiled_task_life_cycle_state: CompiledFunction
-    compiled_monitor_life_cycle_state_updater: CompiledFunction
+    compiled_monitor_life_cycle_state: CompiledFunction
+    compiled_goal_life_cycle_state: CompiledFunction
 
     task_state_history: List[Tuple[float, Tuple[np.ndarray, np.ndarray]]]  # time -> (state, life_cycle_state)
     monitor_state_history: List[Tuple[float, Tuple[np.ndarray, np.ndarray]]]  # time -> (state, life_cycle_state)
@@ -153,8 +154,8 @@ class MotionGraphManager:
         goal_state_symbols = self.goal_state.get_observation_state_symbol_map()
         observation_state_symbols = {**task_state_symbols, **monitor_state_symbols, **goal_state_symbols}
 
-        for (class_name, name, start, reset, pause, end, kwargs), node in zip(tasks + monitors + goals,
-                                                                              self.task_state.nodes + self.monitor_state.nodes + self.goal_state.nodes):
+        for (class_name, name, start, reset, pause, end, kwargs) in tasks + monitors + goals:
+            node = self.get_node(name)
             start_condition = god_map.motion_graph_manager.logic_str_to_expr(
                 logic_str=start,
                 default=cas.TrueSymbol,
@@ -220,9 +221,13 @@ class MotionGraphManager:
 
     @profile
     def compile_node_state_updaters(self) -> None:
-        self.compile_task_state_updater()
-        self.compile_monitor_state_updater()
-        self.compile_goal_state_updater()
+
+        self.compiled_task_observation_state, self.compiled_task_life_cycle_state = self.compile_node_state_updater(
+            self.task_state)
+        self.compiled_monitor_observation_state, self.compiled_monitor_life_cycle_state = self.compile_node_state_updater(
+            self.monitor_state)
+        self.compiled_goal_observation_state, self.compiled_goal_life_cycle_state = self.compile_node_state_updater(
+            self.goal_state)
         self.initialize_states()
         # self._register_expression_update_triggers()
 
@@ -249,6 +254,21 @@ class MotionGraphManager:
                 return goal
         raise GiskardException(f'No goal/task/monitor found for {str(expr)}.')
 
+    def get_node(self, name: str) -> MotionGraphNode:
+        try:
+            return self.task_state.get_node(name)
+        except KeyError:
+            pass
+        try:
+            return self.monitor_state.get_node(name)
+        except KeyError:
+            pass
+        try:
+            return self.goal_state.get_node(name)
+        except KeyError:
+            pass
+        raise GiskardException(f'No goal/task/monitor found for {str(name)}.')
+
     def is_node_registered(self, monitor_state_expr: cas.Expression) -> bool:
         try:
             self.get_node_from_state_expr(monitor_state_expr)
@@ -273,51 +293,26 @@ class MotionGraphManager:
         return condition
 
     @profile
-    def compile_task_state_updater(self) -> None:
-        task_state_updater = []
+    def compile_node_state_updater(self, node_state: MotionGraphNodeStateManager) \
+            -> Tuple[cas.CompiledFunction, cas.CompiledFunction]:
+        state_updater = []
         node: MotionGraphNode
-        for node in self.task_state.nodes:
+        for node in node_state.nodes:
             state_symbol = node.get_observation_state_expression()
             node.pre_compile()
-            state_f = cas.if_eq(node.get_life_cycle_state_expression(), int(LifeCycleState.running),
-                                if_result=node.expression,
-                                else_result=state_symbol)
-            task_state_updater.append(state_f)
-        task_state_updater = cas.Expression(task_state_updater)
-        self.compiled_task_observation_state = task_state_updater.compile(task_state_updater.free_symbols())
-        self.compiled_task_life_cycle_state = compile_graph_node_state_updater(self.task_state)
-
-    @profile
-    def compile_monitor_state_updater(self) -> None:
-        monitor_state_updater = []
-        for node in self.monitor_state.nodes:
-            state_symbol = node.get_observation_state_expression()
             if isinstance(node, PayloadMonitor):
-                state_f = state_symbol  # if payload monitor, copy last state
+                expression = state_symbol  # if payload monitor, copy last state
             else:
-                node.pre_compile()
-                state_f = cas.if_eq(node.get_life_cycle_state_expression(), int(LifeCycleState.running),
-                                    if_result=node.expression,
-                                    else_result=state_symbol)
-            monitor_state_updater.append(state_f)
-        monitor_state_updater = cas.Expression(monitor_state_updater)
-        self.compiled_monitor_observation_state = monitor_state_updater.compile(monitor_state_updater.free_symbols())
-        self.compiled_monitor_life_cycle_state_updater = compile_graph_node_state_updater(self.monitor_state)
-
-    @profile
-    def compile_goal_state_updater(self) -> None:
-        observation_state_updater = []
-        for node in self.goal_state.nodes:
-            state_symbol = node.get_observation_state_expression()
-            node.pre_compile()
-            state_f = cas.if_eq(node.get_life_cycle_state_expression(), int(LifeCycleState.running),
-                                if_result=node.expression,
-                                else_result=state_symbol)
-            observation_state_updater.append(state_f)
-        observation_state_updater = cas.Expression(observation_state_updater)
-        self.compiled_goal_observation_state = observation_state_updater.compile(
-            observation_state_updater.free_symbols())
-        self.compiled_goal_life_cycle_state_updater = compile_graph_node_state_updater(self.goal_state)
+                expression = node.expression
+            state_f = cas.if_eq_cases(a=node.get_life_cycle_state_expression(),
+                                      b_result_cases=[(int(LifeCycleState.running), expression),
+                                                      (int(LifeCycleState.not_started), cas.FalseSymbol)],
+                                      else_result=state_symbol)
+            state_updater.append(state_f)
+        state_updater = cas.Expression(state_updater)
+        compiled_node_observation_state = state_updater.compile(state_updater.free_symbols())
+        compiled_node_life_cycle_state = compile_graph_node_state_updater(node_state)
+        return compiled_node_observation_state, compiled_node_life_cycle_state
 
     @property
     def payload_monitors(self) -> List[PayloadMonitor]:
@@ -391,6 +386,8 @@ class MotionGraphManager:
 
         args = symbol_manager.resolve_symbols(self.compiled_monitor_observation_state.str_params)
         self.monitor_state.observation_state = self.compiled_monitor_observation_state.fast_call(args)
+        next_state, done = self.evaluate_payload_monitors()
+        self.monitor_state.observation_state[self.payload_monitor_filter] = next_state
 
         args = symbol_manager.resolve_symbols(self.compiled_goal_observation_state.str_params)
         self.goal_state.observation_state = self.compiled_goal_observation_state.fast_call(args)
@@ -405,15 +402,13 @@ class MotionGraphManager:
                                self.task_state.observation_state,
                                self.monitor_state.observation_state,
                                self.goal_state.observation_state))
-        self.monitor_state.life_cycle_state = self.compiled_monitor_life_cycle_state_updater.fast_call(args)
+        self.monitor_state.life_cycle_state = self.compiled_monitor_life_cycle_state.fast_call(args)
         args = np.concatenate((self.goal_state.life_cycle_state,
                                self.task_state.observation_state,
                                self.monitor_state.observation_state,
                                self.goal_state.observation_state))
-        self.goal_state.life_cycle_state = self.compiled_goal_life_cycle_state_updater.fast_call(args)
+        self.goal_state.life_cycle_state = self.compiled_goal_life_cycle_state.fast_call(args)
 
-        next_state, done = self.evaluate_payload_monitors()
-        self.monitor_state.observation_state[self.payload_monitor_filter] = next_state
         # self.trigger_update_triggers(self.state)
         self.log_states()
         if isinstance(done, Exception):
@@ -428,8 +423,8 @@ class MotionGraphManager:
                                            (self.monitor_state.observation_state.copy(),
                                             self.monitor_state.life_cycle_state.copy())))
         self.goal_state_history.append((god_map.time,
-                                           (self.goal_state.observation_state.copy(),
-                                            self.goal_state.life_cycle_state.copy())))
+                                        (self.goal_state.observation_state.copy(),
+                                         self.goal_state.life_cycle_state.copy())))
 
     def evaluate_payload_monitors(self) -> Tuple[np.ndarray, Union[bool, Exception]]:
         done = False
@@ -507,4 +502,3 @@ class MotionGraphManager:
             # logging.loginfo(f'{goal_name} added {len(_constraints)+len(_vel_constraints)} constraints.')
         return (list(eq_constraints.values()), list(neq_constraints.values()), list(derivative_constraints.values()),
                 list(quadratic_weight_gains.values()), list(linear_weight_gains.values()))
-

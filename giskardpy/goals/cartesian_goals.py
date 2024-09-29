@@ -9,7 +9,7 @@ from giskardpy.data_types.data_types import Derivatives, ColorRGBA, PrefixName
 from giskardpy.goals.goal import Goal
 from giskardpy.god_map import god_map
 from giskardpy.model.joints import DiffDrive
-from giskardpy.motion_graph.monitors.monitors import ExpressionMonitor
+from giskardpy.motion_graph.monitors.monitors import Monitor
 from giskardpy.motion_graph.tasks.cartesian_tasks import CartesianPosition, CartesianOrientation
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.motion_graph.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA

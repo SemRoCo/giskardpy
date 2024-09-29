@@ -5,7 +5,7 @@ from abc import ABC
 from typing import List, Union, Optional
 
 from giskardpy.motion_graph.graph_node import MotionGraphNode
-from giskardpy.motion_graph.monitors.monitors import ExpressionMonitor, Monitor
+from giskardpy.motion_graph.monitors.monitors import Monitor, Monitor
 from giskardpy.god_map import god_map
 from giskardpy.motion_graph.tasks.task import Task
 from giskardpy.symbol_manager import symbol_manager

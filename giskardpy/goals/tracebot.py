@@ -7,7 +7,7 @@ import numpy as np
 from giskardpy import casadi_wrapper as cas
 from giskardpy.goals.goal import Goal
 from giskardpy.motion_graph.tasks.task import WEIGHT_ABOVE_CA
-from giskardpy.motion_graph.monitors.monitors import ExpressionMonitor
+from giskardpy.motion_graph.monitors.monitors import Monitor
 from giskardpy.god_map import god_map
 
 
@@ -58,7 +58,7 @@ class InsertCylinder(Goal):
         root_P_top = root_P_hole + root_V_up * self.pre_grasp_height
         distance_to_top = cas.euclidean_distance(root_P_tip, root_P_top)
         top_reached = cas.less(distance_to_top, 0.01)
-        top_reached_monitor = ExpressionMonitor(name='top reached', start_condition=start_condition)
+        top_reached_monitor = Monitor(name='top reached', start_condition=start_condition)
         self.add_monitor(top_reached_monitor)
         top_reached_monitor.end_condition = top_reached_monitor.get_observation_state_expression()
         top_reached_monitor.expression = top_reached
@@ -66,7 +66,7 @@ class InsertCylinder(Goal):
         distance_to_line, root_P_on_line = cas.distance_point_to_line_segment(root_P_tip, root_P_hole, root_P_top)
         distance_to_hole = cas.norm(root_P_hole - root_P_tip)
         bottom_reached = cas.less(distance_to_hole, 0.01)
-        bottom_reached_monitor = ExpressionMonitor(name='bottom reached',
+        bottom_reached_monitor = Monitor(name='bottom reached',
                                                    start_condition=start_condition)
         self.add_monitor(bottom_reached_monitor)
         bottom_reached_monitor.end_condition = bottom_reached_monitor.get_observation_state_expression()
@@ -111,7 +111,7 @@ class InsertCylinder(Goal):
         insert_task.start_condition = top_reached_monitor.get_observation_state_expression()
         # # tilt straight
         tilt_error = cas.angle_between_vector(root_V_cylinder_z, root_V_up)
-        tilt_monitor = ExpressionMonitor(name='straight', start_condition=start_condition)
+        tilt_monitor = Monitor(name='straight', start_condition=start_condition)
         self.add_monitor(tilt_monitor)
         tilt_monitor.expression = cas.less(tilt_error, 0.01)
 

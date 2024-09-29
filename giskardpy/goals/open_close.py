@@ -49,10 +49,12 @@ class Open(Goal):
                                        weight=self.weight)
         self.add_task(hinge_goal)
 
+        handle_pose = cas.TransMatrix(reference_frame=self.tip_link, child_frame=self.tip_link)
+
         hold_handle = CartesianPose(root_link=self.handle_link,
                                     tip_link=self.tip_link,
                                     name=f'{self.name}/hold handle',
-                                    goal_pose=god_map.world.compute_fk(self.handle_link, self.tip_link),
+                                    goal_pose=handle_pose,
                                     weight=self.weight)
         self.add_goal(hold_handle)
         self.expression = cas.logic_and(hinge_goal.expression, hold_handle.expression)

@@ -229,12 +229,17 @@ class MotionGraphManager:
         self.compiled_goal_observation_state, self.compiled_goal_life_cycle_state = self.compile_node_state_updater(
             self.goal_state)
         self.initialize_states()
-        # self._register_expression_update_triggers()
+        self._register_expression_update_triggers()
 
     def get_observation_state_symbols(self) -> List[cas.Symbol]:
         return (list(self.task_state.get_observation_state_symbol_map().values()) +
                 list(self.monitor_state.get_observation_state_symbol_map().values()) +
                 list(self.goal_state.get_observation_state_symbol_map().values()))
+
+    def get_life_cycle_state_symbols(self) -> List[cas.Symbol]:
+        return (self.task_state.get_life_cycle_state_symbols() +
+                self.monitor_state.get_life_cycle_state_symbols() +
+                self.goal_state.get_life_cycle_state_symbols())
 
     def initialize_states(self) -> None:
         self.task_state.init_states()
@@ -352,7 +357,8 @@ class MotionGraphManager:
 
             self.triggers[updater_id] = Callback(updater_id, values, self)
         expr = cas.Expression(self.trigger_conditions)
-        self.compiled_trigger_conditions = expr.compile(self.get_observation_state_symbols())
+        symbols = self.get_observation_state_symbols() + self.get_life_cycle_state_symbols()
+        self.compiled_trigger_conditions = expr.compile(symbols)
 
     @profile
     def update_substitution_values(self, updater_id: int, keys: Optional[List[str]] = None):
@@ -367,12 +373,12 @@ class MotionGraphManager:
             f'god_map.motion_graph_manager.substitution_values[{updater_id}]["{original_expr}"]')
 
     @profile
-    def trigger_update_triggers(self, state: np.ndarray):
-        condition_state = self.compiled_trigger_conditions.fast_call(state)
+    def trigger_update_triggers(self, obs_state: np.ndarray, life_cycle_state: np.ndarray):
+        args = np.concatenate((obs_state, life_cycle_state))
+        condition_state = self.compiled_trigger_conditions.fast_call(args)
         for updater_id, value in enumerate(condition_state):
             if updater_id in self.triggers and value:
                 self.triggers[updater_id]()
-                del self.triggers[updater_id]
 
     @cached_property
     def payload_monitor_filter(self):
@@ -392,24 +398,25 @@ class MotionGraphManager:
         args = symbol_manager.resolve_symbols(self.compiled_goal_observation_state.str_params)
         self.goal_state.observation_state = self.compiled_goal_observation_state.fast_call(args)
 
+        obs_state = np.concatenate((self.task_state.observation_state,
+                                    self.monitor_state.observation_state,
+                                    self.goal_state.observation_state))
+        life_cycle_state = np.concatenate((self.task_state.life_cycle_state,
+                                           self.monitor_state.life_cycle_state,
+                                           self.goal_state.life_cycle_state))
+        self.trigger_update_triggers(obs_state=obs_state, life_cycle_state=life_cycle_state)
+
         # %% update life cycle state
         args = np.concatenate((self.task_state.life_cycle_state,
-                               self.task_state.observation_state,
-                               self.monitor_state.observation_state,
-                               self.goal_state.observation_state))
+                               obs_state))
         self.task_state.life_cycle_state = self.compiled_task_life_cycle_state.fast_call(args)
         args = np.concatenate((self.monitor_state.life_cycle_state,
-                               self.task_state.observation_state,
-                               self.monitor_state.observation_state,
-                               self.goal_state.observation_state))
+                               obs_state))
         self.monitor_state.life_cycle_state = self.compiled_monitor_life_cycle_state.fast_call(args)
         args = np.concatenate((self.goal_state.life_cycle_state,
-                               self.task_state.observation_state,
-                               self.monitor_state.observation_state,
-                               self.goal_state.observation_state))
+                               obs_state))
         self.goal_state.life_cycle_state = self.compiled_goal_life_cycle_state.fast_call(args)
 
-        # self.trigger_update_triggers(self.state)
         self.log_states()
         if isinstance(done, Exception):
             raise done

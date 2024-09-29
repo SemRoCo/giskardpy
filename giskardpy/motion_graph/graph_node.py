@@ -69,8 +69,12 @@ class MotionGraphNode:
             return '"' + result + '"'
         return result
 
-    def update_expression_on_enter_running(self, expression: cas.PreservedCasType) -> cas.PreservedCasType:
-        condition = cas.equal(self.get_life_cycle_state_expression(), LifeCycleState.running)
+    def update_expression_on_starting(self, expression: cas.PreservedCasType) -> cas.PreservedCasType:
+        # TODO this creates quite some unnecessary overhead, because there is no need to keep updating expressions,
+        #  when its goal is not started
+        if len(expression.free_symbols()) == 0:
+            return expression
+        condition = cas.equal(self.get_life_cycle_state_expression(), LifeCycleState.not_started)
         return god_map.motion_graph_manager.register_expression_updater(expression, condition)
 
     @property

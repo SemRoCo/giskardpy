@@ -21,7 +21,7 @@ class PoseReached(Monitor):
         else:
             root_T_x = god_map.world.compose_fk_expression(root_link, goal_pose.reference_frame)
             root_T_goal = root_T_x.dot(goal_pose)
-            root_T_goal = self.update_expression_on_enter_running(root_T_goal)
+            root_T_goal = self.update_expression_on_starting(root_T_goal)
 
         # %% position error
         r_P_g = root_T_goal.to_position()
@@ -52,7 +52,7 @@ class PositionReached(Monitor):
         else:
             root_P_x = god_map.world.compose_fk_expression(root_link, goal_point.reference_frame)
             root_P_goal = root_P_x.dot(goal_point)
-            root_P_goal = self.update_expression_on_enter_running(root_P_goal)
+            root_P_goal = self.update_expression_on_starting(root_P_goal)
 
         r_P_c = god_map.world.compose_fk_expression(root_link, tip_link).to_position()
         distance_to_goal = cas.euclidean_distance(root_P_goal, r_P_c)
@@ -73,7 +73,7 @@ class OrientationReached(Monitor):
         else:
             root_T_x = god_map.world.compose_fk_expression(root_link, goal_orientation.reference_frame)
             root_R_goal = root_T_x.dot(goal_orientation)
-            r_R_g = self.update_expression_on_enter_running(root_R_goal)
+            r_R_g = self.update_expression_on_starting(root_R_goal)
 
         r_R_c = god_map.world.compose_fk_expression(root_link, tip_link).to_rotation()
         rotation_error = cas.rotational_error(r_R_c, r_R_g)

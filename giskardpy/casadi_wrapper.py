@@ -2039,7 +2039,9 @@ def distance_point_to_plane(frame_P_current, frame_V_v1, frame_V_v2):
 def angle_between_vector(v1, v2):
     v1 = v1[:3]
     v2 = v2[:3]
-    return acos(dot(v1.T, v2) / (norm(v1) * norm(v2)))
+    return acos(limit(dot(v1.T, v2) / (norm(v1) * norm(v2)),
+                      lower_limit=-1,
+                      upper_limit=1))
 
 
 def rotational_error(r1, r2):

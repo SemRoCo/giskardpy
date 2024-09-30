@@ -58,9 +58,6 @@ class Pointing(Task):
         god_map.debug_expression_manager.add_debug_expression('root_V_pointing_axis',
                                                               root_V_pointing_axis,
                                                               color=ColorRGBA(r=1, g=0, b=0, a=1))
-        god_map.debug_expression_manager.add_debug_expression('root_V_goal_axis',
-                                                              root_V_goal_axis,
-                                                              color=ColorRGBA(r=1, g=0, b=0, a=1))
         god_map.debug_expression_manager.add_debug_expression('goal_point',
                                                               root_P_goal_point,
                                                               color=ColorRGBA(r=0, g=0, b=1, a=1))

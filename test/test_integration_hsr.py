@@ -419,10 +419,10 @@ class TestConstraints:
 
         kitchen_setup.update_start_condition(node_name=door_open, condition=gripper_closed)
         kitchen_setup.update_start_condition(node_name=slipped, condition=gripper_closed)
-        kitchen_setup.update_start_condition(node_name=gripper_opened, condition=slipped)
-        kitchen_setup.update_end_condition(node_name=slipped, condition=slipped)
+        kitchen_setup.update_start_condition(node_name=gripper_opened, condition=f'{slipped} or {door_open}')
+        kitchen_setup.update_end_condition(node_name=slipped, condition=f'{slipped} or {door_open}')
 
-        kitchen_setup.update_end_condition(node_name=door_open, condition=slipped)
+        kitchen_setup.update_end_condition(node_name=door_open, condition=f'{slipped} or {door_open}')
         reset_condition = f'{gripper_opened} and {slipped}'
         kitchen_setup.update_reset_condition(node_name=pointing_at, condition=reset_condition)
         kitchen_setup.update_reset_condition(node_name=bar_grasped, condition=reset_condition)
@@ -434,7 +434,7 @@ class TestConstraints:
         kitchen_setup.update_reset_condition(node_name=gripper_opened, condition=reset_condition)
 
         kitchen_setup.allow_all_collisions()
-        kitchen_setup.monitors.add_end_motion(start_condition=f'{door_open} and not {slipped}')
+        kitchen_setup.monitors.add_end_motion(start_condition=f'{door_open} and {gripper_opened} and not {slipped}')
         kitchen_setup.execute(add_local_minimum_reached=False)
 
 

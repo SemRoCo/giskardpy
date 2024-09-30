@@ -342,7 +342,7 @@ class ExecutionStateToDotParser:
                 graph.add_edge(pydot.Edge(node_name, sub_node_name, color=ResetCondColor, penwidth=LineWidth,
                                           arrowhead='none',
                                           arrowtail='normal',
-                                          constraint=False,
+                                          # constraint=False,
                                           dir='both', arrowsize=ArrowSize, **kwargs))
 
         return graph

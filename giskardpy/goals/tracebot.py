@@ -6,31 +6,26 @@ import numpy as np
 
 from giskardpy import casadi_wrapper as cas
 from giskardpy.goals.goal import Goal
-from giskardpy.motion_graph.tasks.task import WEIGHT_ABOVE_CA
+from giskardpy.motion_graph.tasks.task import WEIGHT_ABOVE_CA, Task
 from giskardpy.motion_graph.monitors.monitors import Monitor
 from giskardpy.god_map import god_map
 
 
 class InsertCylinder(Goal):
     def __init__(self,
+                 name: str,
                  cylinder_name: str,
                  hole_point: cas.Point3,
                  cylinder_height: Optional[float] = None,
                  up: Optional[cas.Vector3] = None,
                  pre_grasp_height: float = 0.1,
                  tilt: float = np.pi / 10,
-                 get_straight_after: float = 0.02,
-                 name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 pause_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol):
+                 get_straight_after: float = 0.02):
         self.cylinder_name = cylinder_name
         self.get_straight_after = get_straight_after
         self.root = god_map.world.root_link_name
         self.tip = god_map.world.search_for_link_name(self.cylinder_name)
-        if name is None:
-            name = f'{self.__class__.__name__}/{self.root}/{self.tip}'
-        super().__init__(name)
+        super().__init__(name=name)
         if cylinder_height is None:
             self.cylinder_height = god_map.world.links[self.tip].collisions[0].height
         else:
@@ -54,79 +49,72 @@ class InsertCylinder(Goal):
         root_P_tip = root_P_tip + root_P_cylinder_bottom
         root_V_cylinder_z = root_T_tip.dot(cas.Vector3([0, 0, -1]))
 
-        # straight line goal
+        # %% straight line goal
         root_P_top = root_P_hole + root_V_up * self.pre_grasp_height
         distance_to_top = cas.euclidean_distance(root_P_tip, root_P_top)
-        top_reached = cas.less(distance_to_top, 0.01)
-        top_reached_monitor = Monitor(name='top reached', start_condition=start_condition)
-        self.add_monitor(top_reached_monitor)
-        top_reached_monitor.end_condition = top_reached_monitor.get_observation_state_expression()
-        top_reached_monitor.expression = top_reached
 
         distance_to_line, root_P_on_line = cas.distance_point_to_line_segment(root_P_tip, root_P_hole, root_P_top)
         distance_to_hole = cas.norm(root_P_hole - root_P_tip)
-        bottom_reached = cas.less(distance_to_hole, 0.01)
-        bottom_reached_monitor = Monitor(name='bottom reached',
-                                                   start_condition=start_condition)
-        self.add_monitor(bottom_reached_monitor)
-        bottom_reached_monitor.end_condition = bottom_reached_monitor.get_observation_state_expression()
-        bottom_reached_monitor.expression = bottom_reached
 
-        reach_top = self.create_and_add_task('reach top')
+        reach_top = Task(name='reach top')
+        self.add_task(reach_top)
         reach_top.add_point_goal_constraints(frame_P_current=root_P_tip,
                                              frame_P_goal=root_P_top,
                                              reference_velocity=0.1,
                                              weight=self.weight)
-        reach_top.end_condition = top_reached_monitor.get_observation_state_expression()
+        reach_top.expression = cas.less(distance_to_top, 0.01)
 
-        go_to_line = self.create_and_add_task('straight line')
-        go_to_line.add_point_goal_constraints(frame_P_current=root_P_tip,
-                                              frame_P_goal=root_P_on_line,
-                                              reference_velocity=0.1,
-                                              weight=self.weight,
-                                              name='pregrasp')
-        go_to_line.start_condition = top_reached_monitor.get_observation_state_expression()
-        # god_map.debug_expression_manager.add_debug_expression('root_V_up', root_V_up)
-        # god_map.debug_expression_manager.add_debug_expression('root_P_hole', root_P_hole)
-        # god_map.debug_expression_manager.add_debug_expression('root_P_tip', root_P_tip)
-        # god_map.debug_expression_manager.add_debug_expression('root_P_top', root_P_top)
-
-        # tilted orientation goal
-        angle = cas.angle_between_vector(root_V_cylinder_z, root_V_up)
-        tilt_task = self.create_and_add_task('tilted')
-        tilt_task.add_position_constraint(expr_current=angle,
+        # %% tilted orientation goal
+        tilt_error = cas.angle_between_vector(root_V_cylinder_z, root_V_up)
+        tilt_task = Task(name='tilted')
+        self.add_task(tilt_task)
+        tilt_task.add_position_constraint(expr_current=tilt_error,
                                           expr_goal=self.tilt,
                                           reference_velocity=0.1,
                                           weight=self.weight)
-        tilt_task.end_condition = bottom_reached_monitor.get_observation_state_expression()
         root_V_cylinder_z.vis_frame = self.tip
+        tilt_task.expression = cas.less_equal(cas.abs(tilt_error - self.tilt), 0.01)
 
-        # move down
-        insert_task = self.create_and_add_task('insert')
+        init_done = cas.logic_and(reach_top.get_observation_state_expression(),
+                                  tilt_task.get_observation_state_expression())
+
+        reach_top.end_condition = init_done
+
+        # %% move down
+        stay_on_line = Task(name='straight line')
+        self.add_task(stay_on_line)
+        stay_on_line.add_point_goal_constraints(frame_P_current=root_P_tip,
+                                                frame_P_goal=root_P_on_line,
+                                                reference_velocity=0.1,
+                                                weight=self.weight,
+                                                name='pregrasp')
+        stay_on_line.expression = cas.less(distance_to_line, 0.01)
+
+        insert_task = Task(name='insert')
+        self.add_task(insert_task)
         insert_task.add_point_goal_constraints(frame_P_current=root_P_tip,
                                                frame_P_goal=root_P_hole,
                                                reference_velocity=0.1,
                                                weight=self.weight,
                                                name='insertion')
-        insert_task.start_condition = top_reached_monitor.get_observation_state_expression()
-        # # tilt straight
-        tilt_error = cas.angle_between_vector(root_V_cylinder_z, root_V_up)
-        tilt_monitor = Monitor(name='straight', start_condition=start_condition)
-        self.add_monitor(tilt_monitor)
-        tilt_monitor.expression = cas.less(tilt_error, 0.01)
+        insert_task.start_condition = init_done
+        insert_task.expression = cas.less(distance_to_hole, 0.01)
 
-        tilt_straight_task = self.create_and_add_task('tilt straight')
+        bottom_reached = cas.logic_and(insert_task.get_observation_state_expression(),
+                                       stay_on_line.get_observation_state_expression())
+
+        tilt_task.end_condition = bottom_reached
+        # %% tilt straight
+        # tilt_monitor.expression = cas.less(tilt_error, 0.01)
+
+        tilt_straight_task = Task(name='tilt straight')
+        self.add_task(tilt_straight_task)
         tilt_straight_task.add_vector_goal_constraints(frame_V_current=root_V_cylinder_z,
                                                        frame_V_goal=root_V_up,
                                                        reference_velocity=0.1,
                                                        weight=self.weight)
-        tilt_straight_task.start_condition = bottom_reached_monitor.get_observation_state_expression()
-        tilt_straight_task.end_condition = tilt_monitor.get_observation_state_expression()
-        self.connect_start_condition_to_all_tasks(start_condition)
-        self.connect_pause_condition_to_all_tasks(pause_condition)
-        # for task in self.tasks:
-        #     task.end_condition = cas.logic_or(task.end_condition, end_condition)
-        tilt_straight_task.end_condition = cas.logic_and(tilt_monitor.get_observation_state_expression(),
-                                                         end_condition)
-        bottom_reached.end_condition = cas.logic_and(bottom_reached_monitor.get_observation_state_expression(),
-                                                     end_condition)
+        tilt_straight_task.start_condition = bottom_reached
+        # tilt_straight_task.end_condition = tilt_monitor.get_observation_state_expression()
+        tilt_straight_task.expression = cas.less_equal(tilt_error, 0.01)
+
+        self.expression = tilt_straight_task.expression

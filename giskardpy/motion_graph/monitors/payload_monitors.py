@@ -1,34 +1,24 @@
-import abc
-from threading import Lock
 from typing import Optional, Dict, Tuple
 
 import numpy as np
-
-import giskardpy.casadi_wrapper as cas
-from giskardpy.data_types.exceptions import MaxTrajectoryLengthException
-from giskardpy.data_types.exceptions import MonitorInitalizationException
-from giskardpy.god_map import god_map
-from giskardpy.middleware import get_middleware
-from giskardpy.motion_graph.monitors.monitors import PayloadMonitor, CancelMotion
 from line_profiler import profile
 
+import giskardpy.casadi_wrapper as cas
+from giskardpy.god_map import god_map
+from giskardpy.middleware import get_middleware
+from giskardpy.motion_graph.monitors.monitors import PayloadMonitor, Monitor
+from giskardpy.symbol_manager import symbol_manager
 
-class SetMaxTrajectoryLength(CancelMotion):
+
+class CheckMaxTrajectoryLength(Monitor):
     length: float
 
     def __init__(self,
-                 length: float,
-                 name: Optional[str] = None):
-        # if not (start_condition == cas.TrueSymbol).to_np():
-        #     raise MonitorInitalizationException(f'Cannot set start_condition for {SetMaxTrajectoryLength.__name__}')
+                 name: str,
+                 length: float):
+        super().__init__(name=name)
         self.length = length
-        error_message = f'Trajectory longer than {self.length}'
-        super().__init__(name=name, exception=MaxTrajectoryLengthException(error_message))
-
-    @profile
-    def __call__(self):
-        if god_map.time > self.length:
-            return super().__call__()
+        self.expression = cas.greater(symbol_manager.time, self.length)
 
 
 class Print(PayloadMonitor):

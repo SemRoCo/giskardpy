@@ -37,6 +37,9 @@ class Monitor(MotionGraphNode):
                                          f'.get_life_cycle_state(\'{self.name}\')')
 
 
+# class ConditionWrapper(Monitor):
+#     def __init__(self,)
+
 class PayloadMonitor(Monitor, ABC):
     state: bool
     run_call_in_thread: bool

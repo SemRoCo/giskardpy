@@ -16,8 +16,8 @@ from giskardpy.god_map import god_map
 from giskardpy.middleware import get_middleware
 from giskardpy.motion_graph.graph_node import MotionGraphNode
 from giskardpy.motion_graph.helpers import compile_graph_node_state_updater, MotionGraphNodeStateManager
-from giskardpy.motion_graph.monitors.monitors import Monitor, Monitor, EndMotion
-from giskardpy.motion_graph.monitors.payload_monitors import PayloadMonitor, CancelMotion
+from giskardpy.motion_graph.monitors.monitors import Monitor, Monitor, EndMotion, CancelMotion
+from giskardpy.motion_graph.monitors.payload_monitors import PayloadMonitor
 from giskardpy.motion_graph.tasks.task import Task
 from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint
 from giskardpy.qp.weight_gain import QuadraticWeightGain, LinearWeightGain

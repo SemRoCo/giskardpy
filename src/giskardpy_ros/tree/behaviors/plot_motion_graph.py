@@ -12,8 +12,7 @@ from giskard_msgs.msg import ExecutionState, MotionGraphNode
 from giskardpy.data_types.data_types import LifeCycleState
 from giskardpy.god_map import god_map
 from giskardpy.middleware import get_middleware
-from giskardpy.motion_graph.monitors.monitors import EndMotion
-from giskardpy.motion_graph.monitors.payload_monitors import CancelMotion
+from giskardpy.motion_graph.monitors.monitors import EndMotion, CancelMotion
 from giskardpy.utils.decorators import record_time
 from giskardpy.utils.utils import create_path
 from giskardpy_ros.tree.behaviors.plugin import GiskardBehavior
@@ -27,7 +26,7 @@ def extract_node_names_from_condition(condition: str) -> List[str]:
 
 def format_condition(condition: str) -> str:
     condition = condition.replace(' and ', '<BR/>       and ')
-    condition = condition.replace(' or ', '<BR/>       nor ')
+    condition = condition.replace(' or ', '<BR/>       or ')
     condition = condition.replace('1.0', 'True')
     condition = condition.replace('0.0', 'False')
     return condition
@@ -342,7 +341,7 @@ class ExecutionStateToDotParser:
                 graph.add_edge(pydot.Edge(node_name, sub_node_name, color=ResetCondColor, penwidth=LineWidth,
                                           arrowhead='none',
                                           arrowtail='normal',
-                                          # constraint=False,
+                                          minlen=0,
                                           dir='both', arrowsize=ArrowSize, **kwargs))
 
         return graph

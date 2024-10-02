@@ -173,7 +173,7 @@ class DotGraphViewer(QWidget):
 
         svg_path = 'graph.svg'
         graph.write_svg(svg_path)
-        # graph.write_pdf('graph.pdf')
+        graph.write_pdf('graph.pdf')
         with QMutexLocker(self.svg_widget.mutex):  # Lock the mutex during SVG loading
             self.svg_widget.load(svg_path)
 

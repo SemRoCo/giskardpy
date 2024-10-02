@@ -112,7 +112,7 @@ giskard_wrapper.monitors.add_end_motion(start_condition=' and '.join([local_min,
 # It's good to also add a cancel condition in case something went wrong and the end motion monitor is unable to become
 # True. Currently, the only predefined specialized cancel monitor is max trajectory length.
 # Alternative you can use monitor.add_cancel_motion similar to end_motion.
-giskard_wrapper.monitors.add_max_trajectory_length(120)
+giskard_wrapper.monitors.add_check_trajectory_length(120)
 # Lastly we allow all collisions
 giskard_wrapper.motion_goals.allow_all_collisions()
 # And execute the goal.

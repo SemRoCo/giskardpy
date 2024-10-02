@@ -6,11 +6,16 @@ import giskard_msgs.msg as giskard_msgs
 from giskard_msgs.msg import MoveResult, CollisionEntry, MoveGoal, WorldResult
 from giskard_msgs.srv import DyeGroupResponse, GetGroupInfoResponse
 from giskardpy.data_types.data_types import goal_parameter
+from giskardpy.data_types.exceptions import MaxTrajectoryLengthException
+from giskardpy.goals.open_close import Open
+from giskardpy.motion_graph.tasks.align_planes import AlignPlanes
+from giskardpy.motion_graph.tasks.grasp_bar import GraspBar
 from giskardpy_ros.python_interface.python_interface import GiskardWrapper
 from giskardpy.motion_graph.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
 
 
 class OldGiskardWrapper(GiskardWrapper):
+    max_trajectory_length_set: bool
 
     def __init__(self, node_name: str = 'giskard'):
         super().__init__(node_name)
@@ -293,7 +298,6 @@ class OldGiskardWrapper(GiskardWrapper):
                               root_group: str = None,
                               max_angular_velocity: Optional[float] = None,
                               weight: Optional[float] = None,
-                              add_monitor: bool = True,
                               **kwargs: goal_parameter):
         """
         This goal will use the kinematic chain between tip and root to align tip_normal with goal_normal.
@@ -309,14 +313,15 @@ class OldGiskardWrapper(GiskardWrapper):
         """
         root_link = giskard_msgs.LinkName(name=root_link, group_name=root_group)
         tip_link = giskard_msgs.LinkName(name=tip_link, group_name=tip_group)
-        self.motion_goals.add_align_planes(end_condition='',
-                                           tip_link=tip_link,
-                                           tip_normal=tip_normal,
-                                           root_link=root_link,
-                                           goal_normal=goal_normal,
-                                           reference_angular_velocity=max_angular_velocity,
-                                           weight=weight,
-                                           **kwargs)
+        self.tasks.add_align_planes(end_condition='',
+                                    tip_link=tip_link,
+                                    name=AlignPlanes.__name__,
+                                    tip_normal=tip_normal,
+                                    root_link=root_link,
+                                    goal_normal=goal_normal,
+                                    reference_angular_velocity=max_angular_velocity,
+                                    weight=weight,
+                                    **kwargs)
 
     def set_prediction_horizon(self, prediction_horizon: int, **kwargs: goal_parameter):
         """
@@ -333,8 +338,10 @@ class OldGiskardWrapper(GiskardWrapper):
         If the trajectory is longer than new_length, Giskard will prempt the goal.
         :param new_length: in seconds
         """
-        self.monitors.add_max_trajectory_length(max_trajectory_length=length,
-                                                **kwargs)
+        max_length = self.monitors.add_check_trajectory_length(length=length,
+                                                               **kwargs)
+        self.monitors.add_cancel_motion(start_condition=max_length,
+                                        error=MaxTrajectoryLengthException(f'Trajectory longer than {length}'))
 
     def set_limit_cartesian_velocity_goal(self,
                                           tip_link: str,
@@ -380,7 +387,6 @@ class OldGiskardWrapper(GiskardWrapper):
                            reference_linear_velocity: Optional[float] = None,
                            reference_angular_velocity: Optional[float] = None,
                            weight: float = WEIGHT_ABOVE_CA,
-                           add_monitor: bool = True,
                            **kwargs: goal_parameter):
         """
         Like a CartesianPose but with more freedom.
@@ -401,17 +407,18 @@ class OldGiskardWrapper(GiskardWrapper):
         """
         root_link = giskard_msgs.LinkName(name=root_link, group_name=root_group)
         tip_link = giskard_msgs.LinkName(name=tip_link, group_name=tip_group)
-        self.motion_goals.add_grasp_bar(end_condition='',
-                                        root_link=root_link,
-                                        tip_link=tip_link,
-                                        tip_grasp_axis=tip_grasp_axis,
-                                        bar_center=bar_center,
-                                        bar_axis=bar_axis,
-                                        bar_length=bar_length,
-                                        reference_linear_velocity=reference_linear_velocity,
-                                        reference_angular_velocity=reference_angular_velocity,
-                                        weight=weight,
-                                        **kwargs)
+        self.tasks.add_grasp_bar(end_condition='',
+                                 name=GraspBar.__name__,
+                                 root_link=root_link,
+                                 tip_link=tip_link,
+                                 tip_grasp_axis=tip_grasp_axis,
+                                 bar_center=bar_center,
+                                 bar_axis=bar_axis,
+                                 bar_length=bar_length,
+                                 reference_linear_velocity=reference_linear_velocity,
+                                 reference_angular_velocity=reference_angular_velocity,
+                                 weight=weight,
+                                 **kwargs)
 
     def set_open_container_goal(self,
                                 tip_link: str,
@@ -435,6 +442,7 @@ class OldGiskardWrapper(GiskardWrapper):
         environment_link = giskard_msgs.LinkName(name=environment_link, group_name=environment_group)
         tip_link = giskard_msgs.LinkName(name=tip_link, group_name=tip_group)
         self.motion_goals.add_open_container(tip_link=tip_link,
+                                             name=Open.__name__,
                                              environment_link=environment_link,
                                              goal_joint_state=goal_joint_state,
                                              weight=weight)

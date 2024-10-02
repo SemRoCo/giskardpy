@@ -35,9 +35,9 @@ from giskardpy.motion_graph.monitors.cartesian_monitors import PoseReached, Posi
 from giskardpy.motion_graph.monitors.joint_monitors import JointGoalReached
 from giskardpy.motion_graph.monitors.monitors import LocalMinimumReached, TimeAbove, Alternator, CancelMotion, EndMotion
 from giskardpy.motion_graph.monitors.overwrite_state_monitors import SetOdometry, SetSeedConfiguration
-from giskardpy.motion_graph.monitors.payload_monitors import Print, Sleep, SetMaxTrajectoryLength, \
-    PayloadAlternator, Pulse
-from giskardpy.motion_graph.tasks.cartesian_tasks import CartesianPosition, CartesianOrientation
+from giskardpy.motion_graph.monitors.payload_monitors import Print, Sleep, \
+    PayloadAlternator, Pulse, CheckMaxTrajectoryLength
+from giskardpy.motion_graph.tasks.cartesian_tasks import CartesianPosition, CartesianOrientation, CartesianPoseAsTask
 from giskardpy_ros.goals.realtime_goals import CarryMyBullshit, RealTimePointing, FollowNavPath
 from giskardpy_ros.ros1 import msg_converter
 from giskardpy_ros.ros1.msg_converter import kwargs_to_json
@@ -545,50 +545,6 @@ class MotionGoalWrapper(MotionGraphNodeWrapper):
                                       pause_condition=pause_condition,
                                       end_condition=end_condition)
 
-    def add_cartesian_pose(self,
-                           name: str,
-                           goal_pose: PoseStamped,
-                           tip_link: Union[str, giskard_msgs.LinkName],
-                           root_link: Union[str, giskard_msgs.LinkName],
-                           reference_linear_velocity: Optional[float] = None,
-                           reference_angular_velocity: Optional[float] = None,
-                           absolute: bool = False,
-                           weight: Optional[float] = None,
-                           start_condition: str = '',
-                           pause_condition: str = '',
-                           end_condition: str = '',
-                           **kwargs: goal_parameter) -> str:
-        """
-        This goal will use the kinematic chain between root and tip link to move tip link to the goal pose.
-        The max velocities enforce a strict limit, but require a lot of additional constraints, thus making the
-        system noticeably slower.
-        The reference velocities don't enforce a strict limit, but also don't require any additional constraints.
-        :param root_link: name of the root link of the kin chain
-        :param tip_link: name of the tip link of the kin chain
-        :param goal_pose: the goal pose
-        :param absolute: if False, the goal pose is reevaluated if start_condition turns True.
-        :param reference_linear_velocity: m/s
-        :param reference_angular_velocity: rad/s
-        :param weight: None = use default weight
-        """
-        if isinstance(root_link, str):
-            root_link = giskard_msgs.LinkName(name=root_link)
-        if isinstance(tip_link, str):
-            tip_link = giskard_msgs.LinkName(name=tip_link)
-        return self.add_motion_goal(class_name=CartesianPose.__name__,
-                                    goal_pose=goal_pose,
-                                    tip_link=tip_link,
-                                    root_link=root_link,
-                                    reference_linear_velocity=reference_linear_velocity,
-                                    reference_angular_velocity=reference_angular_velocity,
-                                    weight=weight,
-                                    name=name,
-                                    absolute=absolute,
-                                    start_condition=start_condition,
-                                    pause_condition=pause_condition,
-                                    end_condition=end_condition,
-                                    **kwargs)
-
     def add_avoid_joint_limits(self,
                                name: str,
                                percentage: int = 15,
@@ -1054,6 +1010,50 @@ class MotionGoalWrapper(MotionGraphNodeWrapper):
         """
         raise DeprecationWarning('please use monitors.set_seed_odometry instead')
 
+    def add_cartesian_pose(self,
+                           name: str,
+                           goal_pose: PoseStamped,
+                           tip_link: Union[str, giskard_msgs.LinkName],
+                           root_link: Union[str, giskard_msgs.LinkName],
+                           reference_linear_velocity: Optional[float] = None,
+                           reference_angular_velocity: Optional[float] = None,
+                           absolute: bool = False,
+                           weight: Optional[float] = None,
+                           start_condition: str = '',
+                           pause_condition: str = '',
+                           end_condition: str = '',
+                           **kwargs: goal_parameter) -> str:
+        """
+        This goal will use the kinematic chain between root and tip link to move tip link to the goal pose.
+        The max velocities enforce a strict limit, but require a lot of additional constraints, thus making the
+        system noticeably slower.
+        The reference velocities don't enforce a strict limit, but also don't require any additional constraints.
+        :param root_link: name of the root link of the kin chain
+        :param tip_link: name of the tip link of the kin chain
+        :param goal_pose: the goal pose
+        :param absolute: if False, the goal pose is reevaluated if start_condition turns True.
+        :param reference_linear_velocity: m/s
+        :param reference_angular_velocity: rad/s
+        :param weight: None = use default weight
+        """
+        if isinstance(root_link, str):
+            root_link = giskard_msgs.LinkName(name=root_link)
+        if isinstance(tip_link, str):
+            tip_link = giskard_msgs.LinkName(name=tip_link)
+        return self.add_motion_goal(class_name=CartesianPose.__name__,
+                                    goal_pose=goal_pose,
+                                    tip_link=tip_link,
+                                    root_link=root_link,
+                                    reference_linear_velocity=reference_linear_velocity,
+                                    reference_angular_velocity=reference_angular_velocity,
+                                    weight=weight,
+                                    name=name,
+                                    absolute=absolute,
+                                    start_condition=start_condition,
+                                    pause_condition=pause_condition,
+                                    end_condition=end_condition,
+                                    **kwargs)
+
     def add_cartesian_pose_straight(self,
                                     name: str,
                                     goal_pose: PoseStamped,
@@ -1324,6 +1324,50 @@ class TaskWrapper(MotionGraphNodeWrapper):
                              end_condition=end_condition,
                              **kwargs)
 
+    def add_cartesian_pose(self,
+                           name: str,
+                           goal_pose: PoseStamped,
+                           tip_link: Union[str, giskard_msgs.LinkName],
+                           root_link: Union[str, giskard_msgs.LinkName],
+                           reference_linear_velocity: Optional[float] = None,
+                           reference_angular_velocity: Optional[float] = None,
+                           absolute: bool = False,
+                           weight: Optional[float] = None,
+                           start_condition: str = '',
+                           pause_condition: str = '',
+                           end_condition: str = '',
+                           **kwargs: goal_parameter) -> str:
+        """
+        This goal will use the kinematic chain between root and tip link to move tip link to the goal pose.
+        The max velocities enforce a strict limit, but require a lot of additional constraints, thus making the
+        system noticeably slower.
+        The reference velocities don't enforce a strict limit, but also don't require any additional constraints.
+        :param root_link: name of the root link of the kin chain
+        :param tip_link: name of the tip link of the kin chain
+        :param goal_pose: the goal pose
+        :param absolute: if False, the goal pose is reevaluated if start_condition turns True.
+        :param reference_linear_velocity: m/s
+        :param reference_angular_velocity: rad/s
+        :param weight: None = use default weight
+        """
+        if isinstance(root_link, str):
+            root_link = giskard_msgs.LinkName(name=root_link)
+        if isinstance(tip_link, str):
+            tip_link = giskard_msgs.LinkName(name=tip_link)
+        return self.add_task(class_name=CartesianPoseAsTask.__name__,
+                             goal_pose=goal_pose,
+                             tip_link=tip_link,
+                             root_link=root_link,
+                             reference_linear_velocity=reference_linear_velocity,
+                             reference_angular_velocity=reference_angular_velocity,
+                             weight=weight,
+                             name=name,
+                             absolute=absolute,
+                             start_condition=start_condition,
+                             pause_condition=pause_condition,
+                             end_condition=end_condition,
+                             **kwargs)
+
     def add_align_planes(self,
                          name: str,
                          goal_normal: Vector3Stamped,
@@ -1505,7 +1549,6 @@ class TaskWrapper(MotionGraphNodeWrapper):
 
 
 class MonitorWrapper(MotionGraphNodeWrapper):
-    max_trajectory_length_set: bool
     _name_prefix = 'M'
 
     def reset(self):
@@ -1791,15 +1834,14 @@ class MonitorWrapper(MotionGraphNodeWrapper):
                                 end_condition='',
                                 exception=error)
 
-    def add_max_trajectory_length(self,
-                                  max_trajectory_length: float = 30) -> str:
+    def add_check_trajectory_length(self, length: float = 30) -> str:
         """
         A monitor that cancels the motion if the trajectory is longer than max_trajectory_length.
         """
         self.max_trajectory_length_set = True
         return self.add_monitor(name='max traj length',
-                                class_name=SetMaxTrajectoryLength.__name__,
-                                length=max_trajectory_length,
+                                class_name=CheckMaxTrajectoryLength.__name__,
+                                length=length,
                                 start_condition='',
                                 pause_condition='',
                                 end_condition='')
@@ -2141,7 +2183,7 @@ class GiskardWrapper:
         self.monitors.add_cancel_motion(start_condition=local_min_reached_monitor_name,
                                         error=LocalMinimumException(f'local minimum reached'))
         if not self.monitors.max_trajectory_length_set:
-            self.monitors.add_max_trajectory_length()
+            self.monitors.add_check_trajectory_length()
         self.monitors.max_trajectory_length_set = False
 
     @property

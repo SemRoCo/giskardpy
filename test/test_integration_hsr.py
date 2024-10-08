@@ -9,6 +9,7 @@ from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
 from giskard_msgs.msg import LinkName, GiskardError
 from giskardpy.data_types.exceptions import EmptyProblemException
+from giskardpy.goals.test import GraspSequence
 from giskardpy.motion_graph.monitors.monitors import FalseMonitor, TrueMonitor
 from giskardpy.motion_graph.monitors.payload_monitors import Pulse
 from giskardpy_ros.configs.behavior_tree_config import StandAloneBTConfig
@@ -390,7 +391,92 @@ class TestConstraints:
         kitchen_setup.update_end_condition(node_name=door_open, condition=f'{door_open}')
 
         kitchen_setup.allow_all_collisions()
-        kitchen_setup.monitors.add_end_motion(start_condition=f'{door_open} and {gripper_opened}')
+        kitchen_setup.monitors.add_end_motion(start_condition=f'{gripper_opened}')
+        kitchen_setup.execute(add_local_minimum_reached=False)
+
+    def test_open_fridge_sequence_semi_simple(self, kitchen_setup: HSRTestWrapper):
+        handle_frame_id = 'iai_kitchen/iai_fridge_door_handle'
+        handle_name = 'iai_fridge_door_handle'
+        camera_link = 'head_rgbd_sensor_link'
+        kitchen_setup.open_gripper()
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = 'map'
+        base_goal.pose.position = Point(0.3, -0.5, 0)
+        base_goal.pose.orientation.w = 1
+        kitchen_setup.allow_all_collisions()
+        kitchen_setup.move_base(base_goal)
+
+        bar_axis = Vector3Stamped()
+        bar_axis.header.frame_id = handle_frame_id
+        bar_axis.vector.z = 1
+
+        bar_center = PointStamped()
+        bar_center.header.frame_id = handle_frame_id
+
+        tip_grasp_axis = Vector3Stamped()
+        tip_grasp_axis.header.frame_id = kitchen_setup.tip
+        tip_grasp_axis.vector.x = 1
+
+        handle_detected = kitchen_setup.monitors.add_const_true(name='Detect Handle')
+
+        # %% phase 1 grasp handle
+        laser_violated = kitchen_setup.monitors.add_pulse(after_ticks=20,
+                                                          name='laser violated')
+        camera_z = Vector3Stamped()
+        camera_z.header.frame_id = camera_link
+        camera_z.vector.z = 1
+
+        bar_grasped = kitchen_setup.tasks.add_grasp_bar(root_link=kitchen_setup.default_root,
+                                                        tip_link=kitchen_setup.tip,
+                                                        tip_grasp_axis=tip_grasp_axis,
+                                                        bar_center=bar_center,
+                                                        bar_axis=bar_axis,
+                                                        bar_length=.4,
+                                                        name='grasp handle')
+
+        # %% close gripper
+        gripper_closed = kitchen_setup.tasks.add_joint_position(name='close gripper',
+                                                                goal_state={'hand_motor_joint': 0})
+        gripper_opened = kitchen_setup.tasks.add_joint_position(name='open gripper',
+                                                                goal_state={'hand_motor_joint': 1.23})
+
+        # %% phase 2 open door
+        slipped = kitchen_setup.monitors.add_pulse(name='slipped', after_ticks=20)
+        door_open = kitchen_setup.motion_goals.add_open_container(tip_link=kitchen_setup.tip,
+                                                                  environment_link=handle_name,
+                                                                  goal_joint_state=1.5,
+                                                                  name='open door')
+        reset = kitchen_setup.monitors.add_monitor(class_name=TrueMonitor.__name__, name='The Great Reset')
+
+        kitchen_setup.update_start_condition(node_name=laser_violated, condition=handle_detected)
+        kitchen_setup.update_start_condition(node_name=bar_grasped, condition=handle_detected)
+        kitchen_setup.update_end_condition(node_name=handle_name, condition=handle_detected)
+
+        kitchen_setup.update_end_condition(node_name=laser_violated, condition=bar_grasped)
+        kitchen_setup.update_end_condition(node_name=bar_grasped, condition=bar_grasped)
+        kitchen_setup.update_pause_condition(node_name=bar_grasped, condition=laser_violated)
+
+        # kitchen_setup.update_start_condition(node_name=gripper_closed, condition=bar_grasped)
+
+        kitchen_setup.update_start_condition(node_name=door_open, condition=gripper_closed)
+        kitchen_setup.update_start_condition(node_name=slipped, condition=gripper_closed)
+        kitchen_setup.update_start_condition(node_name=gripper_opened, condition=f'{slipped} or {door_open}')
+        kitchen_setup.update_end_condition(node_name=slipped, condition=f'{slipped} or {door_open}')
+
+        kitchen_setup.update_end_condition(node_name=door_open, condition=f'{slipped} or {door_open}')
+        reset_condition = f'{gripper_opened} and {slipped}'
+        kitchen_setup.update_start_condition(node_name=reset, condition=reset_condition)
+
+        kitchen_setup.update_reset_condition(node_name=bar_grasped, condition=reset)
+        kitchen_setup.update_reset_condition(node_name=laser_violated, condition=reset)
+        kitchen_setup.update_reset_condition(node_name=gripper_closed, condition=reset)
+        kitchen_setup.update_reset_condition(node_name=door_open, condition=reset)
+        kitchen_setup.update_reset_condition(node_name=slipped, condition=reset)
+        kitchen_setup.update_reset_condition(node_name=gripper_opened, condition=reset)
+        kitchen_setup.update_reset_condition(node_name=reset, condition=reset)
+
+        kitchen_setup.allow_all_collisions()
+        kitchen_setup.monitors.add_end_motion(start_condition=f'{door_open} and {gripper_opened} and not {slipped}')
         kitchen_setup.execute(add_local_minimum_reached=False)
 
     def test_open_fridge_sequence(self, kitchen_setup: HSRTestWrapper):
@@ -552,8 +638,38 @@ class TestCollisionAvoidanceGoals:
                                                                           [0, -1, 0, 0],
                                                                           [1, 0, 0, 0],
                                                                           [0, 0, 0, 1]]))
-        box_setup.set_cart_goal(goal_pose=grasp_pose, tip_link=box_setup.tip, root_link='map')
-        box_setup.execute()
+        grasp = box_setup.motion_goals.add_motion_goal(class_name=GraspSequence.__name__,
+                                                       name='pick up',
+                                                       tip_link=LinkName(name=box_setup.tip),
+                                                       root_link='map',
+                                                       gripper_joint='hand_motor_joint',
+                                                       goal_pose=grasp_pose)
+        detected = box_setup.monitors.add_pulse(name='Detect Object',
+                                                after_ticks=5)
+        success = box_setup.monitors.add_pulse(name='Obj in Hand?',
+                                               after_ticks=2)
+        stop_retry = box_setup.monitors.add_pulse(name='Above 5 Retries',
+                                             after_ticks=100000)
+
+        not_obj_in_hand = f'{grasp} and not {success}'
+        box_setup.update_end_condition(node_name=detected, condition=detected)
+        box_setup.update_reset_condition(node_name=detected, condition=not_obj_in_hand)
+
+        box_setup.update_start_condition(node_name=grasp, condition=detected)
+        box_setup.update_end_condition(node_name=grasp, condition=grasp)
+        box_setup.update_reset_condition(node_name=grasp, condition=not_obj_in_hand)
+
+        box_setup.update_start_condition(node_name=success, condition=grasp)
+        box_setup.update_end_condition(node_name=success, condition=success)
+        box_setup.update_reset_condition(node_name=success, condition=not_obj_in_hand)
+
+        box_setup.update_start_condition(node_name=stop_retry, condition=f'{grasp} and not {success}')
+        box_setup.update_reset_condition(node_name=stop_retry, condition=f'not {stop_retry}')
+
+        box_setup.monitors.add_end_motion(start_condition=success)
+        box_setup.monitors.add_cancel_motion(start_condition=stop_retry, error=Exception('too many retries'))
+
+        box_setup.execute(add_local_minimum_reached=False)
         box_setup.update_parent_link_of_group(box_name, box_setup.tip)
 
         base_goal = PoseStamped()

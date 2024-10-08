@@ -33,7 +33,8 @@ from giskardpy.motion_graph.monitors.cartesian_monitors import PoseReached, Posi
     PointingAt, \
     VectorsAligned, DistanceToLine
 from giskardpy.motion_graph.monitors.joint_monitors import JointGoalReached
-from giskardpy.motion_graph.monitors.monitors import LocalMinimumReached, TimeAbove, Alternator, CancelMotion, EndMotion
+from giskardpy.motion_graph.monitors.monitors import LocalMinimumReached, TimeAbove, Alternator, CancelMotion, \
+    EndMotion, TrueMonitor
 from giskardpy.motion_graph.monitors.overwrite_state_monitors import SetOdometry, SetSeedConfiguration
 from giskardpy.motion_graph.monitors.payload_monitors import Print, Sleep, \
     PayloadAlternator, Pulse, CheckMaxTrajectoryLength
@@ -1961,6 +1962,21 @@ class MonitorWrapper(MotionGraphNodeWrapper):
         return self.add_monitor(class_name=Pulse.__name__,
                                 name=name,
                                 after_ticks=after_ticks,
+                                start_condition=start_condition,
+                                pause_condition=pause_condition,
+                                end_condition=end_condition)
+
+    def add_const_true(self,
+                       name: str,
+                       start_condition: str = '',
+                       pause_condition: str = '',
+                       end_condition: str = '') -> str:
+        """
+        Testing monitor.
+        Like add_alternator but as a PayloadMonitor.
+        """
+        return self.add_monitor(class_name=TrueMonitor.__name__,
+                                name=name,
                                 start_condition=start_condition,
                                 pause_condition=pause_condition,
                                 end_condition=end_condition)

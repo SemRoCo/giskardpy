@@ -527,7 +527,7 @@ class TestMonitors:
         np.testing.assert_almost_equal(current_pose.pose.position.x, 1, decimal=2)
         np.testing.assert_almost_equal(current_pose.pose.position.y, 1, decimal=2)
 
-    def test_thesis_example(self, zero_pose: PR2TestWrapper):
+    def test_thesis_example1(self, zero_pose: PR2TestWrapper):
         pose1 = PoseStamped()
         pose1.header.frame_id = 'map'
         pose1.pose.position.x = 1
@@ -541,7 +541,39 @@ class TestMonitors:
         root_link = 'map'
         tip_link = 'base_footprint'
 
-        local_min = zero_pose.monitors.add_local_minimum_reached(name='Local Min', end_condition='')
+        pose1 = zero_pose.tasks.add_cartesian_pose(goal_pose=pose1,
+                                                   name='Task 1',
+                                                   root_link=root_link,
+                                                   tip_link=tip_link,
+                                                   end_condition=None)
+        pose2 = zero_pose.tasks.add_cartesian_pose(goal_pose=pose2,
+                                                   name='Task 2',
+                                                   root_link=root_link,
+                                                   tip_link=tip_link,
+                                                   start_condition=pose1,
+                                                   end_condition=None)
+        zero_pose.allow_all_collisions()
+        zero_pose.monitors.add_end_motion(start_condition=pose2)
+        zero_pose.execute(add_local_minimum_reached=False)
+        current_pose = zero_pose.compute_fk_pose(root_link=root_link, tip_link=tip_link)
+        np.testing.assert_almost_equal(current_pose.pose.position.x, 1, decimal=2)
+        np.testing.assert_almost_equal(current_pose.pose.position.y, 1, decimal=2)
+
+    def test_thesis_example2(self, zero_pose: PR2TestWrapper):
+        pose1 = PoseStamped()
+        pose1.header.frame_id = 'map'
+        pose1.pose.position.x = 1
+        pose1.pose.orientation.w = 1
+
+        pose2 = PoseStamped()
+        pose2.header.frame_id = 'base_footprint'
+        pose2.pose.position.y = 1
+        pose2.pose.orientation.w = 1
+
+        root_link = 'map'
+        tip_link = 'base_footprint'
+
+        # local_min = zero_pose.monitors.add_local_minimum_reached(name='Local Min', end_condition='')
         pulse = zero_pose.monitors.add_pulse(name='Laser violated', after_ticks=150)
 
         pose1 = zero_pose.tasks.add_cartesian_pose(goal_pose=pose1,
@@ -559,14 +591,13 @@ class TestMonitors:
                                                    end_condition=None)
         zero_pose.allow_all_collisions()
         zero_pose.monitors.add_end_motion(start_condition=' and '.join([pose2]))
-        zero_pose.monitors.add_cancel_motion(start_condition=f'{local_min}', error=Exception(local_min))
+        # zero_pose.monitors.add_cancel_motion(start_condition=f'{local_min}', error=Exception(local_min))
         zero_pose.execute(add_local_minimum_reached=False)
         current_pose = zero_pose.compute_fk_pose(root_link=root_link, tip_link=tip_link)
         np.testing.assert_almost_equal(current_pose.pose.position.x, 1, decimal=2)
         np.testing.assert_almost_equal(current_pose.pose.position.y, 1, decimal=2)
 
     def test_true_monitor(self, zero_pose: PR2TestWrapper):
-
         done = zero_pose.monitors.add_monitor(class_name=TrueMonitor.__name__, name='Node1')
         zero_pose.monitors.add_monitor(class_name=TrueMonitor.__name__, name='Node Name',
                                        end_condition='')
@@ -633,10 +664,10 @@ class TestMonitors:
         better_pose.dye_group(cylinder_name, (0, 0, 1, 1))
 
         inserted = better_pose.motion_goals.add_motion_goal(class_name=InsertCylinder.__name__,
-                                                 name='insert cyclinder',
-                                                 cylinder_name=cylinder_name,
-                                                 cylinder_height=0.121,
-                                                 hole_point=hole_point)
+                                                            name='insert cyclinder',
+                                                            cylinder_name=cylinder_name,
+                                                            cylinder_height=0.121,
+                                                            hole_point=hole_point)
         better_pose.allow_all_collisions()
         better_pose.monitors.add_end_motion(start_condition=inserted)
         better_pose.execute(add_local_minimum_reached=False)

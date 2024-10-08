@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import re
+from collections import defaultdict
 from typing import List, Dict, Tuple, Optional, Union
 
 import pydot
@@ -281,7 +282,7 @@ class ExecutionStateToDotParser:
                   goals: List[MotionGraphNode],
                   obs_states: Dict[str, bool]) -> pydot.Graph:
         all_nodes = tasks + monitors + goals
-        all_node_name = [node.name for node in all_nodes] + [self.cluster_name_to_goal_name(graph.get_name())]
+        all_node_name = [node.name for node in all_nodes]  # + [self.cluster_name_to_goal_name(graph.get_name())]
         for node in all_nodes:
             node_name = node.name
             node_cluster = self.get_cluster_of_node(node_name, graph)

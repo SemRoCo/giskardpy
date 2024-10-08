@@ -42,6 +42,14 @@ class Goal(MotionGraphNode):
     def has_tasks(self) -> bool:
         return len(self.tasks) > 0
 
+    def arrange_in_sequence(self, nodes: List[MotionGraphNode]) -> None:
+        first_node = nodes[0]
+        first_node.end_condition = first_node.get_observation_state_expression()
+        for node in nodes[1:]:
+            node.start_condition = first_node.get_observation_state_expression()
+            node.end_condition = node.get_observation_state_expression()
+            first_node = node
+
     def get_joint_position_symbol(self, joint_name: PrefixName) -> Union[cas.Symbol, float]:
         """
         returns a symbol that refers to the given joint

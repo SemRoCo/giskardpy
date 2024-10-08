@@ -5,6 +5,7 @@ from typing import Optional
 from giskardpy.data_types.data_types import PrefixName
 from giskardpy.goals.cartesian_goals import CartesianPose
 from giskardpy.goals.goal import Goal
+from giskardpy.motion_graph.tasks.cartesian_tasks import CartesianPoseAsTask
 from giskardpy.motion_graph.tasks.joint_tasks import JointPositionList
 from giskardpy.motion_graph.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
 from giskardpy.god_map import god_map
@@ -51,12 +52,12 @@ class Open(Goal):
 
         handle_pose = cas.TransMatrix(reference_frame=self.tip_link, child_frame=self.tip_link)
 
-        hold_handle = CartesianPose(root_link=self.handle_link,
-                                    tip_link=self.tip_link,
-                                    name=f'{self.name}/hold handle',
-                                    goal_pose=handle_pose,
-                                    weight=self.weight)
-        self.add_goal(hold_handle)
+        hold_handle = CartesianPoseAsTask(root_link=self.handle_link,
+                                          tip_link=self.tip_link,
+                                          name=f'{self.name}/hold handle',
+                                          goal_pose=handle_pose,
+                                          weight=self.weight)
+        self.add_task(hold_handle)
         self.expression = cas.logic_and(hinge_goal.expression, hold_handle.expression)
 
 

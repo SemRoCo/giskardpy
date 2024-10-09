@@ -18,6 +18,11 @@ class MotionGraphNode:
     _id: int
     plot: bool
 
+    logic3_start_condition: cas.Expression
+    logic3_pause_condition: cas.Expression
+    logic3_end_condition: cas.Expression
+    logic3_reset_condition: cas.Expression
+
     def __init__(self, *,
                  name: Optional[str] = None,
                  plot: bool = True):

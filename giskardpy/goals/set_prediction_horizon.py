@@ -18,7 +18,7 @@ class SetPredictionHorizon(PayloadMonitor):
         Setting it to 1 will turn of acceleration and jerk limits.
         :param prediction_horizon: size of the prediction horizon, a number that should be 1 or above 5.
         """
-        if not cas.is_true(start_condition):
+        if not cas.is_true_symbol(start_condition):
             raise MonitorInitalizationException(f'{self.__class__.__name__}: start_condition must be True.')
         if name is None:
             name = self.__class__.__name__
@@ -42,7 +42,7 @@ class SetQPSolver(PayloadMonitor):
                  start_condition: cas.Expression = cas.TrueSymbol,
                  pause_condition: cas.Expression = cas.FalseSymbol,
                  end_condition: cas.Expression = cas.FalseSymbol):
-        if not cas.is_true(start_condition):
+        if not cas.is_true_symbol(start_condition):
             raise MonitorInitalizationException(f'{self.__class__.__name__}: start_condition must be True.')
         if name is None:
             name = self.__class__.__name__

@@ -39,7 +39,7 @@ class MotionGoalManager:
     def init_task_state(self):
         self.task_state = np.zeros(len(self.tasks))
         for task in self.tasks.values():
-            if cas.is_true(task.start_condition):
+            if cas.is_true_symbol(task.start_condition):
                 self.task_state[task.id] = LifeCycleState.running
             else:
                 self.task_state[task.id] = LifeCycleState.not_started

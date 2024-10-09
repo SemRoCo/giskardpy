@@ -63,23 +63,23 @@ class Goal(MotionGraphNode):
 
     def connect_start_condition_to_all_tasks(self, condition: cas.Expression) -> None:
         for task in self.tasks:
-            if cas.is_true(task.start_condition):
+            if cas.is_true_symbol(task.start_condition):
                 task.start_condition = condition
             else:
                 task.start_condition = cas.logic_and(task.start_condition, condition)
 
     def connect_pause_condition_to_all_tasks(self, condition: cas.Expression) -> None:
         for task in self.tasks:
-            if cas.is_false(task.pause_condition):
+            if cas.is_false_symbol(task.pause_condition):
                 task.pause_condition = condition
             else:
                 task.pause_condition = cas.logic_or(task.pause_condition, condition)
 
     def connect_end_condition_to_all_tasks(self, condition: cas.Expression) -> None:
         for task in self.tasks:
-            if cas.is_false(task.end_condition):
+            if cas.is_false_symbol(task.end_condition):
                 task.end_condition = condition
-            elif not cas.is_false(condition):
+            elif not cas.is_false_symbol(condition):
                 task.end_condition = cas.logic_and(task.end_condition, condition)
 
     def connect_monitors_to_all_tasks(self,

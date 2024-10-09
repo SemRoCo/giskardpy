@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict, deque, OrderedDict
 from copy import deepcopy
-from enum import IntEnum
+from enum import IntEnum, Enum
 from typing import Optional, Generic, TypeVar, Dict, Union
 
 import numpy as np
@@ -329,3 +329,9 @@ class LifeCycleState(IntEnum):
     paused = 2
     succeeded = 3
     failed = 4
+
+
+class ObservationState:
+    unknown = 0.5
+    false = 0
+    true = 1

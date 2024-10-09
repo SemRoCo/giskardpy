@@ -9,7 +9,7 @@ from line_profiler import profile
 import numpy as np
 
 import giskardpy.casadi_wrapper as cas
-from giskardpy.data_types.data_types import Derivatives, PrefixName
+from giskardpy.data_types.data_types import Derivatives, PrefixName, ObservationState
 from giskardpy.data_types.exceptions import GiskardException, MonitorInitalizationException
 from giskardpy.god_map import god_map
 from giskardpy.motion_graph.graph_node import MotionGraphNode
@@ -41,7 +41,7 @@ class Monitor(MotionGraphNode):
 #     def __init__(self,)
 
 class PayloadMonitor(Monitor, ABC):
-    state: bool
+    state: ObservationState
     run_call_in_thread: bool
 
     def __init__(self, *,
@@ -53,11 +53,11 @@ class PayloadMonitor(Monitor, ABC):
         it's done.
         :param run_call_in_thread: if True, calls __call__ in a separate thread. Use for expensive operations
         """
-        self.state = False
+        self.state = ObservationState.unknown
         self.run_call_in_thread = run_call_in_thread
         super().__init__(name=name)
 
-    def get_state(self) -> bool:
+    def get_state(self) -> ObservationState:
         return self.state
 
     @abc.abstractmethod
@@ -72,9 +72,9 @@ class EndMotion(PayloadMonitor):
                          run_call_in_thread=False)
 
     def __call__(self):
-        self.state = True
+        self.state = ObservationState.true
 
-    def get_state(self) -> bool:
+    def get_state(self) -> ObservationState:
         return self.state
 
 
@@ -88,10 +88,10 @@ class CancelMotion(PayloadMonitor):
 
     @profile
     def __call__(self):
-        self.state = True
+        self.state = ObservationState.true
         raise self.exception
 
-    def get_state(self) -> bool:
+    def get_state(self) -> ObservationState:
         return self.state
 
 

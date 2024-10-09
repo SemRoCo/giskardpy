@@ -9,7 +9,7 @@ from giskardpy.motion_graph.monitors.monitors import PayloadMonitor
 from giskardpy.god_map import god_map
 from giskardpy.data_types.exceptions import GoalInitalizationException
 from giskardpy.model.joints import OmniDrive, DiffDrive, OmniDrivePR22
-from giskardpy.data_types.data_types import PrefixName
+from giskardpy.data_types.data_types import PrefixName, ObservationState
 from giskardpy.utils.math import axis_angle_from_quaternion
 
 
@@ -43,7 +43,7 @@ class SetSeedConfiguration(PayloadMonitor):
                 raise KeyError(f'World has no joint \'{joint_name}\'.')
             god_map.world.state[joint_name].position = initial_joint_value
         god_map.world.notify_state_change()
-        self.state = True
+        self.state = ObservationState.true
 
 
 class SetOdometry(PayloadMonitor):
@@ -93,4 +93,4 @@ class SetOdometry(PayloadMonitor):
         else:
             god_map.world.state[self.brumbrum_joint.yaw.name].position = angle
         god_map.world.notify_state_change()
-        self.state = True
+        self.state = ObservationState.true

@@ -7,7 +7,7 @@ from typing import Union, TypeVar, Optional
 import math
 from line_profiler import profile
 import casadi
-import casadi as ca  # type: ignore
+import casadi as ca
 import numpy as np
 from scipy import sparse as sp
 
@@ -349,6 +349,11 @@ class Expression(Symbol_):
     def remove(self, rows, columns):
         self.s.remove(rows, columns)
 
+    def split(self):
+        assert self.shape[0] == 1 and self.shape[1] == 1
+        parts = [Expression(self.s.dep(i)) for i in range(self.s.n_dep())]
+        return parts
+
     def __add__(self, other):
         if isinstance(other, (int, float)):
             return Expression(self.s.__add__(other))
@@ -507,6 +512,7 @@ class Expression(Symbol_):
 
 TrueSymbol = Expression(True)
 FalseSymbol = Expression(False)
+BooleanUnknown = 0.5
 
 
 class GeometricType:
@@ -1512,6 +1518,12 @@ def equal(x, y):
     return Expression(ca.eq(x, y))
 
 
+def not_equal(x, y):
+    cas_x = _to_sx(x)
+    cas_y = _to_sx(y)
+    return Expression(ca.ne(cas_x, cas_y))
+
+
 def less_equal(x, y):
     if isinstance(x, Symbol_):
         x = x.s
@@ -1550,18 +1562,34 @@ def greater(x, y, decimal_places=None):
 def logic_and(*args):
     assert len(args) >= 2, 'and must be called with at least 2 arguments'
     # if there is any False, return False
-    if [x for x in args if is_false(x)]:
+    if [x for x in args if is_false_symbol(x)]:
         return FalseSymbol
     # filter all True
-    args = [x for x in args if not is_true(x)]
+    args = [x for x in args if not is_true_symbol(x)]
     if len(args) == 0:
         return TrueSymbol
     if len(args) == 1:
         return args[0]
     if len(args) == 2:
-        return Expression(ca.logic_and(args[0].s, args[1].s))
+        cas_a = _to_sx(args[0])
+        cas_b = _to_sx(args[1])
+        return Expression(ca.logic_and(cas_a, cas_b))
     else:
         return Expression(ca.logic_and(args[0].s, logic_and(*args[1:]).s))
+
+
+def logic_and3(a, b):
+    cas_a = _to_sx(a)
+    cas_b = _to_sx(b)
+    return if_cases(cases=[(equal(cas_a, FalseSymbol),
+                            FalseSymbol),
+                           (equal(cas_b, FalseSymbol),
+                            FalseSymbol),
+                           (equal(cas_a, BooleanUnknown),
+                            BooleanUnknown),
+                           (equal(cas_b, BooleanUnknown),
+                            BooleanUnknown)],
+                    else_result=logic_and(cas_a, cas_b))
 
 
 def logic_any(args):
@@ -1575,10 +1603,10 @@ def logic_all(args):
 def logic_or(*args):
     assert len(args) >= 2, 'and must be called with at least 2 arguments'
     # if there is any True, return True
-    if [x for x in args if is_true(x)]:
+    if [x for x in args if is_true_symbol(x)]:
         return TrueSymbol
     # filter all False
-    args = [x for x in args if not is_false(x)]
+    args = [x for x in args if not is_false_symbol(x)]
     if len(args) == 0:
         return FalseSymbol
     if len(args) == 1:
@@ -1589,8 +1617,28 @@ def logic_or(*args):
         return Expression(ca.logic_or(args[0].s, logic_or(*args[1:]).s))
 
 
+def logic_or3(a, b):
+    cas_a = _to_sx(a)
+    cas_b = _to_sx(b)
+    return if_cases(cases=[(logic_or(equal(cas_a, TrueSymbol), equal(cas_b, TrueSymbol)),
+                            TrueSymbol),
+                           (logic_or(equal(cas_a, BooleanUnknown), equal(cas_b, BooleanUnknown)),
+                            BooleanUnknown)
+                           ],
+                    else_result=FalseSymbol)
+
+
 def logic_not(expr):
-    return Expression(ca.logic_not(expr.s))
+    cas_expr = _to_sx(expr)
+    return Expression(ca.logic_not(cas_expr))
+
+
+def logic_not3(expr):
+    cas_expr = _to_sx(expr)
+    return Expression(if_eq_cases(a=cas_expr,
+                                  b_result_cases=[(TrueSymbol, FalseSymbol),
+                                                  (FalseSymbol, TrueSymbol)],
+                                  else_result=BooleanUnknown))
 
 
 def if_greater(a, b, if_result, else_result):
@@ -2033,7 +2081,7 @@ def distance_point_to_plane(frame_P_current, frame_V_v1, frame_V_v2):
     d = normal.dot(frame_P_current)
     normal.scale(d)
     nearest = frame_P_current - normal
-    return norm(nearest-frame_P_current), nearest
+    return norm(nearest - frame_P_current), nearest
 
 
 def angle_between_vector(v1, v2):
@@ -2169,13 +2217,16 @@ def log(x):
     x = Expression(x).s
     return Expression(ca.log(x))
 
+
 def tan(x):
     x = Expression(x).s
     return Expression(ca.tan(x))
 
+
 def cosh(x):
     x = Expression(x).s
     return Expression(ca.cosh(x))
+
 
 def sinh(x):
     x = Expression(x).s
@@ -2263,14 +2314,25 @@ def gradient(ex, arg):
     return Expression(ca.gradient(ex.s, arg.s))
 
 
-def is_true(expr):
+def is_true_symbol(expr):
     try:
         return (expr == TrueSymbol).to_np()
     except Exception as e:
         return False
 
 
-def is_false(expr):
+def is_true(expr):
+    return equal(expr, TrueSymbol)
+
+
+def is_false_symbol(expr):
+    try:
+        return (expr == FalseSymbol).to_np()
+    except Exception as e:
+        return False
+
+
+def is_unknown3(expr):
     try:
         return (expr == FalseSymbol).to_np()
     except Exception as e:
@@ -2295,3 +2357,18 @@ def distance_vector_projected_on_plane(point1, point2, normal_vector):
     dist = point1 - point2
     projection = dist - dot(dist, normal_vector) * normal_vector
     return projection
+
+
+def replace_with_three_logic(expr):
+    cas_expr = _to_sx(expr)
+    if cas_expr.n_dep() == 0:
+        return expr
+    op = cas_expr.op()
+    if op == ca.OP_NOT:
+        return logic_not3(replace_with_three_logic(cas_expr.dep(0)))
+    if op == ca.OP_AND:
+        return logic_and3(replace_with_three_logic(cas_expr.dep(0)),
+                          replace_with_three_logic(cas_expr.dep(1)))
+    if op == ca.OP_OR:
+        return logic_or3(replace_with_three_logic(cas_expr.dep(0)),
+                         replace_with_three_logic(cas_expr.dep(1)))

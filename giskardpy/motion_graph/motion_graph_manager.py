@@ -8,7 +8,7 @@ import numpy as np
 
 import giskardpy.casadi_wrapper as cas
 from giskardpy.casadi_wrapper import CompiledFunction
-from giskardpy.data_types.data_types import LifeCycleState
+from giskardpy.data_types.data_types import LifeCycleState, ObservationState
 from giskardpy.data_types.exceptions import GiskardException, UnknownMonitorException, \
     UnknownTaskException, GoalInitalizationException
 from giskardpy.goals.goal import Goal
@@ -182,9 +182,16 @@ class MotionGraphManager:
             if self.get_parent_node_name_of_node(goal) == '':
                 self.apply_conditions_to_sub_nodes(goal)
 
+    def create_logic3_conditions(self) -> None:
+        for node in self.task_state.nodes + self.monitor_state.nodes + self.goal_state.nodes:
+            node.logic3_start_condition = cas.replace_with_three_logic(node.start_condition)
+            node.logic3_pause_condition = cas.replace_with_three_logic(node.pause_condition)
+            node.logic3_end_condition = cas.replace_with_three_logic(node.end_condition)
+            node.logic3_reset_condition = cas.replace_with_three_logic(node.reset_condition)
+
     def apply_conditions_to_sub_nodes(self, goal: Goal):
         for node in goal.tasks + goal.monitors + goal.goals:
-            if cas.is_true(node.start_condition):
+            if cas.is_true_symbol(node.start_condition):
                 node.start_condition = goal.start_condition
             node.reset_condition = cas.logic_or(node.reset_condition, goal.reset_condition)
             node.pause_condition = cas.logic_or(node.pause_condition, goal.pause_condition)
@@ -213,7 +220,8 @@ class MotionGraphManager:
             return default
         tree = ast.parse(logic_str, mode='eval')
         try:
-            return self.parse_ast_expression(tree.body, observation_state_symbols)
+            expr = self.parse_ast_expression(tree.body, observation_state_symbols)
+            return expr
         except KeyError as e:
             raise GiskardException(f'Unknown symbol {e}')
         except Exception as e:
@@ -221,7 +229,7 @@ class MotionGraphManager:
 
     @profile
     def compile_node_state_updaters(self) -> None:
-
+        self.create_logic3_conditions()
         self.compiled_task_observation_state, self.compiled_task_life_cycle_state = self.compile_node_state_updater(
             self.task_state)
         self.compiled_monitor_observation_state, self.compiled_monitor_life_cycle_state = self.compile_node_state_updater(
@@ -249,13 +257,13 @@ class MotionGraphManager:
 
     def get_node_from_state_expr(self, expr: cas.Expression) -> MotionGraphNode:
         for task in self.task_state.nodes:
-            if cas.is_true(task.get_observation_state_expression() == expr):
+            if cas.is_true_symbol(task.get_observation_state_expression() == expr):
                 return task
         for monitor in self.monitor_state.nodes:
-            if cas.is_true(monitor.get_observation_state_expression() == expr):
+            if cas.is_true_symbol(monitor.get_observation_state_expression() == expr):
                 return monitor
         for goal in self.goal_state.nodes:
-            if cas.is_true(goal.get_observation_state_expression() == expr):
+            if cas.is_true_symbol(goal.get_observation_state_expression() == expr):
                 return goal
         raise GiskardException(f'No goal/task/monitor found for {str(expr)}.')
 
@@ -287,20 +295,21 @@ class MotionGraphManager:
         """
         free_symbols = condition.free_symbols()
         if not free_symbols:
-            return str(cas.is_true(condition))
-        condition = str(condition)
+            return str(cas.is_true_symbol(condition))
+        condition_str = condition.pretty_str()[0][0]
         state_to_monitor_map = {str(x): f'\'{self.get_node_from_state_expr(x).name}\'' for x in free_symbols}
         state_to_monitor_map['&&'] = f'{new_line}and '
         state_to_monitor_map['||'] = f'{new_line}or '
         state_to_monitor_map['!'] = 'not '
+        state_to_monitor_map['==1'] = ''
         for state_str, monitor_name in state_to_monitor_map.items():
-            condition = condition.replace(state_str, monitor_name)
-        return condition
+            condition_str = condition_str.replace(state_str, monitor_name)
+        return condition_str
 
     @profile
     def compile_node_state_updater(self, node_state: MotionGraphNodeStateManager) \
             -> Tuple[cas.CompiledFunction, cas.CompiledFunction]:
-        state_updater = []
+        observation_state_updater = []
         node: MotionGraphNode
         for node in node_state.nodes:
             state_symbol = node.get_observation_state_expression()
@@ -311,11 +320,11 @@ class MotionGraphManager:
                 expression = node.expression
             state_f = cas.if_eq_cases(a=node.get_life_cycle_state_expression(),
                                       b_result_cases=[(int(LifeCycleState.running), expression),
-                                                      (int(LifeCycleState.not_started), cas.FalseSymbol)],
+                                                      (int(LifeCycleState.not_started), ObservationState.unknown)],
                                       else_result=state_symbol)
-            state_updater.append(state_f)
-        state_updater = cas.Expression(state_updater)
-        compiled_node_observation_state = state_updater.compile(state_updater.free_symbols())
+            observation_state_updater.append(state_f)
+        observation_state_updater = cas.Expression(observation_state_updater)
+        compiled_node_observation_state = observation_state_updater.compile(observation_state_updater.free_symbols())
         compiled_node_life_cycle_state = compile_graph_node_state_updater(node_state)
         return compiled_node_observation_state, compiled_node_life_cycle_state
 
@@ -331,7 +340,7 @@ class MotionGraphManager:
         Expression is updated when all monitors are 1 at the same time, but only once.
         """
         updater_id = len(self.substitution_values)
-        if cas.is_true(condition):
+        if cas.is_true_symbol(condition):
             raise ValueError('condition is always true')
         old_symbols = []
         new_symbols = []
@@ -387,17 +396,16 @@ class MotionGraphManager:
     @profile
     def evaluate_node_states(self) -> bool:
         # %% update observation state
+        task_args = symbol_manager.resolve_symbols(self.compiled_task_observation_state.str_params)
+        monitor_args = symbol_manager.resolve_symbols(self.compiled_monitor_observation_state.str_params)
+        goal_args = symbol_manager.resolve_symbols(self.compiled_goal_observation_state.str_params)
+
         next_state, done = self.evaluate_payload_monitors()
+
+        self.task_state.observation_state = self.compiled_task_observation_state.fast_call(task_args)
+        self.monitor_state.observation_state = self.compiled_monitor_observation_state.fast_call(monitor_args)
+        self.goal_state.observation_state = self.compiled_goal_observation_state.fast_call(goal_args)
         self.monitor_state.observation_state[self.payload_monitor_filter] = next_state
-
-        args = symbol_manager.resolve_symbols(self.compiled_task_observation_state.str_params)
-        self.task_state.observation_state = self.compiled_task_observation_state.fast_call(args)
-
-        args = symbol_manager.resolve_symbols(self.compiled_monitor_observation_state.str_params)
-        self.monitor_state.observation_state = self.compiled_monitor_observation_state.fast_call(args)
-
-        args = symbol_manager.resolve_symbols(self.compiled_goal_observation_state.str_params)
-        self.goal_state.observation_state = self.compiled_goal_observation_state.fast_call(args)
 
         obs_state = np.concatenate((self.task_state.observation_state,
                                     self.monitor_state.observation_state,
@@ -447,8 +455,10 @@ class MotionGraphManager:
                     # the call of cancel motion might trigger exceptions
                     # only raise it if no end motion triggered at the same time
                     cancel_exception = e
+            elif filtered_life_cycle_state[i] == LifeCycleState.not_started:
+                payload_monitor.state = ObservationState.unknown
             next_state[i] = payload_monitor.get_state()
-            done = done or (isinstance(payload_monitor, EndMotion) and next_state[i])
+            done = done or (isinstance(payload_monitor, EndMotion) and next_state[i] == ObservationState.true)
         if not done and cancel_exception is not None:
             done = cancel_exception
         return next_state, done

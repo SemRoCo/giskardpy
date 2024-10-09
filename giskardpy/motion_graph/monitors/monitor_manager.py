@@ -107,14 +107,14 @@ class MonitorManager:
 
     def set_initial_life_cycle_state(self):
         for monitor in self.monitors.values():
-            if cas.is_true(monitor.start_condition):
+            if cas.is_true_symbol(monitor.start_condition):
                 self.life_cycle_state[monitor.id] = LifeCycleState.running
             else:
                 self.life_cycle_state[monitor.id] = LifeCycleState.not_started
 
     def get_monitor_from_state_expr(self, expr: cas.Expression) -> Monitor:
         for monitor in self.monitors.values():
-            if cas.is_true(monitor.get_observation_state_expression() == expr):
+            if cas.is_true_symbol(monitor.get_observation_state_expression() == expr):
                 return monitor
         raise GiskardException('No monitor found.')
 
@@ -131,7 +131,7 @@ class MonitorManager:
         """
         free_symbols = condition.free_symbols()
         if not free_symbols:
-            return str(cas.is_true(condition))
+            return str(cas.is_true_symbol(condition))
         condition = str(condition)
         state_to_monitor_map = {str(x): f'\'{self.get_monitor_from_state_expr(x).name}\'' for x in free_symbols}
         state_to_monitor_map['&&'] = f'{new_line}and '
@@ -187,7 +187,7 @@ class MonitorManager:
         Expression is updated when all monitors are 1 at the same time, but only once.
         """
         updater_id = len(self.substitution_values)
-        if cas.is_true(condition):
+        if cas.is_true_symbol(condition):
             raise ValueError('condition is always true')
         old_symbols = []
         new_symbols = []

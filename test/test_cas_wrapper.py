@@ -7,11 +7,100 @@ import numpy as np
 from hypothesis import given, assume, settings
 
 from giskardpy import casadi_wrapper as cas
+from giskardpy.data_types.data_types import ObservationState
 from giskardpy.qp import pos_in_vel_limits as cas2
 import giskardpy.utils.math as giskard_math
 from test.utils_for_tests import float_no_nan_no_inf, unit_vector, quaternion, vector, \
     lists_of_same_length, random_angle, compare_axis_angle, angle_positive, sq_matrix, \
     float_no_nan_no_inf_min_max, compare_orientations
+
+
+
+def logic_not(a):
+    if a == True:
+        return False
+    elif a == False:
+        return True
+    elif a == cas.BooleanUnknown:
+        return cas.BooleanUnknown
+    else:
+        raise ValueError(f'Invalid truth value: {a}')
+
+
+def logic_and(a, b):
+    if a == False or b == False:
+        return False
+    elif a == True and b == True:
+        return True
+    elif a == cas.BooleanUnknown or b == cas.BooleanUnknown:
+        return cas.BooleanUnknown
+    else:
+        raise ValueError(f'Invalid truth values: {a}, {b}')
+
+
+def logic_or(a, b):
+    if a == True or b == True:
+        return True
+    elif a == False and b == False:
+        return False
+    elif a == cas.BooleanUnknown or b == cas.BooleanUnknown:
+        return cas.BooleanUnknown
+    else:
+        raise ValueError(f'Invalid truth values: {a}, {b}')
+
+
+class TestUndefinedLogic(unittest.TestCase):
+    values = [True, False, cas.BooleanUnknown]
+
+    def test_and3(self):
+        s = cas.Symbol('a')
+        s2 = cas.Symbol('b')
+        expr = cas.logic_and3(s, s2)
+        f = expr.compile()
+        for i in self.values:
+            for j in self.values:
+                expected = logic_and(i, j)
+                actual = f(a=i, b=j)
+                assert expected == actual, f'a={i}, b={j}, expected {expected}, actual {actual}'
+
+    def test_or3(self):
+        s = cas.Symbol('a')
+        s2 = cas.Symbol('b')
+        expr = cas.logic_or3(s, s2)
+        f = expr.compile()
+        for i in self.values:
+            for j in self.values:
+                expected = logic_or(i, j)
+                actual = f(a=i, b=j)
+                assert expected == actual, f'a={i}, b={j}, expected {expected}, actual {actual}'
+
+    def test_not3(self):
+        s = cas.Symbol('muh')
+        expr = cas.logic_not3(s)
+        f = expr.compile()
+        for i in self.values:
+            expected = logic_not(i)
+            actual = f(muh=i)
+            assert expected == actual, f'a={i}, expected {expected}, actual {actual}'
+
+    def test_sub_logic_operators(self):
+        def reference_function(a, b, c):
+            not_c = logic_not(c)
+            or_result = logic_or(b, not_c)
+            result = logic_and(a, or_result)
+            return result
+
+        a, b, c = cas.create_symbols(['a', 'b', 'c'])
+        expr = cas.logic_and(a, cas.logic_or(b, cas.logic_not(c)))
+        new_expr = cas.replace_with_three_logic(expr)
+        f = new_expr.compile()
+        values = [True, False, cas.BooleanUnknown]
+        for i in values:
+            for j in values:
+                for k in values:
+                    computed_result = f(a=i, b=j, c=k)
+                    expected_result = reference_function(i, j, k)
+                    assert computed_result == expected_result, f"Mismatch for inputs i={i}, j={j}, k={k}. Expected {expected_result}, got {computed_result}"
 
 
 class TestSymbol:
@@ -191,33 +280,33 @@ class TestExpression(unittest.TestCase):
         s1 = cas.Symbol('s1')
         s2 = cas.Symbol('s2')
         expr = cas.logic_and(cas.TrueSymbol, s1)
-        assert not cas.is_true(expr) and not cas.is_false(expr)
+        assert not cas.is_true_symbol(expr) and not cas.is_false_symbol(expr)
         expr = cas.logic_and(cas.FalseSymbol, s1)
-        assert cas.is_false(expr)
+        assert cas.is_false_symbol(expr)
         expr = cas.logic_and(cas.TrueSymbol, cas.TrueSymbol)
-        assert cas.is_true(expr)
+        assert cas.is_true_symbol(expr)
         expr = cas.logic_and(cas.FalseSymbol, cas.TrueSymbol)
-        assert cas.is_false(expr)
+        assert cas.is_false_symbol(expr)
         expr = cas.logic_and(cas.FalseSymbol, cas.FalseSymbol)
-        assert cas.is_false(expr)
+        assert cas.is_false_symbol(expr)
         expr = cas.logic_and(s1, s2)
-        assert not cas.is_true(expr) and not cas.is_false(expr)
+        assert not cas.is_true_symbol(expr) and not cas.is_false_symbol(expr)
 
     def test_logic_or(self):
         s1 = cas.Symbol('s1')
         s2 = cas.Symbol('s2')
         expr = cas.logic_or(cas.FalseSymbol, s1)
-        assert not cas.is_true(expr) and not cas.is_false(expr)
+        assert not cas.is_true_symbol(expr) and not cas.is_false_symbol(expr)
         expr = cas.logic_or(cas.TrueSymbol, s1)
-        assert cas.is_true(expr)
+        assert cas.is_true_symbol(expr)
         expr = cas.logic_or(cas.TrueSymbol, cas.TrueSymbol)
-        assert cas.is_true(expr)
+        assert cas.is_true_symbol(expr)
         expr = cas.logic_or(cas.FalseSymbol, cas.TrueSymbol)
-        assert cas.is_true(expr)
+        assert cas.is_true_symbol(expr)
         expr = cas.logic_or(cas.FalseSymbol, cas.FalseSymbol)
-        assert cas.is_false(expr)
+        assert cas.is_false_symbol(expr)
         expr = cas.logic_or(s1, s2)
-        assert not cas.is_true(expr) and not cas.is_false(expr)
+        assert not cas.is_true_symbol(expr) and not cas.is_false_symbol(expr)
 
     def test_lt(self):
         e1 = cas.Expression([1, 2, 3, -1])

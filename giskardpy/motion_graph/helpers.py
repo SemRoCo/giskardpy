@@ -3,7 +3,7 @@ from typing import Dict, List, TypeVar, Generic, Set
 import numpy as np
 
 from giskardpy.casadi_wrapper import CompiledFunction
-from giskardpy.data_types.data_types import LifeCycleState
+from giskardpy.data_types.data_types import LifeCycleState, ObservationState
 from giskardpy.data_types.exceptions import GoalInitalizationException
 from giskardpy.god_map import god_map
 from giskardpy.motion_graph.graph_node import MotionGraphNode
@@ -51,10 +51,10 @@ class MotionGraphNodeStateManager(Generic[T]):
         self.key_to_idx[node.name] = len(self.nodes) - 1
 
     def init_states(self) -> None:
-        self.observation_state = np.zeros(len(self.nodes))
+        self.observation_state = np.ones(len(self.nodes)) * ObservationState.unknown
         self.life_cycle_state = np.zeros(len(self.nodes))
         for node_id, node in enumerate(self.nodes):
-            if cas.is_true(node.start_condition):
+            if cas.is_true_symbol(node.start_condition):
                 self.life_cycle_state[node_id] = LifeCycleState.running
             else:
                 self.life_cycle_state[node_id] = LifeCycleState.not_started
@@ -75,21 +75,22 @@ class MotionGraphNodeStateManager(Generic[T]):
 @profile
 def compile_graph_node_state_updater(node_state: MotionGraphNodeStateManager) -> CompiledFunction:
     state_updater = []
+    node: MotionGraphNode
     for node in node_state.nodes:
         state_symbol = node.get_life_cycle_state_expression()
 
-        not_started_transitions = cas.if_else(condition=node.start_condition,
+        not_started_transitions = cas.if_else(condition=cas.is_true(node.logic3_start_condition),
                                               if_result=LifeCycleState.running,
                                               else_result=LifeCycleState.not_started)
-        running_transitions = cas.if_cases(cases=[(node.reset_condition, LifeCycleState.not_started),
-                                                  (node.end_condition, LifeCycleState.succeeded),
-                                                  (node.pause_condition, LifeCycleState.paused)],
+        running_transitions = cas.if_cases(cases=[(cas.is_true(node.logic3_reset_condition), LifeCycleState.not_started),
+                                                  (cas.is_true(node.logic3_end_condition), LifeCycleState.succeeded),
+                                                  (cas.is_true(node.logic3_pause_condition), LifeCycleState.paused)],
                                            else_result=LifeCycleState.running)
-        pause_transitions = cas.if_cases(cases=[(node.reset_condition, LifeCycleState.not_started),
-                                                (node.end_condition, LifeCycleState.succeeded),
-                                                (cas.logic_not(node.pause_condition), LifeCycleState.running)],
+        pause_transitions = cas.if_cases(cases=[(cas.is_true(node.logic3_reset_condition), LifeCycleState.not_started),
+                                                (cas.is_true(node.logic3_end_condition), LifeCycleState.succeeded),
+                                                (cas.logic_not(cas.is_true(node.logic3_pause_condition)), LifeCycleState.running)],
                                          else_result=LifeCycleState.paused)
-        ended_transitions = cas.if_else(condition=node.reset_condition,
+        ended_transitions = cas.if_else(condition=cas.is_true(node.logic3_reset_condition),
                                         if_result=LifeCycleState.not_started,
                                         else_result=LifeCycleState.succeeded)
 

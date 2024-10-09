@@ -4,6 +4,7 @@ import numpy as np
 from line_profiler import profile
 
 import giskardpy.casadi_wrapper as cas
+from giskardpy.data_types.data_types import ObservationState
 from giskardpy.god_map import god_map
 from giskardpy.middleware import get_middleware
 from giskardpy.motion_graph.monitors.monitors import PayloadMonitor, Monitor
@@ -87,6 +88,8 @@ class Counter(PayloadMonitor):
         self.number = number
 
     def __call__(self):
+        if self.state == ObservationState.unknown:
+            self.counter = 0
         self.state = self.counter >= self.number
         self.counter += 1
 
@@ -94,9 +97,10 @@ class Counter(PayloadMonitor):
 class Pulse(PayloadMonitor):
     def __init__(self, name: str, after_ticks: int):
         super().__init__(name=name, run_call_in_thread=False)
-        self.counter = 0
         self.after_ticks = after_ticks
 
     def __call__(self):
+        if self.state == ObservationState.unknown:
+            self.counter = 0
         self.state = self.counter == self.after_ticks
         self.counter += 1

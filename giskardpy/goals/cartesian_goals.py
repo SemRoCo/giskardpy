@@ -36,7 +36,7 @@ class CartesianPositionStraight(Goal):
         self.weight = weight
         self.root_link = root_link
         self.tip_link = tip_link
-        if absolute or cas.is_true(start_condition):
+        if absolute or cas.is_true_symbol(start_condition):
             root_P_goal = god_map.world.transform(self.root_link, goal_point)
         else:
             root_T_x = god_map.world.compose_fk_expression(self.root_link, goal_point.reference_frame)

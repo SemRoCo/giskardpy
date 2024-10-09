@@ -85,10 +85,6 @@ def rnd_joint_state2(draw, joint_limits):
     return {jn: draw(st.floats(ll, ul, allow_nan=False, allow_infinity=False)) for jn, (ll, ul) in muh.items()}
 
 
-@composite
-def pr2_joint_state(draw):
-    pass
-
 
 def pr2_urdf():
     path = get_middleware().resolve_iri('package://giskardpy/test/urdfs/pr2_with_base.urdf')

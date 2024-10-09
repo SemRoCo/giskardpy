@@ -41,7 +41,8 @@ class HSRTestWrapper(GiskardTestWrapper):
                               robot_interface_config=HSRStandaloneInterface(),
                               behavior_tree_config=StandAloneBTConfig(debug_mode=True,
                                                                       publish_tf=True,
-                                                                      publish_js=False),
+                                                                      publish_js=False,
+                                                                      simulation_max_hz=20),
                               qp_controller_config=QPControllerConfig())
         super().__init__(giskard)
         self.gripper_group = 'gripper'
@@ -646,12 +647,12 @@ class TestCollisionAvoidanceGoals:
                                                        goal_pose=grasp_pose)
         detected = box_setup.monitors.add_pulse(name='Detect Object',
                                                 after_ticks=5)
-        success = box_setup.monitors.add_pulse(name='Obj in Hand?',
-                                               after_ticks=2)
+        success = box_setup.monitors.add_time_above(name='Obj in Hand?',
+                                                    threshold=10)
         stop_retry = box_setup.monitors.add_pulse(name='Above 5 Retries',
-                                             after_ticks=100000)
+                                                  after_ticks=100000)
 
-        not_obj_in_hand = f'{grasp} and not {success}'
+        not_obj_in_hand = f'not {success}'
         box_setup.update_end_condition(node_name=detected, condition=detected)
         box_setup.update_reset_condition(node_name=detected, condition=not_obj_in_hand)
 
@@ -677,6 +678,75 @@ class TestCollisionAvoidanceGoals:
         base_goal.pose.position.x -= 0.5
         base_goal.pose.orientation.w = 1
         box_setup.move_base(base_goal)
+
+    def test_schnibbeln(self, box_setup: HSRTestWrapper):
+        box_name = 'Schnibbler'
+        box_pose = PoseStamped()
+        box_pose.header.frame_id = box_setup.tip
+        box_pose.pose.position = Point(0.0, 0.0, 0.06)
+        box_pose.pose.orientation.w = 1.0
+
+        box_setup.add_box_to_world(name=box_name, size=(0.05, 0.01, 0.15), pose=box_pose, parent_link=box_setup.tip)
+        box_setup.close_gripper()
+
+        pre_schnibble_pose = PoseStamped()
+        pre_schnibble_pose.header.frame_id = 'map'
+        pre_schnibble_pose.pose.position = Point(0.85, 0.3, .75)
+        pre_schnibble_pose.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 0, 1, 0],
+                                                                                  [0, -1, 0, 0],
+                                                                                  [1, 0, 0, 0],
+                                                                                  [0, 0, 0, 1]]))
+        pre_schnibble = box_setup.tasks.add_cartesian_pose(name='pre schnibbel',
+                                                           goal_pose=pre_schnibble_pose,
+                                                           tip_link=box_setup.tip,
+                                                           root_link='map')
+
+        schnibble_down_pose = PoseStamped()
+        schnibble_down_pose.header.frame_id = box_name
+        schnibble_down_pose.pose.position.x = -0.1
+        schnibble_down_pose.pose.orientation.w = 1.0
+        schnibble_down = box_setup.tasks.add_cartesian_pose(name='schnibble down',
+                                                            goal_pose=schnibble_down_pose,
+                                                            tip_link=box_name,
+                                                            root_link='map',
+                                                            absolute=False,
+                                                            start_condition=pre_schnibble)
+
+        schnibble_up_pose = PoseStamped()
+        schnibble_up_pose.header.frame_id = box_name
+        schnibble_up_pose.pose.position.x = 0.1
+        schnibble_up_pose.pose.orientation.w = 1.0
+        schnibble_up = box_setup.tasks.add_cartesian_pose(name='schnibble up',
+                                                          goal_pose=schnibble_up_pose,
+                                                          tip_link=box_name,
+                                                          root_link='map',
+                                                          absolute=False,
+                                                          start_condition=schnibble_down)
+
+        right_pose = PoseStamped()
+        right_pose.header.frame_id = box_name
+        right_pose.pose.position.y = 0.02
+        right_pose.pose.orientation.w = 1.0
+        move_right = box_setup.tasks.add_cartesian_pose(name='move right',
+                                                        goal_pose=right_pose,
+                                                        tip_link=box_name,
+                                                        root_link='map',
+                                                        absolute=False,
+                                                        start_condition=schnibble_up)
+
+        schnibbel_done = box_setup.monitors.add_time_above(name='schnibbel done?',
+                                                           threshold=10,
+                                                           start_condition=move_right)
+
+        reset = f'not {schnibbel_done}'
+        box_setup.update_reset_condition(node_name=schnibble_down, condition=reset)
+        box_setup.update_reset_condition(node_name=schnibble_up, condition=reset)
+        box_setup.update_reset_condition(node_name=move_right, condition=reset)
+        box_setup.update_reset_condition(node_name=schnibbel_done, condition=reset)
+
+        box_setup.monitors.add_end_motion(start_condition=schnibbel_done)
+        box_setup.execute(add_local_minimum_reached=False)
+        # box_setup.update_parent_link_of_group(box_name, box_setup.tip)
 
     def test_collision_avoidance(self, zero_pose: HSRTestWrapper):
         js = {'arm_flex_joint': -np.pi / 2}

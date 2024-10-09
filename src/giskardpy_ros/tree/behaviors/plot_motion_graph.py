@@ -10,7 +10,7 @@ from py_trees import Status
 
 import giskard_msgs.msg as giskard_msgs
 from giskard_msgs.msg import ExecutionState, MotionGraphNode
-from giskardpy.data_types.data_types import LifeCycleState
+from giskardpy.data_types.data_types import LifeCycleState, ObservationState
 from giskardpy.god_map import god_map
 from giskardpy.middleware import get_middleware
 from giskardpy.motion_graph.monitors.monitors import EndMotion, CancelMotion
@@ -22,7 +22,7 @@ from giskardpy_ros.tree.blackboard_utils import catch_and_raise_to_blackboard, G
 
 
 def extract_node_names_from_condition(condition: str) -> List[str]:
-    return re.findall(r"'(.*?)'", condition)
+    return set(re.findall(r"'(.*?)'", condition))
 
 
 def format_condition(condition: str) -> str:
@@ -71,9 +71,17 @@ EdgeStyleFalse = 'dashed'
 
 ResetSymbol = '⟲'
 
-ObservationStateToColor: Dict[bool, str] = {
-    True: MonitorTrueGreen,
-    False: MonitorFalseRed
+ObservationStateToColor: Dict[ObservationState, str] = {
+    ObservationState.unknown: ResetCondColor,
+    ObservationState.true: MonitorTrueGreen,
+    ObservationState.false: MonitorFalseRed
+}
+
+
+ObservationStateToSymbol: Dict[ObservationState, str] = {
+    ObservationState.unknown: '?',
+    ObservationState.true: 'True',
+    ObservationState.false: 'False'
 }
 
 LiftCycleStateToColor: Dict[LifeCycleState, str] = {
@@ -106,7 +114,7 @@ class ExecutionStateToDotParser:
         return [m for m in self.execution_state.monitors if m.name == monitor_name][0]
 
     def format_motion_graph_node_msg(self, msg: giskard_msgs.MotionGraphNode,
-                                     obs_state: bool, life_cycle_state: LifeCycleState) -> str:
+                                     obs_state: ObservationState, life_cycle_state: LifeCycleState) -> str:
         start_condition = format_condition(msg.start_condition)
         pause_condition = format_condition(msg.pause_condition)
         end_condition = format_condition(msg.end_condition)
@@ -125,9 +133,10 @@ class ExecutionStateToDotParser:
 
     def conditions_to_str(self, name: str, start_condition: str, pause_condition: Optional[str],
                           end_condition: Optional[str], reset_condition: Optional[str],
-                          obs_state: bool, life_cycle_state: LifeCycleState) -> str:
+                          obs_state: ObservationState, life_cycle_state: LifeCycleState) -> str:
         line_color = 'black'
-        obs_color = ObservationStateToColor[bool(obs_state)]
+        obs_color = ObservationStateToColor[obs_state]
+        obs_text = ObservationStateToSymbol[obs_state]
         life_color = LiftCycleStateToColor[life_cycle_state]
         life_symbol = LiftCycleStateToSymbol[life_cycle_state]
         label = (f'<<TABLE  BORDER="0" CELLBORDER="0" CELLSPACING="0">'
@@ -141,7 +150,7 @@ class ExecutionStateToDotParser:
                  f'  <TD CELLPADDING="0">'
                  f'    <TABLE BORDER="0" CELLBORDER="2" CELLSPACING="0" WIDTH="100%">'
                  f'      <TR>'
-                 f'        <TD BGCOLOR="{obs_color}" WIDTH="50%" FIXEDSIZE="FALSE"><FONT FACE="monospace">{bool(obs_state)}</FONT></TD>'
+                 f'        <TD BGCOLOR="{obs_color}" WIDTH="50%" FIXEDSIZE="FALSE"><FONT FACE="monospace">{obs_text}</FONT></TD>'
                  f'        <VR/>'
                  f'        <TD BGCOLOR="{life_color}" WIDTH="50%" FIXEDSIZE="FALSE"><FONT FACE="monospace">{life_symbol}</FONT></TD>'
                  f'      </TR>'
@@ -194,7 +203,7 @@ class ExecutionStateToDotParser:
         return node_cluster
 
     def add_node(self, graph: pydot.Graph, node_msg: giskard_msgs.MotionGraphNode, style: str, shape: str,
-                 obs_state: bool, life_cycle_state: LifeCycleState) \
+                 obs_state: ObservationState, life_cycle_state: LifeCycleState) \
             -> pydot.Node:
         num_extra_boarders = 0
         node_id = str(node_msg.name)
@@ -295,7 +304,7 @@ class ExecutionStateToDotParser:
                     kwargs['lhead'] = node_cluster.get_name()
                 if sub_node_cluster is not None:
                     kwargs['ltail'] = sub_node_cluster.get_name()
-                if not obs_states[sub_node_name]:
+                if obs_states[sub_node_name] in [ObservationState.false, ObservationState.unknown]:
                     kwargs['style'] = EdgeStyleFalse
                 graph.add_edge(pydot.Edge(src=sub_node_name, dst=node_name, penwidth=LineWidth, color=StartCondColor,
                                           arrowsize=ArrowSize, **kwargs))
@@ -308,7 +317,7 @@ class ExecutionStateToDotParser:
                     kwargs['lhead'] = node_cluster.get_name()
                 if sub_node_cluster is not None:
                     kwargs['ltail'] = sub_node_cluster.get_name()
-                if not obs_states[sub_node_name]:
+                if obs_states[sub_node_name] in [ObservationState.false, ObservationState.unknown]:
                     kwargs['style'] = EdgeStyleFalse
                 graph.add_edge(pydot.Edge(sub_node_name, node_name, penwidth=LineWidth, color=PauseCondColor,
                                           minlen=0,
@@ -322,7 +331,7 @@ class ExecutionStateToDotParser:
                     kwargs['ltail'] = node_cluster.get_name()
                 if sub_node_cluster is not None:
                     kwargs['lhead'] = sub_node_cluster.get_name()
-                if not obs_states[sub_node_name]:
+                if obs_states[sub_node_name] in [ObservationState.false, ObservationState.unknown]:
                     kwargs['style'] = EdgeStyleFalse
                 graph.add_edge(pydot.Edge(node_name, sub_node_name, color=EndCondColor, penwidth=LineWidth,
                                           arrowhead='none',
@@ -337,7 +346,7 @@ class ExecutionStateToDotParser:
                     kwargs['ltail'] = node_cluster.get_name()
                 if sub_node_cluster is not None:
                     kwargs['lhead'] = sub_node_cluster.get_name()
-                if not obs_states[sub_node_name]:
+                if obs_states[sub_node_name] in [ObservationState.false, ObservationState.unknown]:
                     kwargs['style'] = EdgeStyleFalse
                 graph.add_edge(pydot.Edge(node_name, sub_node_name, color=ResetCondColor, penwidth=LineWidth,
                                           arrowhead='none',

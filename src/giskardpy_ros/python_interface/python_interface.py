@@ -1336,7 +1336,7 @@ class TaskWrapper(MotionGraphNodeWrapper):
                            weight: Optional[float] = None,
                            start_condition: str = '',
                            pause_condition: str = '',
-                           end_condition: str = '',
+                           end_condition: Optional[str] = None,
                            **kwargs: goal_parameter) -> str:
         """
         This goal will use the kinematic chain between root and tip link to move tip link to the goal pose.

@@ -32,9 +32,9 @@ class RealTimePointing(Pointing):
                  pointing_axis: cas.Vector3,
                  max_velocity: float = 0.3,
                  weight: float = WEIGHT_BELOW_CA,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 pause_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol):
+                 start_condition: cas.Expression = cas.BinaryTrue,
+                 pause_condition: cas.Expression = cas.BinaryFalse,
+                 end_condition: cas.Expression = cas.BinaryFalse):
         initial_goal = cas.Point3((1, 0, 1), reference_frame=god_map.world.search_for_link_name('base_footprint'))
         super().__init__(tip_link=tip_link,
                          goal_point=initial_goal,
@@ -94,9 +94,9 @@ class CarryMyBullshit(Goal):
                  clear_path: bool = False,
                  drive_back: bool = False,
                  enable_laser_avoidance: bool = True,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 pause_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol):
+                 start_condition: cas.Expression = cas.BinaryTrue,
+                 pause_condition: cas.Expression = cas.BinaryFalse,
+                 end_condition: cas.Expression = cas.BinaryFalse):
         super().__init__(name=name)
         if drive_back:
             get_middleware().loginfo('driving back')
@@ -678,9 +678,9 @@ class FollowNavPath(Goal):
                  traj_tracking_radius: float = 0.5,
                  height_for_camera_target: float = 1,
                  laser_frame_id: str = 'base_range_sensor_link',
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 pause_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol):
+                 start_condition: cas.Expression = cas.BinaryTrue,
+                 pause_condition: cas.Expression = cas.BinaryFalse,
+                 end_condition: cas.Expression = cas.BinaryFalse):
         super().__init__(name=name)
         self.end_of_traj_reached = False
         self.laser_thresholds = {}

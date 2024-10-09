@@ -27,14 +27,14 @@ class MotionGraphNode:
                  name: Optional[str] = None,
                  plot: bool = True):
         self._name = name or self.__class__.__name__
-        self._expression = cas.FalseSymbol
+        self._expression = cas.BinaryFalse
         self.plot = plot
         self._id = -1
         self._name = name
-        self._start_condition = cas.TrueSymbol
-        self._pause_condition = cas.FalseSymbol
-        self._end_condition = cas.FalseSymbol
-        self._reset_condition = cas.FalseSymbol
+        self._start_condition = cas.BinaryTrue
+        self._pause_condition = cas.BinaryFalse
+        self._end_condition = cas.BinaryFalse
+        self._reset_condition = cas.BinaryFalse
 
     def set_conditions(self,
                        start_condition: cas.Expression,

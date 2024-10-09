@@ -21,9 +21,9 @@ class PrePushDoor(Goal):
                  reference_angular_velocity: float = 0.5,
                  weight: float = WEIGHT_BELOW_CA,
                  name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 pause_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol):
+                 start_condition: cas.Expression = cas.BinaryTrue,
+                 pause_condition: cas.Expression = cas.BinaryFalse,
+                 end_condition: cas.Expression = cas.BinaryFalse):
         """
             The objective is to push the object until desired rotation is reached
         """

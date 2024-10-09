@@ -20,9 +20,9 @@ class JointVelocityLimit(Goal):
                  max_velocity: float = 1,
                  hard: bool = False,
                  name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 pause_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol):
+                 start_condition: cas.Expression = cas.BinaryTrue,
+                 pause_condition: cas.Expression = cas.BinaryFalse,
+                 end_condition: cas.Expression = cas.BinaryFalse):
         """
         Limits the joint velocity of a revolute joint.
         :param joint_name:
@@ -73,9 +73,9 @@ class AvoidJointLimits(Goal):
                  group_name: Optional[str] = None,
                  weight: float = WEIGHT_BELOW_CA,
                  name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 pause_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol
+                 start_condition: cas.Expression = cas.BinaryTrue,
+                 pause_condition: cas.Expression = cas.BinaryFalse,
+                 end_condition: cas.Expression = cas.BinaryFalse
                  ):
         """
         Calls AvoidSingleJointLimits for each joint in joint_list
@@ -137,9 +137,9 @@ class JointPositionList(Goal):
                  weight: float = WEIGHT_BELOW_CA,
                  max_velocity: float = 1,
                  name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 pause_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol):
+                 start_condition: cas.Expression = cas.BinaryTrue,
+                 pause_condition: cas.Expression = cas.BinaryFalse,
+                 end_condition: cas.Expression = cas.BinaryFalse):
         """
         Calls JointPosition for a list of joints.
         :param goal_state: maps joint_name to goal position
@@ -197,9 +197,9 @@ class JointSignWave(Goal):
     def __init__(self, name: str, joint_name: str,
                  frequency: float,
                  amp_percentage: float,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 pause_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol):
+                 start_condition: cas.Expression = cas.BinaryTrue,
+                 pause_condition: cas.Expression = cas.BinaryFalse,
+                 end_condition: cas.Expression = cas.BinaryFalse):
         super().__init__(name=name, start_condition=start_condition, pause_condition=pause_condition,
                          end_condition=end_condition)
         joint_name = god_map.world.search_for_joint_name(joint_name)
@@ -220,8 +220,8 @@ class JointSignWave(Goal):
 
 class UnlimitedJointGoal(Goal):
     def __init__(self, name: str, joint_name: str, goal_position: float,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 pause_condition: cas.Expression = cas.FalseSymbol, end_condition: cas.Expression = cas.FalseSymbol):
+                 start_condition: cas.Expression = cas.BinaryTrue,
+                 pause_condition: cas.Expression = cas.BinaryFalse, end_condition: cas.Expression = cas.BinaryFalse):
         super().__init__(name=name, start_condition=start_condition, pause_condition=pause_condition,
                          end_condition=end_condition)
         joint_name = god_map.world.search_for_joint_name(joint_name)

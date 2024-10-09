@@ -17,40 +17,40 @@ from test.utils_for_tests import float_no_nan_no_inf, unit_vector, quaternion, v
 
 
 def logic_not(a):
-    if a == True:
-        return False
-    elif a == False:
-        return True
-    elif a == cas.BooleanUnknown:
-        return cas.BooleanUnknown
+    if a == cas.TrinaryTrue:
+        return cas.TrinaryFalse
+    elif a == cas.TrinaryFalse:
+        return cas.TrinaryTrue
+    elif a == cas.TrinaryUnknown:
+        return cas.TrinaryUnknown
     else:
         raise ValueError(f'Invalid truth value: {a}')
 
 
 def logic_and(a, b):
-    if a == False or b == False:
-        return False
-    elif a == True and b == True:
-        return True
-    elif a == cas.BooleanUnknown or b == cas.BooleanUnknown:
-        return cas.BooleanUnknown
+    if a == cas.TrinaryFalse or b == cas.TrinaryFalse:
+        return cas.TrinaryFalse
+    elif a == cas.TrinaryTrue and b == cas.TrinaryTrue:
+        return cas.TrinaryTrue
+    elif a == cas.TrinaryUnknown or b == cas.TrinaryUnknown:
+        return cas.TrinaryUnknown
     else:
         raise ValueError(f'Invalid truth values: {a}, {b}')
 
 
 def logic_or(a, b):
-    if a == True or b == True:
-        return True
-    elif a == False and b == False:
-        return False
-    elif a == cas.BooleanUnknown or b == cas.BooleanUnknown:
-        return cas.BooleanUnknown
+    if a == cas.TrinaryTrue or b == cas.TrinaryTrue:
+        return cas.TrinaryTrue
+    elif a == cas.TrinaryFalse and b == cas.TrinaryFalse:
+        return cas.TrinaryFalse
+    elif a == cas.TrinaryUnknown or b == cas.TrinaryUnknown:
+        return cas.TrinaryUnknown
     else:
         raise ValueError(f'Invalid truth values: {a}, {b}')
 
 
 class TestUndefinedLogic(unittest.TestCase):
-    values = [True, False, cas.BooleanUnknown]
+    values = [cas.TrinaryTrue, cas.TrinaryFalse, cas.TrinaryUnknown]
 
     def test_and3(self):
         s = cas.Symbol('a')
@@ -94,10 +94,9 @@ class TestUndefinedLogic(unittest.TestCase):
         expr = cas.logic_and(a, cas.logic_or(b, cas.logic_not(c)))
         new_expr = cas.replace_with_three_logic(expr)
         f = new_expr.compile()
-        values = [True, False, cas.BooleanUnknown]
-        for i in values:
-            for j in values:
-                for k in values:
+        for i in self.values:
+            for j in self.values:
+                for k in self.values:
                     computed_result = f(a=i, b=j, c=k)
                     expected_result = reference_function(i, j, k)
                     assert computed_result == expected_result, f"Mismatch for inputs i={i}, j={j}, k={k}. Expected {expected_result}, got {computed_result}"
@@ -279,15 +278,15 @@ class TestExpression(unittest.TestCase):
     def test_logic_and(self):
         s1 = cas.Symbol('s1')
         s2 = cas.Symbol('s2')
-        expr = cas.logic_and(cas.TrueSymbol, s1)
+        expr = cas.logic_and(cas.BinaryTrue, s1)
         assert not cas.is_true_symbol(expr) and not cas.is_false_symbol(expr)
-        expr = cas.logic_and(cas.FalseSymbol, s1)
+        expr = cas.logic_and(cas.BinaryFalse, s1)
         assert cas.is_false_symbol(expr)
-        expr = cas.logic_and(cas.TrueSymbol, cas.TrueSymbol)
+        expr = cas.logic_and(cas.BinaryTrue, cas.BinaryTrue)
         assert cas.is_true_symbol(expr)
-        expr = cas.logic_and(cas.FalseSymbol, cas.TrueSymbol)
+        expr = cas.logic_and(cas.BinaryFalse, cas.BinaryTrue)
         assert cas.is_false_symbol(expr)
-        expr = cas.logic_and(cas.FalseSymbol, cas.FalseSymbol)
+        expr = cas.logic_and(cas.BinaryFalse, cas.BinaryFalse)
         assert cas.is_false_symbol(expr)
         expr = cas.logic_and(s1, s2)
         assert not cas.is_true_symbol(expr) and not cas.is_false_symbol(expr)
@@ -295,15 +294,15 @@ class TestExpression(unittest.TestCase):
     def test_logic_or(self):
         s1 = cas.Symbol('s1')
         s2 = cas.Symbol('s2')
-        expr = cas.logic_or(cas.FalseSymbol, s1)
+        expr = cas.logic_or(cas.BinaryFalse, s1)
         assert not cas.is_true_symbol(expr) and not cas.is_false_symbol(expr)
-        expr = cas.logic_or(cas.TrueSymbol, s1)
+        expr = cas.logic_or(cas.BinaryTrue, s1)
         assert cas.is_true_symbol(expr)
-        expr = cas.logic_or(cas.TrueSymbol, cas.TrueSymbol)
+        expr = cas.logic_or(cas.BinaryTrue, cas.BinaryTrue)
         assert cas.is_true_symbol(expr)
-        expr = cas.logic_or(cas.FalseSymbol, cas.TrueSymbol)
+        expr = cas.logic_or(cas.BinaryFalse, cas.BinaryTrue)
         assert cas.is_true_symbol(expr)
-        expr = cas.logic_or(cas.FalseSymbol, cas.FalseSymbol)
+        expr = cas.logic_or(cas.BinaryFalse, cas.BinaryFalse)
         assert cas.is_false_symbol(expr)
         expr = cas.logic_or(s1, s2)
         assert not cas.is_true_symbol(expr) and not cas.is_false_symbol(expr)

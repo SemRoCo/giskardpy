@@ -15,9 +15,9 @@ class BaseTrajFollower(Goal):
                  joint_name: PrefixName,
                  track_only_velocity: bool = False,
                  weight: float = WEIGHT_ABOVE_CA,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 pause_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol):
+                 start_condition: cas.Expression = cas.BinaryTrue,
+                 pause_condition: cas.Expression = cas.BinaryFalse,
+                 end_condition: cas.Expression = cas.BinaryFalse):
         self.weight = weight
         self.joint_name = joint_name
         super().__init__(name=f'{self.__class__.__name__}/{self.joint_name}')

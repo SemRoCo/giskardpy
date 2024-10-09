@@ -61,9 +61,9 @@ class AlignPerpendicular(FeatureFunctionGoal):
                  name: Optional[str] = None,
                  weight: int = WEIGHT_BELOW_CA,
                  max_vel: float = 0.2,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 pause_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol
+                 start_condition: cas.Expression = cas.BinaryTrue,
+                 pause_condition: cas.Expression = cas.BinaryFalse,
+                 end_condition: cas.Expression = cas.BinaryFalse
                  ):
         super().__init__(tip_link=tip_link,
                          root_link=root_link,
@@ -92,9 +92,9 @@ class HeightGoal(FeatureFunctionGoal):
                  name: Optional[str] = None,
                  weight: int = WEIGHT_BELOW_CA,
                  max_vel: float = 0.2,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 pause_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol
+                 start_condition: cas.Expression = cas.BinaryTrue,
+                 pause_condition: cas.Expression = cas.BinaryFalse,
+                 end_condition: cas.Expression = cas.BinaryFalse
                  ):
         super().__init__(tip_link=tip_link,
                          root_link=root_link,
@@ -126,9 +126,9 @@ class DistanceGoal(FeatureFunctionGoal):
                  name: Optional[str] = None,
                  weight: int = WEIGHT_BELOW_CA,
                  max_vel: float = 0.2,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 pause_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol):
+                 start_condition: cas.Expression = cas.BinaryTrue,
+                 pause_condition: cas.Expression = cas.BinaryFalse,
+                 end_condition: cas.Expression = cas.BinaryFalse):
         super().__init__(tip_link=tip_link,
                          root_link=root_link,
                          reference_feature=reference_point,
@@ -168,9 +168,9 @@ class AngleGoal(FeatureFunctionGoal):
                  name: Optional[str] = None,
                  weight: int = WEIGHT_BELOW_CA,
                  max_vel: float = 0.2,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 pause_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol
+                 start_condition: cas.Expression = cas.BinaryTrue,
+                 pause_condition: cas.Expression = cas.BinaryFalse,
+                 end_condition: cas.Expression = cas.BinaryFalse
                  ):
         super().__init__(tip_link=tip_link,
                          root_link=root_link,

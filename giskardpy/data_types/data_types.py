@@ -6,7 +6,7 @@ from enum import IntEnum, Enum
 from typing import Optional, Generic, TypeVar, Dict, Union
 
 import numpy as np
-
+import giskardpy.casadi_wrapper as cas
 
 class PrefixName:
     primary_separator = '/'
@@ -332,6 +332,6 @@ class LifeCycleState(IntEnum):
 
 
 class ObservationState:
-    unknown = 0.5
-    false = 0
-    true = 1
+    false = cas.TrinaryFalse
+    unknown = cas.TrinaryUnknown
+    true = cas.TrinaryTrue

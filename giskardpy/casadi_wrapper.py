@@ -510,9 +510,12 @@ class Expression(Symbol_):
         return Expression(self.s.reshape(new_shape))
 
 
-TrueSymbol = Expression(True)
-FalseSymbol = Expression(False)
-BooleanUnknown = 0.5
+TrinaryFalse = 0
+TrinaryUnknown = 0.5
+TrinaryTrue = 1
+
+BinaryTrue = Expression(True)
+BinaryFalse = Expression(False)
 
 
 class GeometricType:
@@ -1563,11 +1566,11 @@ def logic_and(*args):
     assert len(args) >= 2, 'and must be called with at least 2 arguments'
     # if there is any False, return False
     if [x for x in args if is_false_symbol(x)]:
-        return FalseSymbol
+        return BinaryFalse
     # filter all True
     args = [x for x in args if not is_true_symbol(x)]
     if len(args) == 0:
-        return TrueSymbol
+        return BinaryTrue
     if len(args) == 1:
         return args[0]
     if len(args) == 2:
@@ -1581,15 +1584,7 @@ def logic_and(*args):
 def logic_and3(a, b):
     cas_a = _to_sx(a)
     cas_b = _to_sx(b)
-    return if_cases(cases=[(equal(cas_a, FalseSymbol),
-                            FalseSymbol),
-                           (equal(cas_b, FalseSymbol),
-                            FalseSymbol),
-                           (equal(cas_a, BooleanUnknown),
-                            BooleanUnknown),
-                           (equal(cas_b, BooleanUnknown),
-                            BooleanUnknown)],
-                    else_result=logic_and(cas_a, cas_b))
+    return min(cas_a, cas_b)
 
 
 def logic_any(args):
@@ -1604,11 +1599,11 @@ def logic_or(*args):
     assert len(args) >= 2, 'and must be called with at least 2 arguments'
     # if there is any True, return True
     if [x for x in args if is_true_symbol(x)]:
-        return TrueSymbol
+        return BinaryTrue
     # filter all False
     args = [x for x in args if not is_false_symbol(x)]
     if len(args) == 0:
-        return FalseSymbol
+        return BinaryFalse
     if len(args) == 1:
         return args[0]
     if len(args) == 2:
@@ -1620,12 +1615,7 @@ def logic_or(*args):
 def logic_or3(a, b):
     cas_a = _to_sx(a)
     cas_b = _to_sx(b)
-    return if_cases(cases=[(logic_or(equal(cas_a, TrueSymbol), equal(cas_b, TrueSymbol)),
-                            TrueSymbol),
-                           (logic_or(equal(cas_a, BooleanUnknown), equal(cas_b, BooleanUnknown)),
-                            BooleanUnknown)
-                           ],
-                    else_result=FalseSymbol)
+    return max(cas_a, cas_b)
 
 
 def logic_not(expr):
@@ -1634,11 +1624,7 @@ def logic_not(expr):
 
 
 def logic_not3(expr):
-    cas_expr = _to_sx(expr)
-    return Expression(if_eq_cases(a=cas_expr,
-                                  b_result_cases=[(TrueSymbol, FalseSymbol),
-                                                  (FalseSymbol, TrueSymbol)],
-                                  else_result=BooleanUnknown))
+    return Expression(1-expr)
 
 
 def if_greater(a, b, if_result, else_result):
@@ -2316,25 +2302,47 @@ def gradient(ex, arg):
 
 def is_true_symbol(expr):
     try:
-        return (expr == TrueSymbol).to_np()
+        return (expr == BinaryTrue).to_np()
     except Exception as e:
         return False
 
 
-def is_true(expr):
-    return equal(expr, TrueSymbol)
+def is_true3(expr):
+    return equal(expr, TrinaryTrue)
+
+
+def is_true3_symbol(expr):
+    try:
+        return (expr == TrinaryTrue).to_np()
+    except Exception as e:
+        return False
 
 
 def is_false_symbol(expr):
     try:
-        return (expr == FalseSymbol).to_np()
+        return (expr == BinaryFalse).to_np()
+    except Exception as e:
+        return False
+
+
+def is_false3(expr):
+    return equal(expr, TrinaryFalse)
+
+
+def is_false3_symbol(expr):
+    try:
+        return (expr == TrinaryFalse).to_np()
     except Exception as e:
         return False
 
 
 def is_unknown3(expr):
+    return equal(expr, TrinaryUnknown)
+
+
+def is_unknown3_symbol(expr):
     try:
-        return (expr == FalseSymbol).to_np()
+        return (expr == TrinaryUnknown).to_np()
     except Exception as e:
         return False
 
@@ -2362,6 +2370,10 @@ def distance_vector_projected_on_plane(point1, point2, normal_vector):
 def replace_with_three_logic(expr):
     cas_expr = _to_sx(expr)
     if cas_expr.n_dep() == 0:
+        if is_true_symbol(cas_expr):
+            return TrinaryTrue
+        if is_false_symbol(cas_expr):
+            return TrinaryFalse
         return expr
     op = cas_expr.op()
     if op == ca.OP_NOT:
@@ -2372,3 +2384,4 @@ def replace_with_three_logic(expr):
     if op == ca.OP_OR:
         return logic_or3(replace_with_three_logic(cas_expr.dep(0)),
                          replace_with_three_logic(cas_expr.dep(1)))
+    return expr

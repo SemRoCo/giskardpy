@@ -10,9 +10,9 @@ from giskardpy.qp.qp_solver_ids import SupportedQPSolver
 
 class SetPredictionHorizon(PayloadMonitor):
     def __init__(self, prediction_horizon: int, name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 pause_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol):
+                 start_condition: cas.Expression = cas.BinaryTrue,
+                 pause_condition: cas.Expression = cas.BinaryFalse,
+                 end_condition: cas.Expression = cas.BinaryFalse):
         """
         Will overwrite the prediction horizon for a single goal.
         Setting it to 1 will turn of acceleration and jerk limits.
@@ -39,9 +39,9 @@ class SetPredictionHorizon(PayloadMonitor):
 class SetQPSolver(PayloadMonitor):
 
     def __init__(self, qp_solver_id: Union[SupportedQPSolver, int], name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 pause_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol):
+                 start_condition: cas.Expression = cas.BinaryTrue,
+                 pause_condition: cas.Expression = cas.BinaryFalse,
+                 end_condition: cas.Expression = cas.BinaryFalse):
         if not cas.is_true_symbol(start_condition):
             raise MonitorInitalizationException(f'{self.__class__.__name__}: start_condition must be True.')
         if name is None:

@@ -31,7 +31,7 @@ class Print(PayloadMonitor):
 
     def __call__(self):
         get_middleware().loginfo(self.message)
-        self.state = True
+        self.state = ObservationState.true
 
 
 class Sleep(PayloadMonitor):
@@ -65,7 +65,7 @@ class CollisionMatrixUpdater(PayloadMonitor):
     def __call__(self):
         god_map.collision_scene.set_collision_matrix(self.collision_matrix)
         god_map.collision_scene.reset_cache()
-        self.state = True
+        self.state = ObservationState.true
 
 
 class PayloadAlternator(PayloadMonitor):
@@ -90,7 +90,10 @@ class Counter(PayloadMonitor):
     def __call__(self):
         if self.state == ObservationState.unknown:
             self.counter = 0
-        self.state = self.counter >= self.number
+        if self.counter >= self.number:
+            self.state = ObservationState.true
+        else:
+            self.state = ObservationState.false
         self.counter += 1
 
 
@@ -102,5 +105,8 @@ class Pulse(PayloadMonitor):
     def __call__(self):
         if self.state == ObservationState.unknown:
             self.counter = 0
-        self.state = self.counter == self.after_ticks
+        if self.counter == self.after_ticks:
+            self.state = ObservationState.true
+        else:
+            self.state = ObservationState.false
         self.counter += 1

@@ -79,18 +79,18 @@ def compile_graph_node_state_updater(node_state: MotionGraphNodeStateManager) ->
     for node in node_state.nodes:
         state_symbol = node.get_life_cycle_state_expression()
 
-        not_started_transitions = cas.if_else(condition=cas.is_true(node.logic3_start_condition),
+        not_started_transitions = cas.if_else(condition=cas.is_true3(node.logic3_start_condition),
                                               if_result=LifeCycleState.running,
                                               else_result=LifeCycleState.not_started)
-        running_transitions = cas.if_cases(cases=[(cas.is_true(node.logic3_reset_condition), LifeCycleState.not_started),
-                                                  (cas.is_true(node.logic3_end_condition), LifeCycleState.succeeded),
-                                                  (cas.is_true(node.logic3_pause_condition), LifeCycleState.paused)],
+        running_transitions = cas.if_cases(cases=[(cas.is_true3(node.logic3_reset_condition), LifeCycleState.not_started),
+                                                  (cas.is_true3(node.logic3_end_condition), LifeCycleState.succeeded),
+                                                  (cas.is_true3(node.logic3_pause_condition), LifeCycleState.paused)],
                                            else_result=LifeCycleState.running)
-        pause_transitions = cas.if_cases(cases=[(cas.is_true(node.logic3_reset_condition), LifeCycleState.not_started),
-                                                (cas.is_true(node.logic3_end_condition), LifeCycleState.succeeded),
-                                                (cas.logic_not(cas.is_true(node.logic3_pause_condition)), LifeCycleState.running)],
+        pause_transitions = cas.if_cases(cases=[(cas.is_true3(node.logic3_reset_condition), LifeCycleState.not_started),
+                                                (cas.is_true3(node.logic3_end_condition), LifeCycleState.succeeded),
+                                                (cas.logic_not(cas.is_true3(node.logic3_pause_condition)), LifeCycleState.running)],
                                          else_result=LifeCycleState.paused)
-        ended_transitions = cas.if_else(condition=cas.is_true(node.logic3_reset_condition),
+        ended_transitions = cas.if_else(condition=cas.is_true3(node.logic3_reset_condition),
                                         if_result=LifeCycleState.not_started,
                                         else_result=LifeCycleState.succeeded)
 

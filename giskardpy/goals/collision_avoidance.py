@@ -25,9 +25,9 @@ class ExternalCollisionAvoidance(Goal):
                  soft_thresholds: Optional[Dict[PrefixName, float]] = None,
                  idx: int = 0,
                  num_repeller: int = 1,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 pause_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol):
+                 start_condition: cas.Expression = cas.BinaryTrue,
+                 pause_condition: cas.Expression = cas.BinaryFalse,
+                 end_condition: cas.Expression = cas.BinaryFalse):
         """
         Don't use me
         """
@@ -144,9 +144,9 @@ class SelfCollisionAvoidance(Goal):
                  idx: float = 0,
                  num_repeller: int = 1,
                  name_prefix: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 pause_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol):
+                 start_condition: cas.Expression = cas.BinaryTrue,
+                 pause_condition: cas.Expression = cas.BinaryFalse,
+                 end_condition: cas.Expression = cas.BinaryFalse):
         self.link_a = link_a
         self.link_b = link_b
         self.max_velocity = max_velocity
@@ -251,9 +251,9 @@ class CollisionAvoidanceHint(Goal):
                  spring_threshold: Optional[float] = None,
                  weight: float = WEIGHT_ABOVE_CA,
                  name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 pause_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol):
+                 start_condition: cas.Expression = cas.BinaryTrue,
+                 pause_condition: cas.Expression = cas.BinaryFalse,
+                 end_condition: cas.Expression = cas.BinaryFalse):
         """
         This goal pushes the link_name in the direction of avoidance_hint, if it is closer than spring_threshold
         to body_b/link_b.
@@ -348,9 +348,9 @@ class CollisionAvoidance(Goal):
     def __init__(self,
                  collision_entries: List[CollisionEntry],
                  name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 pause_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol):
+                 start_condition: cas.Expression = cas.BinaryTrue,
+                 pause_condition: cas.Expression = cas.BinaryFalse,
+                 end_condition: cas.Expression = cas.BinaryFalse):
         if name is None:
             name = self.__class__.__name__
         super().__init__(name)

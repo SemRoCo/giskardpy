@@ -24,9 +24,9 @@ class CartesianPositionStraight(Goal):
                  name: Optional[str] = None,
                  absolute: bool = False,
                  weight: float = WEIGHT_ABOVE_CA,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 pause_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol):
+                 start_condition: cas.Expression = cas.BinaryTrue,
+                 pause_condition: cas.Expression = cas.BinaryFalse,
+                 end_condition: cas.Expression = cas.BinaryFalse):
         """
         Same as CartesianPosition, but tries to move the tip_link in a straight line to the goal_point.
         """
@@ -157,9 +157,9 @@ class DiffDriveBaseGoal(Goal):
                  tip_group: Optional[str] = None,
                  always_forward: bool = False,
                  name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 pause_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol):
+                 start_condition: cas.Expression = cas.BinaryTrue,
+                 pause_condition: cas.Expression = cas.BinaryFalse,
+                 end_condition: cas.Expression = cas.BinaryFalse):
         """
         Like a CartesianPose, but specifically for differential drives. It will achieve the goal in 3 phases.
         1. orient towards goal.
@@ -292,9 +292,9 @@ class CartesianPoseStraight(Goal):
                  weight: float = WEIGHT_ABOVE_CA,
                  absolute: bool = False,
                  name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 pause_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol):
+                 start_condition: cas.Expression = cas.BinaryTrue,
+                 pause_condition: cas.Expression = cas.BinaryFalse,
+                 end_condition: cas.Expression = cas.BinaryFalse):
         """
         See CartesianPose. In contrast to it, this goal will try to move tip_link in a straight line.
         """
@@ -328,9 +328,9 @@ class TranslationVelocityLimit(Goal):
     def __init__(self, root_link: str, tip_link: str, root_group: Optional[str] = None,
                  tip_group: Optional[str] = None,
                  weight=WEIGHT_ABOVE_CA, max_velocity=0.1, hard=True, name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 pause_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol):
+                 start_condition: cas.Expression = cas.BinaryTrue,
+                 pause_condition: cas.Expression = cas.BinaryFalse,
+                 end_condition: cas.Expression = cas.BinaryFalse):
         """
         See CartesianVelocityLimit
         """
@@ -361,9 +361,9 @@ class RotationVelocityLimit(Goal):
     def __init__(self, root_link: str, tip_link: str, root_group: Optional[str] = None,
                  tip_group: Optional[str] = None,
                  weight=WEIGHT_ABOVE_CA, max_velocity=0.5, hard=True, name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 pause_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol):
+                 start_condition: cas.Expression = cas.BinaryTrue,
+                 pause_condition: cas.Expression = cas.BinaryFalse,
+                 end_condition: cas.Expression = cas.BinaryFalse):
         """
         See CartesianVelocityLimit
         """
@@ -403,9 +403,9 @@ class CartesianVelocityLimit(Goal):
                  weight: float = WEIGHT_ABOVE_CA,
                  hard: bool = False,
                  name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 pause_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol):
+                 start_condition: cas.Expression = cas.BinaryTrue,
+                 pause_condition: cas.Expression = cas.BinaryFalse,
+                 end_condition: cas.Expression = cas.BinaryFalse):
         """
         This goal will use put a strict limit on the Cartesian velocity. This will require a lot of constraints, thus
         slowing down the system noticeably.

@@ -17,9 +17,9 @@ class DiffDriveTangentialToPoint(Goal):
                  group_name: Optional[str] = None,
                  reference_velocity: float = 0.5, weight: bool = WEIGHT_ABOVE_CA, drive: bool = False,
                  name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 pause_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol
+                 start_condition: cas.Expression = cas.BinaryTrue,
+                 pause_condition: cas.Expression = cas.BinaryFalse,
+                 end_condition: cas.Expression = cas.BinaryFalse
                  ):
         self.tip = god_map.world.search_for_link_name('base_footprint', group_name)
         self.root = god_map.world.root_link_name
@@ -79,9 +79,9 @@ class KeepHandInWorkspace(Goal):
                  max_velocity: float = 0.3,
                  weight: float = WEIGHT_ABOVE_CA,
                  name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 pause_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol
+                 start_condition: cas.Expression = cas.BinaryTrue,
+                 pause_condition: cas.Expression = cas.BinaryFalse,
+                 end_condition: cas.Expression = cas.BinaryFalse
                  ):
         if base_footprint is None:
             base_footprint = god_map.world.search_for_link_name('base_footprint')

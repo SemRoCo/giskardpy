@@ -23,9 +23,9 @@ class BaseArmWeightScaling(Goal):
                  base_joints: List[str],
                  gain: float = 100000,
                  name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 pause_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol):
+                 start_condition: cas.Expression = cas.BinaryTrue,
+                 pause_condition: cas.Expression = cas.BinaryFalse,
+                 end_condition: cas.Expression = cas.BinaryFalse):
         self.root_link = god_map.world.search_for_link_name(root_link, None)
         self.tip_link = god_map.world.search_for_link_name(tip_link, None)
         if name is None:
@@ -80,9 +80,9 @@ class MaxManipulabilityLinWeight(Goal):
                  name: Optional[str] = None,
                  prediction_horizon: int = 9,
                  m_threshold: float = 0.16,
-                 start_condition: cas.Expression = cas.TrueSymbol,
-                 pause_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.FalseSymbol
+                 start_condition: cas.Expression = cas.BinaryTrue,
+                 pause_condition: cas.Expression = cas.BinaryFalse,
+                 end_condition: cas.Expression = cas.BinaryFalse
                  ):
         self.root_link = god_map.world.search_for_link_name(root_link, None)
         self.tip_link = god_map.world.search_for_link_name(tip_link, None)

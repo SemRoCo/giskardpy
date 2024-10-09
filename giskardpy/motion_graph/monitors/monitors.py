@@ -159,7 +159,7 @@ class TrueMonitor(Monitor):
                  plot: bool = True):
         super().__init__(name=name,
                          plot=plot)
-        self.expression = cas.TrueSymbol
+        self.expression = cas.BinaryTrue
 
 
 class FalseMonitor(Monitor):
@@ -168,4 +168,4 @@ class FalseMonitor(Monitor):
                  plot: bool = True):
         super().__init__(name=name,
                          plot=plot)
-        self.expression = cas.FalseSymbol
+        self.expression = cas.BinaryFalse

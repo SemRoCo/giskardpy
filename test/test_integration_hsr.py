@@ -696,7 +696,7 @@ class TestCollisionAvoidanceGoals:
                                                                                   [0, -1, 0, 0],
                                                                                   [1, 0, 0, 0],
                                                                                   [0, 0, 0, 1]]))
-        pre_schnibble = box_setup.tasks.add_cartesian_pose(name='pre schnibbel',
+        pre_schnibble = box_setup.tasks.add_cartesian_pose(name='Position Knife',
                                                            goal_pose=pre_schnibble_pose,
                                                            tip_link=box_setup.tip,
                                                            root_link='map')
@@ -705,7 +705,7 @@ class TestCollisionAvoidanceGoals:
         schnibble_down_pose.header.frame_id = box_name
         schnibble_down_pose.pose.position.x = -0.1
         schnibble_down_pose.pose.orientation.w = 1.0
-        schnibble_down = box_setup.tasks.add_cartesian_pose(name='schnibble down',
+        schnibble_down = box_setup.tasks.add_cartesian_pose(name='Cut Down',
                                                             goal_pose=schnibble_down_pose,
                                                             tip_link=box_name,
                                                             root_link='map',
@@ -716,7 +716,7 @@ class TestCollisionAvoidanceGoals:
         schnibble_up_pose.header.frame_id = box_name
         schnibble_up_pose.pose.position.x = 0.1
         schnibble_up_pose.pose.orientation.w = 1.0
-        schnibble_up = box_setup.tasks.add_cartesian_pose(name='schnibble up',
+        schnibble_up = box_setup.tasks.add_cartesian_pose(name='Knife Up',
                                                           goal_pose=schnibble_up_pose,
                                                           tip_link=box_name,
                                                           root_link='map',
@@ -727,14 +727,18 @@ class TestCollisionAvoidanceGoals:
         right_pose.header.frame_id = box_name
         right_pose.pose.position.y = 0.02
         right_pose.pose.orientation.w = 1.0
-        move_right = box_setup.tasks.add_cartesian_pose(name='move right',
+        move_right = box_setup.tasks.add_cartesian_pose(name='Move Right',
                                                         goal_pose=right_pose,
                                                         tip_link=box_name,
                                                         root_link='map',
                                                         absolute=False,
                                                         start_condition=schnibble_up)
 
-        schnibbel_done = box_setup.monitors.add_time_above(name='schnibbel done?',
+        human_close = box_setup.monitors.add_pulse(name='Human Close?',
+                                                   after_ticks=80,
+                                                   start_condition=pre_schnibble)
+
+        schnibbel_done = box_setup.monitors.add_time_above(name='Done?',
                                                            threshold=10,
                                                            start_condition=move_right)
 
@@ -743,6 +747,10 @@ class TestCollisionAvoidanceGoals:
         box_setup.update_reset_condition(node_name=schnibble_up, condition=reset)
         box_setup.update_reset_condition(node_name=move_right, condition=reset)
         box_setup.update_reset_condition(node_name=schnibbel_done, condition=reset)
+
+        box_setup.update_pause_condition(node_name=schnibble_down, condition=human_close)
+        box_setup.update_pause_condition(node_name=schnibble_up, condition=human_close)
+        box_setup.update_pause_condition(node_name=move_right, condition=human_close)
 
         box_setup.monitors.add_end_motion(start_condition=schnibbel_done)
         box_setup.execute(add_local_minimum_reached=False)

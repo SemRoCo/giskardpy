@@ -46,11 +46,6 @@ class MotionGraphManager:
     monitor_state_history: List[Tuple[float, Tuple[np.ndarray, np.ndarray]]]  # time -> (state, life_cycle_state)
     goal_state_history: List[Tuple[float, Tuple[np.ndarray, np.ndarray]]]  # time -> (state, life_cycle_state)
 
-    substitution_values: Dict[int, Dict[str, float]]  # id -> (old_symbol, value)
-    triggers: Dict[int, Callable]  # id -> updater callback
-    trigger_conditions: List[cas.Expression]  # id -> condition
-    compiled_trigger_conditions: cas.CompiledFunction  # stacked compiled function which returns array of evaluated conditions
-
     def __init__(self):
         self.allowed_monitor_types = {}
         self.allowed_task_types = {}
@@ -80,15 +75,12 @@ class MotionGraphManager:
             del self.payload_monitor_filter
         except Exception as e:
             pass
-        self.task_state = MotionGraphNodeStateManager()
-        self.monitor_state = MotionGraphNodeStateManager()
-        self.goal_state = MotionGraphNodeStateManager()
+        self.task_state = MotionGraphNodeStateManager(god_map_path='god_map.motion_graph_manager.task_state')
+        self.monitor_state = MotionGraphNodeStateManager(god_map_path='god_map.motion_graph_manager.monitor_state')
+        self.goal_state = MotionGraphNodeStateManager(god_map_path='god_map.motion_graph_manager.goal_state')
         self.task_state_history = []
         self.monitor_state_history = []
         self.goal_state_history = []
-        self.substitution_values = {}
-        self.triggers = {}
-        self.trigger_conditions = []
 
     def get_all_node_names(self) -> Set[str]:
         return self.task_state.get_node_names() | self.monitor_state.get_node_names() | self.goal_state.get_node_names()
@@ -237,7 +229,6 @@ class MotionGraphManager:
         self.compiled_goal_observation_state, self.compiled_goal_life_cycle_state = self.compile_node_state_updater(
             self.goal_state)
         self.initialize_states()
-        self._register_expression_update_triggers()
 
     def get_observation_state_symbols(self) -> List[cas.Symbol]:
         return (list(self.task_state.get_observation_state_symbol_map().values()) +
@@ -333,61 +324,23 @@ class MotionGraphManager:
         return [x for x in self.monitor_state.nodes if isinstance(x, PayloadMonitor)]
 
     @profile
-    def register_expression_updater(self, expression: cas.PreservedCasType,
-                                    condition: cas.Expression) \
+    def register_expression_updater(self, expression: cas.PreservedCasType, node: MotionGraphNode) \
             -> cas.PreservedCasType:
         """
         Expression is updated when all monitors are 1 at the same time, but only once.
         """
-        updater_id = len(self.substitution_values)
-        if cas.is_true_symbol(condition):
-            raise ValueError('condition is always true')
-        old_symbols = []
-        new_symbols = []
-        for i, symbol in enumerate(expression.free_symbols()):
-            old_symbols.append(symbol)
-            new_symbols.append(self.get_substitution_key(updater_id, str(symbol)))
-        new_expression = cas.substitute(expression, old_symbols, new_symbols)
-        self.update_substitution_values(updater_id, [str(s) for s in old_symbols])
-        self.trigger_conditions.append(condition)
-        return new_expression
+        if isinstance(node, Task):
+            return self.task_state.register_expression_updater(node=node, expression=expression)
+        if isinstance(node, Monitor):
+            return self.monitor_state.register_expression_updater(node=node, expression=expression)
+        if isinstance(node, Goal):
+            return self.goal_state.register_expression_updater(node=node, expression=expression)
 
     @profile
-    def _register_expression_update_triggers(self):
-        for updater_id, values in self.substitution_values.items():
-            class Callback:
-                def __init__(self, updater_id: int, values, motion_graph_manager: MotionGraphManager):
-                    self.updater_id = updater_id
-                    self.keys = list(values.keys())
-                    self.motion_graph_manager = motion_graph_manager
-
-                def __call__(self):
-                    return self.motion_graph_manager.update_substitution_values(self.updater_id, self.keys)
-
-            self.triggers[updater_id] = Callback(updater_id, values, self)
-        expr = cas.Expression(self.trigger_conditions)
-        symbols = self.get_observation_state_symbols() + self.get_life_cycle_state_symbols()
-        self.compiled_trigger_conditions = expr.compile(symbols)
-
-    @profile
-    def update_substitution_values(self, updater_id: int, keys: Optional[List[str]] = None):
-        if keys is None:
-            keys = list(self.substitution_values[updater_id].keys())
-        values = symbol_manager.resolve_symbols(keys)
-        self.substitution_values[updater_id] = {key: value for key, value in zip(keys, values)}
-
-    @profile
-    def get_substitution_key(self, updater_id: int, original_expr: str) -> cas.Symbol:
-        return symbol_manager.get_symbol(
-            f'god_map.motion_graph_manager.substitution_values[{updater_id}]["{original_expr}"]')
-
-    @profile
-    def trigger_update_triggers(self, obs_state: np.ndarray, life_cycle_state: np.ndarray):
-        args = np.concatenate((obs_state, life_cycle_state))
-        condition_state = self.compiled_trigger_conditions.fast_call(args)
-        for updater_id, value in enumerate(condition_state):
-            if updater_id in self.triggers and value:
-                self.triggers[updater_id]()
+    def trigger_update_triggers(self):
+        self.task_state.trigger_update_triggers()
+        self.monitor_state.trigger_update_triggers()
+        self.goal_state.trigger_update_triggers()
 
     @cached_property
     def payload_monitor_filter(self):
@@ -410,10 +363,6 @@ class MotionGraphManager:
         obs_state = np.concatenate((self.task_state.observation_state,
                                     self.monitor_state.observation_state,
                                     self.goal_state.observation_state))
-        life_cycle_state = np.concatenate((self.task_state.life_cycle_state,
-                                           self.monitor_state.life_cycle_state,
-                                           self.goal_state.life_cycle_state))
-        self.trigger_update_triggers(obs_state=obs_state, life_cycle_state=life_cycle_state)
 
         # %% update life cycle state
         args = np.concatenate((self.task_state.life_cycle_state,
@@ -425,6 +374,8 @@ class MotionGraphManager:
         args = np.concatenate((self.goal_state.life_cycle_state,
                                obs_state))
         self.goal_state.life_cycle_state = self.compiled_goal_life_cycle_state.fast_call(args)
+
+        self.trigger_update_triggers()
 
         self.log_states()
         if isinstance(done, Exception):

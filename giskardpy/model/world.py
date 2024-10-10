@@ -1175,7 +1175,7 @@ class WorldTree(WorldTreeInterface):
                                     self.joint_position_symbols,
                                     self.joint_velocity_symbols)
 
-    @memoize
+    @copy_memoize
     def compute_fk(self, root_link: PrefixName, tip_link: PrefixName) -> cas.TransMatrix:
         result = cas.TransMatrix(self.compute_fk_np(root_link, tip_link))
         result.reference_frame = root_link

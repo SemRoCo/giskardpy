@@ -65,3 +65,60 @@ class GraspSequence(Goal):
         self.add_task(lift)
         self.arrange_in_sequence([gripper_open, grasp, gripper_closed, lift])
         self.expression = lift.get_observation_state_expression()
+
+
+class Cutting(Goal):
+    def __init__(self,
+                 tip_link: PrefixName,
+                 root_link: PrefixName,
+                 depth: float,
+                 right_shift: float,
+                 max_velocity: float = 100,
+                 weight: float = WEIGHT_ABOVE_CA,
+                 name: Optional[str] = None):
+        """
+        Open a container in an environment.
+        Only works with the environment was added as urdf.
+        Assumes that a handle has already been grasped.
+        Can only handle containers with 1 dof, e.g. drawers or doors.
+        :param tip_link: end effector that is grasping the handle
+        :param environment_link: name of the handle that was grasped
+        :param goal_joint_state: goal state for the container. default is maximum joint state.
+        :param weight:
+        """
+        self.weight = weight
+        self.tip_link = tip_link
+        self.root_link = root_link
+        super().__init__(name=name)
+
+        schnibble_down_pose = god_map.world.compute_fk(root_link=self.tip_link, tip_link=self.tip_link)
+        schnibble_down_pose.x = -depth
+        cut_down = CartesianPoseAsTask(root_link=self.root_link,
+                                       name='Down',
+                                       goal_pose=schnibble_down_pose,
+                                       tip_link=self.tip_link,
+                                       absolute=False)
+        self.add_task(cut_down)
+
+        schnibble_up_pose = god_map.world.compute_fk(root_link=self.tip_link, tip_link=self.tip_link)
+        schnibble_up_pose.x = depth
+        cut_up = CartesianPoseAsTask(root_link=self.root_link,
+                                     name='Up',
+                                     goal_pose=schnibble_up_pose,
+                                     tip_link=self.tip_link,
+                                     absolute=False)
+        self.add_task(cut_up)
+
+        schnibble_right_pose = god_map.world.compute_fk(root_link=self.tip_link, tip_link=self.tip_link)
+        schnibble_right_pose.y = right_shift
+        move_right = CartesianPoseAsTask(root_link=self.root_link,
+                                         name='right',
+                                         goal_pose=schnibble_right_pose,
+                                         tip_link=self.tip_link,
+                                         absolute=False)
+        self.add_task(move_right)
+
+        self.arrange_in_sequence([cut_down, cut_up, move_right])
+        self.expression = cas.if_else(cas.is_true3(move_right.get_observation_state_expression()),
+                                      cas.TrinaryTrue,
+                                      cas.TrinaryFalse)

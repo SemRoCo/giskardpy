@@ -34,7 +34,7 @@ from giskardpy.motion_graph.monitors.cartesian_monitors import PoseReached, Posi
     VectorsAligned, DistanceToLine
 from giskardpy.motion_graph.monitors.joint_monitors import JointGoalReached
 from giskardpy.motion_graph.monitors.monitors import LocalMinimumReached, TimeAbove, Alternator, CancelMotion, \
-    EndMotion, TrueMonitor
+    EndMotion, TrueMonitor, FalseMonitor
 from giskardpy.motion_graph.monitors.overwrite_state_monitors import SetOdometry, SetSeedConfiguration
 from giskardpy.motion_graph.monitors.payload_monitors import Print, Sleep, \
     PayloadAlternator, Pulse, CheckMaxTrajectoryLength
@@ -553,7 +553,7 @@ class MotionGoalWrapper(MotionGraphNodeWrapper):
                                weight: Optional[float] = None,
                                start_condition: str = '',
                                pause_condition: str = '',
-                               end_condition: str = '') -> str:
+                               end_condition: Optional[str] = None) -> str:
         """
         This goal will push joints away from their position limits. For example if percentage is 15 and the joint
         limits are 0-100, it will push it into the 15-85 range.
@@ -575,7 +575,7 @@ class MotionGoalWrapper(MotionGraphNodeWrapper):
                             weight: Optional[float] = None,
                             start_condition: str = '',
                             pause_condition: str = '',
-                            end_condition: str = '') -> str:
+                            end_condition: Optional[str] = None) -> str:
         """
         Same as Open, but will use minimum value as default for goal_joint_state
         """
@@ -601,7 +601,7 @@ class MotionGoalWrapper(MotionGraphNodeWrapper):
                            weight: Optional[float] = None,
                            start_condition: str = '',
                            pause_condition: str = '',
-                           end_condition: str = '') -> str:
+                           end_condition: Optional[str] = None) -> str:
         """
         Open a container in an environment.
         Only works with the environment was added as urdf.
@@ -638,7 +638,7 @@ class MotionGoalWrapper(MotionGraphNodeWrapper):
                                root_group: Optional[str] = None,
                                start_condition: str = '',
                                pause_condition: str = '',
-                               end_condition: str = '') -> str:
+                               end_condition: Optional[str] = None) -> str:
         """
         Aligns the tip_link with the door_object to push it open. Only works if the door object is part of the urdf.
         The door has to be open a little before aligning.
@@ -678,7 +678,7 @@ class MotionGoalWrapper(MotionGraphNodeWrapper):
                           reference_angular_velocity: Optional[float] = None,
                           start_condition: str = '',
                           pause_condition: str = '',
-                          end_condition: str = '') -> str:
+                          end_condition: Optional[str] = None) -> str:
         """
         Positions the gripper in contact with the door before pushing to open.
         : param root_link: root link of the kinematic chain
@@ -713,7 +713,7 @@ class MotionGoalWrapper(MotionGraphNodeWrapper):
                             weight: Optional[float] = None,
                             start_condition: str = '',
                             pause_condition: str = '',
-                            end_condition: str = '',
+                            end_condition: Optional[str] = None,
                             **kwargs: goal_parameter) -> str:
         """
         This goal will use the kinematic chain between root and tip link to move tip link into the goal pose.
@@ -754,7 +754,7 @@ class MotionGoalWrapper(MotionGraphNodeWrapper):
                                      hard: bool = False,
                                      start_condition: str = '',
                                      pause_condition: str = '',
-                                     end_condition: str = '',
+                                     end_condition: Optional[str] = None,
                                      **kwargs: goal_parameter) -> str:
         """
         This goal will use put a strict limit on the Cartesian velocity. This will require a lot of constraints, thus
@@ -794,7 +794,7 @@ class MotionGoalWrapper(MotionGraphNodeWrapper):
                                weight: Optional[float] = None,
                                start_condition: str = '',
                                pause_condition: str = '',
-                               end_condition: str = '',
+                               end_condition: Optional[str] = None,
                                **kwargs: goal_parameter) -> str:
         """
         Will orient pointing_axis at goal_point.
@@ -850,7 +850,7 @@ class MotionGoalWrapper(MotionGraphNodeWrapper):
                              enable_laser_avoidance: bool = True,
                              start_condition: str = '',
                              pause_condition: str = '',
-                             end_condition: str = '') -> str:
+                             end_condition: Optional[str] = None) -> str:
         """
         :param name: name of the goal
         :param tracked_human_position_topic_name: name of the topic where the tracked human is published
@@ -940,7 +940,7 @@ class MotionGoalWrapper(MotionGraphNodeWrapper):
                             laser_frame_id: str = 'base_range_sensor_link',
                             start_condition: str = '',
                             pause_condition: str = '',
-                            end_condition: str = '') -> str:
+                            end_condition: Optional[str] = None) -> str:
         """
         Will follow the path, orienting itself and the head towards the next points in the list.
         At the end orient itself according to the final orientation in it. All other orientations will be ignored.
@@ -1022,7 +1022,7 @@ class MotionGoalWrapper(MotionGraphNodeWrapper):
                            weight: Optional[float] = None,
                            start_condition: str = '',
                            pause_condition: str = '',
-                           end_condition: str = '',
+                           end_condition: Optional[str] = None,
                            **kwargs: goal_parameter) -> str:
         """
         This goal will use the kinematic chain between root and tip link to move tip link to the goal pose.
@@ -1066,7 +1066,7 @@ class MotionGoalWrapper(MotionGraphNodeWrapper):
                                     absolute: bool = False,
                                     start_condition: str = '',
                                     pause_condition: str = '',
-                                    end_condition: str = '',
+                                    end_condition: Optional[str] = None,
                                     **kwargs: goal_parameter) -> str:
         """
         This goal will use the kinematic chain between root and tip link to move tip link into the goal pose.
@@ -1109,7 +1109,7 @@ class MotionGoalWrapper(MotionGraphNodeWrapper):
                                         absolute: bool = False,
                                         start_condition: str = '',
                                         pause_condition: str = '',
-                                        end_condition: str = '',
+                                        end_condition: Optional[str] = None,
                                         **kwargs: goal_parameter) -> str:
         """
         Same as set_translation_goal, but will try to move in a straight line.
@@ -1141,7 +1141,7 @@ class MotionGoalWrapper(MotionGraphNodeWrapper):
                                 weight: Optional[float] = None,
                                 start_condition: str = '',
                                 pause_condition: str = '',
-                                end_condition: str = '',
+                                end_condition: Optional[str] = None,
                                 **kwargs: goal_parameter) -> str:
         if isinstance(root_link, str):
             root_link = giskard_msgs.LinkName(name=root_link)
@@ -1172,7 +1172,7 @@ class MotionGoalWrapper(MotionGraphNodeWrapper):
                    weight: Optional[float] = None,
                    start_condition: str = '',
                    pause_condition: str = '',
-                   end_condition: str = '',
+                   end_condition: Optional[str] = None,
                    **kwargs: goal_parameter) -> str:
         if isinstance(root_link, str):
             root_link = giskard_msgs.LinkName(name=root_link)
@@ -1205,7 +1205,7 @@ class MotionGoalWrapper(MotionGraphNodeWrapper):
                      weight: Optional[float] = None,
                      start_condition: str = '',
                      pause_condition: str = '',
-                     end_condition: str = '',
+                     end_condition: Optional[str] = None,
                      **kwargs: goal_parameter) -> str:
         if isinstance(root_link, str):
             root_link = giskard_msgs.LinkName(name=root_link)
@@ -1238,7 +1238,7 @@ class MotionGoalWrapper(MotionGraphNodeWrapper):
                   weight: Optional[float] = None,
                   start_condition: str = '',
                   pause_condition: str = '',
-                  end_condition: str = '',
+                  end_condition: Optional[str] = None,
                   **kwargs: goal_parameter) -> str:
         if isinstance(root_link, str):
             root_link = giskard_msgs.LinkName(name=root_link)
@@ -1379,7 +1379,7 @@ class TaskWrapper(MotionGraphNodeWrapper):
                          weight: Optional[float] = None,
                          start_condition: str = '',
                          pause_condition: str = '',
-                         end_condition: str = '',
+                         end_condition: Optional[str] = None,
                          **kwargs: goal_parameter) -> str:
         """
         This goal will use the kinematic chain between tip and root to align tip_normal with goal_normal.
@@ -1442,7 +1442,7 @@ class TaskWrapper(MotionGraphNodeWrapper):
                                absolute: bool = False,
                                start_condition: str = '',
                                pause_condition: str = '',
-                               end_condition: str = '',
+                               end_condition: Optional[str] = None,
                                **kwargs: goal_parameter) -> str:
         """
         Will use kinematic chain between root_link and tip_link to move tip_link to goal_point.
@@ -1480,7 +1480,7 @@ class TaskWrapper(MotionGraphNodeWrapper):
                                   absolute: bool = False,
                                   start_condition: str = '',
                                   pause_condition: str = '',
-                                  end_condition: str = '',
+                                  end_condition: Optional[str] = None,
                                   **kwargs: goal_parameter) -> str:
         """
         Will use kinematic chain between root_link and tip_link to move tip_link to goal_orientation.
@@ -1520,7 +1520,7 @@ class TaskWrapper(MotionGraphNodeWrapper):
                      weight: Optional[float] = None,
                      start_condition: str = '',
                      pause_condition: str = '',
-                     end_condition: str = '',
+                     end_condition: Optional[str] = None,
                      **kwargs: goal_parameter) -> str:
         """
         Will orient pointing_axis at goal_point.
@@ -1915,7 +1915,7 @@ class MonitorWrapper(MotionGraphNodeWrapper):
                        name: str,
                        start_condition: str = '',
                        pause_condition: str = '',
-                       end_condition: str = '',
+                       end_condition: Optional[str] = None,
                        mod: int = 2) -> str:
         """
         Testing monitor.
@@ -1954,7 +1954,7 @@ class MonitorWrapper(MotionGraphNodeWrapper):
                   after_ticks: int,
                   start_condition: str = '',
                   pause_condition: str = '',
-                  end_condition: str = '') -> str:
+                  end_condition: Optional[str] = None) -> str:
         """
         Testing monitor.
         Like add_alternator but as a PayloadMonitor.
@@ -1970,12 +1970,27 @@ class MonitorWrapper(MotionGraphNodeWrapper):
                        name: str,
                        start_condition: str = '',
                        pause_condition: str = '',
-                       end_condition: str = '') -> str:
+                       end_condition: Optional[str] = None) -> str:
         """
         Testing monitor.
         Like add_alternator but as a PayloadMonitor.
         """
         return self.add_monitor(class_name=TrueMonitor.__name__,
+                                name=name,
+                                start_condition=start_condition,
+                                pause_condition=pause_condition,
+                                end_condition=end_condition)
+
+    def add_const_false(self,
+                       name: str,
+                       start_condition: str = '',
+                       pause_condition: str = '',
+                       end_condition: Optional[str] = None) -> str:
+        """
+        Testing monitor.
+        Like add_alternator but as a PayloadMonitor.
+        """
+        return self.add_monitor(class_name=FalseMonitor.__name__,
                                 name=name,
                                 start_condition=start_condition,
                                 pause_condition=pause_condition,

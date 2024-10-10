@@ -9,7 +9,7 @@ from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
 from giskard_msgs.msg import LinkName, GiskardError
 from giskardpy.data_types.exceptions import EmptyProblemException
-from giskardpy.goals.test import GraspSequence
+from giskardpy.goals.test import GraspSequence, Cutting
 from giskardpy.motion_graph.monitors.monitors import FalseMonitor, TrueMonitor
 from giskardpy.motion_graph.monitors.payload_monitors import Pulse
 from giskardpy_ros.configs.behavior_tree_config import StandAloneBTConfig
@@ -735,11 +735,15 @@ class TestCollisionAvoidanceGoals:
                                                         start_condition=schnibble_up)
 
         human_close = box_setup.monitors.add_pulse(name='Human Close?',
-                                                   after_ticks=80,
-                                                   start_condition=pre_schnibble)
+                                                   after_ticks=60,
+                                                   start_condition=pre_schnibble,
+                                                   end_condition='')
+
+        no_contact = box_setup.monitors.add_const_true(name='Made Contact?',
+                                                       start_condition=schnibble_down)
 
         schnibbel_done = box_setup.monitors.add_time_above(name='Done?',
-                                                           threshold=10,
+                                                           threshold=5,
                                                            start_condition=move_right)
 
         reset = f'not {schnibbel_done}'
@@ -747,12 +751,69 @@ class TestCollisionAvoidanceGoals:
         box_setup.update_reset_condition(node_name=schnibble_up, condition=reset)
         box_setup.update_reset_condition(node_name=move_right, condition=reset)
         box_setup.update_reset_condition(node_name=schnibbel_done, condition=reset)
+        box_setup.update_reset_condition(node_name=no_contact, condition=reset)
 
         box_setup.update_pause_condition(node_name=schnibble_down, condition=human_close)
         box_setup.update_pause_condition(node_name=schnibble_up, condition=human_close)
         box_setup.update_pause_condition(node_name=move_right, condition=human_close)
 
+
         box_setup.monitors.add_end_motion(start_condition=schnibbel_done)
+        box_setup.monitors.add_cancel_motion(start_condition=f'not {no_contact}', error=Exception('no contact'))
+        box_setup.execute(add_local_minimum_reached=False)
+        # box_setup.update_parent_link_of_group(box_name, box_setup.tip)
+
+    def test_schnibbeln_sequence(self, box_setup: HSRTestWrapper):
+        box_name = 'Schnibbler'
+        box_pose = PoseStamped()
+        box_pose.header.frame_id = box_setup.tip
+        box_pose.pose.position = Point(0.0, 0.0, 0.06)
+        box_pose.pose.orientation.w = 1.0
+
+        box_setup.add_box_to_world(name=box_name, size=(0.05, 0.01, 0.15), pose=box_pose, parent_link=box_setup.tip)
+        box_setup.close_gripper()
+
+        pre_schnibble_pose = PoseStamped()
+        pre_schnibble_pose.header.frame_id = 'map'
+        pre_schnibble_pose.pose.position = Point(0.85, 0.3, .75)
+        pre_schnibble_pose.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 0, 1, 0],
+                                                                                  [0, -1, 0, 0],
+                                                                                  [1, 0, 0, 0],
+                                                                                  [0, 0, 0, 1]]))
+        pre_schnibble = box_setup.tasks.add_cartesian_pose(name='Position Knife',
+                                                           goal_pose=pre_schnibble_pose,
+                                                           tip_link=box_setup.tip,
+                                                           root_link='map')
+        human_close = box_setup.monitors.add_pulse(name='Human Close?',
+                                                   after_ticks=15,
+                                                   start_condition=pre_schnibble,
+                                                   end_condition='')
+
+        cut = box_setup.motion_goals.add_motion_goal(class_name=Cutting.__name__,
+                                                     name='Cut',
+                                                     root_link=LinkName(name='map'),
+                                                     tip_link=LinkName(name=box_name),
+                                                     depth=0.1,
+                                                     right_shift=0.02,
+                                                     start_condition=pre_schnibble)
+
+        # no_contact = box_setup.monitors.add_const_true(name='Made Contact?',
+        #                                                start_condition=schnibble_down)
+
+        schnibbel_done = box_setup.monitors.add_time_above(name='Done?',
+                                                           threshold=4,
+                                                           start_condition=cut)
+
+        reset = f'not {schnibbel_done}'
+        box_setup.update_reset_condition(node_name=cut, condition=reset)
+        box_setup.update_reset_condition(node_name=schnibbel_done, condition=reset)
+        # box_setup.update_reset_condition(node_name=no_contact, condition=reset)
+
+        box_setup.update_pause_condition(node_name=cut, condition=human_close)
+
+
+        box_setup.monitors.add_end_motion(start_condition=schnibbel_done)
+        # box_setup.monitors.add_cancel_motion(start_condition=f'not {no_contact}', error=Exception('no contact'))
         box_setup.execute(add_local_minimum_reached=False)
         # box_setup.update_parent_link_of_group(box_name, box_setup.tip)
 

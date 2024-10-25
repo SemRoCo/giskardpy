@@ -214,8 +214,7 @@ class Weights(ProblemDataPart):
                 for derivative in Derivatives.range(Derivatives.velocity, self.max_derivative):
                     if t >= self.prediction_horizon - (self.max_derivative - derivative):
                         continue
-                    normalized_weight = v.normalized_weight(t, derivative, self.prediction_horizon,
-                                                            evaluated=self.evaluated)
+                    normalized_weight = v.normalized_weight(t, derivative, self.prediction_horizon, evaluated=self.evaluated)
                     weights[derivative][f't{t:03}/{v.position_name}/{derivative}'] = normalized_weight
                     for q_gain in quadratic_weight_gains:
                         if t < len(q_gain.gains) and v in q_gain.gains[t][derivative].keys():
@@ -307,7 +306,7 @@ class FreeVariableBounds(ProblemDataPart):
         self.evaluated = True
 
     @profile
-    def velocity_limit(self, v: FreeVariable):
+    def velocity_limit(self, v: FreeVariable) -> Tuple[cas.Expression, cas.Expression]:
         current_position = v.get_symbol(Derivatives.position)
         lower_velocity_limit = v.get_lower_limit(Derivatives.velocity, evaluated=True)
         upper_velocity_limit = v.get_upper_limit(Derivatives.velocity, evaluated=True)
@@ -318,9 +317,15 @@ class FreeVariableBounds(ProblemDataPart):
 
         lower_jerk_limit = v.get_lower_limit(Derivatives.jerk, evaluated=True)
         upper_jerk_limit = v.get_upper_limit(Derivatives.jerk, evaluated=True)
+        if self.prediction_horizon == 1:
+            return cas.Expression([lower_velocity_limit]), cas.Expression([upper_velocity_limit])
 
-        max_reachable_vel = giskard_math.max_velocity_from_horizon_and_jerk(self.prediction_horizon,
-                                                                            upper_jerk_limit, self.dt)
+        max_reachable_vel = giskard_math.max_velocity_from_horizon_and_jerk(prediction_horizon=self.prediction_horizon,
+                                                                            vel_limit=upper_velocity_limit,
+                                                                            acc_limit=upper_acc_limit,
+                                                                            jerk_limit=upper_jerk_limit,
+                                                                            sample_period=self.dt,
+                                                                            max_derivative=self.max_derivative)
         if max_reachable_vel < upper_velocity_limit:
             error_msg = f'Free variable "{v.name}" can\'t reach velocity limit of "{upper_velocity_limit}". ' \
                         f'Maximum reachable with prediction horizon = "{self.prediction_horizon}", ' \
@@ -350,8 +355,12 @@ class FreeVariableBounds(ProblemDataPart):
                                    dt=self.dt,
                                    ph=self.prediction_horizon)
             except InfeasibleException as e:
-                max_reachable_vel = giskard_math.max_velocity_from_horizon_and_jerk(self.prediction_horizon,
-                                                                                    upper_jerk_limit, self.dt)
+                max_reachable_vel = giskard_math.max_velocity_from_horizon_and_jerk(prediction_horizon=self.prediction_horizon,
+                                                                                    vel_limit=upper_velocity_limit,
+                                                                                    acc_limit=upper_acc_limit,
+                                                                                    jerk_limit=upper_jerk_limit,
+                                                                                    sample_period=self.dt,
+                                                                                    max_derivative=self.max_derivative)
                 if max_reachable_vel < upper_velocity_limit:
                     error_msg = f'Free variable "{v.name}" can\'t reach velocity limit of "{upper_velocity_limit}". ' \
                                 f'Maximum reachable with prediction horizon = "{self.prediction_horizon}", ' \

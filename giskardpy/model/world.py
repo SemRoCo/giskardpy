@@ -591,8 +591,9 @@ class WorldTree(WorldTreeInterface):
 
     def update_state(self, next_commands: NextCommands, dt: float, max_derivative: Derivatives) -> None:
         for free_variable_name, command in next_commands.free_variable_data.items():
-            self.state[free_variable_name][:max_derivative] += command * dt
             self.state[free_variable_name][max_derivative] = command[-1]
+            for i in range(max_derivative-1, -1, -1):
+                self.state[free_variable_name][i] += self.state[free_variable_name][i+1] * dt
         for joint in self.joints.values():
             if isinstance(joint, VirtualFreeVariables):
                 joint.update_state(dt)

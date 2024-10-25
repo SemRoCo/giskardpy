@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from collections import OrderedDict, defaultdict
+from copy import deepcopy
 from itertools import product
 from threading import Lock
 from typing import Dict, Tuple
@@ -36,7 +37,7 @@ class Trajectory:
     def set(self, time: int, point: JointStates):
         if len(self._points) > 0 and list(self._points.keys())[-1] > time:
             raise KeyError('Cannot append a trajectory point that is before the current end time of the trajectory.')
-        self._points[time] = point
+        self._points[time] = deepcopy(point)
 
     def __len__(self) -> int:
         return len(self._points)

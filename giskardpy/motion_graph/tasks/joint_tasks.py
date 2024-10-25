@@ -35,10 +35,10 @@ class JointPositionList(Task):
 
             ll_pos, ul_pos = god_map.world.compute_joint_limits(joint_name, Derivatives.position)
             if ll_pos is not None:
-                goal_position = min(ul_pos, max(ll_pos, goal_position))
+                goal_position = cas.limit(goal_position, ll_pos, ul_pos)
 
             ll_vel, ul_vel = god_map.world.compute_joint_limits(joint_name, Derivatives.velocity)
-            velocity_limit = min(ul_vel, max(ll_vel, max_velocity))
+            velocity_limit = cas.limit(max_velocity, ll_vel, ul_vel)
 
             joint: OneDofJoint = god_map.world.joints[joint_name]
             self.current_positions.append(joint.get_symbol(Derivatives.position))

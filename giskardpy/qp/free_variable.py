@@ -109,9 +109,10 @@ class FreeVariable:
     def normalized_weight(self, t: int, derivative: Derivatives, prediction_horizon: int,
                           evaluated: bool = False) -> Union[Union[cas.Symbol, float], float]:
         weight = self.quadratic_weights[derivative]
-        start = weight * self.horizon_functions[derivative]
-        a = (weight - start) / prediction_horizon
-        weight = a * t + start
+        if prediction_horizon > 1:
+            start = weight * self.horizon_functions[derivative]
+            a = (weight - start) / (prediction_horizon-1)
+            weight = a * t + start
         expr = weight * (1 / self.get_upper_limit(derivative)) ** 2
         if evaluated:
             return symbol_manager.evaluate_expr(expr)

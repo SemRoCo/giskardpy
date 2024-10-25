@@ -1,3 +1,4 @@
+import traceback
 from itertools import combinations
 
 import numpy as np
@@ -188,15 +189,18 @@ class TestWorld:
         box_name = box_world_prismatic.link_names[-1]
         dt = 0.05
         horizon = 9
-        control_dt = 0.02
+        control_dt = 0.05
         max_derivative = Derivatives.jerk
         sim_time = 5
         god_map.time = 0
+        explicit = True
         god_map.control_cycle_counter = 0
 
         if max_derivative == Derivatives.acceleration:
             box_world_prismatic.joints[joint_name].free_variables[0].set_lower_limit(Derivatives.acceleration, -5)
             box_world_prismatic.joints[joint_name].free_variables[0].set_upper_limit(Derivatives.acceleration, 5)
+        # box_world_prismatic.joints[joint_name].free_variables[0].set_lower_limit(Derivatives.jerk, -60)
+        # box_world_prismatic.joints[joint_name].free_variables[0].set_upper_limit(Derivatives.jerk, 60)
         box_world_prismatic.update_default_weights({Derivatives.velocity: 0.01,
                                                     Derivatives.acceleration: 0,
                                                     Derivatives.jerk: 0.0})
@@ -212,7 +216,8 @@ class TestWorld:
         eq, neq, neqd, lin_weight, quad_weight = god_map.motion_graph_manager.get_constraints_from_tasks()
         god_map.qp_controller = QPController(sample_period=dt,
                                              prediction_horizon=horizon,
-                                             max_derivative=max_derivative)
+                                             max_derivative=max_derivative,
+                                             explicit_variables=explicit)
         god_map.qp_controller.init(free_variables=list(box_world_prismatic.free_variables.values()),
                                    equality_constraints=eq)
         god_map.qp_controller.compile()
@@ -230,7 +235,12 @@ class TestWorld:
                 parameters = god_map.qp_controller.get_parameter_names()
                 substitutions = symbol_manager.resolve_symbols(parameters)
                 next_cmd = god_map.qp_controller.get_cmd(substitutions)
-                box_world_prismatic.update_state(next_cmd, control_dt, max_derivative)
+
+                if explicit:
+                    box_world_prismatic.update_state(next_cmd, control_dt, max_derivative)
+                else:
+                    box_world_prismatic.update_state(next_cmd, control_dt, Derivatives.velocity)
+
                 box_world_prismatic.notify_state_change()
                 traj.set(god_map.control_cycle_counter, box_world_prismatic.state)
                 visualize()
@@ -239,6 +249,7 @@ class TestWorld:
                 god_map.time += control_dt
                 god_map.control_cycle_counter += 1
         except Exception as e:
+            traceback.print_exc()
             print(e)
         traj.plot_trajectory('test',
                              sample_period=control_dt,

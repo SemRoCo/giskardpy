@@ -2349,6 +2349,8 @@ def is_unknown3_symbol(expr):
 
 
 def is_constant(expr):
+    if isinstance(expr, (float, int)):
+        return True
     return len(free_symbols(_to_sx(expr))) == 0
 
 

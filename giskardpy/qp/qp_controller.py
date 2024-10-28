@@ -433,7 +433,7 @@ class FreeVariableBounds(ProblemDataPart):
             for v in self.free_variables:
                 lb_, ub_ = v.get_lower_limit(Derivatives.velocity), v.get_upper_limit(Derivatives.velocity)
                 for t in range(self.prediction_horizon):
-                    if t == self.prediction_horizon - 1:
+                    if t >= self.prediction_horizon - 2:
                         lb_, ub_ = 0, 0
                     lb[f't{t:03}/{v.name}/{Derivatives.velocity}'] = lb_
                     ub[f't{t:03}/{v.name}/{Derivatives.velocity}'] = ub_
@@ -651,8 +651,8 @@ class InequalityBounds(ProblemDataPart):
                         vtc = v.get_symbol(Derivatives.velocity)
                         if t == 0:
                             # vtc/dt + a_min <= vt0/dt <= vtc/dt + a_max
-                            lb_acc[f't{t:03}/{v.name}/{Derivatives.acceleration}'] = -vtc/self.dt + a_min
-                            ub_acc[f't{t:03}/{v.name}/{Derivatives.acceleration}'] = -vtc/self.dt + a_max
+                            lb_acc[f't{t:03}/{v.name}/{Derivatives.acceleration}'] = vtc / self.dt + a_min
+                            ub_acc[f't{t:03}/{v.name}/{Derivatives.acceleration}'] = vtc / self.dt + a_max
                         else:
                             lb_acc[f't{t:03}/{v.name}/{Derivatives.acceleration}'] = a_min
                             ub_acc[f't{t:03}/{v.name}/{Derivatives.acceleration}'] = a_max
@@ -663,17 +663,16 @@ class InequalityBounds(ProblemDataPart):
                     atc = v.get_symbol(Derivatives.acceleration)
                     if t == 0:
                         # vtc/dt**2 + atc/dt + j_min <=    vt0/dt**2     <= vtc/dt**2 + atc/dt + j_max
-                        lb_jerk[f't{t:03}/{v.name}/{Derivatives.jerk}'] = vtc/self.dt**2 + atc/self.dt + j_min
-                        ub_jerk[f't{t:03}/{v.name}/{Derivatives.jerk}'] = vtc/self.dt**2 + atc/self.dt + j_max
+                        lb_jerk[f't{t:03}/{v.name}/{Derivatives.jerk}'] = vtc / self.dt ** 2 + atc / self.dt + j_min
+                        ub_jerk[f't{t:03}/{v.name}/{Derivatives.jerk}'] = vtc / self.dt ** 2 + atc / self.dt + j_max
                     elif t == 1:
                         # (- vtc)/dt**2 + j_min <= (vt1 - 2vt0)/dt**2 <= (- vtc)/dt**2 + j_max
-                        lb_jerk[f't{t:03}/{v.name}/{Derivatives.jerk}'] = -vtc/self.dt**2 + j_min
-                        ub_jerk[f't{t:03}/{v.name}/{Derivatives.jerk}'] = -vtc/self.dt**2 + j_max
+                        lb_jerk[f't{t:03}/{v.name}/{Derivatives.jerk}'] = -vtc / self.dt ** 2 + j_min
+                        ub_jerk[f't{t:03}/{v.name}/{Derivatives.jerk}'] = -vtc / self.dt ** 2 + j_max
                     else:
                         lb_jerk[f't{t:03}/{v.name}/{Derivatives.jerk}'] = j_min
                         ub_jerk[f't{t:03}/{v.name}/{Derivatives.jerk}'] = j_max
         return [lb_acc, lb_jerk], [ub_acc, ub_jerk]
-
 
     @profile
     def construct_expression(self) -> Union[cas.Expression, Tuple[cas.Expression, cas.Expression]]:
@@ -1069,44 +1068,61 @@ class InequalityModel(ProblemDataPart):
         | 1/dt**2|-2/dt**2| 1/dt**2|        |                        jt2 = (vt2 - 2vt1 + vt0)/dt**2
         |        | 1/dt**2|-2/dt**2| 1/dt**2|                        jt3 = (vt3 - 2vt2 + vt1)/dt**2
         |-----------------------------------|
-        jt0 = (at0 - atc)/dt
-        jt0 = ((vt0 - vtc)/dt - atc)/dt
-        jt0 = vt0/dt**2 - vtc/dt**2 - atc/dt
+
+        |  v1t0  |  v2t0  |  v1t1  |  v2t1  |  v1t2  |  v2t2  |  v1t3  |  v2t3  |
+        |-----------------------------------------------------------------------|
+        |  1/dt  |        |        |        |        |        |        |        |
+        |        |  1/dt  |        |        |        |        |        |        |
+        | -1/dt  |        |  1/dt  |        |        |        |        |        |
+        |        | -1/dt  |        |  1/dt  |        |        |        |        |
+        |        |        | -1/dt  |        |  1/dt  |        |        |        |
+        |        |        |        | -1/dt  |        |  1/dt  |        |        |
+        |        |        |        |        | -1/dt  |        | 1/dt   |        |
+        |        |        |        |        |        | -1/dt  |        | 1/dt   |
+        |=======================================================================|
+        | 1/dt**2|        |        |        |        |        |        |        |
+        |        | 1/dt**2|        |        |        |        |        |        |
+        |-2/dt**2|        | 1/dt**2|        |        |        |        |        |
+        |        |-2/dt**2|        | 1/dt**2|        |        |        |        |
+        | 1/dt**2|        |-2/dt**2|        | 1/dt**2|        |        |        |
+        |        | 1/dt**2|        |-2/dt**2|        | 1/dt**2|        |        |
+        |        |        | 1/dt**2|        |-2/dt**2|        | 1/dt**2|        |
+        |        |        |        | 1/dt**2|        |-2/dt**2|        | 1/dt**2|
+        |-----------------------------------------------------------------------|
 
         :param max_derivative:
         :return:
         """
         num_rows = self.number_of_free_variables * self.prediction_horizon
         num_columns = self.number_of_free_variables * self.prediction_horizon
-        A_acc = cas.zeros(num_rows, num_columns)
+        # A_acc = cas.zeros(num_rows, num_columns)
         A_jerk = cas.zeros(num_rows, num_columns)
         if max_derivative >= Derivatives.acceleration:
-            rows_to_delete = []
-            for i in range(self.prediction_horizon):
-                for v_i, v in enumerate(self.free_variables):
-                    idx = i*len(self.free_variables) + v_i
-                    a_min = v.get_lower_limit(Derivatives.acceleration)
-                    a_max = v.get_upper_limit(Derivatives.acceleration)
-                    if (np.isinf(a_min) or cas.is_inf(a_min)) and (np.isinf(a_max) or cas.is_inf(a_max)):
-                        rows_to_delete.append(idx)
-                        continue
-                    A_acc[idx, idx] = 1 / self.dt
-                    if idx == 0:
-                        pass
-                    else:
-                        A_acc[i, i - 1] = -1 / self.dt
-            A_acc.remove(rows_to_delete, [])
+            # rows_to_delete = []
+            # for i in range(self.prediction_horizon):
+            #     for v_i, v in enumerate(self.free_variables):
+            #         idx = i*len(self.free_variables) + v_i
+            #         a_min = v.get_lower_limit(Derivatives.acceleration)
+            #         a_max = v.get_upper_limit(Derivatives.acceleration)
+            #         if (np.isinf(a_min) or cas.is_inf(a_min)) and (np.isinf(a_max) or cas.is_inf(a_max)):
+            #             rows_to_delete.append(idx)
+            #             continue
+            #         A_acc[idx, idx] = 1 / self.dt
+            #         if i == 0:
+            #             pass
+            #         else:
+            #             A_acc[i, i - 1] = -1 / self.dt
+            # A_acc.remove(rows_to_delete, [])
             if max_derivative >= Derivatives.jerk:
-                for i in range(self.prediction_horizon):
-                    for v in self.free_variables:
-                        A_jerk[i, i] = 1 / self.dt ** 2
-                        if i >= 1:
-                            A_jerk[i, i - 1] = -2 / self.dt ** 2
-                        if i >= 2:
-                            A_jerk[i, i - 2] = 1 / self.dt ** 2
-                model = cas.vstack([A_acc,A_jerk])
-            else:
-                model = A_acc
+                pre_previous = cas.eye(self.number_of_free_variables * self.prediction_horizon) / self.dt ** 2
+                previous = -2 * cas.eye(self.number_of_free_variables * (self.prediction_horizon-1)) / self.dt ** 2
+                same = cas.eye(self.number_of_free_variables * (self.prediction_horizon-2)) / self.dt ** 2
+                A_jerk = pre_previous
+                A_jerk[self.number_of_free_variables:, :-self.number_of_free_variables] += previous
+                A_jerk[self.number_of_free_variables*2:, :-self.number_of_free_variables*2] += same
+                model = cas.vstack([A_jerk])
+            # else:
+            #     model = A_acc
         else:
             model = cas.Expression()
         slack_model = cas.zeros(model.shape[0], self.number_ineq_slack_variables)
@@ -1193,7 +1209,7 @@ class QPController:
                  retries_with_relaxed_constraints: int = 0,
                  retry_added_slack: float = 100,
                  retry_weight_factor: float = 100,
-                 explicit_variables: bool = True):
+                 explicit_variables: bool = False):
         self.explicit_variables = explicit_variables
         self.sample_period = sample_period
         self.max_derivative = max_derivative
@@ -1373,7 +1389,7 @@ class QPController:
                 return NextCommands.from_xdot(self.free_variables, self.xdot_full, self.order, self.prediction_horizon)
             else:
                 return NextCommands.from_xdot_implicit(self.free_variables, self.xdot_full, self.order,
-                                              self.prediction_horizon, god_map.world, self.sample_period)
+                                                       self.prediction_horizon, god_map.world, self.sample_period)
         except InfeasibleException as e_original:
             self.xdot_full = None
             self._create_debug_pandas(self.qp_solver)

@@ -58,7 +58,7 @@ class NextCommands:
         joint_derivative_filter_ = joint_derivative_filter(offset, prediction_horizon, Derivatives.velocity)
         self.free_variable_data = {
             free_variable.name: [float(xdot[joint_derivative_filter_ + i]),
-                                 float(xdot[joint_derivative_filter_ + i])/dt-last_state[0][0]/dt ,
-                                 float(xdot[joint_derivative_filter_ + i])/dt**2-last_state[0][0]/dt**2-last_state[0][1]/dt ] for i, free_variable in enumerate(free_variables)
+                                 float(xdot[joint_derivative_filter_ + i])/dt-last_state[i][0]/dt ,
+                                 float(xdot[joint_derivative_filter_ + i])/dt**2-last_state[i][0]/dt**2-last_state[i][1]/dt ] for i, free_variable in enumerate(free_variables)
         }
         return self

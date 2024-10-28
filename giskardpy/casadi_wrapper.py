@@ -3,6 +3,7 @@ from __future__ import annotations
 import builtins
 from copy import copy
 from enum import IntEnum
+import re
 from typing import Union, TypeVar, Optional
 import math
 from line_profiler import profile
@@ -2392,6 +2393,6 @@ def is_inf(expr):
     if is_constant(expr):
         return np.isinf(ca.evalf(expr).full()[0][0])
     for arg in range(cas_expr.n_dep()):
-        if is_inf(cas_expr.dep(0)):
+        if is_inf(cas_expr.dep(arg)):
             return True
     return False

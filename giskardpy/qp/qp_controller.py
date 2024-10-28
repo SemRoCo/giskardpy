@@ -647,14 +647,15 @@ class InequalityBounds(ProblemDataPart):
                 if self.max_derivative >= Derivatives.acceleration:
                     a_min = v.get_lower_limit(Derivatives.acceleration)
                     a_max = v.get_upper_limit(Derivatives.acceleration)
-                    vtc = v.get_symbol(Derivatives.velocity)
-                    if t == 0:
-                        # vtc/dt + a_min <= vt0/dt <= vtc/dt + a_max
-                        lb_acc[f't{t:03}/{v.name}/{Derivatives.acceleration}'] = -vtc/self.dt + a_min
-                        ub_acc[f't{t:03}/{v.name}/{Derivatives.acceleration}'] = -vtc/self.dt + a_max
-                    else:
-                        lb_acc[f't{t:03}/{v.name}/{Derivatives.acceleration}'] = a_min
-                        ub_acc[f't{t:03}/{v.name}/{Derivatives.acceleration}'] = a_max
+                    if not ((np.isinf(a_min) or cas.is_inf(a_min)) and (np.isinf(a_max) or cas.is_inf(a_max))):
+                        vtc = v.get_symbol(Derivatives.velocity)
+                        if t == 0:
+                            # vtc/dt + a_min <= vt0/dt <= vtc/dt + a_max
+                            lb_acc[f't{t:03}/{v.name}/{Derivatives.acceleration}'] = -vtc/self.dt + a_min
+                            ub_acc[f't{t:03}/{v.name}/{Derivatives.acceleration}'] = -vtc/self.dt + a_max
+                        else:
+                            lb_acc[f't{t:03}/{v.name}/{Derivatives.acceleration}'] = a_min
+                            ub_acc[f't{t:03}/{v.name}/{Derivatives.acceleration}'] = a_max
                 if self.max_derivative >= Derivatives.jerk:
                     j_min = v.get_lower_limit(Derivatives.jerk)
                     j_max = v.get_upper_limit(Derivatives.jerk)
@@ -1080,19 +1081,29 @@ class InequalityModel(ProblemDataPart):
         A_acc = cas.zeros(num_rows, num_columns)
         A_jerk = cas.zeros(num_rows, num_columns)
         if max_derivative >= Derivatives.acceleration:
+            rows_to_delete = []
             for i in range(self.prediction_horizon):
-                A_acc[i, i] = 1 / self.dt
-                if i == 0:
-                    pass
-                else:
-                    A_acc[i, i - 1] = -1 / self.dt
+                for v_i, v in enumerate(self.free_variables):
+                    idx = i*len(self.free_variables) + v_i
+                    a_min = v.get_lower_limit(Derivatives.acceleration)
+                    a_max = v.get_upper_limit(Derivatives.acceleration)
+                    if (np.isinf(a_min) or cas.is_inf(a_min)) and (np.isinf(a_max) or cas.is_inf(a_max)):
+                        rows_to_delete.append(idx)
+                        continue
+                    A_acc[idx, idx] = 1 / self.dt
+                    if idx == 0:
+                        pass
+                    else:
+                        A_acc[i, i - 1] = -1 / self.dt
+            A_acc.remove(rows_to_delete, [])
             if max_derivative >= Derivatives.jerk:
                 for i in range(self.prediction_horizon):
-                    A_jerk[i, i] = 1 / self.dt ** 2
-                    if i >= 1:
-                        A_jerk[i, i - 1] = -2 / self.dt ** 2
-                    if i >= 2:
-                        A_jerk[i, i - 2] = 1 / self.dt ** 2
+                    for v in self.free_variables:
+                        A_jerk[i, i] = 1 / self.dt ** 2
+                        if i >= 1:
+                            A_jerk[i, i - 1] = -2 / self.dt ** 2
+                        if i >= 2:
+                            A_jerk[i, i - 2] = 1 / self.dt ** 2
                 model = cas.vstack([A_acc,A_jerk])
             else:
                 model = A_acc

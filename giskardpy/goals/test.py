@@ -5,6 +5,7 @@ from typing import Optional
 from giskardpy.data_types.data_types import PrefixName
 from giskardpy.goals.cartesian_goals import CartesianPose
 from giskardpy.goals.goal import Goal
+from giskardpy.motion_graph.monitors.monitors import TrueMonitor, CancelMotion
 from giskardpy.motion_graph.tasks.cartesian_tasks import CartesianPoseAsTask
 from giskardpy.motion_graph.tasks.joint_tasks import JointPositionList
 from giskardpy.motion_graph.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
@@ -94,16 +95,26 @@ class Cutting(Goal):
         schnibble_down_pose = god_map.world.compute_fk(root_link=self.tip_link, tip_link=self.tip_link)
         schnibble_down_pose.x = -depth
         cut_down = CartesianPoseAsTask(root_link=self.root_link,
-                                       name='Down',
+                                       name=f'{self.name}/Down',
                                        goal_pose=schnibble_down_pose,
                                        tip_link=self.tip_link,
                                        absolute=False)
         self.add_task(cut_down)
 
+        made_contact = TrueMonitor(name=f'{self.name}/Made Contact?')
+        self.add_monitor(made_contact)
+        made_contact.start_condition = cut_down.get_observation_state_expression()
+        made_contact.end_condition = made_contact.get_observation_state_expression()
+
+        cancel = CancelMotion(name=f'{self.name}/CancelMotion', exception=Exception('no contact'))
+        self.add_monitor(cancel)
+        cancel.start_condition = cas.logic_not(made_contact.get_observation_state_expression())
+
+
         schnibble_up_pose = god_map.world.compute_fk(root_link=self.tip_link, tip_link=self.tip_link)
         schnibble_up_pose.x = depth
         cut_up = CartesianPoseAsTask(root_link=self.root_link,
-                                     name='Up',
+                                     name=f'{self.name}/Up',
                                      goal_pose=schnibble_up_pose,
                                      tip_link=self.tip_link,
                                      absolute=False)
@@ -112,7 +123,7 @@ class Cutting(Goal):
         schnibble_right_pose = god_map.world.compute_fk(root_link=self.tip_link, tip_link=self.tip_link)
         schnibble_right_pose.y = right_shift
         move_right = CartesianPoseAsTask(root_link=self.root_link,
-                                         name='right',
+                                         name=f'{self.name}/Move Right',
                                          goal_pose=schnibble_right_pose,
                                          tip_link=self.tip_link,
                                          absolute=False)

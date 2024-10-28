@@ -1093,26 +1093,20 @@ class InequalityModel(ProblemDataPart):
         :param max_derivative:
         :return:
         """
-        num_rows = self.number_of_free_variables * self.prediction_horizon
-        num_columns = self.number_of_free_variables * self.prediction_horizon
-        # A_acc = cas.zeros(num_rows, num_columns)
-        A_jerk = cas.zeros(num_rows, num_columns)
         if max_derivative >= Derivatives.acceleration:
-            # rows_to_delete = []
-            # for i in range(self.prediction_horizon):
-            #     for v_i, v in enumerate(self.free_variables):
-            #         idx = i*len(self.free_variables) + v_i
-            #         a_min = v.get_lower_limit(Derivatives.acceleration)
-            #         a_max = v.get_upper_limit(Derivatives.acceleration)
-            #         if (np.isinf(a_min) or cas.is_inf(a_min)) and (np.isinf(a_max) or cas.is_inf(a_max)):
-            #             rows_to_delete.append(idx)
-            #             continue
-            #         A_acc[idx, idx] = 1 / self.dt
-            #         if i == 0:
-            #             pass
-            #         else:
-            #             A_acc[i, i - 1] = -1 / self.dt
-            # A_acc.remove(rows_to_delete, [])
+            previous = cas.eye(self.number_of_free_variables * (self.prediction_horizon)) / self.dt
+            same = -cas.eye(self.number_of_free_variables * (self.prediction_horizon-1)) / self.dt
+            A_acc = previous
+            A_acc[self.number_of_free_variables:, :-self.number_of_free_variables] += same
+            rows_to_delete = []
+            for i in range(self.prediction_horizon):
+                for v_i, v in enumerate(self.free_variables):
+                    idx = i*len(self.free_variables) + v_i
+                    a_min = v.get_lower_limit(Derivatives.acceleration)
+                    a_max = v.get_upper_limit(Derivatives.acceleration)
+                    if (np.isinf(a_min) or cas.is_inf(a_min)) and (np.isinf(a_max) or cas.is_inf(a_max)):
+                        rows_to_delete.append(idx)
+            A_acc.remove(rows_to_delete, [])
             if max_derivative >= Derivatives.jerk:
                 pre_previous = cas.eye(self.number_of_free_variables * self.prediction_horizon) / self.dt ** 2
                 previous = -2 * cas.eye(self.number_of_free_variables * (self.prediction_horizon-1)) / self.dt ** 2
@@ -1120,9 +1114,9 @@ class InequalityModel(ProblemDataPart):
                 A_jerk = pre_previous
                 A_jerk[self.number_of_free_variables:, :-self.number_of_free_variables] += previous
                 A_jerk[self.number_of_free_variables*2:, :-self.number_of_free_variables*2] += same
-                model = cas.vstack([A_jerk])
-            # else:
-            #     model = A_acc
+                model = cas.vstack([A_acc, A_jerk])
+            else:
+                model = A_acc
         else:
             model = cas.Expression()
         slack_model = cas.zeros(model.shape[0], self.number_ineq_slack_variables)

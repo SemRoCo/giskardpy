@@ -1407,7 +1407,7 @@ def equivalent(expression1, expression2):
 
 
 def free_symbols(expression):
-    expression = Expression(expression).s
+    expression = _to_sx(expression)
     return ca.symvar(expression)
 
 
@@ -2348,7 +2348,7 @@ def is_unknown3_symbol(expr):
 
 
 def is_constant(expr):
-    return len(expr.free_symbols()) == 0
+    return len(free_symbols(_to_sx(expr))) == 0
 
 
 def det(expr):
@@ -2385,3 +2385,13 @@ def replace_with_three_logic(expr):
         return logic_or3(replace_with_three_logic(cas_expr.dep(0)),
                          replace_with_three_logic(cas_expr.dep(1)))
     return expr
+
+
+def is_inf(expr):
+    cas_expr = _to_sx(expr)
+    if is_constant(expr):
+        return np.isinf(ca.evalf(expr).full()[0][0])
+    for arg in range(cas_expr.n_dep()):
+        if is_inf(cas_expr.dep(0)):
+            return True
+    return False

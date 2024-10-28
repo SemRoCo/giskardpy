@@ -62,7 +62,7 @@ class ProblemDataPart(ABC):
     equality_constraints: List[EqualityConstraint]
     inequality_constraints: List[InequalityConstraint]
     derivative_constraints: List[DerivativeInequalityConstraint]
-    sample_period: float
+    dt: float
     prediction_horizon: int
     control_horizon: int
     max_derivative: Derivatives
@@ -89,6 +89,10 @@ class ProblemDataPart(ABC):
     @property
     def number_of_free_variables(self) -> int:
         return len(self.free_variables)
+
+    @property
+    def number_ineq_slack_variables(self):
+        return sum(self.control_horizon for c in self.velocity_constraints)
 
     def replace_hack(self, expression: Union[float, cas.Expression], new_value):
         if not isinstance(expression, cas.Expression):
@@ -138,13 +142,14 @@ class ProblemDataPart(ABC):
     def __helper_names(self, param: dict):
         return [x for x, _ in sorted(param.items())]
 
-    def _remove_columns_columns_where_variables_are_zero(self, free_variable_model: cas.Expression) -> cas.Expression:
+    def _remove_columns_columns_where_variables_are_zero(self, free_variable_model: cas.Expression,
+                                                         max_derivative: Derivatives) -> cas.Expression:
         if np.prod(free_variable_model.shape) == 0:
             return free_variable_model
         column_ids = []
         end = 0
-        for derivative in Derivatives.range(Derivatives.velocity, self.max_derivative - 1):
-            last_non_zero_variable = self.prediction_horizon - (self.max_derivative - derivative)
+        for derivative in Derivatives.range(Derivatives.velocity, max_derivative - 1):
+            last_non_zero_variable = self.prediction_horizon - (max_derivative - derivative)
             start = end + self.number_of_free_variables * last_non_zero_variable
             end += self.number_of_free_variables * self.prediction_horizon
             column_ids.extend(range(start, end))
@@ -405,25 +410,34 @@ class FreeVariableBounds(ProblemDataPart):
             -> Tuple[List[Dict[str, cas.symbol_expr_float]], List[Dict[str, cas.symbol_expr_float]]]:
         if self.explicit_variables:
             max_derivative = self.max_derivative
+            lb: DefaultDict[Derivatives, Dict[str, cas.symbol_expr_float]] = defaultdict(dict)
+            ub: DefaultDict[Derivatives, Dict[str, cas.symbol_expr_float]] = defaultdict(dict)
+            for v in self.free_variables:
+                lb_, ub_ = self.velocity_limit(v=v, max_derivative=max_derivative)
+                for t in range(self.prediction_horizon):
+                    for derivative in Derivatives.range(Derivatives.velocity, max_derivative):
+                        if t >= self.prediction_horizon - (max_derivative - derivative):
+                            continue
+                        index = t + self.prediction_horizon * (derivative - 1)
+                        lb[derivative][f't{t:03}/{v.name}/{derivative}'] = lb_[index]
+                        ub[derivative][f't{t:03}/{v.name}/{derivative}'] = ub_[index]
+            lb_params = []
+            ub_params = []
+            for derivative, name_to_bound_map in sorted(lb.items()):
+                lb_params.append(name_to_bound_map)
+            for derivative, name_to_bound_map in sorted(ub.items()):
+                ub_params.append(name_to_bound_map)
         else:
-            max_derivative = Derivatives.velocity
-        lb: DefaultDict[Derivatives, Dict[str, cas.symbol_expr_float]] = defaultdict(dict)
-        ub: DefaultDict[Derivatives, Dict[str, cas.symbol_expr_float]] = defaultdict(dict)
-        for v in self.free_variables:
-            lb_, ub_ = self.velocity_limit(v=v, max_derivative=max_derivative)
-            for t in range(self.prediction_horizon):
-                for derivative in Derivatives.range(Derivatives.velocity, max_derivative):
-                    if t >= self.prediction_horizon - (max_derivative - derivative):
-                        continue
-                    index = t + self.prediction_horizon * (derivative - 1)
-                    lb[derivative][f't{t:03}/{v.name}/{derivative}'] = lb_[index]
-                    ub[derivative][f't{t:03}/{v.name}/{derivative}'] = ub_[index]
-        lb_params = []
-        ub_params = []
-        for derivative, name_to_bound_map in sorted(lb.items()):
-            lb_params.append(name_to_bound_map)
-        for derivative, name_to_bound_map in sorted(ub.items()):
-            ub_params.append(name_to_bound_map)
+            lb: Dict[str, cas.symbol_expr_float] = {}
+            ub: Dict[str, cas.symbol_expr_float] = {}
+            for v in self.free_variables:
+                lb_, ub_ = v.get_lower_limit(Derivatives.velocity), v.get_upper_limit(Derivatives.velocity)
+                for t in range(self.prediction_horizon):
+                    if t == self.prediction_horizon - 1:
+                        lb_, ub_ = 0, 0
+                    lb[f't{t:03}/{v.name}/{Derivatives.velocity}'] = lb_
+                    ub[f't{t:03}/{v.name}/{Derivatives.velocity}'] = ub_
+            lb_params, ub_params = [lb], [ub]
         return lb_params, ub_params
 
     def derivative_slack_limits(self, derivative: Derivatives) \
@@ -625,10 +639,50 @@ class InequalityBounds(ProblemDataPart):
                 bounds[f'{constraint.name}'] = cas.limit(constraint.upper_error, -limit, limit)
         return bounds
 
+    def implicity_model_limits(self) -> Tuple[List[Dict[str, cas.Expression]], List[Dict[str, cas.Expression]]]:
+        lb_acc, ub_acc = {}, {}
+        lb_jerk, ub_jerk = {}, {}
+        for t in range(self.prediction_horizon):
+            for v in self.free_variables:
+                if self.max_derivative >= Derivatives.acceleration:
+                    a_min = v.get_lower_limit(Derivatives.acceleration)
+                    a_max = v.get_upper_limit(Derivatives.acceleration)
+                    vtc = v.get_symbol(Derivatives.velocity)
+                    if t == 0:
+                        # vtc/dt + a_min <= vt0/dt <= vtc/dt + a_max
+                        lb_acc[f't{t:03}/{v.name}/{Derivatives.acceleration}'] = -vtc/self.dt + a_min
+                        ub_acc[f't{t:03}/{v.name}/{Derivatives.acceleration}'] = -vtc/self.dt + a_max
+                    else:
+                        lb_acc[f't{t:03}/{v.name}/{Derivatives.acceleration}'] = a_min
+                        ub_acc[f't{t:03}/{v.name}/{Derivatives.acceleration}'] = a_max
+                if self.max_derivative >= Derivatives.jerk:
+                    j_min = v.get_lower_limit(Derivatives.jerk)
+                    j_max = v.get_upper_limit(Derivatives.jerk)
+                    vtc = v.get_symbol(Derivatives.velocity)
+                    atc = v.get_symbol(Derivatives.acceleration)
+                    if t == 0:
+                        # vtc/dt**2 + atc/dt + j_min <=    vt0/dt**2     <= vtc/dt**2 + atc/dt + j_max
+                        lb_jerk[f't{t:03}/{v.name}/{Derivatives.jerk}'] = vtc/self.dt**2 + atc/self.dt + j_min
+                        ub_jerk[f't{t:03}/{v.name}/{Derivatives.jerk}'] = vtc/self.dt**2 + atc/self.dt + j_max
+                    elif t == 1:
+                        # (- vtc)/dt**2 + j_min <= (vt1 - 2vt0)/dt**2 <= (- vtc)/dt**2 + j_max
+                        lb_jerk[f't{t:03}/{v.name}/{Derivatives.jerk}'] = -vtc/self.dt**2 + j_min
+                        ub_jerk[f't{t:03}/{v.name}/{Derivatives.jerk}'] = -vtc/self.dt**2 + j_max
+                    else:
+                        lb_jerk[f't{t:03}/{v.name}/{Derivatives.jerk}'] = j_min
+                        ub_jerk[f't{t:03}/{v.name}/{Derivatives.jerk}'] = j_max
+        return [lb_acc, lb_jerk], [ub_acc, ub_jerk]
+
+
     @profile
     def construct_expression(self) -> Union[cas.Expression, Tuple[cas.Expression, cas.Expression]]:
-        lb_params = []
-        ub_params = []
+        lb_params: List[Dict[str, cas.Expression]] = []
+        ub_params: List[Dict[str, cas.Expression]] = []
+
+        if not self.explicit_variables:
+            lb, ub = self.implicity_model_limits()
+            lb_params.extend(lb)
+            ub_params.extend(ub)
 
         num_derivative_constraints = 0
         for derivative in Derivatives.range(Derivatives.velocity, self.max_derivative):
@@ -669,7 +723,10 @@ class EqualityModel(ProblemDataPart):
 
     @property
     def number_of_non_slack_columns(self):
-        return self.number_of_free_variables * self.prediction_horizon * self.max_derivative
+        if self.explicit_variables:
+            return self.number_of_free_variables * self.prediction_horizon * self.max_derivative
+        else:
+            return self.number_of_free_variables * self.prediction_horizon
 
     @profile
     def derivative_link_model(self, max_derivative: Derivatives) -> cas.Expression:
@@ -776,13 +833,14 @@ class EqualityModel(ProblemDataPart):
         slack_model = cas.vstack([cas.zeros(derivative_link_model.shape[0],
                                             slack_model.shape[1]),
                                   slack_model])
-        model = self._remove_columns_columns_where_variables_are_zero(model)
+        model = self._remove_columns_columns_where_variables_are_zero(model, max_derivative)
         return model, slack_model
 
 
 class InequalityModel(ProblemDataPart):
     """
     Format:
+        implicit model
         velocity constraints
         acceleration constraints
         jerk constraints
@@ -991,18 +1049,76 @@ class InequalityModel(ProblemDataPart):
             return model, slack_model
         return cas.Expression(), cas.Expression()
 
+    def implicit_model(self, max_derivative: Derivatives) -> Tuple[cas.Expression, cas.Expression]:
+        """
+        ak = (vk - vk-1)/dt
+        jk = (vk - 2vk-1 + vk-2)/dt**2
+
+        Layout for prediction horizon 4
+        Slots are matrices of |controlled variables| x |controlled variables|
+        |  vt0   |  vt1   |  vt2   |  vt3   |
+        |-----------------------------------|
+        |  1/dt  |        |        |        |               vtc/dt + at0 = vt0/dt                   vtc/dt + a_min <= vt0/dt <= vtc/dt + a_max
+        | -1/dt  |  1/dt  |        |        |                        at1 = (vt1 - vt0)/dt
+        |        | -1/dt  |  1/dt  |        |                        at2 = (vt2 - vt1)/dt
+        |        |        | -1/dt  | 1/dt   |                        at3 = (vt3 - vt2)/dt
+        |===================================|
+        | 1/dt**2|        |        |        |   vtc/dt**2 + atc/dt + jt0 = vt0/dt**2                vtc/dt**2 + atc/dt + j_min <=    vt0/dt**2     <= vtc/dt**2 + atc/dt + j_max
+        |-2/dt**2| 1/dt**2|        |        |          - vtc/dt**2 + jt1 = (vt1 - 2vt0)/dt**2           (- vtc)/dt**2 + j_min <= (vt1 - 2vt0)/dt**2 <= (- vtc)/dt**2 + j_max
+        | 1/dt**2|-2/dt**2| 1/dt**2|        |                        jt2 = (vt2 - 2vt1 + vt0)/dt**2
+        |        | 1/dt**2|-2/dt**2| 1/dt**2|                        jt3 = (vt3 - 2vt2 + vt1)/dt**2
+        |-----------------------------------|
+        jt0 = (at0 - atc)/dt
+        jt0 = ((vt0 - vtc)/dt - atc)/dt
+        jt0 = vt0/dt**2 - vtc/dt**2 - atc/dt
+
+        :param max_derivative:
+        :return:
+        """
+        num_rows = self.number_of_free_variables * self.prediction_horizon
+        num_columns = self.number_of_free_variables * self.prediction_horizon
+        A_acc = cas.zeros(num_rows, num_columns)
+        A_jerk = cas.zeros(num_rows, num_columns)
+        if max_derivative >= Derivatives.acceleration:
+            for i in range(self.prediction_horizon):
+                A_acc[i, i] = 1 / self.dt
+                if i == 0:
+                    pass
+                else:
+                    A_acc[i, i - 1] = -1 / self.dt
+            if max_derivative >= Derivatives.jerk:
+                for i in range(self.prediction_horizon):
+                    A_jerk[i, i] = 1 / self.dt ** 2
+                    if i >= 1:
+                        A_jerk[i, i - 1] = -2 / self.dt ** 2
+                    if i >= 2:
+                        A_jerk[i, i - 2] = 1 / self.dt ** 2
+                model = cas.vstack([A_acc,A_jerk])
+            else:
+                model = A_acc
+        else:
+            model = cas.Expression()
+        slack_model = cas.zeros(model.shape[0], self.number_ineq_slack_variables)
+        return model, slack_model
+
     @profile
     def construct_expression(self) -> Union[cas.Expression, Tuple[cas.Expression, cas.Expression]]:
         if self.explicit_variables:
             max_derivative = self.max_derivative
+            derivative_model, derivative_model_slack = cas.Expression(), cas.Expression()
         else:
             max_derivative = Derivatives.velocity
+            derivative_model, derivative_model_slack = self.implicit_model(self.max_derivative)
         vel_constr_model, vel_constr_slack_model = self.velocity_constraint_model()
         acc_constr_model, acc_constr_slack_model = self.acceleration_constraint_model()
         jerk_constr_model, jerk_constr_slack_model = self.jerk_constraint_model()
         inequality_model, inequality_slack_model = self.inequality_constraint_model(max_derivative)
+
         model_parts = []
         slack_model_parts = []
+        if len(derivative_model) > 0:
+            model_parts.append(derivative_model)
+            slack_model_parts.append(derivative_model_slack)
         if len(vel_constr_model) > 0:
             model_parts.append(vel_constr_model)
             slack_model_parts.append(vel_constr_slack_model)
@@ -1018,7 +1134,7 @@ class InequalityModel(ProblemDataPart):
 
         combined_model = cas.vstack(model_parts)
         combined_slack_model = cas.diag_stack(slack_model_parts)
-        combined_model = self._remove_columns_columns_where_variables_are_zero(combined_model)
+        combined_model = self._remove_columns_columns_where_variables_are_zero(combined_model, max_derivative)
         return combined_model, combined_slack_model
 
 
@@ -1243,10 +1359,10 @@ class QPController:
             self.xdot_full = self.qp_solver.solve_and_retry(substitutions=substitutions)
             # self._create_debug_pandas(self.qp_solver)
             if self.explicit_variables:
-                max_derivative = self.order
+                return NextCommands.from_xdot(self.free_variables, self.xdot_full, self.order, self.prediction_horizon)
             else:
-                max_derivative = Derivatives.velocity
-            return NextCommands.from_xdot(self.free_variables, self.xdot_full, max_derivative, self.prediction_horizon)
+                return NextCommands.from_xdot_implicit(self.free_variables, self.xdot_full, self.order,
+                                              self.prediction_horizon, god_map.world, self.sample_period)
         except InfeasibleException as e_original:
             self.xdot_full = None
             self._create_debug_pandas(self.qp_solver)

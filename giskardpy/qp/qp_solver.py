@@ -101,7 +101,7 @@ class QPSolver(ABC):
             if cas.is_constant(expr):
                 finite_filter.append(np.isfinite(casadi_array[i].to_np()))
             else:
-                finite_filter.append(True)
+                finite_filter.append(not cas.is_inf(expr))
         finite_filter = np.array(finite_filter)
         return finite_filter
 

@@ -239,7 +239,7 @@ class TestWorld:
                 if explicit:
                     box_world_prismatic.update_state(next_cmd, control_dt, max_derivative)
                 else:
-                    box_world_prismatic.update_state(next_cmd, control_dt, Derivatives.velocity)
+                    box_world_prismatic.update_state(next_cmd, control_dt, max_derivative)
 
                 box_world_prismatic.notify_state_change()
                 traj.set(god_map.control_cycle_counter, box_world_prismatic.state)

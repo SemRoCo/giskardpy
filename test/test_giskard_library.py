@@ -22,6 +22,7 @@ from giskardpy.qp.qp_controller import QPController
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils.utils import suppress_stderr
 from model.trajectory import Trajectory
+from qp.qp_controller import ControllerMode
 from utils_for_tests import pr2_urdf
 
 try:
@@ -193,7 +194,7 @@ class TestWorld:
         max_derivative = Derivatives.jerk
         sim_time = 5
         god_map.time = 0
-        explicit = True
+        qp_formulation = ControllerMode.implicit
         god_map.control_cycle_counter = 0
 
         if max_derivative == Derivatives.acceleration:
@@ -217,7 +218,7 @@ class TestWorld:
         god_map.qp_controller = QPController(sample_period=dt,
                                              prediction_horizon=horizon,
                                              max_derivative=max_derivative,
-                                             explicit_variables=explicit)
+                                             qp_formulation=qp_formulation)
         god_map.qp_controller.init(free_variables=list(box_world_prismatic.free_variables.values()),
                                    equality_constraints=eq)
         god_map.qp_controller.compile()
@@ -236,10 +237,7 @@ class TestWorld:
                 substitutions = symbol_manager.resolve_symbols(parameters)
                 next_cmd = god_map.qp_controller.get_cmd(substitutions)
 
-                if explicit:
-                    box_world_prismatic.update_state(next_cmd, control_dt, max_derivative)
-                else:
-                    box_world_prismatic.update_state(next_cmd, control_dt, max_derivative)
+                box_world_prismatic.update_state(next_cmd, control_dt, max_derivative)
 
                 box_world_prismatic.notify_state_change()
                 traj.set(god_map.control_cycle_counter, box_world_prismatic.state)

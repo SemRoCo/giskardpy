@@ -4,6 +4,7 @@ import os
 from abc import ABC
 from collections import defaultdict
 from copy import deepcopy
+from enum import IntEnum
 from typing import List, Dict, Tuple, Type, Union, Optional, DefaultDict
 import matplotlib.pyplot as plt
 import numpy as np
@@ -30,6 +31,12 @@ from line_profiler import profile
 
 # used for saving pandas in the same folder every time within a run
 date_str = datetime.datetime.now().strftime('%Yy-%mm-%dd--%Hh-%Mm-%Ss')
+
+
+class ControllerMode(IntEnum):
+    explicit = 0
+    implicit = 1
+    explicit_no_acc = 2
 
 
 def save_pandas(dfs, names, path, time: float, folder_name: Optional[str] = None):
@@ -75,8 +82,8 @@ class ProblemDataPart(ABC):
                  sample_period: float,
                  prediction_horizon: int,
                  max_derivative: Derivatives,
-                 explicit_variables: bool):
-        self.explicit_variables = explicit_variables
+                 qp_formulation: ControllerMode):
+        self.qp_formulation = qp_formulation
         self.free_variables = free_variables
         self.equality_constraints = equality_constraints
         self.inequality_constraints = inequality_constraints
@@ -85,6 +92,10 @@ class ProblemDataPart(ABC):
         self.dt = sample_period
         self.max_derivative = max_derivative
         self.control_horizon = self.prediction_horizon - self.max_derivative + 1
+
+    @property
+    def explicit_variables(self) -> bool:
+        return self.qp_formulation == ControllerMode.explicit
 
     @property
     def number_of_free_variables(self) -> int:
@@ -111,9 +122,6 @@ class ProblemDataPart(ABC):
     @property
     def velocity_constraints(self) -> List[DerivativeInequalityConstraint]:
         return self.get_derivative_constraints(Derivatives.velocity)
-
-    def acc_symbol(self, free_variable_name: str):
-        self.free_variables
 
     @property
     def acceleration_constraints(self) -> List[DerivativeInequalityConstraint]:
@@ -176,7 +184,7 @@ class Weights(ProblemDataPart):
                  derivative_constraints: List[DerivativeInequalityConstraint],
                  sample_period: float,
                  prediction_horizon: int, max_derivative: Derivatives,
-                 explicit_variables: bool):
+                 qp_formulation: ControllerMode):
         super().__init__(free_variables=free_variables,
                          equality_constraints=equality_constraints,
                          inequality_constraints=inequality_constraints,
@@ -184,7 +192,7 @@ class Weights(ProblemDataPart):
                          sample_period=sample_period,
                          prediction_horizon=prediction_horizon,
                          max_derivative=max_derivative,
-                         explicit_variables=explicit_variables)
+                         qp_formulation=qp_formulation)
         self.evaluated = True
 
     def linear_f(self, current_position, limit, target_value, a=10, exp=2) -> Tuple[cas.Expression, float]:
@@ -314,7 +322,7 @@ class FreeVariableBounds(ProblemDataPart):
                  sample_period: float,
                  prediction_horizon: int,
                  max_derivative: Derivatives,
-                 explicit_variables: bool):
+                 qp_formulation: ControllerMode):
         super().__init__(free_variables=free_variables,
                          equality_constraints=equality_constraints,
                          inequality_constraints=inequality_constraints,
@@ -322,7 +330,7 @@ class FreeVariableBounds(ProblemDataPart):
                          sample_period=sample_period,
                          prediction_horizon=prediction_horizon,
                          max_derivative=max_derivative,
-                         explicit_variables=explicit_variables)
+                         qp_formulation=qp_formulation)
         self.evaluated = True
 
     @profile
@@ -521,7 +529,7 @@ class EqualityBounds(ProblemDataPart):
                  sample_period: float,
                  prediction_horizon: int,
                  max_derivative: Derivatives,
-                 explicit_variables: bool):
+                 qp_formulation: ControllerMode):
         super().__init__(free_variables=free_variables,
                          equality_constraints=equality_constraints,
                          inequality_constraints=inequality_constraints,
@@ -529,7 +537,7 @@ class EqualityBounds(ProblemDataPart):
                          sample_period=sample_period,
                          prediction_horizon=prediction_horizon,
                          max_derivative=max_derivative,
-                         explicit_variables=explicit_variables)
+                         qp_formulation=qp_formulation)
         self.evaluated = True
 
     def equality_constraint_bounds(self) -> Dict[str, cas.Expression]:
@@ -592,7 +600,7 @@ class InequalityBounds(ProblemDataPart):
                  prediction_horizon: int,
                  max_derivative: Derivatives,
                  default_limits: bool,
-                 explicit_variables: bool):
+                 qp_formulation: ControllerMode):
         super().__init__(free_variables=free_variables,
                          equality_constraints=equality_constraints,
                          inequality_constraints=inequality_constraints,
@@ -600,7 +608,7 @@ class InequalityBounds(ProblemDataPart):
                          sample_period=sample_period,
                          prediction_horizon=prediction_horizon,
                          max_derivative=max_derivative,
-                         explicit_variables=explicit_variables)
+                         qp_formulation=qp_formulation)
         self.default_limits = default_limits
         self.evaluated = True
 
@@ -746,6 +754,59 @@ class EqualityModel(ProblemDataPart):
         |     |     |     |     |     | -1  |  1  |     |     |     | -dt |     |      0 = -at2 + at3 - jt3 * dt
         |     |     |     |     |     |     | -1  |     |     |     |     | -dt |      0 = -at3 + at4 - jt4 * dt
         |-----------------------------------------------------------------------|
+        """
+        num_rows = self.number_of_free_variables * self.prediction_horizon * (max_derivative - 1)
+        num_columns = self.number_of_free_variables * self.prediction_horizon * max_derivative
+        derivative_link_model = cas.zeros(num_rows, num_columns)
+
+        x_n = cas.eye(num_rows)
+        derivative_link_model[:, :x_n.shape[0]] += x_n
+
+        xd_n = -cas.eye(num_rows) * self.dt
+        h_offset = self.number_of_free_variables * self.prediction_horizon
+        derivative_link_model[:, h_offset:] += xd_n
+
+        x_c_height = self.number_of_free_variables * (self.prediction_horizon - 1)
+        x_c = -cas.eye(x_c_height)
+        offset_v = 0
+        offset_h = 0
+        for derivative in Derivatives.range(Derivatives.velocity, max_derivative - 1):
+            offset_v += self.number_of_free_variables
+            derivative_link_model[offset_v:offset_v + x_c_height, offset_h:offset_h + x_c_height] += x_c
+            offset_v += x_c_height
+            offset_h += self.prediction_horizon * self.number_of_free_variables
+        derivative_link_model = self._remove_rows_columns_where_variables_are_zero(derivative_link_model)
+        return derivative_link_model
+
+    @profile
+    def derivative_link_model_wo_acc(self, max_derivative: Derivatives) -> cas.Expression:
+        """
+        Layout for prediction horizon 5
+        Slots are matrices of |controlled variables| x |controlled variables|
+        | vt0 | vt1 | vt2 | jt0 | jt1 | jt2 | jt3 | jt4 |
+        |-----------------------------------------------|
+        | -1  |     |     |dt**2|     |     |     |     |       -vc - ac*dt = -v0 + j0*dt**2
+        |  2  | -1  |     |     |dt**2|     |     |     |                vc = -v1 + 2*v0 + j1*dt**2
+        | -1  |  2  | -1  |     |     |dt**2|     |     |                 0 = -vt + 2*vt-1 - vt-2 + jt*dt**2
+        |     | -1  |  2  |     |     |     |dt**2|     |                 0 =   0 + 2*vt-1 - vt-2 + jt*dt**2
+        |     |     | -1  |     |     |     |     |dt**2|                 0 =   0 +    0   - vt-2 + jt*dt**2
+        |-----------------------------------------------|
+        vt = vt-1 + at * dt     <=>  vt/dt - vt-1/dt = at
+        at = at-1 + jt * dt     <=>  at/dt - at-1/dt = jt
+
+        vt = vt-1 + (at-1 + jt * dt) * dt
+        vt = vt-1 + at-1*dt + jt * dt**2
+        vt = vt-1 + (vt-1/dt - vt-2/dt)*dt + jt * dt**2
+        vt = vt-1 + vt-1 - vt-2 + jt*dt**2
+
+        0 = -v1 + 2*v0 - vc + j1*dt**2
+        vc = -v1 + 2*v0 + j1*dt**2
+
+        a0/dt - ac/dt = j0
+        (v0/dt - vc/dt)/dt - ac/dt = j0
+        v0/dt**2 - vc/dt**2 - ac/dt = j0
+        -vc/dt**2 - ac/dt = -v0/dt**2 + j0
+        -vc - ac*dt = -v0 + j0*dt**2
         """
         num_rows = self.number_of_free_variables * self.prediction_horizon * (max_derivative - 1)
         num_columns = self.number_of_free_variables * self.prediction_horizon * max_derivative
@@ -1095,13 +1156,13 @@ class InequalityModel(ProblemDataPart):
         """
         if max_derivative >= Derivatives.acceleration:
             previous = cas.eye(self.number_of_free_variables * (self.prediction_horizon)) / self.dt
-            same = -cas.eye(self.number_of_free_variables * (self.prediction_horizon-1)) / self.dt
+            same = -cas.eye(self.number_of_free_variables * (self.prediction_horizon - 1)) / self.dt
             A_acc = previous
             A_acc[self.number_of_free_variables:, :-self.number_of_free_variables] += same
             rows_to_delete = []
             for i in range(self.prediction_horizon):
                 for v_i, v in enumerate(self.free_variables):
-                    idx = i*len(self.free_variables) + v_i
+                    idx = i * len(self.free_variables) + v_i
                     a_min = v.get_lower_limit(Derivatives.acceleration)
                     a_max = v.get_upper_limit(Derivatives.acceleration)
                     if (np.isinf(a_min) or cas.is_inf(a_min)) and (np.isinf(a_max) or cas.is_inf(a_max)):
@@ -1109,11 +1170,11 @@ class InequalityModel(ProblemDataPart):
             A_acc.remove(rows_to_delete, [])
             if max_derivative >= Derivatives.jerk:
                 pre_previous = cas.eye(self.number_of_free_variables * self.prediction_horizon) / self.dt ** 2
-                previous = -2 * cas.eye(self.number_of_free_variables * (self.prediction_horizon-1)) / self.dt ** 2
-                same = cas.eye(self.number_of_free_variables * (self.prediction_horizon-2)) / self.dt ** 2
+                previous = -2 * cas.eye(self.number_of_free_variables * (self.prediction_horizon - 1)) / self.dt ** 2
+                same = cas.eye(self.number_of_free_variables * (self.prediction_horizon - 2)) / self.dt ** 2
                 A_jerk = pre_previous
                 A_jerk[self.number_of_free_variables:, :-self.number_of_free_variables] += previous
-                A_jerk[self.number_of_free_variables*2:, :-self.number_of_free_variables*2] += same
+                A_jerk[self.number_of_free_variables * 2:, :-self.number_of_free_variables * 2] += same
                 model = cas.vstack([A_acc, A_jerk])
             else:
                 model = A_acc
@@ -1203,8 +1264,8 @@ class QPController:
                  retries_with_relaxed_constraints: int = 0,
                  retry_added_slack: float = 100,
                  retry_weight_factor: float = 100,
-                 explicit_variables: bool = False):
-        self.explicit_variables = explicit_variables
+                 qp_formulation: ControllerMode = ControllerMode.explicit):
+        self.qp_formulation = qp_formulation
         self.sample_period = sample_period
         self.max_derivative = max_derivative
         self.prediction_horizon = prediction_horizon
@@ -1327,7 +1388,7 @@ class QPController:
                   'sample_period': self.sample_period,
                   'prediction_horizon': self.prediction_horizon,
                   'max_derivative': self.order,
-                  'explicit_variables': self.explicit_variables}
+                  'qp_formulation': self.qp_formulation}
         self.weights = Weights(**kwargs)
         self.free_variable_bounds = FreeVariableBounds(**kwargs)
         self.equality_model = EqualityModel(**kwargs)
@@ -1348,7 +1409,7 @@ class QPController:
         get_middleware().loginfo('Done compiling controller:')
         get_middleware().loginfo(f'  #free variables: {weights.shape[0]}')
         get_middleware().loginfo(f'  #equality constraints: {bE.shape[0]}')
-        get_middleware().loginfo(f'  #inequality constraints: {lbA.shape[0]*2}')
+        get_middleware().loginfo(f'  #inequality constraints: {lbA.shape[0] * 2}')
 
     def get_parameter_names(self):
         return self.qp_solver.free_symbols_str
@@ -1379,11 +1440,11 @@ class QPController:
         try:
             self.xdot_full = self.qp_solver.solve_and_retry(substitutions=substitutions)
             # self._create_debug_pandas(self.qp_solver)
-            if self.explicit_variables:
-                return NextCommands.from_xdot(self.free_variables, self.xdot_full, self.order, self.prediction_horizon)
-            else:
+            if self.qp_formulation == ControllerMode.implicit:
                 return NextCommands.from_xdot_implicit(self.free_variables, self.xdot_full, self.order,
                                                        self.prediction_horizon, god_map.world, self.sample_period)
+            else:
+                return NextCommands.from_xdot(self.free_variables, self.xdot_full, self.order, self.prediction_horizon)
         except InfeasibleException as e_original:
             self.xdot_full = None
             self._create_debug_pandas(self.qp_solver)

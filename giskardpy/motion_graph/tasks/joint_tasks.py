@@ -34,8 +34,8 @@ class JointPositionList(Task):
             self.joint_names.append(joint_name)
 
             ll_pos, ul_pos = god_map.world.compute_joint_limits(joint_name, Derivatives.position)
-            if ll_pos is not None:
-                goal_position = cas.limit(goal_position, ll_pos, ul_pos)
+            # if ll_pos is not None:
+            #     goal_position = cas.limit(goal_position, ll_pos, ul_pos)
 
             ll_vel, ul_vel = god_map.world.compute_joint_limits(joint_name, Derivatives.velocity)
             velocity_limit = cas.limit(max_velocity, ll_vel, ul_vel)

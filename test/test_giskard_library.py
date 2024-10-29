@@ -23,6 +23,7 @@ from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils.utils import suppress_stderr
 from model.trajectory import Trajectory
 from qp.qp_controller import ControllerMode
+from qp.qp_solver_ids import SupportedQPSolver
 from utils_for_tests import pr2_urdf
 
 try:
@@ -91,11 +92,11 @@ def box_world_prismatic() -> WorldTree:
                                        parent_link_name=self.world.root_link_name,
                                        child_link_name=self.box_name,
                                        axis=(1, 0, 0),
-                                       lower_limits={Derivatives.position: -10,
+                                       lower_limits={Derivatives.position: -2,
                                                      Derivatives.velocity: -1,
                                                      Derivatives.acceleration: -np.inf,
                                                      Derivatives.jerk: -30},
-                                       upper_limits={Derivatives.position: 10,
+                                       upper_limits={Derivatives.position: 2,
                                                      Derivatives.velocity: 1,
                                                      Derivatives.acceleration: np.inf,
                                                      Derivatives.jerk: 30})
@@ -184,82 +185,6 @@ class TestWorld:
                                                   tip_link=box_name).to_np()
         assert fk[0] == 1
         visualize()
-
-    def test_joint_goal(self, box_world_prismatic: WorldTree):
-        joint_name = box_world_prismatic.joint_names[0]
-        box_name = box_world_prismatic.link_names[-1]
-        dt = 0.05
-        horizon = 9
-        control_dt = 0.05
-        max_derivative = Derivatives.jerk
-        sim_time = 5
-        god_map.time = 0
-        qp_formulation = ControllerMode.explicit
-        god_map.control_cycle_counter = 0
-
-        if max_derivative == Derivatives.acceleration:
-            box_world_prismatic.joints[joint_name].free_variables[0].set_lower_limit(Derivatives.acceleration, -5)
-            box_world_prismatic.joints[joint_name].free_variables[0].set_upper_limit(Derivatives.acceleration, 5)
-        # box_world_prismatic.joints[joint_name].free_variables[0].set_lower_limit(Derivatives.jerk, -60)
-        # box_world_prismatic.joints[joint_name].free_variables[0].set_upper_limit(Derivatives.jerk, 60)
-        box_world_prismatic.update_default_weights({Derivatives.velocity: 0.01,
-                                                    Derivatives.acceleration: 0,
-                                                    Derivatives.jerk: 0.0})
-        goal_name = PrefixName('goal')
-
-        v = box_world_prismatic.add_virtual_free_variable(goal_name)
-        box_world_prismatic.state[v.name].position = 1.5
-        joint_task = JointPositionList(name='g1', goal_state={joint_name: v.get_symbol(Derivatives.position)})
-
-        god_map.motion_graph_manager.add_task(joint_task)
-        god_map.motion_graph_manager.initialize_states()
-
-        eq, neq, neqd, lin_weight, quad_weight = god_map.motion_graph_manager.get_constraints_from_tasks()
-        god_map.qp_controller = QPController(sample_period=dt,
-                                             prediction_horizon=horizon,
-                                             max_derivative=max_derivative,
-                                             qp_formulation=qp_formulation)
-        god_map.qp_controller.init(free_variables=list(box_world_prismatic.free_variables.values()),
-                                   equality_constraints=eq)
-        god_map.qp_controller.compile()
-        traj = Trajectory()
-        np.random.seed(69)
-        swap_distance = 2.2
-        next_swap = swap_distance
-        try:
-
-            while god_map.time < sim_time:
-                # box_world_prismatic.state[goal_name].position = np.random.rand() * 2 -1
-                if god_map.time > next_swap:
-                    box_world_prismatic.state[goal_name].position = box_world_prismatic.state[goal_name].position * -1
-                    next_swap += swap_distance
-                parameters = god_map.qp_controller.get_parameter_names()
-                substitutions = symbol_manager.resolve_symbols(parameters)
-                next_cmd = god_map.qp_controller.get_cmd(substitutions)
-
-                box_world_prismatic.update_state(next_cmd, control_dt, max_derivative)
-
-                box_world_prismatic.notify_state_change()
-                traj.set(god_map.control_cycle_counter, box_world_prismatic.state)
-                visualize()
-                # if box_world_prismatic.state[joint_name].position >= goal - 1e-3:
-                #     break
-                god_map.time += control_dt
-                god_map.control_cycle_counter += 1
-        except Exception as e:
-            traceback.print_exc()
-            print(e)
-        traj.plot_trajectory('test',
-                             sample_period=control_dt,
-                             filter_0_vel=False)
-        # fk = box_world_prismatic.compute_fk_point(root_link=box_world_prismatic.root_link_name,
-        #                                           tip_link=box_name).to_np()
-        # np.testing.assert_almost_equal(fk[0], box_world_prismatic.state[v.name].position, decimal=3)
-        vel_profile = traj.to_dict()[Derivatives.velocity][joint_name]
-        vel_limit = box_world_prismatic.joints[joint_name].free_variables[0].get_upper_limit(Derivatives.velocity)
-        print(f'max violation {np.max(np.abs(vel_profile) - vel_limit)}')
-        violated = np.all(np.abs(vel_profile) < vel_limit + 1e-4)
-        assert violated, f'violation {np.max(np.abs(vel_profile) - vel_limit)}'
 
     def test_cart_goal(self, box_world: WorldTree):
         joint_name = box_world.joint_names[0]
@@ -674,3 +599,81 @@ class TestWorld:
             world_setup.compute_chain_reduced_to_controlled_joints(
                 world_setup.search_for_link_name('l_wrist_roll_link'),
                 world_setup.search_for_link_name('l_gripper_r_finger_link'))
+
+class TestController:
+    def test_joint_goal(self, box_world_prismatic: WorldTree):
+        joint_name = box_world_prismatic.joint_names[0]
+        box_name = box_world_prismatic.link_names[-1]
+        dt = 0.05
+        horizon = 9
+        control_dt = 0.05
+        max_derivative = Derivatives.jerk
+        sim_time = 5
+        god_map.time = 0
+        qp_formulation = ControllerMode.explicit_no_acc
+        god_map.control_cycle_counter = 0
+
+        if max_derivative == Derivatives.acceleration:
+            box_world_prismatic.joints[joint_name].free_variables[0].set_lower_limit(Derivatives.acceleration, -5)
+            box_world_prismatic.joints[joint_name].free_variables[0].set_upper_limit(Derivatives.acceleration, 5)
+        # box_world_prismatic.joints[joint_name].free_variables[0].set_lower_limit(Derivatives.jerk, -60)
+        # box_world_prismatic.joints[joint_name].free_variables[0].set_upper_limit(Derivatives.jerk, 60)
+        box_world_prismatic.update_default_weights({Derivatives.velocity: 0.01,
+                                                    Derivatives.acceleration: 0,
+                                                    Derivatives.jerk: 0.0})
+        goal_name = PrefixName('goal')
+
+        v = box_world_prismatic.add_virtual_free_variable(goal_name)
+        box_world_prismatic.state[v.name].position = 1.5
+        joint_task = JointPositionList(name='g1', goal_state={joint_name: v.get_symbol(Derivatives.position)})
+
+        god_map.motion_graph_manager.add_task(joint_task)
+        god_map.motion_graph_manager.initialize_states()
+
+        eq, neq, neqd, lin_weight, quad_weight = god_map.motion_graph_manager.get_constraints_from_tasks()
+        god_map.qp_controller = QPController(sample_period=dt,
+                                             solver_id=SupportedQPSolver.gurobi,
+                                             prediction_horizon=horizon,
+                                             max_derivative=max_derivative,
+                                             qp_formulation=qp_formulation)
+        god_map.qp_controller.init(free_variables=list(box_world_prismatic.free_variables.values()),
+                                   equality_constraints=eq)
+        god_map.qp_controller.compile()
+        traj = Trajectory()
+        np.random.seed(69)
+        swap_distance = 2.2
+        next_swap = swap_distance
+        try:
+
+            while god_map.time < sim_time:
+                # box_world_prismatic.state[goal_name].position = np.random.rand() * 2 -1
+                if god_map.time > next_swap:
+                    box_world_prismatic.state[goal_name].position = box_world_prismatic.state[goal_name].position * -1
+                    next_swap += swap_distance
+                parameters = god_map.qp_controller.get_parameter_names()
+                substitutions = symbol_manager.resolve_symbols(parameters)
+                next_cmd = god_map.qp_controller.get_cmd(substitutions)
+
+                box_world_prismatic.update_state(next_cmd, control_dt, max_derivative)
+
+                box_world_prismatic.notify_state_change()
+                traj.set(god_map.control_cycle_counter, box_world_prismatic.state)
+                visualize()
+                # if box_world_prismatic.state[joint_name].position >= goal - 1e-3:
+                #     break
+                god_map.time += control_dt
+                god_map.control_cycle_counter += 1
+        except Exception as e:
+            traceback.print_exc()
+            print(e)
+        traj.plot_trajectory('test',
+                             sample_period=control_dt,
+                             filter_0_vel=False)
+        # fk = box_world_prismatic.compute_fk_point(root_link=box_world_prismatic.root_link_name,
+        #                                           tip_link=box_name).to_np()
+        # np.testing.assert_almost_equal(fk[0], box_world_prismatic.state[v.name].position, decimal=3)
+        vel_profile = traj.to_dict()[Derivatives.velocity][joint_name]
+        vel_limit = box_world_prismatic.joints[joint_name].free_variables[0].get_upper_limit(Derivatives.velocity)
+        print(f'max violation {np.max(np.abs(vel_profile) - vel_limit)}')
+        violated = np.all(np.abs(vel_profile) < vel_limit + 1e-4)
+        assert violated, f'violation {np.max(np.abs(vel_profile) - vel_limit)}'

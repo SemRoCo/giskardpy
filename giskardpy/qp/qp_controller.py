@@ -1348,7 +1348,7 @@ class QPController:
         get_middleware().loginfo('Done compiling controller:')
         get_middleware().loginfo(f'  #free variables: {weights.shape[0]}')
         get_middleware().loginfo(f'  #equality constraints: {bE.shape[0]}')
-        get_middleware().loginfo(f'  #inequality constraints: {lbA.shape[0]}')
+        get_middleware().loginfo(f'  #inequality constraints: {lbA.shape[0]*2}')
 
     def get_parameter_names(self):
         return self.qp_solver.free_symbols_str

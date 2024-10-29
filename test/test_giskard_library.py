@@ -92,11 +92,11 @@ def box_world_prismatic() -> WorldTree:
                                        parent_link_name=self.world.root_link_name,
                                        child_link_name=self.box_name,
                                        axis=(1, 0, 0),
-                                       lower_limits={Derivatives.position: -2,
+                                       lower_limits={Derivatives.position: -0.5,
                                                      Derivatives.velocity: -1,
                                                      Derivatives.acceleration: -np.inf,
                                                      Derivatives.jerk: -30},
-                                       upper_limits={Derivatives.position: 2,
+                                       upper_limits={Derivatives.position: 0.5,
                                                      Derivatives.velocity: 1,
                                                      Derivatives.acceleration: np.inf,
                                                      Derivatives.jerk: 30})
@@ -610,7 +610,7 @@ class TestController:
         max_derivative = Derivatives.jerk
         sim_time = 5
         god_map.time = 0
-        qp_formulation = ControllerMode.explicit_no_acc
+        qp_formulation = ControllerMode.implicit
         god_map.control_cycle_counter = 0
 
         if max_derivative == Derivatives.acceleration:

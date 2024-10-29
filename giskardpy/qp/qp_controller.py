@@ -164,6 +164,86 @@ class ProblemDataPart(ABC):
         free_variable_model.remove([], column_ids)
         return free_variable_model
 
+    @profile
+    def velocity_limit(self, v: FreeVariable, max_derivative: Derivatives) -> Tuple[cas.Expression, cas.Expression]:
+        current_position = v.get_symbol(Derivatives.position)
+        lower_velocity_limit = v.get_lower_limit(Derivatives.velocity, evaluated=True)
+        upper_velocity_limit = v.get_upper_limit(Derivatives.velocity, evaluated=True)
+        lower_acc_limit = v.get_lower_limit(Derivatives.acceleration, evaluated=True)
+        upper_acc_limit = v.get_upper_limit(Derivatives.acceleration, evaluated=True)
+        current_vel = v.get_symbol(Derivatives.velocity)
+        current_acc = v.get_symbol(Derivatives.acceleration)
+
+        lower_jerk_limit = v.get_lower_limit(Derivatives.jerk, evaluated=True)
+        upper_jerk_limit = v.get_upper_limit(Derivatives.jerk, evaluated=True)
+        if self.prediction_horizon == 1:
+            return cas.Expression([lower_velocity_limit]), cas.Expression([upper_velocity_limit])
+
+        max_reachable_vel = giskard_math.max_velocity_from_horizon_and_jerk(prediction_horizon=self.prediction_horizon,
+                                                                            vel_limit=upper_velocity_limit,
+                                                                            acc_limit=upper_acc_limit,
+                                                                            jerk_limit=upper_jerk_limit,
+                                                                            sample_period=self.dt,
+                                                                            max_derivative=max_derivative)
+        if max_reachable_vel < upper_velocity_limit:
+            error_msg = f'Free variable "{v.name}" can\'t reach velocity limit of "{upper_velocity_limit}". ' \
+                        f'Maximum reachable with prediction horizon = "{self.prediction_horizon}", ' \
+                        f'jerk limit = "{upper_jerk_limit}" and dt = "{self.dt}" is "{max_reachable_vel}".'
+            get_middleware().logerr(error_msg)
+            raise VelocityLimitUnreachableException(error_msg)
+
+        if not v.has_position_limits():
+            lb = cas.Expression([lower_velocity_limit] * self.prediction_horizon
+                                + [lower_acc_limit] * self.prediction_horizon
+                                + [lower_jerk_limit] * self.prediction_horizon)
+            ub = cas.Expression([upper_velocity_limit] * self.prediction_horizon
+                                + [upper_acc_limit] * self.prediction_horizon
+                                + [upper_jerk_limit] * self.prediction_horizon)
+        else:
+            lower_limit = v.get_lower_limit(Derivatives.position, evaluated=True)
+            upper_limit = v.get_upper_limit(Derivatives.position, evaluated=True)
+
+            try:
+                lb, ub = b_profile(current_pos=current_position,
+                                   current_vel=current_vel,
+                                   current_acc=current_acc,
+                                   pos_limits=(lower_limit, upper_limit),
+                                   vel_limits=(lower_velocity_limit, upper_velocity_limit),
+                                   acc_limits=(lower_acc_limit, upper_acc_limit),
+                                   jerk_limits=(lower_jerk_limit, upper_jerk_limit),
+                                   dt=self.dt,
+                                   ph=self.prediction_horizon)
+            except InfeasibleException as e:
+                max_reachable_vel = giskard_math.max_velocity_from_horizon_and_jerk(
+                    prediction_horizon=self.prediction_horizon,
+                    vel_limit=upper_velocity_limit,
+                    acc_limit=upper_acc_limit,
+                    jerk_limit=upper_jerk_limit,
+                    sample_period=self.dt,
+                    max_derivative=self.max_derivative)
+                if max_reachable_vel < upper_velocity_limit:
+                    error_msg = f'Free variable "{v.name}" can\'t reach velocity limit of "{upper_velocity_limit}". ' \
+                                f'Maximum reachable with prediction horizon = "{self.prediction_horizon}", ' \
+                                f'jerk limit = "{upper_jerk_limit}" and dt = "{self.dt}" is "{max_reachable_vel}".'
+                    get_middleware().logerr(error_msg)
+                    raise VelocityLimitUnreachableException(error_msg)
+                else:
+                    raise
+        # %% set velocity limits to infinite, that can't be reached due to acc/jerk limits anyway
+        unlimited_vel_profile = implicit_vel_profile(acc_limit=upper_acc_limit,
+                                                     jerk_limit=upper_jerk_limit,
+                                                     dt=self.dt,
+                                                     ph=self.prediction_horizon)
+        for i in range(self.prediction_horizon):
+            ub[i] = cas.if_less(ub[i], unlimited_vel_profile[i], ub[i], np.inf)
+        unlimited_vel_profile = implicit_vel_profile(acc_limit=-lower_acc_limit,
+                                                     jerk_limit=-lower_jerk_limit,
+                                                     dt=self.dt,
+                                                     ph=self.prediction_horizon)
+        for i in range(self.prediction_horizon):
+            lb[i] = cas.if_less(-lb[i], unlimited_vel_profile[i], lb[i], -np.inf)
+        return lb, ub
+
 
 class Weights(ProblemDataPart):
     """
@@ -335,118 +415,31 @@ class FreeVariableBounds(ProblemDataPart):
         self.evaluated = True
 
     @profile
-    def velocity_limit(self, v: FreeVariable, max_derivative: Derivatives) -> Tuple[cas.Expression, cas.Expression]:
-        current_position = v.get_symbol(Derivatives.position)
-        lower_velocity_limit = v.get_lower_limit(Derivatives.velocity, evaluated=True)
-        upper_velocity_limit = v.get_upper_limit(Derivatives.velocity, evaluated=True)
-        lower_acc_limit = v.get_lower_limit(Derivatives.acceleration, evaluated=True)
-        upper_acc_limit = v.get_upper_limit(Derivatives.acceleration, evaluated=True)
-        current_vel = v.get_symbol(Derivatives.velocity)
-        current_acc = v.get_symbol(Derivatives.acceleration)
-
-        lower_jerk_limit = v.get_lower_limit(Derivatives.jerk, evaluated=True)
-        upper_jerk_limit = v.get_upper_limit(Derivatives.jerk, evaluated=True)
-        if self.prediction_horizon == 1:
-            return cas.Expression([lower_velocity_limit]), cas.Expression([upper_velocity_limit])
-
-        max_reachable_vel = giskard_math.max_velocity_from_horizon_and_jerk(prediction_horizon=self.prediction_horizon,
-                                                                            vel_limit=upper_velocity_limit,
-                                                                            acc_limit=upper_acc_limit,
-                                                                            jerk_limit=upper_jerk_limit,
-                                                                            sample_period=self.dt,
-                                                                            max_derivative=max_derivative)
-        if max_reachable_vel < upper_velocity_limit:
-            error_msg = f'Free variable "{v.name}" can\'t reach velocity limit of "{upper_velocity_limit}". ' \
-                        f'Maximum reachable with prediction horizon = "{self.prediction_horizon}", ' \
-                        f'jerk limit = "{upper_jerk_limit}" and dt = "{self.dt}" is "{max_reachable_vel}".'
-            get_middleware().logerr(error_msg)
-            raise VelocityLimitUnreachableException(error_msg)
-
-        if not v.has_position_limits():
-            lb = cas.Expression([lower_velocity_limit] * self.prediction_horizon
-                                + [lower_acc_limit] * self.prediction_horizon
-                                + [lower_jerk_limit] * self.prediction_horizon)
-            ub = cas.Expression([upper_velocity_limit] * self.prediction_horizon
-                                + [upper_acc_limit] * self.prediction_horizon
-                                + [upper_jerk_limit] * self.prediction_horizon)
-        else:
-            lower_limit = v.get_lower_limit(Derivatives.position, evaluated=True)
-            upper_limit = v.get_upper_limit(Derivatives.position, evaluated=True)
-
-            try:
-                lb, ub = b_profile(current_pos=current_position,
-                                   current_vel=current_vel,
-                                   current_acc=current_acc,
-                                   pos_limits=(lower_limit, upper_limit),
-                                   vel_limits=(lower_velocity_limit, upper_velocity_limit),
-                                   acc_limits=(lower_acc_limit, upper_acc_limit),
-                                   jerk_limits=(lower_jerk_limit, upper_jerk_limit),
-                                   dt=self.dt,
-                                   ph=self.prediction_horizon)
-            except InfeasibleException as e:
-                max_reachable_vel = giskard_math.max_velocity_from_horizon_and_jerk(
-                    prediction_horizon=self.prediction_horizon,
-                    vel_limit=upper_velocity_limit,
-                    acc_limit=upper_acc_limit,
-                    jerk_limit=upper_jerk_limit,
-                    sample_period=self.dt,
-                    max_derivative=self.max_derivative)
-                if max_reachable_vel < upper_velocity_limit:
-                    error_msg = f'Free variable "{v.name}" can\'t reach velocity limit of "{upper_velocity_limit}". ' \
-                                f'Maximum reachable with prediction horizon = "{self.prediction_horizon}", ' \
-                                f'jerk limit = "{upper_jerk_limit}" and dt = "{self.dt}" is "{max_reachable_vel}".'
-                    get_middleware().logerr(error_msg)
-                    raise VelocityLimitUnreachableException(error_msg)
-                else:
-                    raise
-        # %% set velocity limits to infinite, that can't be reached due to acc/jerk limits anyway
-        unlimited_vel_profile = implicit_vel_profile(acc_limit=upper_acc_limit,
-                                                     jerk_limit=upper_jerk_limit,
-                                                     dt=self.dt,
-                                                     ph=self.prediction_horizon)
-        for i in range(self.prediction_horizon):
-            ub[i] = cas.if_less(ub[i], unlimited_vel_profile[i], ub[i], np.inf)
-        unlimited_vel_profile = implicit_vel_profile(acc_limit=-lower_acc_limit,
-                                                     jerk_limit=-lower_jerk_limit,
-                                                     dt=self.dt,
-                                                     ph=self.prediction_horizon)
-        for i in range(self.prediction_horizon):
-            lb[i] = cas.if_less(-lb[i], unlimited_vel_profile[i], lb[i], -np.inf)
-        return lb, ub
-
-    @profile
     def free_variable_bounds(self) \
             -> Tuple[List[Dict[str, cas.symbol_expr_float]], List[Dict[str, cas.symbol_expr_float]]]:
-        if self.qp_formulation in [ControllerMode.explicit, ControllerMode.explicit_no_acc]:
-            max_derivative = self.max_derivative
-            lb: DefaultDict[Derivatives, Dict[str, cas.symbol_expr_float]] = defaultdict(dict)
-            ub: DefaultDict[Derivatives, Dict[str, cas.symbol_expr_float]] = defaultdict(dict)
-            for v in self.free_variables:
-                lb_, ub_ = self.velocity_limit(v=v, max_derivative=max_derivative)
-                for t in range(self.prediction_horizon):
-                    for derivative in Derivatives.range(Derivatives.velocity, max_derivative):
-                        if t >= self.prediction_horizon - (max_derivative - derivative):
-                            continue
-                        if self.qp_formulation == ControllerMode.explicit_no_acc and derivative == Derivatives.acceleration:
-                            continue
-                        index = t + self.prediction_horizon * (derivative - 1)
-                        lb[derivative][f't{t:03}/{v.name}/{derivative}'] = lb_[index]
-                        ub[derivative][f't{t:03}/{v.name}/{derivative}'] = ub_[index]
-            lb_params = []
-            ub_params = []
-            for derivative, name_to_bound_map in sorted(lb.items()):
-                lb_params.append(name_to_bound_map)
-            for derivative, name_to_bound_map in sorted(ub.items()):
-                ub_params.append(name_to_bound_map)
-        elif self.qp_formulation == ControllerMode.implicit:
-            lb: Dict[str, cas.symbol_expr_float] = {}
-            ub: Dict[str, cas.symbol_expr_float] = {}
-            for v in self.free_variables:
-                lb_, ub_ = v.get_lower_limit(Derivatives.velocity), v.get_upper_limit(Derivatives.velocity)
-                for t in range(self.prediction_horizon-2):
-                    lb[f't{t:03}/{v.name}/{Derivatives.velocity}'] = lb_
-                    ub[f't{t:03}/{v.name}/{Derivatives.velocity}'] = ub_
-            lb_params, ub_params = [lb], [ub]
+        # if self.qp_formulation in [ControllerMode.explicit, ControllerMode.explicit_no_acc]:
+        max_derivative = self.max_derivative
+        lb: DefaultDict[Derivatives, Dict[str, cas.symbol_expr_float]] = defaultdict(dict)
+        ub: DefaultDict[Derivatives, Dict[str, cas.symbol_expr_float]] = defaultdict(dict)
+        for v in self.free_variables:
+            lb_, ub_ = self.velocity_limit(v=v, max_derivative=max_derivative)
+            for t in range(self.prediction_horizon):
+                for derivative in Derivatives.range(Derivatives.velocity, max_derivative):
+                    if t >= self.prediction_horizon - (max_derivative - derivative):
+                        continue
+                    if self.qp_formulation == ControllerMode.explicit_no_acc and derivative == Derivatives.acceleration:
+                        continue
+                    if self.qp_formulation == ControllerMode.implicit and derivative >= Derivatives.acceleration:
+                        continue
+                    index = t + self.prediction_horizon * (derivative - 1)
+                    lb[derivative][f't{t:03}/{v.name}/{derivative}'] = lb_[index]
+                    ub[derivative][f't{t:03}/{v.name}/{derivative}'] = ub_[index]
+        lb_params = []
+        ub_params = []
+        for derivative, name_to_bound_map in sorted(lb.items()):
+            lb_params.append(name_to_bound_map)
+        for derivative, name_to_bound_map in sorted(ub.items()):
+            ub_params.append(name_to_bound_map)
         return lb_params, ub_params
 
     def derivative_slack_limits(self, derivative: Derivatives) \
@@ -577,7 +570,8 @@ class EqualityBounds(ProblemDataPart):
                 for v in self.free_variables:
                     name = f't{t:03}/{Derivatives.jerk}/{v.name}/link'
                     if t == 0:
-                        derivative_link[name] = - v.get_symbol(Derivatives.velocity) - v.get_symbol(Derivatives.acceleration) * self.dt
+                        derivative_link[name] = - v.get_symbol(Derivatives.velocity) - v.get_symbol(
+                            Derivatives.acceleration) * self.dt
                     elif t == 1:
                         derivative_link[name] = v.get_symbol(Derivatives.velocity)
                     else:
@@ -673,8 +667,9 @@ class InequalityBounds(ProblemDataPart):
     def implicity_model_limits(self) -> Tuple[List[Dict[str, cas.Expression]], List[Dict[str, cas.Expression]]]:
         lb_acc, ub_acc = {}, {}
         lb_jerk, ub_jerk = {}, {}
-        for t in range(self.prediction_horizon):
-            for v in self.free_variables:
+        for v in self.free_variables:
+            lb_, ub_ = self.velocity_limit(v=v, max_derivative=Derivatives.jerk)
+            for t in range(self.prediction_horizon):
                 # if self.max_derivative >= Derivatives.acceleration:
                 #     a_min = v.get_lower_limit(Derivatives.acceleration)
                 #     a_max = v.get_upper_limit(Derivatives.acceleration)
@@ -688,8 +683,8 @@ class InequalityBounds(ProblemDataPart):
                 #             lb_acc[f't{t:03}/{v.name}/{Derivatives.acceleration}'] = a_min
                 #             ub_acc[f't{t:03}/{v.name}/{Derivatives.acceleration}'] = a_max
                 if self.max_derivative >= Derivatives.jerk:
-                    j_min = v.get_lower_limit(Derivatives.jerk)
-                    j_max = v.get_upper_limit(Derivatives.jerk)
+                    j_min = lb_[self.prediction_horizon * 2 + t]
+                    j_max = ub_[self.prediction_horizon * 2 + t]
                     vtc = v.get_symbol(Derivatives.velocity)
                     atc = v.get_symbol(Derivatives.acceleration)
                     if t == 0:
@@ -757,9 +752,10 @@ class EqualityModel(ProblemDataPart):
         if self.qp_formulation == ControllerMode.explicit:
             return self.number_of_free_variables * self.prediction_horizon * self.max_derivative
         elif self.qp_formulation == ControllerMode.implicit:
-            return self.number_of_free_variables * (self.prediction_horizon-2)
+            return self.number_of_free_variables * (self.prediction_horizon - 2)
         elif self.qp_formulation == ControllerMode.explicit_no_acc:
-            return self.number_of_free_variables * (self.prediction_horizon -2) + self.number_of_free_variables * self.prediction_horizon
+            return self.number_of_free_variables * (
+                    self.prediction_horizon - 2) + self.number_of_free_variables * self.prediction_horizon
 
     @profile
     def derivative_link_model(self, max_derivative: Derivatives) -> cas.Expression:
@@ -833,18 +829,18 @@ class EqualityModel(ProblemDataPart):
         -vc/dt**2 - ac/dt = -v0/dt**2 + j0
         -vc - ac*dt = -v0 + j0*dt**2
         """
-        n_vel = self.number_of_free_variables * (self.prediction_horizon-2)
+        n_vel = self.number_of_free_variables * (self.prediction_horizon - 2)
         n_jerk = self.number_of_free_variables * self.prediction_horizon
         model = cas.zeros(rows=n_jerk,
                           columns=n_jerk + n_vel)
         pre_previous = -cas.eye(n_vel)
         same = pre_previous
         previous = -2 * pre_previous
-        j_same = cas.eye(n_jerk) * self.dt**2
-        model[:-self.number_of_free_variables*2, :n_vel] += pre_previous
+        j_same = cas.eye(n_jerk) * self.dt ** 2
+        model[:-self.number_of_free_variables * 2, :n_vel] += pre_previous
         model[self.number_of_free_variables:-self.number_of_free_variables, :n_vel] += previous
         model[self.number_of_free_variables * 2:, :n_vel] += same
-        model[:,n_vel:] = j_same
+        model[:, n_vel:] = j_same
         return model
 
     def _remove_rows_columns_where_variables_are_zero(self, derivative_link_model: cas.Expression) -> cas.Expression:
@@ -881,7 +877,7 @@ class EqualityModel(ProblemDataPart):
                 model = cas.zeros(len(self.equality_constraints), self.number_of_non_slack_columns)
                 J_eq = cas.jacobian(expressions=cas.Expression(self.equality_constraint_expressions()),
                                     symbols=self.get_free_variable_symbols(Derivatives.position)) * self.dt
-                J_hstack = cas.hstack([J_eq for _ in range(self.prediction_horizon-2)])
+                J_hstack = cas.hstack([J_eq for _ in range(self.prediction_horizon - 2)])
                 # set jacobian entry to 0 if control horizon shorter than prediction horizon
                 horizontal_offset = J_hstack.shape[1]
                 model[:, horizontal_offset * 0:horizontal_offset * 1] = J_hstack
@@ -905,12 +901,13 @@ class EqualityModel(ProblemDataPart):
                         horizontal_offset = J_hstack.shape[1]
                         model[:, horizontal_offset * derivative:horizontal_offset * (derivative + 1)] = J_hstack
                     else:
-                        J_hstack = cas.hstack([J_eq for _ in range(self.prediction_horizon-2)])
+                        J_hstack = cas.hstack([J_eq for _ in range(self.prediction_horizon - 2)])
                         horizontal_offset = J_hstack.shape[1]
                         model[:, horizontal_offset * 0:horizontal_offset * 1] = J_hstack
 
                 # slack variable for total error
-                slack_model = cas.diag(cas.Expression([self.dt * self.control_horizon for c in self.equality_constraints]))
+                slack_model = cas.diag(
+                    cas.Expression([self.dt * self.control_horizon for c in self.equality_constraints]))
                 return model, slack_model
         return cas.Expression(), cas.Expression()
 
@@ -1490,7 +1487,8 @@ class QPController:
                 return NextCommands.from_xdot(self.free_variables, self.xdot_full, self.order, self.prediction_horizon)
             else:
                 return NextCommands.from_xdot_explicit_no_acc(self.free_variables, self.xdot_full, self.order,
-                                                       self.prediction_horizon, god_map.world, self.sample_period)
+                                                              self.prediction_horizon, god_map.world,
+                                                              self.sample_period)
         except InfeasibleException as e_original:
             self.xdot_full = None
             self._create_debug_pandas(self.qp_solver)

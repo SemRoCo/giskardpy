@@ -1461,8 +1461,8 @@ def compile_and_execute(f, params):
         return result
 
 
-def zeros(x, y):
-    return Expression(ca.SX.zeros(x, y))
+def zeros(rows, columns):
+    return Expression(ca.SX.zeros(rows, columns))
 
 
 def ones(x, y):

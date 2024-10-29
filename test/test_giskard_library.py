@@ -194,7 +194,7 @@ class TestWorld:
         max_derivative = Derivatives.jerk
         sim_time = 5
         god_map.time = 0
-        qp_formulation = ControllerMode.implicit
+        qp_formulation = ControllerMode.explicit
         god_map.control_cycle_counter = 0
 
         if max_derivative == Derivatives.acceleration:

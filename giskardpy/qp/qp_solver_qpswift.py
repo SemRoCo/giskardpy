@@ -11,7 +11,7 @@ import scipy.sparse as sp
 from line_profiler import profile
 
 from giskardpy.qp.qp_solver_ids import SupportedQPSolver
-
+from scipy import sparse
 
 class QPSWIFTExitFlags(IntEnum):
     Optimal = 0  # Solution Found
@@ -98,9 +98,7 @@ class QPSolverQPSwift(QPSWIFTFormatter):
     @profile
     def solver_call(self, H: np.ndarray, g: np.ndarray, E: sp.csc_matrix, b: np.ndarray, A: sp.csc_matrix,
                     h: np.ndarray) -> np.ndarray:
-        A = A.toarray()
-        E = E.toarray()
-        result = qpSWIFT.run(c=g, h=h, P=H, G=A, A=E, b=b, opts=self.opts)
+        result = qpSWIFT.run_sparse(c=g, h=h, P=H, G=A, A=E, b=b, opts=self.opts)
         exit_flag = result['basicInfo']['ExitFlag']
         if exit_flag != 0:
             error_code = QPSWIFTExitFlags(exit_flag)
@@ -201,7 +199,7 @@ class QPSolverQPSwift(QPSWIFTFormatter):
     @profile
     def problem_data_to_qp_format(self) \
             -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        H = np.diag(self.weights)
+        H = sp.diags(self.weights, offsets=0, format='csc')
         if np.product(self.nA_A.shape) > 0:
             A = sp.vstack((self.nAi_Ai, self.nA_A))
         else:

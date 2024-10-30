@@ -1469,6 +1469,10 @@ def ones(x, y):
     return Expression(ca.SX.ones(x, y))
 
 
+def tri(dimension):
+    return Expression(np.tri(dimension))
+
+
 def abs(x):
     x = Expression(x).s
     result = ca.fabs(x)

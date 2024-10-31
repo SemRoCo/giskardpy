@@ -40,9 +40,13 @@ class ControllerMode(IntEnum):
     explicit_explicit_pos_limits = 10
     implicit_explicit_pos_limits = 11
     explicit_no_acc_explicit_pos_limits = 12
+    implicit_variable_dt = 21
 
     def explicit_pos_limits(self) -> bool:
-        return self > 10
+        return 20 > self > 10
+
+    def is_dt_variable(self) -> bool:
+        return self > 20
 
     def is_implicit(self) -> bool:
         return self in [self.implicit, self.implicit_explicit_pos_limits]
@@ -64,7 +68,7 @@ def save_pandas(dfs, names, path, time: float, folder_name: Optional[str] = None
         with pd.option_context('display.max_rows', None, 'display.max_columns', None):
             if df.shape[1] > 1:
                 for column_name, column in df.T.items():
-                    zero_filtered_column = column.replace(0, pd.np.nan).dropna(how='all').replace(pd.np.nan, 0)
+                    zero_filtered_column = column.replace(0, np.nan).dropna(how='all').replace(np.nan, 0)
                     csv_string += zero_filtered_column.add_prefix(column_name + '||').to_csv(float_format='%.6f')
             else:
                 csv_string += df.to_csv(float_format='%.6f')
@@ -811,16 +815,16 @@ class EqualityModel(ProblemDataPart):
         Slots are matrices of |controlled variables| x |controlled variables|
         | vt0 | vt1 | vt2 | at0 | at1 | at2 | at3 | jt0 | jt1 | jt2 | jt3 | jt4 |
         |-----------------------------------------------------------------------|
-        |  1  |     |     | -dt |     |     |     |     |     |     |     |     | last_v =  vt0 - at0*dt
-        | -1  |  1  |     |     | -dt |     |     |     |     |     |     |     |      0 = -vt0 + vt1 - at1 * dt
-        |     | -1  |  1  |     |     | -dt |     |     |     |     |     |     |      0 = -vt1 + vt2 - at2 * dt
-        |     |     | -1  |     |     |     | -dt |     |     |     |     |     |      0 = -vt2 + vt3 - at3 * dt
+        |  1  |     |     | -dt |     |     |     |     |     |     |     |     | last_v =  vt0 - at0*cdt
+        | -1  |  1  |     |     | -dt |     |     |     |     |     |     |     |      0 = -vt0 + vt1 - at1 * mdt
+        |     | -1  |  1  |     |     | -dt |     |     |     |     |     |     |      0 = -vt1 + vt2 - at2 * mdt
+        |     |     | -1  |     |     |     | -dt |     |     |     |     |     |      0 = -vt2 + vt3 - at3 * mdt
         |=======================================================================|
-        |     |     |     |  1  |     |     |     | -dt |     |     |     |     | last_a =  at0 - jt0*dt
-        |     |     |     | -1  |  1  |     |     |     | -dt |     |     |     |      0 = -at0 + at1 - jt1 * dt
-        |     |     |     |     | -1  |  1  |     |     |     | -dt |     |     |      0 = -at1 + at2 - jt2 * dt
-        |     |     |     |     |     | -1  |  1  |     |     |     | -dt |     |      0 = -at2 + at3 - jt3 * dt
-        |     |     |     |     |     |     | -1  |     |     |     |     | -dt |      0 = -at3 + at4 - jt4 * dt
+        |     |     |     |  1  |     |     |     | -dt |     |     |     |     | last_a =  at0 - jt0*cdt
+        |     |     |     | -1  |  1  |     |     |     | -dt |     |     |     |      0 = -at0 + at1 - jt1 * mdt
+        |     |     |     |     | -1  |  1  |     |     |     | -dt |     |     |      0 = -at1 + at2 - jt2 * mdt
+        |     |     |     |     |     | -1  |  1  |     |     |     | -dt |     |      0 = -at2 + at3 - jt3 * mdt
+        |     |     |     |     |     |     | -1  |     |     |     |     | -dt |      0 = -at3 + at4 - jt4 * mdt
         |-----------------------------------------------------------------------|
         """
         num_rows = self.number_of_free_variables * self.prediction_horizon * (max_derivative - 1)
@@ -1232,14 +1236,20 @@ class InequalityModel(ProblemDataPart):
         ak = (vk - vk-1)/dt
         jk = (vk - 2vk-1 + vk-2)/dt**2
 
+        vt0 = vtc + at0 * cdt
+        vt1 = vt0 + at1 * mdt
+        vt = vt-1 + at * mdt
+
+        at = vt-1 + jt * mdt
+
         Layout for prediction horizon 4
         Slots are matrices of |controlled variables| x |controlled variables|
         |  vt0   |  vt1   |  vt2   |  vt3   |
         |-----------------------------------|
-        |  1/dt  |        |        |        |               vtc/dt + at0 = vt0/dt                   vtc/dt + a_min <= vt0/dt <= vtc/dt + a_max
+        |  1/dt  |        |        |        |               vtc/cdt + at0 = vt0/cdt                   vtc/dt + a_min <= vt0/dt <= vtc/dt + a_max
         | -1/dt  |  1/dt  |        |        |                        at1 = (vt1 - vt0)/dt
-        |        | -1/dt  |  1/dt  |        |                        at2 = (vt2 - vt1)/dt
-        |        |        | -1/dt  | 1/dt   |                        at3 = (vt3 - vt2)/dt
+        |        | -1/dt  |  1/dt  |        |                        at2 = (vt2 - vt1)/mdt
+        |        |        | -1/dt  | 1/dt   |                        at3 = (vt3 - vt2)/mdt
         |===================================|
         | 1/dt**2|        |        |        |   vtc/dt**2 + atc/dt + jt0 = vt0/dt**2                vtc/dt**2 + atc/dt + j_min <=    vt0/dt**2     <= vtc/dt**2 + atc/dt + j_max
         |-2/dt**2| 1/dt**2|        |        |          - vtc/dt**2 + jt1 = (vt1 - 2vt0)/dt**2           (- vtc)/dt**2 + j_min <= (vt1 - 2vt0)/dt**2 <= (- vtc)/dt**2 + j_max
@@ -1378,6 +1388,7 @@ class QPController:
     @profile
     def __init__(self,
                  sample_period: float = 0.05,
+                 control_dt: Optional[float] = None,
                  prediction_horizon: int = 9,
                  max_derivative: Derivatives = Derivatives.jerk,
                  solver_id: Optional[SupportedQPSolver] = None,
@@ -1385,6 +1396,9 @@ class QPController:
                  retry_added_slack: float = 100,
                  retry_weight_factor: float = 100,
                  qp_formulation: ControllerMode = ControllerMode.explicit):
+        if control_dt is None:
+            control_dt = sample_period
+        self.control_dt = control_dt
         self.qp_formulation = qp_formulation
         self.sample_period = sample_period
         self.max_derivative = max_derivative
@@ -1526,10 +1540,14 @@ class QPController:
         self.qp_solver = self.qp_solver_class(weights=weights, g=g, lb=lb, ub=ub,
                                               E=E, E_slack=E_slack, bE=bE,
                                               A=A, A_slack=A_slack, lbA=lbA, ubA=ubA)
+
+        self.num_free_variables = weights.shape[0]
+        self.num_eq_constraints = bE.shape[0]
+        self.num_ineq_constraints = lbA.shape[0] * 2
         get_middleware().loginfo('Done compiling controller:')
-        get_middleware().loginfo(f'  #free variables: {weights.shape[0]}')
-        get_middleware().loginfo(f'  #equality constraints: {bE.shape[0]}')
-        get_middleware().loginfo(f'  #inequality constraints: {lbA.shape[0] * 2}')
+        get_middleware().loginfo(f'  #free variables: {self.num_free_variables}')
+        get_middleware().loginfo(f'  #equality constraints: {self.num_eq_constraints}')
+        get_middleware().loginfo(f'  #inequality constraints: {self.num_ineq_constraints}')
 
     def get_parameter_names(self):
         return self.qp_solver.free_symbols_str

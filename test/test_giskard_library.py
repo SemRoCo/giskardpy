@@ -1,11 +1,17 @@
+import gc
+import threading
 import traceback
-from itertools import combinations
+from datetime import datetime
+from itertools import combinations, chain
+from typing import Dict, List
 
 import numpy as np
 import pytest
 import urdf_parser_py.urdf as up
-
+import pandas as pd
+import time
 import giskardpy.casadi_wrapper as cas
+from giskardpy.data_types.exceptions import EmptyProblemException
 from giskardpy.data_types.data_types import PrefixName, Derivatives, ColorRGBA
 from giskardpy.god_map import god_map
 from giskardpy.model.better_pybullet_syncer import BetterPyBulletSyncer
@@ -21,9 +27,11 @@ from giskardpy.motion_graph.tasks.joint_tasks import JointPositionList
 from giskardpy.qp.qp_controller import QPController
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils.utils import suppress_stderr
-from model.trajectory import Trajectory
-from qp.qp_controller import ControllerMode
-from qp.qp_solver_ids import SupportedQPSolver
+from giskardpy.model.collision_avoidance_config import DisableCollisionAvoidanceConfig
+from giskardpy.model.trajectory import Trajectory
+from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint
+from giskardpy.qp.qp_controller import ControllerMode
+from giskardpy.qp.qp_solver_ids import SupportedQPSolver
 from utils_for_tests import pr2_urdf
 
 try:
@@ -33,6 +41,12 @@ try:
     rospy.init_node('tests')
     vis = ROSMsgVisualization(tf_frame='map')
     rospy.sleep(1)
+except ImportError as e:
+    pass
+
+try:
+    from giskardpy_ros.ros2 import rospy
+    rospy.init_node('giskard')
 except ImportError as e:
     pass
 
@@ -92,11 +106,11 @@ def box_world_prismatic() -> WorldTree:
                                        parent_link_name=self.world.root_link_name,
                                        child_link_name=self.box_name,
                                        axis=(1, 0, 0),
-                                       lower_limits={Derivatives.position: -0.5,
+                                       lower_limits={Derivatives.position: -1,
                                                      Derivatives.velocity: -1,
                                                      Derivatives.acceleration: -np.inf,
                                                      Derivatives.jerk: -30},
-                                       upper_limits={Derivatives.position: 0.5,
+                                       upper_limits={Derivatives.position: 1,
                                                      Derivatives.velocity: 1,
                                                      Derivatives.acceleration: np.inf,
                                                      Derivatives.jerk: 30})
@@ -152,6 +166,18 @@ def simple_two_arm_world() -> WorldTree:
     config.setup(urdf, 'muh')
     config.world.register_controlled_joints(config.world.movable_joint_names)
     collision_avoidance = DefaultCollisionAvoidanceConfig()
+    collision_avoidance.setup()
+    return config.world
+
+
+@pytest.fixture()
+def pr2_world() -> WorldTree:
+    urdf = open('urdfs/pr2.urdf', 'r').read()
+    config = WorldWithOmniDriveRobot(urdf=urdf)
+    with config.world.modify_world():
+        config.setup()
+    config.world.register_controlled_joints(config.world.movable_joint_names)
+    collision_avoidance = DisableCollisionAvoidanceConfig()
     collision_avoidance.setup()
     return config.world
 
@@ -600,80 +626,288 @@ class TestWorld:
                 world_setup.search_for_link_name('l_wrist_roll_link'),
                 world_setup.search_for_link_name('l_gripper_r_finger_link'))
 
-class TestController:
-    def test_joint_goal(self, box_world_prismatic: WorldTree):
-        joint_name = box_world_prismatic.joint_names[0]
-        box_name = box_world_prismatic.link_names[-1]
-        dt = 0.05
-        horizon = 9
-        control_dt = 0.05
-        max_derivative = Derivatives.jerk
-        sim_time = 5
-        god_map.time = 0
-        qp_formulation = ControllerMode.implicit
-        god_map.control_cycle_counter = 0
 
-        if max_derivative == Derivatives.acceleration:
-            box_world_prismatic.joints[joint_name].free_variables[0].set_lower_limit(Derivatives.acceleration, -5)
-            box_world_prismatic.joints[joint_name].free_variables[0].set_upper_limit(Derivatives.acceleration, 5)
-        # box_world_prismatic.joints[joint_name].free_variables[0].set_lower_limit(Derivatives.jerk, -60)
-        # box_world_prismatic.joints[joint_name].free_variables[0].set_upper_limit(Derivatives.jerk, 60)
-        box_world_prismatic.update_default_weights({Derivatives.velocity: 0.01,
-                                                    Derivatives.acceleration: 0,
-                                                    Derivatives.jerk: 0.0})
-        goal_name = PrefixName('goal')
+class Simulator:
+    def __init__(self, world: WorldTree, control_dt: float, mpc_dt: float, h: int, solver: SupportedQPSolver,
+                 qp_formulation: ControllerMode, joint_names: List[PrefixName], goal: float):
+        god_map.tmp_folder = '.'
+        self.reset()
+        self.world = world
+        self.control_dt = control_dt
+        self.mpc_dt = mpc_dt
+        self.h = h
+        self.solver = solver
+        self.qp_formulation = qp_formulation
+        self.max_derivative = Derivatives.jerk
 
-        v = box_world_prismatic.add_virtual_free_variable(goal_name)
-        box_world_prismatic.state[v.name].position = 1.5
-        joint_task = JointPositionList(name='g1', goal_state={joint_name: v.get_symbol(Derivatives.position)})
+        self.goal = {}
+        goal_name = PrefixName(f'goal')
+        v = self.world.add_virtual_free_variable(goal_name)
+        self.world.state[v.name].position = goal
+        for joint_name in joint_names:
+            self.goal[joint_name] = v.get_symbol(Derivatives.position)
+        joint_task = JointPositionList(name='g1', goal_state=self.goal)
 
         god_map.motion_graph_manager.add_task(joint_task)
         god_map.motion_graph_manager.initialize_states()
 
         eq, neq, neqd, lin_weight, quad_weight = god_map.motion_graph_manager.get_constraints_from_tasks()
-        god_map.qp_controller = QPController(sample_period=dt,
-                                             solver_id=SupportedQPSolver.gurobi,
-                                             prediction_horizon=horizon,
-                                             max_derivative=max_derivative,
-                                             qp_formulation=qp_formulation)
-        god_map.qp_controller.init(free_variables=list(box_world_prismatic.free_variables.values()),
+        god_map.qp_controller = QPController(sample_period=self.mpc_dt,
+                                             solver_id=self.solver,
+                                             prediction_horizon=self.h,
+                                             max_derivative=self.max_derivative,
+                                             qp_formulation=self.qp_formulation)
+        god_map.qp_controller.init(free_variables=self.get_active_free_symbols(eq,neq,neqd),
                                    equality_constraints=eq)
         god_map.qp_controller.compile()
-        traj = Trajectory()
+        self.traj = Trajectory()
+
+    def get_active_free_symbols(self,
+                                eq_constraints: List[EqualityConstraint],
+                                neq_constraints: List[InequalityConstraint],
+                                derivative_constraints: List[DerivativeInequalityConstraint]):
+        symbols = set()
+        for c in chain(eq_constraints, neq_constraints, derivative_constraints):
+            symbols.update(str(s) for s in cas.free_symbols(c.expression))
+        free_variables = list(sorted([v for v in god_map.world.free_variables.values() if v.position_name in symbols],
+                                     key=lambda x: x.position_name))
+        if len(free_variables) == 0:
+            raise EmptyProblemException('Goal parsing resulted in no free variables.')
+        god_map.free_variables = free_variables
+        return free_variables
+
+    def reset(self):
+        god_map.time = 0
+        god_map.control_cycle_counter = 0
+        god_map.motion_graph_manager.reset()
+
+    def step(self):
+        parameters = god_map.qp_controller.get_parameter_names()
+        total_time_start = time.time()
+        substitutions = symbol_manager.resolve_symbols(parameters)
+        parameter_time = time.time() - total_time_start
+
+        qp_time_start = time.time()
+        next_cmd = god_map.qp_controller.get_cmd(substitutions)
+        qp_time = time.time() - qp_time_start
+
+        self.world.update_state(next_cmd, self.control_dt, self.max_derivative)
+
+        self.world.notify_state_change()
+        total_time = time.time() - total_time_start
+        self.traj.set(god_map.control_cycle_counter, self.world.state)
+        god_map.time += self.control_dt
+        god_map.control_cycle_counter += 1
+        return total_time, parameter_time, qp_time
+
+    def update_goal(self, new_value: float):
+        self.world.state['goal'].position = new_value
+
+    def plot_traj(self):
+        self.traj.plot_trajectory('test', sample_period=self.control_dt, filter_0_vel=False)
+
+
+class TestController:
+    def test_joint_goal(self, box_world_prismatic: WorldTree):
+        sim_time = 5
+        joint_name = box_world_prismatic.joint_names[0]
+        goal = 2
+        box_world_prismatic.update_default_weights({Derivatives.velocity: 0.01,
+                                                    Derivatives.acceleration: 0,
+                                                    Derivatives.jerk: 0.0})
+        box_world_prismatic.state[joint_name].position = 2
+        simulator = Simulator(world=box_world_prismatic,
+                              control_dt=0.05,
+                              mpc_dt=0.05,
+                              h=9,
+                              solver=SupportedQPSolver.qpSWIFT,
+                              qp_formulation=ControllerMode.explicit_no_acc,
+                              joint_names=[joint_name],
+                              goal=goal)
+
         np.random.seed(69)
-        swap_distance = 2.2
+        swap_distance = 2
         next_swap = swap_distance
         try:
-
             while god_map.time < sim_time:
                 # box_world_prismatic.state[goal_name].position = np.random.rand() * 2 -1
+                simulator.step()
                 if god_map.time > next_swap:
-                    box_world_prismatic.state[goal_name].position = box_world_prismatic.state[goal_name].position * -1
+                    # goal *= -1
+                    simulator.update_goal(goal)
                     next_swap += swap_distance
-                parameters = god_map.qp_controller.get_parameter_names()
-                substitutions = symbol_manager.resolve_symbols(parameters)
-                next_cmd = god_map.qp_controller.get_cmd(substitutions)
 
-                box_world_prismatic.update_state(next_cmd, control_dt, max_derivative)
-
-                box_world_prismatic.notify_state_change()
-                traj.set(god_map.control_cycle_counter, box_world_prismatic.state)
-                visualize()
-                # if box_world_prismatic.state[joint_name].position >= goal - 1e-3:
-                #     break
-                god_map.time += control_dt
-                god_map.control_cycle_counter += 1
         except Exception as e:
             traceback.print_exc()
             print(e)
-        traj.plot_trajectory('test',
-                             sample_period=control_dt,
-                             filter_0_vel=False)
+        simulator.plot_traj()
         # fk = box_world_prismatic.compute_fk_point(root_link=box_world_prismatic.root_link_name,
         #                                           tip_link=box_name).to_np()
         # np.testing.assert_almost_equal(fk[0], box_world_prismatic.state[v.name].position, decimal=3)
-        vel_profile = traj.to_dict()[Derivatives.velocity][joint_name]
+        vel_profile = simulator.traj.to_dict()[Derivatives.velocity][joint_name]
         vel_limit = box_world_prismatic.joints[joint_name].free_variables[0].get_upper_limit(Derivatives.velocity)
         print(f'max violation {np.max(np.abs(vel_profile) - vel_limit)}')
         violated = np.all(np.abs(vel_profile) < vel_limit + 1e-4)
         assert violated, f'violation {np.max(np.abs(vel_profile) - vel_limit)}'
+
+    def test_joint_goal_pr2(self, pr2_world: WorldTree):
+        sim_time = 4
+        goal = -0.9
+        pr2_world.update_default_weights({Derivatives.velocity: 0.01,
+                                          Derivatives.acceleration: 0,
+                                          Derivatives.jerk: 0.0})
+        simulator = Simulator(world=pr2_world,
+                              control_dt=0.05,
+                              mpc_dt=0.05,
+                              h=9,
+                              solver=SupportedQPSolver.mosek,
+                              qp_formulation=ControllerMode.explicit_no_acc,
+                              joint_names=pr2_world.movable_joint_names[14:15],
+                              # joint_names=pr2_world.movable_joint_names[:14],
+                              # joint_names=pr2_world.movable_joint_names[:-1],
+                              goal=goal)
+
+        np.random.seed(69)
+        swap_distance = 2
+        next_swap = swap_distance
+        try:
+            while god_map.time < sim_time:
+                simulator.step()
+                if god_map.time > next_swap:
+                    goal *= -1
+                    simulator.update_goal(goal)
+                    next_swap += swap_distance
+
+        except Exception as e:
+            traceback.print_exc()
+            print(e)
+            assert False
+        finally:
+            simulator.plot_traj()
+
+    def test_pr2_joint_benchmark(self, pr2_world: WorldTree):
+
+        solvers = [
+            SupportedQPSolver.qpSWIFT,
+            SupportedQPSolver.gurobi,
+            SupportedQPSolver.qpalm,
+        ]
+        formulations = [
+            # ControllerMode.explicit,
+            ControllerMode.explicit_no_acc,
+            ControllerMode.implicit
+        ]
+        max_number_of_joints_total = len(pr2_world.movable_joint_names) - 1  # the last joint doesn't work
+        sim_time = 4
+        goal = -0.9
+        mpc_dt = 0.05
+        control_dt = 0.05
+        horizion = 9
+        pr2_world.update_default_weights({
+            Derivatives.velocity: 0.01,
+            Derivatives.acceleration: 0,
+            Derivatives.jerk: 0.0
+        })
+
+        # List to store results
+        results = []
+
+        for solver in solvers:
+            for formulation in formulations:
+                for num_joints in range(20, max_number_of_joints_total, 10):
+                    gc.collect()
+                    print(f'solver {solver.name}; formulation {formulation.name}; #joints {num_joints}')
+                    simulator = Simulator(
+                        world=pr2_world,
+                        control_dt=control_dt,
+                        mpc_dt=mpc_dt,
+                        h=horizion,
+                        solver=solver,
+                        qp_formulation=formulation,
+                        joint_names=pr2_world.movable_joint_names[0:num_joints],
+                        goal=goal
+                    )
+
+                    np.random.seed(69)
+                    swap_distance = 2
+                    next_swap = swap_distance
+
+                    # Variables to collect statistics
+                    total_times, parameter_times, qp_times = [], [], []
+
+                    try:
+                        while god_map.time < sim_time:
+                            total_time, parameter_time, qp_time = simulator.step()
+
+                            total_times.append(total_time)
+                            parameter_times.append(parameter_time)
+                            qp_times.append(qp_time)
+
+                            if god_map.time > next_swap:
+                                goal *= -1
+                                simulator.update_goal(goal)
+                                next_swap += swap_distance
+
+
+                        # Append results to the list
+                        results.append({
+                            'Solver': solver.name,
+                            'Formulation': formulation.name,
+                            'Num_Joints': num_joints,
+                            'Total_Time_Sum': np.sum(total_times),
+                            'Total_Time_Avg': np.average(total_times),
+                            'Total_Time_Std': np.std(total_times),
+                            'Total_Time_Min': np.min(total_times),
+                            'Total_Time_Max': np.max(total_times),
+                            'Parameter_Time_Sum': np.sum(parameter_times),
+                            'Parameter_Time_Avg': np.average(parameter_times),
+                            'Parameter_Time_Std': np.std(parameter_times),
+                            'Parameter_Time_Min': np.min(parameter_times),
+                            'Parameter_Time_Max': np.max(parameter_times),
+                            'QP_Time_Sum': np.sum(qp_times),
+                            'QP_Time_Avg': np.average(qp_times),
+                            'QP_Time_Std': np.std(qp_times),
+                            'QP_Time_Min': np.min(qp_times),
+                            'QP_Time_Max': np.max(qp_times),
+                            'Control dt': control_dt,
+                            'horizon': horizion,
+                            'MPC dt': mpc_dt,
+                            'Num_Variables': god_map.qp_controller.num_free_variables,
+                            'Num_Inequality_Constraints': god_map.qp_controller.num_ineq_constraints,
+                            'Num_Equality_Constraints': god_map.qp_controller.num_eq_constraints
+                        })
+
+                    except Exception as e:
+                        traceback.print_exc()
+                        print(e)
+                        assert False
+                    # finally:
+                    #     simulator.plot_traj()
+        date_str = datetime.now().strftime('%Yy-%mm-%dd--%Hh-%Mm-%Ss')
+        # Convert results to a Pandas DataFrame
+        df = pd.DataFrame(results)
+        # df.to_csv(f'benchmark_results_{date_str}.csv', index=False)
+        df.to_pickle(f'benchmark_results_{date_str}.pkl')
+
+        # Plotting the results
+        # sns.set(style="whitegrid")
+        # plt.figure(figsize=(12, 6))
+        # sns.lineplot(
+        #     data=df,
+        #     x='Num_Joints',
+        #     y='Avg_Solve_Time',
+        #     style='Formulation',
+        #     hue='Solver',
+        #     markers=True,
+        #     dashes=False
+        # )
+        # plt.title('Average Solve Time vs. Number of Joints')
+        # plt.xlabel('Number of Joints')
+        # plt.ylabel('Average Solve Time (s)')
+        # plt.legend(title='Solver/Formulation', loc='upper left')
+        # plt.tight_layout()
+        # plt.savefig('benchmark.pdf')
+        # plt.show()
+
+import pytest
+pytest.main(['-s', __file__ + '::TestController::test_joint_goal_pr2'])

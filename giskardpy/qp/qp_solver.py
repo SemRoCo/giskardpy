@@ -1,5 +1,6 @@
 import abc
 from abc import ABC
+from collections import defaultdict
 from functools import wraps
 from time import time
 from typing import Tuple, List, Optional, Union, Dict
@@ -57,7 +58,7 @@ class QPSolver(ABC):
     num_eq_constraints: int
     num_neq_constraints: int
     num_free_variable_constraints: int
-    _times: Dict[Tuple[int, int, int, int], list]
+    _times: Dict[Tuple[int, int, int], list] = defaultdict(list)
 
     @abc.abstractmethod
     def __init__(self, weights: cas.Expression, g: cas.Expression, lb: cas.Expression, ub: cas.Expression,

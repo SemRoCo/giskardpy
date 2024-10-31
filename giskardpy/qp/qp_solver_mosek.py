@@ -3,9 +3,10 @@ from copy import deepcopy
 from line_profiler import profile
 import mosek
 import numpy as np
-from scipy import sparse
+from qp.qp_solver_gurobi import QPSolverGurobi
+from qp.qp_solver_ids import SupportedQPSolver
+from scipy import sparse as sp
 
-from giskardpy.qp.qp_solver import QPSolver
 
 unknown = [mosek.solsta.unknown]
 
@@ -21,161 +22,165 @@ def streamprinter(text):
     sys.stdout.flush()
 
 
-class QPSolverMosek(QPSolver):
+class QPSolverMosek(QPSolverGurobi):
     """
     min_x 0.5 x^T P x + q^T x
     s.t.  Ax = b
           Gx <= h
           lb <= x <= ub
     """
-
-    def init(self, H, g, A, lb, ub, lbA, ubA):
-        # TODO potential speed up by reusing model
-        self.env = mosek.Env()
-        # self.env.set_Stream(mosek.streamtype.log, self.streamprinter)
-        self.qpProblem = self.env.Task(0, 0)
-        # self.qpProblem.set_Stream(mosek.streamtype.log, self.streamprinter)
-        self.set_qp(H, g, A, lb, ub, lbA, ubA)
-
-    def set_qp(self, H, g, A, lb, ub, lbA, ubA):
-
-        # Set up bounds
-        # Set up and input bounds
-        bkc = [mosek.boundkey.ra] * len(lbA)
-        numcon = len(bkc)
-        # Set lower and upper bounds for x
-        bkx = [mosek.boundkey.ra] * len(lb)
-        self.numvar = len(bkx)
-
-        # Append 'numcon' empty constraints.
-        # The constraints will initially have no bounds.
-        self.qpProblem.appendcons(numcon)
-
-        # Append 'numvar' variables.
-        # The variables will initially be fixed at zero (x=0).
-        self.qpProblem.appendvars(self.numvar)
-
-        # Optionally add a constant term to the objective.
-        self.qpProblem.putcfix(0.0)
-
-        for j in range(self.numvar):
-            # Set the linear term c_j in the objective.
-            self.qpProblem.putcj(j, g[j])
-            # Set the bounds on variable j
-            # blx[j] <= x_j <= bux[j]
-            self.qpProblem.putvarbound(j, bkx[j], lb[j], ub[j])
-
-        # Input of A
-        sA = sparse.bsr_matrix(A)
-        rows, cols, vals = sparse.find(sA)
-        self.qpProblem.putaijlist(rows, cols, vals)  # Non-zero Values
-
-        for i in range(numcon):
-            self.qpProblem.putconbound(i, bkc[i], lbA[i], ubA[i])
-
-        # Set up and input quadratic objective
-        qsubi = list(range(0, len(H)))
-        qsubj = deepcopy(qsubi)
-        qval = list(H)
-        self.qpProblem.putqobj(qsubi, qsubj, qval)
-        # Input the objective sense (minimize/maximize)
-        self.qpProblem.putobjsense(mosek.objsense.minimize)
-
-        # Define a stream printer to grab output from MOSEK
-
-    def streamprinter(self, text):
-        sys.stdout.write(text)
-        sys.stdout.flush()
-
-    def print_debug(self):
-        # Print a summary containing information
-        # about the solution for debugging purposes
-        self.qpProblem.solutionsummary(mosek.streamtype.msg)
-
-    def round(self, data, decimal_places):
-        return np.round(data, decimal_places)
+    solver_id = SupportedQPSolver.mosek
 
     @profile
-    def solve(self, weights: np.ndarray, g: np.ndarray, A: np.ndarray, lb: np.ndarray, ub: np.ndarray, lbA: np.ndarray,
-              ubA: np.ndarray) -> np.ndarray:
-        # Open MOSEK and create an environment and task
-        # Make a MOSEK environment
-        with mosek.Env() as env:
-            # Attach a printer to the environment
-            env.set_Stream(mosek.streamtype.log, streamprinter)
-            # Create a task
-            with env.Task() as task:
-                task.set_Stream(mosek.streamtype.log, streamprinter)
-                # Set up and input bounds and linear coefficients
-                bkc = [mosek.boundkey.lo]
-                blc = [1.0]
-                buc = [inf]
-                numvar = 3
-                bkx = [mosek.boundkey.lo] * numvar
-                blx = [0.0] * numvar
-                bux = [inf] * numvar
-                c = [0.0, -1.0, 0.0]
-                asub = [[0], [0], [0]]
-                aval = [[1.0], [1.0], [1.0]]
+    def solver_call(self, H: sp.csc_matrix, g: np.ndarray, E: sp.csc_matrix, b: np.ndarray,
+                    A: sp.csc_matrix, lb: np.ndarray, ub: np.ndarray, h: np.ndarray) -> np.ndarray:
+        """
+        Solve the quadratic optimization problem:
+            minimize    (1/2) * x^T H x + g^T x
+            subject to  E x = b
+                        A x <= h
+                        lb <= x <= ub
+        """
+        import sys
+        import mosek
+        import numpy as np
+        import scipy.sparse as sp
 
-                numvar = lb.shape[0]
-                numcon = len(bkc)
+        # Helper function to print log output from MOSEK
+        def streamprinter(text):
+            sys.stdout.write(text)
+            sys.stdout.flush()
+
+        # Create a MOSEK environment
+        with mosek.Env() as env:
+            # Create a task
+            with env.Task(0, 0) as task:
+                # Attach a log stream printer to the task
+                task.set_Stream(mosek.streamtype.log, streamprinter)
+
+                n = H.shape[1]
+                m = A.shape[0] if A is not None and A.shape[0] > 0 else 0
+                p = E.shape[0] if E is not None and E.shape[0] > 0 else 0
+
+                numvar = n
+                numcon = m + p
 
                 # Append 'numcon' empty constraints.
-                # The constraints will initially have no bounds.
                 task.appendcons(numcon)
 
                 # Append 'numvar' variables.
-                # The variables will initially be fixed at zero (x=0).
                 task.appendvars(numvar)
 
-                for j in range(numvar):
-                    # Set the linear term c_j in the objective.
-                    task.putcj(j, c[j])
-                    # Set the bounds on variable j
-                    # blx[j] <= x_j <= bux[j]
-                    task.putvarbound(j, bkx[j], blx[j], bux[j])
-                    # Input column j of A
-                    task.putacol(j,  # Variable (column) index.
-                                 # Row index of non-zeros in column j.
-                                 asub[j],
-                                 aval[j])  # Non-zero Values of column j.
+                # Set the bounds on variables
+                inf = 0.0
+                # inf = mosek.infinity
+                bkx = []
+                blx = []
+                bux = []
+
+                for i in range(n):
+                    lbi = lb[i]
+                    ubi = ub[i]
+                    if np.isinf(lbi) and np.isinf(ubi):
+                        bk = mosek.boundkey.fr
+                        bl = -inf
+                        bu = +inf
+                    elif np.isinf(lbi):
+                        bk = mosek.boundkey.up
+                        bl = -inf
+                        bu = ubi
+                    elif np.isinf(ubi):
+                        bk = mosek.boundkey.lo
+                        bl = lbi
+                        bu = +inf
+                    elif lbi == ubi:
+                        bk = mosek.boundkey.fx
+                        bl = lbi
+                        bu = ubi
+                    else:
+                        bk = mosek.boundkey.ra
+                        bl = lbi
+                        bu = ubi
+                    # Set the variable bound
+                    task.putvarbound(i, bk, bl, bu)
+
+                # Set the constraints bounds
+                bkc = []
+                blc = []
+                buc = []
+
+                # Inequality constraints A x <= h
+                for i in range(m):
+                    bkc.append(mosek.boundkey.up)
+                    blc.append(-inf)
+                    buc.append(h[i])
+
+                # Equality constraints E x = b
+                for i in range(p):
+                    bkc.append(mosek.boundkey.fx)
+                    blc.append(b[i])
+                    buc.append(b[i])
+
+                # Set constraint bounds
                 for i in range(numcon):
                     task.putconbound(i, bkc[i], blc[i], buc[i])
 
-                # Set up and input quadratic objective
-                qsubi = [0, 1, 2, 2]
-                qsubj = [0, 1, 0, 2]
-                qval = [2.0, 0.2, -1.0, 2.0]
+                # Stack A and E vertically to form constraints matrix
+                if m > 0 and p > 0:
+                    constraints = sp.vstack([A, E])
+                elif m > 0:
+                    constraints = A
+                elif p > 0:
+                    constraints = E
+                else:
+                    constraints = sp.csr_matrix((0, n))  # Empty matrix
 
+                # Convert constraints to COO format
+                constraints_coo = constraints.tocoo()
+                # Get the row indices, column indices, and values
+                subi = constraints_coo.row.tolist()
+                subj = constraints_coo.col.tolist()
+                valij = constraints_coo.data.tolist()
+
+                # Input the linear constraints
+                task.putaijlist(subi, subj, valij)
+
+                # Set the linear objective term
+                for i in range(n):
+                    task.putcj(i, g[i])
+
+                # Set up the quadratic objective terms
+                # H should be symmetric, but we need to input only lower triangular part
+                H_coo = H.tocoo()
+                I = H_coo.row
+                J = H_coo.col
+                V = H_coo.data
+                tril_idx = I >= J
+                qsubi = I[tril_idx].tolist()
+                qsubj = J[tril_idx].tolist()
+                qval = V[tril_idx].tolist()
                 task.putqobj(qsubi, qsubj, qval)
 
-                # Input the objective sense (minimize/maximize)
+                # Set the objective sense to minimization
                 task.putobjsense(mosek.objsense.minimize)
 
-                # Optimize
+                # Optimize the task
                 task.optimize()
-                # Print a summary containing information
-                # about the solution for debugging purposes
-                task.solutionsummary(mosek.streamtype.msg)
 
-                prosta = task.getprosta(mosek.soltype.itr)
+                # Get the solution status
                 solsta = task.getsolsta(mosek.soltype.itr)
 
                 # Output a solution
-                xx = task.getxx(mosek.soltype.itr)
+                xx = [0.] * n
+                task.getxx(mosek.soltype.itr, xx)
 
-                if solsta == mosek.solsta.optimal:
-                    print("Optimal solution: %s" % xx)
-                elif solsta == mosek.solsta.dual_infeas_cer:
-                    print("Primal or dual infeasibility.\n")
-                elif solsta == mosek.solsta.prim_infeas_cer:
-                    print("Primal or dual infeasibility.\n")
-                elif mosek.solsta.unknown:
-                    print("Unknown solution status")
-                else:
-                    print("Other solution status")
+                x = np.array(xx)
 
-    # @profile
-    def solve_and_retry(self, weights, g, A, lb, ub, lbA, ubA):
-        return self.solve(weights, g, A, lb, ub, lbA, ubA)
+        if solsta == mosek.solsta.optimal or solsta == mosek.solsta.near_optimal:
+            return x
+        elif solsta == mosek.solsta.dual_infeas_cer:
+            raise Exception("Dual infeasibility certificate found.")
+        elif solsta == mosek.solsta.prim_infeas_cer:
+            raise Exception("Primal infeasibility certificate found.")
+        else:
+            raise Exception(f"Unknown solution status: {solsta}")

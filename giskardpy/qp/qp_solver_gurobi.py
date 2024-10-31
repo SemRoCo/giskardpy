@@ -5,7 +5,7 @@ import gurobipy
 import numpy as np
 from gurobipy import GRB
 from gurobipy.gurobipy import GurobiError
-from scipy import sparse
+from scipy import sparse as sp
 from line_profiler import profile
 
 from giskardpy.data_types.exceptions import QPSolverException, InfeasibleException
@@ -50,6 +50,12 @@ error_info = {
 
 
 class QPSolverGurobi(QPSWIFTFormatter):
+    """
+    min_x 0.5 x^T P x + q^T x
+    s.t.  Ax = b
+          Gx <= h
+          lb <= x <= ub
+    """
     solver_id = SupportedQPSolver.gurobi
     STATUS_VALUE_DICT = {getattr(gurobipy.GRB.status, name): name for name in dir(gurobipy.GRB.status) if
                          '__' not in name}
@@ -62,7 +68,7 @@ class QPSolverGurobi(QPSWIFTFormatter):
              ub: np.ndarray, h: np.ndarray):
         self.qpProblem = gurobipy.Model('qp')
         self.x = self.qpProblem.addMVar(H.shape[0], lb=lb, ub=ub)
-        H = sparse.diags(H, 0)
+        H = sp.diags(H, 0)
         self.qpProblem.setMObjective(Q=H, c=g, constant=0.0, xQ_L=self.x, xQ_R=self.x, sense=GRB.MINIMIZE)
         try:
             self.qpProblem.addMConstr(E, self.x, gurobipy.GRB.EQUAL, b)
@@ -102,8 +108,14 @@ class QPSolverGurobi(QPSWIFTFormatter):
         return self.weights, self.g, self.E, self.bE, self.nA_A, lb, ub, self.nlbA_ubA
 
     @profile
-    def solver_call(self, H: np.ndarray, g: np.ndarray, E: np.ndarray, b: np.ndarray, A: np.ndarray, lb: np.ndarray,
+    def solver_call(self, H: sp.csc_matrix, g: np.ndarray, E: sp.csc_matrix, b: np.ndarray, A: sp.csc_matrix, lb: np.ndarray,
                     ub: np.ndarray, h: np.ndarray) -> np.ndarray:
+        """
+        min_x 0.5 x^T H x + g^T x
+        s.t.  Ex = b
+              Ax <= h
+              lb <= x <= ub
+        """
         self.init(H, g, E, b, A, lb, ub, h)
         self.qpProblem.optimize()
         success = self.qpProblem.status

@@ -1,5 +1,7 @@
 import numpy as np
 from clarabel import clarabel
+import scipy.sparse as sp
+from qp.qp_solver_qpswift import QPSolverQPSwift
 from scipy import sparse
 from line_profiler import profile
 from giskardpy.qp.qp_solver import QPSolver
@@ -7,34 +9,28 @@ from giskardpy.qp.qp_solver_ids import SupportedQPSolver
 from giskardpy.utils.decorators import record_time
 
 
-class QPSolverClarabel(QPSolver):
+class QPSolverClarabel(QPSolverQPSwift):
     solver_id = SupportedQPSolver.clarabel
     """
-    min_x 0.5 x^T P x + q^T x
+    min_x 0.5 x^T P x + c^T x
     s.t.  Ax = b
           Gx <= h
-          lb <= x <= ub
     """
+
+    settings = clarabel.DefaultSettings()
+    settings.verbose = False
 
     @profile
     @record_time
-    def solve(self, weights: np.ndarray, g: np.ndarray, A: np.ndarray, lb: np.ndarray, ub: np.ndarray, lbA: np.ndarray,
-              ubA: np.ndarray) -> np.ndarray:
-        A_b = np.eye(lb.shape[0])
-        G = sparse.csc_matrix(np.vstack([-A_b, A_b, -A, A]))
-        h = np.concatenate([-lb, ub, -lbA, ubA])
-        P = sparse.csc_matrix(np.diag(weights))
-        q = g
+    def solver_call(self, H: np.ndarray, g: np.ndarray, E: sp.csc_matrix, b: np.ndarray, A: sp.csc_matrix,
+                    h: np.ndarray) -> np.ndarray:
+        G = sp.vstack([E, A])
 
-        cones = [clarabel.NonnegativeConeT(h.shape[0])]
+        cones = [clarabel.ZeroConeT(b.shape[0]), clarabel.NonnegativeConeT(h.shape[0])]
+        h = np.concatenate([b, h])
 
-        settings = clarabel.DefaultSettings()
-        settings.verbose = False
-        solver = clarabel.DefaultSolver(P, q, G, h, cones, settings)
+        solver = clarabel.DefaultSolver(H, g, G, h, cones, self.settings)
         result = np.array(solver.solve().x)
 
         return result
 
-    # @profile
-    def solve_and_retry(self, weights, g, A, lb, ub, lbA, ubA):
-        return self.solve(weights, g, A, lb, ub, lbA, ubA)

@@ -27,7 +27,6 @@ class QPSolverQPSwift(QPSWIFTFormatter):
           Gx <= h
     """
     solver_id = SupportedQPSolver.qpSWIFT
-    _times: Dict[Tuple[int, int, int], list] = defaultdict(list)
 
     opts = {
         'OUTPUT': 1,  # 0 = sol; 1 = sol + basicInfo; 2 = sol + basicInfo + advInfo

@@ -32,7 +32,6 @@ class QPSolverQPalm(QPSolver):
     s.t.  lb <= Ax <= ub
     https://github.com/kul-optec/QPALM
     """
-    _times: Dict[Tuple[int, int, int], list] = defaultdict(list)
     sparse = True
     compute_nI_I = True
     settings = qpalm.Settings()

@@ -13,7 +13,7 @@ class SupportedQPSolver(IntEnum):
     # cvxopt = 7
     # qp_solvers = 8
     mosek = 9
-    # scs = 11
+    scs = 11
     # casadi = 12
     # super_csc = 14
     # cvxpy = 15

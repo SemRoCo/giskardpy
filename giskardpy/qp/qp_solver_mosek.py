@@ -3,8 +3,8 @@ from copy import deepcopy
 from line_profiler import profile
 import mosek
 import numpy as np
-from qp.qp_solver_gurobi import QPSolverGurobi
-from qp.qp_solver_ids import SupportedQPSolver
+from giskardpy.qp.qp_solver_gurobi import QPSolverGurobi
+from giskardpy.qp.qp_solver_ids import SupportedQPSolver
 from scipy import sparse as sp
 
 
@@ -41,10 +41,7 @@ class QPSolverMosek(QPSolverGurobi):
                         A x <= h
                         lb <= x <= ub
         """
-        import sys
-        import mosek
-        import numpy as np
-        import scipy.sparse as sp
+        H = sp.diags(H, offsets=0, format='coo')
 
         # Helper function to print log output from MOSEK
         def streamprinter(text):
@@ -56,7 +53,7 @@ class QPSolverMosek(QPSolverGurobi):
             # Create a task
             with env.Task(0, 0) as task:
                 # Attach a log stream printer to the task
-                task.set_Stream(mosek.streamtype.log, streamprinter)
+                # task.set_Stream(mosek.streamtype.log, streamprinter)
 
                 n = H.shape[1]
                 m = A.shape[0] if A is not None and A.shape[0] > 0 else 0
@@ -151,10 +148,9 @@ class QPSolverMosek(QPSolverGurobi):
 
                 # Set up the quadratic objective terms
                 # H should be symmetric, but we need to input only lower triangular part
-                H_coo = H.tocoo()
-                I = H_coo.row
-                J = H_coo.col
-                V = H_coo.data
+                I = H.row
+                J = H.col
+                V = H.data
                 tril_idx = I >= J
                 qsubi = I[tril_idx].tolist()
                 qsubj = J[tril_idx].tolist()
@@ -176,7 +172,7 @@ class QPSolverMosek(QPSolverGurobi):
 
                 x = np.array(xx)
 
-        if solsta == mosek.solsta.optimal or solsta == mosek.solsta.near_optimal:
+        if solsta == mosek.solsta.optimal:
             return x
         elif solsta == mosek.solsta.dual_infeas_cer:
             raise Exception("Dual infeasibility certificate found.")

@@ -1,6 +1,7 @@
 import numpy as np
 from clarabel import clarabel
 import scipy.sparse as sp
+from data_types.exceptions import InfeasibleException
 from qp.qp_solver_qpswift import QPSolverQPSwift
 from scipy import sparse
 from line_profiler import profile
@@ -30,7 +31,8 @@ class QPSolverClarabel(QPSolverQPSwift):
         h = np.concatenate([b, h])
 
         solver = clarabel.DefaultSolver(H, g, G, h, cones, self.settings)
-        result = np.array(solver.solve().x)
-
-        return result
+        result = solver.solve()
+        if result.status != clarabel.SolverStatus.Solved:
+            raise InfeasibleException(f'Failed to solve qp: {str(result.status)}')
+        return np.array(result.x)
 

@@ -1,10 +1,10 @@
 from typing import Union
 
 import cvxopt
-import mosek
 import numpy as np
-from cvxopt import solvers
-from scipy import sparse
+from giskardpy.qp.qp_solver_ids import SupportedQPSolver
+from qp.qp_solver_qpswift import QPSolverQPSwift
+from scipy import sparse as sp
 from line_profiler import profile
 
 from giskardpy.qp.qp_solver import QPSolver
@@ -13,7 +13,7 @@ __infty__ = 1e20  # 1e20 tends to yield division-by-zero errors
 
 
 def _to_cvxopt(
-        M: Union[np.ndarray, sparse.csc_matrix]
+        M: Union[np.ndarray, sp.csc_matrix]
 ) -> Union[cvxopt.matrix, cvxopt.spmatrix]:
     """Convert matrix to CVXOPT format.
 
@@ -36,29 +36,26 @@ def _to_cvxopt(
     )
 
 
-solvers.options['mosek'] = {mosek.iparam.log: 0}
 cvxopt.solvers.options["show_progress"] = False  # disable verbose output
 
 
-class QPSolverCVXOPT(QPSolver):
+class QPSolverCVXOPT(QPSolverQPSwift):
     """
     min_x 0.5 x^T P x + q^T x
     s.t.  Ax = b
           Gx <= h
     """
 
+    solver_id = SupportedQPSolver.cvxopt
+
     @profile
-    def solve(self, weights: np.ndarray, g: np.ndarray, A: np.ndarray, lb: np.ndarray, ub: np.ndarray, lbA: np.ndarray,
-              ubA: np.ndarray) -> np.ndarray:
-        A_b = np.eye(lb.shape[0])
-        G = _to_cvxopt(np.vstack([-A_b, A_b, -A, A]))
-        P = _to_cvxopt(np.diag(weights))
-        h = np.concatenate([-lb, ub, -lbA, ubA])
+    def solver_call(self, H: np.ndarray, g: np.ndarray, E: sp.csc_matrix, b: np.ndarray, A: sp.csc_matrix,
+                    h: np.ndarray) -> np.ndarray:
+        H = _to_cvxopt(H)
+        A = _to_cvxopt(A)
+        E = _to_cvxopt(E)
         g = _to_cvxopt(g)
         h = _to_cvxopt(h)
-        # return np.array(cvxopt.solvers.qp(P=P, q=g, G=G, h=h, solver='mosek')['x']).reshape(weights.shape[0])
-        return np.array(cvxopt.solvers.qp(P=P, q=g, G=G, h=h, verbose=False)['x']).reshape(weights.shape[0])
+        b = _to_cvxopt(b)
+        return np.array(cvxopt.solvers.qp(P=H, q=g, G=A, h=h, A=E, b=b, verbose=False)['x']).flatten()
 
-    # @profile
-    def solve_and_retry(self, weights, g, A, lb, ub, lbA, ubA):
-        return self.solve(weights, g, A, lb, ub, lbA, ubA)

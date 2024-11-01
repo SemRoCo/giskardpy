@@ -18,3 +18,4 @@ class SupportedQPSolver(IntEnum):
     # super_csc = 14
     # cvxpy = 15
     proxsuite = 16
+    piqp = 17

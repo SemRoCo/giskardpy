@@ -108,7 +108,7 @@ class QPSolverGurobi(QPSWIFTFormatter):
         return self.weights, self.g, self.E, self.bE, self.nA_A, lb, ub, self.nlbA_ubA
 
     @profile
-    def solver_call(self, H: sp.csc_matrix, g: np.ndarray, E: sp.csc_matrix, b: np.ndarray, A: sp.csc_matrix, lb: np.ndarray,
+    def solver_call(self, H: np.ndarray, g: np.ndarray, E: sp.csc_matrix, b: np.ndarray, A: sp.csc_matrix, lb: np.ndarray,
                     ub: np.ndarray, h: np.ndarray) -> np.ndarray:
         """
         min_x 0.5 x^T H x + g^T x

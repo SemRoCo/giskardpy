@@ -108,7 +108,9 @@ class ProblemDataPart(ABC):
                  sample_period: float,
                  prediction_horizon: int,
                  max_derivative: Derivatives,
+                 alpha: float,
                  qp_formulation: ControllerMode):
+        self.alpha = alpha
         self.qp_formulation = qp_formulation
         self.free_variables = free_variables
         self.equality_constraints = equality_constraints
@@ -286,6 +288,7 @@ class Weights(ProblemDataPart):
                  derivative_constraints: List[DerivativeInequalityConstraint],
                  sample_period: float,
                  prediction_horizon: int, max_derivative: Derivatives,
+                 alpha: float,
                  qp_formulation: ControllerMode):
         super().__init__(free_variables=free_variables,
                          equality_constraints=equality_constraints,
@@ -294,6 +297,7 @@ class Weights(ProblemDataPart):
                          sample_period=sample_period,
                          prediction_horizon=prediction_horizon,
                          max_derivative=max_derivative,
+                         alpha=alpha,
                          qp_formulation=qp_formulation)
         self.evaluated = True
 
@@ -342,7 +346,7 @@ class Weights(ProblemDataPart):
                     if self.qp_formulation.is_explicit_no_acc():
                         if not (derivative == Derivatives.velocity or derivative == max_derivative):
                             continue
-                    normalized_weight = v.normalized_weight(t, derivative, self.prediction_horizon,
+                    normalized_weight = v.normalized_weight(t, derivative, self.prediction_horizon, alpha=self.alpha,
                                                             evaluated=self.evaluated)
                     weights[derivative][f't{t:03}/{v.position_name}/{derivative}'] = normalized_weight
                     for q_gain in quadratic_weight_gains:
@@ -425,6 +429,7 @@ class FreeVariableBounds(ProblemDataPart):
                  sample_period: float,
                  prediction_horizon: int,
                  max_derivative: Derivatives,
+                 alpha: float,
                  qp_formulation: ControllerMode):
         super().__init__(free_variables=free_variables,
                          equality_constraints=equality_constraints,
@@ -433,6 +438,7 @@ class FreeVariableBounds(ProblemDataPart):
                          sample_period=sample_period,
                          prediction_horizon=prediction_horizon,
                          max_derivative=max_derivative,
+                         alpha=alpha,
                          qp_formulation=qp_formulation)
         self.evaluated = True
 
@@ -558,6 +564,7 @@ class EqualityBounds(ProblemDataPart):
                  sample_period: float,
                  prediction_horizon: int,
                  max_derivative: Derivatives,
+                 alpha: float,
                  qp_formulation: ControllerMode):
         super().__init__(free_variables=free_variables,
                          equality_constraints=equality_constraints,
@@ -566,6 +573,7 @@ class EqualityBounds(ProblemDataPart):
                          sample_period=sample_period,
                          prediction_horizon=prediction_horizon,
                          max_derivative=max_derivative,
+                         alpha=alpha,
                          qp_formulation=qp_formulation)
         self.evaluated = True
 
@@ -652,6 +660,7 @@ class InequalityBounds(ProblemDataPart):
                  prediction_horizon: int,
                  max_derivative: Derivatives,
                  default_limits: bool,
+                 alpha: float,
                  qp_formulation: ControllerMode):
         super().__init__(free_variables=free_variables,
                          equality_constraints=equality_constraints,
@@ -660,6 +669,7 @@ class InequalityBounds(ProblemDataPart):
                          sample_period=sample_period,
                          prediction_horizon=prediction_horizon,
                          max_derivative=max_derivative,
+                         alpha=alpha,
                          qp_formulation=qp_formulation)
         self.default_limits = default_limits
         self.evaluated = True
@@ -1408,10 +1418,12 @@ class QPController:
                  retry_added_slack: float = 100,
                  retry_weight_factor: float = 100,
                  qp_formulation: ControllerMode = ControllerMode.explicit,
+                 alpha: float = 0.1,
                  verbose: bool = True):
         if control_dt is None:
             control_dt = sample_period
         self.control_dt = control_dt
+        self.alpha = alpha
         self.qp_formulation = qp_formulation
         self.sample_period = sample_period
         self.max_derivative = max_derivative
@@ -1540,6 +1552,7 @@ class QPController:
                   'sample_period': self.sample_period,
                   'prediction_horizon': self.prediction_horizon,
                   'max_derivative': self.order,
+                  'alpha': self.alpha,
                   'qp_formulation': self.qp_formulation}
         self.weights = Weights(**kwargs)
         self.free_variable_bounds = FreeVariableBounds(**kwargs)

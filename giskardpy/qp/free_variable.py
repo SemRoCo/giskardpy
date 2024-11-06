@@ -1,6 +1,7 @@
 from collections import defaultdict
 from typing import Dict, Optional, List, Union
 import giskardpy.casadi_wrapper as cas
+import numpy as np
 from giskardpy.god_map import god_map
 from giskardpy.data_types.data_types import Derivatives, PrefixName
 from giskardpy.symbol_manager import symbol_manager
@@ -30,7 +31,7 @@ class FreeVariable:
 
         self.horizon_functions = defaultdict(lambda: 0.00001)
         if horizon_functions is None:
-            horizon_functions = {Derivatives.velocity: 0.1,
+            horizon_functions = {Derivatives.velocity: 1,
                                  Derivatives.acceleration: 0.1,
                                  Derivatives.jerk: 0.1}
         self.horizon_functions.update(horizon_functions)
@@ -106,11 +107,11 @@ class FreeVariable:
 
     @memoize
     @profile
-    def normalized_weight(self, t: int, derivative: Derivatives, prediction_horizon: int,
+    def normalized_weight(self, t: int, derivative: Derivatives, prediction_horizon: int, alpha: float,
                           evaluated: bool = False) -> Union[Union[cas.Symbol, float], float]:
         weight = self.quadratic_weights[derivative]
         if prediction_horizon > 1:
-            start = weight * self.horizon_functions[derivative]
+            start = weight * alpha
             a = (weight - start) / (prediction_horizon-1)
             weight = a * t + start
         expr = weight * (1 / self.get_upper_limit(derivative)) ** 2

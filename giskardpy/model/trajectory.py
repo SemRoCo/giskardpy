@@ -135,7 +135,7 @@ class Trajectory:
             colors = list(mcolors.TABLEAU_COLORS.keys())
             colors.append('k')
 
-            line_styles = ['-', '--', '-.', ':']
+            line_styles = ['-', '--', '-.', ':', (0, (3, 1, 1, 1, 1, 1))]
             graph_styles = list(product(line_styles, colors))
             color_map: Dict[str, Tuple[str, str]] = defaultdict(lambda: graph_styles[len(color_map) + 1])
             data = self.to_dict(normalize_position, filter_0_vel=filter_0_vel)

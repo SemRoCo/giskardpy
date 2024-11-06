@@ -32,6 +32,7 @@ from giskardpy.model.trajectory import Trajectory
 from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint
 from giskardpy.qp.qp_controller import ControllerMode
 from giskardpy.qp.qp_solver_ids import SupportedQPSolver
+from motion_graph.tasks.cartesian_tasks import CartesianPoseAsTask
 from utils_for_tests import pr2_urdf
 
 try:
@@ -46,6 +47,7 @@ except ImportError as e:
 
 try:
     from giskardpy_ros.ros2 import rospy
+
     rospy.init_node('giskard')
 except ImportError as e:
     pass
@@ -629,7 +631,7 @@ class TestWorld:
 
 class Simulator:
     def __init__(self, world: WorldTree, control_dt: float, mpc_dt: float, h: int, solver: SupportedQPSolver,
-                 qp_formulation: ControllerMode, joint_names: List[PrefixName], goal: float):
+                 qp_formulation: ControllerMode):
         god_map.tmp_folder = '.'
         self.reset()
         self.world = world
@@ -640,15 +642,30 @@ class Simulator:
         self.qp_formulation = qp_formulation
         self.max_derivative = Derivatives.jerk
 
-        self.goal = {}
-        goal_name = PrefixName(f'goal')
+    def add_cart_goal(self, root_link: PrefixName, tip_link: PrefixName, x_goal: float):
+        goal_name = PrefixName(f'x_goal')
+        v = self.world.add_virtual_free_variable(goal_name)
+        self.world.state[v.name].position = x_goal
+        self.cart_goal = cas.TransMatrix.from_xyz_rpy(x=v.get_symbol(Derivatives.position),
+                                                      reference_frame=root_link,
+                                                      child_frame=tip_link)
+        task = CartesianPoseAsTask(name='cart g1', root_link=root_link, tip_link=tip_link,
+                                   goal_pose=self.cart_goal, absolute=True)
+
+        god_map.motion_graph_manager.add_task(task)
+
+    def add_joint_goal(self, joint_names: List[PrefixName], goal: float):
+        self.joint_goal = {}
+        goal_name = PrefixName(f'joint_goal')
         v = self.world.add_virtual_free_variable(goal_name)
         self.world.state[v.name].position = goal
         for joint_name in joint_names:
-            self.goal[joint_name] = v.get_symbol(Derivatives.position)
-        joint_task = JointPositionList(name='g1', goal_state=self.goal)
+            self.joint_goal[joint_name] = v.get_symbol(Derivatives.position)
+        joint_task = JointPositionList(name='g1', goal_state=self.joint_goal)
 
         god_map.motion_graph_manager.add_task(joint_task)
+
+    def compile(self):
         god_map.motion_graph_manager.initialize_states()
 
         eq, neq, neqd, lin_weight, quad_weight = god_map.motion_graph_manager.get_constraints_from_tasks()
@@ -656,8 +673,9 @@ class Simulator:
                                              solver_id=self.solver,
                                              prediction_horizon=self.h,
                                              max_derivative=self.max_derivative,
-                                             qp_formulation=self.qp_formulation)
-        god_map.qp_controller.init(free_variables=self.get_active_free_symbols(eq,neq,neqd),
+                                             qp_formulation=self.qp_formulation,
+                                             verbose=False)
+        god_map.qp_controller.init(free_variables=self.get_active_free_symbols(eq, neq, neqd),
                                    equality_constraints=eq)
         god_map.qp_controller.compile()
         self.traj = Trajectory()
@@ -691,7 +709,7 @@ class Simulator:
         next_cmd = god_map.qp_controller.get_cmd(substitutions)
         qp_time = time.time() - qp_time_start
 
-        self.world.update_state(next_cmd, self.control_dt, self.max_derivative)
+        self.world.update_state(next_cmd, self.control_dt, god_map.qp_controller.max_derivative)
 
         self.world.notify_state_change()
         total_time = time.time() - total_time_start
@@ -700,8 +718,11 @@ class Simulator:
         god_map.control_cycle_counter += 1
         return total_time, parameter_time, qp_time
 
-    def update_goal(self, new_value: float):
-        self.world.state['goal'].position = new_value
+    def update_joint_goal(self, new_value: float):
+        self.world.state['joint_goal'].position = new_value
+
+    def update_cart_goal(self, new_value: float):
+        self.world.state['x_goal'].position = new_value
 
     def plot_traj(self):
         self.traj.plot_trajectory('test', sample_period=self.control_dt, filter_0_vel=False)
@@ -721,7 +742,7 @@ class TestController:
                               mpc_dt=0.05,
                               h=9,
                               solver=SupportedQPSolver.qpSWIFT,
-                              qp_formulation=ControllerMode.explicit_no_acc,
+                              qp_formulation=ControllerMode.explicit,
                               joint_names=[joint_name],
                               goal=goal)
 
@@ -734,7 +755,7 @@ class TestController:
                 simulator.step()
                 if god_map.time > next_swap:
                     # goal *= -1
-                    simulator.update_goal(goal)
+                    simulator.update_joint_goal(goal)
                     next_swap += swap_distance
 
         except Exception as e:
@@ -754,18 +775,31 @@ class TestController:
         sim_time = 4
         goal = -0.9
         pr2_world.update_default_weights({Derivatives.velocity: 0.01,
-                                          Derivatives.acceleration: 0,
+                                          Derivatives.acceleration: 0.0,
                                           Derivatives.jerk: 0.0})
+        pr2_world.update_default_limits({
+            Derivatives.velocity: 1,
+            Derivatives.acceleration: np.inf,
+            Derivatives.jerk: 100
+        })
         simulator = Simulator(world=pr2_world,
-                              control_dt=0.05,
+                              control_dt=0.02,
                               mpc_dt=0.05,
                               h=9,
-                              solver=SupportedQPSolver.mosek,
-                              qp_formulation=ControllerMode.explicit_no_acc,
-                              joint_names=pr2_world.movable_joint_names[14:15],
-                              # joint_names=pr2_world.movable_joint_names[:14],
-                              # joint_names=pr2_world.movable_joint_names[:-1],
-                              goal=goal)
+                              solver=SupportedQPSolver.qpSWIFT,
+                              qp_formulation=ControllerMode.explicit)
+        simulator.add_joint_goal(
+            joint_names=pr2_world.movable_joint_names[:1],
+            # joint_names=pr2_world.movable_joint_names[14:15],
+            # joint_names=pr2_world.movable_joint_names[:35],
+            # joint_names=pr2_world.movable_joint_names[27:31],
+            # joint_names=pr2_world.movable_joint_names[:-1],
+            # joint_names=[
+            #     pr2_world.movable_joint_names[27],
+            #     pr2_world.movable_joint_names[31]
+            # ],
+            goal=goal)
+        simulator.compile()
 
         np.random.seed(69)
         swap_distance = 2
@@ -773,10 +807,67 @@ class TestController:
         try:
             while god_map.time < sim_time:
                 simulator.step()
+                goal = np.random.rand() * 2 -1
+                simulator.update_joint_goal(goal)
+                # if god_map.time > next_swap:
+                #     goal *= -1
+                #     simulator.update_joint_goal(goal)
+                #     next_swap += swap_distance
+
+        except Exception as e:
+            traceback.print_exc()
+            print(e)
+            assert False
+        finally:
+            simulator.plot_traj()
+
+    def test_cart_goal_pr2(self, pr2_world: WorldTree):
+        sim_time = 4
+        goal = -0.9
+        pr2_world.update_default_weights({Derivatives.velocity: 0.01,
+                                          Derivatives.acceleration: 0.0,
+                                          Derivatives.jerk: 0.0})
+        chain_a, l, chain_b = pr2_world.compute_split_chain(
+            root_link_name=PrefixName('l_gripper_r_finger_tip_link', 'pr2'),
+            tip_link_name=PrefixName('r_gripper_r_finger_tip_link', 'pr2'),
+            add_joints=False, add_links=True, add_fixed_joints=False,
+            add_non_controlled_joints=False)
+        left_right_kin_chain = chain_a + l + chain_b
+        simulator = Simulator(world=pr2_world,
+                              control_dt=0.05,
+                              mpc_dt=0.05,
+                              h=9,
+                              solver=SupportedQPSolver.proxsuite,
+                              qp_formulation=ControllerMode.no_mpc)
+        length = 10
+        tip_link = left_right_kin_chain[0]
+        for i in range(1, len(left_right_kin_chain)):
+            root_link = left_right_kin_chain[i]
+            a, b, c = pr2_world.compute_split_chain(tip_link, root_link, add_joints=True, add_links=False,
+                                                    add_fixed_joints=False, add_non_controlled_joints=True)
+            actual_length = len(a + b + c)
+            if actual_length == length:
+                break
+        print(actual_length)
+        simulator.add_cart_goal(root_link=tip_link,
+                                tip_link=root_link,
+                                x_goal=goal)
+        simulator.compile()
+
+        np.random.seed(69)
+        swap_distance = 1.7
+        next_swap = swap_distance
+        try:
+            while god_map.time < sim_time:
+                simulator.step()
                 if god_map.time > next_swap:
                     goal *= -1
-                    simulator.update_goal(goal)
+                    simulator.update_cart_goal(goal)
                     next_swap += swap_distance
+            h_density = god_map.qp_controller.qp_solver.H_density
+            a_density = god_map.qp_controller.qp_solver.A_density
+            e_density = god_map.qp_controller.qp_solver.E_density
+            print(h_density, a_density, e_density)
 
         except Exception as e:
             traceback.print_exc()
@@ -786,16 +877,24 @@ class TestController:
             simulator.plot_traj()
 
     def test_pr2_joint_benchmark(self, pr2_world: WorldTree):
-
+        # i = 4
+        # solvers = list(SupportedQPSolver)[i:i+1]
         solvers = [
-            SupportedQPSolver.qpSWIFT,
-            SupportedQPSolver.gurobi,
-            SupportedQPSolver.qpalm,
+            # SupportedQPSolver.qpSWIFT,
+            # SupportedQPSolver.qpalm,
+            # SupportedQPSolver.gurobi,
+            # SupportedQPSolver.piqp,
+            # SupportedQPSolver.clarabel,
+            # SupportedQPSolver.cvxopt,
+            # SupportedQPSolver.osqp,
+            # SupportedQPSolver.proxsuite,
+            SupportedQPSolver.daqp,
         ]
         formulations = [
             # ControllerMode.explicit,
             ControllerMode.explicit_no_acc,
-            ControllerMode.implicit
+            ControllerMode.implicit,
+            ControllerMode.no_mpc
         ]
         max_number_of_joints_total = len(pr2_world.movable_joint_names) - 1  # the last joint doesn't work
         sim_time = 4
@@ -810,23 +909,28 @@ class TestController:
         })
 
         # List to store results
-        results = []
-
+        date_str = datetime.now().strftime('%Yy-%mm-%dd--%Hh-%Mm-%Ss')
         for solver in solvers:
+            results = []
+            print(f'solver {solver.name}')
             for formulation in formulations:
-                for num_joints in range(20, max_number_of_joints_total, 10):
+                print(f'formulation {formulation.name}')
+                num_fails = 0
+                for num_joints in range(1, max_number_of_joints_total, 2):
                     gc.collect()
-                    print(f'solver {solver.name}; formulation {formulation.name}; #joints {num_joints}')
+                    print(f'#joints {num_joints}')
                     simulator = Simulator(
                         world=pr2_world,
                         control_dt=control_dt,
                         mpc_dt=mpc_dt,
                         h=horizion,
                         solver=solver,
-                        qp_formulation=formulation,
-                        joint_names=pr2_world.movable_joint_names[0:num_joints],
-                        goal=goal
+                        qp_formulation=formulation
                     )
+                    simulator.add_joint_goal(
+                        joint_names=pr2_world.movable_joint_names[0:num_joints],
+                        goal=goal)
+                    simulator.compile()
 
                     np.random.seed(69)
                     swap_distance = 2
@@ -845,69 +949,202 @@ class TestController:
 
                             if god_map.time > next_swap:
                                 goal *= -1
-                                simulator.update_goal(goal)
+                                simulator.update_joint_goal(goal)
                                 next_swap += swap_distance
-
-
-                        # Append results to the list
-                        results.append({
-                            'Solver': solver.name,
-                            'Formulation': formulation.name,
-                            'Num_Joints': num_joints,
-                            'Total_Time_Sum': np.sum(total_times),
-                            'Total_Time_Avg': np.average(total_times),
-                            'Total_Time_Std': np.std(total_times),
-                            'Total_Time_Min': np.min(total_times),
-                            'Total_Time_Max': np.max(total_times),
-                            'Parameter_Time_Sum': np.sum(parameter_times),
-                            'Parameter_Time_Avg': np.average(parameter_times),
-                            'Parameter_Time_Std': np.std(parameter_times),
-                            'Parameter_Time_Min': np.min(parameter_times),
-                            'Parameter_Time_Max': np.max(parameter_times),
-                            'QP_Time_Sum': np.sum(qp_times),
-                            'QP_Time_Avg': np.average(qp_times),
-                            'QP_Time_Std': np.std(qp_times),
-                            'QP_Time_Min': np.min(qp_times),
-                            'QP_Time_Max': np.max(qp_times),
-                            'Control dt': control_dt,
-                            'horizon': horizion,
-                            'MPC dt': mpc_dt,
-                            'Num_Variables': god_map.qp_controller.num_free_variables,
-                            'Num_Inequality_Constraints': god_map.qp_controller.num_ineq_constraints,
-                            'Num_Equality_Constraints': god_map.qp_controller.num_eq_constraints
-                        })
-
                     except Exception as e:
-                        traceback.print_exc()
+                        # traceback.print_exc()
                         print(e)
-                        assert False
-                    # finally:
-                    #     simulator.plot_traj()
+                        num_fails += 1
+                    h_density = god_map.qp_controller.qp_solver.H_density
+                    a_density = god_map.qp_controller.qp_solver.A_density
+                    e_density = god_map.qp_controller.qp_solver.E_density
+                    total_density = god_map.qp_controller.qp_solver.total_density
+                    # Append results to the list
+                    print(f'number of fails {num_fails}')
+                    results.append({
+                        'Solver': solver.name,
+                        'Formulation': formulation.name,
+                        'Num_Joints': num_joints,
+                        'Total_Time_Sum': np.sum(total_times) if total_times else 100,
+                        'Total_Time_Avg': np.average(total_times) if total_times else 100,
+                        'Total_Time_Std': np.std(total_times) if total_times else 100,
+                        'Total_Time_Min': np.min(total_times) if total_times else 100,
+                        'Total_Time_Max': np.max(total_times) if total_times else 100,
+                        'Total_Time_Median': np.median(total_times) if total_times else 100,
+                        'Parameter_Time_Sum': np.sum(parameter_times) if total_times else 100,
+                        'Parameter_Time_Avg': np.average(parameter_times) if total_times else 100,
+                        'Parameter_Time_Median': np.median(parameter_times) if total_times else 100,
+                        'Parameter_Time_Std': np.std(parameter_times) if total_times else 100,
+                        'Parameter_Time_Min': np.min(parameter_times) if total_times else 100,
+                        'Parameter_Time_Max': np.max(parameter_times) if total_times else 100,
+                        'QP_Time_Sum': np.sum(qp_times) if total_times else 100,
+                        'QP_Time_Avg': np.average(qp_times) if total_times else 100,
+                        'QP_Time_Median': np.median(qp_times) if total_times else 100,
+                        'QP_Time_Std': np.std(qp_times) if total_times else 100,
+                        'QP_Time_Min': np.min(qp_times) if total_times else 100,
+                        'QP_Time_Max': np.max(qp_times) if total_times else 100,
+                        'Num_Fails': num_fails,
+                        'Control dt': control_dt,
+                        'horizon': horizion,
+                        'MPC dt': mpc_dt,
+                        'Num_Variables': god_map.qp_controller.num_free_variables,
+                        'Num_Inequality_Constraints': god_map.qp_controller.num_ineq_constraints,
+                        'Num_Equality_Constraints': god_map.qp_controller.num_eq_constraints,
+                        'H_Density': h_density,
+                        'A_Density': a_density,
+                        'E_Density': e_density,
+                        'Combined_Density': total_density
+                    })
+
+            # Convert results to a Pandas DataFrame
+            df = pd.DataFrame(results)
+            # df.to_csv(f'benchmark_results_{date_str}.csv', index=False)
+            file_name = f'benchmark_joint_results_{solver.name}_{date_str}.pkl'
+            df.to_pickle(file_name)
+            print(f'saved {file_name}')
+
+    def test_pr2_cart_benchmark(self, pr2_world: WorldTree):
+        # i = 4
+        # solvers = list(SupportedQPSolver)[i:i+1]
+        solvers = [
+            # SupportedQPSolver.qpSWIFT,
+            # SupportedQPSolver.qpalm,
+            # SupportedQPSolver.gurobi,
+            # SupportedQPSolver.piqp,
+            # SupportedQPSolver.clarabel,
+            # SupportedQPSolver.osqp,
+            # SupportedQPSolver.cvxopt,
+            # SupportedQPSolver.proxsuite,
+            SupportedQPSolver.daqp,
+        ]
+        formulations = [
+            # ControllerMode.explicit,
+            ControllerMode.explicit_no_acc,
+            ControllerMode.implicit,
+            ControllerMode.no_mpc
+        ]
+        max_chain_length = 18
+        sim_time = 4
+        goal = -0.9
+        mpc_dt = 0.05
+        control_dt = 0.05
+        horizion = 9
+        pr2_world.update_default_weights({
+            Derivatives.velocity: 0.01,
+            Derivatives.acceleration: 0,
+            Derivatives.jerk: 0.0
+        })
+
+        chain_a, l, chain_b = pr2_world.compute_split_chain(
+            root_link_name=PrefixName('l_gripper_r_finger_tip_link', 'pr2'),
+            tip_link_name=PrefixName('r_gripper_r_finger_tip_link', 'pr2'),
+            add_joints=False, add_links=True, add_fixed_joints=False,
+            add_non_controlled_joints=False)
+        left_right_kin_chain = chain_a + l + chain_b
+
+        # List to store results
         date_str = datetime.now().strftime('%Yy-%mm-%dd--%Hh-%Mm-%Ss')
-        # Convert results to a Pandas DataFrame
-        df = pd.DataFrame(results)
-        # df.to_csv(f'benchmark_results_{date_str}.csv', index=False)
-        df.to_pickle(f'benchmark_results_{date_str}.pkl')
+        for solver in solvers:
+            print(f'solver {solver.name}')
+            results = []
+            for formulation in formulations:
+                print(f'formulation {formulation.name}')
+                num_fails = 0
+                for num_joints in range(1, max_chain_length):
+                    gc.collect()
+                    print(f'#joints {num_joints}')
+                    simulator = Simulator(
+                        world=pr2_world,
+                        control_dt=control_dt,
+                        mpc_dt=mpc_dt,
+                        h=horizion,
+                        solver=solver,
+                        qp_formulation=formulation
+                    )
+                    tip_link = left_right_kin_chain[0]
+                    for i in range(1, len(left_right_kin_chain)):
+                        root_link = left_right_kin_chain[i]
+                        a, b, c = pr2_world.compute_split_chain(tip_link, root_link, add_joints=True, add_links=False,
+                                                                add_fixed_joints=False, add_non_controlled_joints=True)
+                        actual_num_joints = len(a + b + c)
+                        if actual_num_joints == num_joints:
+                            break
+                    simulator.add_cart_goal(root_link=tip_link,
+                                            tip_link=root_link,
+                                            x_goal=goal)
+                    simulator.compile()
 
-        # Plotting the results
-        # sns.set(style="whitegrid")
-        # plt.figure(figsize=(12, 6))
-        # sns.lineplot(
-        #     data=df,
-        #     x='Num_Joints',
-        #     y='Avg_Solve_Time',
-        #     style='Formulation',
-        #     hue='Solver',
-        #     markers=True,
-        #     dashes=False
-        # )
-        # plt.title('Average Solve Time vs. Number of Joints')
-        # plt.xlabel('Number of Joints')
-        # plt.ylabel('Average Solve Time (s)')
-        # plt.legend(title='Solver/Formulation', loc='upper left')
-        # plt.tight_layout()
-        # plt.savefig('benchmark.pdf')
-        # plt.show()
+                    np.random.seed(69)
+                    swap_distance = 1.7
+                    next_swap = swap_distance
 
-import pytest
-pytest.main(['-s', __file__ + '::TestController::test_joint_goal_pr2'])
+                    # Variables to collect statistics
+                    total_times, parameter_times, qp_times = [], [], []
+
+                    try:
+                        while god_map.time < sim_time:
+                            total_time, parameter_time, qp_time = simulator.step()
+
+                            total_times.append(total_time)
+                            parameter_times.append(parameter_time)
+                            qp_times.append(qp_time)
+
+                            if god_map.time > next_swap:
+                                goal *= -1
+                                simulator.update_joint_goal(goal)
+                                next_swap += swap_distance
+                    except Exception as e:
+                        # traceback.print_exc()
+                        print(e)
+                        num_fails += 1
+                        next_swap += swap_distance
+                    h_density = god_map.qp_controller.qp_solver.H_density
+                    a_density = god_map.qp_controller.qp_solver.A_density
+                    e_density = god_map.qp_controller.qp_solver.E_density
+                    total_density = god_map.qp_controller.qp_solver.total_density
+                    # Append results to the list
+                    print(f'number of fails {num_fails}')
+                    results.append({
+                        'Solver': solver.name,
+                        'Formulation': formulation.name,
+                        'Num_Joints': num_joints,
+                        'Total_Time_Sum': np.sum(total_times) if total_times else 100,
+                        'Total_Time_Avg': np.average(total_times) if total_times else 100,
+                        'Total_Time_Std': np.std(total_times) if total_times else 100,
+                        'Total_Time_Min': np.min(total_times) if total_times else 100,
+                        'Total_Time_Max': np.max(total_times) if total_times else 100,
+                        'Total_Time_Median': np.median(total_times) if total_times else 100,
+                        'Parameter_Time_Sum': np.sum(parameter_times) if total_times else 100,
+                        'Parameter_Time_Avg': np.average(parameter_times) if total_times else 100,
+                        'Parameter_Time_Median': np.median(parameter_times) if total_times else 100,
+                        'Parameter_Time_Std': np.std(parameter_times) if total_times else 100,
+                        'Parameter_Time_Min': np.min(parameter_times) if total_times else 100,
+                        'Parameter_Time_Max': np.max(parameter_times) if total_times else 100,
+                        'QP_Time_Sum': np.sum(qp_times) if total_times else 100,
+                        'QP_Time_Avg': np.average(qp_times) if total_times else 100,
+                        'QP_Time_Median': np.median(qp_times) if total_times else 100,
+                        'QP_Time_Std': np.std(qp_times) if total_times else 100,
+                        'QP_Time_Min': np.min(qp_times) if total_times else 100,
+                        'QP_Time_Max': np.max(qp_times) if total_times else 100,
+                        'Num_Fails': num_fails,
+                        'Control dt': control_dt,
+                        'horizon': horizion,
+                        'MPC dt': mpc_dt,
+                        'Num_Variables': god_map.qp_controller.num_free_variables,
+                        'Num_Inequality_Constraints': god_map.qp_controller.num_ineq_constraints,
+                        'Num_Equality_Constraints': god_map.qp_controller.num_eq_constraints,
+                        'H_Density': h_density,
+                        'A_Density': a_density,
+                        'E_Density': e_density,
+                        'Combined_Density': total_density
+                    })
+
+            # Convert results to a Pandas DataFrame
+            df = pd.DataFrame(results)
+            # df.to_csv(f'benchmark_results_{date_str}.csv', index=False)
+            file_name = f'benchmark_cart_results_{solver.name}_{date_str}.pkl'
+            df.to_pickle(file_name)
+            print(f'saved {file_name}')
+
+# import pytest
+# pytest.main(['-s', __file__ + '::TestController::test_joint_goal_pr2'])

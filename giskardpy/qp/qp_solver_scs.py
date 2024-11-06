@@ -31,7 +31,7 @@ class QPSolverSCS(QPSolverClarabel):
             'l': h.shape[0],
         }
 
-        solver = scs.SCS(data, cone, verbose=False)
+        solver = scs.SCS(data, cone, verbose=False, eps_abs=5e-4, eps_rel=5e-4)
         result = solver.solve()
         if result['info']['status_val'] != scs.SOLVED:
             raise InfeasibleException(f'Failed to solve qp: {str(result["info"]["status"])}')

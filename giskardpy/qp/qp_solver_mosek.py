@@ -41,7 +41,7 @@ class QPSolverMosek(QPSolverGurobi):
                         A x <= h
                         lb <= x <= ub
         """
-        H = sp.diags(H, offsets=0, format='coo')
+        H = sp.diags(H+self.regularization_value, offsets=0, format='coo')
 
         # Helper function to print log output from MOSEK
         def streamprinter(text):
@@ -70,10 +70,6 @@ class QPSolverMosek(QPSolverGurobi):
 
                 # Set the bounds on variables
                 inf = 0.0
-                # inf = mosek.infinity
-                bkx = []
-                blx = []
-                bux = []
 
                 for i in range(n):
                     lbi = lb[i]

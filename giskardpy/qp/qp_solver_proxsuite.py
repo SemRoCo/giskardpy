@@ -15,14 +15,17 @@ class QPSolverProxsuite(QPSolver):
     """
     min_x 0.5 x^T H x + g^T x
     s.t.  Ex = b
+          lb <= x <= ub
           lbA <= Ax <= ubA
     """
     sparse = True
+    compute_nI_I = True
 
     @profile
     def __init__(self, weights: cas.Expression, g: cas.Expression, lb: cas.Expression, ub: cas.Expression,
                  E: cas.Expression, E_slack: cas.Expression, bE: cas.Expression,
                  A: cas.Expression, A_slack: cas.Expression, lbA: cas.Expression, ubA: cas.Expression):
+        self.set_density(weights, E, E_slack, A, A_slack)
         self.num_eq_constraints = bE.shape[0]
         self.num_neq_constraints = lbA.shape[0]
         self.num_free_variable_constraints = lb.shape[0]
@@ -91,14 +94,13 @@ class QPSolverProxsuite(QPSolver):
         if self.num_filtered_eq_constraints > 0:
             self.bE_filter[-len(self.bE_part):] = self.bE_part
 
-        self.b_bA_filter = np.ones(self.lb.shape[0] + self.lbA.shape[0], dtype=bool)
-        self.b_zero_inf_filter_view = self.b_bA_filter[:self.lb.shape[0]]
-        self.bA_filter = self.b_bA_filter[self.lb.shape[0]:]
+        self.bA_filter = np.ones(self.lbA.shape[0], dtype=bool)
+        # self.b_filter = np.ones(self.lb.shape[0], dtype=bool)
 
-        self.b_zero_filter = self.weight_filter.copy()
-        self.b_finite_filter = np.isfinite(self.lb) | np.isfinite(self.ub)
-        self.b_zero_inf_filter_view[::] = self.b_zero_filter & self.b_finite_filter
-        self.Ai_inf_filter = self.b_finite_filter[self.b_zero_filter]
+        # self.b_zero_filter = self.weight_filter.copy()
+        # self.b_finite_filter = np.isfinite(self.lb) | np.isfinite(self.ub)
+        # self.b_zero_inf_filter_view[::] = self.b_zero_filter & self.b_finite_filter
+        self.Ai_inf_filter = self.weight_filter
 
         if len(self.bA_part) > 0:
             self.bA_filter[-len(self.bA_part):] = self.bA_part
@@ -108,8 +110,9 @@ class QPSolverProxsuite(QPSolver):
         self.weights = self.weights[self.weight_filter]
         self.g = self.g[self.weight_filter]
         self.bE = self.bE[self.bE_filter]
-        self.lb_lbA = self.lb_lbA[self.b_bA_filter]
-        self.ub_ubA = self.ub_ubA[self.b_bA_filter]
+        self.lbA = self.lbA[self.bA_filter]
+        self.ubA = self.ubA[self.bA_filter]
+        self.lb, self.ub = self.lb[self.weight_filter], self.ub[self.weight_filter]
         if self.num_filtered_eq_constraints > 0:
             self.E = self.E[self.bE_filter, :][:, self.weight_filter]
         else:
@@ -123,27 +126,37 @@ class QPSolverProxsuite(QPSolver):
             self.Ai = self._direct_limit_model(self.weights.shape[0], self.Ai_inf_filter)
 
     @profile
-    def problem_data_to_qp_format(self) -> Tuple[sp.csc_matrix, np.ndarray, sp.csc_matrix, np.ndarray, sp.csc_matrix, np.ndarray, np.ndarray]:
-        H = sp.diags(self.weights)
+    def problem_data_to_qp_format(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        # H = np.diag(self.weights)
+        H = sp.diags(self.weights+self.regularization_value, offsets=0, format='csc')
+        E = self.E
+        # if np.product(self.A.shape) == 0:
+        #     A = self.A
+        # else:
+        #     A = self.A.toarray()
+        # E = self.E.toarray()
         if np.product(self.A.shape) > 0:
             A = sp.vstack((self.Ai, self.A))
         else:
             A = self.Ai
-        return H, self.g, self.E, self.bE, A, self.lb_lbA, self.ub_ubA
+        return H, self.g, E, self.bE, A, self.lbA, self.ubA, self.lb, self.ub
 
     @record_time
     @profile
-    def solver_call(self, H: sp.csc_matrix, g: np.ndarray, E: sp.csc_matrix, b: np.ndarray, A: sp.csc_matrix,
-                    lbA: np.ndarray, ubA: np.ndarray) -> np.ndarray:
-        H = H.toarray()
-        A = A.toarray()
-        E = E.toarray()
-        qp = proxqp.dense.QP(H.shape[0], E.shape[0], A.shape[0])
-        qp.init(H, g, E, b, A, lbA, ubA)
+    def solver_call(self, H: np.ndarray, g: np.ndarray, E: np.ndarray, b: np.ndarray, A: np.ndarray,
+                    lbA: np.ndarray, ubA: np.ndarray, lb: np.ndarray, ub: np.ndarray) -> np.ndarray:
+        lx = np.concatenate((lb, lbA))
+        ux = np.concatenate((ub, ubA))
+        qp = proxqp.sparse.QP(H != 0, E != 0, A != 0)
+        qp.settings.eps_abs = 1e-4
+        qp.settings.eps_rel = 1e-4
+        if len(lx) == 0:
+            A, lbA, ubA = None, None, None
+        qp.init(H=H, g=g, A=E, b=b, C=A, l=lx, u=ux)
         qp.solve()
         if qp.results.info.status.value != 0:
-            qp.settings.verbose = True
-            qp.solve()
+            # qp.settings.verbose = True
+            # qp.solve()
             raise InfeasibleException(f'Failed to solve qp: {qp.results.info.status.name}')
         return qp.results.x
 
@@ -162,24 +175,19 @@ class QPSolverProxsuite(QPSolver):
         """
         :return: weights, g, lb, ub, E, bE, A, lbA, ubA, weight_filter, b_filter, bE_filter, bA_filter
         """
-        num_b = np.where(self.b_zero_inf_filter_view)[0].shape[0]
-        num_bE = np.where(self.bE_filter)[0].shape[0]
         weights = self.weights
         g = self.g
-        lb = self.lb_lbA[:num_b]
-        ub = self.ub_ubA[:num_b]
-        lb, ub = self.lb_ub_with_inf(lb, ub)
+        # lb, ub = self.lb_ub_with_inf(lb, ub)
         bE = self.bE
-        lbA = self.lb_lbA[num_b:]
-        ubA = self.ub_ubA[num_b:]
 
         E = self.E
         A = self.A
         if self.sparse:
             E = E.toarray()
-            A = A.toarray()
+            if np.product(A.shape) > 0:
+                A = A.toarray()
 
-        return weights, g, lb, ub, E, bE, A, lbA, ubA, self.weight_filter, self.bE_filter, self.bA_filter
+        return weights, g, self.lb, self.ub, E, bE, A, self.lbA, self.ubA, self.weight_filter, self.bE_filter, self.bA_filter
 
     @profile
     def relaxed_problem_data_to_qp_format(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
@@ -187,8 +195,8 @@ class QPSolverProxsuite(QPSolver):
         if self.retries_with_relaxed_constraints <= 0:
             raise HardConstraintsViolatedException('Out of retries with relaxed hard constraints.')
         lb_filter, lbA_relaxed, ub_filter, ubA_relaxed, relaxed_qp_data = self.compute_violated_constraints(
-            self.lb[self.b_zero_inf_filter_view],
-            self.ub[self.b_zero_inf_filter_view])
+            self.lb[self.weight_filter],
+            self.ub[self.weight_filter])
         if np.any(lb_filter) or np.any(ub_filter):
             self.weights[ub_filter | lb_filter] *= self.retry_weight_factor
             self.lb_bE_lbA = lbA_relaxed
@@ -203,21 +211,19 @@ class QPSolverProxsuite(QPSolver):
     def compute_violated_constraints(self, filtered_lb: np.ndarray, filtered_ub: np.ndarray):
         lb_relaxed = filtered_lb.copy()
         ub_relaxed = filtered_ub.copy()
-        slack_finite_filter = self.b_finite_filter[-(self.num_eq_slack_variables + self.num_neq_slack_variables):]
+        slack_finite_filter = self.weight_filter[-(self.num_eq_slack_variables + self.num_neq_slack_variables):]
         num_constraints_not_filtered = np.where(self.slack_part[slack_finite_filter])[0].shape[0]
         lb_relaxed[-num_constraints_not_filtered:] -= self.retry_added_slack
         ub_relaxed[-num_constraints_not_filtered:] += self.retry_added_slack
         try:
-            H, g, A, lbA, ubA = self.problem_data_to_qp_format()
-            all_lbA_relaxed = np.concatenate([lb_relaxed, lbA[lb_relaxed.shape[0]:]])
-            all_ubA_relaxed = np.concatenate([ub_relaxed, ubA[ub_relaxed.shape[0]:]])
-            xdot_full = self.solver_call(H=H, g=g, A=A, lbA=all_lbA_relaxed, ubA=all_ubA_relaxed)
+            H, g, E, bE, A, lbA, ubA, lb, ub = self.problem_data_to_qp_format()
+            xdot_full = self.solver_call(H=H, g=g, E=E, b=bE, A=A, lbA=lbA, ubA=ubA, lb=lb_relaxed, ub=ub_relaxed)
         except QPSolverException as e:
             self.retries_with_relaxed_constraints += 1
             raise e
         eps = 1e-4
-        lower_violations = xdot_full < self.lb[self.b_zero_filter] - eps
-        upper_violations = xdot_full > self.ub[self.b_zero_filter] + eps
+        lower_violations = xdot_full < self.lb[self.weight_filter] - eps
+        upper_violations = xdot_full > self.ub[self.weight_filter] + eps
         lower_violations[:-num_constraints_not_filtered] = False
         upper_violations[:-num_constraints_not_filtered] = False
         # revert previous relaxations

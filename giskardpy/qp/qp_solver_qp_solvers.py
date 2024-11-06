@@ -1,13 +1,15 @@
-
 import numpy as np
+from giskardpy.qp.qp_solver_gurobi import QPSolverGurobi
 from qpsolvers import solve_qp
 
 from giskardpy.data_types.exceptions import QPSolverException, InfeasibleException, HardConstraintsViolatedException
 from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.qp.qp_solver_ids import SupportedQPSolver
 from line_profiler import profile
+import scipy.sparse as sp
 
-class QPSolverQPSolvers(QPSolver):
+
+class QPSolverQPSolvers(QPSolverGurobi):
     """
     min_x 0.5 x^T P x + q^T x
     s.t.  Ax = b
@@ -19,31 +21,18 @@ class QPSolverQPSolvers(QPSolver):
     opts = {}
 
     @profile
-    def solve(self, weights: np.ndarray, g: np.ndarray, A: np.ndarray, lb: np.ndarray, ub: np.ndarray, lbA: np.ndarray,
-              ubA: np.ndarray) -> np.ndarray:
-        # A_b = np.eye(lb.shape[0])
-        G = np.vstack([-A, A])
-        P = np.diag(weights)
-        h = np.concatenate([-lbA, ubA])
-        result = solve_qp(P=P, q=g, G=G, h=h, lb=lb, ub=ub, solver='highs')
-        if result is None:
+    def solver_call(self, H: np.ndarray, g: np.ndarray, E: sp.csc_matrix, b: np.ndarray, A: sp.csc_matrix,
+                    lb: np.ndarray,
+                    ub: np.ndarray, h: np.ndarray) -> np.ndarray:
+        H = sp.diags(H, offsets=0, format='csc')
+        # H = np.diag(H+self.regularization_value)
+        # E = E.toarray()
+        # try:
+            # A = A.toarray()
+        # except:
+        #     A = None
+        #     h = None
+        result = np.array(solve_qp(P=H, q=g, G=A, h=h, A=E, b=b, lb=lb, ub=ub, solver='proxqp'))
+        if len(result.shape) == 0:
             raise InfeasibleException('idk')
         return result
-
-    # @profile
-    def solve_and_retry(self, weights, g, A, lb, ub, lbA, ubA):
-        exception = None
-        for i in range(2):
-            try:
-                return self.solve(weights, g, A, lb, ub, lbA, ubA)
-            except QPSolverException as e:
-                exception = e
-                try:
-                    weights, lb, ub = self.compute_relaxed_hard_constraints(weights, g, A, lb, ub, lbA, ubA)
-                    logging.loginfo(f'{e}; retrying with relaxed hard constraints')
-                except InfeasibleException as e2:
-                    if isinstance(e2, HardConstraintsViolatedException):
-                        raise e2
-                    raise e
-                continue
-        raise exception

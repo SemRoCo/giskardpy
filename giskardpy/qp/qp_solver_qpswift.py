@@ -145,7 +145,6 @@ class QPSolverQPSwift(QPSWIFTFormatter):
         ub_with_inf = ub_with_inf[self.weight_filter]
         return lb_with_inf, ub_with_inf
 
-
     def compute_violated_constraints(self, weights: np.ndarray, nA_A: np.ndarray, nlb: np.ndarray,
                                      ub: np.ndarray, nlbA_ubA: np.ndarray):
         nlb_relaxed = nlb.copy()
@@ -197,7 +196,7 @@ class QPSolverQPSwift(QPSWIFTFormatter):
 
     @profile
     def problem_data_to_qp_format(self) \
-            -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+            -> Tuple[sp.csc_matrix, np.ndarray, sp.csc_matrix, np.ndarray, sp.csc_matrix, np.ndarray]:
         H = sp.diags(self.weights, offsets=0, format='csc')
         if np.product(self.nA_A.shape) > 0:
             A = sp.vstack((self.nAi_Ai, self.nA_A))

@@ -14,7 +14,7 @@ class JointGroupVelController(GiskardBehavior):
     def __init__(self, namespace):
         super().__init__(namespace)
         self.namespace = namespace
-        self.cmd_topic = f'{self.namespace}/command'
+        self.cmd_topic = f'/{self.namespace}/command'
         wait_for_topic_to_appear(topic_name=self.cmd_topic, supported_types=[Float64MultiArray])
         self.cmd_pub = rospy.Publisher(self.cmd_topic, Float64MultiArray, queue_size=10)
         self.joint_names = rospy.get_param(f'{self.namespace}/joints')

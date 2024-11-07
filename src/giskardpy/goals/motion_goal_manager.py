@@ -12,13 +12,14 @@ from giskardpy.goals.collision_avoidance import ExternalCollisionAvoidance, Self
 from giskardpy.goals.goal import Goal
 import giskard_msgs.msg as giskard_msgs
 from giskardpy.god_map import god_map
-from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint, \
-    ManipulabilityConstraint
-from giskardpy.symbol_manager import symbol_manager
-from giskardpy.tasks.task import Task
+from giskardpy.motion_graph.helpers import compile_graph_node_state_updater
+from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint
+from giskardpy.motion_graph.tasks.task import Task
 from giskardpy.utils import logging
 from giskardpy.utils.utils import get_all_classes_in_package, convert_dictionary_to_ros_message, \
     json_str_to_kwargs, ImmutableDict
+from giskardpy.qp.weight_gain import QuadraticWeightGain, LinearWeightGain
+
 
 
 class MotionGoalManager:
@@ -30,7 +31,7 @@ class MotionGoalManager:
 
     def __init__(self):
         self.motion_goals = {}
-        self.tasks = {}
+        self.tasks = OrderedDict()
         self.allowed_motion_goal_types = {}
         self.state_history = []
         for path in god_map.giskard.goal_package_paths:
@@ -54,7 +55,7 @@ class MotionGoalManager:
                 hold_condition = god_map.monitor_manager.logic_str_to_expr(motion_goal.hold_condition,
                                                                            default=cas.FalseSymbol)
                 end_condition = god_map.monitor_manager.logic_str_to_expr(motion_goal.end_condition,
-                                                                          default=cas.TrueSymbol)
+                                                                          default=cas.FalseSymbol)
                 c: Goal = C(name=motion_goal.name,
                             start_condition=start_condition,
                             hold_condition=hold_condition,
@@ -87,50 +88,11 @@ class MotionGoalManager:
             if task.name in self.tasks:
                 raise DuplicateNameException(f'Task names {task.name} already exists.')
             self.tasks[task.name] = task
-            task.set_id(len(self.tasks) - 1)
+            task.id = len(self.tasks) - 1
 
     @profile
     def compile_task_state_updater(self):
-        symbols = []
-        for task in sorted(self.tasks.values(), key=lambda x: x.id):
-            symbols.append(task.get_state_expression())
-        task_state = cas.Expression(symbols)
-        symbols = []
-        for i, monitor in enumerate(god_map.monitor_manager.monitors):
-            symbols.append(monitor.get_state_expression())
-        monitor_state = cas.Expression(symbols)
-
-        state_updater = []
-        for task in sorted(self.tasks.values(), key=lambda x: x.id):
-            state_symbol = task_state[task.id]
-
-            if not cas.is_true(task.start_condition):
-                start_if = cas.if_else(task.start_condition,
-                                       if_result=int(TaskState.running),
-                                       else_result=state_symbol)
-            else:
-                start_if = state_symbol
-            if not cas.is_true(task.hold_condition):
-                hold_if = cas.if_else(task.hold_condition,
-                                      if_result=int(TaskState.on_hold),
-                                      else_result=int(TaskState.running))
-            else:
-                hold_if = state_symbol
-            if not cas.is_true(task.end_condition):
-                else_result = cas.if_else(task.end_condition,
-                                          if_result=int(TaskState.succeeded),
-                                          else_result=hold_if)
-            else:
-                else_result = hold_if
-
-            state_f = cas.if_eq_cases(a=state_symbol,
-                                      b_result_cases=[(int(TaskState.not_started), start_if),
-                                                      (int(TaskState.succeeded), int(TaskState.succeeded))],
-                                      else_result=else_result)  # running or on_hold
-            state_updater.append(state_f)
-        state_updater = cas.Expression(state_updater)
-        symbols = task_state.free_symbols() + monitor_state.free_symbols()
-        self.compiled_state_updater = state_updater.compile(symbols)
+        self.compiled_state_updater = compile_graph_node_state_updater(self.tasks)
 
     @profile
     def update_task_state(self, new_state: np.ndarray) -> None:
@@ -253,17 +215,20 @@ class MotionGoalManager:
             -> Tuple[Dict[str, EqualityConstraint],
             Dict[str, InequalityConstraint],
             Dict[str, DerivativeInequalityConstraint],
-            Dict[str, ManipulabilityConstraint]]:
+            Dict[str, QuadraticWeightGain],
+            Dict[str, LinearWeightGain]]:
         eq_constraints = ImmutableDict()
         neq_constraints = ImmutableDict()
         derivative_constraints = ImmutableDict()
-        manip_constraints = ImmutableDict()
+        quadratic_weight_gains = ImmutableDict()
+        linear_weight_gains = ImmutableDict()
         for goal_name, goal in list(self.motion_goals.items()):
             try:
                 new_eq_constraints = OrderedDict()
                 new_neq_constraints = OrderedDict()
                 new_derivative_constraints = OrderedDict()
-                new_manip_constraints = OrderedDict()
+                new_quadratic_weight_gains = OrderedDict()
+                new_linear_weight_gains = OrderedDict()
                 for task in goal.tasks:
                     for constraint in task.get_eq_constraints():
                         new_eq_constraints[constraint.name] = constraint
@@ -271,20 +236,24 @@ class MotionGoalManager:
                         new_neq_constraints[constraint.name] = constraint
                     for constraint in task.get_derivative_constraints():
                         new_derivative_constraints[constraint.name] = constraint
-                    for constraint in task.get_manipulability_constraint():
-                        new_manip_constraints[constraint.name] = constraint
+                    for gain in task.get_quadratic_gains():
+                        new_quadratic_weight_gains[gain.name] = gain
+                    for gain in task.get_linear_gains():
+                        new_linear_weight_gains[gain.name] = gain
             except Exception as e:
                 raise GoalInitalizationException(str(e))
             eq_constraints.update(new_eq_constraints)
             neq_constraints.update(new_neq_constraints)
             derivative_constraints.update(new_derivative_constraints)
-            manip_constraints.update(new_manip_constraints)
+            quadratic_weight_gains.update(new_quadratic_weight_gains)
+            linear_weight_gains.update(new_linear_weight_gains)
             # logging.loginfo(f'{goal_name} added {len(_constraints)+len(_vel_constraints)} constraints.')
         god_map.eq_constraints = eq_constraints
         god_map.neq_constraints = neq_constraints
         god_map.derivative_constraints = derivative_constraints
-        god_map.manip_constraints = manip_constraints
-        return eq_constraints, neq_constraints, derivative_constraints, manip_constraints
+        god_map.quadratic_weight_gains = quadratic_weight_gains
+        god_map.linear_weight_gains = linear_weight_gains
+        return eq_constraints, neq_constraints, derivative_constraints, quadratic_weight_gains, linear_weight_gains
 
     def replace_jsons_with_ros_messages(self, d):
         if isinstance(d, list):

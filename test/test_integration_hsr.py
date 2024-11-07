@@ -3,7 +3,7 @@ from typing import Optional
 
 import numpy as np
 import pytest
-from geometry_msgs.msg import PoseStamped, Point, Quaternion, PointStamped, Vector3Stamped, Vector3
+from geometry_msgs.msg import PoseStamped, Point, Quaternion, PointStamped, Vector3Stamped
 from numpy import pi
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
@@ -11,7 +11,7 @@ from giskard_msgs.msg import GiskardError
 from giskardpy.configs.behavior_tree_config import StandAloneBTConfig
 from giskardpy.configs.giskard import Giskard
 from giskardpy.configs.iai_robots.hsr import HSRCollisionAvoidanceConfig, WorldWithHSRConfig, HSRStandaloneInterface
-from giskardpy.configs.qp_controller_config import QPControllerConfig
+from giskardpy.configs.qp_controller_config import QPControllerConfig, SupportedQPSolver
 from giskardpy.god_map import god_map
 from giskardpy.utils.utils import launch_launchfile
 from utils_for_tests import compare_poses, GiskardTestWrapper
@@ -36,7 +36,9 @@ class HSRTestWrapper(GiskardTestWrapper):
             giskard = Giskard(world_config=WorldWithHSRConfig(),
                               collision_avoidance_config=HSRCollisionAvoidanceConfig(),
                               robot_interface_config=HSRStandaloneInterface(),
-                              behavior_tree_config=StandAloneBTConfig(debug_mode=True, publish_js=True, simulation_max_hz=20),
+                              behavior_tree_config=StandAloneBTConfig(debug_mode=True,
+                                                                      publish_tf=False,
+                                                                      publish_js=False),
                               qp_controller_config=QPControllerConfig())
         super().__init__(giskard)
         self.gripper_group = 'gripper'
@@ -44,10 +46,6 @@ class HSRTestWrapper(GiskardTestWrapper):
         # self.l_gripper = rospy.ServiceProxy('l_gripper_simulator/set_joint_states', SetJointState)
         self.odom_root = 'odom'
         self.robot = god_map.world.groups[self.robot_name]
-
-    def move_base(self, goal_pose):
-        self.set_cart_goal(goal_pose, tip_link='base_footprint', root_link=god_map.world.root_link_name)
-        self.plan_and_execute()
 
     def open_gripper(self):
         self.command_gripper(1.23)
@@ -60,27 +58,10 @@ class HSRTestWrapper(GiskardTestWrapper):
         self.set_joint_goal(js)
         self.plan_and_execute()
 
-    def reset_base(self):
-        p = PoseStamped()
-        p.header.frame_id = 'map'
-        p.pose.orientation.w = 1
-        if god_map.is_standalone():
-            self.teleport_base(p)
-        else:
-            self.move_base(p)
-
     def reset(self):
-        self.clear_world()
-        # self.close_gripper()
-        self.reset_base()
         self.register_group('gripper',
                             root_link_group_name=self.robot_name,
                             root_link_name='hand_palm_link')
-
-    def teleport_base(self, goal_pose, group_name: Optional[str] = None):
-        self.set_seed_odometry(base_pose=goal_pose, group_name=group_name)
-        self.allow_all_collisions()
-        self.plan_and_execute()
 
 
 @pytest.fixture(scope='module')
@@ -353,6 +334,71 @@ class TestConstraints:
         kitchen_setup.allow_self_collision()
         kitchen_setup.plan_and_execute()
 
+    def test_open_fridge_sequence(self, kitchen_setup: HSRTestWrapper):
+        handle_frame_id = 'iai_kitchen/iai_fridge_door_handle'
+        handle_name = 'iai_fridge_door_handle'
+        kitchen_setup.open_gripper()
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = 'map'
+        base_goal.pose.position = Point(0.3, -0.5, 0)
+        base_goal.pose.orientation.w = 1
+        kitchen_setup.allow_all_collisions()
+        kitchen_setup.move_base(base_goal)
+
+        bar_axis = Vector3Stamped()
+        bar_axis.header.frame_id = handle_frame_id
+        bar_axis.vector.z = 1
+
+        bar_center = PointStamped()
+        bar_center.header.frame_id = handle_frame_id
+
+        tip_grasp_axis = Vector3Stamped()
+        tip_grasp_axis.header.frame_id = kitchen_setup.tip
+        tip_grasp_axis.vector.x = 1
+
+        # %% phase 1
+        bar_grasped = kitchen_setup.monitors.add_distance_to_line(name='bar grasped',
+                                                                  root_link=kitchen_setup.default_root,
+                                                                  tip_link=kitchen_setup.tip,
+                                                                  center_point=bar_center,
+                                                                  line_axis=bar_axis,
+                                                                  line_length=.4)
+        kitchen_setup.motion_goals.add_grasp_bar(root_link=kitchen_setup.default_root,
+                                                 tip_link=kitchen_setup.tip,
+                                                 tip_grasp_axis=tip_grasp_axis,
+                                                 bar_center=bar_center,
+                                                 bar_axis=bar_axis,
+                                                 bar_length=.4,
+                                                 name='grasp bar',
+                                                 end_condition=bar_grasped)
+        x_gripper = Vector3Stamped()
+        x_gripper.header.frame_id = kitchen_setup.tip
+        x_gripper.vector.z = 1
+
+        x_goal = Vector3Stamped()
+        x_goal.header.frame_id = handle_frame_id
+        x_goal.vector.x = -1
+        kitchen_setup.motion_goals.add_align_planes(tip_link=kitchen_setup.tip,
+                                                    tip_normal=x_gripper,
+                                                    goal_normal=x_goal,
+                                                    root_link='map',
+                                                    name='orient to door',
+                                                    end_condition=bar_grasped)
+
+        # %% phase 2 open door
+        door_open = kitchen_setup.monitors.add_local_minimum_reached(name='door open',
+                                                                     start_condition=bar_grasped)
+        kitchen_setup.motion_goals.add_open_container(tip_link=kitchen_setup.tip,
+                                                      environment_link=handle_name,
+                                                      goal_joint_state=1.5,
+                                                      name='open door',
+                                                      start_condition=bar_grasped,
+                                                      end_condition=door_open)
+
+        kitchen_setup.allow_all_collisions()
+        kitchen_setup.monitors.add_end_motion(start_condition=door_open)
+        kitchen_setup.execute(add_local_minimum_reached=False)
+
 
 class TestCollisionAvoidanceGoals:
 
@@ -450,31 +496,3 @@ class TestAddObject:
 
         zero_pose.set_joint_goal({'arm_flex_joint': -0.7})
         zero_pose.plan_and_execute()
-
-
-class TestVelocityLimit:
-    # test to see in rviz whether the rotation with limited velocity is oscilaating as it is doing it in mujoco closed loop
-    def test_vel(self, zero_pose):
-        goal_pose = PoseStamped()
-        goal_pose.header.frame_id = 'map'
-        goal_pose.pose.position = Point(1, 0, 0.5)
-        goal_pose.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 0, 1, 0],
-                                                                         [0, -1, 0, 0],
-                                                                         [1, 0, 0, 0],
-                                                                         [0, 0, 0, 1]]))
-        zero_pose.motion_goals.add_cartesian_pose(goal_pose=goal_pose, tip_link='hand_palm_link', root_link='map')
-        zero_pose.execute()
-
-        goal_pose = PoseStamped()
-        goal_pose.header.frame_id = 'hand_palm_link'
-        rotation_axis = Vector3Stamped()
-        rotation_axis.header.frame_id = 'hand_palm_link'
-        rotation_axis.vector = Vector3(*[0, 0, 1])
-
-        goal_pose.pose.orientation = Quaternion(
-            *quaternion_about_axis(1.7, [rotation_axis.vector.x, rotation_axis.vector.y, rotation_axis.vector.z]))
-        zero_pose.motion_goals.add_cartesian_pose(goal_pose, 'hand_palm_link', 'map')
-        zero_pose.motion_goals.add_limit_cartesian_velocity(tip_link='hand_palm_link', root_link='map',
-                                                            max_angular_velocity=0.1)
-        zero_pose.add_default_end_motion_conditions()
-        zero_pose.execute()

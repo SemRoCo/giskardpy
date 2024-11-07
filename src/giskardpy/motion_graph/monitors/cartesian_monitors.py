@@ -1,9 +1,9 @@
-from typing import List, Optional
+from typing import Optional
 
 from geometry_msgs.msg import PointStamped, QuaternionStamped, PoseStamped, Vector3Stamped
 
 import giskardpy.casadi_wrapper as cas
-from giskardpy.monitors.monitors import ExpressionMonitor, Monitor
+from giskardpy.motion_graph.monitors.monitors import ExpressionMonitor
 from giskardpy.god_map import god_map
 import giskardpy.utils.tfwrapper as tf
 from giskardpy.utils.expression_definition_utils import transform_msg, transform_msg_and_turn_to_expr
@@ -19,9 +19,13 @@ class PoseReached(ExpressionMonitor):
                  orientation_threshold: float = 0.01,
                  absolute: bool = False,
                  name: Optional[str] = None,
-                 stay_true: bool = True,
-                 start_condition: cas.Expression = cas.TrueSymbol):
-        super().__init__(name=name, stay_true=stay_true, start_condition=start_condition)
+                 start_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 end_condition: cas.Expression = cas.FalseSymbol):
+        super().__init__(name=name,
+                         start_condition=start_condition,
+                         hold_condition=hold_condition,
+                         end_condition=end_condition)
         root_link = god_map.world.search_for_link_name(root_link, root_group)
         tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
         if absolute:
@@ -54,9 +58,13 @@ class PositionReached(ExpressionMonitor):
                  threshold: float = 0.01,
                  absolute: bool = False,
                  name: Optional[str] = None,
-                 stay_true: bool = True,
-                 start_condition: cas.Expression = cas.TrueSymbol):
-        super().__init__(name=name, stay_true=stay_true, start_condition=start_condition)
+                 start_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 end_condition: cas.Expression = cas.FalseSymbol):
+        super().__init__(name=name,
+                         start_condition=start_condition,
+                         hold_condition=hold_condition,
+                         end_condition=end_condition)
         root_link = god_map.world.search_for_link_name(root_link, root_group)
         tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
 
@@ -80,9 +88,13 @@ class OrientationReached(ExpressionMonitor):
                  threshold: float = 0.01,
                  absolute: bool = False,
                  name: Optional[str] = None,
-                 stay_true: bool = True,
-                 start_condition: cas.Expression = cas.TrueSymbol):
-        super().__init__(name=name, stay_true=stay_true, start_condition=start_condition)
+                 start_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 end_condition: cas.Expression = cas.FalseSymbol):
+        super().__init__(name=name,
+                         start_condition=start_condition,
+                         hold_condition=hold_condition,
+                         end_condition=end_condition)
         root_link = god_map.world.search_for_link_name(root_link, root_group)
         tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
 
@@ -106,9 +118,13 @@ class PointingAt(ExpressionMonitor):
                  pointing_axis: Vector3Stamped = None,
                  threshold: float = 0.01,
                  name: Optional[str] = None,
-                 stay_true: bool = True,
-                 start_condition: cas.Expression = cas.TrueSymbol):
-        super().__init__(name=name, stay_true=stay_true, start_condition=start_condition)
+                 start_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 end_condition: cas.Expression = cas.FalseSymbol):
+        super().__init__(name=name,
+                         start_condition=start_condition,
+                         hold_condition=hold_condition,
+                         end_condition=end_condition)
         self.root = god_map.world.search_for_link_name(root_link, root_group)
         self.tip = god_map.world.search_for_link_name(tip_link, tip_group)
         self.root_P_goal_point = transform_msg(self.root, goal_point)
@@ -139,9 +155,13 @@ class VectorsAligned(ExpressionMonitor):
                  tip_group: Optional[str] = None,
                  threshold: float = 0.01,
                  name: Optional[str] = None,
-                 stay_true: bool = True,
-                 start_condition: cas.Expression = cas.TrueSymbol):
-        super().__init__(name=name, stay_true=stay_true, start_condition=start_condition)
+                 start_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 end_condition: cas.Expression = cas.FalseSymbol):
+        super().__init__(name=name,
+                         start_condition=start_condition,
+                         hold_condition=hold_condition,
+                         end_condition=end_condition)
         self.root = god_map.world.search_for_link_name(root_link, root_group)
         self.tip = god_map.world.search_for_link_name(tip_link, tip_group)
 
@@ -171,9 +191,13 @@ class DistanceToLine(ExpressionMonitor):
                  tip_group: Optional[str] = None,
                  threshold: float = 0.01,
                  name: Optional[str] = None,
-                 stay_true: bool = True,
-                 start_condition: cas.Expression = cas.TrueSymbol):
-        super().__init__(name=name, stay_true=stay_true, start_condition=start_condition)
+                 start_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 end_condition: cas.Expression = cas.FalseSymbol):
+        super().__init__(name=name,
+                         start_condition=start_condition,
+                         hold_condition=hold_condition,
+                         end_condition=end_condition)
         self.root = god_map.world.search_for_link_name(root_link, root_group)
         self.tip = god_map.world.search_for_link_name(tip_link, tip_group)
 

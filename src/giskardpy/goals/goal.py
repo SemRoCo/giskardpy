@@ -2,19 +2,15 @@ from __future__ import annotations
 
 import abc
 from abc import ABC
-from collections import OrderedDict
-from typing import Optional, Tuple, Dict, List, Union
+from typing import List, Union
 
-from giskardpy.monitors.monitors import ExpressionMonitor, Monitor
+from giskardpy.motion_graph.monitors.monitors import ExpressionMonitor, Monitor
 from giskardpy.god_map import god_map
-from giskardpy.tasks.task import Task
+from giskardpy.motion_graph.tasks.task import Task
 from giskardpy.utils.utils import string_shortener
-import giskardpy.casadi_wrapper as cas
 from giskardpy.exceptions import GoalInitalizationException
 from giskardpy.model.joints import OneDofJoint
 from giskardpy.data_types import PrefixName, Derivatives
-from giskardpy.qp.constraint import InequalityConstraint, EqualityConstraint, DerivativeInequalityConstraint, \
-    ManipulabilityConstraint
 import giskardpy.casadi_wrapper as cas
 
 
@@ -27,7 +23,7 @@ class Goal(ABC):
                  name: str,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.TrueSymbol):
+                 end_condition: cas.Expression = cas.FalseSymbol):
         """
         This is where you specify goal parameters and save them as self attributes.
         """
@@ -68,17 +64,26 @@ class Goal(ABC):
             return joint.get_symbol(Derivatives.position)
         raise TypeError(f'get_joint_position_symbol is only supported for OneDofJoint, not {type(joint)}')
 
-    def connect_start_condition_to_all_tasks(self, condition: cas.Expression):
+    def connect_start_condition_to_all_tasks(self, condition: cas.Expression) -> None:
         for task in self.tasks:
-            task.start_condition = cas.logic_and(task.start_condition, condition)
+            if cas.is_true(task.start_condition):
+                task.start_condition = condition
+            else:
+                task.start_condition = cas.logic_and(task.start_condition, condition)
 
-    def connect_hold_condition_to_all_tasks(self, condition: cas.Expression):
+    def connect_hold_condition_to_all_tasks(self, condition: cas.Expression) -> None:
         for task in self.tasks:
-            task.hold_condition = cas.logic_or(task.hold_condition, condition)
+            if cas.is_false(task.hold_condition):
+                task.hold_condition = condition
+            else:
+                task.hold_condition = cas.logic_or(task.hold_condition, condition)
 
-    def connect_end_condition_to_all_tasks(self, condition: cas.Expression):
+    def connect_end_condition_to_all_tasks(self, condition: cas.Expression) -> None:
         for task in self.tasks:
-            task.end_condition = cas.logic_and(task.end_condition, condition)
+            if cas.is_false(task.end_condition):
+                task.end_condition = condition
+            elif not cas.is_false(condition):
+                task.end_condition = cas.logic_and(task.end_condition, condition)
 
     def connect_monitors_to_all_tasks(self,
                                       start_condition: cas.Expression,
@@ -88,13 +93,25 @@ class Goal(ABC):
         self.connect_hold_condition_to_all_tasks(hold_condition)
         self.connect_end_condition_to_all_tasks(end_condition)
 
+    @property
+    def ref_str(self) -> str:
+        """
+        A string referring to self on the god_map. Used with symbol manager.
+        """
+        return f'god_map.motion_goal_manager.motion_goals[\'{str(self)}\']'
+
+    def __add__(self, other: str) -> str:
+        if isinstance(other, str):
+            return self.ref_str + other
+        raise NotImplementedError('Goal can only be added with a string.')
+
     def get_expr_velocity(self, expr: cas.Expression) -> cas.Expression:
         """
         Creates an expressions that computes the total derivative of expr
         """
         return cas.total_derivative(expr,
-                                  self.joint_position_symbols,
-                                  self.joint_velocity_symbols)
+                                    self.joint_position_symbols,
+                                    self.joint_velocity_symbols)
 
     @property
     def joint_position_symbols(self) -> List[Union[cas.Symbol, float]]:
@@ -138,10 +155,3 @@ class Goal(ABC):
             god_map.monitor_manager.add_expression_monitor(monitor)
         else:
             god_map.monitor_manager.add_payload_monitor(monitor)
-
-
-class NonMotionGoal(Goal):
-    """
-    Inherit from this goal, if the goal does not add any constraints.
-    """
-    pass

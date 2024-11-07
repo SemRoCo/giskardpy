@@ -18,7 +18,8 @@ class GoalCanceled(GiskardBehavior):
     @record_time
     @profile
     def update(self) -> Status:
-        if self.action_server.is_preempt_requested() and self.get_blackboard_exception() is None:
+        if (self.action_server.is_preempt_requested() and self.get_blackboard_exception() is None or
+                not self.action_server.is_client_alive()):
             msg = f'\'{self.action_server.name}\' preempted'
             logging.logerr(msg)
             raise_to_blackboard(PreemptedException(msg))

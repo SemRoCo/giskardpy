@@ -1,11 +1,10 @@
 from __future__ import division
 
-from typing import Optional, List
+from typing import Optional
 
 from giskardpy.goals.cartesian_goals import CartesianPosition, CartesianOrientation
 from giskardpy.goals.goal import Goal
-from giskardpy.monitors.monitors import ExpressionMonitor
-from giskardpy.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, Task
+from giskardpy.motion_graph.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
 from giskardpy.goals.joint_goals import JointPositionList
 from giskardpy.god_map import god_map
 import giskardpy.casadi_wrapper as cas
@@ -23,8 +22,7 @@ class Open(Goal):
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.TrueSymbol
-                 ):
+                 end_condition: cas.Expression = cas.FalseSymbol):
         """
         Open a container in an environment.
         Only works with the environment was added as urdf.
@@ -88,7 +86,8 @@ class Open(Goal):
                                                        weight=WEIGHT_BELOW_CA,
                                                        start_condition=start_condition,
                                                        hold_condition=hold_condition,
-                                                       end_condition=end_condition))
+                                                       end_condition=end_condition,
+                                                       name=f'{self.name}/{self.joint_name.short_name}'))
 
 
 class Close(Goal):
@@ -102,8 +101,7 @@ class Close(Goal):
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.TrueSymbol
-                 ):
+                 end_condition: cas.Expression = cas.FalseSymbol):
         """
         Same as Open, but will use minimum value as default for goal_joint_state
         """

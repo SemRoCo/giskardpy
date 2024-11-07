@@ -12,7 +12,8 @@ from giskardpy.tree.behaviors.plugin import GiskardBehavior
 
 class PublishJointState(GiskardBehavior):
     @profile
-    def __init__(self, name: Optional[str] = None, topic_name: Optional[str] = None, include_prefix=False):
+    def __init__(self, name: Optional[str] = None, topic_name: Optional[str] = None, include_prefix: bool = False,
+                 only_prismatic_and_revolute: bool = True):
         if name is None:
             name = self.__class__.__name__
         if topic_name is None:
@@ -21,7 +22,11 @@ class PublishJointState(GiskardBehavior):
         self.include_prefix = include_prefix
         self.cmd_topic = topic_name
         self.cmd_pub = rospy.Publisher(self.cmd_topic, JointState, queue_size=10)
-        self.joint_names = [k for k in god_map.world.joint_names if god_map.world.is_joint_revolute(k) or god_map.world.is_joint_prismatic(k)]
+        if only_prismatic_and_revolute:
+            self.joint_names = [k for k in god_map.world.joint_names if god_map.world.is_joint_revolute(k)
+                                or god_map.world.is_joint_prismatic(k)]
+        else:
+            self.joint_names = list(god_map.world.state.keys())
 
     def update(self):
         msg = JointState()

@@ -7,8 +7,8 @@ from geometry_msgs.msg import Vector3Stamped, PointStamped
 
 from giskardpy import casadi_wrapper as cas
 from giskardpy.goals.goal import Goal
-from giskardpy.tasks.task import WEIGHT_ABOVE_CA
-from giskardpy.monitors.monitors import ExpressionMonitor
+from giskardpy.motion_graph.tasks.task import WEIGHT_ABOVE_CA
+from giskardpy.motion_graph.monitors.monitors import ExpressionMonitor
 from giskardpy.god_map import god_map
 from giskardpy.utils.expression_definition_utils import transform_msg
 
@@ -25,7 +25,7 @@ class InsertCylinder(Goal):
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.TrueSymbol):
+                 end_condition: cas.Expression = cas.FalseSymbol):
         self.cylinder_name = cylinder_name
         self.get_straight_after = get_straight_after
         self.root = god_map.world.root_link_name
@@ -61,24 +61,26 @@ class InsertCylinder(Goal):
         root_P_top = root_P_hole + root_V_up * self.pre_grasp_height
         distance_to_top = cas.euclidean_distance(root_P_tip, root_P_top)
         top_reached = cas.less(distance_to_top, 0.01)
-        top_reached_monitor = ExpressionMonitor(name='top reached', stay_true=True, start_condition=start_condition)
+        top_reached_monitor = ExpressionMonitor(name='top reached', start_condition=start_condition)
         self.add_monitor(top_reached_monitor)
+        top_reached_monitor.end_condition = top_reached_monitor.get_state_expression()
         top_reached_monitor.expression = top_reached
 
         distance_to_line, root_P_on_line = cas.distance_point_to_line_segment(root_P_tip, root_P_hole, root_P_top)
         distance_to_hole = cas.norm(root_P_hole - root_P_tip)
         bottom_reached = cas.less(distance_to_hole, 0.01)
-        bottom_reached_monitor = ExpressionMonitor(name='bottom reached', stay_true=True,
+        bottom_reached_monitor = ExpressionMonitor(name='bottom reached',
                                                    start_condition=start_condition)
-        bottom_reached_monitor.expression = bottom_reached
         self.add_monitor(bottom_reached_monitor)
+        bottom_reached_monitor.end_condition = bottom_reached_monitor.get_state_expression()
+        bottom_reached_monitor.expression = bottom_reached
 
         reach_top = self.create_and_add_task('reach top')
         reach_top.add_point_goal_constraints(frame_P_current=root_P_tip,
                                              frame_P_goal=root_P_top,
                                              reference_velocity=0.1,
                                              weight=self.weight)
-        reach_top.end_condition = top_reached_monitor
+        reach_top.end_condition = top_reached_monitor.get_state_expression()
 
         go_to_line = self.create_and_add_task('straight line')
         go_to_line.add_point_goal_constraints(frame_P_current=root_P_tip,
@@ -86,7 +88,7 @@ class InsertCylinder(Goal):
                                               reference_velocity=0.1,
                                               weight=self.weight,
                                               name='pregrasp')
-        go_to_line.start_condition = top_reached_monitor
+        go_to_line.start_condition = top_reached_monitor.get_state_expression()
         # god_map.debug_expression_manager.add_debug_expression('root_V_up', root_V_up)
         # god_map.debug_expression_manager.add_debug_expression('root_P_hole', root_P_hole)
         # god_map.debug_expression_manager.add_debug_expression('root_P_tip', root_P_tip)
@@ -99,7 +101,7 @@ class InsertCylinder(Goal):
                                           expr_goal=self.tilt,
                                           reference_velocity=0.1,
                                           weight=self.weight)
-        tilt_task.end_condition = bottom_reached_monitor
+        tilt_task.end_condition = bottom_reached_monitor.get_state_expression()
         root_V_cylinder_z.vis_frame = self.tip
 
         # move down
@@ -109,20 +111,20 @@ class InsertCylinder(Goal):
                                                reference_velocity=0.1,
                                                weight=self.weight,
                                                name='insertion')
-        insert_task.start_condition = top_reached_monitor
+        insert_task.start_condition = top_reached_monitor.get_state_expression()
         # # tilt straight
         tilt_error = cas.angle_between_vector(root_V_cylinder_z, root_V_up)
         tilt_monitor = ExpressionMonitor(name='straight', start_condition=start_condition)
-        tilt_monitor.expression = cas.less(tilt_error, 0.01)
         self.add_monitor(tilt_monitor)
+        tilt_monitor.expression = cas.less(tilt_error, 0.01)
 
         tilt_straight_task = self.create_and_add_task('tilt straight')
         tilt_straight_task.add_vector_goal_constraints(frame_V_current=root_V_cylinder_z,
                                                        frame_V_goal=root_V_up,
                                                        reference_velocity=0.1,
                                                        weight=self.weight)
-        tilt_straight_task.start_condition = bottom_reached_monitor
-        tilt_straight_task.end_condition = tilt_monitor
+        tilt_straight_task.start_condition = bottom_reached_monitor.get_state_expression()
+        tilt_straight_task.end_condition = tilt_monitor.get_state_expression()
         self.connect_start_condition_to_all_tasks(start_condition)
         self.connect_hold_condition_to_all_tasks(hold_condition)
         # for task in self.tasks:

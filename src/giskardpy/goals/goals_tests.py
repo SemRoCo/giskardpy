@@ -1,20 +1,19 @@
-from typing import Optional, List
+from typing import Optional
 
 import numpy as np
 from geometry_msgs.msg import QuaternionStamped, PointStamped, PoseStamped, Vector3Stamped
 import giskardpy.casadi_wrapper as cas
-from giskardpy.goals.goal import NonMotionGoal
-from giskardpy.monitors.monitors import ExpressionMonitor
+from giskardpy.goals.goal import Goal
 from giskardpy.god_map import god_map
 from giskardpy.symbol_manager import symbol_manager
 
 
-class DebugGoal(NonMotionGoal):
+class DebugGoal(Goal):
     def __init__(self,
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.TrueSymbol):
+                 end_condition: cas.Expression = cas.FalseSymbol):
         if name is None:
             name = self.__class__.__name__
         super().__init__(name=name)
@@ -59,3 +58,20 @@ class DebugGoal(NonMotionGoal):
         god_map.debug_expression_manager.add_debug_expression('t', t)
 
         god_map.debug_expression_manager.add_debug_expression('f', 23)
+
+
+class CannotResolveSymbol(Goal):
+
+    def __init__(self, name: str, joint_name: str, start_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.FalseSymbol, end_condition: cas.Expression = cas.FalseSymbol):
+        super().__init__(name=name, start_condition=start_condition, hold_condition=hold_condition,
+                         end_condition=end_condition)
+        self.data = {}
+        s = symbol_manager.get_symbol(self + '.data[2]')
+        t = self.create_and_add_task('muh')
+        joint_name = god_map.world.search_for_joint_name(joint_name)
+        joint_position = self.get_joint_position_symbol(joint_name)
+        t.add_equality_constraint(reference_velocity=1,
+                                  equality_bound=1,
+                                  weight=1,
+                                  task_expression=s * joint_position)

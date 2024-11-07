@@ -1,17 +1,14 @@
 from __future__ import division
 
-from typing import Optional, List
+from typing import Optional
 
 from geometry_msgs.msg import Vector3Stamped, PointStamped
 
 import giskardpy.utils.tfwrapper as tf
 import giskardpy.casadi_wrapper as cas
 from giskardpy.goals.goal import Goal
-from giskardpy.monitors.monitors import ExpressionMonitor
-from giskardpy.tasks.task import WEIGHT_ABOVE_CA, Task
+from giskardpy.motion_graph.tasks.task import WEIGHT_ABOVE_CA
 from giskardpy.god_map import god_map
-from giskardpy.model.joints import OmniDrivePR22
-from giskardpy.data_types import Derivatives
 from giskardpy.utils.expression_definition_utils import transform_msg
 
 
@@ -23,7 +20,7 @@ class DiffDriveTangentialToPoint(Goal):
                  name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.TrueSymbol
+                 end_condition: cas.Expression = cas.FalseSymbol
                  ):
         self.tip = god_map.world.search_for_link_name('base_footprint', group_name)
         self.root = god_map.world.root_link_name
@@ -80,7 +77,7 @@ class PointingDiffDriveEEF(Goal):
                  weight=WEIGHT_ABOVE_CA, name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.TrueSymbol
+                 end_condition: cas.Expression = cas.FalseSymbol
                  ):
         self.weight = weight
         self.max_velocity = max_velocity
@@ -131,7 +128,7 @@ class KeepHandInWorkspace(Goal):
                  group_name: Optional[str] = None, weight=WEIGHT_ABOVE_CA, name: Optional[str] = None,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,
-                 end_condition: cas.Expression = cas.TrueSymbol
+                 end_condition: cas.Expression = cas.FalseSymbol
                  ):
         if base_footprint is None:
             base_footprint = 'base_footprint'

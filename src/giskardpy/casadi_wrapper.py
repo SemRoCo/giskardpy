@@ -2,15 +2,16 @@ from __future__ import annotations
 
 import builtins
 from copy import copy
+from enum import IntEnum
 from typing import Union, List, TypeVar
 import math
+
+import casadi
 import casadi as ca  # type: ignore
 import numpy as np
 import geometry_msgs.msg as geometry_msgs
 import rospy
 from scipy import sparse as sp
-from giskardpy.data_types import PrefixName, Derivatives
-from giskardpy.utils import logging
 
 builtin_max = builtins.max
 builtin_min = builtins.min
@@ -66,7 +67,7 @@ class CompiledFunction:
         else:
             try:
                 self.compiled_f = ca.Function('f', parameters, [ca.densify(expression.s)])
-            except Exception:
+            except Exception as e:
                 self.compiled_f = ca.Function('f', parameters, ca.densify(expression.s))
             self.buf, self.f_eval = self.compiled_f.buffer()
             if expression.shape[1] <= 1:
@@ -280,6 +281,15 @@ class Symbol(Symbol_):
     def __neg__(self):
         return Expression(self.s.__neg__())
 
+    def __invert__(self):
+        return logic_not(self)
+
+    def __or__(self, other):
+        return logic_or(self, other)
+
+    def __and__(self, other):
+        return logic_and(self, other)
+
     def __pow__(self, other):
         if isinstance(other, (int, float)):
             return Expression(self.s.__pow__(other))
@@ -442,6 +452,9 @@ class Expression(Symbol_):
     def __neg__(self):
         return Expression(self.s.__neg__())
 
+    def __invert__(self):
+        return logic_not(self)
+
     def __pow__(self, other):
         if isinstance(other, (int, float)):
             return Expression(self.s.__pow__(other))
@@ -462,6 +475,12 @@ class Expression(Symbol_):
         if isinstance(other, Symbol_):
             other = other.s
         return Expression(self.s.__eq__(other))
+
+    def __or__(self, other):
+        return logic_or(self, other)
+
+    def __and__(self, other):
+        return logic_and(self, other)
 
     def __ne__(self, other):
         if isinstance(other, Symbol_):
@@ -1331,7 +1350,7 @@ class Quaternion(Symbol_):
 
 all_expressions = Union[Symbol_, Symbol, Expression, Point3, Vector3, RotationMatrix, TransMatrix, Quaternion]
 all_expressions_float = Union[Symbol, Expression, Point3, Vector3, RotationMatrix, TransMatrix, float, Quaternion]
-symbol_expr_float = Union[Symbol, Expression, float]
+symbol_expr_float = Union[Symbol, Expression, float, int, IntEnum]
 symbol_expr = Union[Symbol, Expression]
 PreservedCasType = TypeVar('PreservedCasType', Point3, Vector3, TransMatrix, RotationMatrix, Quaternion, Expression)
 
@@ -1473,9 +1492,9 @@ def limit(x, lower_limit, upper_limit):
 
 def if_else(condition, if_result, else_result):
     condition = Expression(condition).s
-    if isinstance(if_result, float):
+    if isinstance(if_result, (float, int)):
         if_result = Expression(if_result)
-    if isinstance(else_result, float):
+    if isinstance(else_result, (float, int)):
         else_result = Expression(else_result)
     if isinstance(if_result, (Point3, Vector3, TransMatrix, RotationMatrix, Quaternion)):
         assert type(if_result) == type(else_result), \
@@ -1667,6 +1686,13 @@ def if_eq_cases(a, b_result_cases, else_result):
 def if_less_eq_cases(a, b_result_cases, else_result):
     """
     This only works if b_result_cases is sorted in ascending order.
+    if a <= b_result_cases[0][0]:
+        return b_result_cases[0][1]
+    elif a <= b_result_cases[1][0]:
+        return b_result_cases[1][1]
+    ...
+    else:
+        return else_result
     """
     a = _to_sx(a)
     result = _to_sx(else_result)
@@ -1989,6 +2015,14 @@ def distance_point_to_line(frame_P_point, frame_P_line_point, frame_V_line_direc
     return distance
 
 
+def distance_point_to_plane(frame_P_current, frame_V_v1, frame_V_v2):
+    normal = cross(frame_V_v1, frame_V_v2)
+    d = normal.dot(frame_P_current)
+    normal.scale(d)
+    nearest = frame_P_current - normal
+    return norm(nearest-frame_P_current), nearest
+
+
 def angle_between_vector(v1, v2):
     v1 = v1[:3]
     v2 = v2[:3]
@@ -2204,3 +2238,23 @@ def is_false(expr):
         return (expr == FalseSymbol).evaluate()
     except Exception as e:
         return False
+
+
+def is_constant(expr):
+    return len(expr.free_symbols()) == 0
+
+
+def det(expr):
+    return Expression(ca.det(expr.s))
+
+
+def distance_projected_on_vector(point1, point2, vector):
+    dist = point1 - point2
+    projection = dot(dist, vector)
+    return projection
+
+
+def distance_vector_projected_on_plane(point1, point2, normal_vector):
+    dist = point1 - point2
+    projection = dist - dot(dist, normal_vector) * normal_vector
+    return projection

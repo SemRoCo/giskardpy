@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, List, Dict, Tuple
 
 import rospy
 
-from giskard_msgs.msg import MoveGoal, MoveResult
+from giskard_msgs.msg import MoveGoal
 
 if TYPE_CHECKING:
     from giskardpy.tree.behaviors.action_server import ActionServerHandler
@@ -13,8 +13,7 @@ if TYPE_CHECKING:
     from giskardpy.tree.branches.giskard_bt import GiskardBT
     from giskardpy.model.joints import Joint
     from giskardpy.model.ros_msg_visualization import ROSMsgVisualization
-    from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint, \
-        ManipulabilityConstraint
+    from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint
     from giskardpy.qp.free_variable import FreeVariable
     from giskardpy.qp.next_command import NextCommands
     from giskardpy.model.trajectory import Trajectory
@@ -24,12 +23,13 @@ if TYPE_CHECKING:
     from giskardpy.configs.giskard import Giskard
     from giskardpy.goals.motion_goal_manager import MotionGoalManager
     from giskardpy.debug_expression_manager import DebugExpressionManager
-    from giskardpy.monitors.monitor_manager import MonitorManager
+    from giskardpy.motion_graph.monitors import MonitorManager
     from giskardpy.configs.collision_avoidance_config import CollisionAvoidanceConfig
     from giskardpy.configs.world_config import WorldConfig
     from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer, CollisionCheckerLib, \
         CollisionAvoidanceGroupThresholds, Collisions
     from giskardpy.model.world import WorldTree
+    from giskardpy.qp.weight_gain import QuadraticWeightGain, LinearWeightGain
 
 
 class GodMap:
@@ -63,7 +63,8 @@ class GodMap:
     eq_constraints: Dict[str, EqualityConstraint]
     neq_constraints: Dict[str, InequalityConstraint]
     derivative_constraints: Dict[str, DerivativeInequalityConstraint]
-    manip_constraints: Dict[str, ManipulabilityConstraint]
+    quadratic_weight_gains: Dict[str, QuadraticWeightGain]
+    linear_weight_gains: Dict[str, LinearWeightGain]
     hack: float
     fill_trajectory_velocity_values: bool
     ros_visualizer: ROSMsgVisualization

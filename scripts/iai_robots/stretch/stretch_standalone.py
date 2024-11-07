@@ -12,5 +12,5 @@ if __name__ == '__main__':
     giskard = Giskard(world_config=WorldWithDiffDriveRobot(),
                       collision_avoidance_config=StretchCollisionAvoidanceConfig(),
                       robot_interface_config=StretchStandaloneInterface(),
-                      behavior_tree_config=StandAloneBTConfig())
+                      behavior_tree_config=StandAloneBTConfig(publish_tf=True, publish_js=True, debug_mode=True))
     giskard.live()

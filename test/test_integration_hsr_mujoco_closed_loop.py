@@ -9,17 +9,14 @@ from numpy import pi
 from std_srvs.srv import Trigger
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
-from giskardpy.configs.iai_robots.hsr import HSRCollisionAvoidanceConfig, WorldWithHSRConfig, HSRStandaloneInterface \
-    , HSRMujocoVelocityInterface, HSRVelocityInterface
-from giskardpy.configs.qp_controller_config import QPControllerConfig, SupportedQPSolver
 from giskardpy.configs.behavior_tree_config import StandAloneBTConfig, ClosedLoopBTConfig
 from giskardpy.configs.giskard import Giskard
+from giskardpy.configs.iai_robots.hsr import WorldWithHSRConfig, HSRCollisionAvoidanceConfig, HSRStandaloneInterface, \
+    HSRMujocoVelocityInterface
+from giskardpy.configs.qp_controller_config import QPControllerConfig
+from giskardpy.god_map import god_map
 from giskardpy.utils.utils import launch_launchfile
 from utils_for_tests import compare_poses, GiskardTestWrapper
-from giskardpy.goals.manipulability_goals import MaxManipulability
-import giskardpy.utils.tfwrapper as tf
-from giskardpy.goals.action_goals import PouringAction
-from giskardpy.goals.adaptive_goals import CloseGripper, PouringAdaptiveTilt
 
 
 class HSRTestWrapper(GiskardTestWrapper):
@@ -39,19 +36,15 @@ class HSRTestWrapper(GiskardTestWrapper):
         if giskard is None:
             giskard = Giskard(world_config=WorldWithHSRConfig(),
                               collision_avoidance_config=HSRCollisionAvoidanceConfig(),
-                              robot_interface_config=HSRStandaloneInterface(),
-                              behavior_tree_config=StandAloneBTConfig(debug_mode=True),
-                              qp_controller_config=QPControllerConfig(qp_solver=SupportedQPSolver.qpSWIFT))
+                              robot_interface_config=HSRMujocoVelocityInterface(),
+                              behavior_tree_config=ClosedLoopBTConfig(debug_mode=True),
+                              qp_controller_config=QPControllerConfig())
+        super().__init__(giskard)
         self.gripper_group = 'gripper'
         # self.r_gripper = rospy.ServiceProxy('r_gripper_simulator/set_joint_states', SetJointState)
         # self.l_gripper = rospy.ServiceProxy('l_gripper_simulator/set_joint_states', SetJointState)
         self.odom_root = 'odom'
-        super().__init__(giskard)
-        # self.robot = self.world.groups[self.robot_name]
-
-    def move_base(self, goal_pose):
-        self.set_cart_goal(goal_pose, tip_link='base_footprint', root_link='map')
-        self.plan_and_execute()
+        self.robot = god_map.world.groups[self.robot_name]
 
     def open_gripper(self):
         self.command_gripper(1.24)
@@ -64,78 +57,17 @@ class HSRTestWrapper(GiskardTestWrapper):
         self.set_joint_goal(js)
         self.plan_and_execute()
 
-    def reset_base(self):
-        p = PoseStamped()
-        p.header.frame_id = tf.get_tf_root()
-        p.pose.orientation.w = 1
-
     def reset(self):
-        super().reset()
-
-    def teleport_base(self, goal_pose, group_name: Optional[str] = None):
-        self.allow_all_collisions()
-        self.move_base(goal_pose)
-
-    def set_localization(self, map_T_odom: PoseStamped):
-        pass
-
-
-class HSRTestWrapperMujoco(HSRTestWrapper):
-    better_pose = {
-        'arm_flex_joint': -0.7,
-        'arm_lift_joint': 0.2,
-        'arm_roll_joint': 0.0,
-        'head_pan_joint': -0.1,
-        'head_tilt_joint': 0.1,
-        'wrist_flex_joint': -0.9,
-        'wrist_roll_joint': -0.4,
-    }
-    default_pose = better_pose
-
-    def __init__(self):
-        # self.r_gripper = rospy.ServiceProxy('r_gripper_simulator/set_joint_states', SetJointState)
-        # self.l_gripper = rospy.ServiceProxy('l_gripper_simulator/set_joint_states', SetJointState)
-        self.mujoco_reset = rospy.ServiceProxy('mujoco/reset', Trigger)
-        self.odom_root = 'odom'
-        giskard = Giskard(world_config=WorldWithHSRConfig(description_name='/hsrb4s/robot_description'),
-                          collision_avoidance_config=HSRCollisionAvoidanceConfig(),
-                          robot_interface_config=HSRMujocoVelocityInterface(),
-                          behavior_tree_config=ClosedLoopBTConfig(debug_mode=True),
-                          qp_controller_config=QPControllerConfig(max_trajectory_length=200,
-                                                                  qp_solver=SupportedQPSolver.qpSWIFT))
-        # real hsr closed loop config
-        # giskard = Giskard(world_config=WorldWithHSRConfig(),
-        #                   collision_avoidance_config=HSRCollisionAvoidanceConfig(),
-        #                   robot_interface_config=HSRVelocityInterface(),
-        #                   behavior_tree_config=ClosedLoopBTConfig())
-        super().__init__(giskard)
-
-    def reset_base(self):
-        p = PoseStamped()
-        p.header.frame_id = 'map'
-        p.pose.orientation.w = 1
-        # self.move_base(p)
-
-    def teleport_base(self, goal_pose, group_name: Optional[str] = None):
-        self.move_base(goal_pose)
-
-    def set_localization(self, map_T_odom: PoseStamped):
-        pass
-        # super(HSRTestWrapper, self).set_localization(map_T_odom)
-
-    def reset(self):
-        # self.mujoco_reset()
-        super().reset()
-
-    def command_gripper(self, width):
-        pass
+        self.register_group('gripper',
+                            root_link_group_name=self.robot_name,
+                            root_link_name='hand_palm_link')
 
 
 @pytest.fixture(scope='module')
 def giskard(request, ros):
-    # launch_launchfile('package://hsr_description/launch/upload_hsrb.launch')
-    # c = HSRTestWrapper()
-    c = HSRTestWrapperMujoco()
+    launch_launchfile('package://hsr_description/launch/upload_hsrb.launch')
+    c = HSRTestWrapper()
+    # c = HSRTestWrapperMujoco()
     request.addfinalizer(c.tear_down)
     return c
 
@@ -492,271 +424,3 @@ class TestAddObject:
 
         zero_pose.set_joint_goal({'arm_flex_joint': -0.7})
         zero_pose.plan_and_execute()
-
-
-class TestActionGoals:
-    def test_pouring_action(self, zero_pose):
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class='PouringAction2',
-                                               tip_link='hand_palm_link',
-                                               root_link='map')
-        zero_pose.execute(add_local_minimum_reached=False)
-
-    def test_complete_pouring(self, zero_pose):
-        # first start related scripts for BB detection and scene action reasoning
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class=CloseGripper.__name__,
-                                               name='openGripper',
-                                               as_open=True,
-                                               velocity_threshold=100,
-                                               effort_threshold=1,
-                                               effort=100)
-        zero_pose.allow_all_collisions()
-        zero_pose.execute()
-
-        goal_pose = PoseStamped()
-        goal_pose.header.frame_id = 'map'
-        goal_pose.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 0, 1, 0],
-                                                                         [0, -1, 0, 0],
-                                                                         [1, 0, 0, 0],
-                                                                         [0, 0, 0, 1]]))
-        goal_pose.pose.position.x = 1.95
-        goal_pose.pose.position.y = -0.2
-        goal_pose.pose.position.z = 0.3
-
-        zero_pose.set_cart_goal(goal_pose, 'hand_palm_link', 'map')
-        zero_pose.allow_all_collisions()
-        zero_pose.execute()
-
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class=CloseGripper.__name__,
-                                               name='closeGripper', effort=-220)
-        zero_pose.allow_all_collisions()
-        zero_pose.execute()
-
-        cup_pose = PoseStamped()
-        cup_pose.header.frame_id = 'free_cup'
-        cup_pose.pose.position = Point(0, 0, 0)
-        cup_pose.pose.orientation.w = 1
-
-        # add a new object at the pose of the pot and attach it to the right tip
-        zero_pose.add_box('cup1', (0.07, 0.07, 0.28), pose=cup_pose, parent_link='hand_palm_link')
-        cup_pose.header.frame_id = 'free_cup2'
-        zero_pose.add_box('cup2', (0.07, 0.07, 0.18), pose=cup_pose, parent_link='map')
-
-        # goal_pose.pose.position.x = 1.85
-        # goal_pose.pose.position.y = -0.7
-        # goal_pose.pose.position.z = 0.54
-        # goal_pose.pose.position.x = 1.75
-        # goal_pose.pose.position.y = -0.4
-        # goal_pose.pose.position.z = 0.6
-        goal_pose.header.frame_id = 'cup2'
-        goal_pose.pose.position = Point(-0.3, 0.2, 0.3)
-        # goal_pose.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 0, 1, 0],
-        #                                                                  [0, -1, 0, 0],
-        #                                                                  [1, 0, 0, 0],
-        #                                                                  [0, 0, 0, 1]]))
-        tilt_axis = Vector3Stamped()
-        tilt_axis.header.frame_id = 'hand_palm_link'
-        tilt_axis.vector.z = 1
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class='PouringAdaptiveTilt',
-                                               name='pouring',
-                                               tip='hand_palm_link',
-                                               root='map',
-                                               tilt_angle=0.3,
-                                               pouring_pose=goal_pose,
-                                               tilt_axis=tilt_axis,
-                                               pre_tilt=False)
-        zero_pose.allow_all_collisions()
-        zero_pose.avoid_collision(0.01, 'cup1', 'cup2')
-        zero_pose.execute(add_local_minimum_reached=False)
-
-        goal_pose.pose.position.x = 1.93
-        goal_pose.pose.position.y = -0.2
-        goal_pose.pose.position.z = 0.3
-
-        zero_pose.set_cart_goal(goal_pose, 'hand_palm_link', 'map')
-        zero_pose.allow_all_collisions()
-        zero_pose.execute()
-
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class=CloseGripper.__name__,
-                                               name='openGripper',
-                                               as_open=True,
-                                               velocity_threshold=100,
-                                               effort_threshold=1,
-                                               effort=100)
-        zero_pose.allow_all_collisions()
-        zero_pose.execute()
-
-        goal_pose.pose.position.x = 1.4
-        goal_pose.pose.position.y = -0.2
-        goal_pose.pose.position.z = 0.4
-
-        zero_pose.set_cart_goal(goal_pose, 'hand_palm_link', 'map')
-        zero_pose.allow_all_collisions()
-        zero_pose.execute()
-
-    def test_align_gripper_to_object(self, zero_pose):
-        goal_normal = Vector3Stamped()
-        goal_normal.header.frame_id = 'free_cup'
-        goal_normal.vector.y = -1
-        tip_normal = Vector3Stamped()
-        tip_normal.header.frame_id = 'hand_palm_link'
-        tip_normal.vector.y = 1
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class='AlignGripperToObject',
-                                               name='align',
-                                               tip_link='hand_palm_link',
-                                               root_link='map',
-                                               goal_normal=goal_normal,
-                                               tip_normal=tip_normal)
-        # publish goal_normal again to /align_goal to change the alignement
-        zero_pose.execute(add_local_minimum_reached=False)
-
-    def test_pickup(self, zero_pose):
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class=CloseGripper.__name__,
-                                               name='openGripper',
-                                               as_open=True,
-                                               velocity_threshold=100,
-                                               effort_threshold=1,
-                                               effort=100)
-        zero_pose.allow_all_collisions()
-        zero_pose.execute()
-
-        goal_pose = PoseStamped()
-        goal_pose.header.frame_id = 'map'
-        goal_pose.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 0, 1, 0],
-                                                                         [0, -1, 0, 0],
-                                                                         [1, 0, 0, 0],
-                                                                         [0, 0, 0, 1]]))
-        goal_pose.pose.position.x = 1.95
-        goal_pose.pose.position.y = -0.2
-        goal_pose.pose.position.z = 0.3
-
-        zero_pose.set_cart_goal(goal_pose, 'hand_palm_link', 'map')
-        zero_pose.allow_all_collisions()
-        zero_pose.execute()
-        # add the pickup action
-        goal_pose = PoseStamped()
-        goal_pose.header.frame_id = 'hand_palm_link'
-        goal_pose.pose.position.x = 0.1
-        goal_pose.pose.orientation.w = 1
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class='PickUp',
-                                               name='pickup',
-                                               root_link='map',
-                                               tip_link='hand_palm_link',
-                                               goal_pose=goal_pose)
-        zero_pose.monitors.add_end_motion(
-            start_condition=zero_pose.monitors.add_cartesian_pose('map', 'hand_palm_link', goal_pose))
-        zero_pose.execute(add_local_minimum_reached=False)
-
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class='PutDown',
-                                               name='putdown')
-        zero_pose.execute()
-
-    def test_hand_cam_servo(self, zero_pose: HSRTestWrapperMujoco):
-        optical_axis = Vector3Stamped()
-        optical_axis.header.frame_id = 'hand_palm_link'
-        optical_axis.vector.z = 1
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class='HandCamServoGoal',
-                                               name='hnadcamservo',
-                                               root_link='map',
-                                               cam_link='hand_palm_link',
-                                               optical_axis=optical_axis,
-                                               transform_from_image_coordinates=True)
-        zero_pose.execute(add_local_minimum_reached=False)
-
-    def test_abhijit(self, zero_pose):
-        def openGripper():
-            zero_pose.motion_goals.add_motion_goal(motion_goal_class=CloseGripper.__name__,
-                                                   name='openGripper',
-                                                   as_open=True,
-                                                   velocity_threshold=100,
-                                                   effort_threshold=1,
-                                                   effort=100)
-            zero_pose.allow_all_collisions()
-            zero_pose.execute()
-
-        def closeGripper():
-            zero_pose.motion_goals.add_motion_goal(motion_goal_class=CloseGripper.__name__,
-                                                   name='closeGripper')
-            zero_pose.allow_all_collisions()
-            zero_pose.execute()
-
-        def align_to(side: str, axis_align_to_z: Vector3Stamped, object_frame: str, control_frame: str,
-                     axis_align_to_x: Vector3Stamped = None, distance=0.3, height_offset=0.0, second_distance=0.0):
-            # TODO: add a tilt method with angle and velocity parametrization
-            goal_normal = Vector3Stamped()
-            goal_normal.header.frame_id = object_frame
-            goal_normal.vector.z = 1
-            zero_pose.motion_goals.add_align_planes(goal_normal, control_frame, axis_align_to_z, 'map')
-            if second_axis:
-                second_goal_normal = Vector3Stamped()
-                second_goal_normal.header.frame_id = object_frame
-                second_goal_normal.vector.x = 1
-                zero_pose.motion_goals.add_align_planes(second_goal_normal, control_frame, axis_align_to_x, 'map')
-
-            goal_position = PointStamped()
-            goal_position.header.frame_id = object_frame
-            if side == 'front':
-                goal_position.point.x = -distance
-                goal_position.point.y = second_distance
-                goal_position.point.z = height_offset
-            elif side == 'left':
-                goal_position.point.x = second_distance
-                goal_position.point.y = distance
-                goal_position.point.z = height_offset
-            elif side == 'right':
-                goal_position.point.x = second_distance
-                goal_position.point.y = -distance
-                goal_position.point.z = height_offset
-            zero_pose.motion_goals.add_cartesian_position(goal_position, control_frame, 'map')
-            zero_pose.execute()
-
-        def tilt(angle: float, velocity: float, rotation_axis: Vector3Stamped, controlled_frame: str):
-            goal_pose = PoseStamped()
-            goal_pose.header.frame_id = controlled_frame
-            goal_pose.pose.orientation = Quaternion(
-                *quaternion_about_axis(angle, [rotation_axis.vector.x, rotation_axis.vector.y, rotation_axis.vector.z]))
-            zero_pose.motion_goals.add_cartesian_pose(goal_pose, controlled_frame, 'map')
-            zero_pose.motion_goals.add_limit_cartesian_velocity(tip_link=controlled_frame, root_link='map',
-                                                                max_angular_velocity=velocity)
-            zero_pose.execute()
-
-        upright_axis = Vector3Stamped()
-        upright_axis.header.frame_id = 'hand_palm_link'
-        upright_axis.vector.x = 1
-
-        second_axis = Vector3Stamped()
-        second_axis.header.frame_id = 'hand_palm_link'
-        second_axis.vector.z = 1
-
-        # Here starts the control
-        openGripper()
-
-        align_to('front', axis_align_to_z=upright_axis, object_frame='free_cup', control_frame='hand_palm_link',
-                 axis_align_to_x=second_axis, distance=0.04)
-
-        closeGripper()
-
-        #############move to random position################
-        goal_pose = PoseStamped()
-        goal_pose.header.frame_id = 'map'
-        goal_pose.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 0, 1, 0],
-                                                                         [0, -1, 0, 0],
-                                                                         [1, 0, 0, 0],
-                                                                         [0, 0, 0, 1]]))
-        goal_pose.pose.position.x = 1.7
-        goal_pose.pose.position.y = -0.4
-        goal_pose.pose.position.z = 0.7
-        zero_pose.set_cart_goal(goal_pose, 'hand_palm_link', 'map')
-        zero_pose.allow_all_collisions()
-        zero_pose.execute()
-        #############################
-
-        # align_to('front', axis_align_to_z=upright_axis, object_frame='free_cup2', control_frame='hand_palm_link',
-        #          axis_align_to_x=second_axis, distance=0.3, height_offset=0.2)
-
-        align_to('left', axis_align_to_z=upright_axis, object_frame='free_cup2', control_frame='hand_palm_link',
-                 axis_align_to_x=second_axis, distance=0.13, height_offset=0.2)
-
-        rotation_axis = Vector3Stamped()
-        rotation_axis.header.frame_id = 'hand_palm_link'
-        rotation_axis.vector.z = 1
-        tilt(angle=1.7, velocity=1.0, rotation_axis=rotation_axis, controlled_frame='hand_palm_link')

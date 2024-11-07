@@ -3,7 +3,7 @@ import rospy
 from sensor_msgs.msg import Joy
 import numpy as np
 
-from giskardpy.python_interface import GiskardWrapper
+from giskardpy.python_interface.old_python_interface import OldGiskardWrapper
 
 from giskardpy.utils import logging
 
@@ -12,7 +12,7 @@ class MUH:
     cancel_msg = 'Canceling all Giskard goals.'
 
     def __init__(self, button_ids):
-        self.giskard = GiskardWrapper()
+        self.giskard = OldGiskardWrapper()
         joy_msg: Joy = rospy.wait_for_message('/joy', Joy)
         self.button_filter = np.zeros(len(joy_msg.buttons), dtype=bool)
         self.button_filter[button_ids] = True
@@ -29,7 +29,11 @@ class MUH:
 
 
 rospy.init_node('giskard_e_stop')
-button_ids = rospy.get_param('~button_ids', default=list(range(17)))
+
+joy_msg: Joy = rospy.wait_for_message('/joy', Joy)
+num_buttons = len(joy_msg.buttons)
+
+button_ids = rospy.get_param('~button_ids', default=list(range(num_buttons)))
 muh = MUH(button_ids)
 logging.loginfo('giskard joystick e stop is running')
 rospy.spin()

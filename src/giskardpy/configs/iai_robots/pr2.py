@@ -10,9 +10,12 @@ class WorldWithPR2Config(WorldWithOmniDriveRobot):
 
     def setup(self):
         super().setup()
-        self.set_joint_limits(limit_map={Derivatives.velocity: 3,
+        self.set_joint_limits(limit_map={Derivatives.velocity: 2,
                                          Derivatives.jerk: 60},
                               joint_name='head_pan_joint')
+        self.set_joint_limits(limit_map={Derivatives.velocity: 4,
+                                         Derivatives.jerk: 120},
+                              joint_name='head_tilt_joint')
 
 
 class PR2StandaloneInterface(RobotInterfaceConfig):
@@ -120,6 +123,39 @@ class PR2VelocityMujocoInterface(RobotInterfaceConfig):
         ])
 
         self.add_base_cmd_velocity(cmd_vel_topic='/pr2/cmd_vel',
+                                   joint_name=self.drive_joint_name)
+
+
+class PR2VelocityIAIInterface(RobotInterfaceConfig):
+    map_name: str
+    localization_joint_name: str
+    odom_link_name: str
+    drive_joint_name: str
+
+    def __init__(self,
+                 map_name: str = 'map',
+                 localization_joint_name: str = 'localization',
+                 odom_link_name: str = 'odom_combined',
+                 drive_joint_name: str = 'brumbrum'):
+        self.map_name = map_name
+        self.localization_joint_name = localization_joint_name
+        self.odom_link_name = odom_link_name
+        self.drive_joint_name = drive_joint_name
+
+    def setup(self):
+        self.sync_6dof_joint_with_tf_frame(joint_name=self.localization_joint_name,
+                                           tf_parent_frame=self.map_name,
+                                           tf_child_frame=self.odom_link_name)
+        self.sync_joint_state_topic('/joint_states')
+        self.sync_odometry_topic('/robot_pose_ekf/odom_combined', self.drive_joint_name)
+        self.add_joint_velocity_group_controller(namespace='l_arm_joint_group_velocity_controller')
+        self.add_joint_velocity_group_controller(namespace='r_arm_joint_group_velocity_controller')
+        self.add_joint_position_controller(namespaces=[
+            'head_pan_position_controller',
+            'head_tilt_position_controller',
+        ])
+
+        self.add_base_cmd_velocity(cmd_vel_topic='/base_controller/command',
                                    joint_name=self.drive_joint_name)
 
 

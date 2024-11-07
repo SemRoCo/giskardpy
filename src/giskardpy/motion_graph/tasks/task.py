@@ -1,96 +1,56 @@
-from enum import IntEnum
-from typing import Optional, List, Union, Dict, Callable, Iterable, overload
+from typing import Optional, List, Union, Dict, Callable, Iterable, overload, DefaultDict
 
-import numpy as np
-
-import giskard_msgs.msg
+import giskard_msgs.msg as giskard_msgs
 import giskardpy.casadi_wrapper as cas
 from giskardpy.exceptions import GiskardException, GoalInitalizationException, DuplicateNameException
 from giskardpy.god_map import god_map
-from giskardpy.monitors.monitors import ExpressionMonitor, Monitor
 from giskardpy.data_types import Derivatives, PrefixName, TaskState
-from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint, \
-    ManipulabilityConstraint, Constraint
+from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint
 from giskardpy.symbol_manager import symbol_manager
-from giskardpy.utils.decorators import memoize
+from giskardpy.motion_graph.graph_node import MotionGraphNode
 from giskardpy.utils.utils import string_shortener
+from giskardpy.qp.weight_gain import QuadraticWeightGain, LinearWeightGain
+from giskardpy.qp.free_variable import FreeVariable
 
-WEIGHT_MAX = giskard_msgs.msg.Weights.WEIGHT_MAX
-WEIGHT_ABOVE_CA = giskard_msgs.msg.Weights.WEIGHT_ABOVE_CA
-WEIGHT_COLLISION_AVOIDANCE = giskard_msgs.msg.Weights.WEIGHT_COLLISION_AVOIDANCE
-WEIGHT_BELOW_CA = giskard_msgs.msg.Weights.WEIGHT_BELOW_CA
-WEIGHT_MIN = giskard_msgs.msg.Weights.WEIGHT_MIN
+WEIGHT_MAX = giskard_msgs.Weights.WEIGHT_MAX
+WEIGHT_ABOVE_CA = giskard_msgs.Weights.WEIGHT_ABOVE_CA
+WEIGHT_COLLISION_AVOIDANCE = giskard_msgs.Weights.WEIGHT_COLLISION_AVOIDANCE
+WEIGHT_BELOW_CA = giskard_msgs.Weights.WEIGHT_BELOW_CA
+WEIGHT_MIN = giskard_msgs.Weights.WEIGHT_MIN
 
 
-class Task:
+class Task(MotionGraphNode):
     """
     Tasks are a set of constraints with the same predicates.
     """
     eq_constraints: Dict[PrefixName, EqualityConstraint]
     neq_constraints: Dict[PrefixName, InequalityConstraint]
     derivative_constraints: Dict[PrefixName, DerivativeInequalityConstraint]
-    _start_condition: cas.Expression
-    _hold_condition: cas.Expression
-    _end_condition: cas.Expression
-    _name: str
     _parent_goal_name: str
-    _id: int
 
     def __init__(self, parent_goal_name: str, name: Optional[str] = None):
         if name is None:
             self._name = str(self.__class__.__name__)
         else:
             self._name = name
+        super().__init__(name=name,
+                         start_condition=cas.TrueSymbol, hold_condition=cas.FalseSymbol, end_condition=cas.FalseSymbol)
         self._parent_goal_name = parent_goal_name
         self.eq_constraints = {}
         self.neq_constraints = {}
         self.derivative_constraints = {}
-        self._start_condition = cas.TrueSymbol
-        self._hold_condition = cas.FalseSymbol
-        self._end_condition = cas.TrueSymbol
         self.manip_constraints = {}
-        self._id = -1
+        self.quadratic_gains = []
+        self.linear_weight_gains = []
 
-    @property
-    def start_condition(self) -> cas.Expression:
-        return self._start_condition
-
-    @start_condition.setter
-    def start_condition(self, value: Union[Monitor, cas.Expression]) -> None:
-        if isinstance(value, Monitor):
-            self._start_condition = value.get_state_expression()
-        else:
-            self._start_condition = value
-
-    @property
-    def hold_condition(self) -> cas.Expression:
-        return self._hold_condition
-
-    @hold_condition.setter
-    def hold_condition(self, value: Union[Monitor, cas.Expression]) -> None:
-        if isinstance(value, Monitor):
-            self._hold_condition = value.get_state_expression()
-        else:
-            self._hold_condition = value
-
-    @property
-    def end_condition(self) -> cas.Expression:
-        return self._end_condition
-
-    @end_condition.setter
-    def end_condition(self, value: Union[Monitor, cas.Expression]) -> None:
-        if isinstance(value, Monitor):
-            self._end_condition = value.get_state_expression()
-        else:
-            self._end_condition = value
-
-    @property
-    def id(self) -> int:
-        assert self._id >= 0, f'id of {self.name} is not set.'
-        return self._id
-
-    def set_id(self, new_id: int) -> None:
-        self._id = new_id
+    def to_ros_msg(self) -> giskard_msgs.MotionGoal:
+        msg = giskard_msgs.MotionGoal()
+        msg.name = str(self.name)
+        msg.motion_goal_class = self.__class__.__name__
+        msg.start_condition = god_map.monitor_manager.format_condition(self.start_condition, new_line=' ')
+        msg.hold_condition = god_map.monitor_manager.format_condition(self.hold_condition, new_line=' ')
+        msg.end_condition = god_map.monitor_manager.format_condition(self.end_condition, new_line=' ')
+        return msg
 
     @property
     def name(self) -> PrefixName:
@@ -99,20 +59,8 @@ class Task:
     def __str__(self):
         return self.name
 
-    def formatted_name(self, quoted: bool = False) -> str:
-        formatted_name = string_shortener(original_str=str(self.name),
-                                          max_lines=4,
-                                          max_line_length=25)
-        result = (f'{formatted_name}\n'
-                  f'----start_condition----\n'
-                  f'{god_map.monitor_manager.format_condition(self.start_condition)}\n'
-                  f'----hold_condition----\n'
-                  f'{god_map.monitor_manager.format_condition(self.hold_condition)}\n'
-                  f'----end_condition----\n'
-                  f'{god_map.monitor_manager.format_condition(self.end_condition)}')
-        if quoted:
-            return '"' + result + '"'
-        return result
+    def get_life_cycle_state_expression(self) -> cas.Symbol:
+        return symbol_manager.get_symbol(f'god_map.motion_goal_manager.task_state[{self.id}]')
 
     def get_eq_constraints(self) -> List[EqualityConstraint]:
         return self._apply_monitors_to_constraints(self.eq_constraints.values())
@@ -123,11 +71,11 @@ class Task:
     def get_derivative_constraints(self) -> List[DerivativeInequalityConstraint]:
         return self._apply_monitors_to_constraints(self.derivative_constraints.values())
 
-    def get_manipulability_constraint(self) -> List[ManipulabilityConstraint]:
-        return list(self.manip_constraints.values())
+    def get_quadratic_gains(self) -> List[QuadraticWeightGain]:
+        return self.quadratic_gains
 
-    def get_state_expression(self) -> cas.Symbol:
-        return symbol_manager.get_symbol(f'god_map.motion_goal_manager.task_state[{self.id}]')
+    def get_linear_gains(self) -> List[LinearWeightGain]:
+        return self.linear_weight_gains
 
     @overload
     def _apply_monitors_to_constraints(self, constraints: Iterable[EqualityConstraint]) \
@@ -147,42 +95,22 @@ class Task:
     def _apply_monitors_to_constraints(self, constraints):
         output_constraints = []
         for constraint in constraints:
-            is_running = cas.if_eq(self.get_state_expression(), int(TaskState.running),
+            is_running = cas.if_eq(self.get_life_cycle_state_expression(), int(TaskState.running),
                                    if_result=1,
                                    else_result=0)
             constraint.quadratic_weight *= is_running
             output_constraints.append(constraint)
         return output_constraints
 
-    def add_manipulability_constraint(self,
-                                      task_expression: cas.symbol_expr,
-                                      gain: float,
-                                      prediction_horizon: int,
-                                      name: str = None):
-        if task_expression.shape != (1, 1):
-            raise GoalInitalizationException(f'expression must have shape (1, 1), has {task_expression.shape}')
-        name = name or f'{len(self.manip_constraints)}'
-        constraint = ManipulabilityConstraint(name=name,
-                                              parent_task_name=self.name,
-                                              expression=task_expression,
-                                              gain=gain,
-                                              prediction_horizon=prediction_horizon)
-        self.manip_constraints[constraint.name] = constraint
+    def add_quadratic_weight_gain(self, name: str, gains: List[DefaultDict[Derivatives, Dict[FreeVariable, float]]]):
+        q_gain = QuadraticWeightGain(name=name,
+                                     gains=gains)
+        self.quadratic_gains.append(q_gain)
 
-    def add_manipulability_constraint_vector(self,
-                                             task_expressions: Union[
-                                                 cas.Expression, cas.Vector3, cas.Point3, List[cas.symbol_expr]],
-                                             names: List[str],
-                                             gain: float,
-                                             prediction_horizon: int):
-        if len(task_expressions) != len(names):
-            raise GoalInitalizationException('All parameters must have the same length.')
-        for i in range(len(task_expressions)):
-            name_suffix = names[i] if names else None
-            self.add_manipulability_constraint(name=name_suffix,
-                                               task_expression=task_expressions[i],
-                                               gain=gain,
-                                               prediction_horizon=prediction_horizon)
+    def add_linear_weight_gain(self, name: str, gains: List[DefaultDict[Derivatives, Dict[FreeVariable, float]]]):
+        q_gain = LinearWeightGain(name=name,
+                                  gains=gains)
+        self.linear_weight_gains.append(q_gain)
 
     def add_equality_constraint(self,
                                 reference_velocity: cas.symbol_expr_float,
@@ -568,6 +496,7 @@ class Task:
         """
         trans_error = cas.norm(frame_P_current)
         trans_error = cas.if_eq_zero(trans_error, 0.01, trans_error)
+        god_map.debug_expression_manager.add_debug_expression('trans_error', trans_error)
         self.add_velocity_constraint(upper_velocity_limit=max_velocity,
                                      lower_velocity_limit=-max_velocity,
                                      weight=weight,

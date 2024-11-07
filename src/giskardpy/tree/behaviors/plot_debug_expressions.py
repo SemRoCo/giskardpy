@@ -2,7 +2,7 @@ import traceback
 from threading import Lock
 import numpy as np
 
-from giskardpy.data_types import JointStates
+from giskardpy.data_types import JointStates, PrefixName
 from giskardpy.god_map import god_map
 from giskardpy.model.trajectory import Trajectory
 from giskardpy.tree.behaviors.plot_trajectory import PlotTrajectory
@@ -29,13 +29,13 @@ class PlotDebugExpressions(PlotTrajectory):
                 if isinstance(js_.position, np.ndarray):
                     if len(js_.position.shape) == 1:
                         for x in range(js_.position.shape[0]):
-                            tmp_name = f'{name}|{x}'
+                            tmp_name = PrefixName(f'{name}|{x}')
                             new_js[tmp_name].position = js_.position[x]
                             new_js[tmp_name].velocity = js_.velocity[x]
                     else:
                         for x in range(js_.position.shape[0]):
                             for y in range(js_.position.shape[1]):
-                                tmp_name = f'{name}|{x}_{y}'
+                                tmp_name = PrefixName(f'{name}|{x}_{y}')
                                 new_js[tmp_name].position = js_.position[x, y]
                                 new_js[tmp_name].velocity = js_.velocity[x, y]
                 else:
@@ -45,7 +45,7 @@ class PlotDebugExpressions(PlotTrajectory):
         return new_traj
 
     def plot(self):
-        trajectory = god_map.debug_expression_manager.debug_trajectory
+        trajectory = god_map.debug_expression_manager.raw_traj_to_traj()
         if trajectory and len(trajectory.items()) > 0:
             sample_period = god_map.qp_controller_config.sample_period
             traj = self.split_traj(trajectory)

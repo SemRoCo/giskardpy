@@ -136,6 +136,13 @@ class RobotInterfaceConfig(ABC):
         """
         self.tree.control_loop_branch.send_controls.add_joint_velocity_controllers(namespaces)
 
+    def add_joint_position_controller(self, namespaces: List[str]):
+        """
+        For closed loop mode. Tell Giskard how it can send positions to joints.
+        :param namespaces: A list of namespaces where Giskard can find the topics and rosparams.
+        """
+        self.tree.control_loop_branch.send_controls.add_joint_position_controllers(namespaces)
+
     def add_joint_velocity_group_controller(self, namespace: str):
         """
         For closed loop mode. Tell Giskard how it can send velocities for a group of joints.

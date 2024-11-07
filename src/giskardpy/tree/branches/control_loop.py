@@ -1,6 +1,7 @@
 from typing import Optional
 
 from giskardpy.god_map import god_map
+from giskardpy.model.ros_msg_visualization import VisualizationMode
 from giskardpy.tree.behaviors.collision_checker import CollisionChecker
 from giskardpy.tree.behaviors.evaluate_debug_expressions import EvaluateDebugExpressions
 from giskardpy.tree.behaviors.evaluate_monitors import EvaluateMonitors
@@ -26,17 +27,21 @@ class ControlLoop(AsyncBehavior):
     check_monitors: CheckMonitors
     debug_added: bool = False
     in_projection: bool
+    controller_active: bool = True
+
     time: TimePlugin
     ros_time: RosTime
     kin_sim: KinSimPlugin
     real_kin_sim: RealKinSimPlugin
     send_controls: SendControls
     log_traj: LogTrajPlugin
+    controller_plugin: ControllerPlugin
 
     def __init__(self, name: str = 'control_loop', log_traj: bool = True, max_hz: Optional[float] = None):
         name = f'{name}\nmax_hz: {max_hz}'
         super().__init__(name, max_hz=max_hz)
         self.publish_state = success_is_running(PublishState)('publish state 2')
+        self.publish_state.add_publish_feedback()
         self.projection_synchronization = success_is_running(Synchronization)()
         self.check_monitors = CheckMonitors()
         # projection plugins
@@ -55,7 +60,8 @@ class ControlLoop(AsyncBehavior):
 
         self.add_child(success_is_running(EvaluateMonitors)())
         self.add_child(self.check_monitors)
-        self.add_child(ControllerPlugin('controller'))
+        self.controller_plugin = ControllerPlugin('controller')
+        self.add_child(self.controller_plugin)
 
         self.add_child(success_is_running(ControlCycleCounter)())
 
@@ -76,10 +82,21 @@ class ControlLoop(AsyncBehavior):
         self.remove_projection_behaviors()
         self.add_closed_loop_behaviors()
 
+    @toggle_on('controller_active')
+    def add_qp_controller(self):
+        self.insert_behind(self.controller_plugin, self.check_monitors)
+        self.insert_behind(self.kin_sim, self.time)
+
+    @toggle_off('controller_active')
+    def remove_qp_controller(self):
+        self.remove_child(self.controller_plugin)
+        self.remove_child(self.kin_sim)
+
     def remove_projection_behaviors(self):
         self.remove_child(self.projection_synchronization)
         self.remove_child(self.time)
         self.remove_child(self.kin_sim)
+        # self.publish_state.remove_visualization_marker_behavior()
 
     def remove_closed_loop_behaviors(self):
         self.remove_child(self.closed_loop_synchronization)
@@ -88,6 +105,7 @@ class ControlLoop(AsyncBehavior):
         self.remove_child(self.send_controls)
 
     def add_projection_behaviors(self):
+        # self.publish_state.add_visualization_marker_behavior(mode=VisualizationMode.CollisionsDecomposed)
         self.insert_child(self.projection_synchronization, 1)
         self.insert_child(self.time, -2)
         self.insert_child(self.kin_sim, -2)

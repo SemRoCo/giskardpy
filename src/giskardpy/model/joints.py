@@ -276,7 +276,7 @@ class PrismaticJoint(OneDofJoint):
         super().__init__(name, free_variable_name, parent_link_name, child_link_name, axis, parent_T_child,
                          lower_limits, upper_limits, multiplier, offset)
         motor_expression = self.free_variable.get_symbol(Derivatives.position) * self.multiplier + self.offset
-        translation_axis = w.Point3(self.axis) * motor_expression
+        translation_axis = w.Vector3(self.axis) * motor_expression
         parent_T_child = w.TransMatrix.from_xyz_rpy(x=translation_axis[0],
                                                     y=translation_axis[1],
                                                     z=translation_axis[2])

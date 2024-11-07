@@ -237,3 +237,24 @@ class ExecutionSucceededPrematurely(ExecutionException):
 @GiskardException.register_error_code(GiskardError.BEHAVIOR_TREE_ERROR)
 class BehaviorTreeException(GiskardException):
     pass
+
+
+# %% force torque exceptions
+@GiskardException.register_error_code(GiskardError.FORCE_TORQUE_MONITOR_ERROR)
+class ForceTorqueExceptions(GiskardException):
+    pass
+
+
+@GiskardException.register_error_code(GiskardError.FORCE_TORQUE_MONITOR_GRASPING_MISSED_OBJECT)
+class ForceTorqueMonitorGraspsingMissedObjectExceptions(GiskardException):
+    pass
+
+
+@GiskardException.register_error_code(GiskardError.FORCE_TORQUE_MONITOR_TRANSPORTING_LOST_OBJECT)
+class ForceTorqueTransportingLostObjectExceptions(GiskardException):
+    pass
+
+
+@GiskardException.register_error_code(GiskardError.FORCE_TORQUE_MONITOR_PLACING_MISSED_PLACING_LOCATION)
+class ForceTorquePlacingMissedPlacingLocationExceptions(GiskardException):
+    pass

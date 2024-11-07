@@ -1,14 +1,14 @@
 <launch>
 
-    <include file="$(find stretch_description)/launch/upload.launch"/>
+    <param name="robot_description" command="xacro $(find stretch_description)/urdf/stretch_description_dex.xacro" />
 
     <node pkg="giskardpy" type="stretch_standalone.py" name="giskard" output="screen"/>
 
     <node pkg="giskardpy" type="interactive_marker.py" name="giskard_interactive_marker" output="screen">
         <rosparam param="enable_self_collision">False</rosparam>
         <rosparam param="interactive_marker_chains">
-            - [map, stretch/link_grasp_center]
-            - [map, stretch/base_link]
+            - [map, link_grasp_center]
+            - [map, base_link]
         </rosparam>
     </node>
 

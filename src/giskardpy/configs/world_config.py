@@ -22,6 +22,7 @@ class WorldConfig(ABC):
     def __init__(self):
         god_map.world = WorldTree()
         self.set_default_weights()
+        god_map.is_fixed_base_robot = False
 
     @property
     def world(self) -> WorldTree:
@@ -237,6 +238,7 @@ class WorldWithFixedRobot(WorldConfig):
     def __init__(self, joint_limits: Dict[Derivatives, float] = None):
         super().__init__()
         self._joint_limits = joint_limits
+        god_map.is_fixed_base_robot = True
 
     def setup(self):
         self.set_default_limits(self._joint_limits)

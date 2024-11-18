@@ -19,8 +19,9 @@ class ExecuteTraj(Sequence):
         super().__init__(name)
         self.move_robots = Parallel(name='move robot', policy=ParallelPolicy.SuccessOnAll(synchronise=True))
         self.add_child(self.move_robots)
-        self.prepare_base_control = PrepareBaseTrajControlLoop()
-        self.insert_child(self.prepare_base_control, 0)
+        if not god_map.is_fixed_base_robot:
+            self.prepare_base_control = PrepareBaseTrajControlLoop()
+            self.insert_child(self.prepare_base_control, 0)
 
         self.base_closed_loop = ControlLoop(log_traj=False, max_hz=god_map.behavior_tree_config.control_loop_max_hz)
         self.base_closed_loop.add_closed_loop_behaviors()

@@ -1,0 +1,13 @@
+<launch>
+
+  <node pkg="giskardpy" type="ur5_dualarm.py" name="giskard" output="screen"/>
+
+  <node pkg="giskardpy" type="interactive_marker.py" name="giskard_interactive_marker" output="screen">
+    <rosparam param="enable_self_collision">False</rosparam>
+    <rosparam param="interactive_marker_chains">
+      - [world, left_ee_link]
+      - [world, right_ee_link]
+    </rosparam>
+  </node>
+
+</launch>

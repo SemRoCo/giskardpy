@@ -26,8 +26,6 @@ class KevinStandaloneInterface(StandAloneRobotInterfaceConfig):
     def __init__(self, drive_joint_name: str = 'brumbrum'):
         super().__init__([
             drive_joint_name,
-            'robot_left_rocker_joint',
-            'robot_right_rocker_joint',
             'robot_arm_inner_joint',
             'robot_arm_outer_joint',
             'robot_arm_wrist_joint',

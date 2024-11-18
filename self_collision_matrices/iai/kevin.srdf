@@ -6,21 +6,10 @@
   <disable_self_collision link1="robot_arm_base_link" link2="robot_arm_left_finger_link" reason="Default"/>
   <disable_self_collision link1="robot_arm_base_link" link2="robot_arm_right_finger_link" reason="Default"/>
   <disable_self_collision link1="robot_arm_base_link" link2="robot_base_link" reason="Adjacent"/>
-  <disable_self_collision link1="robot_arm_base_link" link2="robot_front_laser_base_link" reason="Adjacent"/>
-  <disable_self_collision link1="robot_arm_base_link" link2="robot_front_rgbd_camera_link" reason="Adjacent"/>
   <disable_self_collision link1="robot_arm_base_link" link2="robot_housing_link" reason="Adjacent"/>
-  <disable_self_collision link1="robot_arm_base_link" link2="robot_imu_base_link" reason="Adjacent"/>
-  <disable_self_collision link1="robot_arm_base_link" link2="robot_left_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_base_link" link2="robot_left_rocker_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_base_link" link2="robot_left_wheel_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_base_link" link2="robot_rear_left_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_base_link" link2="robot_rear_right_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_base_link" link2="robot_right_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_base_link" link2="robot_right_rocker_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_base_link" link2="robot_right_wheel_link" reason="Never"/>
+  <disable_self_collision link1="robot_arm_base_link" link2="robot_housing_link_bottom" reason="Adjacent"/>
   <disable_self_collision link1="robot_arm_base_link" link2="robot_safety_button_link" reason="Adjacent"/>
   <disable_self_collision link1="robot_arm_base_link" link2="robot_top_3d_laser_base_link" reason="Adjacent"/>
-  <disable_self_collision link1="robot_arm_base_link" link2="robot_top_rgbd_camera_link" reason="Adjacent"/>
   <disable_self_collision link1="robot_arm_column_link" link2="robot_arm_column_link" reason="Adjacent"/>
   <disable_self_collision link1="robot_arm_column_link" link2="robot_arm_inner_link" reason="AlmostAlways"/>
   <disable_self_collision link1="robot_arm_column_link" link2="robot_arm_left_finger_link" reason="Never"/>
@@ -28,236 +17,52 @@
   <disable_self_collision link1="robot_arm_column_link" link2="robot_arm_right_finger_link" reason="Never"/>
   <disable_self_collision link1="robot_arm_column_link" link2="robot_arm_wrist_link" reason="Never"/>
   <disable_self_collision link1="robot_arm_column_link" link2="robot_base_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_column_link" link2="robot_front_laser_base_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_column_link" link2="robot_front_rgbd_camera_link" reason="Never"/>
   <disable_self_collision link1="robot_arm_column_link" link2="robot_housing_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_column_link" link2="robot_imu_base_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_column_link" link2="robot_left_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_column_link" link2="robot_left_rocker_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_column_link" link2="robot_left_wheel_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_column_link" link2="robot_rear_left_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_column_link" link2="robot_rear_right_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_column_link" link2="robot_right_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_column_link" link2="robot_right_rocker_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_column_link" link2="robot_right_wheel_link" reason="Never"/>
+  <disable_self_collision link1="robot_arm_column_link" link2="robot_housing_link_bottom" reason="Never"/>
   <disable_self_collision link1="robot_arm_column_link" link2="robot_safety_button_link" reason="Never"/>
   <disable_self_collision link1="robot_arm_column_link" link2="robot_top_3d_laser_base_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_column_link" link2="robot_top_rgbd_camera_link" reason="Never"/>
   <disable_self_collision link1="robot_arm_inner_link" link2="robot_arm_inner_link" reason="Adjacent"/>
   <disable_self_collision link1="robot_arm_inner_link" link2="robot_arm_left_finger_link" reason="Never"/>
   <disable_self_collision link1="robot_arm_inner_link" link2="robot_arm_outer_link" reason="Default"/>
   <disable_self_collision link1="robot_arm_inner_link" link2="robot_arm_right_finger_link" reason="Never"/>
   <disable_self_collision link1="robot_arm_inner_link" link2="robot_arm_wrist_link" reason="Never"/>
   <disable_self_collision link1="robot_arm_inner_link" link2="robot_base_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_inner_link" link2="robot_front_laser_base_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_inner_link" link2="robot_front_rgbd_camera_link" reason="Never"/>
   <disable_self_collision link1="robot_arm_inner_link" link2="robot_housing_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_inner_link" link2="robot_imu_base_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_inner_link" link2="robot_left_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_inner_link" link2="robot_left_rocker_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_inner_link" link2="robot_left_wheel_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_inner_link" link2="robot_rear_left_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_inner_link" link2="robot_rear_right_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_inner_link" link2="robot_right_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_inner_link" link2="robot_right_rocker_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_inner_link" link2="robot_right_wheel_link" reason="Never"/>
+  <disable_self_collision link1="robot_arm_inner_link" link2="robot_housing_link_bottom" reason="Never"/>
   <disable_self_collision link1="robot_arm_inner_link" link2="robot_top_3d_laser_base_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_inner_link" link2="robot_top_rgbd_camera_link" reason="Never"/>
   <disable_self_collision link1="robot_arm_left_finger_link" link2="robot_arm_left_finger_link" reason="Adjacent"/>
   <disable_self_collision link1="robot_arm_left_finger_link" link2="robot_arm_outer_link" reason="Never"/>
+  <disable_self_collision link1="robot_arm_left_finger_link" link2="robot_arm_right_finger_link" reason="Never"/>
   <disable_self_collision link1="robot_arm_left_finger_link" link2="robot_arm_wrist_link" reason="Default"/>
   <disable_self_collision link1="robot_arm_left_finger_link" link2="robot_base_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_left_finger_link" link2="robot_front_laser_base_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_left_finger_link" link2="robot_front_rgbd_camera_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_left_finger_link" link2="robot_imu_base_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_left_finger_link" link2="robot_left_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_left_finger_link" link2="robot_left_rocker_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_left_finger_link" link2="robot_left_wheel_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_left_finger_link" link2="robot_rear_left_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_left_finger_link" link2="robot_rear_right_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_left_finger_link" link2="robot_right_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_left_finger_link" link2="robot_right_rocker_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_left_finger_link" link2="robot_right_wheel_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_left_finger_link" link2="robot_top_3d_laser_base_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_left_finger_link" link2="robot_top_rgbd_camera_link" reason="Never"/>
+  <disable_self_collision link1="robot_arm_left_finger_link" link2="robot_housing_link" reason="Default"/>
+  <disable_self_collision link1="robot_arm_left_finger_link" link2="robot_housing_link_bottom" reason="Never"/>
   <disable_self_collision link1="robot_arm_outer_link" link2="robot_arm_outer_link" reason="Adjacent"/>
   <disable_self_collision link1="robot_arm_outer_link" link2="robot_arm_right_finger_link" reason="Never"/>
   <disable_self_collision link1="robot_arm_outer_link" link2="robot_arm_wrist_link" reason="AlmostAlways"/>
   <disable_self_collision link1="robot_arm_outer_link" link2="robot_base_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_outer_link" link2="robot_front_laser_base_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_outer_link" link2="robot_front_rgbd_camera_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_outer_link" link2="robot_imu_base_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_outer_link" link2="robot_left_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_outer_link" link2="robot_left_rocker_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_outer_link" link2="robot_left_wheel_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_outer_link" link2="robot_rear_left_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_outer_link" link2="robot_rear_right_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_outer_link" link2="robot_right_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_outer_link" link2="robot_right_rocker_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_outer_link" link2="robot_right_wheel_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_outer_link" link2="robot_top_3d_laser_base_link" reason="Never"/>
+  <disable_self_collision link1="robot_arm_outer_link" link2="robot_housing_link_bottom" reason="Never"/>
   <disable_self_collision link1="robot_arm_right_finger_link" link2="robot_arm_right_finger_link" reason="Adjacent"/>
   <disable_self_collision link1="robot_arm_right_finger_link" link2="robot_arm_wrist_link" reason="Default"/>
   <disable_self_collision link1="robot_arm_right_finger_link" link2="robot_base_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_right_finger_link" link2="robot_front_laser_base_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_right_finger_link" link2="robot_front_rgbd_camera_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_right_finger_link" link2="robot_imu_base_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_right_finger_link" link2="robot_left_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_right_finger_link" link2="robot_left_rocker_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_right_finger_link" link2="robot_left_wheel_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_right_finger_link" link2="robot_rear_left_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_right_finger_link" link2="robot_rear_right_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_right_finger_link" link2="robot_right_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_right_finger_link" link2="robot_right_rocker_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_right_finger_link" link2="robot_right_wheel_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_right_finger_link" link2="robot_top_3d_laser_base_link" reason="Never"/>
+  <disable_self_collision link1="robot_arm_right_finger_link" link2="robot_housing_link" reason="Default"/>
+  <disable_self_collision link1="robot_arm_right_finger_link" link2="robot_housing_link_bottom" reason="Never"/>
   <disable_self_collision link1="robot_arm_wrist_link" link2="robot_arm_wrist_link" reason="Adjacent"/>
   <disable_self_collision link1="robot_arm_wrist_link" link2="robot_base_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_wrist_link" link2="robot_front_laser_base_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_wrist_link" link2="robot_front_rgbd_camera_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_wrist_link" link2="robot_imu_base_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_wrist_link" link2="robot_left_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_wrist_link" link2="robot_left_rocker_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_wrist_link" link2="robot_left_wheel_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_wrist_link" link2="robot_rear_left_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_wrist_link" link2="robot_rear_right_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_wrist_link" link2="robot_right_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_wrist_link" link2="robot_right_rocker_link" reason="Never"/>
-  <disable_self_collision link1="robot_arm_wrist_link" link2="robot_right_wheel_link" reason="Never"/>
+  <disable_self_collision link1="robot_arm_wrist_link" link2="robot_housing_link_bottom" reason="Never"/>
   <disable_self_collision link1="robot_base_link" link2="robot_base_link" reason="Adjacent"/>
-  <disable_self_collision link1="robot_base_link" link2="robot_front_laser_base_link" reason="Adjacent"/>
-  <disable_self_collision link1="robot_base_link" link2="robot_front_rgbd_camera_link" reason="Adjacent"/>
   <disable_self_collision link1="robot_base_link" link2="robot_housing_link" reason="Adjacent"/>
-  <disable_self_collision link1="robot_base_link" link2="robot_imu_base_link" reason="Adjacent"/>
-  <disable_self_collision link1="robot_base_link" link2="robot_left_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_base_link" link2="robot_left_rocker_link" reason="Never"/>
-  <disable_self_collision link1="robot_base_link" link2="robot_left_wheel_link" reason="Never"/>
-  <disable_self_collision link1="robot_base_link" link2="robot_rear_left_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_base_link" link2="robot_rear_right_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_base_link" link2="robot_right_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_base_link" link2="robot_right_rocker_link" reason="Never"/>
-  <disable_self_collision link1="robot_base_link" link2="robot_right_wheel_link" reason="Never"/>
+  <disable_self_collision link1="robot_base_link" link2="robot_housing_link_bottom" reason="Adjacent"/>
   <disable_self_collision link1="robot_base_link" link2="robot_safety_button_link" reason="Adjacent"/>
   <disable_self_collision link1="robot_base_link" link2="robot_top_3d_laser_base_link" reason="Adjacent"/>
-  <disable_self_collision link1="robot_base_link" link2="robot_top_rgbd_camera_link" reason="Adjacent"/>
-  <disable_self_collision link1="robot_front_laser_base_link" link2="robot_front_laser_base_link" reason="Adjacent"/>
-  <disable_self_collision link1="robot_front_laser_base_link" link2="robot_front_rgbd_camera_link" reason="Adjacent"/>
-  <disable_self_collision link1="robot_front_laser_base_link" link2="robot_housing_link" reason="Adjacent"/>
-  <disable_self_collision link1="robot_front_laser_base_link" link2="robot_imu_base_link" reason="Adjacent"/>
-  <disable_self_collision link1="robot_front_laser_base_link" link2="robot_left_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_front_laser_base_link" link2="robot_left_rocker_link" reason="Never"/>
-  <disable_self_collision link1="robot_front_laser_base_link" link2="robot_left_wheel_link" reason="Never"/>
-  <disable_self_collision link1="robot_front_laser_base_link" link2="robot_rear_left_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_front_laser_base_link" link2="robot_rear_right_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_front_laser_base_link" link2="robot_right_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_front_laser_base_link" link2="robot_right_rocker_link" reason="Never"/>
-  <disable_self_collision link1="robot_front_laser_base_link" link2="robot_right_wheel_link" reason="Never"/>
-  <disable_self_collision link1="robot_front_laser_base_link" link2="robot_safety_button_link" reason="Adjacent"/>
-  <disable_self_collision link1="robot_front_laser_base_link" link2="robot_top_3d_laser_base_link" reason="Adjacent"/>
-  <disable_self_collision link1="robot_front_laser_base_link" link2="robot_top_rgbd_camera_link" reason="Adjacent"/>
-  <disable_self_collision link1="robot_front_rgbd_camera_link" link2="robot_front_rgbd_camera_link" reason="Adjacent"/>
-  <disable_self_collision link1="robot_front_rgbd_camera_link" link2="robot_housing_link" reason="Adjacent"/>
-  <disable_self_collision link1="robot_front_rgbd_camera_link" link2="robot_imu_base_link" reason="Adjacent"/>
-  <disable_self_collision link1="robot_front_rgbd_camera_link" link2="robot_left_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_front_rgbd_camera_link" link2="robot_left_rocker_link" reason="Never"/>
-  <disable_self_collision link1="robot_front_rgbd_camera_link" link2="robot_left_wheel_link" reason="Never"/>
-  <disable_self_collision link1="robot_front_rgbd_camera_link" link2="robot_rear_left_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_front_rgbd_camera_link" link2="robot_rear_right_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_front_rgbd_camera_link" link2="robot_right_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_front_rgbd_camera_link" link2="robot_right_rocker_link" reason="Never"/>
-  <disable_self_collision link1="robot_front_rgbd_camera_link" link2="robot_right_wheel_link" reason="Never"/>
-  <disable_self_collision link1="robot_front_rgbd_camera_link" link2="robot_safety_button_link" reason="Adjacent"/>
-  <disable_self_collision link1="robot_front_rgbd_camera_link" link2="robot_top_3d_laser_base_link" reason="Adjacent"/>
-  <disable_self_collision link1="robot_front_rgbd_camera_link" link2="robot_top_rgbd_camera_link" reason="Adjacent"/>
   <disable_self_collision link1="robot_housing_link" link2="robot_housing_link" reason="Adjacent"/>
-  <disable_self_collision link1="robot_housing_link" link2="robot_imu_base_link" reason="Adjacent"/>
-  <disable_self_collision link1="robot_housing_link" link2="robot_left_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_housing_link" link2="robot_left_rocker_link" reason="Never"/>
-  <disable_self_collision link1="robot_housing_link" link2="robot_left_wheel_link" reason="Never"/>
-  <disable_self_collision link1="robot_housing_link" link2="robot_rear_left_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_housing_link" link2="robot_rear_right_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_housing_link" link2="robot_right_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_housing_link" link2="robot_right_rocker_link" reason="Never"/>
-  <disable_self_collision link1="robot_housing_link" link2="robot_right_wheel_link" reason="Never"/>
+  <disable_self_collision link1="robot_housing_link" link2="robot_housing_link_bottom" reason="Adjacent"/>
   <disable_self_collision link1="robot_housing_link" link2="robot_safety_button_link" reason="Adjacent"/>
   <disable_self_collision link1="robot_housing_link" link2="robot_top_3d_laser_base_link" reason="Adjacent"/>
-  <disable_self_collision link1="robot_housing_link" link2="robot_top_rgbd_camera_link" reason="Adjacent"/>
-  <disable_self_collision link1="robot_imu_base_link" link2="robot_imu_base_link" reason="Adjacent"/>
-  <disable_self_collision link1="robot_imu_base_link" link2="robot_left_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_imu_base_link" link2="robot_left_rocker_link" reason="Never"/>
-  <disable_self_collision link1="robot_imu_base_link" link2="robot_left_wheel_link" reason="Never"/>
-  <disable_self_collision link1="robot_imu_base_link" link2="robot_rear_left_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_imu_base_link" link2="robot_rear_right_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_imu_base_link" link2="robot_right_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_imu_base_link" link2="robot_right_rocker_link" reason="Never"/>
-  <disable_self_collision link1="robot_imu_base_link" link2="robot_right_wheel_link" reason="Never"/>
-  <disable_self_collision link1="robot_imu_base_link" link2="robot_safety_button_link" reason="Adjacent"/>
-  <disable_self_collision link1="robot_imu_base_link" link2="robot_top_3d_laser_base_link" reason="Adjacent"/>
-  <disable_self_collision link1="robot_imu_base_link" link2="robot_top_rgbd_camera_link" reason="Adjacent"/>
-  <disable_self_collision link1="robot_left_caster_link" link2="robot_left_caster_link" reason="Adjacent"/>
-  <disable_self_collision link1="robot_left_caster_link" link2="robot_left_rocker_link" reason="Never"/>
-  <disable_self_collision link1="robot_left_caster_link" link2="robot_left_wheel_link" reason="Never"/>
-  <disable_self_collision link1="robot_left_caster_link" link2="robot_rear_left_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_left_caster_link" link2="robot_rear_right_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_left_caster_link" link2="robot_right_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_left_caster_link" link2="robot_right_rocker_link" reason="Never"/>
-  <disable_self_collision link1="robot_left_caster_link" link2="robot_right_wheel_link" reason="Never"/>
-  <disable_self_collision link1="robot_left_caster_link" link2="robot_safety_button_link" reason="Never"/>
-  <disable_self_collision link1="robot_left_caster_link" link2="robot_top_3d_laser_base_link" reason="Never"/>
-  <disable_self_collision link1="robot_left_caster_link" link2="robot_top_rgbd_camera_link" reason="Never"/>
-  <disable_self_collision link1="robot_left_rocker_link" link2="robot_left_rocker_link" reason="Adjacent"/>
-  <disable_self_collision link1="robot_left_rocker_link" link2="robot_left_wheel_link" reason="Never"/>
-  <disable_self_collision link1="robot_left_rocker_link" link2="robot_rear_left_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_left_rocker_link" link2="robot_rear_right_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_left_rocker_link" link2="robot_right_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_left_rocker_link" link2="robot_right_rocker_link" reason="Never"/>
-  <disable_self_collision link1="robot_left_rocker_link" link2="robot_right_wheel_link" reason="Never"/>
-  <disable_self_collision link1="robot_left_rocker_link" link2="robot_safety_button_link" reason="Never"/>
-  <disable_self_collision link1="robot_left_rocker_link" link2="robot_top_3d_laser_base_link" reason="Never"/>
-  <disable_self_collision link1="robot_left_rocker_link" link2="robot_top_rgbd_camera_link" reason="Never"/>
-  <disable_self_collision link1="robot_left_wheel_link" link2="robot_left_wheel_link" reason="Adjacent"/>
-  <disable_self_collision link1="robot_left_wheel_link" link2="robot_rear_left_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_left_wheel_link" link2="robot_rear_right_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_left_wheel_link" link2="robot_right_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_left_wheel_link" link2="robot_right_rocker_link" reason="Never"/>
-  <disable_self_collision link1="robot_left_wheel_link" link2="robot_right_wheel_link" reason="Never"/>
-  <disable_self_collision link1="robot_left_wheel_link" link2="robot_safety_button_link" reason="Never"/>
-  <disable_self_collision link1="robot_left_wheel_link" link2="robot_top_3d_laser_base_link" reason="Never"/>
-  <disable_self_collision link1="robot_left_wheel_link" link2="robot_top_rgbd_camera_link" reason="Never"/>
-  <disable_self_collision link1="robot_rear_left_caster_link" link2="robot_rear_left_caster_link" reason="Adjacent"/>
-  <disable_self_collision link1="robot_rear_left_caster_link" link2="robot_rear_right_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_rear_left_caster_link" link2="robot_right_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_rear_left_caster_link" link2="robot_right_rocker_link" reason="Never"/>
-  <disable_self_collision link1="robot_rear_left_caster_link" link2="robot_right_wheel_link" reason="Never"/>
-  <disable_self_collision link1="robot_rear_left_caster_link" link2="robot_safety_button_link" reason="Never"/>
-  <disable_self_collision link1="robot_rear_left_caster_link" link2="robot_top_3d_laser_base_link" reason="Never"/>
-  <disable_self_collision link1="robot_rear_left_caster_link" link2="robot_top_rgbd_camera_link" reason="Never"/>
-  <disable_self_collision link1="robot_rear_right_caster_link" link2="robot_rear_right_caster_link" reason="Adjacent"/>
-  <disable_self_collision link1="robot_rear_right_caster_link" link2="robot_right_caster_link" reason="Never"/>
-  <disable_self_collision link1="robot_rear_right_caster_link" link2="robot_right_rocker_link" reason="Never"/>
-  <disable_self_collision link1="robot_rear_right_caster_link" link2="robot_right_wheel_link" reason="Never"/>
-  <disable_self_collision link1="robot_rear_right_caster_link" link2="robot_safety_button_link" reason="Never"/>
-  <disable_self_collision link1="robot_rear_right_caster_link" link2="robot_top_3d_laser_base_link" reason="Never"/>
-  <disable_self_collision link1="robot_rear_right_caster_link" link2="robot_top_rgbd_camera_link" reason="Never"/>
-  <disable_self_collision link1="robot_right_caster_link" link2="robot_right_caster_link" reason="Adjacent"/>
-  <disable_self_collision link1="robot_right_caster_link" link2="robot_right_rocker_link" reason="Never"/>
-  <disable_self_collision link1="robot_right_caster_link" link2="robot_right_wheel_link" reason="Never"/>
-  <disable_self_collision link1="robot_right_caster_link" link2="robot_safety_button_link" reason="Never"/>
-  <disable_self_collision link1="robot_right_caster_link" link2="robot_top_3d_laser_base_link" reason="Never"/>
-  <disable_self_collision link1="robot_right_caster_link" link2="robot_top_rgbd_camera_link" reason="Never"/>
-  <disable_self_collision link1="robot_right_rocker_link" link2="robot_right_rocker_link" reason="Adjacent"/>
-  <disable_self_collision link1="robot_right_rocker_link" link2="robot_right_wheel_link" reason="Never"/>
-  <disable_self_collision link1="robot_right_rocker_link" link2="robot_safety_button_link" reason="Never"/>
-  <disable_self_collision link1="robot_right_rocker_link" link2="robot_top_3d_laser_base_link" reason="Never"/>
-  <disable_self_collision link1="robot_right_rocker_link" link2="robot_top_rgbd_camera_link" reason="Never"/>
-  <disable_self_collision link1="robot_right_wheel_link" link2="robot_right_wheel_link" reason="Adjacent"/>
-  <disable_self_collision link1="robot_right_wheel_link" link2="robot_safety_button_link" reason="Never"/>
-  <disable_self_collision link1="robot_right_wheel_link" link2="robot_top_3d_laser_base_link" reason="Never"/>
-  <disable_self_collision link1="robot_right_wheel_link" link2="robot_top_rgbd_camera_link" reason="Never"/>
+  <disable_self_collision link1="robot_housing_link_bottom" link2="robot_housing_link_bottom" reason="Adjacent"/>
+  <disable_self_collision link1="robot_housing_link_bottom" link2="robot_safety_button_link" reason="Adjacent"/>
+  <disable_self_collision link1="robot_housing_link_bottom" link2="robot_top_3d_laser_base_link" reason="Adjacent"/>
   <disable_self_collision link1="robot_safety_button_link" link2="robot_safety_button_link" reason="Adjacent"/>
   <disable_self_collision link1="robot_safety_button_link" link2="robot_top_3d_laser_base_link" reason="Adjacent"/>
-  <disable_self_collision link1="robot_safety_button_link" link2="robot_top_rgbd_camera_link" reason="Adjacent"/>
   <disable_self_collision link1="robot_top_3d_laser_base_link" link2="robot_top_3d_laser_base_link" reason="Adjacent"/>
-  <disable_self_collision link1="robot_top_3d_laser_base_link" link2="robot_top_rgbd_camera_link" reason="Adjacent"/>
-  <disable_self_collision link1="robot_top_rgbd_camera_link" link2="robot_top_rgbd_camera_link" reason="Adjacent"/>
 </robot>

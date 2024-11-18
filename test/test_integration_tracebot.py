@@ -15,7 +15,7 @@ from utils_for_tests import GiskardTestWrapper
 
 @pytest.fixture(scope='module')
 def giskard(request, ros):
-    launch_launchfile('package://iai_tracy_description/launch/upload.launch')
+    # launch_launchfile('package://iai_tracy_description/launch/upload.launch')
     c = TracebotTestWrapper()
     # c = TracebotTestWrapperMujoco()
     request.addfinalizer(c.tear_down)

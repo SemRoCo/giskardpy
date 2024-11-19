@@ -437,14 +437,14 @@ class MotionGraphManager:
     def get_constraints_from_tasks(self) \
             -> Tuple[List[EqualityConstraint],
             List[InequalityConstraint],
-            List[DerivativeInequalityConstraint],
             List[DerivativeEqualityConstraint],
+            List[DerivativeInequalityConstraint],
             List[QuadraticWeightGain],
             List[LinearWeightGain]]:
         eq_constraints = ImmutableDict()
         neq_constraints = ImmutableDict()
-        derivative_constraints = ImmutableDict()
         eq_derivative_constraints = ImmutableDict()
+        derivative_constraints = ImmutableDict()
         quadratic_weight_gains = ImmutableDict()
         linear_weight_gains = ImmutableDict()
         for task in self.task_state.nodes:
@@ -459,10 +459,10 @@ class MotionGraphManager:
                     new_eq_constraints[constraint.name] = constraint
                 for constraint in task.get_neq_constraints():
                     new_neq_constraints[constraint.name] = constraint
-                for constraint in task.get_derivative_constraints():
-                    new_derivative_constraints[constraint.name] = constraint
                 for constraint in task.get_eq_derivative_constraints():
                     new_eq_derivative_constraints[constraint.name] = constraint
+                for constraint in task.get_derivative_constraints():
+                    new_derivative_constraints[constraint.name] = constraint
                 for gain in task.get_quadratic_gains():
                     new_quadratic_weight_gains[gain.name] = gain
                 for gain in task.get_linear_gains():
@@ -471,14 +471,14 @@ class MotionGraphManager:
                 raise GoalInitalizationException(str(e))
             eq_constraints.update(new_eq_constraints)
             neq_constraints.update(new_neq_constraints)
-            derivative_constraints.update(new_derivative_constraints)
             eq_derivative_constraints.update(new_eq_derivative_constraints)
+            derivative_constraints.update(new_derivative_constraints)
             quadratic_weight_gains.update(new_quadratic_weight_gains)
             linear_weight_gains.update(new_linear_weight_gains)
             # logging.loginfo(f'{goal_name} added {len(_constraints)+len(_vel_constraints)} constraints.')
         return (list(eq_constraints.values()),
                 list(neq_constraints.values()),
-                list(derivative_constraints.values()),
                 list(eq_derivative_constraints.values()),
+                list(derivative_constraints.values()),
                 list(quadratic_weight_gains.values()),
                 list(linear_weight_gains.values()))

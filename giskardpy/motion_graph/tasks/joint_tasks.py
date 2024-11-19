@@ -110,3 +110,45 @@ class JointVelocityLimit(Task):
                                              task_expression=current_joint,
                                              velocity_limit=max_velocity,
                                              name=joint_name)
+
+
+class JointVelocity(Task):
+    def __init__(self,
+                 joint_names: List[str],
+                 vel_goal: float,
+                 group_name: Optional[str] = None,
+                 weight: float = WEIGHT_BELOW_CA,
+                 max_velocity: float = 1,
+                 hard: bool = False,
+                 name: Optional[str] = None):
+        """
+        Limits the joint velocity of a revolute joint.
+        :param joint_name:
+        :param group_name: if joint_name is not unique, will search in this group for matches.
+        :param weight:
+        :param max_velocity: rad/s
+        :param hard: turn this into a hard constraint.
+        """
+        self.weight = weight
+        self.vel_goal = vel_goal
+        self.max_velocity = max_velocity
+        self.hard = hard
+        self.joint_names = joint_names
+        if name is None:
+            name = f'{self.__class__.__name__}/{self.joint_names}'
+        super().__init__(name=name)
+
+        for joint_name in self.joint_names:
+            joint_name = god_map.world.search_for_joint_name(joint_name, group_name)
+            joint: OneDofJoint = god_map.world.joints[joint_name]
+            current_joint = joint.get_symbol(Derivatives.position)
+            try:
+                limit_expr = joint.get_limit_expressions(Derivatives.velocity)[1]
+                max_velocity = cas.min(self.max_velocity, limit_expr)
+            except IndexError:
+                max_velocity = self.max_velocity
+            self.add_velocity_eq_constraint(velocity_goal=self.vel_goal,
+                                            weight=self.weight,
+                                            task_expression=current_joint,
+                                            velocity_limit=max_velocity,
+                                            name=joint_name)

@@ -690,13 +690,13 @@ class EqualityBounds(ProblemDataPart):
                 bounds.append(self.last_derivative_values(derivative))
                 bounds.append(self.derivative_links(derivative))
 
+        num_derivative_links = sum(len(x) for x in bounds)
         num_derivative_constraints = 0
         for derivative in Derivatives.range(Derivatives.velocity, self.max_derivative):
             bound = self.eq_derivative_constraint_bounds(derivative)
             num_derivative_constraints += len(bound)
             bounds.append(bound)
 
-        num_derivative_links = sum(len(x) for x in bounds)
         bounds.append(self.equality_constraint_bounds())
         bounds, self.names = self._sorter(*bounds)
         self.names_derivative_links = self.names[:num_derivative_links]
@@ -912,10 +912,11 @@ class EqualityModel(ProblemDataPart):
         |      |   sp | vel constr 2
         |-------------|
         """
+        number_of_non_slack_columns = self.number_of_free_variables * self.prediction_horizon * self.max_derivative
         number_of_vel_rows = len(self.velocity_eq_constraints) * self.prediction_horizon
         if number_of_vel_rows > 0:
             expressions = cas.Expression(self.get_eq_derivative_constraint_expressions(Derivatives.velocity))
-            model = cas.zeros(number_of_vel_rows, self.number_of_non_slack_columns)
+            model = cas.zeros(number_of_vel_rows, number_of_non_slack_columns)
             for derivative in Derivatives.range(Derivatives.position, self.max_derivative - 1):
                 J_vel = cas.jacobian(expressions=expressions,
                                      symbols=self.get_free_variable_symbols(derivative)) * self.dt
@@ -933,7 +934,7 @@ class EqualityModel(ProblemDataPart):
             model.remove(rows_to_delete, [])
 
             # constraint slack
-            num_slack_variables = sum(self.control_horizon for c in self.velocity_constraints)
+            num_slack_variables = sum(self.control_horizon for c in self.velocity_eq_constraints)
             slack_model = cas.eye(num_slack_variables) * self.dt
             return model, slack_model
         return cas.Expression(), cas.Expression()
@@ -1730,7 +1731,7 @@ class QPController:
         """
         try:
             self.xdot_full = self.qp_solver.solve_and_retry(substitutions=substitutions)
-            # self._create_debug_pandas(self.qp_solver)
+            self._create_debug_pandas(self.qp_solver)
             if self.qp_formulation.is_implicit():
                 return NextCommands.from_xdot_implicit(self.free_variables, self.xdot_full, self.order,
                                                        self.prediction_horizon, god_map.world, self.sample_period)
@@ -1848,9 +1849,10 @@ class QPController:
         self.equality_constr_names = self.equality_bounds.names[bE_filter]
         self.inequality_constr_names = self.inequality_bounds.names[bA_filter]
         num_vel_constr = len(self.derivative_constraints) * (self.prediction_horizon - 2)
+        num_eq_vel_constr = len(self.eq_derivative_constraints) * (self.prediction_horizon - 2)
         num_neq_constr = len(self.inequality_constraints)
         num_eq_constr = len(self.equality_constraints)
-        num_constr = num_vel_constr + num_neq_constr + num_eq_constr
+        num_constr = num_vel_constr + num_neq_constr + num_eq_constr + num_eq_vel_constr
 
         self.p_weights = pd.DataFrame(weights, self.free_variable_names, ['data'], dtype=float)
         self.p_g = pd.DataFrame(g, self.free_variable_names, ['data'], dtype=float)

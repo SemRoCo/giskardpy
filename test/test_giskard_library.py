@@ -36,7 +36,8 @@ from giskardpy.qp.qp_controller import ControllerMode
 from giskardpy.qp.qp_solver_ids import SupportedQPSolver
 from hypothesis import given
 from motion_graph.tasks.cartesian_tasks import CartesianPoseAsTask
-from motion_graph.tasks.joint_tasks import JointVelocityLimit
+from motion_graph.tasks.joint_tasks import JointVelocityLimit, JointVelocity
+from qp.constraint import DerivativeEqualityConstraint
 from utils_for_tests import pr2_urdf
 
 try:
@@ -678,14 +679,15 @@ class Simulator:
         self.world.state[v.name].position = goal
         for joint_name in joint_names:
             self.joint_goal[joint_name] = v.get_symbol(Derivatives.position)
-        joint_task = JointVelocityLimit(name='g1', joint_names=joint_names, max_velocity=goal)
+        joint_task = JointVelocity(name='g1', joint_names=joint_names, vel_goal=v.get_symbol(Derivatives.position))
+        # joint_task = JointVelocityLimit(name='g1', joint_names=joint_names, max_velocity=goal)
 
         god_map.motion_graph_manager.add_task(joint_task)
 
     def compile(self):
         god_map.motion_graph_manager.initialize_states()
 
-        eq, neq, neqd, eqd, lin_weight, quad_weight = god_map.motion_graph_manager.get_constraints_from_tasks()
+        eq, neq, eqd, neqd, lin_weight, quad_weight = god_map.motion_graph_manager.get_constraints_from_tasks()
         god_map.qp_controller = QPController(sample_period=self.mpc_dt,
                                              solver_id=self.solver,
                                              prediction_horizon=self.h,
@@ -693,9 +695,10 @@ class Simulator:
                                              qp_formulation=self.qp_formulation,
                                              alpha=self.alpha,
                                              verbose=False)
-        god_map.qp_controller.init(free_variables=self.get_active_free_symbols(eq, neq, neqd),
+        god_map.qp_controller.init(free_variables=self.get_active_free_symbols(eq, neq, eqd, neqd),
                                    equality_constraints=eq,
                                    inequality_constraints=neq,
+                                   eq_derivative_constraints=eqd,
                                    derivative_constraints=neqd)
         god_map.qp_controller.compile()
         self.traj = Trajectory()
@@ -703,9 +706,10 @@ class Simulator:
     def get_active_free_symbols(self,
                                 eq_constraints: List[EqualityConstraint],
                                 neq_constraints: List[InequalityConstraint],
+                                eq_derivative_constraints: List[DerivativeEqualityConstraint],
                                 derivative_constraints: List[DerivativeInequalityConstraint]):
         symbols = set()
-        for c in chain(eq_constraints, neq_constraints, derivative_constraints):
+        for c in chain(eq_constraints, neq_constraints, eq_derivative_constraints, derivative_constraints):
             symbols.update(str(s) for s in cas.free_symbols(c.expression))
         free_variables = list(sorted([v for v in god_map.world.free_variables.values() if v.position_name in symbols],
                                      key=lambda x: x.position_name))
@@ -854,7 +858,7 @@ class TestController:
         pr2_world.update_default_limits({
             Derivatives.velocity: 1,
             Derivatives.acceleration: np.inf,
-            Derivatives.jerk: 100
+            Derivatives.jerk: 50
         })
         simulator = Simulator(world=pr2_world,
                               control_dt=0.05,
@@ -862,7 +866,7 @@ class TestController:
                               h=9,
                               solver=SupportedQPSolver.qpSWIFT,
                               alpha=.1,
-                              qp_formulation=ControllerMode.explicit_no_acc)
+                              qp_formulation=ControllerMode.explicit)
         simulator.add_joint_vel_goal(
             joint_names=pr2_world.movable_joint_names[:1],
             # joint_names=pr2_world.movable_joint_names[14:15],

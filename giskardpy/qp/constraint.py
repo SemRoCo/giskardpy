@@ -158,3 +158,57 @@ class DerivativeInequalityConstraint(Constraint):
     def normalized_weight(self, t) -> float:
         weight_normalized = self.quadratic_weight * (1 / self.normalization_factor) ** 2
         return self.horizon_function(weight_normalized, t)
+
+
+class DerivativeEqualityConstraint(Constraint):
+
+    def __init__(self,
+                 name: str,
+                 parent_task_name: PrefixName,
+                 derivative: Derivatives,
+                 expression: cas.Expression,
+                 bound: Union[cas.symbol_expr_float, List[cas.symbol_expr_float]],
+                 quadratic_weight: cas.symbol_expr_float,
+                 normalization_factor: Optional[cas.symbol_expr_float],
+                 lower_slack_limit: Union[cas.symbol_expr_float, List[cas.symbol_expr_float]],
+                 upper_slack_limit: Union[cas.symbol_expr_float, List[cas.symbol_expr_float]],
+                 linear_weight: cas.symbol_expr_float = None,
+                 horizon_function: Optional[Callable[[float, int], float]] = None):
+        super().__init__(name, parent_task_name)
+        self.derivative = derivative
+        self.expression = expression
+        self.quadratic_weight = quadratic_weight
+        self.normalization_factor = normalization_factor
+        if self.is_iterable(bound):
+            self.bound = bound
+        else:
+            self.bound = defaultdict(lambda: bound)
+
+        if self.is_iterable(lower_slack_limit):
+            self.lower_slack_limit = lower_slack_limit
+        else:
+            self.lower_slack_limit = defaultdict(lambda: lower_slack_limit)
+
+        if self.is_iterable(upper_slack_limit):
+            self.upper_slack_limit = upper_slack_limit
+        else:
+            self.upper_slack_limit = defaultdict(lambda: upper_slack_limit)
+
+        if linear_weight is not None:
+            self.linear_weight = linear_weight
+
+        def default_horizon_function(weight, t):
+            return weight
+
+        self.horizon_function = default_horizon_function
+        if horizon_function is not None:
+            self.horizon_function = horizon_function
+
+    def is_iterable(self, thing):
+        if isinstance(thing, cas.ca.SX) and sum(thing.shape) == 2:
+            return False
+        return hasattr(thing, '__iter__')
+
+    def normalized_weight(self, t) -> float:
+        weight_normalized = self.quadratic_weight * (1 / self.normalization_factor) ** 2
+        return self.horizon_function(weight_normalized, t)

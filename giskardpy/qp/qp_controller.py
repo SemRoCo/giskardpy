@@ -28,6 +28,7 @@ from giskardpy.utils.decorators import memoize
 import giskardpy.utils.math as giskard_math
 from giskardpy.qp.weight_gain import QuadraticWeightGain, LinearWeightGain
 from line_profiler import profile
+from qp.constraint import DerivativeEqualityConstraint
 
 # used for saving pandas in the same folder every time within a run
 date_str = datetime.datetime.now().strftime('%Yy-%mm-%dd--%Hh-%Mm-%Ss')
@@ -95,6 +96,7 @@ class ProblemDataPart(ABC):
     equality_constraints: List[EqualityConstraint]
     inequality_constraints: List[InequalityConstraint]
     derivative_constraints: List[DerivativeInequalityConstraint]
+    eq_derivative_constraints: List[DerivativeEqualityConstraint]
     dt: float
     prediction_horizon: int
     control_horizon: int
@@ -105,6 +107,7 @@ class ProblemDataPart(ABC):
                  equality_constraints: List[EqualityConstraint],
                  inequality_constraints: List[InequalityConstraint],
                  derivative_constraints: List[DerivativeInequalityConstraint],
+                 eq_derivative_constraints: List[DerivativeEqualityConstraint],
                  sample_period: float,
                  prediction_horizon: int,
                  max_derivative: Derivatives,
@@ -116,6 +119,7 @@ class ProblemDataPart(ABC):
         self.equality_constraints = equality_constraints
         self.inequality_constraints = inequality_constraints
         self.derivative_constraints = derivative_constraints
+        self.eq_derivative_constraints = eq_derivative_constraints
         self.prediction_horizon = prediction_horizon
         self.dt = sample_period
         self.max_derivative = max_derivative
@@ -139,6 +143,9 @@ class ProblemDataPart(ABC):
     def get_derivative_constraints(self, derivative: Derivatives) -> List[DerivativeInequalityConstraint]:
         return [c for c in self.derivative_constraints if c.derivative == derivative]
 
+    def get_eq_derivative_constraints(self, derivative: Derivatives) -> List[DerivativeEqualityConstraint]:
+        return [c for c in self.eq_derivative_constraints if c.derivative == derivative]
+
     @abc.abstractmethod
     def construct_expression(self) -> Union[cas.Expression, Tuple[cas.Expression, cas.Expression]]:
         pass
@@ -146,6 +153,10 @@ class ProblemDataPart(ABC):
     @property
     def velocity_constraints(self) -> List[DerivativeInequalityConstraint]:
         return self.get_derivative_constraints(Derivatives.velocity)
+
+    @property
+    def velocity_eq_constraints(self) -> List[DerivativeEqualityConstraint]:
+        return self.get_eq_derivative_constraints(Derivatives.velocity)
 
     @property
     def acceleration_constraints(self) -> List[DerivativeInequalityConstraint]:
@@ -286,6 +297,7 @@ class Weights(ProblemDataPart):
                  equality_constraints: List[EqualityConstraint],
                  inequality_constraints: List[InequalityConstraint],
                  derivative_constraints: List[DerivativeInequalityConstraint],
+                 eq_derivative_constraints: List[DerivativeEqualityConstraint],
                  sample_period: float,
                  prediction_horizon: int, max_derivative: Derivatives,
                  alpha: float,
@@ -294,6 +306,7 @@ class Weights(ProblemDataPart):
                          equality_constraints=equality_constraints,
                          inequality_constraints=inequality_constraints,
                          derivative_constraints=derivative_constraints,
+                         eq_derivative_constraints=eq_derivative_constraints,
                          sample_period=sample_period,
                          prediction_horizon=prediction_horizon,
                          max_derivative=max_derivative,
@@ -313,6 +326,7 @@ class Weights(ProblemDataPart):
         components = []
         components.extend(self.free_variable_weights_expression(quadratic_weight_gains=quadratic_weight_gains))
         components.append(self.equality_weight_expressions())
+        components.extend(self.eq_derivative_weight_expressions())
         components.extend(self.derivative_weight_expressions())
         components.append(self.inequality_weight_expressions())
         weights, _ = self._sorter(*components)
@@ -346,7 +360,8 @@ class Weights(ProblemDataPart):
                     if self.qp_formulation.is_explicit_no_acc():
                         if not (derivative == Derivatives.velocity or derivative == max_derivative):
                             continue
-                    normalized_weight = v.normalized_weight(t, derivative, self.prediction_horizon, alpha=self.alpha,
+                    normalized_weight = v.normalized_weight(t, derivative, self.prediction_horizon - 3,
+                                                            alpha=self.alpha,
                                                             evaluated=self.evaluated)
                     weights[derivative][f't{t:03}/{v.position_name}/{derivative}'] = normalized_weight
                     for q_gain in quadratic_weight_gains:
@@ -364,6 +379,18 @@ class Weights(ProblemDataPart):
             for t in range(self.prediction_horizon):
                 d = Derivatives(d)
                 for c in self.get_derivative_constraints(d):
+                    if t < self.control_horizon:
+                        derivative_constr_weights[f't{t:03}/{c.name}'] = c.normalized_weight(t)
+            params.append(derivative_constr_weights)
+        return params
+
+    def eq_derivative_weight_expressions(self) -> List[Dict[str, cas.Expression]]:
+        params = []
+        for d in Derivatives.range(Derivatives.velocity, self.max_derivative):
+            derivative_constr_weights = {}
+            for t in range(self.prediction_horizon):
+                d = Derivatives(d)
+                for c in self.get_eq_derivative_constraints(d):
                     if t < self.control_horizon:
                         derivative_constr_weights[f't{t:03}/{c.name}'] = c.normalized_weight(t)
             params.append(derivative_constr_weights)
@@ -426,6 +453,7 @@ class FreeVariableBounds(ProblemDataPart):
                  equality_constraints: List[EqualityConstraint],
                  inequality_constraints: List[InequalityConstraint],
                  derivative_constraints: List[DerivativeInequalityConstraint],
+                 eq_derivative_constraints: List[DerivativeEqualityConstraint],
                  sample_period: float,
                  prediction_horizon: int,
                  max_derivative: Derivatives,
@@ -435,6 +463,7 @@ class FreeVariableBounds(ProblemDataPart):
                          equality_constraints=equality_constraints,
                          inequality_constraints=inequality_constraints,
                          derivative_constraints=derivative_constraints,
+                         eq_derivative_constraints=eq_derivative_constraints,
                          sample_period=sample_period,
                          prediction_horizon=prediction_horizon,
                          max_derivative=max_derivative,
@@ -494,6 +523,17 @@ class FreeVariableBounds(ProblemDataPart):
                     upper_slack[f't{t:03}/{c.name}'] = c.upper_slack_limit[t]
         return lower_slack, upper_slack
 
+    def eq_derivative_slack_limits(self, derivative: Derivatives) \
+            -> Tuple[Dict[str, cas.Expression], Dict[str, cas.Expression]]:
+        lower_slack = {}
+        upper_slack = {}
+        for t in range(self.prediction_horizon):
+            for c in self.get_eq_derivative_constraints(derivative):
+                if t < self.control_horizon:
+                    lower_slack[f't{t:03}/{c.name}'] = c.lower_slack_limit[t]
+                    upper_slack[f't{t:03}/{c.name}'] = c.upper_slack_limit[t]
+        return lower_slack, upper_slack
+
     def equality_constraint_slack_lower_bound(self):
         return {f'{c.name}/error': c.lower_slack_limit for c in self.equality_constraints}
 
@@ -516,6 +556,13 @@ class FreeVariableBounds(ProblemDataPart):
         lb_params.append(equality_constraint_slack_lower_bounds)
         ub_params.append(self.equality_constraint_slack_upper_bound())
 
+        num_eq_derivative_slack = 0
+        for derivative in Derivatives.range(Derivatives.velocity, self.max_derivative):
+            lower_slack, upper_slack = self.eq_derivative_slack_limits(derivative)
+            num_eq_derivative_slack += len(lower_slack)
+            lb_params.append(lower_slack)
+            ub_params.append(upper_slack)
+
         num_derivative_slack = 0
         for derivative in Derivatives.range(Derivatives.velocity, self.max_derivative):
             lower_slack, upper_slack = self.derivative_slack_limits(derivative)
@@ -532,7 +579,7 @@ class FreeVariableBounds(ProblemDataPart):
         self.names_slack = self.names[num_free_variables:]
 
         derivative_slack_start = 0
-        derivative_slack_stop = derivative_slack_start + num_derivative_slack
+        derivative_slack_stop = derivative_slack_start + num_derivative_slack + num_eq_derivative_slack
         self.names_derivative_slack = self.names_slack[derivative_slack_start:derivative_slack_stop]
 
         eq_slack_start = derivative_slack_stop
@@ -561,6 +608,7 @@ class EqualityBounds(ProblemDataPart):
                  equality_constraints: List[EqualityConstraint],
                  inequality_constraints: List[InequalityConstraint],
                  derivative_constraints: List[DerivativeInequalityConstraint],
+                 eq_derivative_constraints: List[DerivativeEqualityConstraint],
                  sample_period: float,
                  prediction_horizon: int,
                  max_derivative: Derivatives,
@@ -570,6 +618,7 @@ class EqualityBounds(ProblemDataPart):
                          equality_constraints=equality_constraints,
                          inequality_constraints=inequality_constraints,
                          derivative_constraints=derivative_constraints,
+                         eq_derivative_constraints=eq_derivative_constraints,
                          sample_period=sample_period,
                          prediction_horizon=prediction_horizon,
                          max_derivative=max_derivative,
@@ -594,6 +643,17 @@ class EqualityBounds(ProblemDataPart):
             for v in self.free_variables:
                 derivative_link[f't{t:03}/{derivative}/{v.name}/link'] = 0
         return derivative_link
+
+    def eq_derivative_constraint_bounds(self, derivative: Derivatives) \
+            -> Tuple[Dict[str, cas.Expression], Dict[str, cas.Expression]]:
+        bound = {}
+        for t in range(self.prediction_horizon):
+            for c in self.get_eq_derivative_constraints(derivative):
+                if t < self.control_horizon:
+                    bound[f't{t:03}/{c.name}'] = cas.limit(c.bound[t] * self.dt,
+                                                           -c.normalization_factor * self.dt,
+                                                           c.normalization_factor * self.dt)
+        return bound
 
     @profile
     def construct_expression(self) -> Union[cas.Expression, Tuple[cas.Expression, cas.Expression]]:
@@ -630,11 +690,17 @@ class EqualityBounds(ProblemDataPart):
                 bounds.append(self.last_derivative_values(derivative))
                 bounds.append(self.derivative_links(derivative))
 
+        num_derivative_constraints = 0
+        for derivative in Derivatives.range(Derivatives.velocity, self.max_derivative):
+            bound = self.eq_derivative_constraint_bounds(derivative)
+            num_derivative_constraints += len(bound)
+            bounds.append(bound)
+
         num_derivative_links = sum(len(x) for x in bounds)
         bounds.append(self.equality_constraint_bounds())
         bounds, self.names = self._sorter(*bounds)
         self.names_derivative_links = self.names[:num_derivative_links]
-        self.names_equality_constraints = self.names[num_derivative_links:]
+        # self.names_equality_constraints = self.names[num_derivative_links:]
         return cas.Expression(bounds)
 
 
@@ -656,6 +722,7 @@ class InequalityBounds(ProblemDataPart):
                  equality_constraints: List[EqualityConstraint],
                  inequality_constraints: List[InequalityConstraint],
                  derivative_constraints: List[DerivativeInequalityConstraint],
+                 eq_derivative_constraints: List[DerivativeEqualityConstraint],
                  sample_period: float,
                  prediction_horizon: int,
                  max_derivative: Derivatives,
@@ -666,6 +733,7 @@ class InequalityBounds(ProblemDataPart):
                          equality_constraints=equality_constraints,
                          inequality_constraints=inequality_constraints,
                          derivative_constraints=derivative_constraints,
+                         eq_derivative_constraints=eq_derivative_constraints,
                          sample_period=sample_period,
                          prediction_horizon=prediction_horizon,
                          max_derivative=max_derivative,
@@ -714,7 +782,7 @@ class InequalityBounds(ProblemDataPart):
         lb_jerk, ub_jerk = {}, {}
         for v in self.free_variables:
             lb_, ub_ = v.get_lower_limit(Derivatives.position), v.get_upper_limit(Derivatives.position)
-            for t in range(self.prediction_horizon-2):
+            for t in range(self.prediction_horizon - 2):
                 ptc = v.get_symbol(Derivatives.position)
                 lb_jerk[f't{t:03}/{v.name}/{Derivatives.position}'] = lb_ - ptc
                 ub_jerk[f't{t:03}/{v.name}/{Derivatives.position}'] = ub_ - ptc
@@ -814,6 +882,61 @@ class EqualityModel(ProblemDataPart):
 
     def get_free_variable_symbols(self, order: Derivatives) -> List[cas.Symbol]:
         return self._sorter({v.position_name: v.get_symbol(order) for v in self.free_variables})[0]
+
+    def get_eq_derivative_constraint_expressions(self, derivative: Derivatives):
+        return \
+        self._sorter({c.name: c.expression for c in self.eq_derivative_constraints if c.derivative == derivative})[
+            0]
+
+    def velocity_constraint_model(self) -> Tuple[cas.Expression, cas.Expression]:
+        """
+        model
+        |   t1   |   t2   |   t3   |   t1   |   t2   |   t3   |   t1   |   t2   |   t3   | prediction horizon
+        |v1 v2 v3|v1 v2 v3|v1 v2 v3|a1 a2 a3|a1 a2 a3|a1 a2 a3|j1 j2 j3|j1 j2 j3|j1 j2 j3| free variables
+        |--------------------------------------------------------------------------------|
+        |  Jv*sp |        |        |  Ja*sp |        |        |  Jj*sp |        |        |
+        |  Jv*sp |        |        |  Ja*sp |        |        |  Jj*sp |        |        |
+        |--------------------------------------------------------------------------------|
+        |        |  Jv*sp |        |        |  Ja*sp |        |        |  Jj*sp |        |
+        |        |  Jv*sp |        |        |  Ja*sp |        |        |  Jj*sp |        |
+        |--------------------------------------------------------------------------------|
+
+        slack model
+        |   t1 |   t2 | prediction horizon
+        |s1 s2 |s1 s2 | slack
+        |------|------|
+        |sp    |      | vel constr 1
+        |   sp |      | vel constr 2
+        |-------------|
+        |      |sp    | vel constr 1
+        |      |   sp | vel constr 2
+        |-------------|
+        """
+        number_of_vel_rows = len(self.velocity_eq_constraints) * self.prediction_horizon
+        if number_of_vel_rows > 0:
+            expressions = cas.Expression(self.get_eq_derivative_constraint_expressions(Derivatives.velocity))
+            model = cas.zeros(number_of_vel_rows, self.number_of_non_slack_columns)
+            for derivative in Derivatives.range(Derivatives.position, self.max_derivative - 1):
+                J_vel = cas.jacobian(expressions=expressions,
+                                     symbols=self.get_free_variable_symbols(derivative)) * self.dt
+                J_vel_limit_block = cas.kron(cas.eye(self.prediction_horizon), J_vel)
+                horizontal_offset = self.number_of_free_variables * self.prediction_horizon
+                model[:, horizontal_offset * derivative:horizontal_offset * (derivative + 1)] = J_vel_limit_block
+
+            # delete rows if control horizon of constraint shorter than prediction horizon
+            rows_to_delete = []
+            for t in range(self.prediction_horizon):
+                for i, c in enumerate(self.velocity_eq_constraints):
+                    v_index = i + (t * len(self.velocity_eq_constraints))
+                    if t + 1 > self.control_horizon:
+                        rows_to_delete.append(v_index)
+            model.remove(rows_to_delete, [])
+
+            # constraint slack
+            num_slack_variables = sum(self.control_horizon for c in self.velocity_constraints)
+            slack_model = cas.eye(num_slack_variables) * self.dt
+            return model, slack_model
+        return cas.Expression(), cas.Expression()
 
     @property
     def number_of_non_slack_columns(self) -> int:
@@ -996,6 +1119,7 @@ class EqualityModel(ProblemDataPart):
                 max_derivative = Derivatives.velocity
                 derivative_link_model = self.derivative_link_model_no_acc(self.max_derivative)
         equality_constraint_model, equality_constraint_slack_model = self.equality_constraint_model()
+        vel_constr_model, vel_constr_slack_model = self.velocity_constraint_model()
 
         model_parts = []
         slack_model_parts = []
@@ -1004,6 +1128,9 @@ class EqualityModel(ProblemDataPart):
         if len(equality_constraint_model) > 0:
             model_parts.append(equality_constraint_model)
             slack_model_parts.append(equality_constraint_slack_model)
+        if len(vel_constr_model) > 0:
+            model_parts.append(vel_constr_model)
+            slack_model_parts.append(vel_constr_slack_model)
         model = cas.vstack(model_parts)
         slack_model = cas.vstack(slack_model_parts)
 
@@ -1264,7 +1391,7 @@ class InequalityModel(ProblemDataPart):
 
         at = vt-1 + jt * mdt
 
-        Layout for prediction horizon 4
+        Layout for prediction horizon 6
         Slots are matrices of |controlled variables| x |controlled variables|
         |  vt0   |  vt1   |  vt2   |  vt3   |
         |-----------------------------------|
@@ -1277,25 +1404,8 @@ class InequalityModel(ProblemDataPart):
         |-2/dt**2| 1/dt**2|        |        |          - vtc/dt**2 + jt1 = (vt1 - 2vt0)/dt**2           (- vtc)/dt**2 + j_min <= (vt1 - 2vt0)/dt**2 <= (- vtc)/dt**2 + j_max
         | 1/dt**2|-2/dt**2| 1/dt**2|        |                        jt2 = (vt2 - 2vt1 + vt0)/dt**2
         |        | 1/dt**2|-2/dt**2| 1/dt**2|                        jt3 = (vt3 - 2vt2 + vt1)/dt**2
-        |-----------------------------------|
-
-        |  v1t0  |  v2t0  |  v1t1  |  v2t1  |
-        |-----------------------------------|
-        |  1/dt  |        |        |        |
-        |        |  1/dt  |        |        |
-        | -1/dt  |        |  1/dt  |        |
-        |        | -1/dt  |        |  1/dt  |
-        |        |        | -1/dt  |        |
-        |        |        |        | -1/dt  |
-        |===================================|
-        | 1/dt**2|        |        |        |
-        |        | 1/dt**2|        |        |
-        |-2/dt**2|        | 1/dt**2|        |
-        |        |-2/dt**2|        | 1/dt**2|
-        | 1/dt**2|        |-2/dt**2|        |
-        |        | 1/dt**2|        |-2/dt**2|
-        |        |        | 1/dt**2|        |
-        |        |        |        | 1/dt**2|
+        |        |        | 1/dt**2|-2/dt**2|                        jt4 = (- 2vt3 + vt2)/dt**2
+        |        |        |        | 1/dt**2|                        jt5 = (vt3)/dt**2
         |-----------------------------------|
 
         :param max_derivative:
@@ -1464,6 +1574,7 @@ class QPController:
         self.equality_constraints = []
         self.inequality_constraints = []
         self.derivative_constraints = []
+        self.eq_derivative_constraints = []
         self.quadratic_weight_gains = []
         self.linear_weight_gains = []
         self.xdot_full = None
@@ -1473,6 +1584,7 @@ class QPController:
              equality_constraints: List[EqualityConstraint] = None,
              inequality_constraints: List[InequalityConstraint] = None,
              derivative_constraints: List[DerivativeInequalityConstraint] = None,
+             eq_derivative_constraints: List[DerivativeEqualityConstraint] = None,
              quadratic_weight_gains: List[QuadraticWeightGain] = None,
              linear_weight_gains: List[LinearWeightGain] = None):
         self.reset()
@@ -1484,6 +1596,8 @@ class QPController:
             self.add_equality_constraints(equality_constraints)
         if derivative_constraints is not None:
             self.add_derivative_constraints(derivative_constraints)
+        if eq_derivative_constraints is not None:
+            self.add_eq_derivative_constraints(eq_derivative_constraints)
         if quadratic_weight_gains is not None:
             self.add_quadratic_weight_gains(quadratic_weight_gains)
         if linear_weight_gains is not None:
@@ -1528,6 +1642,12 @@ class QPController:
         duplicates = set([x for x in l if l.count(x) > 1])
         assert duplicates == set(), f'there are multiple constraints with the same name: {duplicates}'
 
+    def add_eq_derivative_constraints(self, constraints: List[DerivativeEqualityConstraint]):
+        self.eq_derivative_constraints.extend(list(sorted(constraints, key=lambda x: x.name)))
+        l = [x.name for x in constraints]
+        duplicates = set([x for x in l if l.count(x) > 1])
+        assert duplicates == set(), f'there are multiple constraints with the same name: {duplicates}'
+
     def check_control_horizon(self, constraint):
         if constraint.control_horizon is None:
             constraint.control_horizon = self.prediction_horizon
@@ -1549,6 +1669,7 @@ class QPController:
                   'equality_constraints': self.equality_constraints,
                   'inequality_constraints': self.inequality_constraints,
                   'derivative_constraints': self.derivative_constraints,
+                  'eq_derivative_constraints': self.eq_derivative_constraints,
                   'sample_period': self.sample_period,
                   'prediction_horizon': self.prediction_horizon,
                   'max_derivative': self.order,

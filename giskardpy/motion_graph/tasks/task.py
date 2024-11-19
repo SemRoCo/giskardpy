@@ -9,6 +9,7 @@ from giskardpy.symbol_manager import symbol_manager
 from giskardpy.motion_graph.graph_node import MotionGraphNode
 from giskardpy.qp.weight_gain import QuadraticWeightGain, LinearWeightGain
 from giskardpy.qp.free_variable import FreeVariable
+from qp.constraint import DerivativeEqualityConstraint
 
 WEIGHT_MAX = 10000
 WEIGHT_ABOVE_CA = 2500
@@ -24,6 +25,7 @@ class Task(MotionGraphNode):
     eq_constraints: Dict[str, EqualityConstraint]
     neq_constraints: Dict[str, InequalityConstraint]
     derivative_constraints: Dict[str, DerivativeInequalityConstraint]
+    eq_derivative_constraints: Dict[str, DerivativeEqualityConstraint]
 
     def __init__(self, *,
                  name: Optional[str] = None,
@@ -33,15 +35,18 @@ class Task(MotionGraphNode):
         self.eq_constraints = {}
         self.neq_constraints = {}
         self.derivative_constraints = {}
+        self.eq_derivative_constraints = {}
         self.manip_constraints = {}
         self.quadratic_gains = []
         self.linear_weight_gains = []
 
     def get_observation_state_expression(self):
-        return symbol_manager.get_symbol(f'god_map.motion_graph_manager.task_state.get_observation_state(\'{self.name}\')')
+        return symbol_manager.get_symbol(
+            f'god_map.motion_graph_manager.task_state.get_observation_state(\'{self.name}\')')
 
     def get_life_cycle_state_expression(self):
-        return symbol_manager.get_symbol(f'god_map.motion_graph_manager.task_state.get_life_cycle_state(\'{self.name}\')')
+        return symbol_manager.get_symbol(
+            f'god_map.motion_graph_manager.task_state.get_life_cycle_state(\'{self.name}\')')
 
     @property
     def ref_str(self) -> str:
@@ -58,6 +63,9 @@ class Task(MotionGraphNode):
 
     def get_derivative_constraints(self) -> List[DerivativeInequalityConstraint]:
         return self._apply_monitors_to_constraints(self.derivative_constraints.values())
+
+    def get_eq_derivative_constraints(self) -> List[DerivativeInequalityConstraint]:
+        return self._apply_monitors_to_constraints(self.eq_derivative_constraints.values())
 
     def get_quadratic_gains(self) -> List[QuadraticWeightGain]:
         return self.quadratic_gains
@@ -393,6 +401,45 @@ class Task(MotionGraphNode):
         if constraint.name in self.derivative_constraints:
             raise KeyError(f'a constraint with name \'{name}\' already exists')
         self.derivative_constraints[constraint.name] = constraint
+
+    def add_velocity_eq_constraint(self,
+                                   velocity_goal: Union[cas.symbol_expr_float, List[cas.symbol_expr_float]],
+                                   weight: cas.symbol_expr_float,
+                                   task_expression: cas.symbol_expr,
+                                   velocity_limit: cas.symbol_expr_float,
+                                   name: Optional[str] = None,
+                                   lower_slack_limit: Union[cas.symbol_expr_float, List[cas.symbol_expr_float]] = -1e4,
+                                   upper_slack_limit: Union[cas.symbol_expr_float, List[cas.symbol_expr_float]] = 1e4,
+                                   horizon_function: Optional[Callable[[float, int], float]] = None):
+        """
+        Add a velocity constraint. Internally, this will be converted into multiple constraints, to ensure that the
+        velocity stays within the given bounds.
+        :param lower_velocity_limit:
+        :param upper_velocity_limit:
+        :param weight:
+        :param task_expression:
+        :param velocity_limit: Used for normalizing the expression, like reference_velocity, must be positive
+        :param name:
+        :param lower_slack_limit:
+        :param upper_slack_limit:
+        :param horizon_function: A function that can takes 'weight' and the id within the horizon as input and computes
+                                    a new weight. Can be used to give points towards the end of the horizon a different
+                                    weight
+        """
+        name = name or ''
+        constraint = DerivativeEqualityConstraint(name=name,
+                                                  parent_task_name=self.name,
+                                                  derivative=Derivatives.velocity,
+                                                  expression=task_expression,
+                                                  bound=velocity_goal,
+                                                  quadratic_weight=weight,
+                                                  normalization_factor=velocity_limit,
+                                                  lower_slack_limit=lower_slack_limit,
+                                                  upper_slack_limit=upper_slack_limit,
+                                                  horizon_function=horizon_function)
+        if constraint.name in self.eq_derivative_constraints:
+            raise KeyError(f'a constraint with name \'{name}\' already exists')
+        self.eq_derivative_constraints[constraint.name] = constraint
 
     def add_acceleration_constraint(self,
                                     lower_acceleration_limit: Union[cas.symbol_expr_float, List[cas.symbol_expr_float]],

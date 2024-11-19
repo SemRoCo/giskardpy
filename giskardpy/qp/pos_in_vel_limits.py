@@ -4,7 +4,10 @@ import numpy as np
 import giskardpy.casadi_wrapper as cas
 import giskardpy.utils.math as gm
 from giskardpy.utils.decorators import memoize
+from giskardpy.god_map import god_map
 from line_profiler import profile
+from giskardpy.symbol_manager import symbol_manager
+
 
 
 def shifted_velocity_profile(vel_profile, acc_profile, distance, dt):
@@ -28,25 +31,42 @@ def shifted_velocity_profile(vel_profile, acc_profile, distance, dt):
     return shifted_vel_profile, shifted_acc_profile
 
 
+def r_gauss(integral):
+    return cas.sqrt(2 * integral + (1 / 4)) - 1 / 2
+
 def acc_cap(current_vel, jerk_limit, dt):
     acc_integral = cas.abs(current_vel) / dt
     jerk_step = jerk_limit * dt
-    n = cas.floor(cas.r_gauss(cas.abs(acc_integral / jerk_step)))
+    n = cas.floor(r_gauss(cas.abs(acc_integral / jerk_step)))
     x = (- cas.gauss(n) * jerk_limit * dt + acc_integral) / (n + 1)
     return cas.abs(n * jerk_limit * dt + x)
 
+# def compute_next_vel_and_acc(current_vel, current_acc, vel_limit, jerk_limit, dt):
+#     next_acc_min = current_acc - jerk_limit * dt  # what are the next possible acc limits given jerk limits
+#     next_acc_max = current_acc + jerk_limit * dt
+#
+#     acc_to_vel = (vel_limit - current_vel) / dt  # the acc needed to fix the vel in one step
+#
+#     next_acc = cas.limit(acc_to_vel, next_acc_min, next_acc_max)  # apply acc limits imposed by current acc and jerk
+#
+#     next_vel = current_vel + next_acc * dt
+#     return next_vel, next_acc
 
 def compute_next_vel_and_acc(current_vel, current_acc, vel_limit, jerk_limit, dt, remaining_ph, no_cap):
-    acc_cap1 = acc_cap(current_vel, jerk_limit, dt)
-    acc_cap2 = remaining_ph * jerk_limit * dt
-    next_acc_min = current_acc - jerk_limit * dt
-    next_acc_max = current_acc + jerk_limit * dt
-    acc_to_vel = (vel_limit - current_vel) / dt
-    acc_ph_max = cas.min(acc_cap1, acc_cap2)
+    acc_cap1 = acc_cap(current_vel, jerk_limit, dt)  # if we start at arbitrary horizon and jerk as strongly as possible, which acc do we have when we reach the vel limit
+    acc_cap2 = remaining_ph * jerk_limit * dt  # max acc reachable given horizon depending only on vel
+    acc_ph_max = cas.min(acc_cap1, acc_cap2)  # in reality we have a limited horizon, so we have to use the min of the two.
     acc_ph_min = - acc_ph_max
+
+    next_acc_min = current_acc - jerk_limit * dt  # looking from the other side, these are the actual acc we can achieve with the jerk limits
+    next_acc_max = current_acc + jerk_limit * dt
+
+    acc_to_vel = (vel_limit - current_vel) / dt  # the total acc needed to reach vel target vel
+
     target_acc = cas.max(next_acc_min, acc_to_vel)
-    target_acc = cas.if_else(no_cap, target_acc, cas.limit(target_acc, acc_ph_min, acc_ph_max))
+    target_acc = cas.if_else(no_cap, target_acc, cas.limit(target_acc, acc_ph_min, acc_ph_max))  # skip when vel_limit is negative
     next_acc = cas.limit(target_acc, next_acc_min, next_acc_max)
+
     next_vel = current_vel + next_acc * dt
     return next_vel, next_acc
 

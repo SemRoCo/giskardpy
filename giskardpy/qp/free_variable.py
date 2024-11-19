@@ -8,6 +8,82 @@ from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils.decorators import memoize
 
 from line_profiler import profile
+from scipy.optimize import fsolve
+
+
+def my_cycloid(x_in: float, weight: float, h: int, alpha: float) -> float:
+    start_y = weight * alpha
+    end_y = weight
+    x = (x_in / h) * (np.pi / 2)
+    r = 1
+
+    def equation(theta):
+        return theta - np.sin(theta) - (2 * x) / r
+
+    # Solve for theta using fsolve with a fixed initial guess
+    theta = fsolve(equation, 0.0)[0]
+    y = r / 2 * (1 - np.cos(theta))
+    y *= (end_y - start_y)
+    y += start_y
+    return y
+
+def my_cycloid2(x_in: float, weight: float, h: int, alpha: float, q: float) -> float:
+    x_in *= q
+    start_y = weight * alpha
+    end_y = weight
+    x = (x_in / h) * (np.pi / 2)
+    r = 1
+
+    def equation(theta):
+        return theta - np.sin(theta) - (2 * x) / r
+
+    # Solve for theta using fsolve with a fixed initial guess
+    theta = fsolve(equation, 0.0)[0]
+    y = r / 2 * (1 - np.cos(theta))
+    y *= (end_y - start_y)
+    y += start_y
+    return y
+
+
+def first_low(x_in: float, weight: float, h: int, alpha: float) -> float:
+    if x_in == 0:
+        return weight * alpha
+    return weight
+
+
+def linear(x_in: float, weight: float, h: int, alpha: float) -> float:
+    start = weight * alpha
+    a = (weight - start) / (h)
+    return a * x_in + start
+
+
+def even(x_in: float, weight: float, h: int, alpha: float) -> float:
+    return weight
+
+
+def quadratic(x_in: float, weight: float, h: int, alpha: float, q: float) -> float:
+    start = weight * alpha
+    a = (weight - start) / (h) ** q
+    return a * x_in ** q + start
+
+def sigmoid(x_in: float, weight: float, h: int, alpha: float, q: float) -> float:
+    start = weight*alpha
+    return (weight-start)*(2 * (1/(1 + np.exp(-q * x_in))) - 1) + start
+
+
+def parabel(x_in: float, weight: float, h: int, alpha: float, q: float) -> float:
+    # Setting up the boundary conditions
+    y0 = weight * alpha  # Value at x = 0
+    y_half_h = weight  # Value at x = h/2
+
+    # Solving for the coefficients a, b, c in ax^2 + bx + c
+    a = 4 * (y0 - y_half_h) / (h ** q)
+    b = -4 * (y0 - y_half_h) / h
+    c = y0
+
+    # Calculating the output for the given x_in
+    return a * x_in ** q + b * x_in + c
+
 
 class FreeVariable:
 
@@ -109,14 +185,19 @@ class FreeVariable:
     @profile
     def normalized_weight(self, t: int, derivative: Derivatives, prediction_horizon: int, alpha: float,
                           evaluated: bool = False) -> Union[Union[cas.Symbol, float], float]:
-        weight = self.quadratic_weights[derivative]
-        if prediction_horizon > 1:
-            start = weight * alpha
-            a = (weight - start) / (prediction_horizon-1)
-            weight = a * t + start
-        expr = weight * (1 / self.get_upper_limit(derivative)) ** 2
-        if evaluated:
-            return symbol_manager.evaluate_expr(expr)
+        weight = symbol_manager.evaluate_expr(self.quadratic_weights[derivative])
+        limit = symbol_manager.evaluate_expr(self.get_upper_limit(derivative))
+
+        # weight = my_cycloid(t, weight, prediction_horizon, alpha) # -0.6975960014626146
+        # weight = my_cycloid2(t, weight, prediction_horizon, alpha, q=2) # -0.7023704675764478
+        # weight = first_low(t, weight, prediction_horizon, alpha)
+        # weight = even(t, weight, prediction_horizon, alpha)
+        weight = linear(t, weight, prediction_horizon, alpha)  # -0.857950480223123
+        # weight = parabel(t, weight, prediction_horizon, alpha, 2)  # -0.8332195779250338
+        # weight = quadratic(t, weight, prediction_horizon, alpha, 1/1.59)  # -0.6672011565358271
+        # weight = sigmoid(t, weight, prediction_horizon, alpha, 1.5)
+
+        return weight * (1 / limit) ** 2
 
     def __str__(self) -> str:
         return self.position_name

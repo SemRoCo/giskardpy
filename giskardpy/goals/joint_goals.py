@@ -12,58 +12,7 @@ from giskardpy.symbol_manager import symbol_manager
 from giskardpy.motion_graph.tasks.task import WEIGHT_BELOW_CA
 
 
-class JointVelocityLimit(Goal):
-    def __init__(self,
-                 joint_names: List[str],
-                 group_name: Optional[str] = None,
-                 weight: float = WEIGHT_BELOW_CA,
-                 max_velocity: float = 1,
-                 hard: bool = False,
-                 name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.BinaryTrue,
-                 pause_condition: cas.Expression = cas.BinaryFalse,
-                 end_condition: cas.Expression = cas.BinaryFalse):
-        """
-        Limits the joint velocity of a revolute joint.
-        :param joint_name:
-        :param group_name: if joint_name is not unique, will search in this group for matches.
-        :param weight:
-        :param max_velocity: rad/s
-        :param hard: turn this into a hard constraint.
-        """
-        self.weight = weight
-        self.max_velocity = max_velocity
-        self.hard = hard
-        self.joint_names = joint_names
-        if name is None:
-            name = f'{self.__class__.__name__}/{self.joint_names}'
-        super().__init__(name)
 
-        task = self.create_and_add_task('joint vel limit')
-        for joint_name in self.joint_names:
-            joint_name = god_map.world.search_for_joint_name(joint_name, group_name)
-            joint: OneDofJoint = god_map.world.joints[joint_name]
-            current_joint = joint.get_symbol(Derivatives.position)
-            try:
-                limit_expr = joint.get_limit_expressions(Derivatives.velocity)[1]
-                max_velocity = cas.min(self.max_velocity, limit_expr)
-            except IndexError:
-                max_velocity = self.max_velocity
-            if self.hard:
-                task.add_velocity_constraint(lower_velocity_limit=-max_velocity,
-                                             upper_velocity_limit=max_velocity,
-                                             weight=self.weight,
-                                             task_expression=current_joint,
-                                             velocity_limit=max_velocity,
-                                             lower_slack_limit=0,
-                                             upper_slack_limit=0)
-            else:
-                task.add_velocity_constraint(lower_velocity_limit=-max_velocity,
-                                             upper_velocity_limit=max_velocity,
-                                             weight=self.weight,
-                                             task_expression=current_joint,
-                                             velocity_limit=max_velocity)
-        self.connect_monitors_to_all_tasks(start_condition, pause_condition, end_condition)
 
 
 class AvoidJointLimits(Goal):

@@ -32,7 +32,7 @@ from giskardpy.utils.utils import suppress_stderr
 from giskardpy.model.collision_avoidance_config import DisableCollisionAvoidanceConfig
 from giskardpy.model.trajectory import Trajectory
 from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint
-from giskardpy.qp.qp_controller import ControllerMode
+from giskardpy.qp.qp_controller import QPFormulation
 from giskardpy.qp.qp_solver_ids import SupportedQPSolver
 from hypothesis import given
 from motion_graph.tasks.cartesian_tasks import CartesianPoseAsTask
@@ -637,7 +637,7 @@ class TestWorld:
 class Simulator:
     def __init__(self, world: WorldTree, control_dt: float, mpc_dt: float, h: int, solver: SupportedQPSolver,
                  alpha: float,
-                 qp_formulation: ControllerMode):
+                 qp_formulation: QPFormulation):
         god_map.tmp_folder = '.'
         self.reset()
         self.world = world
@@ -742,6 +742,14 @@ class Simulator:
         god_map.control_cycle_counter += 1
         return total_time, parameter_time, qp_time
 
+    def apply_noise(self, pos: float, vel: float, acc: float, joint_names: List[str] = None):
+        if joint_names is None:
+            joint_names = self.world.movable_joint_names
+        for joint_name in joint_names:
+            self.world.state[joint_name].position +=  np.random.normal(0, pos, 1)[0]
+            self.world.state[joint_name].velocity +=  np.random.normal(0, vel, 1)[0]
+            self.world.state[joint_name].acceleration +=  np.random.normal(0, acc, 1)[0]
+
     def update_joint_goal(self, new_value: float):
         self.world.state['joint_goal'].position = new_value
 
@@ -767,7 +775,7 @@ class TestController:
                               h=9,
                               solver=SupportedQPSolver.qpSWIFT,
                               alpha=0.1,
-                              qp_formulation=ControllerMode.explicit)
+                              qp_formulation=QPFormulation.explicit)
         simulator.add_joint_goal(joint_names=[joint_name], goal=goal)
         simulator.compile()
 
@@ -798,7 +806,7 @@ class TestController:
 
     def test_joint_goal_pr2(self, pr2_world: WorldTree):
         sim_time = 4
-        goal = -0.9
+        goal = -1
         pr2_world.update_default_weights({Derivatives.velocity: 0.01,
                                           Derivatives.acceleration: 0.0,
                                           Derivatives.jerk: 0.0})
@@ -808,12 +816,12 @@ class TestController:
             Derivatives.jerk: 100
         })
         simulator = Simulator(world=pr2_world,
-                              control_dt=0.05,
+                              control_dt=0.025,
                               mpc_dt=0.05,
                               h=9,
-                              solver=SupportedQPSolver.piqp,
+                              solver=SupportedQPSolver.gurobi,
                               alpha=.1,
-                              qp_formulation=ControllerMode.no_mpc)
+                              qp_formulation=QPFormulation.implicit)
         simulator.add_joint_goal(
             joint_names=pr2_world.movable_joint_names[:1],
             # joint_names=pr2_world.movable_joint_names[14:15],
@@ -828,7 +836,7 @@ class TestController:
         simulator.compile()
 
         np.random.seed(69)
-        swap_distance = 2
+        swap_distance = 0.7
         next_swap = swap_distance
         try:
             while god_map.time < sim_time:
@@ -851,14 +859,14 @@ class TestController:
 
     def test_joint_vel_goal_pr2(self, pr2_world: WorldTree):
         sim_time = 4
-        goal = 0.9
+        goal = 0.0
         pr2_world.update_default_weights({Derivatives.velocity: 0.01,
                                           Derivatives.acceleration: 0.0,
                                           Derivatives.jerk: 0.0})
         pr2_world.update_default_limits({
             Derivatives.velocity: 1,
             Derivatives.acceleration: np.inf,
-            Derivatives.jerk: 50
+            Derivatives.jerk: 100
         })
         simulator = Simulator(world=pr2_world,
                               control_dt=0.05,
@@ -866,18 +874,17 @@ class TestController:
                               h=9,
                               solver=SupportedQPSolver.qpSWIFT,
                               alpha=.1,
-                              qp_formulation=ControllerMode.explicit)
-        simulator.add_joint_vel_goal(
-            joint_names=pr2_world.movable_joint_names[:1],
-            # joint_names=pr2_world.movable_joint_names[14:15],
-            # joint_names=pr2_world.movable_joint_names[:35],
-            # joint_names=pr2_world.movable_joint_names[27:31],
-            # joint_names=pr2_world.movable_joint_names[:-1],
-            # joint_names=[
-                # pr2_world.movable_joint_names[27],
-                # pr2_world.movable_joint_names[13]
-            # ],
-            goal=goal)
+                              qp_formulation=QPFormulation.implicit)
+        joint_names=pr2_world.movable_joint_names[:1]
+        # joint_names=pr2_world.movable_joint_names[14:15],
+        # joint_names=pr2_world.movable_joint_names[:35],
+        # joint_names=pr2_world.movable_joint_names[27:31],
+        # joint_names=pr2_world.movable_joint_names[:-1],
+        # joint_names=[
+            # pr2_world.movable_joint_names[27],
+            # pr2_world.movable_joint_names[13]
+        # ],
+        simulator.add_joint_vel_goal(goal=goal, joint_names=joint_names)
         simulator.compile()
 
         np.random.seed(69)
@@ -886,12 +893,15 @@ class TestController:
         try:
             while god_map.time < sim_time:
                 simulator.step()
+                simulator.apply_noise(0, 0.1, 0, joint_names)
+                goal = np.sin(god_map.time*8)*0.5
+                simulator.update_joint_goal(goal)
                 # goal = np.random.rand() * 2 -1
                 # simulator.update_joint_goal(goal)
-                if god_map.time > next_swap:
-                    goal *= -1
-                    simulator.update_joint_goal(goal)
-                    next_swap += swap_distance
+                # if god_map.time > next_swap:
+                #     goal *= -1
+                #     simulator.update_joint_goal(goal)
+                #     next_swap += swap_distance
 
         except Exception as e:
             traceback.print_exc()
@@ -946,7 +956,7 @@ class TestController:
                                               h=9,
                                               solver=SupportedQPSolver.qpSWIFT,
                                               alpha=.1,
-                                              qp_formulation=ControllerMode.implicit)
+                                              qp_formulation=QPFormulation.implicit)
                         simulator.add_joint_goal(
                             # joint_names=pr2_world.movable_joint_names[:1],
                             # joint_names=pr2_world.movable_joint_names[14:15],
@@ -1017,7 +1027,7 @@ class TestController:
                               mpc_dt=0.05,
                               h=9,
                               solver=SupportedQPSolver.qpSWIFT,
-                              qp_formulation=ControllerMode.implicit)
+                              qp_formulation=QPFormulation.implicit)
         length = 50
         tip_link = left_right_kin_chain[0]
         for i in range(1, len(left_right_kin_chain)):
@@ -1074,7 +1084,7 @@ class TestController:
         formulations = [
             # ControllerMode.explicit,
             # ControllerMode.explicit_no_acc,
-            ControllerMode.implicit,
+            QPFormulation.implicit,
             # ControllerMode.no_mpc
         ]
         max_number_of_joints_total = len(pr2_world.movable_joint_names) - 1  # the last joint doesn't work
@@ -1202,9 +1212,9 @@ class TestController:
         ]
         formulations = [
             # ControllerMode.explicit,
-            ControllerMode.explicit_no_acc,
-            ControllerMode.implicit,
-            ControllerMode.no_mpc
+            QPFormulation.explicit_no_acc,
+            QPFormulation.implicit,
+            QPFormulation.no_mpc
         ]
         max_chain_length = 18
         sim_time = 4

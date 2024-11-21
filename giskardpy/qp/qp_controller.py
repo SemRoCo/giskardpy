@@ -34,7 +34,7 @@ from qp.constraint import DerivativeEqualityConstraint
 date_str = datetime.datetime.now().strftime('%Yy-%mm-%dd--%Hh-%Mm-%Ss')
 
 
-class ControllerMode(IntEnum):
+class QPFormulation(IntEnum):
     no_mpc = -1
     explicit = 0
     implicit = 1
@@ -52,6 +52,12 @@ class ControllerMode(IntEnum):
 
     def is_no_mpc(self) -> bool:
         return self == self.no_mpc
+
+    def has_acc_variables(self) -> bool:
+        return self.is_explicit()
+
+    def has_jerk_variables(self) -> bool:
+        return self.is_explicit() or self.is_explicit_no_acc()
 
     def is_mpc(self) -> bool:
         return not self.is_no_mpc()
@@ -101,6 +107,7 @@ class ProblemDataPart(ABC):
     prediction_horizon: int
     control_horizon: int
     max_derivative: Derivatives
+    qp_formulation: QPFormulation
 
     def __init__(self,
                  free_variables: List[FreeVariable],
@@ -112,7 +119,7 @@ class ProblemDataPart(ABC):
                  prediction_horizon: int,
                  max_derivative: Derivatives,
                  alpha: float,
-                 qp_formulation: ControllerMode):
+                 qp_formulation: QPFormulation):
         self.alpha = alpha
         self.qp_formulation = qp_formulation
         self.free_variables = free_variables
@@ -301,7 +308,7 @@ class Weights(ProblemDataPart):
                  sample_period: float,
                  prediction_horizon: int, max_derivative: Derivatives,
                  alpha: float,
-                 qp_formulation: ControllerMode):
+                 qp_formulation: QPFormulation):
         super().__init__(free_variables=free_variables,
                          equality_constraints=equality_constraints,
                          inequality_constraints=inequality_constraints,
@@ -458,7 +465,7 @@ class FreeVariableBounds(ProblemDataPart):
                  prediction_horizon: int,
                  max_derivative: Derivatives,
                  alpha: float,
-                 qp_formulation: ControllerMode):
+                 qp_formulation: QPFormulation):
         super().__init__(free_variables=free_variables,
                          equality_constraints=equality_constraints,
                          inequality_constraints=inequality_constraints,
@@ -613,7 +620,7 @@ class EqualityBounds(ProblemDataPart):
                  prediction_horizon: int,
                  max_derivative: Derivatives,
                  alpha: float,
-                 qp_formulation: ControllerMode):
+                 qp_formulation: QPFormulation):
         super().__init__(free_variables=free_variables,
                          equality_constraints=equality_constraints,
                          inequality_constraints=inequality_constraints,
@@ -728,7 +735,7 @@ class InequalityBounds(ProblemDataPart):
                  max_derivative: Derivatives,
                  default_limits: bool,
                  alpha: float,
-                 qp_formulation: ControllerMode):
+                 qp_formulation: QPFormulation):
         super().__init__(free_variables=free_variables,
                          equality_constraints=equality_constraints,
                          inequality_constraints=inequality_constraints,
@@ -885,8 +892,8 @@ class EqualityModel(ProblemDataPart):
 
     def get_eq_derivative_constraint_expressions(self, derivative: Derivatives):
         return \
-        self._sorter({c.name: c.expression for c in self.eq_derivative_constraints if c.derivative == derivative})[
-            0]
+            self._sorter({c.name: c.expression for c in self.eq_derivative_constraints if c.derivative == derivative})[
+                0]
 
     def velocity_constraint_model(self) -> Tuple[cas.Expression, cas.Expression]:
         """
@@ -912,28 +919,24 @@ class EqualityModel(ProblemDataPart):
         |      |   sp | vel constr 2
         |-------------|
         """
-        number_of_non_slack_columns = self.number_of_free_variables * self.prediction_horizon * self.max_derivative
-        number_of_vel_rows = len(self.velocity_eq_constraints) * self.prediction_horizon
+        number_of_vel_rows = len(self.velocity_eq_constraints) * (self.prediction_horizon - 2)
         if number_of_vel_rows > 0:
             expressions = cas.Expression(self.get_eq_derivative_constraint_expressions(Derivatives.velocity))
-            model = cas.zeros(number_of_vel_rows, number_of_non_slack_columns)
+            parts = []
             for derivative in Derivatives.range(Derivatives.position, self.max_derivative - 1):
+                if derivative == Derivatives.velocity and not self.qp_formulation.has_acc_variables():
+                    continue
+                if derivative == Derivatives.acceleration and not self.qp_formulation.has_jerk_variables():
+                    continue
                 J_vel = cas.jacobian(expressions=expressions,
                                      symbols=self.get_free_variable_symbols(derivative)) * self.dt
-                J_vel_limit_block = cas.kron(cas.eye(self.prediction_horizon), J_vel)
-                horizontal_offset = self.number_of_free_variables * self.prediction_horizon
-                model[:, horizontal_offset * derivative:horizontal_offset * (derivative + 1)] = J_vel_limit_block
-
-            # delete rows if control horizon of constraint shorter than prediction horizon
-            rows_to_delete = []
-            for t in range(self.prediction_horizon):
-                for i, c in enumerate(self.velocity_eq_constraints):
-                    v_index = i + (t * len(self.velocity_eq_constraints))
-                    if t + 1 > self.control_horizon:
-                        rows_to_delete.append(v_index)
-            model.remove(rows_to_delete, [])
+                missing_variables = self.max_derivative - derivative - 1
+                eye = cas.eye(self.prediction_horizon)[:-2, :self.prediction_horizon - missing_variables]
+                J_vel_limit_block = cas.kron(eye, J_vel)
+                parts.append(J_vel_limit_block)
 
             # constraint slack
+            model = cas.hstack(parts)
             num_slack_variables = sum(self.control_horizon for c in self.velocity_eq_constraints)
             slack_model = cas.eye(num_slack_variables) * self.dt
             return model, slack_model
@@ -1116,6 +1119,8 @@ class EqualityModel(ProblemDataPart):
             if self.qp_formulation.is_explicit():
                 max_derivative = self.max_derivative
                 derivative_link_model = self.derivative_link_model(max_derivative)
+                derivative_link_model = self._remove_columns_columns_where_variables_are_zero(derivative_link_model,
+                                                                                              max_derivative)
             elif self.qp_formulation.is_explicit_no_acc():
                 max_derivative = Derivatives.velocity
                 derivative_link_model = self.derivative_link_model_no_acc(self.max_derivative)
@@ -1138,7 +1143,7 @@ class EqualityModel(ProblemDataPart):
         slack_model = cas.vstack([cas.zeros(derivative_link_model.shape[0],
                                             slack_model.shape[1]),
                                   slack_model])
-        model = self._remove_columns_columns_where_variables_are_zero(model, max_derivative)
+        # model = self._remove_columns_columns_where_variables_are_zero(model, max_derivative)
         return model, slack_model
 
 
@@ -1528,7 +1533,7 @@ class QPController:
                  retries_with_relaxed_constraints: int = 0,
                  retry_added_slack: float = 100,
                  retry_weight_factor: float = 100,
-                 qp_formulation: ControllerMode = ControllerMode.explicit,
+                 qp_formulation: QPFormulation = QPFormulation.explicit,
                  alpha: float = 0.1,
                  verbose: bool = True):
         if control_dt is None:

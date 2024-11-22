@@ -1125,6 +1125,9 @@ class EqualityModel(ProblemDataPart):
                 max_derivative = Derivatives.velocity
                 derivative_link_model = self.derivative_link_model_no_acc(self.max_derivative)
         equality_constraint_model, equality_constraint_slack_model = self.equality_constraint_model()
+        if self.qp_formulation.is_explicit():
+            equality_constraint_model = self._remove_columns_columns_where_variables_are_zero(equality_constraint_model,
+                                                                                              max_derivative)
         vel_constr_model, vel_constr_slack_model = self.velocity_constraint_model()
 
         model_parts = []
@@ -1736,7 +1739,7 @@ class QPController:
         """
         try:
             self.xdot_full = self.qp_solver.solve_and_retry(substitutions=substitutions)
-            self._create_debug_pandas(self.qp_solver)
+            # self._create_debug_pandas(self.qp_solver)
             if self.qp_formulation.is_implicit():
                 return NextCommands.from_xdot_implicit(self.free_variables, self.xdot_full, self.order,
                                                        self.prediction_horizon, god_map.world, self.sample_period)

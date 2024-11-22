@@ -176,9 +176,9 @@ def b_profile(current_pos, current_vel, current_acc,
                                                                          skip_first)
     # check if my projected vel profile violated position limits
     vel_lb_violated = cas.logic_or(cas.logic_any(proj_vel_profile < pos_vel_profile_lb - eps),
-                                   cas.not_equal(proj_vel_profile[-1], 0))
+                                   cas.greater_equal(cas.abs(proj_vel_profile[-1]), eps))
     vel_ub_violated = cas.logic_or(cas.logic_any(proj_vel_profile > pos_vel_profile_ub + eps),
-                                   cas.not_equal(proj_vel_profile[-1], 0))
+                                   cas.greater_equal(cas.abs(proj_vel_profile[-1]), eps))
 
     # if either lower or upper position limits would get violated, relax jerk constraints to max slow down.
     special_jerk_limits = cas.logic_or(vel_lb_violated, vel_ub_violated)

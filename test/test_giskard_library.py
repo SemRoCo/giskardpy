@@ -1,10 +1,12 @@
 import gc
 import threading
 import traceback
+from collections import defaultdict
 from datetime import datetime
 from itertools import combinations, chain
-from typing import Dict, List
+from typing import Dict, List, Callable
 
+from data_types.data_types import JointStates
 from hypothesis import strategies as st, settings, HealthCheck, example, reproduce_failure
 
 import numpy as np
@@ -37,7 +39,9 @@ from giskardpy.qp.qp_solver_ids import SupportedQPSolver
 from hypothesis import given
 from motion_graph.tasks.cartesian_tasks import CartesianPoseAsTask
 from motion_graph.tasks.joint_tasks import JointVelocityLimit, JointVelocity
+from motion_graph.tasks.task import WEIGHT_ABOVE_CA
 from qp.constraint import DerivativeEqualityConstraint
+from sympy.strategies.branch import condition
 from utils_for_tests import pr2_urdf
 
 try:
@@ -668,7 +672,9 @@ class Simulator:
         self.world.state[v.name].position = goal
         for joint_name in joint_names:
             self.joint_goal[joint_name] = v.get_symbol(Derivatives.position)
-        joint_task = JointPositionList(name='g1', goal_state=self.joint_goal)
+        joint_task = JointPositionList(name='g1', goal_state=self.joint_goal,
+                                       # weight=WEIGHT_ABOVE_CA
+                                       )
 
         god_map.motion_graph_manager.add_task(joint_task)
 
@@ -701,6 +707,7 @@ class Simulator:
                                    eq_derivative_constraints=eqd,
                                    derivative_constraints=neqd)
         god_map.qp_controller.compile()
+        god_map.debug_expression_manager.compile_debug_expressions()
         self.traj = Trajectory()
 
     def get_active_free_symbols(self,
@@ -722,6 +729,12 @@ class Simulator:
         god_map.time = 0
         god_map.control_cycle_counter = 0
         god_map.motion_graph_manager.reset()
+        god_map.debug_expression_manager.reset()
+        for joint_state in god_map.world.state.values():
+            joint_state.position = 0
+            joint_state.velocity = 0
+            joint_state.acceleration = 0
+            joint_state.jerk = 0
 
     def step(self):
         parameters = god_map.qp_controller.get_parameter_names()
@@ -736,6 +749,7 @@ class Simulator:
         self.world.update_state(next_cmd, self.control_dt, god_map.qp_controller.max_derivative)
 
         self.world.notify_state_change()
+        god_map.debug_expression_manager.eval_debug_expressions()
         total_time = time.time() - total_time_start
         self.traj.set(god_map.control_cycle_counter, self.world.state)
         god_map.time += self.control_dt
@@ -746,9 +760,9 @@ class Simulator:
         if joint_names is None:
             joint_names = self.world.movable_joint_names
         for joint_name in joint_names:
-            self.world.state[joint_name].position +=  np.random.normal(0, pos, 1)[0]
-            self.world.state[joint_name].velocity +=  np.random.normal(0, vel, 1)[0]
-            self.world.state[joint_name].acceleration +=  np.random.normal(0, acc, 1)[0]
+            self.world.state[joint_name].position += np.random.normal(0, pos, 1)[0]
+            self.world.state[joint_name].velocity += np.random.normal(0, vel, 1)[0]
+            self.world.state[joint_name].acceleration += np.random.normal(0, acc, 1)[0]
 
     def update_joint_goal(self, new_value: float):
         self.world.state['joint_goal'].position = new_value
@@ -756,8 +770,92 @@ class Simulator:
     def update_cart_goal(self, new_value: float):
         self.world.state['x_goal'].position = new_value
 
-    def plot_traj(self):
-        self.traj.plot_trajectory('test', sample_period=self.control_dt, filter_0_vel=False)
+    def plot_traj(self, plot_legend: bool = True):
+        self.traj.plot_trajectory('test', sample_period=self.control_dt, filter_0_vel=True,
+                                  hspace=0.5, height_per_derivative=4)
+        graph_styles = [
+            ['-', '#996900'],
+            ['--', 'black'],
+        ]
+        color_map = defaultdict(lambda: graph_styles[len(color_map)])
+        god_map.debug_expression_manager.raw_traj_to_traj(control_dt=self.control_dt).plot_trajectory(
+            'debug', sample_period=self.control_dt, filter_0_vel=False,
+            hspace=1, height_per_derivative=3,
+            color_map=color_map,
+            plot0_lines=False,
+            legend=plot_legend,
+        )
+
+def joint_thing(jerk_limit: float, sim_time: float, control_dt: float, mpc_dt: float, h: int,
+                world: WorldTree, goal_function: Callable[[float], float], plot_legend: bool = True):
+    world.update_default_weights({Derivatives.velocity: 0.01,
+                                      Derivatives.acceleration: 0.0,
+                                      Derivatives.jerk: 0.0})
+    world.update_default_limits({
+        Derivatives.velocity: 1,
+        Derivatives.acceleration: np.inf,
+        Derivatives.jerk: jerk_limit
+    })
+    simulator = Simulator(world=world,
+                          control_dt=control_dt,
+                          mpc_dt=mpc_dt,
+                          h=h,
+                          solver=SupportedQPSolver.gurobi,
+                          alpha=0.1,
+                          qp_formulation=QPFormulation.explicit_no_acc)
+    simulator.reset()
+    simulator.add_joint_goal(
+        # joint_names=pr2_world.movable_joint_names[:1],
+        joint_names=['pr2/r_wrist_roll_joint'],
+        # joint_names=pr2_world.movable_joint_names[14:15],
+        # joint_names=pr2_world.movable_joint_names[:35],
+        # joint_names=pr2_world.movable_joint_names[27:31],
+        # joint_names=pr2_world.movable_joint_names[:-1],
+        # joint_names=[
+        # pr2_world.movable_joint_names[12], # torso
+        # pr2_world.movable_joint_names[27], # r_gripper_r_finger
+        # pr2_world.movable_joint_names[13] # head pan
+        # pr2_world.movable_joint_names[14] # head pan
+        # ],
+        goal=goal_function(0))
+    simulator.compile()
+
+    np.random.seed(69)
+    total_times, parameter_times, qp_times = [], [], []
+
+    try:
+        while god_map.time < sim_time:
+            total_time, parameter_time, qp_time = simulator.step()
+
+            total_times.append(total_time)
+            parameter_times.append(parameter_time)
+            qp_times.append(qp_time)
+            simulator.update_joint_goal(goal_function(god_map.time))
+
+    except Exception as e:
+        traceback.print_exc()
+        print(e)
+        assert False
+    finally:
+        simulator.plot_traj(plot_legend)
+    avg = np.average(qp_times)
+    print(f'avg time {avg} or {1 / avg}hz')
+    # print(f'min pos {min(simulator.traj.to_dict()[0][pr2_world.movable_joint_names[0]])}')
+    # print(f'max vel {min(simulator.traj.to_dict()[1][pr2_world.movable_joint_names[0]])}')
+
+
+class GoalSwapper:
+    def __init__(self, goal: float, swap_time: float, noise: float):
+        self.goal = goal
+        self.next_swap = swap_time
+        self.swap_time = swap_time
+        self.noise = noise
+
+    def __call__(self, time: float):
+        if time > self.next_swap:
+            self.goal = - self.goal
+            self.next_swap += self.swap_time
+        return self.goal + np.random.normal(0, self.noise, 1)[0]
 
 
 class TestController:
@@ -805,57 +903,17 @@ class TestController:
         assert violated, f'violation {np.max(np.abs(vel_profile) - vel_limit)}'
 
     def test_joint_goal_pr2(self, pr2_world: WorldTree):
+        jerk_limit = 2500
         sim_time = 4
-        goal = -1
-        pr2_world.update_default_weights({Derivatives.velocity: 0.01,
-                                          Derivatives.acceleration: 0.0,
-                                          Derivatives.jerk: 0.0})
-        pr2_world.update_default_limits({
-            Derivatives.velocity: 1,
-            Derivatives.acceleration: np.inf,
-            Derivatives.jerk: 100
-        })
-        simulator = Simulator(world=pr2_world,
-                              control_dt=0.025,
-                              mpc_dt=0.05,
-                              h=9,
-                              solver=SupportedQPSolver.gurobi,
-                              alpha=.1,
-                              qp_formulation=QPFormulation.implicit)
-        simulator.add_joint_goal(
-            joint_names=pr2_world.movable_joint_names[:1],
-            # joint_names=pr2_world.movable_joint_names[14:15],
-            # joint_names=pr2_world.movable_joint_names[:35],
-            # joint_names=pr2_world.movable_joint_names[27:31],
-            # joint_names=pr2_world.movable_joint_names[:-1],
-            # joint_names=[
-                # pr2_world.movable_joint_names[27],
-                # pr2_world.movable_joint_names[13]
-            # ],
-            goal=goal)
-        simulator.compile()
+        joint_thing(jerk_limit=jerk_limit, sim_time=sim_time,
+                    control_dt=0.05, mpc_dt=0.05, h=5, world=pr2_world,
+                    goal_function=GoalSwapper(1, 1.5, 0.25),
+                    plot_legend=True)
+        joint_thing(jerk_limit=jerk_limit, sim_time=sim_time,
+                    control_dt=0.01, mpc_dt=0.01, h=5, world=pr2_world,
+                    goal_function=GoalSwapper(1, 1.5, 0.25),
+                    plot_legend=False)
 
-        np.random.seed(69)
-        swap_distance = 0.7
-        next_swap = swap_distance
-        try:
-            while god_map.time < sim_time:
-                simulator.step()
-                # goal = np.random.rand() * 2 -1
-                # simulator.update_joint_goal(goal)
-                if god_map.time > next_swap:
-                    goal *= -1
-                    simulator.update_joint_goal(goal)
-                    next_swap += swap_distance
-
-        except Exception as e:
-            traceback.print_exc()
-            print(e)
-            assert False
-        finally:
-            simulator.plot_traj()
-        # print(f'min pos {min(simulator.traj.to_dict()[0][pr2_world.movable_joint_names[0]])}')
-        # print(f'max vel {min(simulator.traj.to_dict()[1][pr2_world.movable_joint_names[0]])}')
 
     def test_joint_vel_goal_pr2(self, pr2_world: WorldTree):
         sim_time = 4
@@ -875,14 +933,14 @@ class TestController:
                               solver=SupportedQPSolver.qpSWIFT,
                               alpha=.1,
                               qp_formulation=QPFormulation.implicit)
-        joint_names=pr2_world.movable_joint_names[:1]
+        joint_names = pr2_world.movable_joint_names[:1]
         # joint_names=pr2_world.movable_joint_names[14:15],
         # joint_names=pr2_world.movable_joint_names[:35],
         # joint_names=pr2_world.movable_joint_names[27:31],
         # joint_names=pr2_world.movable_joint_names[:-1],
         # joint_names=[
-            # pr2_world.movable_joint_names[27],
-            # pr2_world.movable_joint_names[13]
+        # pr2_world.movable_joint_names[27],
+        # pr2_world.movable_joint_names[13]
         # ],
         simulator.add_joint_vel_goal(goal=goal, joint_names=joint_names)
         simulator.compile()
@@ -894,7 +952,7 @@ class TestController:
             while god_map.time < sim_time:
                 simulator.step()
                 simulator.apply_noise(0, 0.1, 0, joint_names)
-                goal = np.sin(god_map.time*8)*0.5
+                goal = np.sin(god_map.time * 8) * 0.5
                 simulator.update_joint_goal(goal)
                 # goal = np.random.rand() * 2 -1
                 # simulator.update_joint_goal(goal)
@@ -926,10 +984,10 @@ class TestController:
         # vel_values = [20, 1, 0, 1 -20]
         # acc_values = [100, 1, 0, -100]
         # goal_values = [2.8]
-        pos_values = [2.8]
-        vel_values = [1]
-        acc_values = [0]
-        goal_values = [0]
+        pos_values = [-0.3588]
+        vel_values = [-0.5537]
+        acc_values = [7.517]
+        goal_values = [-1]
 
         jerk_violations = 0
         for pos in pos_values:
@@ -937,7 +995,8 @@ class TestController:
                 for acc in acc_values:
                     for goal in goal_values:
                         print(f'testing {pos} {vel} {acc} {goal}')
-                        joint = pr2_world.movable_joint_names[13]
+                        # joint = pr2_world.movable_joint_names[13]
+                        joint = pr2_world.movable_joint_names[14]
                         pr2_world.state[joint][0] = pos
                         pr2_world.state[joint][1] = vel
                         pr2_world.state[joint][2] = acc
@@ -948,13 +1007,13 @@ class TestController:
                         pr2_world.update_default_limits({
                             Derivatives.velocity: 1,
                             Derivatives.acceleration: np.inf,
-                            Derivatives.jerk: 30
+                            Derivatives.jerk: 100
                         })
                         simulator = Simulator(world=pr2_world,
-                                              control_dt=0.05,
+                                              control_dt=0.01,
                                               mpc_dt=0.05,
-                                              h=9,
-                                              solver=SupportedQPSolver.qpSWIFT,
+                                              h=5,
+                                              solver=SupportedQPSolver.gurobi,
                                               alpha=.1,
                                               qp_formulation=QPFormulation.implicit)
                         simulator.add_joint_goal(
@@ -994,7 +1053,7 @@ class TestController:
                         pos_lb, _, _, _ = list(pr2_world.joints[joint].free_variable.get_lower_limits(3).values())
                         # print(f'min pos {min(simulator.traj.to_dict()[0][joint])}')
                         eps = 1e-2
-                        traj =simulator.traj.to_dict(filter_0_vel=False)
+                        traj = simulator.traj.to_dict(filter_0_vel=False)
                         assert traj[0][joint][-1] <= pos_ub + eps
                         assert traj[0][joint][-1] >= pos_lb - eps
                         assert np.all(np.abs(traj[1][joint]) <= vel + eps)
@@ -1049,7 +1108,7 @@ class TestController:
         try:
             while god_map.time < sim_time:
                 simulator.step()
-                goal = np.random.rand() * 2 -1
+                goal = np.random.rand() * 2 - 1
                 simulator.update_cart_goal(goal)
                 # if god_map.time > next_swap:
                 #     goal *= -1

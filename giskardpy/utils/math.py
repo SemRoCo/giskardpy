@@ -199,6 +199,39 @@ def max_velocity_from_horizon_and_jerk(prediction_horizon: int,
     return vel_limit
 
 
+def max_velocity_from_horizon_and_jerk_qp(prediction_horizon: int,
+                                          vel_limit: float,
+                                          acc_limit: float,
+                                          jerk_limit: float,
+                                          dt: float,
+                                          max_derivative: Derivatives):
+    upper_limits = ((vel_limit,) * prediction_horizon,
+                    (acc_limit,) * prediction_horizon,
+                    (jerk_limit,) * prediction_horizon)
+    lower_limits = ((-vel_limit,) * prediction_horizon,
+                    (-acc_limit,) * prediction_horizon,
+                    (-jerk_limit,) * prediction_horizon)
+    return mpc(upper_limits=upper_limits, lower_limits=lower_limits,
+               current_values=(0, 0), dt=dt, ph=prediction_horizon, q_weight=(0,0,0), lin_weight=(-1,0,0),
+               solver_class=None, link_to_current_vel=False)
+
+def max_velocity_from_horizon_and_jerk_qp2(prediction_horizon: int,
+                                          vel_limit: float,
+                                          acc_limit: float,
+                                          jerk_limit: float,
+                                          dt: float,
+                                          max_derivative: Derivatives):
+    upper_limits = ((vel_limit,) * prediction_horizon,
+                    tuple([0] + [acc_limit] * (prediction_horizon-1)),
+                    (np.inf,) * prediction_horizon)
+    lower_limits = ((-vel_limit,) * prediction_horizon,
+                    tuple([0] + [-acc_limit] * (prediction_horizon-1)),
+                    (-np.inf,) * prediction_horizon)
+    return mpc(upper_limits=upper_limits, lower_limits=lower_limits,
+               current_values=(vel_limit, 0), dt=dt, ph=prediction_horizon, q_weight=(0,0,1), lin_weight=(0,0,0),
+               solver_class=None, link_to_current_vel=True)
+
+
 @memoize
 def mpc(upper_limits: Tuple[Tuple[float, ...], ...],
         lower_limits: Tuple[Tuple[float, ...], ...],
@@ -244,8 +277,10 @@ def mpc(upper_limits: Tuple[Tuple[float, ...], ...],
     lb = np.array(lb)
     ub = np.array(ub)
     if not link_to_current_vel:
-        model = np.delete(model, [0, ph], axis=0)
-        bE = np.delete(bE, [0, ph])
+        model = np.delete(model, [0], axis=0)
+        bE = np.delete(bE, [0])
+        lb[ph] = 0
+        ub[ph] = 0
     result = solver.default_interface_solver_call(H=H, g=g, lb=lb, ub=ub,
                                                   E=model, bE=bE,
                                                   A=empty, lbA=np.array([]), ubA=np.array([]))

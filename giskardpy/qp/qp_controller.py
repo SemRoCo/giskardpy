@@ -227,12 +227,19 @@ class ProblemDataPart(ABC):
                                                                             jerk_limit=upper_jerk_limit,
                                                                             sample_period=self.dt,
                                                                             max_derivative=max_derivative)
-        if max_reachable_vel < upper_velocity_limit:
-            error_msg = f'Free variable "{v.name}" can\'t reach velocity limit of "{upper_velocity_limit}". ' \
-                        f'Maximum reachable with prediction horizon = "{self.prediction_horizon}", ' \
-                        f'jerk limit = "{upper_jerk_limit}" and dt = "{self.dt}" is "{max_reachable_vel}".'
-            get_middleware().logerr(error_msg)
-            raise VelocityLimitUnreachableException(error_msg)
+        print(
+            f'max vel qp {giskard_math.max_velocity_from_horizon_and_jerk_qp(prediction_horizon=self.prediction_horizon,
+                                                                             vel_limit=100,
+                                                                             acc_limit=upper_acc_limit,
+                                                                             jerk_limit=upper_jerk_limit,
+                                                                             dt=self.dt,
+                                                                             max_derivative=max_derivative)[0]}')
+        # if max_reachable_vel < upper_velocity_limit:
+        #     error_msg = f'Free variable "{v.name}" can\'t reach velocity limit of "{upper_velocity_limit}". ' \
+        #                 f'Maximum reachable with prediction horizon = "{self.prediction_horizon}", ' \
+        #                 f'jerk limit = "{upper_jerk_limit}" and dt = "{self.dt}" is "{max_reachable_vel}".'
+        #     get_middleware().logerr(error_msg)
+        #     raise VelocityLimitUnreachableException(error_msg)
 
         if not v.has_position_limits():
             lb = cas.Expression([lower_velocity_limit] * self.prediction_horizon

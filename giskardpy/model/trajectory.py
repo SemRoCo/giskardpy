@@ -5,7 +5,7 @@ from collections import OrderedDict, defaultdict
 from copy import deepcopy
 from itertools import product
 from threading import Lock
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Optional, List
 import numpy as np
 import matplotlib.colors as mcolors
 import pylab as plt
@@ -69,7 +69,7 @@ class Trajectory:
     def length_in_seconds(self) -> float:
         return len(self) * god_map.qp_controller.sample_period
 
-    def to_dict(self, normalize_position: bool = False, filter_0_vel: bool = True) -> Dict[
+    def to_dict(self, normalize_position: Optional[bool] = None, filter_0_vel: bool = True) -> Dict[
         Derivatives, Dict[PrefixName, np.ndarray]]:
         data = defaultdict(lambda: defaultdict(list))
         for time, joint_states in self.items():
@@ -81,7 +81,8 @@ class Trajectory:
                 d_data[free_variable] = np.array(trajectory, dtype=float)
                 if (free_variable in god_map.world.free_variables
                         and not god_map.world.free_variables[free_variable].has_position_limits()):
-                    normalize_position = True
+                    if normalize_position is None:
+                        normalize_position = True
                 if normalize_position and derivative == Derivatives.position:
                     d_data[free_variable] -= (d_data[free_variable].max() + d_data[free_variable].min()) / 2.
         if filter_0_vel:
@@ -107,7 +108,9 @@ class Trajectory:
                         legend: bool = True,
                         hspace: float = 1,
                         y_limits: bool = None,
-                        filter_0_vel: bool = True):
+                        color_map: Optional[Dict[str, Tuple[str, str]]] = None,
+                        filter_0_vel: bool = True,
+                        plot0_lines: bool = True):
         """
         :type tj: Trajectory
         :param controlled_joints: only joints in this list will be added to the plot
@@ -134,10 +137,10 @@ class Trajectory:
                 return
             colors = list(mcolors.TABLEAU_COLORS.keys())
             colors.append('k')
-
-            line_styles = ['-', '--', '-.', ':', (0, (3, 1, 1, 1, 1, 1))]
-            graph_styles = list(product(line_styles, colors))
-            color_map: Dict[str, Tuple[str, str]] = defaultdict(lambda: graph_styles[len(color_map) + 1])
+            if color_map is None:
+                line_styles = ['-', '--', '-.', ':', (0, (3, 1, 1, 1, 1, 1))]
+                graph_styles = list(product(line_styles, colors))
+                color_map: Dict[str, Tuple[str, str]] = defaultdict(lambda: graph_styles[len(color_map) + 1])
             data = self.to_dict(normalize_position, filter_0_vel=filter_0_vel)
             times = np.arange(len(self)) * sample_period
 
@@ -155,7 +158,7 @@ class Trajectory:
                 if print_last_tick:
                     ticks = np.append(ticks, times[-1])
                 for derivative in Derivatives.range(start=Derivatives.position, stop=max_derivative):
-                    axs[derivative].set_title(str(derivative))
+                    axs[derivative].set_title(str(derivative.name))
                     axs[derivative].xaxis.set_ticks(ticks)
                     if y_limits is not None:
                         axs[derivative].set_ylim(y_limits)
@@ -170,9 +173,10 @@ class Trajectory:
                 for free_variable, f_data in d_data.items():
                     try:
                         style, color = color_map[str(free_variable)]
-                        axs[derivative].plot(times, f_data, color=color,
-                                             linestyle=style,
-                                             label=free_variable)
+                        if plot0_lines or not np.allclose(f_data, 0):
+                            axs[derivative].plot(times, f_data, color=color,
+                                                 linestyle=style,
+                                                 label=free_variable)
                     except KeyError:
                         get_middleware().logwarn(f'Not enough colors to plot all joints, skipping {free_variable}.')
                     except Exception as e:

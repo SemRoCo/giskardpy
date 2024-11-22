@@ -7,7 +7,7 @@
         <rosparam param="disable_self_collision">False</rosparam>
         <rosparam param="interactive_marker_chains">
             - [map, robot_arm_tool_link]
-            - [map, r_gripper_tool_frame]
+            - [map, l_gripper_tool_frame]
         </rosparam>
     </node>
 </launch>

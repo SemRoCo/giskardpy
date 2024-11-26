@@ -75,9 +75,10 @@ class DebugExpressionManager:
         for control_cycle_counter, evaluated_debug_expressions in enumerate(self._raw_debug_trajectory):
             if control_cycle_counter >= 1:
                 last_mjs = debug_trajectory.get_exact(control_cycle_counter - 1)
+                js = deepcopy(last_mjs)
             else:
                 last_mjs = JointStates()
-            js = deepcopy(last_mjs)
+                js = JointStates()
             for name, value in evaluated_debug_expressions.items():
                 if len(value) > 1:
                     if len(value.shape) == 2:
@@ -85,15 +86,17 @@ class DebugExpressionManager:
                             for y in range(value.shape[1]):
                                 tmp_name = f'{name}|{x}_{y}'
                                 self.evaluated_expr_to_js(tmp_name, last_mjs, js, float(value[x, y]), control_dt,
-                                                          self.debug_expressions[name].debug_derivative)
+                                                          self.debug_expressions[name].debug_derivative,
+                                                          control_cycle_counter)
                     else:
                         for x in range(value.shape[0]):
                             tmp_name = f'{name}|{x}'
                             self.evaluated_expr_to_js(tmp_name, last_mjs, js, float(value[x]), control_dt,
-                                                      self.debug_expressions[name].debug_derivative)
+                                                      self.debug_expressions[name].debug_derivative,
+                                                      control_cycle_counter)
                 else:
                     self.evaluated_expr_to_js(name, last_mjs, js, float(value), control_dt,
-                                              self.debug_expressions[name].debug_derivative)
+                                              self.debug_expressions[name].debug_derivative, control_cycle_counter)
             debug_trajectory.set(control_cycle_counter, js)
         for control_cycle_counter, evaluated_debug_expressions in enumerate(self._raw_debug_trajectory):
             js = debug_trajectory.get_exact(control_cycle_counter)
@@ -105,10 +108,10 @@ class DebugExpressionManager:
         return debug_trajectory
 
     def evaluated_expr_to_js(self, name: Union[PrefixName, str], last_js: JointStates, next_js: JointStates, value: float,
-                             dt:float, derivative: Derivatives):
+                             dt:float, derivative: Derivatives, control_cycle_counter: int):
         next_js[name][derivative] = value
 
-        for i in range(derivative + 1, 4):
+        for i in range(derivative + 1, 4 + min(control_cycle_counter-3, 0)):
             next_js[name][i] = (next_js[name][i - 1] - last_js[name][i - 1]) / dt
 
         for i in range(derivative - 1, -1, -1):

@@ -69,8 +69,8 @@ class Trajectory:
     def length_in_seconds(self) -> float:
         return len(self) * god_map.qp_controller.sample_period
 
-    def to_dict(self, normalize_position: Optional[bool] = None, filter_0_vel: bool = True) -> Dict[
-        Derivatives, Dict[PrefixName, np.ndarray]]:
+    def to_dict(self, normalize_position: Optional[bool] = None, filter_0_vel: bool = True, sort: bool = True)\
+            -> Dict[Derivatives, Dict[PrefixName, np.ndarray]]:
         data = defaultdict(lambda: defaultdict(list))
         for time, joint_states in self.items():
             for free_variable, joint_state in joint_states.items():
@@ -90,8 +90,11 @@ class Trajectory:
                 if abs(trajectory.max() - trajectory.min()) < 1e-5:
                     for derivative, d_data in list(data.items()):
                         del d_data[free_variable]
-        for derivative, d_data in data.items():
-            data[derivative] = SortedDict(sorted(d_data.items()))
+        if sort:
+            for derivative, d_data in data.items():
+                data[derivative] = SortedDict(sorted(d_data.items()))
+        # else:
+        #     data = d_data
         return data
 
     @profile
@@ -108,6 +111,7 @@ class Trajectory:
                         legend: bool = True,
                         hspace: float = 1,
                         y_limits: bool = None,
+                        sort: bool = True,
                         color_map: Optional[Dict[str, Tuple[str, str]]] = None,
                         filter_0_vel: bool = True,
                         plot0_lines: bool = True):
@@ -141,7 +145,7 @@ class Trajectory:
                 line_styles = ['-', '--', '-.', ':', (0, (3, 1, 1, 1, 1, 1))]
                 graph_styles = list(product(line_styles, colors))
                 color_map: Dict[str, Tuple[str, str]] = defaultdict(lambda: graph_styles[len(color_map) + 1])
-            data = self.to_dict(normalize_position, filter_0_vel=filter_0_vel)
+            data = self.to_dict(normalize_position, filter_0_vel=filter_0_vel, sort=sort)
             times = np.arange(len(self)) * sample_period
 
             f, axs = plt.subplots((max_derivative + 1), sharex=True, gridspec_kw={'hspace': hspace})
@@ -174,9 +178,18 @@ class Trajectory:
                     try:
                         style, color = color_map[str(free_variable)]
                         if plot0_lines or not np.allclose(f_data, 0):
-                            axs[derivative].plot(times, f_data, color=color,
-                                                 linestyle=style,
-                                                 label=free_variable)
+                            if not style.startswith('!'):
+                                axs[derivative].plot(times, f_data, color=color,
+                                                     linestyle=style,
+                                                     label=free_variable)
+                            else:
+                                if 'above' in style:
+                                    y2 = np.array(list(data[derivative].values())).max()
+                                else:
+                                    y2 = np.array(list(data[derivative].values())).min()
+                                # axs[derivative].fill_between(times, f_data, y2=y2, color=color, alpha=0.5, label='Shaded Area')
+                                axs[derivative].fill_between(times, f_data, y2=y2, color='none', hatch='//',
+                                                             edgecolor=color, alpha=1, label=free_variable)
                     except KeyError:
                         get_middleware().logwarn(f'Not enough colors to plot all joints, skipping {free_variable}.')
                     except Exception as e:
@@ -185,6 +198,7 @@ class Trajectory:
 
             if legend:
                 axs[0].legend(bbox_to_anchor=(1.01, 1), loc='upper left')
+                # axs[0].legend(bbox_to_anchor=(0.5, 2), loc='upper left')
 
             axs[-1].set_xlabel('time [s]')
 

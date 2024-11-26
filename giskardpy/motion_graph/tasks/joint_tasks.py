@@ -7,6 +7,7 @@ from giskardpy.god_map import god_map
 from giskardpy.model.joints import OneDofJoint
 from giskardpy.motion_graph.monitors.joint_monitors import JointGoalReached
 from giskardpy.motion_graph.tasks.task import Task, WEIGHT_BELOW_CA
+from qp.pos_in_vel_limits import b_profile
 
 
 class JointPositionList(Task):
@@ -41,7 +42,7 @@ class JointPositionList(Task):
             velocity_limit = cas.limit(max_velocity, ll_vel, ul_vel)
 
             joint: OneDofJoint = god_map.world.joints[joint_name]
-            self.current_positions.append(joint.get_symbol(Derivatives.position))
+            self.current_positions.append(joint.free_variable.get_symbol(Derivatives.position))
             self.goal_positions.append(goal_position)
             self.velocity_limits.append(velocity_limit)
 
@@ -57,6 +58,64 @@ class JointPositionList(Task):
                                          equality_bound=error,
                                          weight=self.weight,
                                          task_expression=current)
+            ll_pos, ul_pos = god_map.world.compute_joint_limits(name, Derivatives.position)
+            god_map.debug_expression_manager.add_debug_expression(f'{name}/goal', goal,
+                                                                  derivatives_to_plot=[
+                                                                      Derivatives.position,
+                                                                      # Derivatives.velocity
+                                                                  ])
+            # god_map.debug_expression_manager.add_debug_expression(f'{name}/lower_limit', cas.Expression(ll_pos),
+            #                                                       derivatives_to_plot=[
+            #                                                           Derivatives.position,
+            #                                                           # Derivatives.velocity
+            #                                                       ])
+            if ul_pos is not None:
+                god_map.debug_expression_manager.add_debug_expression(f'{name}/joint_bounds', cas.Expression(ul_pos),
+                                                                      derivatives_to_plot=[
+                                                                          Derivatives.position,
+                                                                          # Derivatives.velocity
+                                                                      ])
+                current_vel = god_map.world.joints[name].free_variable.get_symbol(Derivatives.velocity)
+                current_acc = god_map.world.joints[name].free_variable.get_symbol(Derivatives.acceleration)
+                lb, ub = b_profile(current_pos=current,
+                                   current_vel=current_vel,
+                                   current_acc=current_acc,
+                                   pos_limits=(ll_pos, ul_pos),
+                                   vel_limits=god_map.world.compute_joint_limits(name, Derivatives.velocity),
+                                   acc_limits=god_map.world.compute_joint_limits(name, Derivatives.acceleration),
+                                   jerk_limits=god_map.world.compute_joint_limits(name, Derivatives.jerk),
+                                   dt=god_map.qp_controller.sample_period,
+                                   ph=god_map.qp_controller.prediction_horizon)
+                god_map.debug_expression_manager.add_debug_expression(f'{name}/upper_vel',
+                                                                      ub[0],
+                                                                      derivative=Derivatives.velocity,
+                                                                      color='r--',
+                                                                      derivatives_to_plot=[Derivatives.velocity])
+                god_map.debug_expression_manager.add_debug_expression(f'{name}/lower_vel',
+                                                                      lb[0],
+                                                                      derivative=Derivatives.velocity,
+                                                                      color='r--',
+                                                                      derivatives_to_plot=[Derivatives.velocity])
+                god_map.debug_expression_manager.add_debug_expression(f'{name}/upper_jerk',
+                                                                      ub[god_map.qp_controller.prediction_horizon*2],
+                                                                      derivative=Derivatives.jerk,
+                                                                      color='r--',
+                                                                      derivatives_to_plot=[Derivatives.jerk])
+                god_map.debug_expression_manager.add_debug_expression(f'{name}/lower_jerk',
+                                                                      lb[god_map.qp_controller.prediction_horizon*2],
+                                                                      derivative=Derivatives.jerk,
+                                                                      color='r--',
+                                                                      derivatives_to_plot=[Derivatives.jerk])
+            for d in Derivatives.range(Derivatives.position, Derivatives.jerk):
+                if d == Derivatives.position:
+                    variable_name = f'{name}/current'
+                else:
+                    variable_name = f'{name}/current/{d}'
+                god_map.debug_expression_manager.add_debug_expression(variable_name,
+                                                                      god_map.world.joints[name].get_symbol(d),
+                                                                      derivative=d,
+                                                                      color='r--',
+                                                                      derivatives_to_plot=[d])
         joint_monitor = JointGoalReached(goal_state=goal_state,
                                          threshold=threshold)
         self.expression = joint_monitor.expression

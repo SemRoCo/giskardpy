@@ -113,53 +113,57 @@ def b_profile(current_pos, current_vel, current_acc,
     vel_limit = vel_limits[1]
     acc_limit = acc_limits[1]
     jerk_limit = jerk_limits[1]
-    pos_range = pos_limits[1] - pos_limits[0]
-    pos_limit_lb = pos_limits[0]
-    pos_limit_ub = pos_limits[1]
-    # reduce vel limit, if it can surpass position limits in one dt
-    vel_limit = min(vel_limit * dt, pos_range / 2) / dt
-    # %% compute max possible profile
-    profile = gm.simple_mpc(vel_limit=vel_limit,
-                            acc_limit=acc_limit,
-                            jerk_limit=jerk_limit,
-                            current_vel=vel_limit,
-                            current_acc=0,
-                            dt=dt, ph=ph,
-                            q_weight=(0, 0, 0), lin_weight=(-1, 0, 0))
-    vel_profile_mpc = profile[:ph]
-    acc_profile_mpc = profile[ph:ph * 2]
-    pos_error_lb = pos_limit_lb - current_pos
-    pos_error_ub = pos_limit_ub - current_pos
-    # %% limits to profile, if vel integral bigger than remaining distance to pos limits
-    pos_vel_profile_lb, _ = shifted_velocity_profile(vel_profile=vel_profile_mpc,
-                                                     acc_profile=acc_profile_mpc,
-                                                     distance=-pos_error_lb,
-                                                     dt=dt)
-    pos_vel_profile_lb *= -1
-    pos_vel_profile_ub, _ = shifted_velocity_profile(vel_profile=vel_profile_mpc,
-                                                     acc_profile=acc_profile_mpc,
-                                                     distance=pos_error_ub,
-                                                     dt=dt)
-    # %% when limits are violated, compute the max velocity that can be reached in one step from zero and put it as
-    # negative limits
-    one_step_change_ = jerk_limit * dt ** 2
-    one_step_change_lb = cas.min(cas.max(0, pos_error_lb), one_step_change_)
-    one_step_change_lb = cas.limit(one_step_change_lb, -vel_limit, vel_limit)
-    one_step_change_ub = cas.max(cas.min(0, pos_error_ub), -one_step_change_)
-    one_step_change_ub = cas.limit(one_step_change_ub, -vel_limit, vel_limit)
-    pos_vel_profile_lb[0] = cas.if_greater(pos_error_lb, 0, one_step_change_lb, pos_vel_profile_lb[0])
-    pos_vel_profile_ub[0] = cas.if_less(pos_error_ub, 0, one_step_change_ub, pos_vel_profile_ub[0])
+    if pos_limits[0] is not None:
+        pos_range = pos_limits[1] - pos_limits[0]
+        pos_limit_lb = pos_limits[0]
+        pos_limit_ub = pos_limits[1]
+        # reduce vel limit, if it can surpass position limits in one dt
+        vel_limit = min(vel_limit * dt, pos_range / 2) / dt
+        # %% compute max possible profile
+        profile = gm.simple_mpc(vel_limit=vel_limit,
+                                acc_limit=acc_limit,
+                                jerk_limit=jerk_limit,
+                                current_vel=vel_limit,
+                                current_acc=0,
+                                dt=dt, ph=ph,
+                                q_weight=(0, 0, 0), lin_weight=(-1, 0, 0))
+        vel_profile_mpc = profile[:ph]
+        acc_profile_mpc = profile[ph:ph * 2]
+        pos_error_lb = pos_limit_lb - current_pos
+        pos_error_ub = pos_limit_ub - current_pos
+        # %% limits to profile, if vel integral bigger than remaining distance to pos limits
+        pos_vel_profile_lb, _ = shifted_velocity_profile(vel_profile=vel_profile_mpc,
+                                                         acc_profile=acc_profile_mpc,
+                                                         distance=-pos_error_lb,
+                                                         dt=dt)
+        pos_vel_profile_lb *= -1
+        pos_vel_profile_ub, _ = shifted_velocity_profile(vel_profile=vel_profile_mpc,
+                                                         acc_profile=acc_profile_mpc,
+                                                         distance=pos_error_ub,
+                                                         dt=dt)
+        # %% when limits are violated, compute the max velocity that can be reached in one step from zero and put it as
+        # negative limits
+        one_step_change_ = jerk_limit * dt ** 2
+        one_step_change_lb = cas.min(cas.max(0, pos_error_lb/dt), one_step_change_)
+        one_step_change_lb = cas.limit(one_step_change_lb, -vel_limit, vel_limit)
+        one_step_change_ub = cas.max(cas.min(0, pos_error_ub/dt), -one_step_change_)
+        one_step_change_ub = cas.limit(one_step_change_ub, -vel_limit, vel_limit)
+        pos_vel_profile_lb[0] = cas.if_greater(pos_error_lb, 0, one_step_change_lb, pos_vel_profile_lb[0])
+        pos_vel_profile_ub[0] = cas.if_less(pos_error_ub, 0, one_step_change_ub, pos_vel_profile_ub[0])
 
-    # the acc profile doesn't really matter, just keep the old stuff
+        # all 0, unless lower or upper position limits are violated
+        goal_profile = cas.max(pos_vel_profile_lb, 0) + cas.min(pos_vel_profile_ub, 0)
+        # skip first when lower or upper position limit are violated
+        skip_first = cas.logic_or(pos_vel_profile_lb[0] >= 0, pos_vel_profile_ub[0] <= 0)
+    else:
+        goal_profile = cas.zeros(ph, 1)
+        pos_vel_profile_ub = cas.ones(ph, 1) * vel_limit
+        pos_vel_profile_lb = -pos_vel_profile_ub
+        skip_first = 0
+
     acc_profile = cas.ones(*pos_vel_profile_ub.shape) * acc_limit
-
-    # %% compute jerk profile that allows jerk violations in order to fix position violations
     jerk_profile = cas.ones(*pos_vel_profile_ub.shape) * jerk_limit
 
-    # all 0, unless lower or upper position limits are violated
-    goal_profile = cas.max(pos_vel_profile_lb, 0) + cas.min(pos_vel_profile_ub, 0)
-    # skip first when lower or upper position limit are violated
-    skip_first = cas.logic_or(pos_vel_profile_lb[0] >= 0, pos_vel_profile_ub[0] <= 0)
     # vel and acc profile for slowing down asap
     proj_vel_profile, proj_acc_profile, _ = compute_slowdown_asap_vel_profile(current_vel,
                                                                               current_acc,

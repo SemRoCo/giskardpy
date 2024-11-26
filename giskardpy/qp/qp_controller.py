@@ -206,6 +206,27 @@ class ProblemDataPart(ABC):
         free_variable_model.remove([], column_ids)
         return free_variable_model
 
+    def find_best_jerk_limit(self, target_vel_limit: float, jerk_limit: float,
+                             max_derivative: Derivatives, eps: float = 0.001) -> float:
+        upper_bound = jerk_limit
+        lower_bound = 0
+        for i in range(100):
+            vel_limit = giskard_math.max_velocity_from_horizon_and_jerk_qp(prediction_horizon=self.prediction_horizon,
+                                                                           vel_limit=100,
+                                                                           acc_limit=np.inf,
+                                                                           jerk_limit=jerk_limit,
+                                                                           dt=self.dt,
+                                                                           max_derivative=max_derivative)[0]
+            if abs(vel_limit - target_vel_limit) < eps:
+                break
+            if vel_limit > target_vel_limit:
+                upper_bound = jerk_limit
+                jerk_limit = int((jerk_limit + lower_bound) / 2)
+            else:
+                lower_bound = jerk_limit
+                jerk_limit = int((jerk_limit + upper_bound) / 2)
+        print(f'best velocity limit: {vel_limit} with jerk limit: {jerk_limit} after {i} iterations')
+
     @profile
     def velocity_limit(self, v: FreeVariable, max_derivative: Derivatives) -> Tuple[cas.Expression, cas.Expression]:
         current_position = v.get_symbol(Derivatives.position)
@@ -227,6 +248,7 @@ class ProblemDataPart(ABC):
                                                                             jerk_limit=upper_jerk_limit,
                                                                             sample_period=self.dt,
                                                                             max_derivative=max_derivative)
+        self.find_best_jerk_limit(upper_velocity_limit, (4*upper_velocity_limit)/self.dt**2, max_derivative)
         print(
             f'max vel qp {giskard_math.max_velocity_from_horizon_and_jerk_qp(prediction_horizon=self.prediction_horizon,
                                                                              vel_limit=100,
@@ -242,42 +264,43 @@ class ProblemDataPart(ABC):
         #     raise VelocityLimitUnreachableException(error_msg)
 
         if not v.has_position_limits():
-            lb = cas.Expression([lower_velocity_limit] * self.prediction_horizon
-                                + [lower_acc_limit] * self.prediction_horizon
-                                + [lower_jerk_limit] * self.prediction_horizon)
-            ub = cas.Expression([upper_velocity_limit] * self.prediction_horizon
-                                + [upper_acc_limit] * self.prediction_horizon
-                                + [upper_jerk_limit] * self.prediction_horizon)
+            # lb = cas.Expression([lower_velocity_limit] * self.prediction_horizon
+            #                     + [lower_acc_limit] * self.prediction_horizon
+            #                     + [lower_jerk_limit] * self.prediction_horizon)
+            # ub = cas.Expression([upper_velocity_limit] * self.prediction_horizon
+            #                     + [upper_acc_limit] * self.prediction_horizon
+            #                     + [upper_jerk_limit] * self.prediction_horizon)
+            lower_limit = upper_limit = None
         else:
             lower_limit = v.get_lower_limit(Derivatives.position, evaluated=True)
             upper_limit = v.get_upper_limit(Derivatives.position, evaluated=True)
 
-            try:
-                lb, ub = b_profile(current_pos=current_position,
-                                   current_vel=current_vel,
-                                   current_acc=current_acc,
-                                   pos_limits=(lower_limit, upper_limit),
-                                   vel_limits=(lower_velocity_limit, upper_velocity_limit),
-                                   acc_limits=(lower_acc_limit, upper_acc_limit),
-                                   jerk_limits=(lower_jerk_limit, upper_jerk_limit),
-                                   dt=self.dt,
-                                   ph=self.prediction_horizon)
-            except InfeasibleException as e:
-                max_reachable_vel = giskard_math.max_velocity_from_horizon_and_jerk(
-                    prediction_horizon=self.prediction_horizon,
-                    vel_limit=upper_velocity_limit,
-                    acc_limit=upper_acc_limit,
-                    jerk_limit=upper_jerk_limit,
-                    sample_period=self.dt,
-                    max_derivative=self.max_derivative)
-                if max_reachable_vel < upper_velocity_limit:
-                    error_msg = f'Free variable "{v.name}" can\'t reach velocity limit of "{upper_velocity_limit}". ' \
-                                f'Maximum reachable with prediction horizon = "{self.prediction_horizon}", ' \
-                                f'jerk limit = "{upper_jerk_limit}" and dt = "{self.dt}" is "{max_reachable_vel}".'
-                    get_middleware().logerr(error_msg)
-                    raise VelocityLimitUnreachableException(error_msg)
-                else:
-                    raise
+        try:
+            lb, ub = b_profile(current_pos=current_position,
+                               current_vel=current_vel,
+                               current_acc=current_acc,
+                               pos_limits=(lower_limit, upper_limit),
+                               vel_limits=(lower_velocity_limit, upper_velocity_limit),
+                               acc_limits=(lower_acc_limit, upper_acc_limit),
+                               jerk_limits=(lower_jerk_limit, upper_jerk_limit),
+                               dt=self.dt,
+                               ph=self.prediction_horizon)
+        except InfeasibleException as e:
+            max_reachable_vel = giskard_math.max_velocity_from_horizon_and_jerk(
+                prediction_horizon=self.prediction_horizon,
+                vel_limit=upper_velocity_limit,
+                acc_limit=upper_acc_limit,
+                jerk_limit=upper_jerk_limit,
+                sample_period=self.dt,
+                max_derivative=self.max_derivative)
+            if max_reachable_vel < upper_velocity_limit:
+                error_msg = f'Free variable "{v.name}" can\'t reach velocity limit of "{upper_velocity_limit}". ' \
+                            f'Maximum reachable with prediction horizon = "{self.prediction_horizon}", ' \
+                            f'jerk limit = "{upper_jerk_limit}" and dt = "{self.dt}" is "{max_reachable_vel}".'
+                get_middleware().logerr(error_msg)
+                raise VelocityLimitUnreachableException(error_msg)
+            else:
+                raise
         # %% set velocity limits to infinite, that can't be reached due to acc/jerk limits anyway
         # unlimited_vel_profile = implicit_vel_profile(acc_limit=upper_acc_limit,
         #                                              jerk_limit=upper_jerk_limit,

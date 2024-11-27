@@ -13,7 +13,7 @@ from giskardpy.utils.utils import is_running_in_pytest
 
 class BehaviorTreeConfig(ABC):
 
-    def __init__(self, mode: ControlModes, control_loop_max_hz: float = 50, simulation_max_hz: Optional[float] = None):
+    def __init__(self, mode: ControlModes, control_loop_max_hz: float = 80, simulation_max_hz: Optional[float] = None):
         """
 
         :param mode: Defines the default setup of the behavior tree.

@@ -30,7 +30,7 @@ class WorldWithHSRConfig(WorldConfig):
         self.set_default_color(1, 1, 1, 1)
         self.set_default_limits({Derivatives.velocity: 1,
                                  Derivatives.acceleration: np.inf,
-                                 Derivatives.jerk: 30})
+                                 Derivatives.jerk: 711})
         self.add_empty_link(PrefixName(self.map_name))
         self.add_6dof_joint(parent_link=self.map_name, child_link=self.odom_link_name,
                             joint_name=self.localization_joint_name)
@@ -45,17 +45,17 @@ class WorldWithHSRConfig(WorldConfig):
                                   yaw_vel_name=PrefixName('odom_t', self.robot_group_name),
                                   translation_limits={
                                       Derivatives.velocity: 0.2,
-                                      Derivatives.acceleration: 1,
-                                      Derivatives.jerk: 6,
+                                      Derivatives.acceleration: np.inf,
+                                      Derivatives.jerk: 142,
                                   },
                                   rotation_limits={
                                       Derivatives.velocity: 0.2,
-                                      Derivatives.acceleration: 1,
-                                      Derivatives.jerk: 6
+                                      Derivatives.acceleration: np.inf,
+                                      Derivatives.jerk: 142
                                   },
                                   robot_group_name=self.robot_group_name)
         self.set_joint_limits(limit_map={
-            Derivatives.jerk: 10,
+            Derivatives.jerk: 107,
         },
             joint_name='arm_lift_joint')
 

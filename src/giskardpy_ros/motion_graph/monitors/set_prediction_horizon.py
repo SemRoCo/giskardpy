@@ -16,7 +16,7 @@ class EnableVelocityTrajectoryTracking(PayloadMonitor):
         when they are send to the robot.
         :param enabled: If True, will the velocity part of the message.
         """
-        if not cas.is_true(start_condition):
+        if not cas.is_true_symbol(start_condition):
             raise MonitorInitalizationException(f'{self.__class__.__name__}: start_condition must be True.')
         if name is None:
             name = self.__class__.__name__

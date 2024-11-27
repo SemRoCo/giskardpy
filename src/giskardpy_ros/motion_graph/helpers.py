@@ -19,19 +19,19 @@ def compile_graph_node_state_updater(graph_nodes: Dict[PrefixName, MotionGraphNo
     for node in sorted(graph_nodes.values(), key=lambda x: x.id):
         state_symbol = node_state[node.id]
 
-        if cas.is_true(node.start_condition):
+        if cas.is_true_symbol(node.start_condition):
             start_if = TaskState.running  # start right away
         else:
             start_if = cas.if_else(node.start_condition,
                                    if_result=TaskState.running,
                                    else_result=TaskState.not_started)
-        if cas.is_false(node.hold_condition):
+        if cas.is_false_symbol(node.hold_condition):
             hold_if = TaskState.running  # never hold
         else:
             hold_if = cas.if_else(node.hold_condition,
                                   if_result=TaskState.on_hold,
                                   else_result=TaskState.running)
-        if cas.is_false(node.end_condition):
+        if cas.is_false_symbol(node.end_condition):
             else_result = hold_if  # never end
         else:
             else_result = cas.if_else(node.end_condition,

@@ -1,0 +1,17 @@
+<launch>
+  <arg name="debug_mode" default="False" />
+
+
+  <node pkg="giskardpy" type="justin_standalone.py" name="giskard" output="screen" />
+
+    <node pkg="giskardpy" type="interactive_marker.py" name="giskard_interactive_marker" output="screen">
+    <rosparam param="enable_self_collision">True</rosparam>
+    <rosparam param="interactive_marker_chains">
+      - [map, r_gripper_tool_frame]
+    </rosparam>
+  </node>
+
+  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find giskardpy)/launch/rviz_config/standalone.rviz" />
+
+</launch>
+

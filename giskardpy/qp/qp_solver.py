@@ -1,11 +1,11 @@
 import abc
 from abc import ABC
+from collections import defaultdict
 from functools import wraps
 from time import time
 from typing import Tuple, List, Optional, Union, Dict
 import scipy.sparse as sp
 import numpy as np
-
 
 import giskardpy.casadi_wrapper as cas
 from giskardpy.data_types.exceptions import HardConstraintsViolatedException, InfeasibleException, QPSolverException
@@ -15,6 +15,7 @@ from giskardpy.utils.decorators import memoize
 
 from giskardpy.utils.utils import is_running_in_pytest
 from line_profiler import profile
+
 
 def record_solver_call_time(function):
     if not is_running_in_pytest():
@@ -57,13 +58,42 @@ class QPSolver(ABC):
     num_eq_constraints: int
     num_neq_constraints: int
     num_free_variable_constraints: int
-    _times: Dict[Tuple[int, int, int, int], list]
+    _times: Dict[Tuple[int, int, int], list] = defaultdict(list)
+    regularization_value = 0.00001
+
+    H_density: float
+    A_density: float
+    E_density: float
 
     @abc.abstractmethod
     def __init__(self, weights: cas.Expression, g: cas.Expression, lb: cas.Expression, ub: cas.Expression,
                  A: cas.Expression, A_slack: cas.Expression, lbA: cas.Expression, ubA: cas.Expression,
                  E: cas.Expression, E_slack: cas.Expression, bE: cas.Expression):
         pass
+
+    def set_density(self, weights: cas.Expression, E: cas.Expression, E_slack: cas.Expression, A: cas.Expression,
+                    A_slack: cas.Expression):
+        if len(weights) > 0:
+            H_nnz = len(weights)
+            H_elements = len(weights) ** 2
+            self.H_density = H_nnz / H_elements
+            A = cas.ca.sparsify(A.s)
+            A_slack = cas.ca.sparsify(A_slack.s)
+            E = cas.ca.sparsify(E.s)
+            E_slack = cas.ca.sparsify(E_slack.s)
+            A_nnz = 2 * (A.nnz() + A_slack.nnz())
+            A_elements = (2 * A.shape[0]) * (A.shape[1] + A_slack.shape[1])  # twice because ineq constraints are normally one sided
+            E_nnz = (E.nnz() + E_slack.nnz())
+            E_elements = E.shape[0] * (E.shape[1] + E_slack.shape[1])
+            if A_elements == 0:
+                self.A_density = np.nan
+            else:
+                self.A_density = A_nnz / A_elements
+            if E_elements == 0:
+                self.E_density = np.nan
+            else:
+                self.E_density = E_nnz / E_elements
+            self.total_density = (H_nnz + A_nnz + E_nnz) / (H_elements + A_elements + E_elements)
 
     @classmethod
     def get_solver_times(cls) -> dict:
@@ -230,6 +260,7 @@ class QPSWIFTFormatter(QPSolver):
         s.t.  Ex = b
               Ax <= lb/ub
         """
+        self.set_density(weights, E, E_slack, A, A_slack)
         self.num_eq_constraints = bE.shape[0]
         self.num_neq_constraints = lbA.shape[0]
         self.num_free_variable_constraints = lb.shape[0]

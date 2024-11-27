@@ -208,6 +208,10 @@ class WorldTree(WorldTreeInterface):
         for derivative, limit in new_limits.items():
             self._default_limits[derivative] = limit
         assert len(self._default_limits) == max(self._default_limits)
+        for v in self.free_variables.values():
+            for d, new_limit in new_limits.items():
+                v.set_lower_limit(d, -new_limit)
+                v.set_upper_limit(d, new_limit)
 
     def update_default_weights(self, new_weights: Dict[Derivatives, float]):
         if not hasattr(self, '_default_weights'):
@@ -591,8 +595,9 @@ class WorldTree(WorldTreeInterface):
 
     def update_state(self, next_commands: NextCommands, dt: float, max_derivative: Derivatives) -> None:
         for free_variable_name, command in next_commands.free_variable_data.items():
-            self.state[free_variable_name][:max_derivative] += command * dt
             self.state[free_variable_name][max_derivative] = command[-1]
+            for i in range(max_derivative-1, -1, -1):
+                self.state[free_variable_name][i] += self.state[free_variable_name][i+1] * dt
         for joint in self.joints.values():
             if isinstance(joint, VirtualFreeVariables):
                 joint.update_state(dt)
@@ -1174,7 +1179,7 @@ class WorldTree(WorldTreeInterface):
                                     self.joint_position_symbols,
                                     self.joint_velocity_symbols)
 
-    @memoize
+    @copy_memoize
     def compute_fk(self, root_link: PrefixName, tip_link: PrefixName) -> cas.TransMatrix:
         result = cas.TransMatrix(self.compute_fk_np(root_link, tip_link))
         result.reference_frame = root_link

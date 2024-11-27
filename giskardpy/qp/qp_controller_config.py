@@ -13,8 +13,8 @@ class QPControllerConfig:
 
     def __init__(self,
                  qp_solver: Optional[SupportedQPSolver] = None,
-                 prediction_horizon: int = 9,
-                 sample_period: float = 0.05,
+                 prediction_horizon: int = 7,
+                 sample_period: float = 0.0125,
                  max_trajectory_length: Optional[float] = 30,
                  retries_with_relaxed_constraints: int = 5,
                  added_slack: float = 100,
@@ -30,8 +30,8 @@ class QPControllerConfig:
         :param weight_factor: don't change, only for the pros.
         """
         self.__qp_solver = qp_solver
-        if prediction_horizon < 7:
-            raise ValueError('prediction horizon must be >= 7.')
+        if prediction_horizon < 4:
+            raise ValueError('prediction horizon must be >= 4.')
         self.__prediction_horizon = prediction_horizon
         self.__sample_period = sample_period
         self.__max_trajectory_length = max_trajectory_length

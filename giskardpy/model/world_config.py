@@ -19,7 +19,7 @@ class WorldConfig(ABC):
     _default_limits = {
         Derivatives.velocity: 1,
         Derivatives.acceleration: np.inf,
-        Derivatives.jerk: 30
+        Derivatives.jerk: 711
     }
 
     def __init__(self, register_on_god_map: bool = True):
@@ -64,7 +64,7 @@ class WorldConfig(ABC):
         Set the joint limits for individual joints
         :param limit_map: maps Derivatives to values, e.g. {Derivatives.velocity: 1,
                                                             Derivatives.acceleration: np.inf,
-                                                            Derivatives.jerk: 30}
+                                                            Derivatives.jerk: 711}
         """
         joint_name = self.world.search_for_joint_name(joint_name, group_name)
         joint = self.world.joints[joint_name]
@@ -89,7 +89,7 @@ class WorldConfig(ABC):
         The default values will be set automatically, even if this function is not called.
         :param new_limits: e.g. {Derivatives.velocity: 1,
                                  Derivatives.acceleration: np.inf,
-                                 Derivatives.jerk: 30}
+                                 Derivatives.jerk: 711}
         """
         self.world.update_default_limits(new_limits)
 
@@ -207,7 +207,7 @@ class EmptyWorld(WorldConfig):
         self._default_limits = {
             Derivatives.velocity: 1,
             Derivatives.acceleration: np.inf,
-            Derivatives.jerk: 30
+            Derivatives.jerk: 711
         }
         self.set_default_limits(self._default_limits)
         self.add_empty_link(PrefixName('map'))
@@ -244,7 +244,7 @@ class WorldWithOmniDriveRobot(WorldConfig):
     def setup(self, robot_name: Optional[str] = None):
         self.set_default_limits({Derivatives.velocity: 1,
                                  Derivatives.acceleration: np.inf,
-                                 Derivatives.jerk: 30})
+                                 Derivatives.jerk: 711})
         self.add_empty_link(PrefixName(self.map_name))
         self.add_empty_link(PrefixName(self.odom_link_name))
         self.add_6dof_joint(parent_link=self.map_name, child_link=self.odom_link_name,
@@ -256,13 +256,13 @@ class WorldWithOmniDriveRobot(WorldConfig):
                                   child_link_name=root_link_name,
                                   translation_limits={
                                       Derivatives.velocity: 0.2,
-                                      Derivatives.acceleration: 1,
-                                      Derivatives.jerk: 5,
+                                      Derivatives.acceleration: np.inf,
+                                      Derivatives.jerk: 142,
                                   },
                                   rotation_limits={
                                       Derivatives.velocity: 0.2,
-                                      Derivatives.acceleration: 1,
-                                      Derivatives.jerk: 5
+                                      Derivatives.acceleration: np.inf,
+                                      Derivatives.jerk: 142
                                   },
                                   robot_group_name=self.robot_group_name)
 
@@ -289,7 +289,7 @@ class WorldWithDiffDriveRobot(WorldConfig):
     def setup(self):
         self.set_default_limits({Derivatives.velocity: 1,
                                  Derivatives.acceleration: np.inf,
-                                 Derivatives.jerk: 30})
+                                 Derivatives.jerk: 711})
         self.add_empty_link(PrefixName(self.map_name))
         self.add_empty_link(PrefixName(self.odom_link_name))
         self.add_6dof_joint(parent_link=self.map_name, child_link=self.odom_link_name,
@@ -301,12 +301,12 @@ class WorldWithDiffDriveRobot(WorldConfig):
                                   child_link_name=root_link_name,
                                   translation_limits={
                                       Derivatives.velocity: 0.2,
-                                      Derivatives.acceleration: 1,
-                                      Derivatives.jerk: 5,
+                                      Derivatives.acceleration: np.inf,
+                                      Derivatives.jerk: 142,
                                   },
                                   rotation_limits={
                                       Derivatives.velocity: 0.2,
-                                      Derivatives.acceleration: 1,
-                                      Derivatives.jerk: 5
+                                      Derivatives.acceleration: np.inf,
+                                      Derivatives.jerk: 142
                                   },
                                   robot_group_name=self.robot_group_name)

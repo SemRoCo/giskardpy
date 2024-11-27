@@ -32,7 +32,6 @@ class QPSolverQPalm(QPSolver):
     s.t.  lb <= Ax <= ub
     https://github.com/kul-optec/QPALM
     """
-    _times: Dict[Tuple[int, int, int], list] = defaultdict(list)
     sparse = True
     compute_nI_I = True
     settings = qpalm.Settings()
@@ -52,6 +51,7 @@ class QPSolverQPalm(QPSolver):
         s.t.  lb <= Ax <= ub
         combined matrix format:
         """
+        self.set_density(weights, E, E_slack, A, A_slack)
         self.num_eq_constraints = bE.shape[0]
         self.num_neq_constraints = lbA.shape[0]
         self.num_free_variable_constraints = lb.shape[0]
@@ -61,10 +61,11 @@ class QPSolverQPalm(QPSolver):
         self.num_non_slack_variables = self.num_free_variable_constraints - self.num_slack_variables
 
         if len(A) == 0:
-            combined_A = cas.hstack([E, E_slack])
+            combined_A = E = A = cas.hstack([E, E_slack])
         else:
-            combined_A = cas.vstack([cas.hstack([E, E_slack, cas.zeros(E.shape[0], A_slack.shape[1])]),
-                                     cas.hstack([A, cas.zeros(A.shape[0], E_slack.shape[1]), A_slack])])
+            A = cas.hstack([A, cas.zeros(A.shape[0], E_slack.shape[1]), A_slack])
+            E = cas.hstack([E, E_slack, cas.zeros(E.shape[0], A_slack.shape[1])])
+            combined_A = cas.vstack([E, A])
 
         free_symbols = set(weights.free_symbols())
         free_symbols.update(combined_A.free_symbols())
@@ -254,3 +255,9 @@ class QPSolverQPalm(QPSolver):
             A = A.toarray()
 
         return weights, g, lb, ub, E, bE, A, lbA, ubA, self.weight_filter, self.bE_filter_view, self.bA_filter_view
+
+    def compute_H_A_E_density(self) -> Tuple[float, float, float]:
+        H, _, E, _, A, _ = self.problem_data_to_qp_format()
+        h_count, a_count, e_count = H.count_nonzero(), A.count_nonzero(), E.count_nonzero()
+        return h_count / (H.shape[0] * H.shape[1]), (a_count - (h_count * 2)) / (A.shape[0] + A.shape[1]), e_count / (
+                    E.shape[0] + E.shape[1])

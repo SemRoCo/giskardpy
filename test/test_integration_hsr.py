@@ -12,6 +12,7 @@ from giskardpy.data_types.exceptions import EmptyProblemException
 from giskardpy.goals.test import GraspSequence, Cutting
 from giskardpy.motion_graph.monitors.monitors import FalseMonitor, TrueMonitor
 from giskardpy.motion_graph.monitors.payload_monitors import Pulse
+from giskardpy.qp.qp_solver_ids import SupportedQPSolver
 from giskardpy_ros.configs.behavior_tree_config import StandAloneBTConfig
 from giskardpy_ros.configs.giskard import Giskard
 from giskardpy_ros.configs.iai_robots.hsr import HSRCollisionAvoidanceConfig, WorldWithHSRConfig, HSRStandaloneInterface
@@ -43,7 +44,7 @@ class HSRTestWrapper(GiskardTestWrapper):
                                                                       publish_tf=True,
                                                                       publish_js=False,
                                                                       simulation_max_hz=20),
-                              qp_controller_config=QPControllerConfig())
+                              qp_controller_config=QPControllerConfig(qp_solver=SupportedQPSolver.gurobi))
         super().__init__(giskard)
         self.gripper_group = 'gripper'
         # self.r_gripper = rospy.ServiceProxy('r_gripper_simulator/set_joint_states', SetJointState)
@@ -801,13 +802,13 @@ class TestCollisionAvoidanceGoals:
         #                                                start_condition=schnibble_down)
 
         schnibbel_done = box_setup.monitors.add_time_above(name='Done?',
-                                                           threshold=4,
+                                                           threshold=10,
                                                            start_condition=cut)
 
         reset = f'not {schnibbel_done}'
         box_setup.update_reset_condition(node_name=cut, condition=reset)
         box_setup.update_reset_condition(node_name=schnibbel_done, condition=reset)
-        # box_setup.update_reset_condition(node_name=no_contact, condition=reset)
+        box_setup.update_end_condition(node_name=human_close, condition=schnibbel_done)
 
         box_setup.update_pause_condition(node_name=cut, condition=human_close)
 

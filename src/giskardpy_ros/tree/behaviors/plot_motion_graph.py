@@ -67,7 +67,6 @@ MonitorShape = 'rectangle'
 TaskStyle = 'filled, diagonals'
 TaskShape = 'rectangle'
 ConditionFont = 'monospace'
-EdgeStyleFalse = 'dashed'
 
 ResetSymbol = '⟲'
 
@@ -77,11 +76,19 @@ ObservationStateToColor: Dict[ObservationState, str] = {
     ObservationState.false: MonitorFalseRed
 }
 
-
 ObservationStateToSymbol: Dict[ObservationState, str] = {
     ObservationState.unknown: '?',
     ObservationState.true: 'True',
     ObservationState.false: 'False'
+}
+
+ObservationStateToEdgeStyle: Dict[ObservationState, Dict[str, str]] = {
+    ObservationState.unknown: {'penwidth': (LineWidth * 1.5) / 2,
+                               # 'label': '<<FONT FACE="monospace"><B>?</B></FONT>>',
+                               'fontsize': Fontsize * 1.333},
+    ObservationState.true: {'penwidth': LineWidth * 1.5},
+    ObservationState.false: {'style': 'dashed',
+                             'penwidth': LineWidth * 1.5}
 }
 
 LiftCycleStateToColor: Dict[LifeCycleState, str] = {
@@ -105,10 +112,16 @@ LiftCycleStateToSymbol: Dict[LifeCycleState, str] = {
 
 class ExecutionStateToDotParser:
     graph: pydot.Graph
+    compact: bool
 
-    def __init__(self, execution_state: ExecutionState):
+    def __init__(self, execution_state: ExecutionState, compact: bool = False):
+        self.compact = compact
         self.execution_state = execution_state
-        self.graph = pydot.Dot(graph_type='digraph', graph_name='', ranksep=RankSep, nodesep=NodeSep, compound=True)
+        self.graph = pydot.Dot(graph_type='digraph', graph_name='',
+                               ranksep=RankSep if not self.compact else RankSep*0.5,
+                               nodesep=NodeSep if not self.compact else NodeSep*0.5,
+                               compound=True,
+                               ratio='compress')
 
     def search_for_monitor(self, monitor_name: str) -> giskard_msgs.MotionGraphNode:
         return [m for m in self.execution_state.monitors if m.name == monitor_name][0]
@@ -156,19 +169,24 @@ class ExecutionStateToDotParser:
                  f'      </TR>'
                  f'    </TABLE>'
                  f'  </TD>'
-                 f'</TR>'
-                 f'<TR>'
-                 f'  <TD ALIGN="LEFT" BALIGN="LEFT" CELLPADDING="{LineWidth}"><FONT FACE="{ConditionFont}">start:{start_condition}</FONT></TD>'
                  f'</TR>')
-        if pause_condition is not None:
-            label += (f'<TR><TD WIDTH="100%" BGCOLOR="{line_color}" HEIGHT="{LineWidth}"></TD></TR>'
-                      f'<TR><TD ALIGN="LEFT" BALIGN="LEFT" CELLPADDING="{LineWidth}"><FONT FACE="{ConditionFont}">pause:{pause_condition}</FONT></TD></TR>')
-        if end_condition is not None:
-            label += (f'<TR><TD WIDTH="100%" BGCOLOR="{line_color}" HEIGHT="{LineWidth}"></TD></TR>'
-                      f'<TR><TD ALIGN="LEFT" BALIGN="LEFT" CELLPADDING="{LineWidth}"><FONT FACE="{ConditionFont}">end  :{end_condition}</FONT></TD></TR>')
-        if reset_condition is not None:
-            label += (f'<TR><TD WIDTH="100%" BGCOLOR="{line_color}" HEIGHT="{LineWidth}"></TD></TR>'
-                      f'<TR><TD ALIGN="LEFT" BALIGN="LEFT" CELLPADDING="{LineWidth}"><FONT FACE="{ConditionFont}">reset:{reset_condition}</FONT></TD></TR>')
+        if self.compact:
+            label += (f'<TR>'
+                      f'  <TD WIDTH="100%" HEIGHT="{LineWidth*2.5}"></TD>'
+                      f'</TR>')
+        else:
+            if start_condition is not None:
+                label += (f'<TR><TD WIDTH="100%" BGCOLOR="{line_color}" HEIGHT="{LineWidth}"></TD></TR>'
+                          f'<TR><TD ALIGN="LEFT" BALIGN="LEFT" CELLPADDING="{LineWidth}"><FONT FACE="{ConditionFont}">start:{start_condition}</FONT></TD></TR>')
+            if pause_condition is not None:
+                label += (f'<TR><TD WIDTH="100%" BGCOLOR="{line_color}" HEIGHT="{LineWidth}"></TD></TR>'
+                          f'<TR><TD ALIGN="LEFT" BALIGN="LEFT" CELLPADDING="{LineWidth}"><FONT FACE="{ConditionFont}">pause:{pause_condition}</FONT></TD></TR>')
+            if end_condition is not None:
+                label += (f'<TR><TD WIDTH="100%" BGCOLOR="{line_color}" HEIGHT="{LineWidth}"></TD></TR>'
+                          f'<TR><TD ALIGN="LEFT" BALIGN="LEFT" CELLPADDING="{LineWidth}"><FONT FACE="{ConditionFont}">end  :{end_condition}</FONT></TD></TR>')
+            if reset_condition is not None:
+                label += (f'<TR><TD WIDTH="100%" BGCOLOR="{line_color}" HEIGHT="{LineWidth}"></TD></TR>'
+                          f'<TR><TD ALIGN="LEFT" BALIGN="LEFT" CELLPADDING="{LineWidth}"><FONT FACE="{ConditionFont}">reset:{reset_condition}</FONT></TD></TR>')
         label += f'</TABLE>>'
         return label
 
@@ -238,11 +256,12 @@ class ExecutionStateToDotParser:
         return name[8:]
 
     def to_dot_graph(self) -> pydot.Graph:
-        obs_states: Dict[str, bool] = {}
+        obs_states: Dict[str, ObservationState] = {}
         self.add_goal_cluster(self.graph, obs_states)
         return self.graph
 
-    def add_goal_cluster(self, parent_cluster: Union[pydot.Graph, pydot.Cluster], obs_states: Dict[str, bool]):
+    def add_goal_cluster(self, parent_cluster: Union[pydot.Graph, pydot.Cluster],
+                         obs_states: Dict[str, ObservationState]):
         my_tasks: List[MotionGraphNode] = []
         for i, task in enumerate(self.execution_state.tasks):
             # TODO add one collision avoidance task?
@@ -289,7 +308,7 @@ class ExecutionStateToDotParser:
                   tasks: List[MotionGraphNode],
                   monitors: List[MotionGraphNode],
                   goals: List[MotionGraphNode],
-                  obs_states: Dict[str, bool]) -> pydot.Graph:
+                  obs_states: Dict[str, ObservationState]) -> pydot.Graph:
         all_nodes = tasks + monitors + goals
         all_node_name = [node.name for node in all_nodes]  # + [self.cluster_name_to_goal_name(graph.get_name())]
         for node in all_nodes:
@@ -304,9 +323,8 @@ class ExecutionStateToDotParser:
                     kwargs['lhead'] = node_cluster.get_name()
                 if sub_node_cluster is not None:
                     kwargs['ltail'] = sub_node_cluster.get_name()
-                if obs_states[sub_node_name] in [ObservationState.false, ObservationState.unknown]:
-                    kwargs['style'] = EdgeStyleFalse
-                graph.add_edge(pydot.Edge(src=sub_node_name, dst=node_name, penwidth=LineWidth, color=StartCondColor,
+                kwargs.update(ObservationStateToEdgeStyle[obs_states[sub_node_name]])
+                graph.add_edge(pydot.Edge(src=sub_node_name, dst=node_name, color=StartCondColor,
                                           arrowsize=ArrowSize, **kwargs))
             for sub_node_name in extract_node_names_from_condition(node.pause_condition):
                 if sub_node_name not in all_node_name:
@@ -317,9 +335,8 @@ class ExecutionStateToDotParser:
                     kwargs['lhead'] = node_cluster.get_name()
                 if sub_node_cluster is not None:
                     kwargs['ltail'] = sub_node_cluster.get_name()
-                if obs_states[sub_node_name] in [ObservationState.false, ObservationState.unknown]:
-                    kwargs['style'] = EdgeStyleFalse
-                graph.add_edge(pydot.Edge(sub_node_name, node_name, penwidth=LineWidth, color=PauseCondColor,
+                kwargs.update(ObservationStateToEdgeStyle[obs_states[sub_node_name]])
+                graph.add_edge(pydot.Edge(sub_node_name, node_name, color=PauseCondColor,
                                           minlen=0,
                                           arrowsize=ArrowSize, **kwargs))
             for sub_node_name in extract_node_names_from_condition(node.end_condition):
@@ -331,9 +348,8 @@ class ExecutionStateToDotParser:
                     kwargs['ltail'] = node_cluster.get_name()
                 if sub_node_cluster is not None:
                     kwargs['lhead'] = sub_node_cluster.get_name()
-                if obs_states[sub_node_name] in [ObservationState.false, ObservationState.unknown]:
-                    kwargs['style'] = EdgeStyleFalse
-                graph.add_edge(pydot.Edge(node_name, sub_node_name, color=EndCondColor, penwidth=LineWidth,
+                kwargs.update(ObservationStateToEdgeStyle[obs_states[sub_node_name]])
+                graph.add_edge(pydot.Edge(node_name, sub_node_name, color=EndCondColor,
                                           arrowhead='none',
                                           arrowtail='normal',
                                           dir='both', arrowsize=ArrowSize, **kwargs))
@@ -346,9 +362,8 @@ class ExecutionStateToDotParser:
                     kwargs['ltail'] = node_cluster.get_name()
                 if sub_node_cluster is not None:
                     kwargs['lhead'] = sub_node_cluster.get_name()
-                if obs_states[sub_node_name] in [ObservationState.false, ObservationState.unknown]:
-                    kwargs['style'] = EdgeStyleFalse
-                graph.add_edge(pydot.Edge(node_name, sub_node_name, color=ResetCondColor, penwidth=LineWidth,
+                kwargs.update(ObservationStateToEdgeStyle[obs_states[sub_node_name]])
+                graph.add_edge(pydot.Edge(node_name, sub_node_name, color=ResetCondColor,
                                           arrowhead='none',
                                           arrowtail='normal',
                                           minlen=0,

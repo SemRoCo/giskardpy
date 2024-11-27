@@ -169,8 +169,8 @@ class PR2TestWrapper(GiskardTestWrapper):
                               behavior_tree_config=StandAloneBTConfig(debug_mode=True,
                                                                       publish_tf=True,
                                                                       simulation_max_hz=None),
-                              # qp_controller_config=QPControllerConfig(qp_solver=SupportedQPSolver.gurobi))
-                              qp_controller_config=QPControllerConfig())
+                              qp_controller_config=QPControllerConfig(qp_solver=SupportedQPSolver.qpSWIFT))
+                              # qp_controller_config=QPControllerConfig())
         super().__init__(giskard)
         self.robot = god_map.world.groups[self.robot_name]
 
@@ -297,7 +297,7 @@ class TestJointGoals:
             'l_wrist_flex_joint': -0.1,
             'l_wrist_roll_joint': -6.062015047706399,
         }
-        zero_pose.set_joint_goal(goal_state=js)
+        zero_pose.tasks.add_joint_position(name='joint task', goal_state=js)
         zero_pose.allow_all_collisions()
         zero_pose.execute()
 
@@ -375,14 +375,21 @@ class TestJointGoals:
 
     def test_prismatic_joint1(self, zero_pose: PR2TestWrapper):
         zero_pose.allow_all_collisions()
-        js = {'torso_lift_joint': 0.1}
+        js = {
+            'torso_lift_joint': 0.1,
+            # 'torso_lift_joint': 0.1
+        }
         zero_pose.set_joint_goal(js)
         zero_pose.execute()
 
     def test_revolute_joint1(self, zero_pose: PR2TestWrapper):
         zero_pose.allow_all_collisions()
-        js = {'r_elbow_flex_joint': -1}
-        zero_pose.set_joint_goal(js)
+        js = {
+            # 'r_elbow_flex_joint': -1,
+            'l_wrist_roll_joint': -1,
+            'r_wrist_roll_joint': 1
+        }
+        zero_pose.tasks.add_joint_position(name='joint task', goal_state=js)
         zero_pose.execute()
 
     def test_unlimited_joint_goal(self, zero_pose: PR2TestWrapper):
@@ -536,12 +543,12 @@ class TestMonitors:
         tip_link = 'base_footprint'
 
         pose1 = zero_pose.tasks.add_cartesian_pose(goal_pose=pose1,
-                                                   name='Task 1',
+                                                   name='Pose 1',
                                                    root_link=root_link,
                                                    tip_link=tip_link,
                                                    end_condition=None)
         pose2 = zero_pose.tasks.add_cartesian_pose(goal_pose=pose2,
-                                                   name='Task 2',
+                                                   name='Pose 2',
                                                    root_link=root_link,
                                                    tip_link=tip_link,
                                                    start_condition=pose1,
@@ -568,7 +575,7 @@ class TestMonitors:
         tip_link = 'base_footprint'
 
         # local_min = zero_pose.monitors.add_local_minimum_reached(name='Local Min', end_condition='')
-        pulse = zero_pose.monitors.add_pulse(name='Laser violated', after_ticks=150)
+        pulse = zero_pose.monitors.add_pulse(name='Laser violated', after_ticks=150, end_condition='')
 
         pose1 = zero_pose.tasks.add_cartesian_pose(goal_pose=pose1,
                                                    name='Base Pose 1',
@@ -1003,6 +1010,36 @@ class TestMonitors:
         current_pose = zero_pose.compute_fk_pose(root_link='map',
                                                  tip_link='base_footprint')
         compare_poses(current_pose.pose, base_goal.pose)
+
+    def test_joint_and_base_goal(self, zero_pose: PR2TestWrapper):
+        js = {
+            'torso_lift_joint': 0.2999225173357618,
+            'head_pan_joint': 0.041880780651479044,
+            'head_tilt_joint': -0.37,
+            'r_upper_arm_roll_joint': -0.9487714747527726,
+            'r_shoulder_pan_joint': -1.0047307505973626,
+            'r_shoulder_lift_joint': 0.48736790658811985,
+            'r_forearm_roll_joint': -14.895833882874182,
+            'r_elbow_flex_joint': -1.392377908925028,
+            'r_wrist_flex_joint': -0.4548695149411013,
+            'r_wrist_roll_joint': 0.11426798984097819,
+            'l_upper_arm_roll_joint': 1.7383062350263658,
+            'l_shoulder_pan_joint': 1.8799810286792007,
+            'l_shoulder_lift_joint': 0.011627231224188975,
+            'l_forearm_roll_joint': 312.67276414458695,
+            'l_elbow_flex_joint': -2.0300928925694675,
+            'l_wrist_flex_joint': -0.1,
+            'l_wrist_roll_joint': -6.062015047706399,
+        }
+        zero_pose.tasks.add_joint_position(name='joint task', goal_state=js)
+        zero_pose.allow_all_collisions()
+        base_pose = PoseStamped()
+        base_pose.header.frame_id = 'map'
+        base_pose.pose.position.x = 2
+        base_pose.pose.orientation.w = 1
+        zero_pose.tasks.add_cartesian_pose(name='base goal', goal_pose=base_pose, tip_link='base_footprint',
+                                           root_link='map')
+        zero_pose.execute()
 
     def test_hold_monitors(self, zero_pose: PR2TestWrapper):
         sleep = zero_pose.monitors.add_sleep(0.5)
@@ -4688,7 +4725,7 @@ class TestEndMotionReason:
 # pytest.main(['-s', __file__ + '::TestConstraints::test_RelativePositionSequence'])
 # pytest.main(['-s', __file__ + '::TestConstraints::test_open_dishwasher_apartment'])
 # pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_bowl_and_cup'])
-# pytest.main(['-s', __file__ + '::TestMonitors::test_bowl_and_cup_sequence'])
+# pytest.main(['-s', __file__ + '::TestMonitors::test_joint_and_base_goal'])
 # pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_avoid_collision_go_around_corner'])
 # pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_avoid_collision_box_between_boxes'])
 # pytest.main(['-s', __file__ + '::TestSelfCollisionAvoidance::test_avoid_self_collision_with_l_arm'])

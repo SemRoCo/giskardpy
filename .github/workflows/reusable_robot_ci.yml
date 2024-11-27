@@ -134,7 +134,7 @@ jobs:
         name: Checkout iai_robot_peripherals
         uses: actions/checkout@v3
         with:
-          path: 'ros_ws/src/iai_robots'
+          path: 'ros_ws/src/iai_robot_peripherals'
           repository: code-iai/iai_robot_peripherals
           ref: main
       - if: ${{ inputs.robot == 'pr2' }}

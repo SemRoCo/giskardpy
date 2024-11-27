@@ -1251,27 +1251,24 @@ class InequalityModel(ProblemDataPart):
         |      |   sp | vel constr 2
         |-------------|
         """
-        number_of_vel_rows = len(self.velocity_constraints) * self.prediction_horizon
+        number_of_vel_rows = len(self.velocity_constraints) * (self.prediction_horizon - 2)
         if number_of_vel_rows > 0:
             expressions = cas.Expression(self.get_derivative_constraint_expressions(Derivatives.velocity))
-            model = cas.zeros(number_of_vel_rows, self.number_of_non_slack_columns)
+            parts = []
             for derivative in Derivatives.range(Derivatives.position, self.max_derivative - 1):
+                if derivative == Derivatives.velocity and not self.qp_formulation.has_acc_variables():
+                    continue
+                if derivative == Derivatives.acceleration and not self.qp_formulation.has_jerk_variables():
+                    continue
                 J_vel = cas.jacobian(expressions=expressions,
                                      symbols=self.get_free_variable_symbols(derivative)) * self.dt
-                J_vel_limit_block = cas.kron(cas.eye(self.prediction_horizon), J_vel)
-                horizontal_offset = self.number_of_free_variables * self.prediction_horizon
-                model[:, horizontal_offset * derivative:horizontal_offset * (derivative + 1)] = J_vel_limit_block
-
-            # delete rows if control horizon of constraint shorter than prediction horizon
-            rows_to_delete = []
-            for t in range(self.prediction_horizon):
-                for i, c in enumerate(self.velocity_constraints):
-                    v_index = i + (t * len(self.velocity_constraints))
-                    if t + 1 > self.control_horizon:
-                        rows_to_delete.append(v_index)
-            model.remove(rows_to_delete, [])
+                missing_variables = self.max_derivative - derivative - 1
+                eye = cas.eye(self.prediction_horizon)[:-2, :self.prediction_horizon - missing_variables]
+                J_vel_limit_block = cas.kron(eye, J_vel)
+                parts.append(J_vel_limit_block)
 
             # constraint slack
+            model = cas.hstack(parts)
             num_slack_variables = sum(self.control_horizon for c in self.velocity_constraints)
             slack_model = cas.eye(num_slack_variables) * self.dt
             return model, slack_model

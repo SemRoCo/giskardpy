@@ -3,11 +3,12 @@ from __future__ import annotations
 import builtins
 from copy import copy
 from enum import IntEnum
+import re
 from typing import Union, TypeVar, Optional
 import math
 from line_profiler import profile
 import casadi
-import casadi as ca  # type: ignore
+import casadi as ca
 import numpy as np
 from scipy import sparse as sp
 
@@ -349,6 +350,11 @@ class Expression(Symbol_):
     def remove(self, rows, columns):
         self.s.remove(rows, columns)
 
+    def split(self):
+        assert self.shape[0] == 1 and self.shape[1] == 1
+        parts = [Expression(self.s.dep(i)) for i in range(self.s.n_dep())]
+        return parts
+
     def __add__(self, other):
         if isinstance(other, (int, float)):
             return Expression(self.s.__add__(other))
@@ -505,8 +511,12 @@ class Expression(Symbol_):
         return Expression(self.s.reshape(new_shape))
 
 
-TrueSymbol = Expression(True)
-FalseSymbol = Expression(False)
+TrinaryFalse = 0
+TrinaryUnknown = 0.5
+TrinaryTrue = 1
+
+BinaryTrue = TrueSymbol = Expression(True)
+BinaryFalse = FalseSymbol = Expression(False)
 
 
 class GeometricType:
@@ -1398,7 +1408,7 @@ def equivalent(expression1, expression2):
 
 
 def free_symbols(expression):
-    expression = Expression(expression).s
+    expression = _to_sx(expression)
     return ca.symvar(expression)
 
 
@@ -1451,8 +1461,8 @@ def compile_and_execute(f, params):
         return result
 
 
-def zeros(x, y):
-    return Expression(ca.SX.zeros(x, y))
+def zeros(rows, columns):
+    return Expression(ca.SX.zeros(rows, columns))
 
 
 def ones(x, y):
@@ -1512,6 +1522,12 @@ def equal(x, y):
     return Expression(ca.eq(x, y))
 
 
+def not_equal(x, y):
+    cas_x = _to_sx(x)
+    cas_y = _to_sx(y)
+    return Expression(ca.ne(cas_x, cas_y))
+
+
 def less_equal(x, y):
     if isinstance(x, Symbol_):
         x = x.s
@@ -1550,18 +1566,26 @@ def greater(x, y, decimal_places=None):
 def logic_and(*args):
     assert len(args) >= 2, 'and must be called with at least 2 arguments'
     # if there is any False, return False
-    if [x for x in args if is_false(x)]:
-        return FalseSymbol
+    if [x for x in args if is_false_symbol(x)]:
+        return BinaryFalse
     # filter all True
-    args = [x for x in args if not is_true(x)]
+    args = [x for x in args if not is_true_symbol(x)]
     if len(args) == 0:
-        return TrueSymbol
+        return BinaryTrue
     if len(args) == 1:
         return args[0]
     if len(args) == 2:
-        return Expression(ca.logic_and(args[0].s, args[1].s))
+        cas_a = _to_sx(args[0])
+        cas_b = _to_sx(args[1])
+        return Expression(ca.logic_and(cas_a, cas_b))
     else:
         return Expression(ca.logic_and(args[0].s, logic_and(*args[1:]).s))
+
+
+def logic_and3(a, b):
+    cas_a = _to_sx(a)
+    cas_b = _to_sx(b)
+    return min(cas_a, cas_b)
 
 
 def logic_any(args):
@@ -1575,12 +1599,12 @@ def logic_all(args):
 def logic_or(*args):
     assert len(args) >= 2, 'and must be called with at least 2 arguments'
     # if there is any True, return True
-    if [x for x in args if is_true(x)]:
-        return TrueSymbol
+    if [x for x in args if is_true_symbol(x)]:
+        return BinaryTrue
     # filter all False
-    args = [x for x in args if not is_false(x)]
+    args = [x for x in args if not is_false_symbol(x)]
     if len(args) == 0:
-        return FalseSymbol
+        return BinaryFalse
     if len(args) == 1:
         return args[0]
     if len(args) == 2:
@@ -1589,8 +1613,19 @@ def logic_or(*args):
         return Expression(ca.logic_or(args[0].s, logic_or(*args[1:]).s))
 
 
+def logic_or3(a, b):
+    cas_a = _to_sx(a)
+    cas_b = _to_sx(b)
+    return max(cas_a, cas_b)
+
+
 def logic_not(expr):
-    return Expression(ca.logic_not(expr.s))
+    cas_expr = _to_sx(expr)
+    return Expression(ca.logic_not(cas_expr))
+
+
+def logic_not3(expr):
+    return Expression(1-expr)
 
 
 def if_greater(a, b, if_result, else_result):
@@ -1661,8 +1696,6 @@ def if_eq_cases(a, b_result_cases, else_result):
         return b_result_cases[0][1]
     elif a == b_result_cases[1][0]:
         return b_result_cases[1][1]
-    elif a == b_result_cases[2][0]:
-        return b_result_cases[2][1]
     ...
     else:
         return else_result
@@ -1674,6 +1707,26 @@ def if_eq_cases(a, b_result_cases, else_result):
         b = _to_sx(b_result_cases[i][0])
         b_result = _to_sx(b_result_cases[i][1])
         result = ca.if_else(ca.eq(a, b), b_result, result)
+    return Expression(result)
+
+
+@profile
+def if_cases(cases, else_result):
+    """
+    if cases[0][0]:
+        return cases[0][1]
+    elif cases[1][0]:
+        return cases[1][1]
+    ...
+    else:
+        return else_result
+    """
+    else_result = _to_sx(else_result)
+    result = _to_sx(else_result)
+    for i in reversed(range(len(cases))):
+        case = _to_sx(cases[i][0])
+        case_result = _to_sx(cases[i][1])
+        result = ca.if_else(case, case_result, result)
     return Expression(result)
 
 
@@ -2021,7 +2074,9 @@ def distance_point_to_plane(frame_P_current, frame_V_v1, frame_V_v2):
 def angle_between_vector(v1, v2):
     v1 = v1[:3]
     v2 = v2[:3]
-    return acos(dot(v1.T, v2) / (norm(v1) * norm(v2)))
+    return acos(limit(dot(v1.T, v2) / (norm(v1) * norm(v2)),
+                      lower_limit=-1,
+                      upper_limit=1))
 
 
 def rotational_error(r1, r2):
@@ -2149,13 +2204,16 @@ def log(x):
     x = Expression(x).s
     return Expression(ca.log(x))
 
+
 def tan(x):
     x = Expression(x).s
     return Expression(ca.tan(x))
 
+
 def cosh(x):
     x = Expression(x).s
     return Expression(ca.cosh(x))
+
 
 def sinh(x):
     x = Expression(x).s
@@ -2243,22 +2301,57 @@ def gradient(ex, arg):
     return Expression(ca.gradient(ex.s, arg.s))
 
 
-def is_true(expr):
+def is_true_symbol(expr):
     try:
-        return (expr == TrueSymbol).to_np()
+        return (expr == BinaryTrue).to_np()
     except Exception as e:
         return False
 
 
-def is_false(expr):
+def is_true3(expr):
+    return equal(expr, TrinaryTrue)
+
+
+def is_true3_symbol(expr):
     try:
-        return (expr == FalseSymbol).to_np()
+        return (expr == TrinaryTrue).to_np()
+    except Exception as e:
+        return False
+
+
+def is_false_symbol(expr):
+    try:
+        return (expr == BinaryFalse).to_np()
+    except Exception as e:
+        return False
+
+
+def is_false3(expr):
+    return equal(expr, TrinaryFalse)
+
+
+def is_false3_symbol(expr):
+    try:
+        return (expr == TrinaryFalse).to_np()
+    except Exception as e:
+        return False
+
+
+def is_unknown3(expr):
+    return equal(expr, TrinaryUnknown)
+
+
+def is_unknown3_symbol(expr):
+    try:
+        return (expr == TrinaryUnknown).to_np()
     except Exception as e:
         return False
 
 
 def is_constant(expr):
-    return len(expr.free_symbols()) == 0
+    if isinstance(expr, (float, int)):
+        return True
+    return len(free_symbols(_to_sx(expr))) == 0
 
 
 def det(expr):
@@ -2275,3 +2368,33 @@ def distance_vector_projected_on_plane(point1, point2, normal_vector):
     dist = point1 - point2
     projection = dist - dot(dist, normal_vector) * normal_vector
     return projection
+
+
+def replace_with_three_logic(expr):
+    cas_expr = _to_sx(expr)
+    if cas_expr.n_dep() == 0:
+        if is_true_symbol(cas_expr):
+            return TrinaryTrue
+        if is_false_symbol(cas_expr):
+            return TrinaryFalse
+        return expr
+    op = cas_expr.op()
+    if op == ca.OP_NOT:
+        return logic_not3(replace_with_three_logic(cas_expr.dep(0)))
+    if op == ca.OP_AND:
+        return logic_and3(replace_with_three_logic(cas_expr.dep(0)),
+                          replace_with_three_logic(cas_expr.dep(1)))
+    if op == ca.OP_OR:
+        return logic_or3(replace_with_three_logic(cas_expr.dep(0)),
+                         replace_with_three_logic(cas_expr.dep(1)))
+    return expr
+
+
+def is_inf(expr):
+    cas_expr = _to_sx(expr)
+    if is_constant(expr):
+        return np.isinf(ca.evalf(expr).full()[0][0])
+    for arg in range(cas_expr.n_dep()):
+        if is_inf(cas_expr.dep(arg)):
+            return True
+    return False

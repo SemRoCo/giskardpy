@@ -47,7 +47,7 @@ class Open(Goal):
         else:
             goal_joint_state = min(max_position, goal_joint_state)
 
-        if not cas.is_true(start_condition):
+        if not cas.is_true_symbol(start_condition):
             handle_T_tip = god_map.world.compose_fk_expression(self.handle_link, self.tip_link)
             handle_T_tip = god_map.monitor_manager.register_expression_updater(handle_T_tip,
                                                                                start_condition)

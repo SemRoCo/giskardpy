@@ -22,7 +22,7 @@ class PoseReached(ExpressionMonitor):
                          start_condition=start_condition,
                          hold_condition=hold_condition,
                          end_condition=end_condition)
-        if absolute or cas.is_true(start_condition):
+        if absolute or cas.is_true_symbol(start_condition):
             root_T_goal = god_map.world.transform(root_link, goal_pose)
         else:
             root_T_x = god_map.world.compose_fk_expression(root_link, goal_pose.reference_frame)
@@ -59,7 +59,7 @@ class PositionReached(ExpressionMonitor):
                          start_condition=start_condition,
                          hold_condition=hold_condition,
                          end_condition=end_condition)
-        if absolute or cas.is_true(start_condition):
+        if absolute or cas.is_true_symbol(start_condition):
             root_P_goal = god_map.world.transform(root_link, goal_point)
         else:
             root_P_x = god_map.world.compose_fk_expression(root_link, goal_point.reference_frame)
@@ -86,7 +86,7 @@ class OrientationReached(ExpressionMonitor):
                          start_condition=start_condition,
                          hold_condition=hold_condition,
                          end_condition=end_condition)
-        if absolute or cas.is_true(start_condition):
+        if absolute or cas.is_true_symbol(start_condition):
             r_R_g = god_map.world.transform(root_link, goal_orientation)
         else:
             root_T_x = god_map.world.compose_fk_expression(root_link, goal_orientation.reference_frame)

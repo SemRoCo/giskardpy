@@ -8,7 +8,7 @@ from py_trees import Blackboard, Status
 from giskardpy.data_types.exceptions import DontPrintStackTrace
 
 if TYPE_CHECKING:
-    from giskardpy.configs.giskard import Giskard
+    from giskardpy_ros.configs.giskard import Giskard
     from giskardpy_ros.ros1.ros_msg_visualization import ROSMsgVisualization
     from giskardpy_ros.tree.behaviors.action_server import ActionServerHandler
     from giskardpy_ros.tree.branches.giskard_bt import GiskardBT

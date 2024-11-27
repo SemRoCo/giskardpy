@@ -14,6 +14,7 @@ from giskardpy.motion_graph.monitors.payload_monitors import CancelMotion
 from giskardpy.motion_graph.monitors.monitor_manager import EndMotion
 from giskardpy.utils.decorators import record_time
 from giskardpy.utils.utils import create_path
+from giskardpy_ros.ros1.msg_converter import json_str_to_ros_kwargs
 from giskardpy_ros.tree.behaviors.plugin import GiskardBehavior
 from giskardpy_ros.tree.behaviors.publish_feedback import giskard_state_to_execution_state
 from giskardpy_ros.tree.blackboard_utils import catch_and_raise_to_blackboard
@@ -74,7 +75,7 @@ def format_condition(condition: str) -> str:
 
 def format_monitor_msg(msg: giskard_msgs.Monitor, color: str) -> str:
     start_condition = format_condition(msg.start_condition)
-    kwargs = json_str_to_kwargs(msg.kwargs)
+    kwargs = json_str_to_ros_kwargs(msg.kwargs)
     hold_condition = format_condition(kwargs['hold_condition'])
     end_condition = format_condition(kwargs['end_condition'])
     if msg.monitor_class in {EndMotion.__name__, CancelMotion.__name__}:
@@ -166,7 +167,7 @@ def execution_state_to_dot_graph(execution_state: ExecutionState, use_state_colo
                                                       execution_state.monitor_state[i])]
         else:
             color, bg_color = 'black', 'white'
-        kwargs = json_str_to_kwargs(monitor.kwargs)
+        kwargs = json_str_to_ros_kwargs(monitor.kwargs)
         hold_condition = format_condition(kwargs['hold_condition'])
         end_condition = format_condition(kwargs['end_condition'])
         monitor_node = add_node(monitor, color, bg_color)

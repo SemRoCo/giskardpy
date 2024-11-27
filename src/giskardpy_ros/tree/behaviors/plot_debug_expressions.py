@@ -3,7 +3,7 @@ from threading import Lock
 import numpy as np
 from line_profiler import profile
 
-from giskardpy.data_types.data_types import JointStates
+from giskardpy.data_types.data_types import JointStates, PrefixName
 from giskardpy.god_map import god_map
 from giskardpy.middleware import get_middleware
 from giskardpy.model.trajectory import Trajectory

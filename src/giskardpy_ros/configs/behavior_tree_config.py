@@ -239,7 +239,7 @@ class StandAloneBTConfig(BehaviorTreeConfig):
         if self.publish_js:
             self.add_js_publisher(include_prefix=self.include_prefix)
         if self.publish_free_variables:
-            self.add_free_variable_publisher()
+            self.add_free_variable_publisher(include_prefix=False)
 
 
 class OpenLoopBTConfig(BehaviorTreeConfig):

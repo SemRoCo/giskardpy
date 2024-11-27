@@ -74,7 +74,7 @@ class RobotInterfaceConfig(ABC):
             group_name = self.world.robot_name
         self.tree.wait_for_goal.synchronization.sync_joint_state_topic(group_name=group_name,
                                                                        topic_name=topic_name)
-        if GiskardBlackboard().tree.is_closed_loop():
+        if GiskardBlackboard().tree.is_closed_loop() and group_name == self.world.robot_name:
             self.tree.control_loop_branch.closed_loop_synchronization.sync_joint_state2_topic(
                 group_name=group_name,
                 topic_name=topic_name)

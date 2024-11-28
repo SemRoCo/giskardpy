@@ -101,6 +101,7 @@ class Trajectory:
     def plot_trajectory(self,
                         path_to_data_folder: str,
                         sample_period: float,
+                        unit: str = 'rad or m',
                         cm_per_second: float = 2.5,
                         normalize_position: bool = False,
                         tick_stride: float = 0.5,
@@ -197,10 +198,14 @@ class Trajectory:
                 axs[derivative].grid()
 
             if legend:
-                axs[0].legend(bbox_to_anchor=(1.01, 1), loc='upper left')
+                axs[1].legend(bbox_to_anchor=(1.01, 1), loc='upper left')
                 # axs[0].legend(bbox_to_anchor=(0.5, 2), loc='upper left')
 
             axs[-1].set_xlabel('time [s]')
+            axs[Derivatives.position].set_ylabel(unit)
+            axs[Derivatives.velocity].set_ylabel(unit + r'$/s$')
+            axs[Derivatives.acceleration].set_ylabel(unit + r'$/s^2$')
+            axs[Derivatives.jerk].set_ylabel(unit + r'$/s^3$')
 
             file_name = path_to_data_folder + file_name
             last_file_name = file_name.replace('.pdf', f'{history}.pdf')

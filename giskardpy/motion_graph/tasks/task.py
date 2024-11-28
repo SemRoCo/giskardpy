@@ -1,5 +1,7 @@
 from typing import Optional, List, Union, Dict, Callable, Iterable, overload, DefaultDict
 
+import numpy as np
+
 import giskardpy.casadi_wrapper as cas
 from giskardpy.data_types.exceptions import GoalInitalizationException, DuplicateNameException
 from giskardpy.god_map import god_map
@@ -441,6 +443,26 @@ class Task(MotionGraphNode):
             raise KeyError(f'a constraint with name \'{name}\' already exists')
         self.eq_derivative_constraints[constraint.name] = constraint
 
+    def add_velocity_eq_constraint_vector(self,
+                                          velocity_goals: Union[
+                                              cas.Expression, cas.Vector3, cas.Point3, List[cas.symbol_expr_float]],
+                                          reference_velocities: Union[
+                                              cas.Expression, cas.Vector3, cas.Point3, List[cas.symbol_expr_float]],
+                                          weights: Union[
+                                              cas.Expression, cas.Vector3, cas.Point3, List[cas.symbol_expr_float]],
+                                          task_expression: Union[
+                                              cas.Expression, cas.Vector3, cas.Point3, List[cas.symbol_expr]],
+                                          names: List[str]):
+        for i in range(len(velocity_goals)):
+            name_suffix = names[i] if names else None
+            self.add_velocity_eq_constraint(velocity_goal=velocity_goals[i],
+                                            weight=weights[i],
+                                            velocity_limit=reference_velocities[i],
+                                            task_expression=task_expression[i],
+                                            name=name_suffix,
+                                            lower_slack_limit=-np.inf,
+                                            upper_slack_limit=np.inf)
+
     def add_acceleration_constraint(self,
                                     lower_acceleration_limit: Union[cas.symbol_expr_float, List[cas.symbol_expr_float]],
                                     upper_acceleration_limit: Union[cas.symbol_expr_float, List[cas.symbol_expr_float]],
@@ -512,7 +534,7 @@ class Task(MotionGraphNode):
                                          frame_P_current: cas.Point3,
                                          max_velocity: cas.symbol_expr_float,
                                          weight: cas.symbol_expr_float,
-                                         max_violation: cas.symbol_expr_float = 1e4,
+                                         max_violation: cas.symbol_expr_float = np.inf,
                                          name=''):
         """
         Adds constraints to limit the translational velocity of frame_P_current. Be aware that the velocity is relative
@@ -525,7 +547,7 @@ class Task(MotionGraphNode):
         """
         trans_error = cas.norm(frame_P_current)
         trans_error = cas.if_eq_zero(trans_error, 0.01, trans_error)
-        god_map.debug_expression_manager.add_debug_expression('trans_error', trans_error)
+        # god_map.debug_expression_manager.add_debug_expression('trans_error', trans_error)
         self.add_velocity_constraint(upper_velocity_limit=max_velocity,
                                      lower_velocity_limit=-max_velocity,
                                      weight=weight,

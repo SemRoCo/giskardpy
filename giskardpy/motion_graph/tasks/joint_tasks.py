@@ -53,13 +53,24 @@ class JointPositionList(Task):
             else:
                 error = goal - current
 
-            self.add_equality_constraint(name=name,
+            self.add_equality_constraint(name=f'{self.name}/{name}',
                                          reference_velocity=velocity_limit,
                                          equality_bound=error,
                                          weight=self.weight,
                                          task_expression=current)
             ll_pos, ul_pos = god_map.world.compute_joint_limits(name, Derivatives.position)
-            god_map.debug_expression_manager.add_debug_expression(f'{name}/goal', goal,
+            god_map.debug_expression_manager.add_debug_expression(f'{self.name}/target', goal,
+                                                                  derivatives_to_plot=[
+                                                                      Derivatives.position,
+                                                                      # Derivatives.velocity
+                                                                  ])
+            cap = self.max_velocity*god_map.qp_controller.sample_period * (god_map.qp_controller.prediction_horizon-2)
+            god_map.debug_expression_manager.add_debug_expression(f'{self.name}/upper_cap', goal + cap,
+                                                                  derivatives_to_plot=[
+                                                                      Derivatives.position,
+                                                                      # Derivatives.velocity
+                                                                  ])
+            god_map.debug_expression_manager.add_debug_expression(f'{self.name}/lower_cap', goal - cap,
                                                                   derivatives_to_plot=[
                                                                       Derivatives.position,
                                                                       # Derivatives.velocity

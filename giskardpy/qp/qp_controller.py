@@ -457,6 +457,10 @@ class Weights(ProblemDataPart):
                     for derivative in Derivatives.range(Derivatives.velocity, self.max_derivative):
                         if t >= self.prediction_horizon - (self.max_derivative - derivative):
                             continue
+                        if derivative == Derivatives.acceleration and not self.qp_formulation.has_acc_variables():
+                            continue
+                        if derivative == Derivatives.jerk and not self.qp_formulation.has_jerk_variables():
+                            continue
                         weights[derivative][f't{t:03}/{v.position_name}/{derivative}'] = 0
                         for l_gain in linear_weight_gains:
                             if t < len(l_gain.gains) and v in l_gain.gains[t][derivative].keys():

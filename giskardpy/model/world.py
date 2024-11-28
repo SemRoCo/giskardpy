@@ -177,7 +177,7 @@ class WorldTree(WorldTreeInterface):
     def set_default_weights(self,
                             velocity_weight: float = 0.01,
                             acceleration_weight: float = 0,
-                            jerk_weight: float = 0.01):
+                            jerk_weight: float = 0.0):
         """
         The default values are set automatically, even if this function is not called.
         A typical goal has a weight of 1, so the values in here should be sufficiently below that.

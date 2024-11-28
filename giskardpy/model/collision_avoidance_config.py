@@ -214,6 +214,15 @@ class DisableCollisionAvoidanceConfig(CollisionAvoidanceConfig):
     def setup(self):
         pass
 
+class BPBCollisionAvoidanceConfig(CollisionAvoidanceConfig):
+    def __init__(self, collision_checker: CollisionCheckerLib = CollisionCheckerLib.bpb):
+        super().__init__(collision_checker)
+
+    def setup(self):
+        pass
+
+    def _sanity_check(self):
+        pass
 
 class DefaultCollisionAvoidanceConfig(CollisionAvoidanceConfig):
     def setup(self):

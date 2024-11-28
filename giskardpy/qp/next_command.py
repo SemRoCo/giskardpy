@@ -9,7 +9,7 @@ import giskardpy.utils.math as giskard_math
 from giskardpy.utils.decorators import memoize
 from line_profiler import profile
 if TYPE_CHECKING:
-    from model.world import WorldTree
+    from giskardpy.model.world import WorldTree
 
 
 @memoize

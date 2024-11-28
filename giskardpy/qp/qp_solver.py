@@ -371,9 +371,9 @@ class QPSWIFTFormatter(QPSolver):
         if len(nlbA_filter) > 0:
             nlbA_filter[nlbA_filter] = self.nlbA_filter_half
             if self.sparse:
-                merged_A[nlbA_filter] = nA.toarray()
+                merged_A[nlbA_filter] = -nA.toarray()
             else:
-                merged_A[nlbA_filter] = nA
+                merged_A[nlbA_filter] = -nA
 
         ubA_filter = self.ubA_finite_filter.copy()
         if len(ubA_filter) > 0:

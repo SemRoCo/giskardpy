@@ -197,9 +197,7 @@ class SelfCollisionAvoidance(Goal):
                                         qp_limits_for_lba)
 
         upper_slack = cas.if_greater(actual_distance, hard_threshold,
-                                     cas.limit(self.soft_threshold - hard_threshold,
-                                               -qp_limits_for_lba,
-                                               qp_limits_for_lba),
+                                     lower_limit_limited + cas.max(0, actual_distance - hard_threshold),
                                      lower_limit_limited)
 
         # undo factor in A

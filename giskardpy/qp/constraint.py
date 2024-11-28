@@ -55,7 +55,7 @@ class InequalityConstraint(Constraint):
         return self.name
 
     def normalized_weight(self, control_horizon: int) -> cas.Expression:
-        weight_normalized = self.quadratic_weight * (1 / (self.velocity_limit** 2 * control_horizon) )
+        weight_normalized = self.quadratic_weight * (1 / (self.velocity_limit** 2) )
         return weight_normalized
 
     def capped_lower_error(self, dt: float, control_horizon: int) -> cas.Expression:
@@ -101,7 +101,7 @@ class EqualityConstraint(Constraint):
         return self.name
 
     def normalized_weight(self, control_horizon: int) -> cas.Expression:
-        weight_normalized = self.quadratic_weight * (1 / (self.velocity_limit** 2 * control_horizon) )
+        weight_normalized = self.quadratic_weight * (1 / (self.velocity_limit** 2) )
         return weight_normalized
 
     def capped_bound(self, dt: float, control_horizon: int) -> cas.Expression:

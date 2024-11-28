@@ -100,7 +100,7 @@ class LocalMinimumReached(Monitor):
                  name: Optional[str] = None,
                  min_cut_off: float = 0.01,
                  max_cut_off: float = 0.06,
-                 joint_convergence_threshold: float = 0.02,
+                 joint_convergence_threshold: float = 0.01,
                  windows_size: int = 1):
         super().__init__(name=name)
         self.joint_convergence_threshold = joint_convergence_threshold

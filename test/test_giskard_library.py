@@ -37,9 +37,10 @@ from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, De
 from giskardpy.qp.qp_controller import QPFormulation
 from giskardpy.qp.qp_solver_ids import SupportedQPSolver
 from hypothesis import given
-from motion_graph.tasks.cartesian_tasks import CartesianPoseAsTask
+from motion_graph.tasks.cartesian_tasks import CartesianPoseAsTask, CartesianPosition, CartesianPositionVelocityLimit, \
+    CartesianPositionVelocityGoal
 from motion_graph.tasks.joint_tasks import JointVelocityLimit, JointVelocity
-from motion_graph.tasks.task import WEIGHT_ABOVE_CA
+from motion_graph.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE
 from qp.constraint import DerivativeEqualityConstraint
 from sympy.strategies.branch import condition
 from tensorflow.python.ops.gen_math_ops import accumulate_nv2
@@ -641,12 +642,13 @@ class TestWorld:
 
 
 class Simulator:
-    goal_names: List[str]
+    goal_state: Dict[str, Tuple[float, float]]
 
     def __init__(self, world: WorldTree, control_dt: float, mpc_dt: float, h: int, solver: SupportedQPSolver,
                  jerk_limit: float,
                  alpha: float, graph_styles: Optional[List[Tuple[str, str]]],
                  qp_formulation: QPFormulation):
+        god_map.simulator = self
         world.update_default_weights({Derivatives.velocity: 0.01,
                                       Derivatives.acceleration: 0.0,
                                       Derivatives.jerk: 0.0})
@@ -682,29 +684,51 @@ class Simulator:
                                              alpha=self.alpha,
                                              verbose=False)
 
-    def add_cart_goal(self, root_link: PrefixName, tip_link: PrefixName, x_goal: float):
-        goal_name = PrefixName(f'x_goal')
-        v = self.world.add_virtual_free_variable(goal_name)
-        self.world.state[v.name].position = x_goal
-        self.cart_goal = cas.TransMatrix.from_xyz_rpy(x=v.get_symbol(Derivatives.position),
-                                                      reference_frame=root_link,
-                                                      child_frame=tip_link)
-        task = CartesianPoseAsTask(name='cart g1', root_link=root_link, tip_link=tip_link,
-                                   goal_pose=self.cart_goal, absolute=True)
-
+    def add_cart_goal(self, root_link: PrefixName, tip_link: PrefixName, x_goal: float, name: str = 'g1',
+                      weight: float = WEIGHT_BELOW_CA):
+        goal_symbol = symbol_manager.get_symbol(f'god_map.simulator.goal_state[\"{name}\"][0]')
+        weight_symbol = symbol_manager.get_symbol(f'god_map.simulator.goal_state[\"{name}\"][1]')
+        cart_goal = cas.TransMatrix.from_xyz_rpy(x=goal_symbol,
+                                                 reference_frame=root_link,
+                                                 child_frame=tip_link)
+        task = CartesianPoseAsTask(name=name, root_link=root_link, tip_link=tip_link,
+                                   goal_pose=cart_goal, absolute=True, weight=weight_symbol)
+        self.goal_state[name] = (x_goal, weight)
         god_map.motion_graph_manager.add_task(task)
 
-    def add_joint_goal(self, joint_names: List[PrefixName], goal: float, name: str = 'g1'):
-        self.goal_names.append(name)
-        self.joint_goal = {}
+    def add_cart_position_goal(self, root_link: PrefixName, tip_link: PrefixName, x_goal: float, name: str = 'g1',
+                               weight: float = WEIGHT_BELOW_CA):
+        goal_symbol = symbol_manager.get_symbol(f'god_map.simulator.goal_state[\"{name}\"][0]')
+        weight_symbol = symbol_manager.get_symbol(f'god_map.simulator.goal_state[\"{name}\"][1]')
+        cart_goal = cas.TransMatrix.from_xyz_rpy(y=goal_symbol,
+                                                 reference_frame=root_link,
+                                                 child_frame=tip_link)
+        task = CartesianPosition(name=name, root_link=root_link, tip_link=tip_link,
+                                 goal_point=cart_goal.to_position(), absolute=True, weight=weight_symbol)
+        self.goal_state[name] = (x_goal, weight)
+        god_map.motion_graph_manager.add_task(task)
+
+    def add_cart_vel_goal(self, root_link: PrefixName, tip_link: PrefixName, x_goal: float, name: str = 'g1',
+                               weight: float = WEIGHT_BELOW_CA):
+        goal_symbol = symbol_manager.get_symbol(f'god_map.simulator.goal_state[\"{name}\"][0]')
+        weight_symbol = symbol_manager.get_symbol(f'god_map.simulator.goal_state[\"{name}\"][1]')
+        task = CartesianPositionVelocityGoal(name=name, root_link=root_link, tip_link=tip_link,
+                                             x_vel=0, y_vel=x_goal, z_vel=0, weight=weight_symbol)
+        self.goal_state[name] = (x_goal, weight)
+        god_map.motion_graph_manager.add_task(task)
+
+    def add_joint_goal(self, joint_names: List[PrefixName], goal: float, name: str = 'g1',
+                       weight: float = WEIGHT_BELOW_CA):
+        joint_goal = {}
         goal_name = PrefixName(name)
-        v = self.world.add_virtual_free_variable(goal_name)
-        self.world.state[v.name].position = goal
+        goal_symbol = symbol_manager.get_symbol(f'god_map.simulator.goal_state[\"{goal_name}\"][0]')
+        weight_symbol = symbol_manager.get_symbol(f'god_map.simulator.goal_state[\"{goal_name}\"][1]')
         for joint_name in joint_names:
-            self.joint_goal[joint_name] = v.get_symbol(Derivatives.position)
-        joint_task = JointPositionList(name=name, goal_state=self.joint_goal,
-                                       # weight=WEIGHT_ABOVE_CA
+            joint_goal[joint_name] = goal_symbol
+        joint_task = JointPositionList(name=name, goal_state=joint_goal,
+                                       weight=weight_symbol
                                        )
+        self.goal_state[goal_name] = (goal, weight)
 
         god_map.motion_graph_manager.add_task(joint_task)
 
@@ -749,7 +773,7 @@ class Simulator:
         return free_variables
 
     def reset(self):
-        self.goal_names = []
+        self.goal_state = {}
         god_map.time = 0
         god_map.control_cycle_counter = 0
         god_map.motion_graph_manager.reset()
@@ -782,7 +806,7 @@ class Simulator:
 
     def run(self, goal_function: Callable[[str, float], float], sim_time: float,
             pos_noise: float, vel_noise: float, acc_noise: float,
-            plot_legend: bool = True):
+            plot_legend: bool = True, plot_kwargs: dict = dict()):
         np.random.seed(69)
         total_times, parameter_times, qp_times = [], [], []
         try:
@@ -793,17 +817,25 @@ class Simulator:
                 total_times.append(total_time)
                 parameter_times.append(parameter_time)
                 qp_times.append(qp_time)
-                for goal_name in self.goal_names:
-                    self.update_joint_goal(goal_name, goal_function(goal_name, god_map.time))
+                for goal_name in self.goal_state:
+                    next_goal, next_weight = goal_function(goal_name, god_map.time)
+                    self.update_goal(goal_name, next_goal, next_weight)
 
         except Exception as e:
             traceback.print_exc()
             print(e)
             assert False
         finally:
-            self.plot_traj(plot_legend)
+            self.plot_traj(plot_kwargs, plot_legend)
         avg = np.average(qp_times)
         print(f'avg time {avg} or {1 / avg}hz')
+        traj_dict = self.traj.to_dict(normalize_position=False, filter_0_vel=False, sort=True)
+        for free_variable in god_map.qp_controller.free_variables:
+            for d in Derivatives.range(Derivatives.position, Derivatives.jerk):
+                print(f'min {d.name}: {min(traj_dict[d][free_variable.name])}')
+                print(f'max {d.name}: {max(traj_dict[d][free_variable.name])}')
+                print(f'--------------------------------------------')
+        print('===========run end===========')
 
     def apply_noise(self, pos: float, vel: float, acc: float, joint_names: List[str] = None):
         if joint_names is None:
@@ -820,13 +852,10 @@ class Simulator:
             self.world.state[joint_name].velocity += np.random.normal(0, vel, 1)[0]
             self.world.state[joint_name].acceleration += np.random.normal(0, acc, 1)[0]
 
-    def update_joint_goal(self, goal_name: str, new_value: float):
-        self.world.state[goal_name].position = new_value
+    def update_goal(self, goal_name: str, new_value: float, new_weight: float):
+        self.goal_state[goal_name] = (new_value, new_weight)
 
-    def update_cart_goal(self, new_value: float):
-        self.world.state['x_goal'].position = new_value
-
-    def plot_traj(self, plot_legend: bool = True):
+    def plot_traj(self, plot_kwargs: dict, plot_legend: bool = True):
         self.traj.plot_trajectory('test', sample_period=self.control_dt, filter_0_vel=True,
                                   hspace=0.5, height_per_derivative=4)
         color_map = defaultdict(lambda: self.graph_styles[len(color_map)])
@@ -837,6 +866,7 @@ class Simulator:
             plot0_lines=False,
             legend=plot_legend,
             sort=False,
+            **plot_kwargs
         )
 
 
@@ -844,7 +874,6 @@ def joint_thing(jerk_limit: float, sim_time: float, control_dt: float, mpc_dt: f
                 world: WorldTree, goal_function: Callable[[float], float], pos_noise: float, vel_noise: float,
                 acc_noise: float, joint_names: Tuple[str] = ('pr2/r_wrist_roll_joint',), plot_legend: bool = True,
                 graph_styles=None):
-
     simulator = Simulator(world=world,
                           control_dt=control_dt,
                           mpc_dt=mpc_dt,
@@ -889,7 +918,7 @@ class GoalSwapper:
         if time > self.next_swap:
             self.goal = - self.goal
             self.next_swap += self.swap_time
-        return self.goal + self.offset + np.random.normal(0, self.noise, 1)[0]
+        return self.goal + self.offset + np.random.normal(0, self.noise, 1)[0], 1
 
 
 class GoalSequence:
@@ -946,7 +975,7 @@ class TestController:
                 simulator.step()
                 if god_map.time > next_swap:
                     # goal *= -1
-                    simulator.update_joint_goal(goal)
+                    simulator.update_goal(goal)
                     next_swap += swap_distance
 
         except Exception as e:
@@ -1057,55 +1086,34 @@ class TestController:
         # simulator.traj.to_dict()[0][joint_names[0]][61:]
 
     def test_joint_goal_pr2_fight(self, pr2_world: WorldTree):
-        jerk_limit = 1111
-        sim_time = 6
+        jerk_limit = 711
+        sim_time = 2.5
         h = 7
         noise = 0.00
-        control_dt = 0.01
-        pos_noise = 0.0005
+        control_dt = 0.0125
+        pos_noise = 0.000
         vel_noise = 0
         acc_noise = 0
+        goal1 = 0.2
+        goal2 = 0.5
+        goal3 = 0.7
         graph_styles = [
+            ['--', 'black'],
             [':', 'black'],
-            # ['!shade above', 'red'],
-            # ['!shade above', 'red'],
-            # ['!shade below', 'red'],
-            # ['!shade above', 'red'],
-            # ['!shade below', 'red'],
-            ['-', '#003399'],
-            ['-', '#003399'],
-            ['-', '#003399'],
-            ['-', '#003399'],
             [':', 'black'],
-            # ['!shade above', 'red'],
-            # ['!shade above', 'red'],
-            # ['!shade below', 'red'],
-            # ['!shade above', 'red'],
-            # ['!shade below', 'red'],
             ['-', '#003399'],
             ['-', '#003399'],
             ['-', '#003399'],
             ['-', '#003399'],
-            [':', 'black'],
-            # ['!shade above', 'red'],
-            # ['!shade above', 'red'],
-            # ['!shade below', 'red'],
-            # ['!shade above', 'red'],
-            # ['!shade below', 'red'],
-            ['-', '#003399'],
-            ['-', '#003399'],
-            ['-', '#003399'],
-            ['-', '#003399'],
-        ]
-        goals = [
-            [0, -0.1],
-            # [0.8, -0.15]
-        ]
-        x = np.linspace(0.8, sim_time, 1000)
-        x2 = np.linspace(0.75, 1.75, 1000)
-        y = np.cos((x) * np.pi * x2) * 0.1 - 0.2
-        goals.extend(list(zip(x.tolist(), y.tolist())))
 
+            ['--', '#993000'],
+            [':', '#993000'],
+            [':', '#993000'],
+
+            ['--', '#993000'],
+            [':', '#993000'],
+            [':', '#993000'],
+        ]
         simulator = Simulator(world=pr2_world,
                               control_dt=control_dt,
                               mpc_dt=control_dt,
@@ -1117,42 +1125,174 @@ class TestController:
                               qp_formulation=QPFormulation.explicit_no_acc)
         simulator.reset()
         simulator.add_joint_goal(
-            # joint_names=pr2_world.movable_joint_names[:1],
             joint_names=('pr2/r_wrist_roll_joint',),
-            # joint_names=pr2_world.movable_joint_names[14:15],
-            # joint_names=pr2_world.movable_joint_names[:35],
-            # joint_names=pr2_world.movable_joint_names[27:31],
-            # joint_names=pr2_world.movable_joint_names[:-1],
-            # joint_names=[
-            # pr2_world.movable_joint_names[12], # torso
-            # pr2_world.movable_joint_names[27], # r_gripper_r_finger
-            # pr2_world.movable_joint_names[13] # head pan
-            # pr2_world.movable_joint_names[14] # head pan
-            # ],
             name='g1',
-            goal=1)
+            weight=1,
+            goal=goal1)
         simulator.add_joint_goal(
-            # joint_names=pr2_world.movable_joint_names[:1],
             joint_names=('pr2/r_wrist_roll_joint',),
-            # joint_names=pr2_world.movable_joint_names[14:15],
-            # joint_names=pr2_world.movable_joint_names[:35],
-            # joint_names=pr2_world.movable_joint_names[27:31],
-            # joint_names=pr2_world.movable_joint_names[:-1],
-            # joint_names=[
-            # pr2_world.movable_joint_names[12], # torso
-            # pr2_world.movable_joint_names[27], # r_gripper_r_finger
-            # pr2_world.movable_joint_names[13] # head pan
-            # pr2_world.movable_joint_names[14] # head pan
-            # ],
             name='g2',
-            goal=-1)
+            weight=1,
+            goal=goal2)
+        simulator.add_joint_goal(
+            joint_names=('pr2/r_wrist_roll_joint',),
+            name='g3',
+            weight=1,
+            goal=goal3)
         simulator.compile()
+
         def goal_function(name, time):
             if name == 'g1':
-                return 1
-            return -1
+                return goal1, WEIGHT_BELOW_CA
+            if name == 'g2':
+                g2_weight = 0
+                if time > 0.5:
+                    g2_weight = WEIGHT_BELOW_CA
+                if time > 1:
+                    g2_weight = WEIGHT_COLLISION_AVOIDANCE
+                if time > 1.5:
+                    g2_weight = WEIGHT_BELOW_CA
+                if time > 1.75:
+                    g2_weight = 0
+                if time > 1.9:
+                    g2_weight = WEIGHT_BELOW_CA
+                if time > 2.1:
+                    g2_weight = 0
+                return goal2, g2_weight
+            if name == 'g3':
+                return goal3, WEIGHT_BELOW_CA
+
         simulator.run(goal_function, sim_time, pos_noise, vel_noise, acc_noise,
-                      plot_legend=False)
+                      plot_legend=True)
+
+    def test_cart_goal_pr2_fight(self, pr2_world: WorldTree):
+        jerk_limit = 1111
+        sim_time = 5
+        h = 7
+        noise = 0.00
+        control_dt = 0.01
+        pos_noise = 0.000
+        vel_noise = 0
+        acc_noise = 0
+        goal1 = 0.4
+        goal2 = 0.5
+        graph_styles = [
+            ['--', 'black'],
+            [':', 'black'],
+            [':', 'black'],
+            ['-', '#003399'],
+            ['--', '#993000'],
+            [':', '#993000'],
+            [':', '#993000'],
+            # ['-', '#003399'],
+            # ['-', '#003399'],
+            # ['-', '#003399'],
+        ]
+        simulator = Simulator(world=pr2_world,
+                              control_dt=control_dt,
+                              mpc_dt=control_dt,
+                              h=h,
+                              solver=SupportedQPSolver.gurobi,
+                              alpha=0.1,
+                              graph_styles=graph_styles,
+                              jerk_limit=jerk_limit,
+                              qp_formulation=QPFormulation.explicit_no_acc)
+        simulator.reset()
+        simulator.add_cart_position_goal(
+            root_link='pr2/r_gripper_tool_frame',
+            tip_link='pr2/l_gripper_tool_frame',
+            name='g1',
+            weight=1,
+            x_goal=goal1)
+        simulator.add_cart_position_goal(
+            root_link='pr2/r_gripper_tool_frame',
+            tip_link='pr2/l_gripper_tool_frame',
+            name='g2',
+            weight=1,
+            x_goal=goal2)
+        simulator.compile()
+
+        def goal_function(name, time):
+            if name == 'g1':
+                return goal1, WEIGHT_BELOW_CA
+            if name == 'g2':
+                g2_weight = 0
+                if time > 0.5:
+                    g2_weight = WEIGHT_BELOW_CA
+                if time > 1:
+                    g2_weight = WEIGHT_COLLISION_AVOIDANCE
+                if time > 1.5:
+                    g2_weight = WEIGHT_BELOW_CA
+                if time > 1.75:
+                    g2_weight = 0
+                if time > 1.9:
+                    g2_weight = WEIGHT_BELOW_CA
+                if time > 2.1:
+                    g2_weight = 0
+                return goal2, g2_weight
+
+        simulator.run(goal_function, sim_time, pos_noise, vel_noise, acc_noise,
+                      plot_legend=True)
+
+    def test_cart_vel_goal_pr2_fight(self, pr2_world: WorldTree):
+        jerk_limit = 1111
+        sim_time = 5
+        h = 7
+        noise = 0.00
+        control_dt = 0.01
+        pos_noise = 0.000
+        vel_noise = 0
+        acc_noise = 0
+        goal1 = 1
+        goal2 = -1.5
+        graph_styles = [
+            ['--', 'black'],
+            # [':', 'black'],
+            # [':', 'black'],
+            ['-', '#003399'],
+            ['--', '#993000'],
+            # [':', '#993000'],
+            # [':', '#993000'],
+            # ['-', '#003399'],
+            # ['-', '#003399'],
+            # ['-', '#003399'],
+        ]
+        simulator = Simulator(world=pr2_world,
+                              control_dt=control_dt,
+                              mpc_dt=control_dt,
+                              h=h,
+                              solver=SupportedQPSolver.gurobi,
+                              alpha=0.1,
+                              graph_styles=graph_styles,
+                              jerk_limit=jerk_limit,
+                              qp_formulation=QPFormulation.explicit_no_acc)
+        simulator.reset()
+        simulator.add_cart_vel_goal(
+            root_link='pr2/r_gripper_tool_frame',
+            tip_link='pr2/l_gripper_tool_frame',
+            name='g1',
+            weight=1,
+            x_goal=goal1)
+        simulator.add_cart_vel_goal(
+            root_link='pr2/r_gripper_tool_frame',
+            tip_link='pr2/l_gripper_tool_frame',
+            name='g2',
+            weight=1,
+            x_goal=goal2)
+        simulator.compile()
+
+        def goal_function(name, time):
+            if name == 'g1':
+                return goal1, WEIGHT_BELOW_CA
+            if name == 'g2':
+                g2_weight = 0
+                if time > 2.5:
+                    g2_weight = WEIGHT_COLLISION_AVOIDANCE
+                return goal2, g2_weight
+
+        simulator.run(goal_function, sim_time, pos_noise, vel_noise, acc_noise,
+                      plot_legend=True,
+                      plot_kwargs={'unit': 'm'})
 
     def test_joint_goal_pr2_tune_guide(self, pr2_world: WorldTree):
         sim_time = 4
@@ -1230,7 +1370,7 @@ class TestController:
                 simulator.step()
                 simulator.apply_noise(0, 0.1, 0, joint_names)
                 goal = np.sin(god_map.time * 8) * 0.5
-                simulator.update_joint_goal(goal)
+                simulator.update_goal(goal)
                 # goal = np.random.rand() * 2 -1
                 # simulator.update_joint_goal(goal)
                 # if god_map.time > next_swap:
@@ -1488,7 +1628,7 @@ class TestController:
 
                             if god_map.time > next_swap:
                                 goal *= -1
-                                simulator.update_joint_goal(goal)
+                                simulator.update_goal(goal)
                                 next_swap += swap_distance
                     except Exception as e:
                         # traceback.print_exc()
@@ -1630,7 +1770,7 @@ class TestController:
 
                             if god_map.time > next_swap:
                                 goal *= -1
-                                simulator.update_joint_goal(goal)
+                                simulator.update_goal(goal)
                                 next_swap += swap_distance
                     except Exception as e:
                         # traceback.print_exc()

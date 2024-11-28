@@ -801,21 +801,19 @@ class InequalityBounds(ProblemDataPart):
     def lower_inequality_constraint_bound(self):
         bounds = {}
         for constraint in self.inequality_constraints:
-            limit = constraint.velocity_limit * self.dt * self.control_horizon
             if isinstance(constraint.lower_error, float) and np.isinf(constraint.lower_error):
                 bounds[f'{constraint.name}'] = constraint.lower_error
             else:
-                bounds[f'{constraint.name}'] = cas.limit(constraint.lower_error, -limit, limit)
+                bounds[f'{constraint.name}'] = constraint.capped_lower_error(self.dt, self.control_horizon)
         return bounds
 
     def upper_inequality_constraint_bound(self):
         bounds = {}
         for constraint in self.inequality_constraints:
-            limit = constraint.velocity_limit * self.dt * self.control_horizon
             if isinstance(constraint.upper_error, float) and np.isinf(constraint.upper_error):
                 bounds[f'{constraint.name}'] = constraint.upper_error
             else:
-                bounds[f'{constraint.name}'] = cas.limit(constraint.upper_error, -limit, limit)
+                bounds[f'{constraint.name}'] = constraint.capped_upper_error(self.dt, self.control_horizon)
         return bounds
 
     def implicit_pos_model_limits(self) -> Tuple[List[Dict[str, cas.Expression]], List[Dict[str, cas.Expression]]]:
@@ -1118,7 +1116,7 @@ class EqualityModel(ProblemDataPart):
 
                 # slack variable for total error
                 slack_model = cas.diag(
-                    cas.Expression([self.dt * self.control_horizon for c in self.equality_constraints]))
+                    cas.Expression([self.dt for c in self.equality_constraints]))
                 return model, slack_model
         else:
             if self.qp_formulation.is_implicit():
@@ -1394,7 +1392,7 @@ class InequalityModel(ProblemDataPart):
 
                 # slack variable for total error
                 slack_model = cas.diag(
-                    cas.Expression([self.dt * self.control_horizon for c in self.inequality_constraints]))
+                    cas.Expression([self.dt for c in self.inequality_constraints]))
                 return model, slack_model
         else:
             if self.qp_formulation.is_implicit():

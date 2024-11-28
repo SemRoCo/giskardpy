@@ -167,7 +167,7 @@ class LocalMinimumReached(ExpressionMonitor):
                  name: Optional[str] = None,
                  min_cut_off: float = 0.01,
                  max_cut_off: float = 0.06,
-                 joint_convergence_threshold: float = 0.02,
+                 joint_convergence_threshold: float = 0.01,
                  windows_size: int = 1,
                  start_condition: cas.Expression = cas.TrueSymbol,
                  hold_condition: cas.Expression = cas.FalseSymbol,

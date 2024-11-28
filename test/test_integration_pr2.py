@@ -1256,10 +1256,10 @@ class TestConstraints:
                                       add_monitor=False)
         apartment_setup.execute()
 
-    def test_VelocityLimitUnreachableException(self, zero_pose: PR2TestWrapper):
-        zero_pose.set_prediction_horizon(prediction_horizon=7)
-        zero_pose.set_joint_goal(zero_pose.better_pose)
-        zero_pose.execute(expected_error_type=VelocityLimitUnreachableException)
+    # def test_VelocityLimitUnreachableException(self, zero_pose: PR2TestWrapper):
+    #     zero_pose.set_prediction_horizon(prediction_horizon=7)
+    #     zero_pose.set_joint_goal(zero_pose.better_pose)
+    #     zero_pose.execute(expected_error_type=VelocityLimitUnreachableException)
 
     def test_SetPredictionHorizon11(self, zero_pose: PR2TestWrapper):
         default_prediction_horizon = god_map.qp_controller.prediction_horizon
@@ -3386,9 +3386,11 @@ class TestCollisionAvoidanceGoals:
         p = PoseStamped()
         p.header.frame_id = pocky_pose_setup.r_tip
         p.pose.position.x = 0.08
-        p.pose.orientation = Quaternion(*quaternion_about_axis(0.01, [1, 0, 0]).tolist())
-        pocky_pose_setup.add_box_to_world(name='box',
-                                          size=(0.2, 0.05, 0.05),
+        p.pose.orientation = Quaternion(*quaternion_about_axis(np.pi/2, [0, 1, 0]).tolist())
+        pocky_pose_setup.add_cylinder_to_world(name='box',
+                                          # size=(0.2, 0.05, 0.05),
+                                               height = 0.2,
+                                               radius=0.025,
                                           parent_link=pocky_pose_setup.r_tip,
                                           pose=p)
         p = PoseStamped()

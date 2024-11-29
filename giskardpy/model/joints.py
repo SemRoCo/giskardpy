@@ -351,7 +351,7 @@ class OmniDrive(MovableJoint, VirtualFreeVariables):
             self.translation_limits = {
                 Derivatives.velocity: 0.5,
                 Derivatives.acceleration: np.inf,
-                Derivatives.jerk: 5
+                Derivatives.jerk: None
             }
         else:
             self.translation_limits = translation_limits
@@ -360,7 +360,7 @@ class OmniDrive(MovableJoint, VirtualFreeVariables):
             self.rotation_limits = {
                 Derivatives.velocity: 0.6,
                 Derivatives.acceleration: np.inf,
-                Derivatives.jerk: 10
+                Derivatives.jerk: None
             }
         else:
             self.rotation_limits = rotation_limits
@@ -383,8 +383,8 @@ class OmniDrive(MovableJoint, VirtualFreeVariables):
         self.parent_T_child = odom_T_bf.dot(bf_T_bf_vel).dot(bf_vel_T_bf)
 
     def create_free_variables(self) -> None:
-        translation_lower_limits = {derivative: -limit for derivative, limit in self.translation_limits.items()}
-        rotation_lower_limits = {derivative: -limit for derivative, limit in self.rotation_limits.items()}
+        translation_lower_limits = {derivative: -limit if limit is not None else None for derivative, limit in self.translation_limits.items()}
+        rotation_lower_limits = {derivative: -limit if limit is not None else None for derivative, limit in self.rotation_limits.items()}
 
         self.x = god_map.world.add_virtual_free_variable(name=self.x_name)
         self.y = god_map.world.add_virtual_free_variable(name=self.y_name)
@@ -452,8 +452,8 @@ class DiffDrive(MovableJoint, VirtualFreeVariables):
         if translation_limits is None:
             self.translation_limits = {
                 Derivatives.velocity: 0.5,
-                Derivatives.acceleration: 1000,
-                Derivatives.jerk: 5
+                Derivatives.acceleration: np.inf,
+                Derivatives.jerk: None
             }
         else:
             self.translation_limits = translation_limits
@@ -461,8 +461,8 @@ class DiffDrive(MovableJoint, VirtualFreeVariables):
         if rotation_limits is None:
             self.rotation_limits = {
                 Derivatives.velocity: 0.6,
-                Derivatives.acceleration: 1000,
-                Derivatives.jerk: 10
+                Derivatives.acceleration: np.inf,
+                Derivatives.jerk: None
             }
         else:
             self.rotation_limits = rotation_limits
@@ -543,8 +543,8 @@ class OmniDrivePR22(MovableJoint, VirtualFreeVariables):
         if translation_limits is None:
             self.translation_limits = {
                 Derivatives.velocity: 0.5,
-                Derivatives.acceleration: 1000,
-                Derivatives.jerk: 5
+                Derivatives.acceleration: np.inf,
+                Derivatives.jerk: None
             }
         else:
             self.translation_limits = translation_limits
@@ -552,8 +552,8 @@ class OmniDrivePR22(MovableJoint, VirtualFreeVariables):
         if rotation_limits is None:
             self.rotation_limits = {
                 Derivatives.velocity: 0.6,
-                Derivatives.acceleration: 1000,
-                Derivatives.jerk: 10
+                Derivatives.acceleration: np.inf,
+                Derivatives.jerk: None
             }
         else:
             self.rotation_limits = rotation_limits
@@ -569,13 +569,13 @@ class OmniDrivePR22(MovableJoint, VirtualFreeVariables):
         rotation_lower_limits = {derivative: -limit for derivative, limit in self.rotation_limits.items()}
         caster_upper_limits = {
             Derivatives.velocity: 100,
-            Derivatives.acceleration: 1000,
-            Derivatives.jerk: 100,
+            Derivatives.acceleration: np.inf,
+            Derivatives.jerk: None,
         }
         caster_lower_limits = {
             Derivatives.velocity: -100,
-            Derivatives.acceleration: -1000,
-            Derivatives.jerk: -100,
+            Derivatives.acceleration: -np.inf,
+            Derivatives.jerk: None,
         }
 
         self.x = god_map.world.add_virtual_free_variable(name=PrefixName('x', self.name))

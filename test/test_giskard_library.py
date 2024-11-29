@@ -195,7 +195,7 @@ class TestWorld:
         god_map.motion_goal_manager.init_task_state()
 
         eq, neq, neqd, lin_weight, quad_weight = god_map.motion_goal_manager.get_constraints_from_goals()
-        controller = QPController(sample_period=dt)
+        controller = QPController(mpc_dt=dt)
         controller.init(free_variables=list(box_world_prismatic.free_variables.values()),
                         equality_constraints=eq)
         controller.compile()
@@ -229,7 +229,7 @@ class TestWorld:
         god_map.motion_goal_manager.init_task_state()
 
         eq, neq, neqd, lin_weight, quad_weight = god_map.motion_goal_manager.get_constraints_from_goals()
-        controller = QPController(sample_period=dt)
+        controller = QPController(mpc_dt=dt)
         controller.init(free_variables=list(box_world.free_variables.values()),
                         equality_constraints=eq)
         controller.compile()
@@ -278,7 +278,7 @@ class TestWorld:
         god_map.motion_goal_manager.init_task_state()
 
         eq, neq, neqd, lin_weight, quad_weight = god_map.motion_goal_manager.get_constraints_from_goals()
-        controller = QPController(sample_period=dt)
+        controller = QPController(mpc_dt=dt)
         controller.init(free_variables=list(box_world.free_variables.values()),
                         equality_constraints=eq)
         controller.compile()
@@ -295,7 +295,7 @@ class TestWorld:
 
             god_map.monitor_manager.evaluate_monitors()
             traj.append(box_world.state[joint_name].position)
-            god_map.time += controller.sample_period
+            god_map.time += controller.mpc_dt
             god_map.control_cycle_counter += 1
         fk = box_world.compute_fk_point(root_link=box_world.root_link_name, tip_link=box_name).to_np()
         np.testing.assert_almost_equal(fk[0], goal2.to_position().to_np()[0], decimal=3)
@@ -332,7 +332,7 @@ class TestWorld:
         god_map.motion_goal_manager.init_task_state()
 
         eq, neq, neqd, lin_weight, quad_weight = god_map.motion_goal_manager.get_constraints_from_goals()
-        controller = QPController(sample_period=dt)
+        controller = QPController(mpc_dt=dt)
         controller.init(free_variables=list(box_world.free_variables.values()),
                         equality_constraints=eq)
         controller.compile()
@@ -348,7 +348,7 @@ class TestWorld:
             god_map.monitor_manager.evaluate_monitors()
             traj.append((box_world.state[box_world.joints[joint_name].x_name].position,
                          box_world.state[box_world.joints[joint_name].y_name].position))
-            god_map.time += controller.sample_period
+            god_map.time += controller.mpc_dt
             god_map.control_cycle_counter += 1
         fk = box_world.compute_fk_point(root_link=box_world.root_link_name, tip_link=box_name).to_np()
         np.testing.assert_almost_equal(fk[0], goal1.to_position().to_np()[0], decimal=2)

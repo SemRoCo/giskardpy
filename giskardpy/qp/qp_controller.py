@@ -206,29 +206,6 @@ class ProblemDataPart(ABC):
         free_variable_model.remove([], column_ids)
         return free_variable_model
 
-    @memoize
-    def find_best_jerk_limit(self, target_vel_limit: float, jerk_limit: float,
-                             max_derivative: Derivatives, eps: float = 0.001) -> float:
-        upper_bound = jerk_limit
-        lower_bound = 0
-        for i in range(100):
-            vel_limit = giskard_math.max_velocity_from_horizon_and_jerk_qp(prediction_horizon=self.prediction_horizon,
-                                                                           vel_limit=100,
-                                                                           acc_limit=np.inf,
-                                                                           jerk_limit=jerk_limit,
-                                                                           dt=self.dt,
-                                                                           max_derivative=max_derivative)[0]
-            if abs(vel_limit - target_vel_limit) < eps:
-                break
-            if vel_limit > target_vel_limit:
-                upper_bound = jerk_limit
-                jerk_limit = int((jerk_limit + lower_bound) / 2)
-            else:
-                lower_bound = jerk_limit
-                jerk_limit = int((jerk_limit + upper_bound) / 2)
-        print(f'best velocity limit: {vel_limit} with jerk limit: {jerk_limit} after {i} iterations')
-        return jerk_limit
-
     @profile
     def velocity_limit(self, v: FreeVariable, max_derivative: Derivatives) -> Tuple[cas.Expression, cas.Expression]:
         current_position = v.get_symbol(Derivatives.position)
@@ -239,41 +216,17 @@ class ProblemDataPart(ABC):
         current_vel = v.get_symbol(Derivatives.velocity)
         current_acc = v.get_symbol(Derivatives.acceleration)
 
-        # lower_jerk_limit = v.get_lower_limit(Derivatives.jerk, evaluated=True)
-        # upper_jerk_limit = v.get_upper_limit(Derivatives.jerk, evaluated=True)
+        lower_jerk_limit = v.get_lower_limit(Derivatives.jerk, evaluated=True)
+        upper_jerk_limit = v.get_upper_limit(Derivatives.jerk, evaluated=True)
         if self.prediction_horizon == 1:
             return cas.Expression([lower_velocity_limit]), cas.Expression([upper_velocity_limit])
 
-        # max_reachable_vel = giskard_math.max_velocity_from_horizon_and_jerk(prediction_horizon=self.prediction_horizon,
-        #                                                                     vel_limit=upper_velocity_limit,
-        #                                                                     acc_limit=upper_acc_limit,
-        #                                                                     jerk_limit=upper_jerk_limit,
-        #                                                                     sample_period=self.dt,
-        #                                                                     max_derivative=max_derivative)
-        upper_jerk_limit = self.find_best_jerk_limit(upper_velocity_limit, (4 * upper_velocity_limit) / self.dt ** 2, max_derivative)
-        lower_jerk_limit = -upper_jerk_limit
-
-        print(
-            f'''max vel qp {giskard_math.max_velocity_from_horizon_and_jerk_qp(prediction_horizon=self.prediction_horizon,
-                                                                               vel_limit=100,
-                                                                               acc_limit=upper_acc_limit,
-                                                                               jerk_limit=upper_jerk_limit,
-                                                                               dt=self.dt,
-                                                                               max_derivative=max_derivative)[0]}''')
-        # if max_reachable_vel < upper_velocity_limit:
-        #     error_msg = f'Free variable "{v.name}" can\'t reach velocity limit of "{upper_velocity_limit}". ' \
-        #                 f'Maximum reachable with prediction horizon = "{self.prediction_horizon}", ' \
-        #                 f'jerk limit = "{upper_jerk_limit}" and dt = "{self.dt}" is "{max_reachable_vel}".'
-        #     get_middleware().logerr(error_msg)
-        #     raise VelocityLimitUnreachableException(error_msg)
+        if upper_jerk_limit is None:
+            upper_jerk_limit = giskard_math.find_best_jerk_limit(self.prediction_horizon, self.dt,
+                                                                 upper_velocity_limit)
+            lower_jerk_limit = -upper_jerk_limit
 
         if not v.has_position_limits():
-            # lb = cas.Expression([lower_velocity_limit] * self.prediction_horizon
-            #                     + [lower_acc_limit] * self.prediction_horizon
-            #                     + [lower_jerk_limit] * self.prediction_horizon)
-            # ub = cas.Expression([upper_velocity_limit] * self.prediction_horizon
-            #                     + [upper_acc_limit] * self.prediction_horizon
-            #                     + [upper_jerk_limit] * self.prediction_horizon)
             lower_limit = upper_limit = None
         else:
             lower_limit = v.get_lower_limit(Derivatives.position, evaluated=True)
@@ -290,13 +243,13 @@ class ProblemDataPart(ABC):
                                dt=self.dt,
                                ph=self.prediction_horizon)
         except InfeasibleException as e:
-            max_reachable_vel = giskard_math.max_velocity_from_horizon_and_jerk(
+            max_reachable_vel = giskard_math.max_velocity_from_horizon_and_jerk_qp(
                 prediction_horizon=self.prediction_horizon,
-                vel_limit=upper_velocity_limit,
+                vel_limit=100,
                 acc_limit=upper_acc_limit,
                 jerk_limit=upper_jerk_limit,
-                sample_period=self.dt,
-                max_derivative=self.max_derivative)
+                dt=self.dt,
+                max_derivative=max_derivative)[0]
             if max_reachable_vel < upper_velocity_limit:
                 error_msg = f'Free variable "{v.name}" can\'t reach velocity limit of "{upper_velocity_limit}". ' \
                             f'Maximum reachable with prediction horizon = "{self.prediction_horizon}", ' \
@@ -420,6 +373,18 @@ class Weights(ProblemDataPart):
             for t in range(self.prediction_horizon):
                 d = Derivatives(d)
                 for c in self.get_derivative_constraints(d):
+                    if t < self.control_horizon:
+                        derivative_constr_weights[f't{t:03}/{c.name}'] = c.normalized_weight(t)
+            params.append(derivative_constr_weights)
+        return params
+
+    def eq_derivative_weight_expressions(self) -> List[Dict[str, cas.Expression]]:
+        params = []
+        for d in Derivatives.range(Derivatives.velocity, self.max_derivative):
+            derivative_constr_weights = {}
+            for t in range(self.prediction_horizon):
+                d = Derivatives(d)
+                for c in self.get_eq_derivative_constraints(d):
                     if t < self.control_horizon:
                         derivative_constr_weights[f't{t:03}/{c.name}'] = c.normalized_weight(t)
             params.append(derivative_constr_weights)
@@ -563,6 +528,17 @@ class FreeVariableBounds(ProblemDataPart):
         upper_slack = {}
         for t in range(self.prediction_horizon):
             for c in self.get_derivative_constraints(derivative):
+                if t < self.control_horizon:
+                    lower_slack[f't{t:03}/{c.name}'] = c.lower_slack_limit[t]
+                    upper_slack[f't{t:03}/{c.name}'] = c.upper_slack_limit[t]
+        return lower_slack, upper_slack
+
+    def eq_derivative_slack_limits(self, derivative: Derivatives) \
+            -> Tuple[Dict[str, cas.Expression], Dict[str, cas.Expression]]:
+        lower_slack = {}
+        upper_slack = {}
+        for t in range(self.prediction_horizon):
+            for c in self.get_eq_derivative_constraints(derivative):
                 if t < self.control_horizon:
                     lower_slack[f't{t:03}/{c.name}'] = c.lower_slack_limit[t]
                     upper_slack[f't{t:03}/{c.name}'] = c.upper_slack_limit[t]
@@ -1589,9 +1565,9 @@ class QPController:
 
     @profile
     def __init__(self,
-                 sample_period: float = 0.05,
+                 mpc_dt: float,
+                 prediction_horizon: int,
                  control_dt: Optional[float] = None,
-                 prediction_horizon: int = 9,
                  max_derivative: Derivatives = Derivatives.jerk,
                  solver_id: Optional[SupportedQPSolver] = None,
                  retries_with_relaxed_constraints: int = 0,
@@ -1601,11 +1577,11 @@ class QPController:
                  alpha: float = 0.1,
                  verbose: bool = True):
         if control_dt is None:
-            control_dt = sample_period
+            control_dt = mpc_dt
         self.control_dt = control_dt
         self.alpha = alpha
         self.qp_formulation = qp_formulation
-        self.sample_period = sample_period
+        self.mpc_dt = mpc_dt
         self.max_derivative = max_derivative
         self.prediction_horizon = prediction_horizon
         self.retries_with_relaxed_constraints = retries_with_relaxed_constraints
@@ -1619,7 +1595,7 @@ class QPController:
 
         if self.verbose:
             get_middleware().loginfo(f'Initialized QP Controller:\n'
-                                     f'sample period: "{self.sample_period}"s\n'
+                                     f'sample period: "{self.mpc_dt}"s\n'
                                      f'max derivative: "{self.max_derivative.name}"\n'
                                      f'prediction horizon: "{self.prediction_horizon}"\n'
                                      f'QP solver: "{self.qp_solver_class.solver_id.name}"')
@@ -1740,7 +1716,7 @@ class QPController:
                   'inequality_constraints': self.inequality_constraints,
                   'derivative_constraints': self.derivative_constraints,
                   'eq_derivative_constraints': self.eq_derivative_constraints,
-                  'sample_period': self.sample_period,
+                  'sample_period': self.mpc_dt,
                   'prediction_horizon': self.prediction_horizon,
                   'max_derivative': self.order,
                   'alpha': self.alpha,
@@ -1803,13 +1779,13 @@ class QPController:
             # self._create_debug_pandas(self.qp_solver)
             if self.qp_formulation.is_implicit():
                 return NextCommands.from_xdot_implicit(self.free_variables, self.xdot_full, self.order,
-                                                       self.prediction_horizon, god_map.world, self.sample_period)
+                                                       self.prediction_horizon, god_map.world, self.mpc_dt)
             elif self.qp_formulation.is_explicit() or self.qp_formulation.is_no_mpc():
                 return NextCommands.from_xdot(self.free_variables, self.xdot_full, self.order, self.prediction_horizon)
             else:
                 return NextCommands.from_xdot_explicit_no_acc(self.free_variables, self.xdot_full, self.order,
                                                               self.prediction_horizon, god_map.world,
-                                                              self.sample_period)
+                                                              self.mpc_dt)
         except InfeasibleException as e_original:
             self.xdot_full = None
             self._create_debug_pandas(self.qp_solver)
@@ -1856,14 +1832,14 @@ class QPController:
         except KeyError:
             get_middleware().loginfo('start position not found in state')
             start_pos = 0
-        ts = np.array([(i + 1) * self.sample_period for i in range(self.prediction_horizon)])
+        ts = np.array([(i + 1) * self.mpc_dt for i in range(self.prediction_horizon)])
         filtered_x = self.p_xdot.filter(like=f'/{joint_name}/', axis=0)
         vel_end = self.prediction_horizon - self.order + 1
         acc_end = vel_end + self.prediction_horizon - self.order + 2
         velocities = filtered_x[:vel_end].values
         positions = [start_pos]
         for x_ in velocities:
-            positions.append(positions[-1] + x_ * self.sample_period)
+            positions.append(positions[-1] + x_ * self.mpc_dt)
 
         positions = np.array(positions[1:])
         positions = pad(positions.T[0], len(ts), pad_value=positions[-1])
@@ -1899,7 +1875,7 @@ class QPController:
             if not np.isinf(lower_limit):
                 ax.axhline(y=lower_limit, color='k', linestyle='--')
         # Example: Set x-ticks for each subplot
-        tick_labels = [f'{x}/{x * self.sample_period:.3f}' for x in range(self.prediction_horizon)]
+        tick_labels = [f'{x}/{x * self.mpc_dt:.3f}' for x in range(self.prediction_horizon)]
 
         axs[-1].set_xticks(ts)  # Set tick locations
         axs[-1].set_xticklabels(tick_labels)  # Set custom tick labels
@@ -1931,21 +1907,21 @@ class QPController:
         if len(bE) > 0:
             self.p_bE_raw = pd.DataFrame(bE, self.equality_constr_names, ['data'], dtype=float)
             self.p_bE = deepcopy(self.p_bE_raw)
-            self.p_bE[len(self.equality_bounds.names_derivative_links):] /= self.sample_period
+            self.p_bE[len(self.equality_bounds.names_derivative_links):] /= self.mpc_dt
         else:
             self.p_bE = pd.DataFrame()
         if len(lbA) > 0:
             self.p_lbA_raw = pd.DataFrame(lbA, self.inequality_constr_names, ['data'], dtype=float)
             self.p_lbA = deepcopy(self.p_lbA_raw)
-            self.p_lbA /= self.sample_period
+            self.p_lbA /= self.mpc_dt
 
             self.p_ubA_raw = pd.DataFrame(ubA, self.inequality_constr_names, ['data'], dtype=float)
             self.p_ubA = deepcopy(self.p_ubA_raw)
-            self.p_ubA /= self.sample_period
+            self.p_ubA /= self.mpc_dt
 
             self.p_bA_raw = pd.DataFrame({'lbA': lbA, 'ubA': ubA}, self.inequality_constr_names, dtype=float)
             self.p_bA = deepcopy(self.p_bA_raw)
-            self.p_bA /= self.sample_period
+            self.p_bA /= self.mpc_dt
         else:
             self.p_lbA = pd.DataFrame()
             self.p_ubA = pd.DataFrame()

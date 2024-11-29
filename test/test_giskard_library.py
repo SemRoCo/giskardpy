@@ -44,7 +44,7 @@ from motion_graph.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA, WEIGHT_COL
 from qp.constraint import DerivativeEqualityConstraint
 from sympy.strategies.branch import condition
 from tensorflow.python.ops.gen_math_ops import accumulate_nv2
-from utils.math import limit
+from utils.math import limit, find_best_jerk_limit
 from utils_for_tests import pr2_urdf
 
 try:
@@ -648,6 +648,9 @@ class Simulator:
                  jerk_limit: float,
                  alpha: float, graph_styles: Optional[List[Tuple[str, str]]],
                  qp_formulation: QPFormulation):
+        vel_limit = 1
+        # if jerk_limit is None:
+        #     jerk_limit = find_best_jerk_limit(h, mpc_dt, vel_limit)
         god_map.simulator = self
         world.update_default_weights({Derivatives.velocity: 0.01,
                                       Derivatives.acceleration: 0.0,
@@ -676,7 +679,7 @@ class Simulator:
             ]
         else:
             self.graph_styles = graph_styles
-        god_map.qp_controller = QPController(sample_period=self.mpc_dt,
+        god_map.qp_controller = QPController(mpc_dt=self.mpc_dt,
                                              solver_id=self.solver,
                                              prediction_horizon=self.h,
                                              max_derivative=self.max_derivative,
@@ -709,7 +712,7 @@ class Simulator:
         god_map.motion_graph_manager.add_task(task)
 
     def add_cart_vel_goal(self, root_link: PrefixName, tip_link: PrefixName, x_goal: float, name: str = 'g1',
-                               weight: float = WEIGHT_BELOW_CA):
+                          weight: float = WEIGHT_BELOW_CA):
         goal_symbol = symbol_manager.get_symbol(f'god_map.simulator.goal_state[\"{name}\"][0]')
         weight_symbol = symbol_manager.get_symbol(f'god_map.simulator.goal_state[\"{name}\"][1]')
         task = CartesianPositionVelocityGoal(name=name, root_link=root_link, tip_link=tip_link,
@@ -859,8 +862,8 @@ class Simulator:
         self.traj.plot_trajectory('test', sample_period=self.control_dt, filter_0_vel=True,
                                   hspace=0.5, height_per_derivative=4)
         color_map = defaultdict(lambda: self.graph_styles[len(color_map)])
-        god_map.debug_expression_manager.raw_traj_to_traj(control_dt=self.control_dt).plot_trajectory(
-            'debug', sample_period=self.control_dt, filter_0_vel=False,
+        god_map.debug_expression_manager.raw_traj_to_traj(control_dt=self.control_dt).plot_trajectory('',
+            sample_period=self.control_dt, filter_0_vel=False,
             hspace=1, height_per_derivative=3,
             color_map=color_map,
             plot0_lines=False,
@@ -914,7 +917,7 @@ class GoalSwapper:
         self.noise = noise
         self.offset = offset
 
-    def __call__(self, time: float):
+    def __call__(self, goal_name: str, time: float):
         if time > self.next_swap:
             self.goal = - self.goal
             self.next_swap += self.swap_time
@@ -928,11 +931,11 @@ class GoalSequence:
         self.goal = 0
         self.i = 0
 
-    def __call__(self, time: float):
+    def __call__(self, goal_name: str, time: float):
         while self.i < len(self.goals) - 1 and time >= self.goals[self.i + 1][0]:
             self.i += 1
         self.goal = self.goals[self.i][1]
-        return self.goal + np.random.normal(0, self.noise, 1)[0]
+        return self.goal + np.random.normal(0, self.noise, 1)[0], 1
 
 
 class GoalSin:
@@ -942,9 +945,9 @@ class GoalSin:
         self.phase = phase
         self.noise = noise
 
-    def __call__(self, time: float):
+    def __call__(self, goal_name: str, time: float):
         self.goal = np.cos(god_map.time * np.pi / self.phase) * self.magnitude
-        return self.goal + np.random.normal(0, self.noise, 1)[0]
+        return self.goal + np.random.normal(0, self.noise, 1)[0], 1
 
 
 class TestController:
@@ -994,24 +997,58 @@ class TestController:
     def test_joint_goal_pr2_dt_vs_jerk(self, pr2_world: WorldTree):
         jerk_limit = 2500
         sim_time = 4
+        ph = 5
         noise = 0.25
         pos_noise = 0
         vel_noise = 0
         acc_noise = 0
+
         graph_styles = [
             ['--', 'black'],
-            ['-', '#993000'],
+            ['none', 'black'],
+            ['none', 'black'],
+            ['-', '#003399'],
+            ['-', '#003399'],
+            ['-', '#003399'],
+            ['-', '#003399'],
+
+            ['--', '#993000'],
+            ['none', '#993000'],
+            ['none', '#993000'],
+
+            ['--', '#993000'],
+            ['none', '#993000'],
+            ['none', '#993000'],
         ]
-        joint_thing(jerk_limit=jerk_limit, sim_time=sim_time,
-                    control_dt=0.05, mpc_dt=0.05, h=5, world=pr2_world,
-                    goal_function=GoalSwapper(1, 1.5, noise),
-                    graph_styles=graph_styles, plot_legend=True,
-                    pos_noise=pos_noise, vel_noise=vel_noise, acc_noise=acc_noise)
-        joint_thing(jerk_limit=jerk_limit, sim_time=sim_time,
-                    control_dt=0.01, mpc_dt=0.01, h=5, world=pr2_world,
-                    goal_function=GoalSwapper(1, 1.5, noise),
-                    graph_styles=graph_styles, plot_legend=False,
-                    pos_noise=pos_noise, vel_noise=vel_noise, acc_noise=acc_noise)
+        simulator = Simulator(world=pr2_world,
+                              control_dt=0.05,
+                              mpc_dt=0.05,
+                              h=ph,
+                              solver=SupportedQPSolver.gurobi,
+                              alpha=0.1,
+                              graph_styles=graph_styles,
+                              jerk_limit=jerk_limit,
+                              qp_formulation=QPFormulation.explicit_no_acc)
+        simulator.reset()
+        simulator.add_joint_goal(joint_names=('pr2/r_wrist_roll_joint',), name='g1', weight=1, goal=1)
+        simulator.compile()
+        simulator.run(GoalSwapper(1, 1.5, noise), sim_time, pos_noise, vel_noise, acc_noise,
+                      plot_legend=True, plot_kwargs={'unit': 'rad', 'file_name': 'jerk_vs_dt_0.05.pdf'})
+        # %%
+        simulator = Simulator(world=pr2_world,
+                              control_dt=0.01,
+                              mpc_dt=0.01,
+                              h=ph,
+                              solver=SupportedQPSolver.gurobi,
+                              alpha=0.1,
+                              graph_styles=graph_styles,
+                              jerk_limit=jerk_limit,
+                              qp_formulation=QPFormulation.explicit_no_acc)
+        simulator.reset()
+        simulator.add_joint_goal(joint_names=('pr2/r_wrist_roll_joint',), name='g1', weight=1, goal=1)
+        simulator.compile()
+        simulator.run(GoalSwapper(1, 1.5, noise), sim_time, pos_noise, vel_noise, acc_noise,
+                      plot_legend=False, plot_kwargs={'unit': 'rad', 'file_name': 'jerk_vs_dt_0.01.pdf'})
 
     def test_joint_goal_pr2_implicit_limit(self, pr2_world: WorldTree):
         jerk_limit = 100
@@ -1032,33 +1069,85 @@ class TestController:
     def test_joint_goal_pr2_dt_vs_dt_actual(self, pr2_world: WorldTree):
         jerk_limit = 100
         sim_time = 4
+        mpc_dt = 0.05
+        ph = 5
         noise = 0.
         pos_noise = 0
         vel_noise = 0
         acc_noise = 0
-        joint_thing(jerk_limit=jerk_limit, sim_time=sim_time,
-                    control_dt=0.01, mpc_dt=0.05, h=9, world=pr2_world,
-                    goal_function=GoalSwapper(1, 1.5, noise),
-                    plot_legend=True, pos_noise=pos_noise, vel_noise=vel_noise, acc_noise=acc_noise)
-        joint_thing(jerk_limit=jerk_limit, sim_time=sim_time,
-                    control_dt=0.05, mpc_dt=0.05, h=9, world=pr2_world,
-                    goal_function=GoalSwapper(1, 1.5, noise),
-                    plot_legend=False, pos_noise=pos_noise, vel_noise=vel_noise, acc_noise=acc_noise)
-        joint_thing(jerk_limit=jerk_limit, sim_time=sim_time + 0.05,
-                    control_dt=0.075, mpc_dt=0.05, h=5, world=pr2_world,
-                    goal_function=GoalSwapper(1, 1.5, noise),
-                    plot_legend=False, pos_noise=pos_noise, vel_noise=vel_noise, acc_noise=acc_noise)
+        graph_styles = [
+            ['--', 'black'],
+            ['none', 'black'],
+            ['none', 'black'],
+            ['-', '#003399'],
+            ['-', '#003399'],
+            ['-', '#003399'],
+            ['-', '#003399'],
+
+            ['--', '#993000'],
+            ['none', '#993000'],
+            ['none', '#993000'],
+
+            ['--', '#993000'],
+            ['none', '#993000'],
+            ['none', '#993000'],
+        ]
+        simulator = Simulator(world=pr2_world,
+                              control_dt=0.01,
+                              mpc_dt=mpc_dt,
+                              h=ph,
+                              solver=SupportedQPSolver.gurobi,
+                              alpha=0.1,
+                              graph_styles=graph_styles,
+                              jerk_limit=jerk_limit,
+                              qp_formulation=QPFormulation.explicit_no_acc)
+        simulator.reset()
+        simulator.add_joint_goal(joint_names=('pr2/r_wrist_roll_joint',), name='g1', weight=1, goal=1)
+        simulator.compile()
+        simulator.run(GoalSwapper(1, 1.5, noise), sim_time, pos_noise, vel_noise, acc_noise,
+                      plot_legend=True, plot_kwargs={'unit': 'rad', 'file_name': 'actual_vs_mpc_0.01.pdf'})
+        # %%
+        simulator = Simulator(world=pr2_world,
+                              control_dt=0.05,
+                              mpc_dt=mpc_dt,
+                              h=ph,
+                              solver=SupportedQPSolver.gurobi,
+                              alpha=0.1,
+                              graph_styles=graph_styles,
+                              jerk_limit=jerk_limit,
+                              qp_formulation=QPFormulation.explicit_no_acc)
+        simulator.reset()
+        simulator.add_joint_goal(joint_names=('pr2/r_wrist_roll_joint',), name='g1', weight=1, goal=1)
+        simulator.compile()
+        simulator.run(GoalSwapper(1, 1.5, noise), sim_time, pos_noise, vel_noise, acc_noise,
+                      plot_legend=False, plot_kwargs={'unit': 'rad', 'file_name': 'actual_vs_mpc_0.05.pdf'})
+        # %%
+        simulator = Simulator(world=pr2_world,
+                              control_dt=0.07,
+                              mpc_dt=mpc_dt,
+                              h=ph,
+                              solver=SupportedQPSolver.gurobi,
+                              alpha=0.1,
+                              graph_styles=graph_styles,
+                              jerk_limit=jerk_limit,
+                              qp_formulation=QPFormulation.explicit_no_acc)
+        simulator.reset()
+        simulator.add_joint_goal(joint_names=('pr2/r_wrist_roll_joint',), name='g1', weight=1, goal=1)
+        simulator.compile()
+        simulator.run(GoalSwapper(1, 1.5, noise), sim_time, pos_noise, vel_noise, acc_noise,
+                      plot_legend=False, plot_kwargs={'unit': 'rad', 'file_name': 'actual_vs_mpc_0.07.pdf'})
 
     def test_joint_goal_pr2_pos_limits(self, pr2_world: WorldTree):
-        jerk_limit = 1111
         sim_time = 6
         noise = 0.00
         control_dt = 0.01
-        pos_noise = 0.0005
+        pos_noise = 0.001
         vel_noise = 0
         acc_noise = 0
         graph_styles = [
             [':', 'black'],
+            ['none', 'black'],
+            ['none', 'black'],
             ['!shade above', 'red'],
             ['!shade above', 'red'],
             ['!shade below', 'red'],
@@ -1075,15 +1164,26 @@ class TestController:
         ]
         x = np.linspace(0.8, sim_time, 1000)
         x2 = np.linspace(0.75, 1.75, 1000)
-        y = np.cos((x) * np.pi * x2) * 0.1 - 0.2
+        y = np.cos((x) * np.pi * x2*0.8) * 0.1 - 0.2
         goals.extend(list(zip(x.tolist(), y.tolist())))
-        joint_thing(jerk_limit=jerk_limit, sim_time=sim_time,
-                    control_dt=control_dt, mpc_dt=control_dt, h=7, world=pr2_world,
-                    goal_function=GoalSequence(goals, noise),
-                    joint_names=('pr2/r_elbow_flex_joint',),
-                    plot_legend=True, pos_noise=pos_noise, vel_noise=vel_noise, acc_noise=acc_noise,
-                    graph_styles=graph_styles)
-        # simulator.traj.to_dict()[0][joint_names[0]][61:]
+        goal_f = GoalSequence(goals, noise)
+
+        simulator = Simulator(world=pr2_world,
+                              control_dt=control_dt,
+                              mpc_dt=control_dt,
+                              h=7,
+                              solver=SupportedQPSolver.gurobi,
+                              alpha=0.1,
+                              graph_styles=graph_styles,
+                              jerk_limit=None,
+                              qp_formulation=QPFormulation.explicit_no_acc)
+        simulator.reset()
+        first_goal, first_weight = goal_f('', 0)
+        simulator.add_joint_goal(joint_names=('pr2/r_elbow_flex_joint',), name='g1', weight=first_weight,
+                                 goal=first_goal)
+        simulator.compile()
+        simulator.run(goal_f, sim_time, pos_noise, vel_noise, acc_noise,
+                      plot_legend=True, plot_kwargs={'unit': 'rad', 'file_name': 'pos_limits.pdf'})
 
     def test_joint_goal_pr2_fight(self, pr2_world: WorldTree):
         jerk_limit = 711
@@ -1297,40 +1397,78 @@ class TestController:
     def test_joint_goal_pr2_tune_guide(self, pr2_world: WorldTree):
         sim_time = 4
         noise = 0.05
-        pos_noise = 0.0
+        dt = 0.01
+        pos_noise = 0.0005
         vel_noise = 0
         acc_noise = 0
         phase = 1.5
+
         graph_styles = [
             ['--', 'black'],
-            # ['!shade above', 'red'],
-            # ['!shade above', 'red'],
-            # ['!shade below', 'red'],
-            ['-', '#993000'],
+            ['none', 'black'],
+            ['none', 'black'],
+            ['-', '#003399'],
+            ['-', '#003399'],
+            ['-', '#003399'],
+            ['-', '#003399'],
+
+            ['--', '#993000'],
+            ['none', '#993000'],
+            ['none', '#993000'],
+
+            ['--', '#993000'],
+            ['none', '#993000'],
+            ['none', '#993000'],
         ]
-        joint_thing(jerk_limit=5000, sim_time=sim_time,
-                    control_dt=0.01, mpc_dt=0.01, h=4, world=pr2_world,
-                    goal_function=GoalSin(1, magnitude=0.5, phase=phase, noise=noise),
-                    pos_noise=pos_noise, vel_noise=vel_noise, acc_noise=acc_noise,
-                    graph_styles=graph_styles,
-                    plot_legend=False)
-        joint_thing(jerk_limit=40000, sim_time=sim_time,
-                    control_dt=0.01, mpc_dt=0.01, h=4, world=pr2_world,
-                    goal_function=GoalSin(1, magnitude=0.5, phase=phase, noise=noise),
-                    pos_noise=pos_noise, vel_noise=vel_noise, acc_noise=acc_noise,
-                    graph_styles=graph_styles,
-                    plot_legend=False)
-        joint_thing(jerk_limit=1000, sim_time=sim_time,
-                    control_dt=0.01, mpc_dt=0.01, h=10, world=pr2_world,
-                    goal_function=GoalSin(1, magnitude=0.5, phase=phase, noise=noise),
-                    pos_noise=pos_noise, vel_noise=vel_noise, acc_noise=acc_noise,
-                    graph_styles=graph_styles,
-                    plot_legend=False)
-        # joint_thing(jerk_limit=500, sim_time=sim_time,
-        #             control_dt=0.01, mpc_dt=0.01, h=10, world=pr2_world,
-        #             goal_function=GoalSin(1, magnitude=0.5, phase=phase, noise=noise),
-        #             pos_noise=pos_noise, vel_noise=vel_noise, acc_noise=acc_noise,
-        #             plot_legend=False)
+        goalf_f = GoalSin(1, magnitude=0.5, phase=phase, noise=noise)
+        simulator = Simulator(world=pr2_world,
+                              control_dt=dt,
+                              mpc_dt=dt,
+                              h=4,
+                              solver=SupportedQPSolver.gurobi,
+                              alpha=0.1,
+                              graph_styles=graph_styles,
+                              jerk_limit=None,
+                              qp_formulation=QPFormulation.explicit_no_acc)
+        simulator.reset()
+        first_goal, first_weight = goalf_f('', 0)
+        simulator.add_joint_goal(joint_names=('pr2/r_wrist_roll_joint',), name='g1', weight=first_weight,
+                                 goal=first_goal)
+        simulator.compile()
+        simulator.run(goalf_f, sim_time, pos_noise, vel_noise, acc_noise,
+                      plot_legend=True, plot_kwargs={'unit': 'rad', 'file_name': 'tune_guide_h4.pdf'})
+        # %%
+        simulator = Simulator(world=pr2_world,
+                              control_dt=dt,
+                              mpc_dt=dt,
+                              h=6,
+                              solver=SupportedQPSolver.gurobi,
+                              alpha=0.1,
+                              graph_styles=graph_styles,
+                              jerk_limit=None,
+                              qp_formulation=QPFormulation.explicit_no_acc)
+        simulator.reset()
+        simulator.add_joint_goal(joint_names=('pr2/r_wrist_roll_joint',), name='g1', weight=first_weight,
+                                 goal=first_goal)
+        simulator.compile()
+        simulator.run(goalf_f, sim_time, pos_noise, vel_noise, acc_noise,
+                      plot_legend=True, plot_kwargs={'unit': 'rad', 'file_name': 'tune_guide_h6.pdf'})
+        # %%
+        simulator = Simulator(world=pr2_world,
+                              control_dt=dt,
+                              mpc_dt=dt,
+                              h=8,
+                              solver=SupportedQPSolver.gurobi,
+                              alpha=0.1,
+                              graph_styles=graph_styles,
+                              jerk_limit=None,
+                              qp_formulation=QPFormulation.explicit_no_acc)
+        simulator.reset()
+        simulator.add_joint_goal(joint_names=('pr2/r_wrist_roll_joint',), name='g1', weight=first_weight,
+                                 goal=first_goal)
+        simulator.compile()
+        simulator.run(goalf_f, sim_time, pos_noise, vel_noise, acc_noise,
+                      plot_legend=True, plot_kwargs={'unit': 'rad', 'file_name': 'tune_guide_h8.pdf'})
 
     def test_joint_vel_goal_pr2(self, pr2_world: WorldTree):
         sim_time = 4

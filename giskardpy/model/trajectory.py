@@ -179,6 +179,8 @@ class Trajectory:
                     try:
                         style, color = color_map[str(free_variable)]
                         if plot0_lines or not np.allclose(f_data, 0):
+                            if style == 'none':
+                                continue
                             if not style.startswith('!'):
                                 axs[derivative].plot(times, f_data, color=color,
                                                      linestyle=style,
@@ -198,8 +200,7 @@ class Trajectory:
                 axs[derivative].grid()
 
             if legend:
-                axs[1].legend(bbox_to_anchor=(1.01, 1), loc='upper left')
-                # axs[0].legend(bbox_to_anchor=(0.5, 2), loc='upper left')
+                axs[0].legend(bbox_to_anchor=(1.01, 1), loc='upper left')
 
             axs[-1].set_xlabel('time [s]')
             axs[Derivatives.position].set_ylabel(unit)

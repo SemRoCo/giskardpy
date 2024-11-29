@@ -64,7 +64,7 @@ class JointPositionList(Task):
                                                                       Derivatives.position,
                                                                       # Derivatives.velocity
                                                                   ])
-            cap = self.max_velocity*god_map.qp_controller.sample_period * (god_map.qp_controller.prediction_horizon-2)
+            cap = self.max_velocity*god_map.qp_controller.mpc_dt * (god_map.qp_controller.prediction_horizon-2)
             god_map.debug_expression_manager.add_debug_expression(f'{self.name}/upper_cap', goal + cap,
                                                                   derivatives_to_plot=[
                                                                       Derivatives.position,
@@ -95,7 +95,7 @@ class JointPositionList(Task):
                                    vel_limits=god_map.world.compute_joint_limits(name, Derivatives.velocity),
                                    acc_limits=god_map.world.compute_joint_limits(name, Derivatives.acceleration),
                                    jerk_limits=god_map.world.compute_joint_limits(name, Derivatives.jerk),
-                                   dt=god_map.qp_controller.sample_period,
+                                   dt=god_map.qp_controller.mpc_dt,
                                    ph=god_map.qp_controller.prediction_horizon)
                 god_map.debug_expression_manager.add_debug_expression(f'{name}/upper_vel',
                                                                       ub[0],

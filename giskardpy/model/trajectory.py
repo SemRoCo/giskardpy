@@ -67,7 +67,7 @@ class Trajectory:
 
     @property
     def length_in_seconds(self) -> float:
-        return len(self) * god_map.qp_controller.sample_period
+        return len(self) * god_map.qp_controller.mpc_dt
 
     def to_dict(self, normalize_position: Optional[bool] = None, filter_0_vel: bool = True, sort: bool = True)\
             -> Dict[Derivatives, Dict[PrefixName, np.ndarray]]:

@@ -14,7 +14,8 @@ class QPControllerConfig:
     def __init__(self,
                  qp_solver: Optional[SupportedQPSolver] = None,
                  prediction_horizon: int = 7,
-                 sample_period: float = 0.0125,
+                 mpc_dt: float = 0.0125,
+                 control_dt: Optional[float] = None,
                  max_trajectory_length: Optional[float] = 30,
                  retries_with_relaxed_constraints: int = 5,
                  added_slack: float = 100,
@@ -22,7 +23,7 @@ class QPControllerConfig:
         """
         :param qp_solver: if not set, Giskard will search for the fasted installed solver.
         :param prediction_horizon: Giskard uses MPC and this is the length of the horizon. You usually don't need to change this.
-        :param sample_period: time (s) difference between commands in the MPC horizon.
+        :param mpc_dt: time (s) difference between commands in the MPC horizon.
         :param max_trajectory_length: Giskard will stop planning/controlling the robot until this amount of s has passed.
                                       This is disabled if set to None.
         :param retries_with_relaxed_constraints: don't change, only for the pros.
@@ -33,7 +34,8 @@ class QPControllerConfig:
         if prediction_horizon < 4:
             raise ValueError('prediction horizon must be >= 4.')
         self.__prediction_horizon = prediction_horizon
-        self.__sample_period = sample_period
+        self.__mpc_dt = mpc_dt
+        self.control_dt = control_dt
         self.__max_trajectory_length = max_trajectory_length
         self.__retries_with_relaxed_constraints = retries_with_relaxed_constraints
         self.__added_slack = added_slack
@@ -42,7 +44,8 @@ class QPControllerConfig:
         self.set_defaults()
 
     def set_defaults(self):
-        god_map.qp_controller = QPController(sample_period=self.__sample_period,
+        god_map.qp_controller = QPController(mpc_dt=self.__mpc_dt,
+                                             control_dt=self.control_dt,
                                              prediction_horizon=self.__prediction_horizon,
                                              solver_id=self.__qp_solver,
                                              max_derivative=self.__max_derivative,

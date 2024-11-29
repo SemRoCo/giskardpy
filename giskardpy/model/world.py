@@ -210,7 +210,7 @@ class WorldTree(WorldTreeInterface):
         assert len(self._default_limits) == max(self._default_limits)
         for v in self.free_variables.values():
             for d, new_limit in new_limits.items():
-                v.set_lower_limit(d, -new_limit)
+                v.set_lower_limit(d, -new_limit if new_limit is not None else None)
                 v.set_upper_limit(d, new_limit)
 
     def update_default_weights(self, new_weights: Dict[Derivatives, float]):
@@ -666,7 +666,7 @@ class WorldTree(WorldTreeInterface):
                 joint = Joint.from_urdf(urdf_joint, group_name)
                 if not isinstance(joint, FixedJoint):
                     for derivative, limit in self.default_limits.items():
-                        joint.free_variable.set_lower_limit(derivative, -limit)
+                        joint.free_variable.set_lower_limit(derivative, -limit if limit is not None else None)
                         joint.free_variable.set_upper_limit(derivative, limit)
                 self.add_joint(joint)
 

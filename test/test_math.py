@@ -9,7 +9,7 @@ class TestMath(unittest.TestCase):
         limits = {
             Derivatives.velocity: 1,
             Derivatives.acceleration: np.inf,
-            Derivatives.jerk: 21.1
+            Derivatives.jerk: None
         }
         actual = giskard_math.mpc_velocity_integral(limits, 0.05, 9)
         expected = giskard_math.mpc_velocity_integral3(limits, 0.05, 9)

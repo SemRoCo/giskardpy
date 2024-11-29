@@ -137,6 +137,8 @@ class FreeVariable:
         else:
             raise KeyError(f'Free variable {self} doesn\'t have lower limit for derivative of order {derivative}')
         if evaluated:
+            if expr is None:
+                return None
             return float(symbol_manager.evaluate_expr(expr))
         return expr
 
@@ -158,6 +160,8 @@ class FreeVariable:
         else:
             raise KeyError(f'Free variable {self} doesn\'t have upper limit for derivative of order {derivative}')
         if evaluated:
+            if expr is None:
+                return None
             return symbol_manager.evaluate_expr(expr)
         return expr
 
@@ -185,8 +189,11 @@ class FreeVariable:
     @profile
     def normalized_weight(self, t: int, derivative: Derivatives, prediction_horizon: int, alpha: float,
                           evaluated: bool = False) -> Union[Union[cas.Symbol, float], float]:
+        limit = self.get_upper_limit(derivative)
+        if limit is None:
+            return 0.0
         weight = symbol_manager.evaluate_expr(self.quadratic_weights[derivative])
-        limit = symbol_manager.evaluate_expr(self.get_upper_limit(derivative))
+        limit = symbol_manager.evaluate_expr(limit)
 
         # weight = my_cycloid(t, weight, prediction_horizon, alpha) # -0.6975960014626146
         # weight = my_cycloid2(t, weight, prediction_horizon, alpha, q=2) # -0.7023704675764478

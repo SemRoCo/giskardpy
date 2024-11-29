@@ -212,23 +212,24 @@ def max_velocity_from_horizon_and_jerk_qp(prediction_horizon: int,
                     (-acc_limit,) * prediction_horizon,
                     (-jerk_limit,) * prediction_horizon)
     return mpc(upper_limits=upper_limits, lower_limits=lower_limits,
-               current_values=(0, 0), dt=dt, ph=prediction_horizon, q_weight=(0,0,0), lin_weight=(-1,0,0),
+               current_values=(0, 0), dt=dt, ph=prediction_horizon, q_weight=(0, 0, 0), lin_weight=(-1, 0, 0),
                solver_class=None, link_to_current_vel=False)
 
+
 def max_velocity_from_horizon_and_jerk_qp2(prediction_horizon: int,
-                                          vel_limit: float,
-                                          acc_limit: float,
-                                          jerk_limit: float,
-                                          dt: float,
-                                          max_derivative: Derivatives):
+                                           vel_limit: float,
+                                           acc_limit: float,
+                                           jerk_limit: float,
+                                           dt: float,
+                                           max_derivative: Derivatives):
     upper_limits = ((vel_limit,) * prediction_horizon,
-                    tuple([0] + [acc_limit] * (prediction_horizon-1)),
+                    tuple([0] + [acc_limit] * (prediction_horizon - 1)),
                     (np.inf,) * prediction_horizon)
     lower_limits = ((-vel_limit,) * prediction_horizon,
-                    tuple([0] + [-acc_limit] * (prediction_horizon-1)),
+                    tuple([0] + [-acc_limit] * (prediction_horizon - 1)),
                     (-np.inf,) * prediction_horizon)
     return mpc(upper_limits=upper_limits, lower_limits=lower_limits,
-               current_values=(vel_limit, 0), dt=dt, ph=prediction_horizon, q_weight=(0,0,1), lin_weight=(0,0,0),
+               current_values=(vel_limit, 0), dt=dt, ph=prediction_horizon, q_weight=(0, 0, 1), lin_weight=(0, 0, 0),
                solver_class=None, link_to_current_vel=True)
 
 
@@ -492,3 +493,33 @@ def quaternion_slerp(q1, q2, t):
     if 0.001 > abs(sin_half_theta):
         return 0.5 * q1 + 0.5 * q2
     return ratio_a * q1 + ratio_b * q2
+
+
+@memoize
+def find_best_jerk_limit(prediction_horizon: int, dt: float, target_vel_limit: float, eps: float = 0.0001) -> float:
+    jerk_limit = (4 * target_vel_limit) / dt ** 2
+    upper_bound = jerk_limit
+    lower_bound = 0
+    best_vel_limit = 0
+    best_jerk_limit = 0
+    for i in range(100):
+        vel_limit = max_velocity_from_horizon_and_jerk_qp(prediction_horizon=prediction_horizon,
+                                                          vel_limit=1000,
+                                                          acc_limit=np.inf,
+                                                          jerk_limit=jerk_limit,
+                                                          dt=dt,
+                                                          max_derivative=Derivatives.jerk)[0]
+        if abs(vel_limit - target_vel_limit) < abs(best_vel_limit - target_vel_limit):
+            best_vel_limit = vel_limit
+            best_jerk_limit = jerk_limit
+        if abs(vel_limit - target_vel_limit) < eps:
+            break
+        if vel_limit > target_vel_limit:
+            upper_bound = jerk_limit
+            jerk_limit = round((jerk_limit + lower_bound) / 2, 4)
+        else:
+            lower_bound = jerk_limit
+            jerk_limit = round((jerk_limit + upper_bound) / 2, 4)
+    print(
+        f'best velocity limit: {best_vel_limit} (target = {target_vel_limit}) with jerk limit: {best_jerk_limit} after {i + 1} iterations')
+    return best_jerk_limit

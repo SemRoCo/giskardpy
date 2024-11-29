@@ -72,9 +72,9 @@ class Giskard:
         god_map.hack = 0
 
     def set_defaults(self) -> None:
+        self.qp_controller_config.set_defaults()
         self.world_config.set_defaults()
         self.robot_interface_config.set_defaults()
-        self.qp_controller_config.set_defaults()
         self.collision_avoidance_config.set_defaults()
         self.behavior_tree_config.set_defaults()
 
@@ -95,11 +95,6 @@ class Giskard:
         GiskardBlackboard().tree.setup(30)
 
     def sanity_check(self):
-        hz = GiskardBlackboard().control_loop_max_hz
-        if god_map.qp_controller.sample_period < 1/hz:
-            raise GiskardException(f'control_loop_max_hz (1/{hz}hz = {1/hz}) '
-                                   f'must be smaller than sample period of controller '
-                                   f'({god_map.qp_controller.sample_period}).')
         self._controlled_joints_sanity_check()
 
     def _controlled_joints_sanity_check(self):

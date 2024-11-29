@@ -24,8 +24,6 @@ class GiskardBlackboard(Blackboard):
     world_action_server: ActionServerHandler
     ros_visualizer: ROSMsgVisualization
     fill_trajectory_velocity_values: bool
-    control_loop_max_hz: float
-    simulation_max_hz: float
 
 
 def raise_to_blackboard(exception):

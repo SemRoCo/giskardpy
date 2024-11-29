@@ -25,8 +25,8 @@ class RealKinSimPlugin(GiskardBehavior):
             return Status.RUNNING
         next_cmds = god_map.qp_solver_solution
         dt = next_time - self.last_time
-        if dt > god_map.qp_controller.sample_period:
-            dt = god_map.qp_controller.sample_period
+        if dt > god_map.qp_controller.mpc_dt:
+            dt = god_map.qp_controller.mpc_dt
         god_map.world.update_state(next_cmds, dt, max_derivative=god_map.qp_controller.max_derivative)
         self.last_time = next_time
         return Status.RUNNING

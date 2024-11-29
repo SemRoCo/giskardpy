@@ -19,7 +19,7 @@ class WorldWithBoxyBaseConfig(WorldConfig):
     def setup(self):
         self.set_default_limits({Derivatives.velocity: 0.5,
                                  Derivatives.acceleration: np.inf,
-                                 Derivatives.jerk: 15})
+                                 Derivatives.jerk: None})
         self.add_empty_link(PrefixName(self.map_name))
         self.add_robot_urdf(urdf=rospy.get_param('robot_description'))
         root_link_name = self.get_root_link_of_group(self.robot_group_name)

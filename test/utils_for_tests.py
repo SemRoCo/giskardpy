@@ -538,7 +538,7 @@ class GiskardTestWrapper(OldGiskardWrapper):
             diff = time() - time_spend_giskarding
             self.total_time_spend_giskarding += diff
             self.total_time_spend_moving += (len(god_map.trajectory.keys()) *
-                                             god_map.qp_controller.sample_period)
+                                             god_map.qp_controller.mpc_dt)
             get_middleware().logwarn(f'Goal processing took {diff}')
             result_exception = msg_converter.error_msg_to_exception(r.error)
             if expected_error_type is not None:

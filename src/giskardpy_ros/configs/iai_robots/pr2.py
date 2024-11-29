@@ -21,10 +21,10 @@ class WorldWithPR2Config(WorldWithOmniDriveRobot):
     def setup(self, robot_name: Optional[str] = None):
         super().setup(robot_name)
         self.set_joint_limits(limit_map={Derivatives.velocity: 2,
-                                         Derivatives.jerk: 1422},
+                                         Derivatives.jerk: None},
                               joint_name='head_pan_joint')
         self.set_joint_limits(limit_map={Derivatives.velocity: 3.5,
-                                         Derivatives.jerk: 2489},
+                                         Derivatives.jerk: None},
                               joint_name='head_tilt_joint')
 
 

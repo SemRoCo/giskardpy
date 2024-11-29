@@ -37,7 +37,8 @@ class ControlLoop(AsyncBehavior):
     log_traj: LogTrajPlugin
     controller_plugin: ControllerPlugin
 
-    def __init__(self, name: str = 'control_loop', log_traj: bool = True, max_hz: Optional[float] = None):
+    def __init__(self, name: str = 'control_loop', log_traj: bool = True):
+        max_hz = 1/GiskardBlackboard().giskard.qp_controller_config.control_dt
         name = f'{name}\nmax_hz: {max_hz}'
         super().__init__(name, max_hz=max_hz)
         self.publish_state = success_is_running(PublishState)('publish state 2')

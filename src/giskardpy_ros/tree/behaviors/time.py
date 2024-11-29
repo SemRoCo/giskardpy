@@ -14,7 +14,7 @@ class TimePlugin(GiskardBehavior):
 
     @profile
     def update(self):
-        god_map.time += god_map.qp_controller.sample_period
+        god_map.time += god_map.qp_controller.mpc_dt
         return Status.SUCCESS
 
 

@@ -104,7 +104,7 @@ class PlotGanttChart(GiskardBehavior):
         god_map.monitor_manager.evaluate_monitors()
 
         # add Nones to make sure all bars gets "ended"
-        new_end_time = god_map.time + god_map.qp_controller.sample_period
+        new_end_time = god_map.time + god_map.qp_controller.mpc_dt
 
         monitor_history = copy(god_map.monitor_manager.state_history)
         monitor_history.append((new_end_time, ([None] * len(monitor_history[0][1][0]), [None] * len(monitor_history[0][1][0]))))

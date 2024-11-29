@@ -32,7 +32,7 @@ class SetMoveResult(GiskardBehavior):
 
         trajectory = god_map.trajectory
         joints = [god_map.world.joints[joint_name] for joint_name in god_map.world.movable_joint_names]
-        sample_period = god_map.qp_controller.sample_period
+        sample_period = god_map.qp_controller.mpc_dt
         move_result.trajectory = msg_converter.trajectory_to_ros_trajectory(trajectory,
                                                                             sample_period=sample_period,
                                                                             start_time=0,

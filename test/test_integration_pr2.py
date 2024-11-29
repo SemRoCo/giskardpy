@@ -165,10 +165,9 @@ class PR2TestWrapper(GiskardTestWrapper):
                                                                                # collision_checker=CollisionCheckerLib.none),
                                                                                ),
                               behavior_tree_config=StandAloneBTConfig(debug_mode=True,
-                                                                      publish_tf=True,
-                                                                      simulation_max_hz=None),
+                                                                      publish_tf=True),
                               # qp_controller_config=QPControllerConfig(qp_solver=SupportedQPSolver.gurobi))
-                              qp_controller_config=QPControllerConfig())
+                              qp_controller_config=QPControllerConfig(mpc_dt=0.05))
         super().__init__(giskard)
         self.robot = god_map.world.groups[self.robot_name]
 
@@ -1280,12 +1279,12 @@ class TestConstraints:
         zero_pose.set_max_traj_length(new_length)
         zero_pose.set_cart_goal(base_goal, tip_link='base_footprint', root_link='map')
         result = zero_pose.execute(expected_error_type=MaxTrajectoryLengthException)
-        dt = god_map.qp_controller.sample_period
+        dt = god_map.qp_controller.mpc_dt
         np.testing.assert_almost_equal(len(result.trajectory.points) * dt, new_length + dt)
 
         zero_pose.set_cart_goal(base_goal, tip_link='base_footprint', root_link='map')
         result = zero_pose.execute(expected_error_type=MaxTrajectoryLengthException)
-        dt = god_map.qp_controller.sample_period
+        dt = god_map.qp_controller.mpc_dt
         assert len(result.trajectory.points) * dt > new_length + 1
 
     def test_CollisionAvoidanceHint(self, kitchen_setup: PR2TestWrapper):

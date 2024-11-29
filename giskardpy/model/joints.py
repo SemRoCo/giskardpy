@@ -478,8 +478,8 @@ class DiffDrive(MovableJoint, VirtualFreeVariables):
         self.parent_T_child = cas.dot(odom_T_bf, bf_T_bf_vel)
 
     def create_free_variables(self) -> None:
-        translation_lower_limits = {derivative: -limit for derivative, limit in self.translation_limits.items()}
-        rotation_lower_limits = {derivative: -limit for derivative, limit in self.rotation_limits.items()}
+        translation_lower_limits = {derivative: -limit if limit is not None else limit for derivative, limit in self.translation_limits.items()}
+        rotation_lower_limits = {derivative: -limit if limit is not None else limit for derivative, limit in self.rotation_limits.items()}
 
         self.x = god_map.world.add_virtual_free_variable(name=PrefixName('x', self.name))
         self.y = god_map.world.add_virtual_free_variable(name=PrefixName('y', self.name))

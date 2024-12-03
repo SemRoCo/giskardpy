@@ -81,7 +81,7 @@ class Rate:
         if elapsed_time > self.sleep_dur * 2:
             self.last_time = curr_time
             if self.print_warning:
-                get_middleware().logwarn(f'Control loop can\'t keep up with {GiskardBlackboard().control_loop_max_hz} hz. '
+                get_middleware().logwarn(f'Control loop can\'t keep up with {GiskardBlackboard().giskard.qp_controller_config.control_dt} hz. '
                                 f'This loop took {elapsed_time.to_sec():.5f}s')
 
 

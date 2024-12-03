@@ -237,9 +237,7 @@ class StandAloneBTConfig(BehaviorTreeConfig):
 class OpenLoopBTConfig(BehaviorTreeConfig):
     def __init__(self,
                  debug_mode: bool = False,
-                 control_loop_max_hz: float = 50,
-                 visualization_mode: VisualizationMode = VisualizationMode.CollisionsDecomposed,
-                 simulation_max_hz: Optional[float] = None):
+                 visualization_mode: VisualizationMode = VisualizationMode.CollisionsDecomposed):
         """
         The default behavior tree for Giskard in open-loop mode. It will first plan the trajectory in simulation mode
         and then publish it to connected joint trajectory followers. The base trajectory is tracked with a closed-loop
@@ -247,8 +245,7 @@ class OpenLoopBTConfig(BehaviorTreeConfig):
         :param debug_mode:  enable various debugging tools.
         :param control_loop_max_hz: if not None, limits the frequency of the base trajectory controller.
         """
-        super().__init__(ControlModes.open_loop, control_loop_max_hz=control_loop_max_hz,
-                         simulation_max_hz=simulation_max_hz)
+        super().__init__(ControlModes.open_loop)
         if god_map.is_in_github_workflow():
             debug_mode = False
         self.debug_mode = debug_mode
@@ -273,16 +270,13 @@ class OpenLoopBTConfig(BehaviorTreeConfig):
 
 class ClosedLoopBTConfig(BehaviorTreeConfig):
     def __init__(self, debug_mode: bool = False,
-                 control_loop_max_hz: float = 50,
-                 visualization_mode: VisualizationMode = VisualizationMode.CollisionsDecomposed,
-                 simulation_max_hz: Optional[float] = None):
+                 visualization_mode: VisualizationMode = VisualizationMode.CollisionsDecomposed):
         """
         The default configuration for Giskard in closed loop mode. Make use to set up the robot interface accordingly.
         :param debug_mode: If True, will publish debug data on topics. This will significantly slow down the control loop.
         :param control_loop_max_hz: Limits the control loop frequency. If None, it will go as fast as possible.
         """
-        super().__init__(ControlModes.close_loop, control_loop_max_hz=control_loop_max_hz,
-                         simulation_max_hz=simulation_max_hz)
+        super().__init__(ControlModes.close_loop)
         if god_map.is_in_github_workflow():
             debug_mode = False
         self.debug_mode = debug_mode

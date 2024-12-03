@@ -183,7 +183,7 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
 
         result = self.action_client.get_result()
         if result:
-            if current_time < self.min_deadline:
+            if current_time.to_sec() < self.min_deadline.to_sec():
                 msg = f'\'{self.namespace}\' executed too quickly, stopping execution.'
                 e = ExecutionSucceededPrematurely(msg)
                 raise_to_blackboard(e)
@@ -192,7 +192,7 @@ class SendFollowJointTrajectory(ActionClient, GiskardBehavior):
             get_middleware().loginfo(f'\'{self.namespace}\' successfully executed the trajectory.')
             return py_trees.Status.SUCCESS
 
-        if current_time > self.max_deadline:
+        if current_time.to_sec() > self.max_deadline.to_sec():
             self.action_client.cancel_goal()
             msg = f'Cancelling \'{self.namespace}\' because it took to long to execute the goal.'
             get_middleware().logerr(msg)

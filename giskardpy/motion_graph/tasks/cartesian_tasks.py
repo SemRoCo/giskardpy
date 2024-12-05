@@ -1,12 +1,12 @@
 from typing import Optional
 
-from data_types.data_types import Derivatives
+from giskardpy.data_types.data_types import Derivatives
 from giskardpy import casadi_wrapper as cas
 from giskardpy.data_types.data_types import PrefixName, ColorRGBA
 from giskardpy.god_map import god_map
 from giskardpy.motion_graph.monitors.cartesian_monitors import PositionReached, OrientationReached
 from giskardpy.motion_graph.tasks.task import Task, WEIGHT_ABOVE_CA
-from symbol_manager import symbol_manager
+from giskardpy.symbol_manager import symbol_manager
 
 
 class CartesianPosition(Task):

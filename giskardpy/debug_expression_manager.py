@@ -3,7 +3,7 @@ from typing import Dict, Optional, List, Tuple, Union
 
 import numpy as np
 import pandas as pd
-from data_types.data_types import Derivatives
+from giskardpy.data_types.data_types import Derivatives
 from line_profiler import profile
 
 import giskardpy.casadi_wrapper as cas

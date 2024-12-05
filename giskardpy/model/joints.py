@@ -226,6 +226,7 @@ class OneDofJoint(MovableJoint):
         self.parent_link_name = parent_link_name
         self.child_link_name = child_link_name
         self.parent_T_child = parent_T_child or cas.TransMatrix()
+        self.original_parent_T_child = cas.TransMatrix(self.parent_T_child)
         if multiplier is None:
             self.multiplier = 1
         else:
@@ -718,3 +719,31 @@ class PR2CasterJoint(MovableJoint):
 
     def get_free_variable_names(self) -> List[PrefixName]:
         return []
+
+
+class JustinTorso(Joint):
+    q1: FreeVariable
+    q2: FreeVariable
+    q3: cas.Expression
+
+    def __init__(self,
+                 name: PrefixName,
+                 parent_link_name: PrefixName,
+                 child_link_name: PrefixName,
+                 axis: Tuple[float, float, float],
+                 parent_T_child: cas.TransMatrix,
+                 q1: FreeVariable,
+                 q2: FreeVariable):
+        self.parent_T_child = parent_T_child
+        self.name = name
+        self.parent_link_name = parent_link_name
+        self.child_link_name = child_link_name
+        self.axis = axis
+
+        self.q1 = q1
+        self.q2 = q2
+        self.q3 = -self.q2.get_symbol(Derivatives.position) - self.q1.get_symbol(Derivatives.position)
+
+        rotation_axis = cas.Vector3(self.axis)
+        parent_R_child = cas.RotationMatrix.from_axis_angle(rotation_axis, self.q3)
+        self.parent_T_child = self.parent_T_child.dot(cas.TransMatrix(parent_R_child))

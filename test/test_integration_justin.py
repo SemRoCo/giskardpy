@@ -10,6 +10,7 @@ from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 from giskard_msgs.msg import LinkName, GiskardError
 from giskardpy.data_types.exceptions import EmptyProblemException
 from giskardpy.motion_graph.tasks.task import WEIGHT_ABOVE_CA
+from giskardpy.utils.math import quaternion_from_rotation_matrix
 from giskardpy_ros.configs.behavior_tree_config import StandAloneBTConfig
 from giskardpy_ros.configs.giskard import Giskard
 from giskardpy_ros.configs.iai_robots.hsr import HSRCollisionAvoidanceConfig, WorldWithHSRConfig, HSRStandaloneInterface
@@ -56,7 +57,8 @@ class JustinTestWrapper(GiskardTestWrapper):
                               robot_interface_config=JustinStandaloneInterface(),
                               behavior_tree_config=StandAloneBTConfig(publish_tf=True, debug_mode=True,
                                                                       visualization_mode=VisualizationMode.VisualsFrameLocked),
-                              qp_controller_config=QPControllerConfig())
+                              qp_controller_config=QPControllerConfig(mpc_dt=0.0125,
+                                                                      control_dt=0.0125))
         super().__init__(giskard)
         # self.r_gripper = rospy.ServiceProxy('r_gripper_simulator/set_joint_states', SetJointState)
         # self.l_gripper = rospy.ServiceProxy('l_gripper_simulator/set_joint_states', SetJointState)
@@ -208,70 +210,133 @@ class TestEuRobin:
     def test_open_fridge_dlr(self, dlr_kitchen_setup: JustinTestWrapper):
         handle_frame_id = 'dlr_kitchen/fridge_door_handle'
         handle_name = 'fridge_door_handle'
-        handle_joint = 'fridge_door_joint'
+        door_joint = 'fridge_door_joint'
+        fridge = 'dlr_kitchen/fridge'
         # base_goal = PoseStamped()
-        # base_goal.header.frame_id = 'map'
-        # base_goal.pose.position = Point(0.3, -0.5, 0)
-        # base_goal.pose.orientation.w = 1
-        # kitchen_setup.move_base(base_goal)
+        box_name = 'box'
+        kitchenette = 'dlr_kitchen/kitchenette'
+        box_pose = PoseStamped()
+        box_pose.header.frame_id = kitchenette
+        box_pose.pose.position.z = 0.22
+        box_pose.pose.position.x = -0.1
+        box_pose.pose.orientation.w = 1.0
+        dlr_kitchen_setup.world.add_box(name=box_name, size=(0.03, 0.15, 0.2), pose=box_pose, parent_link=kitchenette)
+        dlr_kitchen_setup.dye_group(group_name=box_name, rgba=(0.0, 0.0, 1.0, 1.0))
 
-        bar_axis = Vector3Stamped()
-        bar_axis.header.frame_id = handle_frame_id
-        bar_axis.vector.z = 1
+        pre_grasp_pose = PoseStamped()
+        pre_grasp_pose.header.frame_id = box_name
+        pre_grasp_pose.pose.orientation = Quaternion(*quaternion_from_rotation_matrix([[-1, 0, 0, 0],
+                                                                                   [0, 1, 0, 0],
+                                                                                   [0, 0, -1, 0],
+                                                                                   [0, 0, 0, 1]]))
+        pre_grasp_pose.pose.position.z = 0.25
+        box_pre_grasped = dlr_kitchen_setup.tasks.add_cartesian_pose(name='pregrasp pose',
+                                                                 goal_pose=pre_grasp_pose,
+                                                                 tip_link=dlr_kitchen_setup.r_tip,
+                                                                 root_link='map')
 
-        bar_center = PointStamped()
-        bar_center.header.frame_id = handle_frame_id
-
-        tip_grasp_axis = Vector3Stamped()
-        tip_grasp_axis.header.frame_id = dlr_kitchen_setup.r_tip
-        tip_grasp_axis.vector.y = 1
-
-        dlr_kitchen_setup.set_grasp_bar_goal(root_link=dlr_kitchen_setup.default_root,
-                                             tip_link=dlr_kitchen_setup.r_tip,
-                                             tip_grasp_axis=tip_grasp_axis,
-                                             bar_center=bar_center,
-                                             bar_axis=bar_axis,
-                                             bar_length=.1)
-        x_gripper = Vector3Stamped()
-        x_gripper.header.frame_id = dlr_kitchen_setup.r_tip
-        x_gripper.vector.z = 1
-
-        x_goal = Vector3Stamped()
-        x_goal.header.frame_id = handle_frame_id
-        x_goal.vector.x = 1
-        dlr_kitchen_setup.set_align_planes_goal(tip_link=dlr_kitchen_setup.r_tip,
-                                                tip_normal=x_gripper,
-                                                goal_normal=x_goal,
-                                                root_link='map')
-        dlr_kitchen_setup.allow_all_collisions()
-        # dlr_kitchen_setup.add_json_goal('AvoidJointLimits', percentage=10)
-        dlr_kitchen_setup.execute()
-        current_pose = dlr_kitchen_setup.compute_fk_pose(root_link='map', tip_link=dlr_kitchen_setup.r_tip)
-
-        dlr_kitchen_setup.set_open_container_goal(tip_link=dlr_kitchen_setup.r_tip,
-                                                  environment_link=handle_name,
-                                                  goal_joint_state=1.5)
-        # dlr_kitchen_setup.set_json_goal('AvoidJointLimits', percentage=40)
-        dlr_kitchen_setup.allow_all_collisions()
-        # dlr_kitchen_setup.add_json_goal('AvoidJointLimits')
-        dlr_kitchen_setup.execute()
-        dlr_kitchen_setup.set_env_state({handle_joint: 1.5})
-
-        pose_reached = dlr_kitchen_setup.monitors.add_cartesian_pose('map',
-                                                                     tip_link=dlr_kitchen_setup.r_tip,
-                                                                     goal_pose=current_pose)
-        dlr_kitchen_setup.monitors.add_end_motion(start_condition=pose_reached)
-
-        dlr_kitchen_setup.set_open_container_goal(tip_link=dlr_kitchen_setup.r_tip,
-                                                  environment_link=handle_name,
-                                                  goal_joint_state=0)
-        dlr_kitchen_setup.allow_all_collisions()
-        # dlr_kitchen_setup.set_json_goal('AvoidJointLimits', percentage=40)
-
+        grasp_pose = deepcopy(pre_grasp_pose)
+        grasp_pose.pose.position.z -= 0.1
+        box_grasped = dlr_kitchen_setup.tasks.add_cartesian_pose(name='grasp box',
+                                                                 goal_pose=grasp_pose,
+                                                                 tip_link=dlr_kitchen_setup.r_tip,
+                                                                 root_link='map',
+                                                                 start_condition=box_pre_grasped)
+        dlr_kitchen_setup.monitors.add_end_motion(start_condition=box_grasped)
+        dlr_kitchen_setup.avoid_all_collisions()
+        dlr_kitchen_setup.allow_self_collision()
         dlr_kitchen_setup.execute(add_local_minimum_reached=False)
 
-        dlr_kitchen_setup.set_env_state({handle_joint: 0})
+        # %%
+        dlr_kitchen_setup.world.update_parent_link_of_group(name=box_name, parent_link=dlr_kitchen_setup.r_tip)
 
-        dlr_kitchen_setup.set_joint_goal(dlr_kitchen_setup.better_pose)
-        dlr_kitchen_setup.allow_all_collisions()
-        dlr_kitchen_setup.execute()
+        # %%
+        base_pose = PoseStamped()
+        base_pose.header.frame_id = 'base_footprint'
+        base_pose.pose.orientation.w = 1.0
+        base_pose.pose.position.x = -1
+        drove_back = dlr_kitchen_setup.tasks.add_cartesian_pose(name='drive back',
+                                                                goal_pose=base_pose,
+                                                                tip_link='base_footprint',
+                                                                root_link='map')
+
+        hand_over_pose = PoseStamped()
+        hand_over_pose.header.frame_id = dlr_kitchen_setup.l_tip
+        hand_over_pose.pose.orientation = Quaternion(*quaternion_from_rotation_matrix([[-1, 0, 0, 0],
+                                                                                       [0, 1, 0, 0],
+                                                                                       [0, 0, -1, 0],
+                                                                                       [0, 0, 0, 1]]))
+        hand_over_pose.pose.position.z = 0.3
+        handed_over = dlr_kitchen_setup.tasks.add_cartesian_pose(name='hand over',
+                                                                 goal_pose=hand_over_pose,
+                                                                 tip_link=dlr_kitchen_setup.r_tip,
+                                                                 root_link=dlr_kitchen_setup.l_tip)
+
+        done = f'{handed_over} and {drove_back}'
+        dlr_kitchen_setup.monitors.add_end_motion(start_condition=done)
+        dlr_kitchen_setup.execute(add_local_minimum_reached=False)
+
+        # %%
+        dlr_kitchen_setup.world.update_parent_link_of_group(name=box_name, parent_link=dlr_kitchen_setup.l_tip)
+        # %%
+        in_default_pose = dlr_kitchen_setup.tasks.add_joint_position(name='default joint pose',
+                                                                     goal_state=dlr_kitchen_setup.better_pose)
+        handle_grasp_pose = PoseStamped()
+        handle_grasp_pose.header.frame_id = handle_frame_id
+        handle_grasp_pose.pose.orientation = Quaternion(*quaternion_from_rotation_matrix([[0, 0, 1, 0],
+                                                                                          [1, 0, 0, 0],
+                                                                                          [0, 1, 0, 0],
+                                                                                          [0, 0, 0, 1]]))
+        handle_grasp_pose.pose.position.x = -0.2
+        handle_graped = dlr_kitchen_setup.tasks.add_cartesian_pose(name='grasp handle',
+                                                                   goal_pose=handle_grasp_pose,
+                                                                   tip_link=dlr_kitchen_setup.r_tip,
+                                                                   root_link='map',
+                                                                   start_condition=in_default_pose)
+
+        door_open = dlr_kitchen_setup.motion_goals.add_open_container(name='open fridge',
+                                                                      tip_link=dlr_kitchen_setup.r_tip,
+                                                                      environment_link=handle_name,
+                                                                      start_condition=handle_graped)
+        door_half_open = dlr_kitchen_setup.monitors.add_joint_position(name='is door half open?',
+                                                                       goal_state={door_joint: np.pi / 4},
+                                                                       start_condition=handle_graped)
+
+        place_pose = PoseStamped()
+        place_pose.header.frame_id = fridge
+        place_pose.pose.orientation = Quaternion(*quaternion_from_rotation_matrix([[0, 0, 1, 0],
+                                                                                   [-1, 0, 0, 0],
+                                                                                   [0, -1, 0, 0],
+                                                                                   [0, 0, 0, 1]]))
+        place_pose.pose.position.z = 0.35
+        place_pose.pose.position.x = 0.
+        box_placed = dlr_kitchen_setup.tasks.add_cartesian_pose(name='place box',
+                                                                goal_pose=place_pose,
+                                                                tip_link=box_name,
+                                                                root_link='map',
+                                                                start_condition=door_half_open)
+
+
+
+        done = f'{door_open} and {box_placed}'
+        dlr_kitchen_setup.monitors.add_end_motion(start_condition=done)
+        dlr_kitchen_setup.execute(add_local_minimum_reached=False)
+
+        # %%
+        dlr_kitchen_setup.world.update_parent_link_of_group(name=box_name, parent_link=fridge)
+
+        # %%
+        retract_pose = PoseStamped()
+        retract_pose.header.frame_id = dlr_kitchen_setup.l_tip
+        retract_pose.pose.orientation.w = 1.0
+        retract_pose.pose.position.z = -0.5
+        retracted = dlr_kitchen_setup.tasks.add_cartesian_pose(name='retract left hand',
+                                                               goal_pose=retract_pose,
+                                                               tip_link=dlr_kitchen_setup.l_tip,
+                                                               root_link='map')
+
+        door_closed = dlr_kitchen_setup.motion_goals.add_close_container(name='close fridge',
+                                                                         tip_link=dlr_kitchen_setup.r_tip,
+                                                                         environment_link=handle_name)
+        dlr_kitchen_setup.monitors.add_end_motion(start_condition=f'{door_closed} and {retracted}')
+        dlr_kitchen_setup.execute(add_local_minimum_reached=False)

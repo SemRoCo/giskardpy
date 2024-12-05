@@ -39,6 +39,7 @@ from giskardpy.motion_graph.monitors.overwrite_state_monitors import SetOdometry
 from giskardpy.motion_graph.monitors.payload_monitors import Print, Sleep, \
     PayloadAlternator, Pulse, CheckMaxTrajectoryLength
 from giskardpy.motion_graph.tasks.cartesian_tasks import CartesianPosition, CartesianOrientation, CartesianPoseAsTask
+from giskardpy.motion_graph.tasks.weight_scaling_goals import MaxManipulability
 from giskardpy_ros.goals.realtime_goals import CarryMyBullshit, RealTimePointing, FollowNavPath
 from giskardpy_ros.ros1 import msg_converter
 from giskardpy_ros.ros1.msg_converter import kwargs_to_json
@@ -438,7 +439,7 @@ class MotionGoalWrapper(MotionGraphNodeWrapper):
 
     def _add_collision_entries_as_goals(self):
         for (start_condition, pause_condition, end_condition), collision_entries in self._collision_entries.items():
-            name = 'collision avoidance'
+            name = 'CA'
             if start_condition or pause_condition or end_condition:
                 name += f'{start_condition}, {pause_condition}, {end_condition}'
             self.add_motion_goal(class_name=CollisionAvoidance.__name__,
@@ -527,7 +528,7 @@ class MotionGoalWrapper(MotionGraphNodeWrapper):
                                       end_condition=end_condition)
 
     def allow_self_collision(self,
-                             robot_name: str,
+                             robot_name: Optional[str] = None,
                              start_condition: str = '',
                              pause_condition: str = '',
                              end_condition: str = ''):
@@ -1369,6 +1370,40 @@ class TaskWrapper(MotionGraphNodeWrapper):
                              end_condition=end_condition,
                              **kwargs)
 
+    def add_maximize_manipulability(self,
+                                    name: str,
+                                    tip_link: Union[str, giskard_msgs.LinkName],
+                                    root_link: Union[str, giskard_msgs.LinkName],
+                                    start_condition: str = '',
+                                    pause_condition: str = '',
+                                    end_condition: Optional[str] = None,
+                                    **kwargs: goal_parameter) -> str:
+        """
+        This goal will use the kinematic chain between root and tip link to move tip link to the goal pose.
+        The max velocities enforce a strict limit, but require a lot of additional constraints, thus making the
+        system noticeably slower.
+        The reference velocities don't enforce a strict limit, but also don't require any additional constraints.
+        :param root_link: name of the root link of the kin chain
+        :param tip_link: name of the tip link of the kin chain
+        :param goal_pose: the goal pose
+        :param absolute: if False, the goal pose is reevaluated if start_condition turns True.
+        :param reference_linear_velocity: m/s
+        :param reference_angular_velocity: rad/s
+        :param weight: None = use default weight
+        """
+        if isinstance(root_link, str):
+            root_link = giskard_msgs.LinkName(name=root_link)
+        if isinstance(tip_link, str):
+            tip_link = giskard_msgs.LinkName(name=tip_link)
+        return self.add_task(class_name=MaxManipulability.__name__,
+                             name=name,
+                             tip_link=tip_link,
+                             root_link=root_link,
+                             start_condition=start_condition,
+                             pause_condition=pause_condition,
+                             end_condition=end_condition,
+                             **kwargs)
+
     def add_align_planes(self,
                          name: str,
                          goal_normal: Vector3Stamped,
@@ -1982,10 +2017,10 @@ class MonitorWrapper(MotionGraphNodeWrapper):
                                 end_condition=end_condition)
 
     def add_const_false(self,
-                       name: str,
-                       start_condition: str = '',
-                       pause_condition: str = '',
-                       end_condition: Optional[str] = None) -> str:
+                        name: str,
+                        start_condition: str = '',
+                        pause_condition: str = '',
+                        end_condition: Optional[str] = None) -> str:
         """
         Testing monitor.
         Like add_alternator but as a PayloadMonitor.
@@ -2263,6 +2298,9 @@ class GiskardWrapper:
             self._client.send_goal(goal, feedback_cb=self._feedback_cb)
 
     def _create_action_goal(self) -> MoveGoal:
+        if not self.motion_goals._collision_entries:
+            self.motion_goals.avoid_all_collisions()
+        self.motion_goals._add_collision_entries_as_goals()
         action_goal = MoveGoal()
         action_goal.monitors = self._quote_conditions(self.monitors.motion_graph_nodes)
         action_goal.tasks = self._quote_conditions(self.tasks.motion_graph_nodes)

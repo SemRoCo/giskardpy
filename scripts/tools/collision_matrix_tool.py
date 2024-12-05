@@ -24,6 +24,7 @@ from giskardpy.model.world_config import EmptyWorld
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from giskardpy_ros.configs.behavior_tree_config import BehaviorTreeConfig, StandAloneBTConfig
 from giskardpy_ros.configs.giskard import Giskard
+from giskardpy_ros.configs.other_robots.justin import WorldWithJustinConfig
 from giskardpy_ros.configs.robot_interface_config import RobotInterfaceConfig, StandAloneRobotInterfaceConfig
 from giskardpy.god_map import god_map
 from giskardpy.model.better_pybullet_syncer import BetterPyBulletSyncer
@@ -173,7 +174,7 @@ class Table(QTableWidget):
     def dye_disabled_links(self, disabled_color: Optional[ColorRGBA] = None):
         if disabled_color is None:
             disabled_color = ColorRGBA(1, 0, 0, 1)
-        self.ros_visualizer.clear_marker()
+        self.ros_visualizer.clear_marker('')
         god_map.collision_scene.sync()
         for link_name in god_map.world.link_names_with_collisions:
             if link_name.short_name in self.enabled_link_names:

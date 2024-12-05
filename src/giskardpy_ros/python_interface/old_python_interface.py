@@ -32,6 +32,7 @@ class OldGiskardWrapper(GiskardWrapper):
     def _create_action_goal(self) -> MoveGoal:
         if not self.motion_goals._collision_entries:
             self.motion_goals.avoid_all_collisions()
+        self.motion_goals._add_collision_entries_as_goals()
         action_goal = MoveGoal()
         action_goal.monitors = self._quote_conditions(self.monitors.motion_graph_nodes)
         action_goal.tasks = self._quote_conditions(self.tasks.motion_graph_nodes)

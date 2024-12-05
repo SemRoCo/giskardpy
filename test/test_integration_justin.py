@@ -204,3 +204,74 @@ class TestEuRobin:
         kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
         kitchen_setup.allow_all_collisions()
         kitchen_setup.execute()
+
+    def test_open_fridge_dlr(self, dlr_kitchen_setup: JustinTestWrapper):
+        handle_frame_id = 'dlr_kitchen/fridge_door_handle'
+        handle_name = 'fridge_door_handle'
+        handle_joint = 'fridge_door_joint'
+        # base_goal = PoseStamped()
+        # base_goal.header.frame_id = 'map'
+        # base_goal.pose.position = Point(0.3, -0.5, 0)
+        # base_goal.pose.orientation.w = 1
+        # kitchen_setup.move_base(base_goal)
+
+        bar_axis = Vector3Stamped()
+        bar_axis.header.frame_id = handle_frame_id
+        bar_axis.vector.z = 1
+
+        bar_center = PointStamped()
+        bar_center.header.frame_id = handle_frame_id
+
+        tip_grasp_axis = Vector3Stamped()
+        tip_grasp_axis.header.frame_id = dlr_kitchen_setup.r_tip
+        tip_grasp_axis.vector.y = 1
+
+        dlr_kitchen_setup.set_grasp_bar_goal(root_link=dlr_kitchen_setup.default_root,
+                                             tip_link=dlr_kitchen_setup.r_tip,
+                                             tip_grasp_axis=tip_grasp_axis,
+                                             bar_center=bar_center,
+                                             bar_axis=bar_axis,
+                                             bar_length=.1)
+        x_gripper = Vector3Stamped()
+        x_gripper.header.frame_id = dlr_kitchen_setup.r_tip
+        x_gripper.vector.z = 1
+
+        x_goal = Vector3Stamped()
+        x_goal.header.frame_id = handle_frame_id
+        x_goal.vector.x = 1
+        dlr_kitchen_setup.set_align_planes_goal(tip_link=dlr_kitchen_setup.r_tip,
+                                                tip_normal=x_gripper,
+                                                goal_normal=x_goal,
+                                                root_link='map')
+        dlr_kitchen_setup.allow_all_collisions()
+        # dlr_kitchen_setup.add_json_goal('AvoidJointLimits', percentage=10)
+        dlr_kitchen_setup.execute()
+        current_pose = dlr_kitchen_setup.compute_fk_pose(root_link='map', tip_link=dlr_kitchen_setup.r_tip)
+
+        dlr_kitchen_setup.set_open_container_goal(tip_link=dlr_kitchen_setup.r_tip,
+                                                  environment_link=handle_name,
+                                                  goal_joint_state=1.5)
+        # dlr_kitchen_setup.set_json_goal('AvoidJointLimits', percentage=40)
+        dlr_kitchen_setup.allow_all_collisions()
+        # dlr_kitchen_setup.add_json_goal('AvoidJointLimits')
+        dlr_kitchen_setup.execute()
+        dlr_kitchen_setup.set_env_state({handle_joint: 1.5})
+
+        pose_reached = dlr_kitchen_setup.monitors.add_cartesian_pose('map',
+                                                                     tip_link=dlr_kitchen_setup.r_tip,
+                                                                     goal_pose=current_pose)
+        dlr_kitchen_setup.monitors.add_end_motion(start_condition=pose_reached)
+
+        dlr_kitchen_setup.set_open_container_goal(tip_link=dlr_kitchen_setup.r_tip,
+                                                  environment_link=handle_name,
+                                                  goal_joint_state=0)
+        dlr_kitchen_setup.allow_all_collisions()
+        # dlr_kitchen_setup.set_json_goal('AvoidJointLimits', percentage=40)
+
+        dlr_kitchen_setup.execute(add_local_minimum_reached=False)
+
+        dlr_kitchen_setup.set_env_state({handle_joint: 0})
+
+        dlr_kitchen_setup.set_joint_goal(dlr_kitchen_setup.better_pose)
+        dlr_kitchen_setup.allow_all_collisions()
+        dlr_kitchen_setup.execute()

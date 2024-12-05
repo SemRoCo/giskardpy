@@ -20,7 +20,7 @@ right_arm_joints = [
     "right_arm4_joint",
     "right_arm5_joint",
     "right_arm6_joint",
-    "right_arm7_joint",
+    "right_arm7_joint"
 ]
 better_pose = {
     "torso1_joint": 0.0,
@@ -87,18 +87,18 @@ grasp_point = PointStamped()
 grasp_point.header.frame_id = p_grasp.header.frame_id
 grasp_point.point = p_grasp.pose.position
 mon = giskard.monitors.add_cartesian_pose('map', 'r_gripper_tool_frame', p_pre)
+mon2 = giskard.monitors.add_cartesian_pose('map', 'r_gripper_tool_frame', p_grasp, name='endPose')
 giskard.motion_goals.add_cartesian_pose(p_pre, 'r_gripper_tool_frame', 'map', end_condition=mon, name='pre')
 
 giskard.motion_goals.add_cartesian_pose(p_grasp, 'r_gripper_tool_frame', 'map', start_condition=mon, name='grasp')
 
-giskard.motion_goals.add_motion_goal(motion_goal_class=BaseArmWeightScaling.__name__,
-                                     root_link='map',
-                                     tip_link='r_gripper_tool_frame',
-                                     tip_goal=grasp_point,
-                                     gain=10000,
-                                     arm_joints=right_arm_joints,
-                                     base_joints=['brumbrum', 'torso1_joint', 'torso2_joint', 'torso3_joint',
-                                                  'torso4_joint'], )
+#giskard.motion_goals.add_motion_goal(motion_goal_class=BaseArmWeightScaling.__name__,
+#                                     root_link='map',
+#                                     tip_link='r_gripper_tool_frame',
+#                                     tip_goal=grasp_point,
+#                                     gain=10000,
+#                                     arm_joints=right_arm_joints,
+#                                     base_joints=['brumbrum'], )
 giskard.motion_goals.add_motion_goal(motion_goal_class=MaxManipulabilityLinWeight.__name__,
                                      root_link='torso4',
                                      tip_link='r_gripper_tool_frame')
@@ -107,7 +107,8 @@ p_axis.header.frame_id = 'head1'
 p_axis.vector.x = 1
 giskard.motion_goals.add_pointing(goal_point=grasp_point, tip_link='head1', pointing_axis=p_axis, root_link='map',
                                   weight=WEIGHT_COLLISION_AVOIDANCE)
-#giskard.motion_goals.avoid_all_collisions()
-#giskard.motion_goals.allow_collision(group2='box')
-giskard.add_default_end_motion_conditions()
+# giskard.motion_goals.avoid_all_collisions()
+# giskard.motion_goals.allow_collision(group2='box')
+#giskard.add_default_end_motion_conditions()
+giskard.monitors.add_end_motion(start_condition=mon2)
 giskard.execute()

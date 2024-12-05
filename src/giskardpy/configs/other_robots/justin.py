@@ -53,6 +53,11 @@ class WorldWithJustinConfig(WorldConfig):
                                   },
                                   robot_group_name=self.robot_group_name)
 
+        self.set_joint_limits(limit_map={Derivatives.velocity: 0.2}, joint_name='torso1_joint')
+        self.set_joint_limits(limit_map={Derivatives.velocity: 0.2}, joint_name='torso2_joint')
+        self.set_joint_limits(limit_map={Derivatives.velocity: 0.2}, joint_name='torso3_joint')
+        self.set_joint_limits(limit_map={Derivatives.velocity: 0.2}, joint_name='torso4_joint')
+
 class JustinStandaloneInterface(StandAloneRobotInterfaceConfig):
 
     def __init__(self, drive_joint_name: str = 'brumbrum'):

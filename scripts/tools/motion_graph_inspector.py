@@ -10,6 +10,8 @@ from PyQt5.QtCore import QMutex, QMutexLocker
 from giskardpy_ros.tree.behaviors.plot_motion_graph import ExecutionStateToDotParser
 
 
+compact = False
+
 class MySvgWidget(QSvgWidget):
 
     def __init__(self, *args):
@@ -44,7 +46,7 @@ class DotGraphViewer(QWidget):
         self.last_goal_id = -1
 
         # Initialize the ROS node
-        rospy.init_node('motion_graph_viewer', anonymous=True)
+        rospy.init_node('motion_statechart_viewer', anonymous=True)
 
         # Set up the GUI components
         self.svg_widget = MySvgWidget(self)
@@ -94,7 +96,7 @@ class DotGraphViewer(QWidget):
         layout.addLayout(nav_layout)
         self.setLayout(layout)
 
-        self.setWindowTitle('Motion Graph Viewer')
+        self.setWindowTitle('Motion Statechart Viewer')
         self.resize(800, 600)
 
         # Initialize graph history and goal tracking
@@ -148,7 +150,7 @@ class DotGraphViewer(QWidget):
             self.graphs_by_goal[goal_id] = []
             self.goals.append(goal_id)
 
-        parser = ExecutionStateToDotParser(msg, compact=True)
+        parser = ExecutionStateToDotParser(msg, compact=compact)
         graph = parser.to_dot_graph()
 
         self.graphs_by_goal[goal_id].append(graph)

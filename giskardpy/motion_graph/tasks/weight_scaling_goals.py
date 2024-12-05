@@ -6,6 +6,8 @@ from giskardpy.god_map import god_map
 from giskardpy.data_types.data_types import Derivatives
 from collections import defaultdict
 
+from giskardpy.motion_graph.tasks.task import Task
+
 
 class BaseArmWeightScaling(Goal):
     """
@@ -68,7 +70,7 @@ class BaseArmWeightScaling(Goal):
                                        gains=list_gains)
 
 
-class MaxManipulabilityLinWeight(Goal):
+class MaxManipulability(Task):
     """
        This goal maximizes the manipulability of the kinematic chain between root_link and tip_link.
        This chain should only include rotational joint and no linear joints i.e. torso lift joints or odometry joints.
@@ -78,42 +80,40 @@ class MaxManipulabilityLinWeight(Goal):
                  tip_link: str,
                  gain: float = 0.5,
                  name: Optional[str] = None,
-                 prediction_horizon: int = 9,
                  m_threshold: float = 0.16,
-                 start_condition: cas.Expression = cas.BinaryTrue,
-                 pause_condition: cas.Expression = cas.BinaryFalse,
-                 end_condition: cas.Expression = cas.BinaryFalse
                  ):
         self.root_link = god_map.world.search_for_link_name(root_link, None)
         self.tip_link = god_map.world.search_for_link_name(tip_link, None)
         if name is None:
             name = f'{self.__class__.__name__}/{self.root_link}/{self.tip_link}'
-        super().__init__(name)
+        super().__init__(name=name)
 
         results = god_map.world.compute_split_chain(self.root_link, self.tip_link, True, True, False, False)
         for joint in results[2]:
             if 'joint' in joint and not god_map.world.is_joint_rotational(joint):
                 raise Exception('Non rotational joint in kinematic chain of Maximize Manipulability Goal')
 
-        task = self.create_and_add_task('MaxManipulability')
         root_P_tip = god_map.world.compose_fk_expression(self.root_link, self.tip_link).to_position()[:3]
 
         J = cas.jacobian(root_P_tip, root_P_tip.free_symbols())
         JJT = J.dot(J.T)
         m = cas.sqrt(cas.det(JJT))
         list_gains = []
-        for t in range(prediction_horizon):
+        for t in range(god_map.qp_controller.prediction_horizon):
             gains = defaultdict(dict)
             for symbol in root_P_tip.free_symbols():
                 J_dq = cas.total_derivative(J, [symbol], [1])
                 product = cas.matrix_inverse(JJT).dot(J_dq).dot(J.T)
                 trace = cas.trace(product)
                 v = self.get_free_variable(symbol)
-                gains[Derivatives.velocity][v] = cas.if_greater(m, m_threshold, 0, trace * m * -gain)
-                gains[Derivatives.acceleration][v] = cas.if_greater(m, m_threshold, 0, trace * m * -gain)
-                gains[Derivatives.jerk][v] = cas.if_greater(m, m_threshold, 0, trace * m * -gain)
+                if t < god_map.qp_controller.prediction_horizon - 2:
+                    gains[Derivatives.velocity][v] = cas.if_greater(m, m_threshold, 0, trace * m * -gain)
+                if god_map.qp_controller.qp_formulation.has_acc_variables() and t < god_map.qp_controller.prediction_horizon - 1:
+                    gains[Derivatives.acceleration][v] = cas.if_greater(m, m_threshold, 0, trace * m * -gain)
+                if god_map.qp_controller.qp_formulation.has_jerk_variables():
+                    gains[Derivatives.jerk][v] = cas.if_greater(m, m_threshold, 0, trace * m * -gain)
             list_gains.append(gains)
-        task.add_linear_weight_gain(name, gains=list_gains)
+        self.add_linear_weight_gain(name, gains=list_gains)
 
         god_map.debug_expression_manager.add_debug_expression(f'mIndex{tip_link}', m)
 

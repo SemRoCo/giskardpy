@@ -17,21 +17,23 @@ import os
 
 from std_msgs.msg import ColorRGBA
 
-from giskardpy.configs.behavior_tree_config import BehaviorTreeConfig, StandAloneBTConfig
-from giskardpy.configs.collision_avoidance_config import CollisionAvoidanceConfig, _BPBCollisionAvoidanceConfig
-from giskardpy.configs.giskard import Giskard
-from giskardpy.configs.qp_controller_config import QPControllerConfig
-from giskardpy.configs.robot_interface_config import RobotInterfaceConfig, StandAloneRobotInterfaceConfig
-from giskardpy.configs.world_config import WorldConfig, EmptyWorld
+from giskardpy.data_types.data_types import PrefixName
+from giskardpy.middleware import get_middleware, set_middleware
+from giskardpy.model.collision_avoidance_config import BPBCollisionAvoidanceConfig
+from giskardpy.model.world_config import EmptyWorld
+from giskardpy.qp.qp_controller_config import QPControllerConfig
+from giskardpy_ros.configs.behavior_tree_config import BehaviorTreeConfig, StandAloneBTConfig
+from giskardpy_ros.configs.giskard import Giskard
+from giskardpy_ros.configs.robot_interface_config import RobotInterfaceConfig, StandAloneRobotInterfaceConfig
 from giskardpy.god_map import god_map
 from giskardpy.model.better_pybullet_syncer import BetterPyBulletSyncer
 from giskardpy.model.collision_world_syncer import DisableCollisionReason
-from giskardpy.model.ros_msg_visualization import ROSMsgVisualization
 from giskardpy.model.utils import robot_name_from_urdf_string
 from giskardpy.model.world import WorldTree
-from giskardpy.data_types import PrefixName
-from giskardpy.tree.control_modes import ControlModes
-from giskardpy.utils.utils import resolve_ros_iris
+from giskardpy_ros.ros1.interface import ROS1Wrapper
+from giskardpy_ros.ros1.ros_msg_visualization import ROSMsgVisualization
+from giskardpy_ros.ros1.visualization_mode import VisualizationMode
+from giskardpy_ros.tree.blackboard_utils import GiskardBlackboard
 
 reason_color_map = {
     DisableCollisionReason.Never: (163, 177, 233),  # blue
@@ -89,7 +91,7 @@ class Table(QTableWidget):
         super().__init__()
         self.cellClicked.connect(self.table_item_callback)
         self._disabled_links = set()
-        self.ros_visualizer = ROSMsgVisualization('map')
+        self.ros_visualizer = ROSMsgVisualization('collision_matrix_tool', mode=VisualizationMode.CollisionsDecomposed)
 
     def update_disabled_links(self, link_names: Set[PrefixName]):
         self._disabled_links = link_names
@@ -152,7 +154,7 @@ class Table(QTableWidget):
         return None
 
     def table_item_callback(self, row, column):
-        self.ros_visualizer.clear_marker()
+        self.ros_visualizer.clear_marker('')
         god_map.collision_scene.sync()
         for link_name in god_map.world.link_names_with_collisions:
             god_map.world.links[link_name].dye_collisions(god_map.world.default_link_color)
@@ -165,6 +167,7 @@ class Table(QTableWidget):
         god_map.world.links[link1].dye_collisions(color_msg)
         god_map.world.links[link2].dye_collisions(color_msg)
         god_map.world.reset_cache()
+        self.ros_visualizer.clear_marker_cache()
         self.ros_visualizer.publish_markers()
 
     def dye_disabled_links(self, disabled_color: Optional[ColorRGBA] = None):
@@ -450,12 +453,12 @@ class Application(QMainWindow):
         super().__init__()
         self.giskard = Giskard(world_config=EmptyWorld(),
                                robot_interface_config=StandAloneRobotInterfaceConfig([]),
-                               collision_avoidance_config=_BPBCollisionAvoidanceConfig(),
+                               collision_avoidance_config=BPBCollisionAvoidanceConfig(),
                                behavior_tree_config=StandAloneBTConfig(),
                                qp_controller_config=QPControllerConfig())
         with god_map.world.modify_world():
-            god_map.world_config.setup()
-        god_map.collision_avoidance_config.setup()
+            GiskardBlackboard().giskard.world_config.setup()
+        GiskardBlackboard().giskard.collision_avoidance_config.setup()
         self.timer = QTimer()
         self.timer.start(1000)  # Time in milliseconds
         self.timer.timeout.connect(lambda: None)
@@ -578,12 +581,12 @@ class Application(QMainWindow):
                 QMessageBox.critical(self, 'Error', f'Parameter not found: \n{robot_description}')
 
     def load_urdf(self, urdf: str, progress_str: str):
-        god_map.world._clear()
+        god_map.world.clear()
         self.urdf_progress.set_progress(0, f'Loading {progress_str}')
         group_name = robot_name_from_urdf_string(urdf)
         self.urdf_progress.set_progress(10, f'Parsing {progress_str}')
         god_map.world.add_urdf(urdf, group_name)
-        god_map.controlled_joints = god_map.world.movable_joint_names
+        god_map.world.controlled_joints = god_map.world.movable_joint_names
         self.urdf_progress.set_progress(50, f'Applying vhacd to concave meshes of {progress_str}')
         god_map.collision_scene.sync()
         self.urdf_progress.set_progress(80, f'Updating table {progress_str}')
@@ -594,7 +597,7 @@ class Application(QMainWindow):
         self.urdf_progress.set_progress(100, f'Loaded {progress_str}')
 
     def set_tmp_srdf_path(self):
-        self.__srdf_path = resolve_ros_iris('package://giskardpy_ros/self_collision_matrices/')
+        self.__srdf_path = get_middleware().resolve_iri('package://giskardpy_ros/self_collision_matrices/')
 
     def disable_srdf_buttons(self):
         self.__disable_srdf_buttons(True)
@@ -692,6 +695,7 @@ def handle_sigint(sig, frame):
 
 if __name__ == '__main__':
     rospy.init_node('self_collision_matrix_updater')
+    set_middleware(ROS1Wrapper())
     signal.signal(signal.SIGINT, handle_sigint)
 
     app = QApplication(sys.argv)

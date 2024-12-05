@@ -23,7 +23,7 @@ class ExecuteTraj(Sequence):
         self.prepare_base_control = PrepareBaseTrajControlLoop()
         self.insert_child(self.prepare_base_control, 0)
 
-        self.base_closed_loop = ControlLoop(log_traj=False, max_hz=GiskardBlackboard().control_loop_max_hz)
+        self.base_closed_loop = ControlLoop(log_traj=False)
         self.base_closed_loop.add_closed_loop_behaviors()
         self.move_robots.add_child(self.base_closed_loop)
 

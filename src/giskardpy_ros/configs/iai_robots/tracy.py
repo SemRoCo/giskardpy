@@ -11,7 +11,7 @@ class TracyWorldConfig(WorldWithFixedRobot):
     def __init__(self):
         super().__init__({Derivatives.velocity: 0.2,
                           Derivatives.acceleration: np.inf,
-                          Derivatives.jerk: 15})
+                          Derivatives.jerk: None})
 
 
 class TracyCollisionAvoidanceConfig(LoadSelfCollisionMatrixConfig):

@@ -16,6 +16,7 @@ from giskardpy.middleware import get_middleware
 from giskardpy.motion_graph.monitors.monitors import EndMotion, CancelMotion
 from giskardpy.utils.decorators import record_time
 from giskardpy.utils.utils import create_path
+from giskardpy_ros.ros1.msg_converter import json_str_to_ros_kwargs
 from giskardpy_ros.tree.behaviors.plugin import GiskardBehavior
 from giskardpy_ros.tree.behaviors.publish_feedback import giskard_state_to_execution_state
 from giskardpy_ros.tree.blackboard_utils import catch_and_raise_to_blackboard, GiskardBlackboard

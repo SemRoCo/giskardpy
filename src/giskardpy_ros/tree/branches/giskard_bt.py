@@ -51,11 +51,7 @@ class GiskardBT(BehaviourTree):
         self.root = Sequence('Giskard')
         self.wait_for_goal = WaitForGoal()
         self.prepare_control_loop = failure_is_success(PrepareControlLoop)()
-        if self.is_closed_loop():
-            max_hz = GiskardBlackboard().control_loop_max_hz
-        else:
-            max_hz = GiskardBlackboard().simulation_max_hz
-        self.control_loop_branch = failure_is_success(ControlLoop)(max_hz=max_hz)
+        self.control_loop_branch = failure_is_success(ControlLoop)()
         if self.is_closed_loop():
             self.control_loop_branch.add_closed_loop_behaviors()
         else:

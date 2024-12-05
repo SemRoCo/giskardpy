@@ -36,7 +36,12 @@ class ControlLoop(AsyncBehavior):
     controller_plugin: ControllerPlugin
     evaluate_monitors: EvaluateMonitors
 
-    def __init__(self, name: str = 'control_loop', log_traj: bool = True, max_hz: Optional[float] = None):
+    def __init__(self, name: str = 'control_loop', log_traj: bool = True):
+        control_dt = GiskardBlackboard().giskard.qp_controller_config.control_dt
+        if control_dt is not None:
+            max_hz = 1/control_dt
+        else:
+            max_hz = None
         name = f'{name}\nmax_hz: {max_hz}'
         super().__init__(name, max_hz=max_hz)
         self.publish_state = success_is_running(PublishState)('publish state 2')

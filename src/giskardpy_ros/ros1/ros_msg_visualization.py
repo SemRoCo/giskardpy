@@ -160,7 +160,8 @@ class ROSMsgVisualization:
                 self.clear_marker(world_ns)
                 marker_array.markers.extend(self.create_world_markers(name_space=world_ns))
             marker_array.markers.extend(self.create_collision_markers(name_space=collision_ns))
-            self.publisher.publish(marker_array)
+            if len(marker_array.markers) > 0:
+                self.publisher.publish(marker_array)
 
     def publish_trajectory_markers(self, trajectory: Trajectory, every_x: int = 10,
                                    start_alpha: float = 0.5, stop_alpha: float = 1.0,

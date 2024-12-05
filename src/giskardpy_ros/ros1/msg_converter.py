@@ -36,7 +36,7 @@ from giskardpy.motion_graph.monitors.monitors import EndMotion, CancelMotion, Mo
 from giskardpy.motion_graph.tasks.task import Task
 from giskardpy.utils.math import quaternion_from_rotation_matrix
 from giskardpy.utils.utils import get_all_classes_in_module
-from giskardpy_ros.ros1.ros_msg_visualization import VisualizationMode
+from giskardpy_ros.ros1.visualization_mode import VisualizationMode
 
 
 # TODO probably needs some consistency check

@@ -109,7 +109,7 @@ class PlotGanttChart(GiskardBehavior):
             pass
 
         # add Nones to make sure all bars gets "ended"
-        new_end_time = god_map.time + god_map.qp_controller.sample_period
+        new_end_time = god_map.time + god_map.qp_controller.mpc_dt
 
         task_history = copy(god_map.motion_graph_manager.task_state_history)
         task_history.append((new_end_time, ([None] * len(task_history[0][1][0]),

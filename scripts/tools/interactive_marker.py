@@ -74,9 +74,9 @@ class IMServer(object):
         marker = Marker()
 
         marker.type = Marker.SPHERE
-        marker.scale.x = msg.scale * MARKER_SCALE * 2
-        marker.scale.y = msg.scale * MARKER_SCALE * 2
-        marker.scale.z = msg.scale * MARKER_SCALE * 2
+        marker.scale.x = msg.scale * MARKER_SCALE * 0.5
+        marker.scale.y = msg.scale * MARKER_SCALE * 0.5
+        marker.scale.z = msg.scale * MARKER_SCALE * 0.5
         marker.color.r = 0.5
         marker.color.g = 0.5
         marker.color.b = 0.5
@@ -267,6 +267,7 @@ class IMServer(object):
 if __name__ == '__main__':
     rospy.init_node('giskard_interactive_marker')
     root_tips = rospy.get_param('~interactive_marker_chains')
+    MARKER_SCALE = rospy.get_param('~marker_scale', 0.15)
     im = IMServer(root_tips)
     while not rospy.is_shutdown():
         rospy.sleep(1)

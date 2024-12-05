@@ -13,17 +13,12 @@ from giskardpy.utils.utils import is_running_in_pytest
 
 class BehaviorTreeConfig(ABC):
 
-    def __init__(self, mode: ControlModes, control_loop_max_hz: float = 50, simulation_max_hz: Optional[float] = None):
+    def __init__(self, mode: ControlModes):
         """
 
         :param mode: Defines the default setup of the behavior tree.
-        :param control_loop_max_hz: if mode == ControlModes.standalone: limits the simulation speed
-                       if mode == ControlModes.open_loop: limits the control loop of the base tracker
-                       if mode == ControlModes.close_loop: limits the control loop
         """
         self._control_mode = mode
-        GiskardBlackboard().control_loop_max_hz = control_loop_max_hz
-        GiskardBlackboard().simulation_max_hz = simulation_max_hz
 
     @abstractmethod
     def setup(self):
@@ -195,14 +190,12 @@ class StandAloneBTConfig(BehaviorTreeConfig):
                  visualization_mode: VisualizationMode = VisualizationMode.VisualsFrameLocked,
                  publish_free_variables: bool = False,
                  publish_tf: bool = True,
-                 include_prefix: bool = False,
-                 simulation_max_hz: Optional[float] = None):
+                 include_prefix: bool = False):
         """
         The default behavior tree for Giskard in standalone mode. Make sure to set up the robot interface accordingly.
         :param debug_mode: enable various debugging tools.
         :param publish_js: publish current world state.
         :param publish_tf: publish all link poses in tf.
-        :param simulation_max_hz: if not None, will limit the frequency of the simulation.
         :param include_prefix: whether to include the robot name prefix when publishing joint states or tf
         """
         self.include_prefix = include_prefix
@@ -212,9 +205,8 @@ class StandAloneBTConfig(BehaviorTreeConfig):
                 publish_js = False
                 publish_tf = True
                 debug_mode = False
-                simulation_max_hz = None
                 self.visualization_mode = VisualizationMode.Nothing
-        super().__init__(ControlModes.standalone, simulation_max_hz=simulation_max_hz)
+        super().__init__(ControlModes.standalone)
         self.debug_mode = debug_mode
         self.publish_js = publish_js
         self.publish_free_variables = publish_free_variables
@@ -239,15 +231,13 @@ class StandAloneBTConfig(BehaviorTreeConfig):
         if self.publish_js:
             self.add_js_publisher(include_prefix=self.include_prefix)
         if self.publish_free_variables:
-            self.add_free_variable_publisher()
+            self.add_free_variable_publisher(include_prefix=False)
 
 
 class OpenLoopBTConfig(BehaviorTreeConfig):
     def __init__(self,
                  debug_mode: bool = False,
-                 control_loop_max_hz: float = 50,
-                 visualization_mode: VisualizationMode = VisualizationMode.CollisionsDecomposed,
-                 simulation_max_hz: Optional[float] = None):
+                 visualization_mode: VisualizationMode = VisualizationMode.CollisionsDecomposed):
         """
         The default behavior tree for Giskard in open-loop mode. It will first plan the trajectory in simulation mode
         and then publish it to connected joint trajectory followers. The base trajectory is tracked with a closed-loop
@@ -255,8 +245,7 @@ class OpenLoopBTConfig(BehaviorTreeConfig):
         :param debug_mode:  enable various debugging tools.
         :param control_loop_max_hz: if not None, limits the frequency of the base trajectory controller.
         """
-        super().__init__(ControlModes.open_loop, control_loop_max_hz=control_loop_max_hz,
-                         simulation_max_hz=simulation_max_hz)
+        super().__init__(ControlModes.open_loop)
         if god_map.is_in_github_workflow():
             debug_mode = False
         self.debug_mode = debug_mode
@@ -281,16 +270,13 @@ class OpenLoopBTConfig(BehaviorTreeConfig):
 
 class ClosedLoopBTConfig(BehaviorTreeConfig):
     def __init__(self, debug_mode: bool = False,
-                 control_loop_max_hz: float = 50,
-                 visualization_mode: VisualizationMode = VisualizationMode.CollisionsDecomposed,
-                 simulation_max_hz: Optional[float] = None):
+                 visualization_mode: VisualizationMode = VisualizationMode.CollisionsDecomposed):
         """
         The default configuration for Giskard in closed loop mode. Make use to set up the robot interface accordingly.
         :param debug_mode: If True, will publish debug data on topics. This will significantly slow down the control loop.
         :param control_loop_max_hz: Limits the control loop frequency. If None, it will go as fast as possible.
         """
-        super().__init__(ControlModes.close_loop, control_loop_max_hz=control_loop_max_hz,
-                         simulation_max_hz=simulation_max_hz)
+        super().__init__(ControlModes.close_loop)
         if god_map.is_in_github_workflow():
             debug_mode = False
         self.debug_mode = debug_mode

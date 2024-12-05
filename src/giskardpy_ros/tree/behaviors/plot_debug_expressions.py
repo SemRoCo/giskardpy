@@ -3,7 +3,7 @@ from threading import Lock
 import numpy as np
 from line_profiler import profile
 
-from giskardpy.data_types.data_types import JointStates
+from giskardpy.data_types.data_types import JointStates, PrefixName
 from giskardpy.god_map import god_map
 from giskardpy.middleware import get_middleware
 from giskardpy.model.trajectory import Trajectory
@@ -48,7 +48,7 @@ class PlotDebugExpressions(PlotTrajectory):
     def plot(self):
         trajectory = god_map.debug_expression_manager.raw_traj_to_traj()
         if trajectory and len(trajectory.items()) > 0:
-            sample_period = god_map.qp_controller.sample_period
+            sample_period = god_map.qp_controller.mpc_dt
             traj = self.split_traj(trajectory)
             try:
                 traj.plot_trajectory(path_to_data_folder=self.path_to_data_folder,

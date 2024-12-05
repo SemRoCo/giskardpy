@@ -13,6 +13,7 @@ from giskardpy.goals.test import GraspSequence, Cutting
 from giskardpy.motion_graph.monitors.monitors import FalseMonitor, TrueMonitor
 from giskardpy.motion_graph.monitors.payload_monitors import Pulse
 from giskardpy.qp.qp_solver_ids import SupportedQPSolver
+from giskardpy.motion_graph.tasks.task import WEIGHT_ABOVE_CA
 from giskardpy_ros.configs.behavior_tree_config import StandAloneBTConfig
 from giskardpy_ros.configs.giskard import Giskard
 from giskardpy_ros.configs.iai_robots.hsr import HSRCollisionAvoidanceConfig, WorldWithHSRConfig, HSRStandaloneInterface
@@ -42,9 +43,8 @@ class HSRTestWrapper(GiskardTestWrapper):
                               robot_interface_config=HSRStandaloneInterface(),
                               behavior_tree_config=StandAloneBTConfig(debug_mode=True,
                                                                       publish_tf=True,
-                                                                      publish_js=False,
-                                                                      simulation_max_hz=20),
-                              qp_controller_config=QPControllerConfig(qp_solver=SupportedQPSolver.gurobi))
+                                                                      publish_js=False),
+                              qp_controller_config=QPControllerConfig(mpc_dt=0.05))
         super().__init__(giskard)
         self.gripper_group = 'gripper'
         # self.r_gripper = rospy.ServiceProxy('r_gripper_simulator/set_joint_states', SetJointState)
@@ -834,6 +834,27 @@ class TestCollisionAvoidanceGoals:
         js = {'arm_flex_joint': 0}
         zero_pose.set_joint_goal(js, add_monitor=False)
         zero_pose.execute()
+
+    #
+    # def test_avoid_collision_touch_hard_threshold(self, box_setup: HSRTestWrapper):
+    #     base_goal = PoseStamped()
+    #     base_goal.header.frame_id = box_setup.default_root
+    #     base_goal.pose.position.x = 0.2
+    #     base_goal.pose.orientation.z = 1
+    #     box_setup.teleport_base(base_goal)
+    #
+    #     box_setup.avoid_collision(min_distance=0.05, group1=box_setup.robot_name)
+    #     box_setup.allow_self_collision()
+    #
+    #     base_goal = PoseStamped()
+    #     base_goal.header.frame_id = 'base_footprint'
+    #     base_goal.pose.position.x = -0.3
+    #     base_goal.pose.orientation.w = 1
+    #     box_setup.set_cart_goal(base_goal, tip_link='base_footprint', root_link='map', weight=WEIGHT_ABOVE_CA)
+    #     box_setup.set_max_traj_length(30)
+    #     box_setup.execute(add_local_minimum_reached=False)
+    #     box_setup.check_cpi_geq(['base_link'], 0.048)
+    #     box_setup.check_cpi_leq(['base_link'], 0.07)
 
 
 class TestAddObject:

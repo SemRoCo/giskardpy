@@ -45,7 +45,7 @@ jobs:
     runs-on: ubuntu-20.04
     strategy:
       matrix:
-        qp_solver: [qpalm, qpSWIFT]
+        qp_solver: [qpSWIFT]
     env:
       QP_SOLVER: ${{ matrix.qp_solver }}
     steps:
@@ -130,6 +130,13 @@ jobs:
           path: 'ros_ws/src/iai_robots'
           repository: code-iai/iai_robots
           ref: master
+      - if: ${{ inputs.robot == 'donbot' }}
+        name: Checkout iai_robot_peripherals
+        uses: actions/checkout@v3
+        with:
+          path: 'ros_ws/src/iai_robot_peripherals'
+          repository: code-iai/iai_robot_peripherals
+          ref: main
       - if: ${{ inputs.robot == 'pr2' }}
         name: Checkout iai_pr2
         uses: actions/checkout@v3

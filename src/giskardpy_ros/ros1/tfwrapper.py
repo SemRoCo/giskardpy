@@ -17,8 +17,8 @@ from giskardpy.middleware import get_middleware
 from giskardpy.utils.decorators import memoize
 from giskardpy.utils.math import rotation_matrix_from_quaternion
 
-tfBuffer: Buffer
-tf_listener: TransformListener
+tfBuffer: Buffer = None
+tf_listener: TransformListener = None
 
 
 def init(tf_buffer_size: float = 15) -> None:

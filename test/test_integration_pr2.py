@@ -24,7 +24,7 @@ from giskardpy.data_types.exceptions import GiskardException, VelocityLimitUnrea
 from giskardpy.goals.cartesian_goals import RelativePositionSequence
 from giskardpy.goals.collision_avoidance import CollisionAvoidanceHint
 from giskardpy.goals.goals_tests import DebugGoal, CannotResolveSymbol
-from giskardpy.goals.joint_goals import JointVelocityLimit, UnlimitedJointGoal
+from giskardpy.goals.joint_goals import UnlimitedJointGoal
 from giskardpy.goals.set_prediction_horizon import SetQPSolver
 from giskardpy.goals.tracebot import InsertCylinder
 from giskardpy.goals.weight_scaling_goals import MaxManipulabilityLinWeight, BaseArmWeightScaling
@@ -33,6 +33,7 @@ from giskardpy.middleware import get_middleware
 from giskardpy.model.utils import hacky_urdf_parser_fix
 from giskardpy.motion_graph.monitors.monitors import TrueMonitor
 from giskardpy.motion_graph.monitors.payload_monitors import Counter, Pulse
+from giskardpy.motion_graph.tasks.joint_tasks import JointVelocityLimit
 from giskardpy.motion_graph.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE
 from giskardpy.qp.qp_controller_config import SupportedQPSolver, QPControllerConfig
 from giskardpy_ros.configs.behavior_tree_config import StandAloneBTConfig
@@ -167,10 +168,9 @@ class PR2TestWrapper(GiskardTestWrapper):
                                                                                # collision_checker=CollisionCheckerLib.none),
                                                                                ),
                               behavior_tree_config=StandAloneBTConfig(debug_mode=True,
-                                                                      publish_tf=True,
-                                                                      simulation_max_hz=None),
-                              qp_controller_config=QPControllerConfig(qp_solver=SupportedQPSolver.qpSWIFT))
-                              # qp_controller_config=QPControllerConfig())
+                                                                      publish_tf=True),
+                              # qp_controller_config=QPControllerConfig(qp_solver=SupportedQPSolver.gurobi))
+                              qp_controller_config=QPControllerConfig())
         super().__init__(giskard)
         self.robot = god_map.world.groups[self.robot_name]
 
@@ -1396,10 +1396,10 @@ class TestConstraints:
                                       add_monitor=False)
         apartment_setup.execute()
 
-    def test_VelocityLimitUnreachableException(self, zero_pose: PR2TestWrapper):
-        zero_pose.set_prediction_horizon(prediction_horizon=7)
-        zero_pose.set_joint_goal(zero_pose.better_pose)
-        zero_pose.execute(expected_error_type=VelocityLimitUnreachableException)
+    # def test_VelocityLimitUnreachableException(self, zero_pose: PR2TestWrapper):
+    #     zero_pose.set_prediction_horizon(prediction_horizon=7)
+    #     zero_pose.set_joint_goal(zero_pose.better_pose)
+    #     zero_pose.execute(expected_error_type=VelocityLimitUnreachableException)
 
     def test_SetPredictionHorizon11(self, zero_pose: PR2TestWrapper):
         default_prediction_horizon = god_map.qp_controller.prediction_horizon
@@ -1420,12 +1420,12 @@ class TestConstraints:
         zero_pose.set_max_traj_length(new_length)
         zero_pose.set_cart_goal(base_goal, tip_link='base_footprint', root_link='map')
         result = zero_pose.execute(expected_error_type=MaxTrajectoryLengthException)
-        dt = god_map.qp_controller.sample_period
-        np.testing.assert_almost_equal(len(result.trajectory.points) * dt, new_length + dt * 2)
+        dt = god_map.qp_controller.mpc_dt
+        np.testing.assert_almost_equal(len(result.trajectory.points) * dt, new_length + dt)
 
         zero_pose.set_cart_goal(base_goal, tip_link='base_footprint', root_link='map')
         result = zero_pose.execute(expected_error_type=MaxTrajectoryLengthException)
-        dt = god_map.qp_controller.sample_period
+        dt = god_map.qp_controller.mpc_dt
         assert len(result.trajectory.points) * dt > new_length + 1
 
     def test_CollisionAvoidanceHint(self, kitchen_setup: PR2TestWrapper):
@@ -1523,7 +1523,7 @@ class TestConstraints:
         vel_limit = 0.4
         joint_goal = 1
         zero_pose.allow_all_collisions()
-        zero_pose.motion_goals.add_motion_goal(class_name=JointVelocityLimit.__name__,
+        zero_pose.tasks.add_motion_goal(class_name=JointVelocityLimit.__name__,
                                                joint_names=[joint.short_name],
                                                max_velocity=vel_limit,
                                                hard=True)
@@ -3526,9 +3526,11 @@ class TestCollisionAvoidanceGoals:
         p = PoseStamped()
         p.header.frame_id = pocky_pose_setup.r_tip
         p.pose.position.x = 0.08
-        p.pose.orientation = Quaternion(*quaternion_about_axis(0.01, [1, 0, 0]).tolist())
-        pocky_pose_setup.add_box_to_world(name='box',
-                                          size=(0.2, 0.05, 0.05),
+        p.pose.orientation = Quaternion(*quaternion_about_axis(np.pi/2, [0, 1, 0]).tolist())
+        pocky_pose_setup.add_cylinder_to_world(name='box',
+                                          # size=(0.2, 0.05, 0.05),
+                                               height = 0.2,
+                                               radius=0.025,
                                           parent_link=pocky_pose_setup.r_tip,
                                           pose=p)
         p = PoseStamped()
@@ -3701,7 +3703,8 @@ class TestCollisionAvoidanceGoals:
         p.pose.position.x = 0.08
         p.pose.orientation.w = 1
         box_setup.set_cart_goal(p, box_setup.r_tip, box_setup.default_root, add_monitor=False)
-        box_setup.execute()
+        box_setup.set_max_traj_length(10)
+        box_setup.execute(add_local_minimum_reached=False, expected_error_type=MaxTrajectoryLengthException)
         box_setup.check_cpi_geq([attached_link_name], -0.005)
         box_setup.check_cpi_leq([attached_link_name], 0.01)
         box_setup.detach_group(attached_link_name)

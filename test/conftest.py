@@ -1,11 +1,13 @@
+import numpy as np
 import pytest
 import rospy
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, Quaternion
 
 import giskardpy_ros.ros1.tfwrapper as tf
 from giskardpy.god_map import god_map
 from giskardpy.middleware import get_middleware, set_middleware
 from giskardpy.model.joints import OneDofJoint
+from giskardpy.utils.math import quaternion_from_axis_angle
 from giskardpy_ros.ros1.interface import ROS1Wrapper
 from giskardpy_ros.tree.blackboard_utils import GiskardBlackboard
 from utils_for_tests import launch_launchfile
@@ -100,6 +102,36 @@ def kitchen_setup(better_pose: GiskardTestWrapper) -> GiskardTestWrapper:
         kitchen_pose = PoseStamped()
         kitchen_pose.header.frame_id = str(better_pose.default_root)
         kitchen_pose.pose.orientation.w = 1
+        better_pose.add_urdf_to_world(name=better_pose.default_env_name,
+                                      urdf=rospy.get_param('kitchen_description'),
+                                      pose=kitchen_pose)
+    else:
+        kitchen_pose = tf.lookup_pose('map', 'iai_kitchen/world')
+        better_pose.add_urdf_to_world(name=better_pose.default_env_name,
+                                      urdf=rospy.get_param('kitchen_description'),
+                                      pose=kitchen_pose,
+                                      js_topic='/kitchen/joint_states',
+                                      set_js_topic='/kitchen/cram_joint_states')
+    js = {}
+    for joint_name in god_map.world.groups[better_pose.default_env_name].movable_joint_names:
+        joint = god_map.world.joints[joint_name]
+        if isinstance(joint, OneDofJoint):
+            if GiskardBlackboard().tree.is_standalone():
+                js[str(joint.free_variable.name)] = 0.0
+            else:
+                js[str(joint.free_variable.name.short_name)] = 0.0
+    better_pose.set_env_state(js)
+    return better_pose
+
+@pytest.fixture()
+def dlr_kitchen_setup(better_pose: GiskardTestWrapper) -> GiskardTestWrapper:
+    better_pose.default_env_name = 'dlr_kitchen'
+    if GiskardBlackboard().tree.is_standalone():
+        kitchen_pose = PoseStamped()
+        kitchen_pose.header.frame_id = str(better_pose.default_root)
+        kitchen_pose.pose.position.x = -2
+        kitchen_pose.pose.position.y = 2
+        kitchen_pose.pose.orientation = Quaternion(*quaternion_from_axis_angle([0,0,1], -np.pi/2))
         better_pose.add_urdf_to_world(name=better_pose.default_env_name,
                                       urdf=rospy.get_param('kitchen_description'),
                                       pose=kitchen_pose)

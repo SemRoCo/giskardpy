@@ -8,6 +8,7 @@ from giskardpy.model.joints import OneDofJoint
 from giskardpy.motion_graph.monitors.joint_monitors import JointGoalReached
 from giskardpy.motion_graph.tasks.task import Task, WEIGHT_BELOW_CA
 from qp.pos_in_vel_limits import b_profile
+from utils.math import find_best_jerk_limit
 
 
 class JointPositionList(Task):
@@ -80,7 +81,7 @@ class JointPositionList(Task):
             #                                                           Derivatives.position,
             #                                                           # Derivatives.velocity
             #                                                       ])
-            if ul_pos is not None:
+            if god_map.qp_controller.qp_formulation.is_mpc() and ul_pos is not None:
                 god_map.debug_expression_manager.add_debug_expression(f'{name}/joint_bounds', cas.Expression(ul_pos),
                                                                       derivatives_to_plot=[
                                                                           Derivatives.position,
@@ -88,13 +89,14 @@ class JointPositionList(Task):
                                                                       ])
                 current_vel = god_map.world.joints[name].free_variable.get_symbol(Derivatives.velocity)
                 current_acc = god_map.world.joints[name].free_variable.get_symbol(Derivatives.acceleration)
+                jerk_limit = find_best_jerk_limit(god_map.qp_controller.prediction_horizon, god_map.qp_controller.mpc_dt, god_map.world.compute_joint_limits(name, Derivatives.velocity)[1])
                 lb, ub = b_profile(current_pos=current,
                                    current_vel=current_vel,
                                    current_acc=current_acc,
                                    pos_limits=(ll_pos, ul_pos),
                                    vel_limits=god_map.world.compute_joint_limits(name, Derivatives.velocity),
                                    acc_limits=god_map.world.compute_joint_limits(name, Derivatives.acceleration),
-                                   jerk_limits=god_map.world.compute_joint_limits(name, Derivatives.jerk),
+                                   jerk_limits=(-jerk_limit, jerk_limit),
                                    dt=god_map.qp_controller.mpc_dt,
                                    ph=god_map.qp_controller.prediction_horizon)
                 god_map.debug_expression_manager.add_debug_expression(f'{name}/upper_vel',
@@ -117,6 +119,11 @@ class JointPositionList(Task):
                                                                       derivative=Derivatives.jerk,
                                                                       color='r--',
                                                                       derivatives_to_plot=[Derivatives.jerk])
+            # god_map.debug_expression_manager.add_debug_expression(f'{name}/weight',
+            #                                                       weight,
+            #                                                       derivative=Derivatives.position,
+            #                                                       color='r--',
+            #                                                       derivatives_to_plot=[Derivatives.position])
             for d in Derivatives.range(Derivatives.position, Derivatives.jerk):
                 if d == Derivatives.position:
                     variable_name = f'{name}/current'

@@ -280,7 +280,7 @@ class Link:
             link.collisions.append(LinkGeometry.from_urdf(urdf_thing=urdf_collision,
                                                           color=color))
         for urdf_visual in urdf_link.visuals:
-            if urdf_visual.material.color:
+            if urdf_visual.material and urdf_visual.material.color:
                 link.visuals.append(LinkGeometry.from_urdf(urdf_thing=urdf_visual,
                                                            color=ColorRGBA(*urdf_visual.material.color.rgba)))
             else:

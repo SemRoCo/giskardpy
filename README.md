@@ -57,11 +57,12 @@ If it doesn't work, make sure that your ```$PYTHONPATH``` includes something lik
 ```/path/to/your/bullet3/build_cmake/better_python:/path/to/your/bullet3/examples/pybullet```. 
 
 #### Alternative QP solvers
-Giskard supports multiple QP solvers and will automatically use the fasted installed solver.
+Giskard supports multiple QP solvers and will automatically use the fasted installed solver. 
+qpSWIFT is highly recommended.
 
 - `qpalm`: Default solver, because it is the easiest to install and still reasonably fast.
-- `qpSWIFT`: Fastest open source solver in most cases. Install instructions: https://github.com/qpSWIFT/qpSWIFT.
-- `gurobi`: Commercial solver. Slightly slower than `qpSWIFT` on most robots. Outperforms `qpSWFIT` on systems with a lot of dof and/or a large prediction horizon.
+- `qpSWIFT`: Fastest solver for Giskard. Download our fork: [https://github.com/SemRoCo/qpSWIFT](https://github.com/SemRoCo/qpSWIFT.git) and follow the [install instructions](https://github.com/SemRoCo/qpSWIFT/wiki/2.Installation)
+- `gurobi`: Commercial solver. Slower than `qpSWIFT`, faster than `qpalm`, useful for debugging during development.
   - ```sudo pip3 install gurobipy```
   - You can apply for a free academic license or buy one here: https://www.gurobi.com/academia/academic-program-and-licenses/
   - If you have vpn access to or are in the local network of the IAI of the University of Bremen, follow these instructions: https://ai.uni-bremen.de/wiki/intern/adm/gurobi

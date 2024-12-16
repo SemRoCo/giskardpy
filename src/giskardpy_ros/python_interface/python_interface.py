@@ -26,6 +26,7 @@ from giskardpy.goals.collision_avoidance import CollisionAvoidance
 from giskardpy.motion_graph.tasks.grasp_bar import GraspBar
 from giskardpy.goals.joint_goals import JointPositionList, AvoidJointLimits
 from giskardpy.goals.open_close import Close, Open
+from giskardpy.motion_graph.tasks.joint_tasks import JointPositionLimitList, JustinTorsoLimit
 from giskardpy.motion_graph.tasks.pointing import Pointing
 from giskardpy.goals.pre_push_door import PrePushDoor
 from giskardpy.goals.set_prediction_horizon import SetPredictionHorizon
@@ -439,7 +440,7 @@ class MotionGoalWrapper(MotionGraphNodeWrapper):
 
     def _add_collision_entries_as_goals(self):
         for (start_condition, pause_condition, end_condition), collision_entries in self._collision_entries.items():
-            name = 'CA'
+            name = 'collision avoidance'
             if start_condition or pause_condition or end_condition:
                 name += f'{start_condition}, {pause_condition}, {end_condition}'
             self.add_motion_goal(class_name=CollisionAvoidance.__name__,
@@ -1460,6 +1461,62 @@ class TaskWrapper(MotionGraphNodeWrapper):
         return self.add_task(class_name=JointPositionList.__name__,
                              goal_state=goal_state,
                              weight=weight,
+                             max_velocity=max_velocity,
+                             name=name,
+                             start_condition=start_condition,
+                             pause_condition=pause_condition,
+                             end_condition=end_condition,
+                             **kwargs)
+
+    def add_joint_position_limit(self,
+                                 name: str,
+                                 lower_upper_limits: Dict[str, Tuple[float, float]],
+                                 weight: Optional[float] = None,
+                                 max_velocity: Optional[float] = None,
+                                 start_condition: str = '',
+                                 pause_condition: str = '',
+                                 end_condition: Optional[str] = None,
+                                 **kwargs: goal_parameter) -> str:
+        """
+        Sets joint position goals for all pairs in goal_state
+        :param goal_state: maps joint_name to goal position
+        :param weight: None = use default weight
+        :param max_velocity: will be applied to all joints
+        """
+        return self.add_task(class_name=JointPositionLimitList.__name__,
+                             lower_upper_limits=lower_upper_limits,
+                             weight=weight,
+                             max_velocity=max_velocity,
+                             name=name,
+                             start_condition=start_condition,
+                             pause_condition=pause_condition,
+                             end_condition=end_condition,
+                             **kwargs)
+
+    def add_justin_torso_limit(self,
+                               name: str,
+                               joint_name: Union[str, giskard_msgs.LinkName],
+                               lower_limit: float = -1,
+                               upper_limit: float = -0.25,
+                               weight: Optional[float] = None,
+                               max_velocity: Optional[float] = None,
+                               start_condition: str = '',
+                               pause_condition: str = '',
+                               end_condition: Optional[str] = None,
+                               **kwargs: goal_parameter) -> str:
+        """
+        Sets joint position goals for all pairs in goal_state
+        :param goal_state: maps joint_name to goal position
+        :param weight: None = use default weight
+        :param max_velocity: will be applied to all joints
+        """
+        if isinstance(joint_name, str):
+            joint_name = giskard_msgs.LinkName(name=joint_name)
+        return self.add_task(class_name=JustinTorsoLimit.__name__,
+                             lower_limit=lower_limit,
+                             upper_limit=upper_limit,
+                             weight=weight,
+                             joint_name=joint_name,
                              max_velocity=max_velocity,
                              name=name,
                              start_condition=start_condition,

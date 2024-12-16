@@ -7,16 +7,14 @@ import numpy as np
 import pytest
 import rospy
 from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, PointStamped, QuaternionStamped
-from nav_msgs.msg import Path
 from numpy import pi
 from shape_msgs.msg import SolidPrimitive
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
 import giskard_msgs.msg as giskard_msgs
-from giskard_msgs.msg import WorldBody, CollisionEntry, WorldGoal, LinkName, GiskardError
+from giskard_msgs.msg import WorldBody, CollisionEntry, WorldGoal, LinkName
 from giskardpy.data_types.data_types import PrefixName
-from giskardpy.data_types.exceptions import GiskardException, VelocityLimitUnreachableException, \
-    MaxTrajectoryLengthException, UnknownGoalException, GoalInitalizationException, LocalMinimumException, \
+from giskardpy.data_types.exceptions import GiskardException, MaxTrajectoryLengthException, UnknownGoalException, GoalInitalizationException, LocalMinimumException, \
     DuplicateNameException, CorruptMeshException, UnknownGroupException, UnknownLinkException, \
     InvalidWorldOperationException, CorruptShapeException, TransformException, CorruptURDFException, \
     SelfCollisionViolatedException, HardConstraintsViolatedException, SetupException, EmptyProblemException, \
@@ -27,19 +25,18 @@ from giskardpy.goals.goals_tests import DebugGoal, CannotResolveSymbol
 from giskardpy.goals.joint_goals import UnlimitedJointGoal
 from giskardpy.goals.set_prediction_horizon import SetQPSolver
 from giskardpy.goals.tracebot import InsertCylinder
-from giskardpy.goals.weight_scaling_goals import MaxManipulabilityLinWeight, BaseArmWeightScaling
+from giskardpy.motion_graph.tasks.weight_scaling_goals import MaxManipulability, BaseArmWeightScaling
 from giskardpy.god_map import god_map
 from giskardpy.middleware import get_middleware
 from giskardpy.model.utils import hacky_urdf_parser_fix
 from giskardpy.motion_graph.monitors.monitors import TrueMonitor
-from giskardpy.motion_graph.monitors.payload_monitors import Counter, Pulse
+from giskardpy.motion_graph.monitors.payload_monitors import Pulse
 from giskardpy.motion_graph.tasks.joint_tasks import JointVelocityLimit
 from giskardpy.motion_graph.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE
 from giskardpy.qp.qp_controller_config import SupportedQPSolver, QPControllerConfig
 from giskardpy_ros.configs.behavior_tree_config import StandAloneBTConfig
 from giskardpy_ros.configs.giskard import Giskard
 from giskardpy_ros.configs.iai_robots.pr2 import PR2CollisionAvoidance, PR2StandaloneInterface, WorldWithPR2Config
-from giskardpy_ros.goals.realtime_goals import FollowNavPath
 from giskardpy_ros.python_interface.old_python_interface import OldGiskardWrapper
 from giskardpy_ros.tree.blackboard_utils import GiskardBlackboard
 from utils_for_tests import compare_poses, publish_marker_vector, GiskardTestWrapper, compare_points
@@ -665,7 +662,7 @@ class TestMonitors:
         better_pose.dye_group(cylinder_name, (0, 0, 1, 1))
 
         inserted = better_pose.motion_goals.add_motion_goal(class_name=InsertCylinder.__name__,
-                                                            name='insert cyclinder',
+                                                            name='Insert Cyclinder',
                                                             cylinder_name=cylinder_name,
                                                             cylinder_height=0.121,
                                                             hole_point=hole_point)
@@ -4375,7 +4372,7 @@ class TestManipulability:
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.allow_all_collisions()
         zero_pose.set_cart_goal(p, zero_pose.r_tip, 'map')
-        zero_pose.motion_goals.add_motion_goal(class_name=MaxManipulabilityLinWeight.__name__,
+        zero_pose.motion_goals.add_motion_goal(class_name=MaxManipulability.__name__,
                                                root_link='torso_lift_link',
                                                tip_link='r_gripper_tool_frame')
         zero_pose.execute()
@@ -4388,12 +4385,12 @@ class TestManipulability:
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.allow_all_collisions()
         zero_pose.set_cart_goal(p, zero_pose.r_tip, 'map')
-        zero_pose.motion_goals.add_motion_goal(class_name=MaxManipulabilityLinWeight.__name__,
+        zero_pose.motion_goals.add_motion_goal(class_name=MaxManipulability.__name__,
                                                root_link='torso_lift_link',
                                                tip_link='r_gripper_tool_frame')
         p.pose.position = Point(1, 0.1, 0)
         zero_pose.set_cart_goal(p, zero_pose.l_tip, 'map')
-        zero_pose.motion_goals.add_motion_goal(class_name=MaxManipulabilityLinWeight.__name__,
+        zero_pose.motion_goals.add_motion_goal(class_name=MaxManipulability.__name__,
                                                root_link='torso_lift_link',
                                                tip_link='l_gripper_tool_frame')
         zero_pose.execute(add_local_minimum_reached=True)
@@ -4491,10 +4488,10 @@ class TestWeightScaling:
                                                    'l_wrist_flex_joint',
                                                    'l_wrist_roll_joint'],
                                                base_joints=['brumbrum'])
-        zero_pose.motion_goals.add_motion_goal(class_name=MaxManipulabilityLinWeight.__name__,
+        zero_pose.motion_goals.add_motion_goal(class_name=MaxManipulability.__name__,
                                                root_link='torso_lift_link',
                                                tip_link='r_gripper_tool_frame')
-        zero_pose.motion_goals.add_motion_goal(class_name=MaxManipulabilityLinWeight.__name__,
+        zero_pose.motion_goals.add_motion_goal(class_name=MaxManipulability.__name__,
                                                root_link='torso_lift_link',
                                                tip_link='l_gripper_tool_frame')
         zero_pose.add_default_end_motion_conditions()
@@ -4512,7 +4509,7 @@ class TestWeightScaling:
         zero_pose.allow_all_collisions()
         zero_pose.set_cart_goal(p, zero_pose.r_tip, 'map')
         m_threshold = 0.16
-        zero_pose.motion_goals.add_motion_goal(class_name=MaxManipulabilityLinWeight.__name__,
+        zero_pose.motion_goals.add_motion_goal(class_name=MaxManipulability.__name__,
                                                root_link='torso_lift_link',
                                                tip_link=zero_pose.r_tip,
                                                m_threshold=m_threshold)
@@ -4529,13 +4526,13 @@ class TestWeightScaling:
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.allow_all_collisions()
         zero_pose.set_cart_goal(p, zero_pose.r_tip, 'map')
-        zero_pose.motion_goals.add_motion_goal(class_name=MaxManipulabilityLinWeight.__name__,
+        zero_pose.motion_goals.add_motion_goal(class_name=MaxManipulability.__name__,
                                                root_link='torso_lift_link',
                                                tip_link=zero_pose.r_tip,
                                                m_threshold=m_threshold)
         p.pose.position = Point(1, 0.1, 0)
         zero_pose.set_cart_goal(p, zero_pose.l_tip, 'map')
-        zero_pose.motion_goals.add_motion_goal(class_name=MaxManipulabilityLinWeight.__name__,
+        zero_pose.motion_goals.add_motion_goal(class_name=MaxManipulability.__name__,
                                                root_link='torso_lift_link',
                                                tip_link=zero_pose.l_tip,
                                                m_threshold=m_threshold)

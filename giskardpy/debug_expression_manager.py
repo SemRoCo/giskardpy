@@ -35,6 +35,8 @@ class DebugExpressionManager:
                              derivatives_to_plot: Optional[List[Derivatives]] = None):
         if derivatives_to_plot is None:
             derivatives_to_plot = [derivative]
+        if isinstance(expression, (int, float)):
+            expression = cas.Expression(expression)
         if isinstance(expression, cas.Symbol_):
             expression.color = color
         expression.debug_derivative = derivative

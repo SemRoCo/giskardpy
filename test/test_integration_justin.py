@@ -221,16 +221,25 @@ class TestJointGoals:
             "torso2_joint": -1,
             "torso3_joint": 0.2,
         }
-        zero_pose.set_joint_goal(js)
-        zero_pose.allow_all_collisions()
-        zero_pose.execute()
+        zero_pose.tasks.add_joint_position(name='g1', goal_state=js)
+        zero_pose.tasks.add_justin_torso_limit(name='torso4_joint', joint_name='torso4_joint',
+                                               weight=WEIGHT_ABOVE_CA)
+        zero_pose.motion_goals.allow_all_collisions()
+        local_min = zero_pose.monitors.add_local_minimum_reached(name='local_min')
+        zero_pose.monitors.add_end_motion(start_condition=local_min)
+        zero_pose.execute(add_local_minimum_reached=False)
+
         js = {
             "torso2_joint": 0,
             "torso3_joint": 2,
         }
-        zero_pose.set_joint_goal(js)
-        zero_pose.allow_all_collisions()
-        zero_pose.execute()
+        zero_pose.tasks.add_joint_position(name='g2', goal_state=js)
+        zero_pose.tasks.add_justin_torso_limit(name='torso4_joint', joint_name='torso4_joint',
+                                               weight=WEIGHT_ABOVE_CA)
+        zero_pose.motion_goals.allow_all_collisions()
+        local_min = zero_pose.monitors.add_local_minimum_reached(name='local_min')
+        zero_pose.monitors.add_end_motion(start_condition=local_min)
+        zero_pose.execute(add_local_minimum_reached=False)
 
 
 class TestEuRobin:

@@ -75,8 +75,9 @@ def zero_pose(resetted_giskard: GiskardTestWrapper) -> GiskardTestWrapper:
         resetted_giskard.execute(add_local_minimum_reached=False)
     else:
         resetted_giskard.allow_all_collisions()
-        resetted_giskard.set_joint_goal(resetted_giskard.default_pose)
-        resetted_giskard.execute()
+        done = resetted_giskard.tasks.add_joint_position(name='joint goal', goal_state=resetted_giskard.default_pose)
+        resetted_giskard.monitors.add_end_motion(start_condition=done)
+        resetted_giskard.execute(add_local_minimum_reached=False)
     return resetted_giskard
 
 

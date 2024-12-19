@@ -4053,6 +4053,81 @@ class TestCollisionAvoidanceGoals:
 
     # TODO FIXME attaching and detach of urdf objects that listen to joint states
 
+    def test_iis(self, kitchen_setup: PR2TestWrapper):
+        box_name = 'box'
+        fridge_handle_name = 'iai_fridge_door_handle'
+        fridge_shelf_name = 'iai_fridge_door_shelf1_bottom'
+        sink_area = 'sink_area_surface'
+        left_gripper = 'l_gripper_tool_frame'
+        right_gripper = 'r_gripper_tool_frame'
+
+        box_pose = PoseStamped()
+        box_pose.header.frame_id = sink_area
+        box_pose.pose.position.z = 0.06
+        box_pose.pose.position.x = 0.15
+        box_pose.pose.orientation.w = 1
+        kitchen_setup.world.add_box(name=box_name, size=[0.05, 0.05, 0.15], pose=box_pose, parent_link='map')
+
+        goal_pose = PoseStamped()
+        goal_pose.header.frame_id = box_name
+        goal_pose.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 0, -1, 0],
+                                                                         [0, -1, 0, 0],
+                                                                         [-1, 0, 0, 0],
+                                                                         [0, 0, 0, 1]]))
+        kitchen_setup.motion_goals.add_cartesian_pose(goal_pose=goal_pose, root_link='map', tip_link=left_gripper)
+        kitchen_setup.allow_all_collisions()
+        kitchen_setup.execute()
+
+        kitchen_setup.world.update_parent_link_of_group(name=box_name, parent_link=left_gripper)
+
+        drive_back_pose = PoseStamped()
+        drive_back_pose.header.frame_id = 'base_footprint'
+        drive_back_pose.pose.position.x = -0.5
+        drive_back_pose.pose.orientation.w = 1
+        kitchen_setup.motion_goals.add_cartesian_pose(goal_pose=drive_back_pose, root_link='map',
+                                                      tip_link='base_footprint')
+        kitchen_setup.allow_all_collisions()
+        kitchen_setup.execute()
+
+        grasp_handle_pose = PoseStamped()
+        grasp_handle_pose.header.frame_id = fridge_handle_name
+        grasp_handle_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0, 0, 1]))
+        kitchen_setup.motion_goals.add_cartesian_pose(goal_pose=grasp_handle_pose, root_link='map',
+                                                      tip_link=right_gripper)
+        kitchen_setup.allow_all_collisions()
+        kitchen_setup.execute()
+
+        kitchen_setup.motion_goals.add_open_container(tip_link=right_gripper,
+                                                      environment_link=fridge_handle_name)
+        kitchen_setup.allow_all_collisions()
+        kitchen_setup.execute()
+
+        place_pose = PoseStamped()
+        place_pose.header.frame_id = fridge_shelf_name
+        place_pose.pose.position.z = 0.1
+        place_pose.pose.orientation = Quaternion(*quaternion_from_matrix([[-1, 0, 0, 0],
+                                                                          [0, -1, 0, 0],
+                                                                          [0, 0, 1, 0],
+                                                                          [0, 0, 0, 1]]))
+        kitchen_setup.motion_goals.add_cartesian_pose(goal_pose=place_pose,
+                                                      root_link='map',
+                                                      tip_link=box_name)
+
+        grasp_handle_pose = PoseStamped()
+        grasp_handle_pose.header.frame_id = fridge_handle_name
+        grasp_handle_pose.pose.orientation = Quaternion(*quaternion_about_axis(np.pi, [0, 0, 1]))
+        kitchen_setup.motion_goals.add_cartesian_pose(goal_pose=grasp_handle_pose, root_link='map',
+                                                      tip_link=right_gripper)
+        kitchen_setup.allow_all_collisions()
+        kitchen_setup.execute()
+
+        kitchen_setup.update_parent_link_of_group(name=box_name, parent_link=fridge_shelf_name)
+
+        kitchen_setup.motion_goals.add_close_container(tip_link=right_gripper,
+                                                       environment_link=fridge_handle_name)
+        kitchen_setup.allow_all_collisions()
+        kitchen_setup.execute()
+
     # def test_iis(self, kitchen_setup: PR2TestWrapper):
     #     # rosrun tf static_transform_publisher 0 - 0.2 0.93 1.5707963267948966 0 0 iai_kitchen/table_area_main lid 10
     #     # rosrun tf static_transform_publisher 0 - 0.15 0 0 0 0 lid goal 10

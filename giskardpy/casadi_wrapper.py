@@ -2075,6 +2075,14 @@ def distance_point_to_plane(frame_P_current, frame_V_v1, frame_V_v2):
     return norm(nearest - frame_P_current), nearest
 
 
+def distance_point_to_plane_signed(frame_P_current, frame_V_v1, frame_V_v2):
+    normal = cross(frame_V_v1, frame_V_v2)
+    normal = normal / norm(normal)  # Normalize the normal vector
+    d = normal.dot(frame_P_current)  # Signed distance to the plane
+    nearest = frame_P_current - normal * d  # Nearest point on the plane
+    return d, nearest
+
+
 def angle_between_vector(v1, v2):
     v1 = v1[:3]
     v2 = v2[:3]

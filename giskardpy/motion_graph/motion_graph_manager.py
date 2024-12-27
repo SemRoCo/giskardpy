@@ -359,7 +359,8 @@ class MotionGraphManager:
         self.task_state.observation_state = self.compiled_task_observation_state.fast_call(task_args)
         self.monitor_state.observation_state = self.compiled_monitor_observation_state.fast_call(monitor_args)
         self.goal_state.observation_state = self.compiled_goal_observation_state.fast_call(goal_args)
-        self.monitor_state.observation_state[self.payload_monitor_filter] = next_state
+        if len(self.payload_monitors) > 0:
+            self.monitor_state.observation_state[self.payload_monitor_filter] = next_state
 
         obs_state = np.concatenate((self.task_state.observation_state,
                                     self.monitor_state.observation_state,
@@ -398,6 +399,8 @@ class MotionGraphManager:
         done = False
         cancel_exception = None
         next_state = np.zeros(len(self.payload_monitors))
+        if len(self.payload_monitor_filter) == 0:
+            return next_state, False
         filtered_life_cycle_state = self.monitor_state.life_cycle_state[self.payload_monitor_filter]
         for i, payload_monitor in enumerate(self.payload_monitors):
             if filtered_life_cycle_state[i] == LifeCycleState.running:

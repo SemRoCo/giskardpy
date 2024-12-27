@@ -191,8 +191,12 @@ class CartesianPoseAsTask(Task):
                                         frame_P_current=r_P_c,
                                         reference_velocity=self.reference_linear_velocity,
                                         weight=self.weight)
-        # god_map.debug_expression_manager.add_debug_expression(f'{self.name}/current_point', r_P_c,
-        #                                                       color=ColorRGBA(r=1.0, g=0.0, b=0.0, a=1.0))
+        if tip_link in ['rollin_justin/l_gripper_tool_frame', 'box/box']:
+            god_map.debug_expression_manager.add_debug_expression(f'{self.name}/l/current_point', r_P_c,
+                                                                  color=ColorRGBA(r=0.0, g=0.0, b=1.0, a=1.0))
+        if tip_link in ['rollin_justin/r_gripper_tool_frame']:
+            god_map.debug_expression_manager.add_debug_expression(f'{self.name}/r/current_point', r_P_c,
+                                                                  color=ColorRGBA(r=1.0, g=0.0, b=0.0, a=1.0))
         # god_map.debug_expression_manager.add_debug_expression(f'{self.name}/goal_point', root_P_goal,
         #                                                       color=ColorRGBA(r=0.0, g=0.0, b=1.0, a=1.0))
 
@@ -299,3 +303,40 @@ class CartesianPositionVelocityGoal(Task):
                                                    f'{name}/z',
                                                ],
                                                weights=[weight] * 3)
+
+
+class JustinTorsoLimitCart(Task):
+    def __init__(self, *, root_link: PrefixName, tip_link: PrefixName,
+                 forward_distance: float, backward_distance: float, weight: float = WEIGHT_ABOVE_CA,
+                 name: Optional[str] = None, plot: bool = True):
+        super().__init__(name=name, plot=plot)
+        torso_root_T_torso_tip = god_map.world.compose_fk_expression(root_link, tip_link)
+        torso_root_V_up = cas.Vector3((0, 0, 1))
+        torso_root_V_up.reference_frame = root_link
+        torso_root_V_up.vis_frame = root_link
+
+        torso_root_V_left = cas.Vector3((0, 1, 0))
+        torso_root_V_left.reference_frame = root_link
+        torso_root_V_left.vis_frame = root_link
+
+        torso_root_P_torso_tip = torso_root_T_torso_tip.to_position()
+
+        distance, nearest = cas.distance_point_to_plane_signed(frame_P_current=torso_root_P_torso_tip,
+                                                               frame_V_v1=torso_root_V_left,
+                                                               frame_V_v2=torso_root_V_up)
+        # distance = cas.distance_point_to_line(torso_root_P_torso_tip, cas.Point3((0, 0, 0)), torso_root_V_up)
+
+        # god_map.debug_expression_manager.add_debug_expression(f'{self.name}/torso_root_V_up',
+        #                                                       expression=torso_root_V_up)
+        # god_map.debug_expression_manager.add_debug_expression(f'{self.name}/torso_root_P_torso_tip',
+        #                                                       expression=torso_root_P_torso_tip)
+        god_map.debug_expression_manager.add_debug_expression(f'{self.name}/distance',
+                                                              expression=distance)
+
+        self.add_inequality_constraint(reference_velocity=CartesianPosition.default_reference_velocity,
+                                       lower_error=-backward_distance - distance,
+                                       upper_error=forward_distance - distance,
+                                       weight=weight,
+                                       task_expression=distance,
+                                       name=f'{name}/distance')
+        self.expression = cas.less_equal(distance, forward_distance)

@@ -884,6 +884,10 @@ def distance_point_to_plane(frame_P_current: Point3, frame_V_v1: Vector3,
                                           frame_V_v2: Vector3) -> \
         Tuple[Expression, Point3]: ...
 
+def distance_point_to_plane_signed(frame_P_current: Point3, frame_V_v1: Vector3,
+                                          frame_V_v2: Vector3) -> \
+        Tuple[Expression, Point3]: ...
+
 def angle_between_vector(v1: Vector3, v2: Vector3) -> Expression: ...
 
 def velocity_limit_from_position_limit(acceleration_limit: Union[Symbol, float],

@@ -20,12 +20,26 @@ class WorldWithPR2Config(WorldWithOmniDriveRobot):
 
     def setup(self, robot_name: Optional[str] = None):
         super().setup(robot_name)
-        self.set_joint_limits(limit_map={Derivatives.velocity: 2,
+        self.set_joint_limits(limit_map={Derivatives.velocity: 1,
                                          Derivatives.jerk: None},
                               joint_name='head_pan_joint')
         self.set_joint_limits(limit_map={Derivatives.velocity: 3.5,
                                          Derivatives.jerk: None},
                               joint_name='head_tilt_joint')
+
+        self.set_joint_limits(limit_map={Derivatives.velocity: 0.15,
+                                         Derivatives.jerk: None},
+                              joint_name='r_shoulder_pan_joint')
+        self.set_joint_limits(limit_map={Derivatives.velocity: 0.15,
+                                         Derivatives.jerk: None},
+                              joint_name='l_shoulder_pan_joint')
+
+        self.set_joint_limits(limit_map={Derivatives.velocity: 0.2,
+                                         Derivatives.jerk: None},
+                              joint_name='r_shoulder_lift_joint')
+        self.set_joint_limits(limit_map={Derivatives.velocity: 0.2,
+                                         Derivatives.jerk: None},
+                              joint_name='l_shoulder_lift_joint')
 
 
 class PR2StandaloneInterface(RobotInterfaceConfig):
@@ -157,13 +171,11 @@ class PR2VelocityIAIInterface(RobotInterfaceConfig):
                                            tf_parent_frame=self.map_name,
                                            tf_child_frame=self.odom_link_name)
         self.sync_joint_state_topic('/joint_states')
-        self.sync_odometry_topic('/robot_pose_ekf/odom_combined', self.drive_joint_name)
+        self.sync_odometry_topic('/robot_pose_ekf/odom_combined', self.drive_joint_name,
+                                 sync_in_control_loop=False)
         self.add_joint_velocity_group_controller(namespace='l_arm_joint_group_velocity_controller')
         self.add_joint_velocity_group_controller(namespace='r_arm_joint_group_velocity_controller')
-        self.add_joint_position_controller(namespaces=[
-            'head_pan_position_controller',
-            'head_tilt_position_controller',
-        ])
+        self.add_joint_velocity_group_controller(namespace='spine_velocity_controller')
 
         self.add_base_cmd_velocity(cmd_vel_topic='/base_controller/command',
                                    joint_name=self.drive_joint_name)

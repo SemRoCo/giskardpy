@@ -22,6 +22,6 @@ if __name__ == '__main__':
     giskard = Giskard(world_config=WorldWithPR2ConfigBlue(),
                       collision_avoidance_config=PR2CollisionAvoidance(),
                       robot_interface_config=PR2JointTrajServerIAIInterface(),
-                      behavior_tree_config=OpenLoopBTConfig(),
+                      behavior_tree_config=OpenLoopBTConfig(debug_mode=True),
                       qp_controller_config=QPControllerConfig())
     giskard.live()

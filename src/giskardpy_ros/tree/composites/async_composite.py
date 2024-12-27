@@ -10,6 +10,7 @@ from py_trees import Status, Composite, Behaviour
 from giskardpy_ros.tree.behaviors.plugin import GiskardBehavior
 from giskardpy_ros.ros1.ros_timer import Rate
 from giskardpy_ros.tree.blackboard_utils import raise_to_blackboard
+from giskardpy.middleware import get_middleware
 
 
 class AsyncBehavior(GiskardBehavior, Composite):
@@ -39,6 +40,7 @@ class AsyncBehavior(GiskardBehavior, Composite):
         return self.status == Status.RUNNING
 
     def terminate(self, new_status: Status) -> None:
+        get_middleware().loginfo(f'avg dt was {self.sleeper.avg_dt}')
         self.set_status(Status.FAILURE)
         try:
             self.update_thread.join()

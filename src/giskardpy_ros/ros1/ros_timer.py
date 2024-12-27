@@ -2,6 +2,7 @@ import threading
 import time
 from typing import Callable
 
+import numpy as np
 import rospy
 from rospy.timer import TimerEvent
 from rospy.timer import sleep
@@ -28,6 +29,8 @@ class Rate:
         self.last_time = rospy.rostime.get_rostime()
         self.sleep_dur = rospy.rostime.Duration(0, int(1e9 / hz))
         self._reset = reset
+        self.dt_sum = 0
+        self.loop_count = 0
 
     def _remaining(self, curr_time):
         """
@@ -73,16 +76,26 @@ class Rate:
                 raise
             self.last_time = rospy.rostime.get_rostime()
             return
-        self.last_time = self.last_time + self.sleep_dur
 
         # detect time jumping forwards, as well as loops that are
         # inherently too slow
         elapsed_time = curr_time - self.last_time
+        if self.loop_count > 1:
+            self.dt_sum += elapsed_time.to_sec()
+        self.loop_count += 1
         if elapsed_time > self.sleep_dur * 2:
             self.last_time = curr_time
-            if self.print_warning:
-                get_middleware().logwarn(f'Control loop can\'t keep up with {GiskardBlackboard().giskard.qp_controller_config.control_dt} hz. '
-                                f'This loop took {elapsed_time.to_sec():.5f}s')
+            if self.print_warning and self.loop_count > 1:
+                get_middleware().logwarn(
+                    f'Control loop can\'t keep up with {GiskardBlackboard().giskard.qp_controller_config.control_dt} dt. '
+                    f'This loop took {elapsed_time.to_sec():.5f}s; average is {self.avg_dt}')
+        self.last_time = self.last_time + self.sleep_dur
+
+    @property
+    def avg_dt(self):
+        if self.loop_count >= 2:
+            return self.dt_sum / (self.loop_count - 1)
+        return np.nan
 
 
 class Timer(threading.Thread):

@@ -299,7 +299,7 @@ class WorldWrapper:
         :return: WorldResult
         """
         if isinstance(root_link_name, str):
-            root_link_name = giskard_msgs.LinkName(root_link_name)
+            root_link_name = giskard_msgs.LinkName(root_link_name, '')
         req = WorldGoal()
         req.operation = WorldGoal.REGISTER_GROUP
         req.group_name = new_group_name

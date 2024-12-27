@@ -39,7 +39,9 @@ from giskardpy.motion_graph.monitors.monitors import LocalMinimumReached, TimeAb
 from giskardpy.motion_graph.monitors.overwrite_state_monitors import SetOdometry, SetSeedConfiguration
 from giskardpy.motion_graph.monitors.payload_monitors import Print, Sleep, \
     PayloadAlternator, Pulse, CheckMaxTrajectoryLength
-from giskardpy.motion_graph.tasks.cartesian_tasks import CartesianPosition, CartesianOrientation, CartesianPoseAsTask
+from giskardpy.motion_graph.tasks.cartesian_tasks import CartesianPosition, CartesianOrientation, CartesianPoseAsTask, \
+    JustinTorsoLimitCart
+from giskardpy.motion_graph.tasks.task import WEIGHT_ABOVE_CA
 from giskardpy.motion_graph.tasks.weight_scaling_goals import MaxManipulability
 from giskardpy_ros.goals.realtime_goals import CarryMyBullshit, RealTimePointing, FollowNavPath
 from giskardpy_ros.ros1 import msg_converter
@@ -1495,30 +1497,26 @@ class TaskWrapper(MotionGraphNodeWrapper):
 
     def add_justin_torso_limit(self,
                                name: str,
-                               joint_name: Union[str, giskard_msgs.LinkName],
-                               lower_limit: float = -1,
-                               upper_limit: float = -0.25,
-                               weight: Optional[float] = None,
-                               max_velocity: Optional[float] = None,
+                               root_link: Union[str, giskard_msgs.LinkName] = 'torso1',
+                               tip_link: Union[str, giskard_msgs.LinkName] = 'torso4',
+                               forward_distance: float = 0.05,
+                               backward_distance: float = 0.14,
+                               weight: float = WEIGHT_ABOVE_CA,
                                start_condition: str = '',
                                pause_condition: str = '',
                                end_condition: Optional[str] = None,
                                **kwargs: goal_parameter) -> str:
-        """
-        Sets joint position goals for all pairs in goal_state
-        :param goal_state: maps joint_name to goal position
-        :param weight: None = use default weight
-        :param max_velocity: will be applied to all joints
-        """
-        if isinstance(joint_name, str):
-            joint_name = giskard_msgs.LinkName(name=joint_name)
-        return self.add_task(class_name=JustinTorsoLimit.__name__,
-                             lower_limit=lower_limit,
-                             upper_limit=upper_limit,
-                             weight=weight,
-                             joint_name=joint_name,
-                             max_velocity=max_velocity,
+        if isinstance(root_link, str):
+            root_link = giskard_msgs.LinkName(name=root_link)
+        if isinstance(tip_link, str):
+            tip_link = giskard_msgs.LinkName(name=tip_link)
+        return self.add_task(class_name=JustinTorsoLimitCart.__name__,
+                             root_link=root_link,
+                             tip_link=tip_link,
+                             forward_distance=forward_distance,
+                             backward_distance=backward_distance,
                              name=name,
+                             weight=weight,
                              start_condition=start_condition,
                              pause_condition=pause_condition,
                              end_condition=end_condition,

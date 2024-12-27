@@ -238,7 +238,7 @@ class TestMoveBaseGoals:
         # zero_pose.execute(expected_error_code=GiskardError.EXECUTION_ERROR,
         #                   add_local_minimum_reached=False)
         zero_pose.execute(expected_error_type=PreemptedException,
-                          stop_after=20,
+                          # stop_after=20,
                           add_local_minimum_reached=False)
 
         # zero_pose.set_json_goal('CarryMyBullshit',

@@ -52,7 +52,7 @@ class CarryMyBullshit(Goal):
     traj_data: List[np.ndarray] = None
     thresholds: np.ndarray = None
     thresholds_pc: np.ndarray = None
-    human_point: cas.Point3 = None
+    human_point: PointStamped = None
     pub: rospy.Publisher = None
     laser_sub: rospy.Subscriber = None
     point_cloud_laser_sub: rospy.Subscriber = None
@@ -141,7 +141,7 @@ class CarryMyBullshit(Goal):
         self.traj_tracking_radius = traj_tracking_radius
         self.interpolation_step_size = 0.05
         self.max_temp_distance = int(self.traj_tracking_radius / self.interpolation_step_size)
-        self.human_point = cas.Point3()
+        self.human_point = PointStamped()
         self.height_for_camera_target = height_for_camera_target
         self.drive_back = drive_back
         if clear_path or (not self.drive_back and CarryMyBullshit.trajectory is None):
@@ -221,8 +221,9 @@ class CarryMyBullshit(Goal):
         if self.drive_back:
             map_P_human = root_P_goal_point
         else:
-            map_P_human = symbol_manager.get_expr(self.ref_str + '.human_point', input_type_hint=cas.Point3,
-                                                  output_type_hint=cas.Point3)
+            map_P_human = cas.Point3((symbol_manager.get_symbol(self.ref_str + '.human_point.point.x'),
+                                      symbol_manager.get_symbol(self.ref_str + '.human_point.point.y'),
+                                      symbol_manager.get_symbol(self.ref_str + '.human_point.point.z')))
             map_P_human_projected = map_P_human
             map_P_human_projected.z = 0
 
@@ -459,7 +460,7 @@ class CarryMyBullshit(Goal):
     def get_first_traj_point(self) -> np.ndarray:
         return CarryMyBullshit.traj_data[0]
 
-    @memoize_with_counter(4)
+    # @memoize_with_counter(4)
     def get_current_target(self) -> Dict[str, float]:
         self.check_laser_scan_age()
         traj = CarryMyBullshit.trajectory.copy()
@@ -638,7 +639,7 @@ class CarryMyBullshit(Goal):
                 CarryMyBullshit.traj_data.append(current_point)
 
             CarryMyBullshit.trajectory = np.array(CarryMyBullshit.traj_data)
-            self.human_point = msg_converter.ros_msg_to_giskard_obj(point, god_map.world)
+            self.human_point = point
         except Exception as e:
             get_middleware().logwarn(f'rejected new target because: {e}')
         self.publish_trajectory()

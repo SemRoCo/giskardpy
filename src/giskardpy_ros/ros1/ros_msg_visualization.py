@@ -196,7 +196,7 @@ class ROSMsgVisualization:
                                  raw_debug_trajectory: List[Dict[PrefixName, np.ndarray]],
                                  joint_space_traj: Trajectory,
                                  every_x: int = 10,
-                                 start_alpha: float = 0.5, stop_alpha: float = 1.0,
+                                 start_alpha: float = 0.15, stop_alpha: float = 1.0,
                                  namespace: str = 'debug_trajectory') -> None:
         self.clear_marker(namespace)
         marker_array = MarkerArray()
@@ -205,6 +205,24 @@ class ROSMsgVisualization:
             if i < 0 or i >= len(raw_debug_trajectory):
                 raise ValueError("Index i is out of range")
             return start_alpha + i * (stop_alpha - start_alpha) / (len(raw_debug_trajectory) - 1)
+
+        def scale_color_to_white(original_color: ColorRGBA, scale: float) -> ColorRGBA:
+            """
+            Scales the input RGBA color between white and the original color based on the scale value.
+
+            :param original_color: The original ColorRGBA message.
+            :param scale: A value between 0 and 1, where 0 is white and 1 is the original color.
+            :return: A new ColorRGBA message scaled between white and the original color.
+            """
+            scale = max(0.0, min(1.0, scale))  # Ensure scale is clamped between 0 and 1
+
+            new_color = ColorRGBA()
+            new_color.r = (1.0 - scale) + scale * original_color.r
+            new_color.g = (1.0 - scale) + scale * original_color.g
+            new_color.b = (1.0 - scale) + scale * original_color.b
+            new_color.a = original_color.a  # Keep alpha unchanged
+
+            return new_color
 
         with god_map.world.reset_joint_state_context():
             for point_id, point in enumerate(raw_debug_trajectory):
@@ -218,7 +236,11 @@ class ROSMsgVisualization:
                                                                   debug_values=point,
                                                                   marker_id_offset=len(marker_array.markers))
                     for m in markers:
-                        m.color.a = compute_alpha(point_id)
+                        m.color = scale_color_to_white(m.color, start_alpha + (point_id+1)/len(raw_debug_trajectory))
+                        # m.color.r = min(1-m.color.r+compute_alpha(point_id), 1)
+                        # m.color.g = min(1-m.color.g+compute_alpha(point_id), 1)
+                        # m.color.b = min(1-m.color.b+compute_alpha(point_id), 1)
+                        # m.color.a = 1
                     marker_array.markers.extend(deepcopy(markers))
         self.publisher.publish(marker_array)
 

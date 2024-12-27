@@ -8,6 +8,7 @@ from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
 from giskard_msgs.msg import LinkName, GiskardError
 from giskardpy.data_types.exceptions import EmptyProblemException
+from giskardpy.motion_graph.tasks.cartesian_tasks import JustinTorsoLimitCart
 from giskardpy.motion_graph.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
 from giskardpy.utils.math import quaternion_from_rotation_matrix
 from giskardpy_ros.configs.behavior_tree_config import StandAloneBTConfig
@@ -178,7 +179,7 @@ class TestJointGoals:
             "right_arm6_joint": 0.0,
             "right_arm7_joint": 0.0,
         }
-        zero_pose.set_joint_goal(js)
+        zero_pose.tasks.add_joint_position(name='js', goal_state=js)
         zero_pose.allow_all_collisions()
         zero_pose.execute()
 
@@ -222,8 +223,7 @@ class TestJointGoals:
             "torso3_joint": 0.2,
         }
         zero_pose.tasks.add_joint_position(name='g1', goal_state=js)
-        zero_pose.tasks.add_justin_torso_limit(name='torso4_joint', joint_name='torso4_joint',
-                                               weight=WEIGHT_ABOVE_CA)
+        zero_pose.tasks.add_justin_torso_limit(name='torso4_joint', end_condition='')
         zero_pose.motion_goals.allow_all_collisions()
         local_min = zero_pose.monitors.add_local_minimum_reached(name='local_min')
         zero_pose.monitors.add_end_motion(start_condition=local_min)
@@ -234,8 +234,7 @@ class TestJointGoals:
             "torso3_joint": 2,
         }
         zero_pose.tasks.add_joint_position(name='g2', goal_state=js)
-        zero_pose.tasks.add_justin_torso_limit(name='torso4_joint', joint_name='torso4_joint',
-                                               weight=WEIGHT_ABOVE_CA)
+        zero_pose.tasks.add_justin_torso_limit(name='torso4_joint', end_condition='')
         zero_pose.motion_goals.allow_all_collisions()
         local_min = zero_pose.monitors.add_local_minimum_reached(name='local_min')
         zero_pose.monitors.add_end_motion(start_condition=local_min)
@@ -325,7 +324,7 @@ class TestEuRobin:
         box_pose = PoseStamped()
         box_pose.header.frame_id = kitchenette
         box_pose.pose.position.z = 0.22
-        box_pose.pose.position.x = -0.1
+        box_pose.pose.position.x = -0.15
         box_pose.pose.orientation.w = 1.0
         dlr_kitchen_setup.world.add_box(name=box_name, size=(0.03, 0.15, 0.2), pose=box_pose, parent_link=kitchenette)
         dlr_kitchen_setup.dye_group(group_name=box_name, rgba=(0.0, 0.0, 1.0, 1.0))
@@ -361,6 +360,7 @@ class TestEuRobin:
         # dlr_kitchen_setup.motion_goals.allow_self_collision(end_condition=box_pre_grasped)
         dlr_kitchen_setup.motion_goals.allow_collision(group1=dlr_kitchen_setup.robot_name, group2=box_name)
         dlr_kitchen_setup.motion_goals.allow_self_collision()
+        dlr_kitchen_setup.tasks.add_justin_torso_limit(name='torso4_joint', end_condition='')
         dlr_kitchen_setup.execute(add_local_minimum_reached=False)
 
         # %%
@@ -405,6 +405,7 @@ class TestEuRobin:
         dlr_kitchen_setup.monitors.add_end_motion(start_condition=f'{right_hand_opened} and {drove_back}')
         dlr_kitchen_setup.motion_goals.allow_collision(group1=dlr_kitchen_setup.robot_name, group2=box_name)
         dlr_kitchen_setup.motion_goals.allow_self_collision()
+        dlr_kitchen_setup.tasks.add_justin_torso_limit(name='torso4_joint', end_condition='')
         dlr_kitchen_setup.execute(add_local_minimum_reached=False)
 
         # %%
@@ -459,6 +460,7 @@ class TestEuRobin:
         dlr_kitchen_setup.allow_collision(group2=dlr_kitchen_setup.right_hand_group,
                                           group1=dlr_kitchen_setup.default_env_name)
         dlr_kitchen_setup.allow_self_collision()
+        dlr_kitchen_setup.tasks.add_justin_torso_limit(name='torso4_joint', end_condition='')
         dlr_kitchen_setup.execute(add_local_minimum_reached=False)
 
         # %%
@@ -485,4 +487,5 @@ class TestEuRobin:
         dlr_kitchen_setup.allow_collision(group2=dlr_kitchen_setup.right_hand_group,
                                           group1=dlr_kitchen_setup.default_env_name)
         dlr_kitchen_setup.allow_self_collision()
+        dlr_kitchen_setup.tasks.add_justin_torso_limit(name='torso4_joint', end_condition='')
         dlr_kitchen_setup.execute(add_local_minimum_reached=False)

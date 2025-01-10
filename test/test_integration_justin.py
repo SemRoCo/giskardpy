@@ -120,7 +120,7 @@ class JustinTestWrapper(GiskardTestWrapper):
             giskard = Giskard(world_config=WorldWithJustinConfig(),
                               collision_avoidance_config=JustinCollisionAvoidanceConfig(),
                               robot_interface_config=JustinStandaloneInterface(),
-                              behavior_tree_config=StandAloneBTConfig(publish_tf=True, debug_mode=True,
+                              behavior_tree_config=StandAloneBTConfig(publish_tf=False, debug_mode=False,
                                                                       visualization_mode=VisualizationMode.VisualsFrameLocked),
                               qp_controller_config=QPControllerConfig(mpc_dt=0.0125,
                                                                       control_dt=None))

@@ -44,7 +44,8 @@ class HSRTestWrapper(GiskardTestWrapper):
                               behavior_tree_config=StandAloneBTConfig(debug_mode=True,
                                                                       publish_tf=True,
                                                                       publish_js=False),
-                              qp_controller_config=QPControllerConfig(mpc_dt=0.05))
+                              qp_controller_config=QPControllerConfig(mpc_dt=0.01,
+                                                                      control_dt=0.01))
         super().__init__(giskard)
         self.gripper_group = 'gripper'
         # self.r_gripper = rospy.ServiceProxy('r_gripper_simulator/set_joint_states', SetJointState)
@@ -770,13 +771,21 @@ class TestCollisionAvoidanceGoals:
         box_pose.header.frame_id = box_setup.tip
         box_pose.pose.position = Point(0.0, 0.0, 0.06)
         box_pose.pose.orientation.w = 1.0
+        bread_name = 'Bernd'
+        bread_pose = PoseStamped()
+        bread_pose.header.frame_id = 'map'
+        bread_pose.pose.position = Point(0.91, 0.25, .62)
+        bread_pose.pose.orientation.w = 1.0
 
         box_setup.add_box_to_world(name=box_name, size=(0.05, 0.01, 0.15), pose=box_pose, parent_link=box_setup.tip)
+        box_setup.add_box_to_world(name=bread_name, size=(0.1, 0.2, 0.06), pose=bread_pose, parent_link='box')
+        box_setup.dye_group(group_name=box_name, rgba=(0.0, 0.588, 0.784, 1.0))
+        box_setup.dye_group(group_name=bread_name, rgba=(0.784, 0.588, 0.0, 1.0))
         box_setup.close_gripper()
 
         pre_schnibble_pose = PoseStamped()
         pre_schnibble_pose.header.frame_id = 'map'
-        pre_schnibble_pose.pose.position = Point(0.85, 0.3, .75)
+        pre_schnibble_pose.pose.position = Point(0.85, 0.2, .75)
         pre_schnibble_pose.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 0, 1, 0],
                                                                                   [0, -1, 0, 0],
                                                                                   [1, 0, 0, 0],
@@ -786,7 +795,8 @@ class TestCollisionAvoidanceGoals:
                                                            tip_link=box_setup.tip,
                                                            root_link='map')
         human_close = box_setup.monitors.add_pulse(name='Human Close?',
-                                                   after_ticks=15,
+                                                   after_ticks=50,
+                                                   true_for_ticks=50,
                                                    start_condition=pre_schnibble,
                                                    end_condition='')
 
@@ -795,14 +805,14 @@ class TestCollisionAvoidanceGoals:
                                                      root_link=LinkName(name='map'),
                                                      tip_link=LinkName(name=box_name),
                                                      depth=0.1,
-                                                     right_shift=0.02,
+                                                     right_shift=-0.1,
                                                      start_condition=pre_schnibble)
 
         # no_contact = box_setup.monitors.add_const_true(name='Made Contact?',
         #                                                start_condition=schnibble_down)
 
         schnibbel_done = box_setup.monitors.add_time_above(name='Done?',
-                                                           threshold=10,
+                                                           threshold=3.5,
                                                            start_condition=cut)
 
         reset = f'not {schnibbel_done}'
@@ -815,6 +825,7 @@ class TestCollisionAvoidanceGoals:
 
         box_setup.monitors.add_end_motion(start_condition=schnibbel_done)
         # box_setup.monitors.add_cancel_motion(start_condition=f'not {no_contact}', error=Exception('no contact'))
+        box_setup.allow_all_collisions()
         box_setup.execute(add_local_minimum_reached=False)
         # box_setup.update_parent_link_of_group(box_name, box_setup.tip)
 

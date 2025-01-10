@@ -98,14 +98,16 @@ class Counter(PayloadMonitor):
 
 
 class Pulse(PayloadMonitor):
-    def __init__(self, name: str, after_ticks: int):
+    def __init__(self, name: str, after_ticks: int, true_for_ticks: int):
         super().__init__(name=name, run_call_in_thread=False)
         self.after_ticks = after_ticks
+        self.true_for_ticks = true_for_ticks
+        self.ticks = 0
 
     def __call__(self):
         if self.state == ObservationState.unknown:
             self.counter = 0
-        if self.counter == self.after_ticks:
+        if self.after_ticks <= self.counter <= self.after_ticks + self.true_for_ticks:
             self.state = ObservationState.true
         else:
             self.state = ObservationState.false

@@ -35,6 +35,7 @@ from giskardpy.motion_graph.monitors.monitors import LocalMinimumReached, TimeAb
 from giskardpy.motion_graph.monitors.overwrite_state_monitors import SetOdometry, SetSeedConfiguration
 from giskardpy.motion_graph.monitors.payload_monitors import Print, Sleep, SetMaxTrajectoryLength, \
     PayloadAlternator
+from giskardpy_ros.goals.realtime_goals import CarryMyBullshit, FollowNavPath, RealTimePointing
 from giskardpy_ros.ros1 import msg_converter
 from giskardpy_ros.ros1.msg_converter import kwargs_to_json
 from giskardpy_ros.utils.utils import make_world_body_box

@@ -14,6 +14,7 @@ from tf.transformations import quaternion_from_matrix, quaternion_about_axis, qu
 
 import giskardpy_ros.ros1.tfwrapper as tf
 from giskard_msgs.msg import MoveGoal, GiskardError
+from giskardpy.data_types.exceptions import PreemptedException
 from giskardpy_ros.configs.behavior_tree_config import ClosedLoopBTConfig
 from giskardpy_ros.configs.giskard import Giskard
 from giskardpy_ros.configs.iai_robots.pr2 import PR2CollisionAvoidance, PR2VelocityMujocoInterface, WorldWithPR2Config
@@ -27,6 +28,28 @@ import giskardpy_ros.ros1.msg_converter as msg_converter
 
 
 class PR2TestWrapperMujoco(PR2TestWrapper):
+    default_pose = {
+        'r_elbow_flex_joint': -0.15,
+        'r_forearm_roll_joint': 0,
+        'r_shoulder_lift_joint': 0,
+        'r_shoulder_pan_joint': 0,
+        'r_upper_arm_roll_joint': 0,
+        'r_wrist_flex_joint': -0.10001,
+        'r_wrist_roll_joint': 0,
+        'l_elbow_flex_joint': -0.15,
+        'l_forearm_roll_joint': 0,
+        'l_shoulder_lift_joint': 0,
+        'l_shoulder_pan_joint': 0,
+        'l_upper_arm_roll_joint': 0,
+        'l_wrist_flex_joint': -0.10001,
+        'l_wrist_roll_joint': 0,
+        # 'torso_lift_joint': 0.2,
+        'head_pan_joint': 0,
+        'head_tilt_joint': 0,
+        'l_gripper_l_finger_joint': 0.55,
+        'r_gripper_l_finger_joint': 0.55
+    }
+
     better_pose = {'r_shoulder_pan_joint': -1.7125,
                    'r_shoulder_lift_joint': -0.25672,
                    'r_upper_arm_roll_joint': -1.46335,
@@ -41,7 +64,7 @@ class PR2TestWrapperMujoco(PR2TestWrapper):
                    'l_forearm_roll_joint': 16.99,
                    'l_wrist_flex_joint': - 0.10001,
                    'l_wrist_roll_joint': 0,
-                   'torso_lift_joint': 0.2,
+                   # 'torso_lift_joint': 0.2,
                    # 'l_gripper_l_finger_joint': 0.55,
                    # 'r_gripper_l_finger_joint': 0.55,
                    'head_pan_joint': 0,
@@ -62,8 +85,10 @@ class PR2TestWrapperMujoco(PR2TestWrapper):
         giskard = Giskard(world_config=WorldWithPR2Config(),
                           collision_avoidance_config=PR2CollisionAvoidance(),
                           robot_interface_config=PR2VelocityMujocoInterface(),
-                          behavior_tree_config=ClosedLoopBTConfig(debug_mode=True, control_loop_max_hz=50),
-                          qp_controller_config=QPControllerConfig(qp_solver=SupportedQPSolver.qpSWIFT))
+                          behavior_tree_config=ClosedLoopBTConfig(debug_mode=True),
+                          qp_controller_config=QPControllerConfig(qp_solver=SupportedQPSolver.qpSWIFT,
+                                                                  mpc_dt=0.0125,
+                                                                  control_dt=0.0125))
         super().__init__(giskard)
 
     def reset_base(self):
@@ -237,7 +262,7 @@ class TestMoveBaseGoals:
         zero_pose.allow_all_collisions()
         # zero_pose.execute(expected_error_code=GiskardError.EXECUTION_ERROR,
         #                   add_local_minimum_reached=False)
-        zero_pose.execute(expected_error_code=GiskardError.PREEMPTED,
+        zero_pose.execute(expected_error_type=PreemptedException,
                           stop_after=20,
                           add_local_minimum_reached=False)
 

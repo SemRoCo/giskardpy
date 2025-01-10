@@ -135,11 +135,11 @@ class CarryMyBullshit(Goal):
         else:
             self.root = god_map.world.search_for_link_name(root_link)
         self.camera_link = god_map.world.search_for_link_name(camera_link)
-        self.tip_V_camera_axis = Vector3()
+        self.tip_V_camera_axis = cas.Vector3()
         self.tip_V_camera_axis.z = 1
         self.tip = self.odom_joint.child_link_name
         self.odom = self.odom_joint.parent_link_name
-        self.tip_V_pointing_axis = Vector3()
+        self.tip_V_pointing_axis = cas.Vector3()
         self.tip_V_pointing_axis.x = 1
         self.max_rotation_velocity = max_rotation_velocity
         self.max_rotation_velocity_head = max_rotation_velocity_head
@@ -197,27 +197,27 @@ class CarryMyBullshit(Goal):
         root_T_camera = god_map.world.compose_fk_expression(self.root, self.camera_link)
         root_P_bf = root_T_bf.to_position()
 
-        min_left_violation1 = symbol_manager.get_symbol(self + '.closest_laser_left')
-        min_right_violation1 = symbol_manager.get_symbol(self + '.closest_laser_right')
-        closest_laser_reading1 = symbol_manager.get_symbol(self + '.closest_laser_reading')
-        min_left_violation2 = symbol_manager.get_symbol(self + '.closest_laser_left_pc')
-        min_right_violation2 = symbol_manager.get_symbol(self + '.closest_laser_right_pc')
-        closest_laser_reading2 = symbol_manager.get_symbol(self + '.closest_laser_reading_pc')
+        min_left_violation1 = symbol_manager.get_symbol(self.ref_str + '.closest_laser_left')
+        min_right_violation1 = symbol_manager.get_symbol(self.ref_str + '.closest_laser_right')
+        closest_laser_reading1 = symbol_manager.get_symbol(self.ref_str + '.closest_laser_reading')
+        min_left_violation2 = symbol_manager.get_symbol(self.ref_str + '.closest_laser_left_pc')
+        min_right_violation2 = symbol_manager.get_symbol(self.ref_str + '.closest_laser_right_pc')
+        closest_laser_reading2 = symbol_manager.get_symbol(self.ref_str + '.closest_laser_reading_pc')
 
         closest_laser_left = cas.min(min_left_violation1, min_left_violation2)
         closest_laser_right = cas.max(min_right_violation1, min_right_violation2)
         closest_laser_reading = cas.min(closest_laser_reading1, closest_laser_reading2)
 
         if not self.drive_back:
-            last_target_age = symbol_manager.get_symbol(self + '.last_target_age')
+            last_target_age = symbol_manager.get_symbol(self.ref_str + '.last_target_age')
             target_lost = ExpressionMonitor(name='target out of sight')
             self.add_monitor(target_lost)
             target_lost.expression = cas.greater_equal(last_target_age, self.target_age_threshold)
 
-        next_x = symbol_manager.get_symbol(self + '.get_current_target()[\'next_x\']')
-        next_y = symbol_manager.get_symbol(self + '.get_current_target()[\'next_y\']')
-        closest_x = symbol_manager.get_symbol(self + '.get_current_target()[\'closest_x\']')
-        closest_y = symbol_manager.get_symbol(self + '.get_current_target()[\'closest_y\']')
+        next_x = symbol_manager.get_symbol(self.ref_str + '.get_current_target()[\'next_x\']')
+        next_y = symbol_manager.get_symbol(self.ref_str + '.get_current_target()[\'next_y\']')
+        closest_x = symbol_manager.get_symbol(self.ref_str + '.get_current_target()[\'closest_x\']')
+        closest_y = symbol_manager.get_symbol(self.ref_str + '.get_current_target()[\'closest_y\']')
         # tangent_x = god_map.to_expr(self._get_identifier() + ['get_current_target', tuple(), 'tangent_x'])
         # tangent_y = god_map.to_expr(self._get_identifier() + ['get_current_target', tuple(), 'tangent_y'])
         clear_memo(self.get_current_target)
@@ -230,8 +230,10 @@ class CarryMyBullshit(Goal):
         if self.drive_back:
             map_P_human = root_P_goal_point
         else:
-            map_P_human = cas.Point3(symbol_manager.get_expr(self + '.human_point', input_type_hint=PointStamped))
-            map_P_human_projected = cas.Point3(map_P_human)
+            map_P_human = cas.Point3((symbol_manager.get_symbol(self.ref_str + '.human_point.point.x'),
+                                      symbol_manager.get_symbol(self.ref_str + '.human_point.point.y'),
+                                      symbol_manager.get_symbol(self.ref_str + '.human_point.point.z')))
+            map_P_human_projected = map_P_human
             map_P_human_projected.z = 0
 
         # %% orient to goal
@@ -351,8 +353,8 @@ class CarryMyBullshit(Goal):
                                                            name='move sideways')
 
         if self.drive_back:
-            first_traj_x = symbol_manager.get_symbol(self + '.get_first_traj_point()[0]')
-            first_traj_y = symbol_manager.get_symbol(self + '.get_first_traj_point()[1]')
+            first_traj_x = symbol_manager.get_symbol(self.ref_str + '.get_first_traj_point()[0]')
+            first_traj_y = symbol_manager.get_symbol(self.ref_str + '.get_first_traj_point()[1]')
             first_point = cas.Point3([first_traj_x, first_traj_y, 0])
             goal_reached = ExpressionMonitor(name='goal reached?')
             self.add_monitor(goal_reached)

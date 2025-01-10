@@ -442,6 +442,10 @@ class MotionGoalWrapper(MotionGraphNodeWrapper):
 
     def _add_collision_entries_as_goals(self):
         for (start_condition, pause_condition, end_condition), collision_entries in self._collision_entries.items():
+            if (collision_entries[-1].type == CollisionEntry.ALLOW_COLLISION
+                    and collision_entries[-1].group1 == CollisionEntry.ALL
+                    and collision_entries[-1].group2 == CollisionEntry.ALL):
+                continue
             name = 'collision avoidance'
             if start_condition or pause_condition or end_condition:
                 name += f'{start_condition}, {pause_condition}, {end_condition}'
@@ -2042,6 +2046,7 @@ class MonitorWrapper(MotionGraphNodeWrapper):
     def add_pulse(self,
                   name: str,
                   after_ticks: int,
+                  true_for_ticks: int = 1,
                   start_condition: str = '',
                   pause_condition: str = '',
                   end_condition: Optional[str] = None) -> str:
@@ -2051,6 +2056,7 @@ class MonitorWrapper(MotionGraphNodeWrapper):
         """
         return self.add_monitor(class_name=Pulse.__name__,
                                 name=name,
+                                true_for_ticks=true_for_ticks,
                                 after_ticks=after_ticks,
                                 start_condition=start_condition,
                                 pause_condition=pause_condition,

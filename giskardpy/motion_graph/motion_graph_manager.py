@@ -338,7 +338,7 @@ class MotionGraphManager:
         monitor_args = symbol_manager.resolve_symbols(self.compiled_monitor_observation_state.str_params)
         goal_args = symbol_manager.resolve_symbols(self.compiled_goal_observation_state.str_params)
 
-        next_state, done = self.evaluate_payload_monitors()
+        next_state, done, exception = self.evaluate_payload_monitors()
 
         self.task_state.observation_state = self.compiled_task_observation_state.fast_call(task_args)
         self.monitor_state.observation_state = self.compiled_monitor_observation_state.fast_call(monitor_args)
@@ -364,8 +364,8 @@ class MotionGraphManager:
         self.trigger_update_triggers()
 
         self.log_states()
-        if not done and isinstance(done, Exception):
-            raise done
+        if not done and exception is not None:
+            raise exception
         return done
 
     def log_states(self) -> None:
@@ -379,12 +379,12 @@ class MotionGraphManager:
                                         (self.goal_state.observation_state.copy(),
                                          self.goal_state.life_cycle_state.copy())))
 
-    def evaluate_payload_monitors(self) -> Tuple[np.ndarray, Union[bool, Exception]]:
+    def evaluate_payload_monitors(self) -> Tuple[np.ndarray, bool, Optional[Exception]]:
         done = False
         cancel_exception = None
         next_state = np.zeros(len(self.payload_monitors))
         if len(self.payload_monitor_filter) == 0:
-            return next_state, False
+            return next_state, False, None
         filtered_life_cycle_state = self.monitor_state.life_cycle_state[self.payload_monitor_filter]
         for i, payload_monitor in enumerate(self.payload_monitors):
             if filtered_life_cycle_state[i] == LifeCycleState.running:
@@ -398,9 +398,7 @@ class MotionGraphManager:
                 payload_monitor.state = ObservationState.unknown
             next_state[i] = payload_monitor.get_state()
             done = done or (isinstance(payload_monitor, EndMotion) and next_state[i] == ObservationState.true)
-        if not done and cancel_exception is not None:
-            done = cancel_exception
-        return next_state, done
+        return next_state, done, cancel_exception
 
     def has_end_motion_monitor(self) -> bool:
         for m in self.monitor_state.nodes:

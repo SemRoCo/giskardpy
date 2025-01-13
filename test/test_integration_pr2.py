@@ -14,7 +14,8 @@ from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 import giskard_msgs.msg as giskard_msgs
 from giskard_msgs.msg import WorldBody, CollisionEntry, WorldGoal, LinkName
 from giskardpy.data_types.data_types import PrefixName
-from giskardpy.data_types.exceptions import GiskardException, MaxTrajectoryLengthException, UnknownGoalException, GoalInitalizationException, LocalMinimumException, \
+from giskardpy.data_types.exceptions import GiskardException, MaxTrajectoryLengthException, UnknownGoalException, \
+    GoalInitalizationException, LocalMinimumException, \
     DuplicateNameException, CorruptMeshException, UnknownGroupException, UnknownLinkException, \
     InvalidWorldOperationException, CorruptShapeException, TransformException, CorruptURDFException, \
     SelfCollisionViolatedException, HardConstraintsViolatedException, SetupException, EmptyProblemException, \
@@ -22,7 +23,6 @@ from giskardpy.data_types.exceptions import GiskardException, MaxTrajectoryLengt
 from giskardpy.goals.cartesian_goals import RelativePositionSequence
 from giskardpy.goals.collision_avoidance import CollisionAvoidanceHint
 from giskardpy.goals.goals_tests import DebugGoal, CannotResolveSymbol
-from giskardpy.goals.joint_goals import UnlimitedJointGoal
 from giskardpy.goals.set_prediction_horizon import SetQPSolver
 from giskardpy.goals.tracebot import InsertCylinder
 from giskardpy.motion_graph.tasks.weight_scaling_goals import MaxManipulability, BaseArmWeightScaling
@@ -31,7 +31,7 @@ from giskardpy.middleware import get_middleware
 from giskardpy.model.utils import hacky_urdf_parser_fix
 from giskardpy.motion_graph.monitors.monitors import TrueMonitor
 from giskardpy.motion_graph.monitors.payload_monitors import Pulse
-from giskardpy.motion_graph.tasks.joint_tasks import JointVelocityLimit
+from giskardpy.motion_graph.tasks.joint_tasks import JointVelocityLimit, UnlimitedJointGoal
 from giskardpy.motion_graph.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE
 from giskardpy.qp.qp_controller_config import SupportedQPSolver, QPControllerConfig
 from giskardpy_ros.configs.behavior_tree_config import StandAloneBTConfig
@@ -294,7 +294,7 @@ class TestJointGoals:
             'l_wrist_flex_joint': -0.1,
             'l_wrist_roll_joint': -6.062015047706399,
         }
-        zero_pose.tasks.add_joint_position(name='joint task', goal_state=js)
+        zero_pose.motion_goals.add_joint_position(name='joint task', goal_state=js)
         zero_pose.allow_all_collisions()
         zero_pose.execute()
 
@@ -331,10 +331,11 @@ class TestJointGoals:
         zero_pose.execute()
 
         zero_pose.set_seed_configuration(zero_pose.better_pose)
-        zero_pose.set_joint_goal(goal_state=js)
+        done = zero_pose.motion_goals.add_joint_position(goal_state=js, name='joint goal1')
         zero_pose.allow_all_collisions()
         # zero_pose.set_json_goal('EnableVelocityTrajectoryTracking', enabled=True)
-        zero_pose.projection()
+        zero_pose.monitors.add_end_motion(done)
+        zero_pose.projection(add_local_minimum_reached=False)
 
     def test_gripper_goal(self, zero_pose: PR2TestWrapper):
         js = {
@@ -386,15 +387,18 @@ class TestJointGoals:
             'l_wrist_roll_joint': -1,
             'r_wrist_roll_joint': 1
         }
-        zero_pose.tasks.add_joint_position(name='joint task', goal_state=js)
+        zero_pose.motion_goals.add_joint_position(name='joint task', goal_state=js)
         zero_pose.execute()
 
     def test_unlimited_joint_goal(self, zero_pose: PR2TestWrapper):
         zero_pose.allow_all_collisions()
         zero_pose.motion_goals.add_motion_goal(class_name=UnlimitedJointGoal.__name__,
                                                joint_name='r_elbow_flex_joint',
+                                               name='goal',
                                                goal_position=-3)
-        zero_pose.execute()
+        local_min = zero_pose.monitors.add_local_minimum_reached(name='local_min')
+        zero_pose.monitors.add_end_motion(local_min)
+        zero_pose.execute(add_local_minimum_reached=False)
 
     def test_hard_joint_limits(self, zero_pose: PR2TestWrapper):
         zero_pose.allow_self_collision()
@@ -462,30 +466,30 @@ class TestMonitors:
         assert god_map.trajectory.length_in_seconds > 4
 
     def test_joint_sequence(self, zero_pose: PR2TestWrapper):
-        g1 = zero_pose.tasks.add_joint_position(name='g1',
-                                                goal_state=zero_pose.better_pose)
+        g1 = zero_pose.motion_goals.add_joint_position(name='g1',
+                                                       goal_state=zero_pose.better_pose)
         end_monitor = zero_pose.monitors.add_local_minimum_reached(name='local min', start_condition=g1)
-        g2 = zero_pose.tasks.add_joint_position(name='g2',
-                                                goal_state=pocky_pose,
-                                                start_condition=g1)
+        g2 = zero_pose.motion_goals.add_joint_position(name='g2',
+                                                       goal_state=pocky_pose,
+                                                       start_condition=g1)
         zero_pose.update_end_condition(node_name=g2, condition=f'{end_monitor} and {g2}')
         zero_pose.allow_all_collisions()
         zero_pose.monitors.add_end_motion(start_condition=end_monitor)
         zero_pose.execute(add_local_minimum_reached=False)
 
     def test_reset(self, zero_pose: PR2TestWrapper):
-        g1 = zero_pose.tasks.add_joint_position(name='joint goal 1',
-                                                goal_state=zero_pose.better_pose)
-        g2 = zero_pose.tasks.add_joint_position(name='joint goal 2',
-                                                goal_state=pocky_pose,
-                                                start_condition=g1)
+        g1 = zero_pose.motion_goals.add_joint_position(name='joint goal 1',
+                                                       goal_state=zero_pose.better_pose)
+        g2 = zero_pose.motion_goals.add_joint_position(name='joint goal 2',
+                                                       goal_state=pocky_pose,
+                                                       start_condition=g1)
         pulse = zero_pose.monitors.add_monitor(class_name=Pulse.__name__,
                                                name='once',
                                                after_ticks=1,
                                                start_condition=g2,
                                                end_condition='')
         local_min = zero_pose.monitors.add_local_minimum_reached(name='local min', start_condition=g2)
-        zero_pose.tasks.update_reset_condition(g1, pulse)
+        zero_pose.motion_goals.update_reset_condition(g1, pulse)
         zero_pose.allow_all_collisions()
         zero_pose.monitors.add_end_motion(start_condition=local_min)
         zero_pose.execute(add_local_minimum_reached=False)
@@ -506,17 +510,17 @@ class TestMonitors:
 
         end_monitor = zero_pose.monitors.add_local_minimum_reached(name='local min')
 
-        pose1 = zero_pose.tasks.add_cartesian_pose(goal_pose=pose1,
-                                                   name='base pose 1',
-                                                   root_link=root_link,
-                                                   tip_link=tip_link,
-                                                   end_condition=None)
-        pose2 = zero_pose.tasks.add_cartesian_pose(goal_pose=pose2,
-                                                   name='base pose 2',
-                                                   root_link=root_link,
-                                                   tip_link=tip_link,
-                                                   start_condition=pose1,
-                                                   end_condition=None)
+        pose1 = zero_pose.motion_goals.add_cartesian_pose(goal_pose=pose1,
+                                                          name='base pose 1',
+                                                          root_link=root_link,
+                                                          tip_link=tip_link,
+                                                          end_condition=None)
+        pose2 = zero_pose.motion_goals.add_cartesian_pose(goal_pose=pose2,
+                                                          name='base pose 2',
+                                                          root_link=root_link,
+                                                          tip_link=tip_link,
+                                                          start_condition=pose1,
+                                                          end_condition=None)
         zero_pose.allow_all_collisions()
         zero_pose.monitors.add_end_motion(start_condition=' and '.join([pose2, end_monitor]))
         zero_pose.set_max_traj_length(30)
@@ -539,17 +543,17 @@ class TestMonitors:
         root_link = 'map'
         tip_link = 'base_footprint'
 
-        pose1 = zero_pose.tasks.add_cartesian_pose(goal_pose=pose1,
-                                                   name='Pose 1',
-                                                   root_link=root_link,
-                                                   tip_link=tip_link,
-                                                   end_condition=None)
-        pose2 = zero_pose.tasks.add_cartesian_pose(goal_pose=pose2,
-                                                   name='Pose 2',
-                                                   root_link=root_link,
-                                                   tip_link=tip_link,
-                                                   start_condition=pose1,
-                                                   end_condition=None)
+        pose1 = zero_pose.motion_goals.add_cartesian_pose(goal_pose=pose1,
+                                                          name='Pose 1',
+                                                          root_link=root_link,
+                                                          tip_link=tip_link,
+                                                          end_condition=None)
+        pose2 = zero_pose.motion_goals.add_cartesian_pose(goal_pose=pose2,
+                                                          name='Pose 2',
+                                                          root_link=root_link,
+                                                          tip_link=tip_link,
+                                                          start_condition=pose1,
+                                                          end_condition=None)
         zero_pose.allow_all_collisions()
         zero_pose.monitors.add_end_motion(start_condition=pose2)
         zero_pose.execute(add_local_minimum_reached=False)
@@ -574,19 +578,19 @@ class TestMonitors:
         # local_min = zero_pose.monitors.add_local_minimum_reached(name='Local Min', end_condition='')
         pulse = zero_pose.monitors.add_pulse(name='Laser violated', after_ticks=150, end_condition='')
 
-        pose1 = zero_pose.tasks.add_cartesian_pose(goal_pose=pose1,
-                                                   name='Base Pose 1',
-                                                   root_link=root_link,
-                                                   tip_link=tip_link,
-                                                   pause_condition=pulse,
-                                                   end_condition=None)
-        pose2 = zero_pose.tasks.add_cartesian_pose(goal_pose=pose2,
-                                                   name='Base Pose 2',
-                                                   root_link=root_link,
-                                                   tip_link=tip_link,
-                                                   start_condition=pose1,
-                                                   pause_condition=pulse,
-                                                   end_condition=None)
+        pose1 = zero_pose.motion_goals.add_cartesian_pose(goal_pose=pose1,
+                                                          name='Base Pose 1',
+                                                          root_link=root_link,
+                                                          tip_link=tip_link,
+                                                          pause_condition=pulse,
+                                                          end_condition=None)
+        pose2 = zero_pose.motion_goals.add_cartesian_pose(goal_pose=pose2,
+                                                          name='Base Pose 2',
+                                                          root_link=root_link,
+                                                          tip_link=tip_link,
+                                                          start_condition=pose1,
+                                                          pause_condition=pulse,
+                                                          end_condition=None)
         zero_pose.allow_all_collisions()
         zero_pose.monitors.add_end_motion(start_condition=' and '.join([pose2]))
         # zero_pose.monitors.add_cancel_motion(start_condition=f'{local_min}', error=Exception(local_min))
@@ -971,13 +975,13 @@ class TestMonitors:
         left_monitor = zero_pose.monitors.add_joint_position(goal_state=zero_pose.better_pose_left,
                                                              name='left pose reached',
                                                              start_condition=sleep1)
-        zero_pose.tasks.add_joint_position(goal_state=zero_pose.better_pose_right,
-                                           name='right pose',
-                                           start_condition=sleep2,
-                                           end_condition=right_monitor)
-        zero_pose.tasks.add_joint_position(goal_state=zero_pose.better_pose_left,
-                                           name='left pose',
-                                           end_condition=left_monitor)
+        zero_pose.motion_goals.add_joint_position(goal_state=zero_pose.better_pose_right,
+                                                  name='right pose',
+                                                  start_condition=sleep2,
+                                                  end_condition=right_monitor)
+        zero_pose.motion_goals.add_joint_position(goal_state=zero_pose.better_pose_left,
+                                                  name='left pose',
+                                                  end_condition=left_monitor)
 
         base_goal = PoseStamped()
         base_goal.header.frame_id = 'map'
@@ -1028,14 +1032,14 @@ class TestMonitors:
             'l_wrist_flex_joint': -0.1,
             'l_wrist_roll_joint': -6.062015047706399,
         }
-        zero_pose.tasks.add_joint_position(name='joint task', goal_state=js)
+        zero_pose.motion_goals.add_joint_position(name='joint task', goal_state=js)
         zero_pose.allow_all_collisions()
         base_pose = PoseStamped()
         base_pose.header.frame_id = 'map'
         base_pose.pose.position.x = 2
         base_pose.pose.orientation.w = 1
-        zero_pose.tasks.add_cartesian_pose(name='base goal', goal_pose=base_pose, tip_link='base_footprint',
-                                           root_link='map')
+        zero_pose.motion_goals.add_cartesian_pose(name='base goal', goal_pose=base_pose, tip_link='base_footprint',
+                                                  root_link='map')
         zero_pose.execute()
 
     def test_hold_monitors(self, zero_pose: PR2TestWrapper):
@@ -1520,7 +1524,7 @@ class TestConstraints:
         vel_limit = 0.4
         joint_goal = 1
         zero_pose.allow_all_collisions()
-        zero_pose.tasks.add_motion_goal(class_name=JointVelocityLimit.__name__,
+        zero_pose.motion_goals.add_motion_goal(class_name=JointVelocityLimit.__name__,
                                                joint_names=[joint.short_name],
                                                max_velocity=vel_limit,
                                                hard=True)
@@ -3523,13 +3527,13 @@ class TestCollisionAvoidanceGoals:
         p = PoseStamped()
         p.header.frame_id = pocky_pose_setup.r_tip
         p.pose.position.x = 0.08
-        p.pose.orientation = Quaternion(*quaternion_about_axis(np.pi/2, [0, 1, 0]).tolist())
+        p.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 2, [0, 1, 0]).tolist())
         pocky_pose_setup.add_cylinder_to_world(name='box',
-                                          # size=(0.2, 0.05, 0.05),
-                                               height = 0.2,
+                                               # size=(0.2, 0.05, 0.05),
+                                               height=0.2,
                                                radius=0.025,
-                                          parent_link=pocky_pose_setup.r_tip,
-                                          pose=p)
+                                               parent_link=pocky_pose_setup.r_tip,
+                                               pose=p)
         p = PoseStamped()
         p.header.frame_id = pocky_pose_setup.r_tip
         p.pose.position.x = 0.12

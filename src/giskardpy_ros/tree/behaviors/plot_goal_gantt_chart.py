@@ -9,7 +9,7 @@ from py_trees import Status
 from giskardpy.goals.collision_avoidance import CollisionAvoidance
 from giskardpy.goals.goal import Goal
 from giskardpy.middleware import get_middleware
-from giskardpy.motion_graph.graph_node import MotionGraphNode
+from giskardpy.motion_graph.graph_node import MotionStatechartNode
 from giskardpy.motion_graph.monitors.monitors import Monitor, EndMotion, CancelMotion
 from giskardpy.god_map import god_map
 from giskardpy.motion_graph.tasks.task import LifeCycleState, Task
@@ -26,8 +26,8 @@ class PlotGanttChart(GiskardBehavior):
     def __init__(self, name: str = 'plot gantt chart'):
         super().__init__(name)
 
-    def plot_gantt_chart(self, tasks: List[MotionGraphNode], monitors: List[MotionGraphNode],
-                         goals: List[MotionGraphNode], file_name: str):
+    def plot_gantt_chart(self, tasks: List[MotionStatechartNode], monitors: List[MotionStatechartNode],
+                         goals: List[MotionStatechartNode], file_name: str):
         monitor_plot_filter = np.array([monitor.plot for monitor in god_map.motion_graph_manager.monitor_state.nodes])
         goal_plot_filter = np.array([goal.plot for goal in god_map.motion_graph_manager.goal_state.nodes])
         task_plot_filter = np.array([not isinstance(g, CollisionAvoidance) for g in tasks])

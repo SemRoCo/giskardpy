@@ -50,14 +50,10 @@ class ParseActionGoal(GiskardBehavior):
         return Status.SUCCESS
 
     def parse_motion_graph(self, move_goal: MoveGoal):
-        task_data = self.parse_motion_graph_component(motion_graph_nodes=move_goal.tasks)
-        monitor_data = self.parse_motion_graph_component(motion_graph_nodes=move_goal.monitors)
-        goal_data = self.parse_motion_graph_component(motion_graph_nodes=move_goal.goals)
-        god_map.motion_graph_manager.parse_motion_graph(tasks=task_data,
-                                                        monitors=monitor_data,
-                                                        goals=goal_data)
+        node_data = self.parse_motion_graph_component(motion_graph_nodes=move_goal.nodes)
+        god_map.motion_graph_manager.parse_motion_graph(nodes=node_data)
 
-    def parse_motion_graph_component(self, motion_graph_nodes: List[giskard_msgs.MotionGraphNode]) \
+    def parse_motion_graph_component(self, motion_graph_nodes: List[giskard_msgs.MotionStatechartNode]) \
             -> List[Tuple[str, str, str, str, str, str, dict]]:
         parsed_nodes = []
         for node in motion_graph_nodes:

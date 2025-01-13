@@ -9,7 +9,7 @@ from line_profiler import profile
 from py_trees import Status
 
 import giskard_msgs.msg as giskard_msgs
-from giskard_msgs.msg import ExecutionState, MotionGraphNode
+from giskard_msgs.msg import ExecutionState, MotionStatechartNode
 from giskardpy.data_types.data_types import LifeCycleState, ObservationState
 from giskardpy.god_map import god_map
 from giskardpy.middleware import get_middleware
@@ -124,10 +124,10 @@ class ExecutionStateToDotParser:
                                compound=True,
                                ratio='compress')
 
-    def search_for_monitor(self, monitor_name: str) -> giskard_msgs.MotionGraphNode:
+    def search_for_monitor(self, monitor_name: str) -> giskard_msgs.MotionStatechartNode:
         return [m for m in self.execution_state.monitors if m.name == monitor_name][0]
 
-    def format_motion_graph_node_msg(self, msg: giskard_msgs.MotionGraphNode,
+    def format_motion_graph_node_msg(self, msg: giskard_msgs.MotionStatechartNode,
                                      obs_state: ObservationState, life_cycle_state: LifeCycleState) -> str:
         start_condition = format_condition(msg.start_condition)
         pause_condition = format_condition(msg.pause_condition)
@@ -221,7 +221,7 @@ class ExecutionStateToDotParser:
                 break
         return node_cluster
 
-    def add_node(self, graph: pydot.Graph, node_msg: giskard_msgs.MotionGraphNode, style: str, shape: str,
+    def add_node(self, graph: pydot.Graph, node_msg: giskard_msgs.MotionStatechartNode, style: str, shape: str,
                  obs_state: ObservationState, life_cycle_state: LifeCycleState) \
             -> pydot.Node:
         num_extra_boarders = 0
@@ -263,7 +263,7 @@ class ExecutionStateToDotParser:
 
     def add_goal_cluster(self, parent_cluster: Union[pydot.Graph, pydot.Cluster],
                          obs_states: Dict[str, ObservationState]):
-        my_tasks: List[MotionGraphNode] = []
+        my_tasks: List[MotionStatechartNode] = []
         for i, task in enumerate(self.execution_state.tasks):
             # TODO add one collision avoidance task?
             if self.execution_state.task_parents[i] == self.cluster_name_to_goal_name(parent_cluster.get_name()):
@@ -273,7 +273,7 @@ class ExecutionStateToDotParser:
                               life_cycle_state=self.execution_state.task_life_cycle_state[i])
                 my_tasks.append(task)
                 obs_states[task.name] = obs_state
-        my_monitors: List[MotionGraphNode] = []
+        my_monitors: List[MotionStatechartNode] = []
         for i, monitor in enumerate(self.execution_state.monitors):
             if self.execution_state.monitor_parents[i] == self.cluster_name_to_goal_name(parent_cluster.get_name()):
                 obs_state = self.execution_state.monitor_state[i]
@@ -283,7 +283,7 @@ class ExecutionStateToDotParser:
                               life_cycle_state=life_cycle_state)
                 my_monitors.append(monitor)
                 obs_states[monitor.name] = obs_state
-        my_goals: List[MotionGraphNode] = []
+        my_goals: List[MotionStatechartNode] = []
         for i, goal in enumerate(self.execution_state.goals):
             if self.execution_state.goal_parents[i] == self.cluster_name_to_goal_name(parent_cluster.get_name()):
                 obs_state = self.execution_state.goal_state[i]
@@ -306,9 +306,9 @@ class ExecutionStateToDotParser:
 
     def add_edges(self,
                   graph: Union[pydot.Graph, pydot.Cluster],
-                  tasks: List[MotionGraphNode],
-                  monitors: List[MotionGraphNode],
-                  goals: List[MotionGraphNode],
+                  tasks: List[MotionStatechartNode],
+                  monitors: List[MotionStatechartNode],
+                  goals: List[MotionStatechartNode],
                   obs_states: Dict[str, ObservationState]) -> pydot.Graph:
         all_nodes = tasks + monitors + goals
         all_node_name = [node.name for node in all_nodes]  # + [self.cluster_name_to_goal_name(graph.get_name())]

@@ -12,7 +12,7 @@ from shape_msgs.msg import SolidPrimitive
 
 import giskard_msgs.msg as giskard_msgs
 from giskard_msgs.msg import (MoveAction, MoveGoal, WorldBody, CollisionEntry, MoveResult, MoveFeedback,
-                              WorldGoal, WorldAction, WorldResult, MotionGraphNode)
+                              WorldGoal, WorldAction, WorldResult, MotionStatechartNode)
 from giskard_msgs.srv import DyeGroupRequest, DyeGroup, GetGroupInfoRequest, DyeGroupResponse
 from giskard_msgs.srv import GetGroupInfo, GetGroupNames
 from giskard_msgs.srv import GetGroupNamesResponse, GetGroupInfoResponse
@@ -24,9 +24,9 @@ from giskardpy.goals.cartesian_goals import CartesianPose, DiffDriveBaseGoal, Ca
     CartesianPoseStraight, CartesianPositionStraight
 from giskardpy.goals.collision_avoidance import CollisionAvoidance
 from giskardpy.motion_graph.tasks.grasp_bar import GraspBar
-from giskardpy.goals.joint_goals import JointPositionList, AvoidJointLimits
+from giskardpy.goals.joint_goals import AvoidJointLimits
 from giskardpy.goals.open_close import Close, Open
-from giskardpy.motion_graph.tasks.joint_tasks import JointPositionLimitList, JustinTorsoLimit
+from giskardpy.motion_graph.tasks.joint_tasks import JointPositionLimitList, JointPositionList
 from giskardpy.motion_graph.tasks.pointing import Pointing
 from giskardpy.goals.pre_push_door import PrePushDoor
 from giskardpy.goals.set_prediction_horizon import SetPredictionHorizon
@@ -315,8 +315,8 @@ class WorldWrapper:
         return self._send_goal_and_wait(req)
 
 
-class MotionGraphNodeWrapper:
-    _motion_graph_nodes: Dict[str, MotionGraphNode]
+class MotionStatechartNodeWrapper:
+    _motion_graph_nodes: Dict[str, MotionStatechartNode]
     _name_prefix = ''
     giskard_wrapper: GiskardWrapper
 
@@ -329,20 +329,20 @@ class MotionGraphNodeWrapper:
         return self.giskard_wrapper.robot_name
 
     @property
-    def motion_graph_nodes(self) -> Dict[str, MotionGraphNode]:
+    def motion_graph_nodes(self) -> Dict[str, MotionStatechartNode]:
         return self._motion_graph_nodes
 
     def reset(self):
         self._motion_graph_nodes = ImmutableDict()
 
-    def _add_motion_graph_node(self, *,
-                               class_name: str,
-                               name: str,
-                               start_condition: str = '',
-                               pause_condition: str = '',
-                               end_condition: Optional[str] = None,
-                               reset_condition: str = '',
-                               **kwargs) -> str:
+    def _add_motion_statechart_node(self, *,
+                                    class_name: str,
+                                    name: str,
+                                    start_condition: str = '',
+                                    pause_condition: str = '',
+                                    end_condition: Optional[str] = None,
+                                    reset_condition: str = '',
+                                    **kwargs) -> str:
         """
         Generic function to add a motion goal.
         :param motion_goal_class: Name of a class defined in src/giskardpy/goals
@@ -353,7 +353,7 @@ class MotionGraphNodeWrapper:
         :param end_condition: a logical expression. Goal will become inactive when this becomes True.
         :param kwargs: kwargs for __init__ function of motion_goal_class
         """
-        motion_goal = MotionGraphNode()
+        motion_goal = MotionStatechartNode()
         motion_goal.name = name
         motion_goal.class_name = class_name
         self._motion_graph_nodes[name] = motion_goal
@@ -400,7 +400,7 @@ class MotionGraphNodeWrapper:
         self._motion_graph_nodes[node_name].end_condition = condition
 
 
-class MotionGoalWrapper(MotionGraphNodeWrapper):
+class MotionGoalWrapper(MotionStatechartNodeWrapper):
     _name_prefix = 'G'
     _collision_entries: Dict[Tuple[str, str, str], List[CollisionEntry]]
 
@@ -425,12 +425,369 @@ class MotionGoalWrapper(MotionGraphNodeWrapper):
         :param end_condition: a logical expression. Goal will become inactive when this becomes True.
         :param kwargs: kwargs for __init__ function of motion_goal_class
         """
-        return super()._add_motion_graph_node(class_name=class_name,
-                                              name=name,
-                                              start_condition=start_condition,
-                                              pause_condition=pause_condition,
-                                              end_condition=end_condition,
-                                              **kwargs)
+        return super()._add_motion_statechart_node(class_name=class_name,
+                                                   name=name,
+                                                   start_condition=start_condition,
+                                                   pause_condition=pause_condition,
+                                                   end_condition=end_condition,
+                                                   **kwargs)
+
+    def add_grasp_bar(self,
+                      name: str,
+                      bar_center: PointStamped,
+                      bar_axis: Vector3Stamped,
+                      bar_length: float,
+                      tip_link: Union[str, giskard_msgs.LinkName],
+                      tip_grasp_axis: Vector3Stamped,
+                      root_link: Union[str, giskard_msgs.LinkName],
+                      reference_linear_velocity: Optional[float] = None,
+                      reference_angular_velocity: Optional[float] = None,
+                      weight: Optional[float] = None,
+                      start_condition: str = '',
+                      pause_condition: str = '',
+                      end_condition: Optional[str] = None,
+                      **kwargs: goal_parameter) -> str:
+        """
+        Like a CartesianPose but with more freedom.
+        tip_link is allowed to be at any point along bar_axis, that is without bar_center +/- bar_length.
+        It will align tip_grasp_axis with bar_axis, but allows rotation around it.
+        :param root_link: root link of the kinematic chain
+        :param tip_link: tip link of the kinematic chain
+        :param tip_grasp_axis: axis of tip_link that will be aligned with bar_axis
+        :param bar_center: center of the bar to be grasped
+        :param bar_axis: alignment of the bar to be grasped
+        :param bar_length: length of the bar to be grasped
+        :param reference_linear_velocity: m/s
+        :param reference_angular_velocity: rad/s
+        """
+        if isinstance(root_link, str):
+            root_link = giskard_msgs.LinkName(name=root_link)
+        if isinstance(tip_link, str):
+            tip_link = giskard_msgs.LinkName(name=tip_link)
+        return self.add_motion_goal(class_name=GraspBar.__name__,
+                                    root_link=root_link,
+                                    tip_link=tip_link,
+                                    tip_grasp_axis=tip_grasp_axis,
+                                    bar_center=bar_center,
+                                    bar_axis=bar_axis,
+                                    bar_length=bar_length,
+                                    reference_linear_velocity=reference_linear_velocity,
+                                    reference_angular_velocity=reference_angular_velocity,
+                                    weight=weight,
+                                    name=name,
+                                    start_condition=start_condition,
+                                    pause_condition=pause_condition,
+                                    end_condition=end_condition,
+                                    **kwargs)
+
+    def add_cartesian_pose(self,
+                           name: str,
+                           goal_pose: PoseStamped,
+                           tip_link: Union[str, giskard_msgs.LinkName],
+                           root_link: Union[str, giskard_msgs.LinkName],
+                           reference_linear_velocity: Optional[float] = None,
+                           reference_angular_velocity: Optional[float] = None,
+                           absolute: bool = False,
+                           weight: Optional[float] = None,
+                           start_condition: str = '',
+                           pause_condition: str = '',
+                           end_condition: Optional[str] = None,
+                           **kwargs: goal_parameter) -> str:
+        """
+        This goal will use the kinematic chain between root and tip link to move tip link to the goal pose.
+        The max velocities enforce a strict limit, but require a lot of additional constraints, thus making the
+        system noticeably slower.
+        The reference velocities don't enforce a strict limit, but also don't require any additional constraints.
+        :param root_link: name of the root link of the kin chain
+        :param tip_link: name of the tip link of the kin chain
+        :param goal_pose: the goal pose
+        :param absolute: if False, the goal pose is reevaluated if start_condition turns True.
+        :param reference_linear_velocity: m/s
+        :param reference_angular_velocity: rad/s
+        :param weight: None = use default weight
+        """
+        if isinstance(root_link, str):
+            root_link = giskard_msgs.LinkName(name=root_link)
+        if isinstance(tip_link, str):
+            tip_link = giskard_msgs.LinkName(name=tip_link)
+        return self.add_motion_goal(class_name=CartesianPoseAsTask.__name__,
+                                    goal_pose=goal_pose,
+                                    tip_link=tip_link,
+                                    root_link=root_link,
+                                    reference_linear_velocity=reference_linear_velocity,
+                                    reference_angular_velocity=reference_angular_velocity,
+                                    weight=weight,
+                                    name=name,
+                                    absolute=absolute,
+                                    start_condition=start_condition,
+                                    pause_condition=pause_condition,
+                                    end_condition=end_condition,
+                                    **kwargs)
+
+    def add_maximize_manipulability(self,
+                                    name: str,
+                                    tip_link: Union[str, giskard_msgs.LinkName],
+                                    root_link: Union[str, giskard_msgs.LinkName],
+                                    start_condition: str = '',
+                                    pause_condition: str = '',
+                                    end_condition: Optional[str] = None,
+                                    **kwargs: goal_parameter) -> str:
+        """
+        This goal will use the kinematic chain between root and tip link to move tip link to the goal pose.
+        The max velocities enforce a strict limit, but require a lot of additional constraints, thus making the
+        system noticeably slower.
+        The reference velocities don't enforce a strict limit, but also don't require any additional constraints.
+        :param root_link: name of the root link of the kin chain
+        :param tip_link: name of the tip link of the kin chain
+        :param goal_pose: the goal pose
+        :param absolute: if False, the goal pose is reevaluated if start_condition turns True.
+        :param reference_linear_velocity: m/s
+        :param reference_angular_velocity: rad/s
+        :param weight: None = use default weight
+        """
+        if isinstance(root_link, str):
+            root_link = giskard_msgs.LinkName(name=root_link)
+        if isinstance(tip_link, str):
+            tip_link = giskard_msgs.LinkName(name=tip_link)
+        return self.add_motion_goal(class_name=MaxManipulability.__name__,
+                                    name=name,
+                                    tip_link=tip_link,
+                                    root_link=root_link,
+                                    start_condition=start_condition,
+                                    pause_condition=pause_condition,
+                                    end_condition=end_condition,
+                                    **kwargs)
+
+    def add_align_planes(self,
+                         name: str,
+                         goal_normal: Vector3Stamped,
+                         tip_link: Union[str, giskard_msgs.LinkName],
+                         tip_normal: Vector3Stamped,
+                         root_link: Union[str, giskard_msgs.LinkName],
+                         reference_angular_velocity: Optional[float] = None,
+                         weight: Optional[float] = None,
+                         start_condition: str = '',
+                         pause_condition: str = '',
+                         end_condition: Optional[str] = None,
+                         **kwargs: goal_parameter) -> str:
+        """
+        This goal will use the kinematic chain between tip and root to align tip_normal with goal_normal.
+        :param goal_normal:
+        :param tip_link: tip link of the kinematic chain
+        :param tip_normal:
+        :param root_link: root link of the kinematic chain
+        :param reference_angular_velocity: rad/s
+        :param weight:
+        """
+        if isinstance(root_link, str):
+            root_link = giskard_msgs.LinkName(name=root_link)
+        if isinstance(tip_link, str):
+            tip_link = giskard_msgs.LinkName(name=tip_link)
+        return self.add_motion_goal(class_name=AlignPlanes.__name__,
+                                    tip_link=tip_link,
+                                    tip_normal=tip_normal,
+                                    root_link=root_link,
+                                    goal_normal=goal_normal,
+                                    max_angular_velocity=reference_angular_velocity,
+                                    weight=weight,
+                                    name=name,
+                                    start_condition=start_condition,
+                                    pause_condition=pause_condition,
+                                    end_condition=end_condition,
+                                    **kwargs)
+
+    def add_joint_position(self,
+                           name: str,
+                           goal_state: Dict[str, float],
+                           weight: Optional[float] = None,
+                           max_velocity: Optional[float] = None,
+                           start_condition: str = '',
+                           pause_condition: str = '',
+                           end_condition: Optional[str] = None,
+                           **kwargs: goal_parameter) -> str:
+        """
+        Sets joint position goals for all pairs in goal_state
+        :param goal_state: maps joint_name to goal position
+        :param weight: None = use default weight
+        :param max_velocity: will be applied to all joints
+        """
+        return self.add_motion_goal(class_name=JointPositionList.__name__,
+                                    goal_state=goal_state,
+                                    weight=weight,
+                                    max_velocity=max_velocity,
+                                    name=name,
+                                    start_condition=start_condition,
+                                    pause_condition=pause_condition,
+                                    end_condition=end_condition,
+                                    **kwargs)
+
+    def add_joint_position_limit(self,
+                                 name: str,
+                                 lower_upper_limits: Dict[str, Tuple[float, float]],
+                                 weight: Optional[float] = None,
+                                 max_velocity: Optional[float] = None,
+                                 start_condition: str = '',
+                                 pause_condition: str = '',
+                                 end_condition: Optional[str] = None,
+                                 **kwargs: goal_parameter) -> str:
+        """
+        Sets joint position goals for all pairs in goal_state
+        :param goal_state: maps joint_name to goal position
+        :param weight: None = use default weight
+        :param max_velocity: will be applied to all joints
+        """
+        return self.add_motion_goal(class_name=JointPositionLimitList.__name__,
+                                    lower_upper_limits=lower_upper_limits,
+                                    weight=weight,
+                                    max_velocity=max_velocity,
+                                    name=name,
+                                    start_condition=start_condition,
+                                    pause_condition=pause_condition,
+                                    end_condition=end_condition,
+                                    **kwargs)
+
+    def add_justin_torso_limit(self,
+                               name: str,
+                               root_link: Union[str, giskard_msgs.LinkName] = 'torso1',
+                               tip_link: Union[str, giskard_msgs.LinkName] = 'torso4',
+                               forward_distance: float = 0.05,
+                               backward_distance: float = 0.14,
+                               weight: float = WEIGHT_ABOVE_CA,
+                               start_condition: str = '',
+                               pause_condition: str = '',
+                               end_condition: Optional[str] = None,
+                               **kwargs: goal_parameter) -> str:
+        if isinstance(root_link, str):
+            root_link = giskard_msgs.LinkName(name=root_link)
+        if isinstance(tip_link, str):
+            tip_link = giskard_msgs.LinkName(name=tip_link)
+        return self.add_motion_goal(class_name=JustinTorsoLimitCart.__name__,
+                                    root_link=root_link,
+                                    tip_link=tip_link,
+                                    forward_distance=forward_distance,
+                                    backward_distance=backward_distance,
+                                    name=name,
+                                    weight=weight,
+                                    start_condition=start_condition,
+                                    pause_condition=pause_condition,
+                                    end_condition=end_condition,
+                                    **kwargs)
+
+    def add_cartesian_position(self,
+                               name: str,
+                               goal_point: PointStamped,
+                               tip_link: Union[str, giskard_msgs.LinkName],
+                               root_link: Union[str, giskard_msgs.LinkName],
+                               reference_velocity: Optional[float] = 0.2,
+                               weight: Optional[float] = None,
+                               absolute: bool = False,
+                               start_condition: str = '',
+                               pause_condition: str = '',
+                               end_condition: Optional[str] = None,
+                               **kwargs: goal_parameter) -> str:
+        """
+        Will use kinematic chain between root_link and tip_link to move tip_link to goal_point.
+        :param goal_point:
+        :param tip_link: tip link of the kinematic chain
+        :param root_link: root link of the kinematic chain
+        :param reference_velocity: m/s
+        :param weight:
+        :param absolute: if False, the goal pose is reevaluated if start_condition turns True.
+        """
+        if isinstance(root_link, str):
+            root_link = giskard_msgs.LinkName(name=root_link)
+        if isinstance(tip_link, str):
+            tip_link = giskard_msgs.LinkName(name=tip_link)
+        return self.add_motion_goal(class_name=CartesianPosition.__name__,
+                                    goal_point=goal_point,
+                                    tip_link=tip_link,
+                                    root_link=root_link,
+                                    reference_velocity=reference_velocity,
+                                    weight=weight,
+                                    absolute=absolute,
+                                    name=name,
+                                    start_condition=start_condition,
+                                    pause_condition=pause_condition,
+                                    end_condition=end_condition,
+                                    **kwargs)
+
+    def add_cartesian_orientation(self,
+                                  name: str,
+                                  goal_orientation: QuaternionStamped,
+                                  tip_link: Union[str, giskard_msgs.LinkName],
+                                  root_link: Union[str, giskard_msgs.LinkName],
+                                  reference_velocity: Optional[float] = None,
+                                  weight: Optional[float] = None,
+                                  absolute: bool = False,
+                                  start_condition: str = '',
+                                  pause_condition: str = '',
+                                  end_condition: Optional[str] = None,
+                                  **kwargs: goal_parameter) -> str:
+        """
+        Will use kinematic chain between root_link and tip_link to move tip_link to goal_orientation.
+        :param goal_orientation:
+        :param tip_link: tip link of kinematic chain
+        :param root_link: root link of kinematic chain
+        :param tip_group: if tip link is not unique, you can use this to tell Giskard in which group to search.
+        :param root_group: if root link is not unique, you can use this to tell Giskard in which group to search.
+        :param reference_velocity: rad/s, approx limit
+        :param absolute: if False, the goal pose is reevaluated if start_condition turns True.
+        """
+        if isinstance(root_link, str):
+            root_link = giskard_msgs.LinkName(name=root_link)
+        if isinstance(tip_link, str):
+            tip_link = giskard_msgs.LinkName(name=tip_link)
+        return self.add_motion_goal(class_name=CartesianOrientation.__name__,
+                                    goal_orientation=goal_orientation,
+                                    tip_link=tip_link,
+                                    root_link=root_link,
+                                    reference_velocity=reference_velocity,
+                                    weight=weight,
+                                    absolute=absolute,
+                                    name=name,
+                                    start_condition=start_condition,
+                                    pause_condition=pause_condition,
+                                    end_condition=end_condition,
+                                    **kwargs)
+
+    def add_pointing(self,
+                     name: str,
+                     goal_point: PointStamped,
+                     tip_link: Union[str, giskard_msgs.LinkName],
+                     pointing_axis: Vector3Stamped,
+                     root_link: Union[str, giskard_msgs.LinkName],
+                     max_velocity: float = 0.3,
+                     threshold: float = 0.01,
+                     weight: Optional[float] = None,
+                     start_condition: str = '',
+                     pause_condition: str = '',
+                     end_condition: Optional[str] = None,
+                     **kwargs: goal_parameter) -> str:
+        """
+        Will orient pointing_axis at goal_point.
+        :param tip_link: tip link of the kinematic chain.
+        :param goal_point: where to point pointing_axis at.
+        :param root_link: root link of the kinematic chain.
+        :param pointing_axis: the axis of tip_link that will be used for pointing
+        :param max_velocity: rad/s
+        """
+        if isinstance(root_link, str):
+            root_link = giskard_msgs.LinkName(name=root_link)
+        if isinstance(tip_link, str):
+            tip_link = giskard_msgs.LinkName(name=tip_link)
+        return self.add_motion_goal(class_name=Pointing.__name__,
+                                    tip_link=tip_link,
+                                    goal_point=goal_point,
+                                    root_link=root_link,
+                                    pointing_axis=pointing_axis,
+                                    max_velocity=max_velocity,
+                                    threshold=threshold,
+                                    weight=weight,
+                                    name=name,
+                                    start_condition=start_condition,
+                                    pause_condition=pause_condition,
+                                    end_condition=end_condition,
+                                    **kwargs)
 
     def _add_collision_avoidance(self,
                                  collisions: List[CollisionEntry],
@@ -1019,50 +1376,6 @@ class MotionGoalWrapper(MotionGraphNodeWrapper):
         """
         raise DeprecationWarning('please use monitors.set_seed_odometry instead')
 
-    def add_cartesian_pose(self,
-                           name: str,
-                           goal_pose: PoseStamped,
-                           tip_link: Union[str, giskard_msgs.LinkName],
-                           root_link: Union[str, giskard_msgs.LinkName],
-                           reference_linear_velocity: Optional[float] = None,
-                           reference_angular_velocity: Optional[float] = None,
-                           absolute: bool = False,
-                           weight: Optional[float] = None,
-                           start_condition: str = '',
-                           pause_condition: str = '',
-                           end_condition: Optional[str] = None,
-                           **kwargs: goal_parameter) -> str:
-        """
-        This goal will use the kinematic chain between root and tip link to move tip link to the goal pose.
-        The max velocities enforce a strict limit, but require a lot of additional constraints, thus making the
-        system noticeably slower.
-        The reference velocities don't enforce a strict limit, but also don't require any additional constraints.
-        :param root_link: name of the root link of the kin chain
-        :param tip_link: name of the tip link of the kin chain
-        :param goal_pose: the goal pose
-        :param absolute: if False, the goal pose is reevaluated if start_condition turns True.
-        :param reference_linear_velocity: m/s
-        :param reference_angular_velocity: rad/s
-        :param weight: None = use default weight
-        """
-        if isinstance(root_link, str):
-            root_link = giskard_msgs.LinkName(name=root_link)
-        if isinstance(tip_link, str):
-            tip_link = giskard_msgs.LinkName(name=tip_link)
-        return self.add_motion_goal(class_name=CartesianPose.__name__,
-                                    goal_pose=goal_pose,
-                                    tip_link=tip_link,
-                                    root_link=root_link,
-                                    reference_linear_velocity=reference_linear_velocity,
-                                    reference_angular_velocity=reference_angular_velocity,
-                                    weight=weight,
-                                    name=name,
-                                    absolute=absolute,
-                                    start_condition=start_condition,
-                                    pause_condition=pause_condition,
-                                    end_condition=end_condition,
-                                    **kwargs)
-
     def add_cartesian_pose_straight(self,
                                     name: str,
                                     goal_pose: PoseStamped,
@@ -1268,382 +1581,7 @@ class MotionGoalWrapper(MotionGraphNodeWrapper):
                                     **kwargs)
 
 
-class TaskWrapper(MotionGraphNodeWrapper):
-    _name_prefix = 'T'
-
-    def add_task(self, *,
-                 class_name: str,
-                 name: str,
-                 start_condition: str = '',
-                 pause_condition: str = '',
-                 end_condition: Optional[str] = None,
-                 **kwargs) -> str:
-        return super()._add_motion_graph_node(class_name=class_name,
-                                              name=name,
-                                              start_condition=start_condition,
-                                              pause_condition=pause_condition,
-                                              end_condition=end_condition,
-                                              **kwargs)
-
-    def add_grasp_bar(self,
-                      name: str,
-                      bar_center: PointStamped,
-                      bar_axis: Vector3Stamped,
-                      bar_length: float,
-                      tip_link: Union[str, giskard_msgs.LinkName],
-                      tip_grasp_axis: Vector3Stamped,
-                      root_link: Union[str, giskard_msgs.LinkName],
-                      reference_linear_velocity: Optional[float] = None,
-                      reference_angular_velocity: Optional[float] = None,
-                      weight: Optional[float] = None,
-                      start_condition: str = '',
-                      pause_condition: str = '',
-                      end_condition: Optional[str] = None,
-                      **kwargs: goal_parameter) -> str:
-        """
-        Like a CartesianPose but with more freedom.
-        tip_link is allowed to be at any point along bar_axis, that is without bar_center +/- bar_length.
-        It will align tip_grasp_axis with bar_axis, but allows rotation around it.
-        :param root_link: root link of the kinematic chain
-        :param tip_link: tip link of the kinematic chain
-        :param tip_grasp_axis: axis of tip_link that will be aligned with bar_axis
-        :param bar_center: center of the bar to be grasped
-        :param bar_axis: alignment of the bar to be grasped
-        :param bar_length: length of the bar to be grasped
-        :param reference_linear_velocity: m/s
-        :param reference_angular_velocity: rad/s
-        """
-        if isinstance(root_link, str):
-            root_link = giskard_msgs.LinkName(name=root_link)
-        if isinstance(tip_link, str):
-            tip_link = giskard_msgs.LinkName(name=tip_link)
-        return self.add_task(class_name=GraspBar.__name__,
-                             root_link=root_link,
-                             tip_link=tip_link,
-                             tip_grasp_axis=tip_grasp_axis,
-                             bar_center=bar_center,
-                             bar_axis=bar_axis,
-                             bar_length=bar_length,
-                             reference_linear_velocity=reference_linear_velocity,
-                             reference_angular_velocity=reference_angular_velocity,
-                             weight=weight,
-                             name=name,
-                             start_condition=start_condition,
-                             pause_condition=pause_condition,
-                             end_condition=end_condition,
-                             **kwargs)
-
-    def add_cartesian_pose(self,
-                           name: str,
-                           goal_pose: PoseStamped,
-                           tip_link: Union[str, giskard_msgs.LinkName],
-                           root_link: Union[str, giskard_msgs.LinkName],
-                           reference_linear_velocity: Optional[float] = None,
-                           reference_angular_velocity: Optional[float] = None,
-                           absolute: bool = False,
-                           weight: Optional[float] = None,
-                           start_condition: str = '',
-                           pause_condition: str = '',
-                           end_condition: Optional[str] = None,
-                           **kwargs: goal_parameter) -> str:
-        """
-        This goal will use the kinematic chain between root and tip link to move tip link to the goal pose.
-        The max velocities enforce a strict limit, but require a lot of additional constraints, thus making the
-        system noticeably slower.
-        The reference velocities don't enforce a strict limit, but also don't require any additional constraints.
-        :param root_link: name of the root link of the kin chain
-        :param tip_link: name of the tip link of the kin chain
-        :param goal_pose: the goal pose
-        :param absolute: if False, the goal pose is reevaluated if start_condition turns True.
-        :param reference_linear_velocity: m/s
-        :param reference_angular_velocity: rad/s
-        :param weight: None = use default weight
-        """
-        if isinstance(root_link, str):
-            root_link = giskard_msgs.LinkName(name=root_link)
-        if isinstance(tip_link, str):
-            tip_link = giskard_msgs.LinkName(name=tip_link)
-        return self.add_task(class_name=CartesianPoseAsTask.__name__,
-                             goal_pose=goal_pose,
-                             tip_link=tip_link,
-                             root_link=root_link,
-                             reference_linear_velocity=reference_linear_velocity,
-                             reference_angular_velocity=reference_angular_velocity,
-                             weight=weight,
-                             name=name,
-                             absolute=absolute,
-                             start_condition=start_condition,
-                             pause_condition=pause_condition,
-                             end_condition=end_condition,
-                             **kwargs)
-
-    def add_maximize_manipulability(self,
-                                    name: str,
-                                    tip_link: Union[str, giskard_msgs.LinkName],
-                                    root_link: Union[str, giskard_msgs.LinkName],
-                                    start_condition: str = '',
-                                    pause_condition: str = '',
-                                    end_condition: Optional[str] = None,
-                                    **kwargs: goal_parameter) -> str:
-        """
-        This goal will use the kinematic chain between root and tip link to move tip link to the goal pose.
-        The max velocities enforce a strict limit, but require a lot of additional constraints, thus making the
-        system noticeably slower.
-        The reference velocities don't enforce a strict limit, but also don't require any additional constraints.
-        :param root_link: name of the root link of the kin chain
-        :param tip_link: name of the tip link of the kin chain
-        :param goal_pose: the goal pose
-        :param absolute: if False, the goal pose is reevaluated if start_condition turns True.
-        :param reference_linear_velocity: m/s
-        :param reference_angular_velocity: rad/s
-        :param weight: None = use default weight
-        """
-        if isinstance(root_link, str):
-            root_link = giskard_msgs.LinkName(name=root_link)
-        if isinstance(tip_link, str):
-            tip_link = giskard_msgs.LinkName(name=tip_link)
-        return self.add_task(class_name=MaxManipulability.__name__,
-                             name=name,
-                             tip_link=tip_link,
-                             root_link=root_link,
-                             start_condition=start_condition,
-                             pause_condition=pause_condition,
-                             end_condition=end_condition,
-                             **kwargs)
-
-    def add_align_planes(self,
-                         name: str,
-                         goal_normal: Vector3Stamped,
-                         tip_link: Union[str, giskard_msgs.LinkName],
-                         tip_normal: Vector3Stamped,
-                         root_link: Union[str, giskard_msgs.LinkName],
-                         reference_angular_velocity: Optional[float] = None,
-                         weight: Optional[float] = None,
-                         start_condition: str = '',
-                         pause_condition: str = '',
-                         end_condition: Optional[str] = None,
-                         **kwargs: goal_parameter) -> str:
-        """
-        This goal will use the kinematic chain between tip and root to align tip_normal with goal_normal.
-        :param goal_normal:
-        :param tip_link: tip link of the kinematic chain
-        :param tip_normal:
-        :param root_link: root link of the kinematic chain
-        :param reference_angular_velocity: rad/s
-        :param weight:
-        """
-        if isinstance(root_link, str):
-            root_link = giskard_msgs.LinkName(name=root_link)
-        if isinstance(tip_link, str):
-            tip_link = giskard_msgs.LinkName(name=tip_link)
-        return self.add_task(class_name=AlignPlanes.__name__,
-                             tip_link=tip_link,
-                             tip_normal=tip_normal,
-                             root_link=root_link,
-                             goal_normal=goal_normal,
-                             max_angular_velocity=reference_angular_velocity,
-                             weight=weight,
-                             name=name,
-                             start_condition=start_condition,
-                             pause_condition=pause_condition,
-                             end_condition=end_condition,
-                             **kwargs)
-
-    def add_joint_position(self,
-                           name: str,
-                           goal_state: Dict[str, float],
-                           weight: Optional[float] = None,
-                           max_velocity: Optional[float] = None,
-                           start_condition: str = '',
-                           pause_condition: str = '',
-                           end_condition: Optional[str] = None,
-                           **kwargs: goal_parameter) -> str:
-        """
-        Sets joint position goals for all pairs in goal_state
-        :param goal_state: maps joint_name to goal position
-        :param weight: None = use default weight
-        :param max_velocity: will be applied to all joints
-        """
-        return self.add_task(class_name=JointPositionList.__name__,
-                             goal_state=goal_state,
-                             weight=weight,
-                             max_velocity=max_velocity,
-                             name=name,
-                             start_condition=start_condition,
-                             pause_condition=pause_condition,
-                             end_condition=end_condition,
-                             **kwargs)
-
-    def add_joint_position_limit(self,
-                                 name: str,
-                                 lower_upper_limits: Dict[str, Tuple[float, float]],
-                                 weight: Optional[float] = None,
-                                 max_velocity: Optional[float] = None,
-                                 start_condition: str = '',
-                                 pause_condition: str = '',
-                                 end_condition: Optional[str] = None,
-                                 **kwargs: goal_parameter) -> str:
-        """
-        Sets joint position goals for all pairs in goal_state
-        :param goal_state: maps joint_name to goal position
-        :param weight: None = use default weight
-        :param max_velocity: will be applied to all joints
-        """
-        return self.add_task(class_name=JointPositionLimitList.__name__,
-                             lower_upper_limits=lower_upper_limits,
-                             weight=weight,
-                             max_velocity=max_velocity,
-                             name=name,
-                             start_condition=start_condition,
-                             pause_condition=pause_condition,
-                             end_condition=end_condition,
-                             **kwargs)
-
-    def add_justin_torso_limit(self,
-                               name: str,
-                               root_link: Union[str, giskard_msgs.LinkName] = 'torso1',
-                               tip_link: Union[str, giskard_msgs.LinkName] = 'torso4',
-                               forward_distance: float = 0.05,
-                               backward_distance: float = 0.14,
-                               weight: float = WEIGHT_ABOVE_CA,
-                               start_condition: str = '',
-                               pause_condition: str = '',
-                               end_condition: Optional[str] = None,
-                               **kwargs: goal_parameter) -> str:
-        if isinstance(root_link, str):
-            root_link = giskard_msgs.LinkName(name=root_link)
-        if isinstance(tip_link, str):
-            tip_link = giskard_msgs.LinkName(name=tip_link)
-        return self.add_task(class_name=JustinTorsoLimitCart.__name__,
-                             root_link=root_link,
-                             tip_link=tip_link,
-                             forward_distance=forward_distance,
-                             backward_distance=backward_distance,
-                             name=name,
-                             weight=weight,
-                             start_condition=start_condition,
-                             pause_condition=pause_condition,
-                             end_condition=end_condition,
-                             **kwargs)
-
-    def add_cartesian_position(self,
-                               name: str,
-                               goal_point: PointStamped,
-                               tip_link: Union[str, giskard_msgs.LinkName],
-                               root_link: Union[str, giskard_msgs.LinkName],
-                               reference_velocity: Optional[float] = 0.2,
-                               weight: Optional[float] = None,
-                               absolute: bool = False,
-                               start_condition: str = '',
-                               pause_condition: str = '',
-                               end_condition: Optional[str] = None,
-                               **kwargs: goal_parameter) -> str:
-        """
-        Will use kinematic chain between root_link and tip_link to move tip_link to goal_point.
-        :param goal_point:
-        :param tip_link: tip link of the kinematic chain
-        :param root_link: root link of the kinematic chain
-        :param reference_velocity: m/s
-        :param weight:
-        :param absolute: if False, the goal pose is reevaluated if start_condition turns True.
-        """
-        if isinstance(root_link, str):
-            root_link = giskard_msgs.LinkName(name=root_link)
-        if isinstance(tip_link, str):
-            tip_link = giskard_msgs.LinkName(name=tip_link)
-        return self.add_task(class_name=CartesianPosition.__name__,
-                             goal_point=goal_point,
-                             tip_link=tip_link,
-                             root_link=root_link,
-                             reference_velocity=reference_velocity,
-                             weight=weight,
-                             absolute=absolute,
-                             name=name,
-                             start_condition=start_condition,
-                             pause_condition=pause_condition,
-                             end_condition=end_condition,
-                             **kwargs)
-
-    def add_cartesian_orientation(self,
-                                  name: str,
-                                  goal_orientation: QuaternionStamped,
-                                  tip_link: Union[str, giskard_msgs.LinkName],
-                                  root_link: Union[str, giskard_msgs.LinkName],
-                                  reference_velocity: Optional[float] = None,
-                                  weight: Optional[float] = None,
-                                  absolute: bool = False,
-                                  start_condition: str = '',
-                                  pause_condition: str = '',
-                                  end_condition: Optional[str] = None,
-                                  **kwargs: goal_parameter) -> str:
-        """
-        Will use kinematic chain between root_link and tip_link to move tip_link to goal_orientation.
-        :param goal_orientation:
-        :param tip_link: tip link of kinematic chain
-        :param root_link: root link of kinematic chain
-        :param tip_group: if tip link is not unique, you can use this to tell Giskard in which group to search.
-        :param root_group: if root link is not unique, you can use this to tell Giskard in which group to search.
-        :param reference_velocity: rad/s, approx limit
-        :param absolute: if False, the goal pose is reevaluated if start_condition turns True.
-        """
-        if isinstance(root_link, str):
-            root_link = giskard_msgs.LinkName(name=root_link)
-        if isinstance(tip_link, str):
-            tip_link = giskard_msgs.LinkName(name=tip_link)
-        return self.add_task(class_name=CartesianOrientation.__name__,
-                             goal_orientation=goal_orientation,
-                             tip_link=tip_link,
-                             root_link=root_link,
-                             reference_velocity=reference_velocity,
-                             weight=weight,
-                             absolute=absolute,
-                             name=name,
-                             start_condition=start_condition,
-                             pause_condition=pause_condition,
-                             end_condition=end_condition,
-                             **kwargs)
-
-    def add_pointing(self,
-                     name: str,
-                     goal_point: PointStamped,
-                     tip_link: Union[str, giskard_msgs.LinkName],
-                     pointing_axis: Vector3Stamped,
-                     root_link: Union[str, giskard_msgs.LinkName],
-                     max_velocity: float = 0.3,
-                     threshold: float = 0.01,
-                     weight: Optional[float] = None,
-                     start_condition: str = '',
-                     pause_condition: str = '',
-                     end_condition: Optional[str] = None,
-                     **kwargs: goal_parameter) -> str:
-        """
-        Will orient pointing_axis at goal_point.
-        :param tip_link: tip link of the kinematic chain.
-        :param goal_point: where to point pointing_axis at.
-        :param root_link: root link of the kinematic chain.
-        :param pointing_axis: the axis of tip_link that will be used for pointing
-        :param max_velocity: rad/s
-        """
-        if isinstance(root_link, str):
-            root_link = giskard_msgs.LinkName(name=root_link)
-        if isinstance(tip_link, str):
-            tip_link = giskard_msgs.LinkName(name=tip_link)
-        return self.add_task(class_name=Pointing.__name__,
-                             tip_link=tip_link,
-                             goal_point=goal_point,
-                             root_link=root_link,
-                             pointing_axis=pointing_axis,
-                             max_velocity=max_velocity,
-                             threshold=threshold,
-                             weight=weight,
-                             name=name,
-                             start_condition=start_condition,
-                             pause_condition=pause_condition,
-                             end_condition=end_condition,
-                             **kwargs)
-
-
-class MonitorWrapper(MotionGraphNodeWrapper):
+class MonitorWrapper(MotionStatechartNodeWrapper):
     _name_prefix = 'M'
 
     def reset(self):
@@ -1669,13 +1607,13 @@ class MonitorWrapper(MotionGraphNodeWrapper):
         :param kwargs: kwargs for __init__ function of motion_goal_class
         :return: the name of the monitor with added quotes to be used in logical expressions for conditions.
         """
-        return super()._add_motion_graph_node(class_name=class_name,
-                                              name=name,
-                                              start_condition=start_condition,
-                                              pause_condition=pause_condition,
-                                              end_condition=end_condition,
-                                              reset_condition=reset_condition,
-                                              **kwargs)
+        return super()._add_motion_statechart_node(class_name=class_name,
+                                                   name=name,
+                                                   start_condition=start_condition,
+                                                   pause_condition=pause_condition,
+                                                   end_condition=end_condition,
+                                                   reset_condition=reset_condition,
+                                                   **kwargs)
 
     def add_local_minimum_reached(self,
                                   name: str,
@@ -2224,7 +2162,6 @@ class GiskardWrapper:
         """
         self.world = WorldWrapper(node_name)
         self.monitors = MonitorWrapper(self)
-        self.tasks = TaskWrapper(self)
         self.motion_goals = MotionGoalWrapper(self)
         self.clear_motion_goals_and_monitors()
         giskard_topic = f'{node_name}/command'
@@ -2244,16 +2181,16 @@ class GiskardWrapper:
         self.update_reset_condition(node_name, reset_condition)
 
     def update_start_condition(self, node_name: str, condition: str) -> None:
-        self.motion_graph_nodes[node_name].start_condition = condition
+        self.motion_statechart_nodes[node_name].start_condition = condition
 
     def update_reset_condition(self, node_name: str, condition: str) -> None:
-        self.motion_graph_nodes[node_name].reset_condition = condition
+        self.motion_statechart_nodes[node_name].reset_condition = condition
 
     def update_pause_condition(self, node_name: str, condition: str) -> None:
-        self.motion_graph_nodes[node_name].pause_condition = condition
+        self.motion_statechart_nodes[node_name].pause_condition = condition
 
     def update_end_condition(self, node_name: str, condition: str) -> None:
-        self.motion_graph_nodes[node_name].end_condition = condition
+        self.motion_statechart_nodes[node_name].end_condition = condition
 
     def quote_node_names(self, condition: str) -> str:
         operators = {'and', 'or', 'not', '(', ')'}
@@ -2281,10 +2218,13 @@ class GiskardWrapper:
         return ''.join(result)
 
     @property
-    def motion_graph_nodes(self) -> Dict[str, MotionGraphNode]:
+    def motion_statechart_nodes(self) -> Dict[str, MotionStatechartNode]:
         return {**self.motion_goals.motion_graph_nodes,
-                **self.tasks.motion_graph_nodes,
                 **self.monitors.motion_graph_nodes}
+
+    @property
+    def num_nodes(self) -> int:
+        return len(self.motion_statechart_nodes)
 
     def add_default_end_motion_conditions(self) -> None:
         """
@@ -2294,7 +2234,7 @@ class GiskardWrapper:
         4. Adds a max trajectory length monitor, if one wasn't added already.
         """
         local_min_reached_monitor_name = self.monitors.add_local_minimum_reached('local min')
-        for node in self.motion_graph_nodes.values():
+        for node in self.motion_statechart_nodes.values():
             if node.end_condition and node.name != local_min_reached_monitor_name:
                 node.end_condition = f'({node.end_condition}) and {local_min_reached_monitor_name}'
             else:
@@ -2302,8 +2242,6 @@ class GiskardWrapper:
         end_motion_condition = ''
         if len(self.monitors.motion_graph_nodes) > 0:
             end_motion_condition += f'{self.monitors.get_anded_nodes()}'
-        if len(self.tasks.motion_graph_nodes) > 0:
-            end_motion_condition += f' and {self.tasks.get_anded_nodes()}'
         if len(self.motion_goals.motion_graph_nodes) > 0:
             end_motion_condition += f' and {self.motion_goals.get_anded_nodes()}'
         self.monitors.add_end_motion(start_condition=end_motion_condition)
@@ -2323,7 +2261,6 @@ class GiskardWrapper:
         """
         self.motion_goals.reset()
         self.monitors.reset()
-        self.tasks.reset()
 
     def execute(self, wait: bool = True) -> MoveResult:
         """
@@ -2363,13 +2300,13 @@ class GiskardWrapper:
             self.motion_goals.avoid_all_collisions()
         self.motion_goals._add_collision_entries_as_goals()
         action_goal = MoveGoal()
-        action_goal.monitors = self._quote_conditions(self.monitors.motion_graph_nodes)
-        action_goal.tasks = self._quote_conditions(self.tasks.motion_graph_nodes)
-        action_goal.goals = self._quote_conditions(self.motion_goals.motion_graph_nodes)
+        templated_and_tasks = self._quote_conditions(self.monitors.motion_graph_nodes)
+        monitors = self._quote_conditions(self.motion_goals.motion_graph_nodes)
+        action_goal.nodes = templated_and_tasks + monitors
         self.clear_motion_goals_and_monitors()
         return action_goal
 
-    def _quote_conditions(self, nodes: Dict[str, MotionGraphNode]) -> List[MotionGraphNode]:
+    def _quote_conditions(self, nodes: Dict[str, MotionStatechartNode]) -> List[MotionStatechartNode]:
         result = []
         for node in nodes.values():
             node.start_condition = self.quote_node_names(node.start_condition)

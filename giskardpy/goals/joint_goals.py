@@ -166,18 +166,3 @@ class JointSignWave(Goal):
         god_map.debug_expression_manager.add_debug_expression('goal', goal_position)
         self.connect_monitors_to_all_tasks(start_condition, pause_condition, end_condition)
 
-
-class UnlimitedJointGoal(Goal):
-    def __init__(self, name: str, joint_name: str, goal_position: float,
-                 start_condition: cas.Expression = cas.BinaryTrue,
-                 pause_condition: cas.Expression = cas.BinaryFalse, end_condition: cas.Expression = cas.BinaryFalse):
-        super().__init__(name=name, start_condition=start_condition, pause_condition=pause_condition,
-                         end_condition=end_condition)
-        joint_name = god_map.world.search_for_joint_name(joint_name)
-        t = self.create_and_add_task('task')
-        joint_symbol = self.get_joint_position_symbol(joint_name)
-        t.add_position_constraint(expr_current=joint_symbol,
-                                  expr_goal=goal_position,
-                                  reference_velocity=2,
-                                  weight=WEIGHT_BELOW_CA)
-        self.connect_monitors_to_all_tasks(start_condition, pause_condition, end_condition)

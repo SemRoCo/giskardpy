@@ -364,7 +364,7 @@ class MotionGraphManager:
         self.trigger_update_triggers()
 
         self.log_states()
-        if isinstance(done, Exception):
+        if not done and isinstance(done, Exception):
             raise done
         return done
 

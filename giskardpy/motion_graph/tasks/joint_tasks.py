@@ -189,7 +189,8 @@ class JointPositionLimitList(Task):
             self.velocity_limits.append(velocity_limit)
 
         for name, current, lower_limit, upper_limit, velocity_limit in zip(self.names, self.current_positions,
-                                                       self.lower_limits, self.upper_limits, self.velocity_limits):
+                                                                           self.lower_limits, self.upper_limits,
+                                                                           self.velocity_limits):
             if god_map.world.is_joint_continuous(name):
                 lower_error = cas.shortest_angular_distance(current, lower_limit)
                 upper_error = cas.shortest_angular_distance(current, upper_limit)
@@ -203,6 +204,7 @@ class JointPositionLimitList(Task):
                                            upper_error=upper_error,
                                            weight=self.weight,
                                            task_expression=current)
+
 
 class JustinTorsoLimit(Task):
     def __init__(self,
@@ -227,8 +229,10 @@ class JustinTorsoLimit(Task):
             upper_error = upper_limit - current
 
         god_map.debug_expression_manager.add_debug_expression('torso 4 joint', current)
-        god_map.debug_expression_manager.add_debug_expression('torso 2 joint', joint.q1.get_symbol(Derivatives.position))
-        god_map.debug_expression_manager.add_debug_expression('torso 3 joint', joint.q2.get_symbol(Derivatives.position))
+        god_map.debug_expression_manager.add_debug_expression('torso 2 joint',
+                                                              joint.q1.get_symbol(Derivatives.position))
+        god_map.debug_expression_manager.add_debug_expression('torso 3 joint',
+                                                              joint.q2.get_symbol(Derivatives.position))
         god_map.debug_expression_manager.add_debug_expression('lower_limit', lower_limit)
         god_map.debug_expression_manager.add_debug_expression('upper_limit', upper_limit)
 
@@ -238,7 +242,6 @@ class JustinTorsoLimit(Task):
                                        upper_error=upper_error,
                                        weight=self.weight,
                                        task_expression=current)
-
 
 
 class JointVelocityLimit(Task):
@@ -331,3 +334,15 @@ class JointVelocity(Task):
                                             task_expression=current_joint,
                                             velocity_limit=max_velocity,
                                             name=joint_name)
+
+
+class UnlimitedJointGoal(Task):
+    def __init__(self, name: str, joint_name: str, goal_position: float):
+        super().__init__(name=name, )
+        joint_name = god_map.world.search_for_joint_name(joint_name)
+        joint = god_map.world.joints[joint_name]
+        joint_symbol = joint.get_symbol(Derivatives.position)
+        self.add_position_constraint(expr_current=joint_symbol,
+                                     expr_goal=goal_position,
+                                     reference_velocity=2,
+                                     weight=WEIGHT_BELOW_CA)

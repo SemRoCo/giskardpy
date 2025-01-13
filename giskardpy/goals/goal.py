@@ -4,7 +4,7 @@ import abc
 from abc import ABC
 from typing import List, Union, Optional
 
-from giskardpy.motion_graph.graph_node import MotionGraphNode
+from giskardpy.motion_graph.graph_node import MotionStatechartNode
 from giskardpy.motion_graph.monitors.monitors import Monitor, Monitor
 from giskardpy.god_map import god_map
 from giskardpy.motion_graph.tasks.task import Task
@@ -16,7 +16,7 @@ from giskardpy.data_types.data_types import PrefixName, Derivatives
 import giskardpy.casadi_wrapper as cas
 
 
-class Goal(MotionGraphNode):
+class Goal(MotionStatechartNode):
     tasks: List[Task]
     monitors: List[Monitor]
     goals: List[Goal]
@@ -42,7 +42,7 @@ class Goal(MotionGraphNode):
     def has_tasks(self) -> bool:
         return len(self.tasks) > 0
 
-    def arrange_in_sequence(self, nodes: List[MotionGraphNode]) -> None:
+    def arrange_in_sequence(self, nodes: List[MotionStatechartNode]) -> None:
         first_node = nodes[0]
         first_node.end_condition = first_node.get_observation_state_expression()
         for node in nodes[1:]:

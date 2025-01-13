@@ -14,7 +14,7 @@ from giskardpy.data_types.exceptions import GiskardException, UnknownMonitorExce
 from giskardpy.goals.goal import Goal
 from giskardpy.god_map import god_map
 from giskardpy.middleware import get_middleware
-from giskardpy.motion_graph.graph_node import MotionGraphNode
+from giskardpy.motion_graph.graph_node import MotionStatechartNode
 from giskardpy.motion_graph.helpers import compile_graph_node_state_updater, MotionGraphNodeStateManager
 from giskardpy.motion_graph.monitors.monitors import Monitor, Monitor, EndMotion, CancelMotion
 from giskardpy.motion_graph.monitors.payload_monitors import PayloadMonitor
@@ -65,7 +65,7 @@ class MotionGraphManager:
     def add_goal_package_path(self, path: str) -> None:
         self.allowed_goal_types.update(get_all_classes_in_package(path, Goal))
 
-    def get_parent_node_name_of_node(self, node: MotionGraphNode) -> str:
+    def get_parent_node_name_of_node(self, node: MotionStatechartNode) -> str:
         for goal in self.goal_state.nodes:
             if node in goal.tasks + goal.monitors + goal.goals:
                 return goal.name
@@ -108,46 +108,30 @@ class MotionGraphManager:
         if node_name in self.get_all_node_names():
             raise ValueError(f'Node "{node_name}" already exists')
 
-    def parse_motion_graph(self, *,
-                           tasks: List[Tuple[str, str, str, str, str, str, dict]],
-                           monitors: List[Tuple[str, str, str, str, str, str, dict]],
-                           goals: List[Tuple[str, str, str, str, str, str, dict]]) -> None:
-        # %% add goals
-        for class_name, name, start, reset, pause, end, kwargs in goals:
-            try:
-                get_middleware().loginfo(f'Adding task of type: \'{class_name}\'')
-                C = god_map.motion_graph_manager.allowed_goal_types[class_name]
-            except KeyError:
+    def parse_motion_graph(self, *, nodes: List[Tuple[str, str, str, str, str, str, dict]]) -> None:
+        for class_name, name, start, reset, pause, end, kwargs in nodes:
+            get_middleware().loginfo(f'Adding node of type: \'{class_name}\'')
+            if class_name in self.allowed_monitor_types:
+                C = self.allowed_monitor_types[class_name]
+                monitor: Monitor = C(name=name, **kwargs)
+                self.add_monitor(monitor)
+            elif class_name in self.allowed_task_types:
+                C = self.allowed_task_types[class_name]
+                task: Task = C(name=name, **kwargs)
+                self.add_task(task)
+            elif class_name in self.allowed_goal_types:
+                C = self.allowed_goal_types[class_name]
+                goal: Goal = C(name=name, **kwargs)
+                self.add_goal(goal)
+            else:
                 raise UnknownTaskException(f'unknown task type: \'{class_name}\'.')
-            goal: Goal = C(name=name, **kwargs)
-            self.add_goal(goal)
-
-        # %% add tasks
-        for class_name, name, start, reset, pause, end, kwargs in tasks:
-            try:
-                get_middleware().loginfo(f'Adding task of type: \'{class_name}\'')
-                C = god_map.motion_graph_manager.allowed_task_types[class_name]
-            except KeyError:
-                raise UnknownTaskException(f'unknown task type: \'{class_name}\'.')
-            task: Task = C(name=name, **kwargs)
-            self.add_task(task)
-
-        # %% add monitors
-        for class_name, name, start, reset, pause, end, kwargs in monitors:
-            try:
-                get_middleware().loginfo(f'Adding monitor of type: \'{class_name}\'')
-                C = god_map.motion_graph_manager.allowed_monitor_types[class_name]
-            except KeyError:
-                raise UnknownMonitorException(f'unknown monitor type: \'{class_name}\'.')
-            monitor: Monitor = C(name=name, **kwargs)
-            self.add_monitor(monitor)
 
         task_state_symbols = self.task_state.get_observation_state_symbol_map()
         monitor_state_symbols = self.monitor_state.get_observation_state_symbol_map()
         goal_state_symbols = self.goal_state.get_observation_state_symbol_map()
         observation_state_symbols = {**task_state_symbols, **monitor_state_symbols, **goal_state_symbols}
 
-        for (class_name, name, start, reset, pause, end, kwargs) in tasks + monitors + goals:
+        for (class_name, name, start, reset, pause, end, kwargs) in nodes:
             node = self.get_node(name)
             start_condition = god_map.motion_graph_manager.logic_str_to_expr(
                 logic_str=start,
@@ -247,7 +231,7 @@ class MotionGraphManager:
         self.goal_state.init_states()
         self.log_states()
 
-    def get_node_from_state_expr(self, expr: cas.Expression) -> MotionGraphNode:
+    def get_node_from_state_expr(self, expr: cas.Expression) -> MotionStatechartNode:
         for task in self.task_state.nodes:
             if cas.is_true_symbol(task.get_observation_state_expression() == expr):
                 return task
@@ -259,7 +243,7 @@ class MotionGraphManager:
                 return goal
         raise GiskardException(f'No goal/task/monitor found for {str(expr)}.')
 
-    def get_node(self, name: str) -> MotionGraphNode:
+    def get_node(self, name: str) -> MotionStatechartNode:
         try:
             return self.task_state.get_node(name)
         except KeyError:
@@ -302,7 +286,7 @@ class MotionGraphManager:
     def compile_node_state_updater(self, node_state: MotionGraphNodeStateManager) \
             -> Tuple[cas.CompiledFunction, cas.CompiledFunction]:
         observation_state_updater = []
-        node: MotionGraphNode
+        node: MotionStatechartNode
         for node in node_state.nodes:
             state_symbol = node.get_observation_state_expression()
             node.pre_compile()
@@ -325,7 +309,7 @@ class MotionGraphManager:
         return [x for x in self.monitor_state.nodes if isinstance(x, PayloadMonitor)]
 
     @profile
-    def register_expression_updater(self, expression: cas.PreservedCasType, node: MotionGraphNode) \
+    def register_expression_updater(self, expression: cas.PreservedCasType, node: MotionStatechartNode) \
             -> cas.PreservedCasType:
         """
         Expression is updated when all monitors are 1 at the same time, but only once.

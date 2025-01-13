@@ -8,7 +8,7 @@ from giskardpy.god_map import god_map
 from giskardpy.utils.utils import string_shortener
 
 
-class MotionGraphNode:
+class MotionStatechartNode:
     _start_condition: cas.Expression
     _reset_condition: cas.Expression
     _pause_condition: cas.Expression
@@ -56,7 +56,7 @@ class MotionGraphNode:
     def __repr__(self) -> str:
         return str(self)
 
-    def __eq__(self, other: MotionGraphNode) -> bool:
+    def __eq__(self, other: MotionStatechartNode) -> bool:
         return self.name == other.name
 
     def formatted_name(self, quoted: bool = False) -> str:

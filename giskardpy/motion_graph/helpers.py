@@ -6,13 +6,13 @@ from giskardpy.casadi_wrapper import CompiledFunction
 from giskardpy.data_types.data_types import LifeCycleState, ObservationState
 from giskardpy.data_types.exceptions import GoalInitalizationException
 from giskardpy.god_map import god_map
-from giskardpy.motion_graph.graph_node import MotionGraphNode
+from giskardpy.motion_graph.graph_node import MotionStatechartNode
 import giskardpy.casadi_wrapper as cas
 from line_profiler import profile
 
 from giskardpy.symbol_manager import symbol_manager
 
-T = TypeVar('T', bound=MotionGraphNode)
+T = TypeVar('T', bound=MotionStatechartNode)
 
 
 class MotionGraphNodeStateManager(Generic[T]):
@@ -92,7 +92,7 @@ class MotionGraphNodeStateManager(Generic[T]):
         return {key: self.life_cycle_state[idx] for key, idx in self.key_to_idx.items()}
 
     @profile
-    def register_expression_updater(self, node: MotionGraphNode, expression: cas.PreservedCasType) \
+    def register_expression_updater(self, node: MotionStatechartNode, expression: cas.PreservedCasType) \
             -> cas.PreservedCasType:
         """
         Expression is updated when all monitors are 1 at the same time, but only once.
@@ -137,7 +137,7 @@ class MotionGraphNodeStateManager(Generic[T]):
 @profile
 def compile_graph_node_state_updater(node_state: MotionGraphNodeStateManager) -> CompiledFunction:
     state_updater = []
-    node: MotionGraphNode
+    node: MotionStatechartNode
     for node in node_state.nodes:
         state_symbol = node.get_life_cycle_state_expression()
 

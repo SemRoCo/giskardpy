@@ -457,7 +457,7 @@ class GiskardTestWrapper(OldGiskardWrapper):
     #
 
     def teleport_base(self, goal_pose, group_name: Optional[str] = None):
-        done = self.monitors.add_set_seed_odometry(base_pose=goal_pose, group_name=group_name)
+        done = self.monitors.add_set_seed_odometry(base_pose=goal_pose, group_name=group_name, name='teleport base')
         self.allow_all_collisions()
         self.monitors.add_end_motion(start_condition=done)
         self.execute(add_local_minimum_reached=False)

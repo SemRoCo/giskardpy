@@ -415,7 +415,7 @@ class TestJointGoals:
         zero_pose.set_joint_goal(goal_js, add_monitor=False)
         zero_pose.execute()
         js = {'torso_lift_joint': 0.32}
-        zero_pose.set_joint_goal(js)
+        zero_pose.set_joint_goal(js, add_monitor=False)
         zero_pose.execute()
 
         goal_js = {'r_elbow_flex_joint': r_elbow_flex_joint_limits[1] + 0.2,

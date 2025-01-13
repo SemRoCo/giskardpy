@@ -17,16 +17,15 @@ from giskard_msgs.srv import DyeGroupRequest, DyeGroup, GetGroupInfoRequest, Dye
 from giskard_msgs.srv import GetGroupInfo, GetGroupNames
 from giskard_msgs.srv import GetGroupNamesResponse, GetGroupInfoResponse
 from giskardpy.data_types.data_types import goal_parameter
-from giskardpy.data_types.exceptions import LocalMinimumException
+from giskardpy.data_types.exceptions import LocalMinimumException, MaxTrajectoryLengthException
 from giskardpy.motion_graph.tasks.align_planes import AlignPlanes
 from giskardpy.goals.align_to_push_door import AlignToPushDoor
 from giskardpy.goals.cartesian_goals import CartesianPose, DiffDriveBaseGoal, CartesianVelocityLimit, \
     CartesianPoseStraight, CartesianPositionStraight
 from giskardpy.goals.collision_avoidance import CollisionAvoidance
 from giskardpy.motion_graph.tasks.grasp_bar import GraspBar
-from giskardpy.goals.joint_goals import AvoidJointLimits
 from giskardpy.goals.open_close import Close, Open
-from giskardpy.motion_graph.tasks.joint_tasks import JointPositionLimitList, JointPositionList
+from giskardpy.motion_graph.tasks.joint_tasks import JointPositionLimitList, JointPositionList, AvoidJointLimits
 from giskardpy.motion_graph.tasks.pointing import Pointing
 from giskardpy.goals.pre_push_door import PrePushDoor
 from giskardpy.goals.set_prediction_horizon import SetPredictionHorizon
@@ -369,11 +368,12 @@ class MotionStatechartNodeWrapper:
         self.update_reset_condition(node_name=name, condition=reset_condition)
         return name
 
-    def get_anded_nodes(self) -> str:
+    def get_anded_nodes(self, add_nodes_without_end_condition: bool = True) -> str:
         nodes = []
         for node in self.motion_graph_nodes.values():
-            if node.class_name not in get_all_classes_in_package('giskardpy.motion_graph.monitors',
-                                                                 CancelMotion):
+            if (node.class_name not in get_all_classes_in_package('giskardpy.motion_graph.monitors',
+                                                                 CancelMotion)
+                    and (add_nodes_without_end_condition or node.end_condition != '')):
                 nodes.append(node.name)
         return ' and '.join(nodes)
 
@@ -1872,12 +1872,14 @@ class MonitorWrapper(MotionStatechartNodeWrapper):
         A monitor that cancels the motion if the trajectory is longer than max_trajectory_length.
         """
         self.max_trajectory_length_set = True
-        return self.add_monitor(name='max traj length',
+        length = self.add_monitor(name='max traj length',
                                 class_name=CheckMaxTrajectoryLength.__name__,
                                 length=length,
                                 start_condition='',
                                 pause_condition='',
                                 end_condition='')
+        return self.add_cancel_motion(start_condition=length, error=MaxTrajectoryLengthException('traj too long'),
+                                      name='traj too long')
 
     def add_print(self,
                   message: str,
@@ -2234,16 +2236,18 @@ class GiskardWrapper:
         4. Adds a max trajectory length monitor, if one wasn't added already.
         """
         local_min_reached_monitor_name = self.monitors.add_local_minimum_reached('local min')
-        for node in self.motion_statechart_nodes.values():
-            if node.end_condition and node.name != local_min_reached_monitor_name:
-                node.end_condition = f'({node.end_condition}) and {local_min_reached_monitor_name}'
-            else:
-                node.end_condition = local_min_reached_monitor_name
+        # for node in self.motion_statechart_nodes.values():
+        #     if node.end_condition and node.name != local_min_reached_monitor_name:
+        #         node.end_condition = f'({node.end_condition}) and {local_min_reached_monitor_name}'
+        #     else:
+        #         node.end_condition = local_min_reached_monitor_name
         end_motion_condition = ''
-        if len(self.monitors.motion_graph_nodes) > 0:
-            end_motion_condition += f'{self.monitors.get_anded_nodes()}'
-        if len(self.motion_goals.motion_graph_nodes) > 0:
-            end_motion_condition += f' and {self.motion_goals.get_anded_nodes()}'
+        monitor_part = self.monitors.get_anded_nodes(add_nodes_without_end_condition=False)
+        if len(monitor_part) > 0:
+            end_motion_condition += f'{monitor_part}'
+        motion_goal_part = self.motion_goals.get_anded_nodes(add_nodes_without_end_condition=False)
+        if len(motion_goal_part) > 0:
+            end_motion_condition += f' and {motion_goal_part}'
         self.monitors.add_end_motion(start_condition=end_motion_condition)
         self.monitors.add_cancel_motion(start_condition=local_min_reached_monitor_name,
                                         error=LocalMinimumException(f'local minimum reached'))

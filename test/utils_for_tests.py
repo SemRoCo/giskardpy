@@ -544,7 +544,7 @@ class GiskardTestWrapper(OldGiskardWrapper):
             result_exception = msg_converter.error_msg_to_exception(r.error)
             if expected_error_type is not None:
                 assert type(result_exception) == expected_error_type, \
-                    f'got: {result_exception}, ' \
+                    f'got: {type(result_exception)}, ' \
                     f'expected: {expected_error_type} | error_massage: {r.error.msg}'
             else:
                 if result_exception is not None:

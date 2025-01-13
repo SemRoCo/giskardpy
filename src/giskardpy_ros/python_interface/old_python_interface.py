@@ -1,6 +1,7 @@
 from typing import Dict, Optional, List, Tuple
 
 from geometry_msgs.msg import PoseStamped, PointStamped, QuaternionStamped, Vector3Stamped
+from pandas.core.dtypes.cast import ensure_dtype_can_hold_na
 
 import giskard_msgs.msg as giskard_msgs
 from giskard_msgs.msg import MoveResult, CollisionEntry, MoveGoal, WorldResult
@@ -370,6 +371,7 @@ class OldGiskardWrapper(GiskardWrapper):
                                                        max_linear_velocity=max_linear_velocity,
                                                        max_angular_velocity=max_angular_velocity,
                                                        hard=hard,
+                                                       end_condition='',
                                                        **kwargs)
 
     def set_grasp_bar_goal(self,
@@ -472,6 +474,7 @@ class OldGiskardWrapper(GiskardWrapper):
                                                  door_handle=door_handle,
                                                  tip_group=tip_group,
                                                  tip_gripper_axis=tip_gripper_axis,
+                                                 end_condition='',
                                                  root_group=root_group,
                                                  weight=weight)
 
@@ -498,6 +501,7 @@ class OldGiskardWrapper(GiskardWrapper):
                                             name=name,
                                             tip_link=tip_link,
                                             door_object=door_object,
+                                            end_condition='',
                                             door_handle=door_handle,
                                             reference_linear_velocity=reference_linear_velocity,
                                             reference_angular_velocity=reference_angular_velocity,

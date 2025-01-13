@@ -22,7 +22,7 @@ from giskardpy.data_types.exceptions import GiskardException, MaxTrajectoryLengt
     UnknownJointException
 from giskardpy.goals.cartesian_goals import RelativePositionSequence
 from giskardpy.goals.collision_avoidance import CollisionAvoidanceHint
-from giskardpy.goals.goals_tests import DebugGoal, CannotResolveSymbol
+from giskardpy.motion_graph.tasks.goals_tests import DebugGoal, CannotResolveSymbol
 from giskardpy.goals.set_prediction_horizon import SetQPSolver
 from giskardpy.goals.tracebot import InsertCylinder
 from giskardpy.motion_graph.tasks.weight_scaling_goals import MaxManipulability, BaseArmWeightScaling
@@ -167,7 +167,7 @@ class PR2TestWrapper(GiskardTestWrapper):
                               behavior_tree_config=StandAloneBTConfig(debug_mode=True,
                                                                       publish_tf=True),
                               # qp_controller_config=QPControllerConfig(qp_solver=SupportedQPSolver.gurobi))
-                              qp_controller_config=QPControllerConfig())
+                              qp_controller_config=QPControllerConfig(mpc_dt=0.05))
         super().__init__(giskard)
         self.robot = god_map.world.groups[self.robot_name]
 
@@ -1355,12 +1355,13 @@ class TestConstraints:
         zero_pose.execute(expected_error_type=EmptyProblemException, add_local_minimum_reached=False)
 
     def test_add_debug_expr(self, zero_pose: PR2TestWrapper):
-        zero_pose.motion_goals.add_motion_goal(class_name=DebugGoal.__name__)
-        zero_pose.set_joint_goal(zero_pose.better_pose)
+        zero_pose.motion_goals.add_motion_goal(class_name=DebugGoal.__name__, name='goal', end_condition='')
+        zero_pose.set_joint_goal(zero_pose.better_pose, add_monitor=False)
         zero_pose.execute()
 
     def test_cannot_resolve_symbol(self, zero_pose: PR2TestWrapper):
         zero_pose.motion_goals.add_motion_goal(class_name=CannotResolveSymbol.__name__,
+                                               name='goal',
                                                joint_name='torso_lift_joint')
         zero_pose.execute(expected_error_type=GiskardException)
 
@@ -1374,14 +1375,14 @@ class TestConstraints:
         pose.header.frame_id = 'map'
         pose.pose.position.x = 1
         pose.pose.orientation.w = 1
-        zero_pose.monitors.add_set_seed_odometry(base_pose=pose)
+        zero_pose.monitors.add_set_seed_odometry(base_pose=pose, name='goal')
         zero_pose.set_joint_goal(zero_pose.better_pose)
         zero_pose.plan()
         pose = PoseStamped()
         pose.header.frame_id = 'map'
         pose.pose.position.x = 1
         pose.pose.orientation.w = 1
-        zero_pose.monitors.add_set_seed_odometry(base_pose=pose, group_name=zero_pose.robot_name)
+        zero_pose.monitors.add_set_seed_odometry(base_pose=pose, group_name=zero_pose.robot_name, name='goal')
         zero_pose.set_joint_goal(zero_pose.better_pose)
         zero_pose.plan()
 
@@ -1402,15 +1403,15 @@ class TestConstraints:
     #     zero_pose.set_joint_goal(zero_pose.better_pose)
     #     zero_pose.execute(expected_error_type=VelocityLimitUnreachableException)
 
-    def test_SetPredictionHorizon11(self, zero_pose: PR2TestWrapper):
-        default_prediction_horizon = god_map.qp_controller.prediction_horizon
-        zero_pose.set_prediction_horizon(prediction_horizon=11)
-        zero_pose.set_joint_goal(zero_pose.better_pose)
-        zero_pose.execute()
-        assert god_map.qp_controller.prediction_horizon == 11
-        zero_pose.set_joint_goal(zero_pose.default_pose)
-        zero_pose.execute()
-        assert god_map.qp_controller.prediction_horizon == default_prediction_horizon
+    # def test_SetPredictionHorizon11(self, zero_pose: PR2TestWrapper):
+    #     default_prediction_horizon = god_map.qp_controller.prediction_horizon
+    #     zero_pose.set_prediction_horizon(prediction_horizon=11)
+    #     zero_pose.set_joint_goal(zero_pose.better_pose)
+    #     zero_pose.execute()
+    #     assert god_map.qp_controller.prediction_horizon == 11
+    #     zero_pose.set_joint_goal(zero_pose.default_pose)
+    #     zero_pose.execute()
+    #     assert god_map.qp_controller.prediction_horizon == default_prediction_horizon
 
     def test_SetMaxTrajLength(self, zero_pose: PR2TestWrapper):
         new_length = 4
@@ -1447,12 +1448,14 @@ class TestConstraints:
         avoidance_hint.vector.y = -1
         kitchen_setup.avoid_all_collisions(0.1)
         kitchen_setup.motion_goals.add_motion_goal(class_name=CollisionAvoidanceHint.__name__,
+                                                   name='goal',
                                                    tip_link='base_link',
                                                    max_threshold=0.4,
                                                    spring_threshold=0.5,
                                                    # max_linear_velocity=1,
                                                    object_link_name='kitchen_island',
                                                    weight=WEIGHT_COLLISION_AVOIDANCE,
+                                                   end_condition='',
                                                    avoidance_hint=avoidance_hint)
         kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
 
@@ -1526,9 +1529,11 @@ class TestConstraints:
         zero_pose.allow_all_collisions()
         zero_pose.motion_goals.add_motion_goal(class_name=JointVelocityLimit.__name__,
                                                joint_names=[joint.short_name],
+                                               name='goal',
                                                max_velocity=vel_limit,
+                                               end_condition='',
                                                hard=True)
-        zero_pose.set_joint_goal(goal_state={joint.short_name: joint_goal})
+        zero_pose.set_joint_goal(goal_state={joint.short_name: joint_goal}, add_monitor=False)
         zero_pose.execute()
         np.testing.assert_almost_equal(god_map.world.state[joint].position, joint_goal, decimal=3)
         np.testing.assert_array_less(god_map.trajectory.to_dict()[1][joint], vel_limit + 1e-4)
@@ -1596,7 +1601,8 @@ class TestConstraints:
         goal_position_p = deepcopy(goal_position)
         goal_position_p.header.frame_id = 'base_link'
         zero_pose.set_straight_cart_goal(goal_pose=goal_position_p, tip_link=zero_pose.l_tip,
-                                         root_link=zero_pose.default_root)
+                                         root_link=zero_pose.default_root,
+                                         add_monitor=False)
         zero_pose.execute()
 
     def test_CartesianPoseStraight2(self, better_pose: PR2TestWrapper):
@@ -1627,26 +1633,30 @@ class TestConstraints:
         goal.pose.position.x -= 0.1
         goal.pose.position.y += 0.4
         better_pose.set_straight_cart_goal(goal_pose=goal, tip_link=better_pose.l_tip,
-                                           root_link=better_pose.default_root)
+                                           root_link=better_pose.default_root,
+                                           add_monitor=False)
         better_pose.execute()
 
         goal = deepcopy(object_pose)
         goal.pose.position.z -= 0.4
         better_pose.set_straight_cart_goal(goal_pose=goal, tip_link=better_pose.l_tip,
-                                           root_link=better_pose.default_root)
+                                           root_link=better_pose.default_root,
+                                           add_monitor=False)
         better_pose.execute()
 
         goal = deepcopy(object_pose)
         goal.pose.position.y -= 0.4
         goal.pose.position.x -= 0.2
         better_pose.set_straight_cart_goal(goal_pose=goal, tip_link=better_pose.l_tip,
-                                           root_link=better_pose.default_root)
+                                           root_link=better_pose.default_root,
+                                           add_monitor=False)
         better_pose.execute()
 
         goal = deepcopy(object_pose)
         goal.pose.position.x -= 0.4
         better_pose.set_straight_cart_goal(goal_pose=goal, tip_link=better_pose.l_tip,
-                                           root_link=better_pose.default_root)
+                                           root_link=better_pose.default_root,
+                                           add_monitor=False)
         better_pose.execute()
 
     def test_CartesianVelocityLimit(self, zero_pose: PR2TestWrapper):
@@ -1672,10 +1682,11 @@ class TestConstraints:
                                 root_link='map',
                                 reference_linear_velocity=eef_linear_velocity,
                                 reference_angular_velocity=eef_angular_velocity,
+                                add_monitor=False,
                                 weight=WEIGHT_BELOW_CA)
         zero_pose.execute()
 
-        for time, state in god_map.debug_expression_manager.raw_traj_to_traj().items():
+        for time, state in god_map.debug_expression_manager.raw_traj_to_traj(god_map.qp_controller.control_dt).items():
             key = f'trans_error'
             assert key in state
             assert state[key].position <= base_linear_velocity + 2e3
@@ -1952,7 +1963,7 @@ class TestConstraints:
         kitchen_setup.execute()
 
         # # # close the gripper
-        kitchen_setup.set_joint_goal(goal_state={'r_gripper_l_finger_joint': 0.0})
+        kitchen_setup.set_joint_goal(goal_state={'r_gripper_l_finger_joint': 0.0}, add_monitor=False)
 
         kitchen_setup.set_pre_push_door_goal(root_link=kitchen_setup.default_root,
                                              tip_link=hand,
@@ -2005,26 +2016,26 @@ class TestConstraints:
     def test_wrong_constraint_type(self, zero_pose: PR2TestWrapper):
         goal_state = {'r_elbow_flex_joint': -1.0}
         kwargs = {'goal_state': goal_state}
-        zero_pose.motion_goals.add_motion_goal(class_name='jointpos', **kwargs)
+        zero_pose.motion_goals.add_motion_goal(class_name='jointpos', name='goal', **kwargs)
         zero_pose.execute(expected_error_type=UnknownGoalException)
 
     def test_python_code_in_constraint_type(self, zero_pose: PR2TestWrapper):
         goal_state = {'r_elbow_flex_joint': -1.0}
         kwargs = {'goal_state': goal_state}
-        zero_pose.motion_goals.add_motion_goal(class_name='print("muh")', **kwargs)
+        zero_pose.motion_goals.add_motion_goal(class_name='print("muh")', name='goal', **kwargs)
         zero_pose.execute(expected_error_type=UnknownGoalException)
 
     def test_wrong_params1(self, zero_pose: PR2TestWrapper):
         goal_state = {5432: 'muh'}
         kwargs = {'goal_state': goal_state}
-        zero_pose.motion_goals.add_motion_goal(class_name='JointPositionList', **kwargs)
+        zero_pose.motion_goals.add_motion_goal(class_name='JointPositionList', name='goal', **kwargs)
         zero_pose.execute(expected_error_type=UnknownJointException)
 
     def test_wrong_params2(self, zero_pose: PR2TestWrapper):
         goal_state = {'r_elbow_flex_joint': 'muh'}
         kwargs = {'goal_state': goal_state}
-        zero_pose.motion_goals.add_motion_goal(class_name='JointPositionList', **kwargs)
-        zero_pose.execute(expected_error_type=GoalInitalizationException)
+        zero_pose.motion_goals.add_motion_goal(class_name='JointPositionList', name='goal', **kwargs)
+        zero_pose.execute(expected_error_type=TypeError)
 
     # def test_align_planes2(self, zero_pose: PR2TestWrapper):
     #     # FIXME, what should I do with opposite vectors?

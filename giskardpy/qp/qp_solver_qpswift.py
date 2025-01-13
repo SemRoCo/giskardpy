@@ -32,7 +32,7 @@ class QPSolverQPSwift(QPSWIFTFormatter):
         'OUTPUT': 1,  # 0 = sol; 1 = sol + basicInfo; 2 = sol + basicInfo + advInfo
         # 'MAXITER': 100,  # 0 < MAXITER < 200; default 100. maximum number of iterations needed
         # 'ABSTOL': 9e-4,  # 0 < ABSTOL < 1; default 1e-6. absolute tolerance
-        'RELTOL': 3.e-5,  # 0 < RELTOL < 1; default 1e-6. relative tolerance
+        'RELTOL': 3.5e-5,  # 0 < RELTOL < 1; default 1e-6. relative tolerance
         # 'SIGMA': 0.01,  # default 100. maximum centering allowed
         # 'VERBOSE': 1  # 0 = no print; 1 = print
     }

@@ -3,7 +3,7 @@ from typing import Optional
 from giskardpy import casadi_wrapper as cas
 from giskardpy.goals.goal import Goal
 from giskardpy.god_map import god_map
-from giskardpy.motion_graph.tasks.task import WEIGHT_BELOW_CA
+from giskardpy.motion_graph.tasks.task import WEIGHT_BELOW_CA, Task
 
 import numpy as np
 
@@ -40,7 +40,7 @@ class PrePushDoor(Goal):
         if name is None:
             name = f'{self.__class__.__name__}/{self.tip}/{self.door_object}'
 
-        super().__init__(name)
+        super().__init__(name=name)
 
         root_T_tip = god_map.world.compose_fk_expression(self.root, self.tip)
         root_T_door = god_map.world.compose_fk_expression(self.root, self.door_object)
@@ -65,10 +65,9 @@ class PrePushDoor(Goal):
         god_map.debug_expression_manager.add_debug_expression('goal_point_on_plane',
                                                               cas.Point3(root_P_nearest_in_rotated_door))
 
-        push_door_task = self.create_and_add_task('pre push door')
+        push_door_task = Task(name='pre push door')
+        self.add_task(push_door_task)
         push_door_task.add_point_goal_constraints(frame_P_current=root_T_tip.to_position(),
                                                   frame_P_goal=cas.Point3(root_P_nearest_in_rotated_door),
                                                   reference_velocity=self.reference_linear_velocity,
                                                   weight=self.weight)
-
-        self.connect_monitors_to_all_tasks(start_condition, pause_condition, end_condition)

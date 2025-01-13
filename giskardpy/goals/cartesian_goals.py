@@ -12,7 +12,7 @@ from giskardpy.model.joints import DiffDrive
 from giskardpy.motion_graph.monitors.monitors import Monitor
 from giskardpy.motion_graph.tasks.cartesian_tasks import CartesianPosition, CartesianOrientation
 from giskardpy.symbol_manager import symbol_manager
-from giskardpy.motion_graph.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
+from giskardpy.motion_graph.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, Task
 
 
 class CartesianPositionStraight(Goal):
@@ -23,28 +23,24 @@ class CartesianPositionStraight(Goal):
                  reference_velocity: Optional[float] = None,
                  name: Optional[str] = None,
                  absolute: bool = False,
-                 weight: float = WEIGHT_ABOVE_CA,
-                 start_condition: cas.Expression = cas.BinaryTrue,
-                 pause_condition: cas.Expression = cas.BinaryFalse,
-                 end_condition: cas.Expression = cas.BinaryFalse):
+                 weight: float = WEIGHT_ABOVE_CA):
         """
         Same as CartesianPosition, but tries to move the tip_link in a straight line to the goal_point.
         """
+        super().__init__(name=name)
         if reference_velocity is None:
             reference_velocity = 0.2
         self.reference_velocity = reference_velocity
         self.weight = weight
         self.root_link = root_link
         self.tip_link = tip_link
-        if absolute or cas.is_true_symbol(start_condition):
+
+        if absolute:
             root_P_goal = god_map.world.transform(self.root_link, goal_point)
         else:
             root_T_x = god_map.world.compose_fk_expression(self.root_link, goal_point.reference_frame)
             root_P_goal = root_T_x.dot(goal_point)
-            root_P_goal = god_map.motion_graph_manager.register_expression_updater(root_P_goal, start_condition)
-        if name is None:
-            name = f'{self.__class__.__name__}/{self.root_link}/{self.tip_link}'
-        super().__init__(name)
+            root_P_goal = self.update_expression_on_starting(root_P_goal)
 
         root_P_tip = god_map.world.compose_fk_expression(self.root_link, self.tip_link).to_position()
         t_T_r = god_map.world.compose_fk_expression(self.tip_link, self.root_link)
@@ -72,7 +68,8 @@ class CartesianPositionStraight(Goal):
         expr_p = a_T_t.to_position()
         dist = cas.norm(root_P_goal - root_P_tip)
 
-        task = self.create_and_add_task('position straight')
+        task = Task(name='position straight')
+        self.add_task(task)
         task.add_equality_constraint_vector(reference_velocities=[self.reference_velocity] * 3,
                                             equality_bounds=[dist, 0, 0],
                                             weights=[WEIGHT_ABOVE_CA, WEIGHT_ABOVE_CA * 2, WEIGHT_ABOVE_CA * 2],
@@ -84,7 +81,6 @@ class CartesianPositionStraight(Goal):
                                                               color=ColorRGBA(r=1, g=0, b=0, a=1))
         god_map.debug_expression_manager.add_debug_expression(f'{self.name}/goal_point', root_P_goal,
                                                               color=ColorRGBA(r=0, g=0, b=1, a=1))
-        self.connect_monitors_to_all_tasks(start_condition, pause_condition, end_condition)
 
 
 class CartesianPose(Goal):
@@ -297,31 +293,28 @@ class CartesianPoseStraight(Goal):
         """
         self.root_link = root_link
         self.tip_link = tip_link
-        if name is None:
-            name = f'{self.__class__.__name__}/{self.root_link}/{self.tip_link}'
         super().__init__(name=name)
-        self.add_constraints_of_goal(CartesianPositionStraight(root_link=root_link,
-                                                               tip_link=tip_link,
-                                                               goal_point=goal_pose.to_position(),
-                                                               reference_velocity=reference_linear_velocity,
-                                                               weight=weight,
-                                                               absolute=absolute))
-        self.add_constraints_of_goal(CartesianOrientation(root_link=root_link,
-                                                          tip_link=tip_link,
-                                                          goal_orientation=goal_pose.to_rotation(),
-                                                          reference_velocity=reference_angular_velocity,
-                                                          absolute=absolute,
-                                                          weight=weight,
-                                                          point_of_debug_matrix=goal_pose.to_position()))
+        self.add_goal(CartesianPositionStraight(root_link=root_link,
+                                                tip_link=tip_link,
+                                                name=name + '/pos',
+                                                goal_point=goal_pose.to_position(),
+                                                reference_velocity=reference_linear_velocity,
+                                                weight=weight,
+                                                absolute=absolute))
+        self.add_task(CartesianOrientation(root_link=root_link,
+                                           tip_link=tip_link,
+                                           name=name + '/rot',
+                                           goal_orientation=goal_pose.to_rotation(),
+                                           reference_velocity=reference_angular_velocity,
+                                           absolute=absolute,
+                                           weight=weight,
+                                           point_of_debug_matrix=goal_pose.to_position()))
 
 
 class TranslationVelocityLimit(Goal):
     def __init__(self, root_link: str, tip_link: str, root_group: Optional[str] = None,
                  tip_group: Optional[str] = None,
-                 weight=WEIGHT_ABOVE_CA, max_velocity=0.1, hard=True, name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.BinaryTrue,
-                 pause_condition: cas.Expression = cas.BinaryFalse,
-                 end_condition: cas.Expression = cas.BinaryFalse):
+                 weight=WEIGHT_ABOVE_CA, max_velocity=0.1, hard=True, name: Optional[str] = None):
         """
         See CartesianVelocityLimit
         """
@@ -329,13 +322,14 @@ class TranslationVelocityLimit(Goal):
         self.tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
         if name is None:
             name = f'{self.__class__.__name__}/{self.root_link}/{self.tip_link}'
-        super().__init__(name)
+        super().__init__(name=name)
         self.hard = hard
         self.weight = weight
         self.max_velocity = max_velocity
 
         r_P_c = god_map.world.compose_fk_expression(self.root_link, self.tip_link).to_position()
-        task = self.create_and_add_task('limit translation vel')
+        task = Task(name='limit translation vel')
+        self.add_task(task)
         if not self.hard:
             task.add_translational_velocity_limit(frame_P_current=r_P_c,
                                                   max_velocity=self.max_velocity,
@@ -345,16 +339,13 @@ class TranslationVelocityLimit(Goal):
                                                   max_velocity=self.max_velocity,
                                                   weight=self.weight,
                                                   max_violation=0)
-        self.connect_monitors_to_all_tasks(start_condition, pause_condition, end_condition)
+        # self.expression = cas.norm(r_P_c)
 
 
 class RotationVelocityLimit(Goal):
     def __init__(self, root_link: str, tip_link: str, root_group: Optional[str] = None,
                  tip_group: Optional[str] = None,
-                 weight=WEIGHT_ABOVE_CA, max_velocity=0.5, hard=True, name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.BinaryTrue,
-                 pause_condition: cas.Expression = cas.BinaryFalse,
-                 end_condition: cas.Expression = cas.BinaryFalse):
+                 weight=WEIGHT_ABOVE_CA, max_velocity=0.5, hard=True, name: Optional[str] = None):
         """
         See CartesianVelocityLimit
         """
@@ -362,7 +353,7 @@ class RotationVelocityLimit(Goal):
         self.tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
         if name is None:
             name = f'{self.__class__.__name__}/{self.root_link}/{self.tip_link}'
-        super().__init__(name)
+        super().__init__(name=name)
         self.hard = hard
 
         self.weight = weight
@@ -370,7 +361,8 @@ class RotationVelocityLimit(Goal):
 
         r_R_c = god_map.world.compose_fk_expression(self.root_link, self.tip_link).to_rotation()
 
-        task = self.create_and_add_task('rot vel limit')
+        task = Task(name='rot vel limit')
+        self.add_task(task)
         if self.hard:
             task.add_rotational_velocity_limit(frame_R_current=r_R_c,
                                                max_velocity=self.max_velocity,
@@ -380,7 +372,6 @@ class RotationVelocityLimit(Goal):
                                                max_velocity=self.max_velocity,
                                                weight=self.weight,
                                                max_violation=0)
-        self.connect_monitors_to_all_tasks(start_condition, pause_condition, end_condition)
 
 
 class CartesianVelocityLimit(Goal):
@@ -393,10 +384,7 @@ class CartesianVelocityLimit(Goal):
                  max_angular_velocity: float = 0.5,
                  weight: float = WEIGHT_ABOVE_CA,
                  hard: bool = False,
-                 name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.BinaryTrue,
-                 pause_condition: cas.Expression = cas.BinaryFalse,
-                 end_condition: cas.Expression = cas.BinaryFalse):
+                 name: Optional[str] = None):
         """
         This goal will use put a strict limit on the Cartesian velocity. This will require a lot of constraints, thus
         slowing down the system noticeably.
@@ -413,27 +401,24 @@ class CartesianVelocityLimit(Goal):
         self.tip_link = tip_link
         if name is None:
             name = f'{self.__class__.__name__}/{self.root_link}/{self.tip_link}'
-        super().__init__(name)
-        self.add_constraints_of_goal(TranslationVelocityLimit(root_link=root_link,
-                                                              root_group=root_group,
-                                                              tip_link=tip_link,
-                                                              tip_group=tip_group,
-                                                              max_velocity=max_linear_velocity,
-                                                              weight=weight,
-                                                              hard=hard,
-                                                              start_condition=start_condition,
-                                                              pause_condition=pause_condition,
-                                                              end_condition=end_condition))
-        self.add_constraints_of_goal(RotationVelocityLimit(root_link=root_link,
-                                                           root_group=root_group,
-                                                           tip_link=tip_link,
-                                                           tip_group=tip_group,
-                                                           max_velocity=max_angular_velocity,
-                                                           weight=weight,
-                                                           hard=hard,
-                                                           start_condition=start_condition,
-                                                           pause_condition=pause_condition,
-                                                           end_condition=end_condition))
+        super().__init__(name=name)
+        g = TranslationVelocityLimit(root_link=root_link,
+                                     root_group=root_group,
+                                     tip_link=tip_link,
+                                     tip_group=tip_group,
+                                     max_velocity=max_linear_velocity,
+                                     weight=weight,
+                                     hard=hard)
+        self.add_goal(g)
+        g2 = RotationVelocityLimit(root_link=root_link,
+                                   root_group=root_group,
+                                   tip_link=tip_link,
+                                   tip_group=tip_group,
+                                   max_velocity=max_angular_velocity,
+                                   weight=weight,
+                                   hard=hard)
+        self.add_goal(g2)
+        self.expression = cas.TrinaryUnknown
 
 
 class RelativePositionSequence(Goal):

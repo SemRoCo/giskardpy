@@ -2,17 +2,16 @@ from typing import Optional
 
 import numpy as np
 import giskardpy.casadi_wrapper as cas
+from giskardpy.data_types.data_types import Derivatives
 from giskardpy.goals.goal import Goal
 from giskardpy.god_map import god_map
+from giskardpy.motion_graph.tasks.task import Task
 from giskardpy.symbol_manager import symbol_manager
 
 
-class DebugGoal(Goal):
+class DebugGoal(Task):
     def __init__(self,
-                 name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.BinaryTrue,
-                 pause_condition: cas.Expression = cas.BinaryFalse,
-                 end_condition: cas.Expression = cas.BinaryFalse):
+                 name: Optional[str] = None):
         if name is None:
             name = self.__class__.__name__
         super().__init__(name=name)
@@ -43,18 +42,16 @@ class DebugGoal(Goal):
         god_map.debug_expression_manager.add_debug_expression('f', 23)
 
 
-class CannotResolveSymbol(Goal):
+class CannotResolveSymbol(Task):
 
-    def __init__(self, name: str, joint_name: str, start_condition: cas.Expression = cas.BinaryTrue,
-                 pause_condition: cas.Expression = cas.BinaryFalse, end_condition: cas.Expression = cas.BinaryFalse):
-        super().__init__(name=name, start_condition=start_condition, pause_condition=pause_condition,
-                         end_condition=end_condition)
+    def __init__(self, name: str, joint_name: str):
+        super().__init__(name=name)
         self.data = {}
-        s = symbol_manager.get_symbol(self + '.data[2]')
-        t = self.create_and_add_task('muh')
+        s = symbol_manager.get_symbol(self.ref_str + '.data[2]')
         joint_name = god_map.world.search_for_joint_name(joint_name)
-        joint_position = self.get_joint_position_symbol(joint_name)
-        t.add_equality_constraint(reference_velocity=1,
+        joint = god_map.world.joints[joint_name]
+        joint_position = joint.get_symbol(Derivatives.position)
+        self.add_equality_constraint(reference_velocity=1,
                                   equality_bound=1,
                                   weight=1,
                                   task_expression=s * joint_position)

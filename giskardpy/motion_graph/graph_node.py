@@ -27,7 +27,7 @@ class MotionStatechartNode:
                  name: Optional[str] = None,
                  plot: bool = True):
         self._name = name or self.__class__.__name__
-        self._expression = cas.BinaryFalse
+        self._expression = cas.TrinaryUnknown
         self.plot = plot
         self._id = -1
         self._name = name

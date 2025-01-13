@@ -10,7 +10,7 @@ import giskardpy.casadi_wrapper as cas
 from giskardpy.casadi_wrapper import CompiledFunction
 from giskardpy.data_types.data_types import LifeCycleState, ObservationState
 from giskardpy.data_types.exceptions import GiskardException, UnknownMonitorException, \
-    UnknownTaskException, GoalInitalizationException
+    UnknownTaskException, GoalInitalizationException, UnknownGoalException
 from giskardpy.goals.goal import Goal
 from giskardpy.god_map import god_map
 from giskardpy.middleware import get_middleware
@@ -124,7 +124,7 @@ class MotionGraphManager:
                 goal: Goal = C(name=name, **kwargs)
                 self.add_goal(goal)
             else:
-                raise UnknownTaskException(f'unknown task type: \'{class_name}\'.')
+                raise UnknownGoalException(f'unknown task type: \'{class_name}\'.')
 
         task_state_symbols = self.task_state.get_observation_state_symbol_map()
         monitor_state_symbols = self.monitor_state.get_observation_state_symbol_map()

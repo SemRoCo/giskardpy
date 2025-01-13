@@ -254,10 +254,7 @@ class CollisionAvoidanceHint(Goal):
                  max_threshold: float = 0.05,
                  spring_threshold: Optional[float] = None,
                  weight: float = WEIGHT_ABOVE_CA,
-                 name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.BinaryTrue,
-                 pause_condition: cas.Expression = cas.BinaryFalse,
-                 end_condition: cas.Expression = cas.BinaryFalse):
+                 name: Optional[str] = None):
         """
         This goal pushes the link_name in the direction of avoidance_hint, if it is closer than spring_threshold
         to body_b/link_b.
@@ -275,7 +272,7 @@ class CollisionAvoidanceHint(Goal):
         self.link_b = god_map.world.search_for_link_name(object_link_name)
         if name is None:
             name = f'{self.__class__.__name__}/{self.link_name}/{self.link_b}'
-        super().__init__(name)
+        super().__init__(name=name)
         self.key = (self.link_name, self.link_b)
         self.link_b_hash = self.link_b.__hash__()
         if root_link is None:
@@ -326,12 +323,13 @@ class CollisionAvoidanceHint(Goal):
         expr = root_V_avoidance_hint.dot(root_P_a)
 
         # self.add_debug_expr('dist', actual_distance)
-        task = self.create_and_add_task('avoidance_hint')
+        task = Task(name='avoidance_hint')
+        self.add_task(task)
         task.add_equality_constraint(reference_velocity=max_velocity,
                                      equality_bound=max_velocity,
                                      weight=weight,
                                      task_expression=expr)
-        self.connect_monitors_to_all_tasks(start_condition, pause_condition, end_condition)
+        self.expression = cas.TrinaryUnknown
 
     def get_actual_distance(self):
         expr = f'god_map.closest_point.get_external_collisions_long_key(\'{self.key[0]}\', \'{self.key[1]}\').contact_distance'

@@ -6,7 +6,7 @@ from giskardpy.data_types.data_types import ColorRGBA
 from giskardpy.data_types.exceptions import GoalInitalizationException
 from giskardpy.goals.goal import Goal
 from giskardpy.god_map import god_map
-from giskardpy.motion_graph.tasks.task import WEIGHT_BELOW_CA
+from giskardpy.motion_graph.tasks.task import WEIGHT_BELOW_CA, Task
 
 
 class AlignToPushDoor(Goal):
@@ -22,10 +22,7 @@ class AlignToPushDoor(Goal):
                  reference_linear_velocity: float = 0.1,
                  reference_angular_velocity: float = 0.5,
                  weight: float = WEIGHT_BELOW_CA,
-                 name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.BinaryTrue,
-                 pause_condition: cas.Expression = cas.BinaryFalse,
-                 end_condition: cas.Expression = cas.BinaryFalse):
+                 name: Optional[str] = None):
         """
         The objective is to reach an intermediate point before pushing the door
         """
@@ -84,7 +81,8 @@ class AlignToPushDoor(Goal):
 
             god_map.debug_expression_manager.add_debug_expression('root_V_grasp_axis', root_V_tip_grasp_axis)
             god_map.debug_expression_manager.add_debug_expression('root_V_object_axis', root_V_object_rotation_axis)
-            align_to_push_task = self.create_and_add_task('align_to_push_door')
+            align_to_push_task = Task(name='align_to_push_door')
+            self.add_task(align_to_push_task)
             align_to_push_task.add_point_goal_constraints(frame_P_current=root_T_tip.to_position(),
                                                           frame_P_goal=root_P_top,
                                                           reference_velocity=self.reference_linear_velocity,
@@ -95,7 +93,6 @@ class AlignToPushDoor(Goal):
                                                            reference_velocity=self.reference_angular_velocity,
                                                            weight=self.weight)
 
-            self.connect_monitors_to_all_tasks(start_condition, pause_condition, end_condition)
         else:
             raise GoalInitalizationException(f'Goal cant be initialized. Failed to initialise {self.__class__.__name__}'
                                              'goal as the door is not open')

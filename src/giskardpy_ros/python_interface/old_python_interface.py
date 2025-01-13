@@ -332,10 +332,7 @@ class OldGiskardWrapper(GiskardWrapper):
         If the trajectory is longer than new_length, Giskard will prempt the goal.
         :param new_length: in seconds
         """
-        name = f'Node {self.num_nodes}'
-        max_length = self.monitors.add_check_trajectory_length(length=length,
-                                                               name=name,
-                                                               **kwargs)
+        max_length = self.monitors.add_check_trajectory_length(length=length, **kwargs)
         name = f'Node {self.num_nodes}'
         self.monitors.add_cancel_motion(start_condition=max_length,
                                         name=name,
@@ -575,7 +572,8 @@ class OldGiskardWrapper(GiskardWrapper):
         self.motion_goals.add_avoid_joint_limits(percentage=percentage,
                                                  name=name,
                                                  weight=weight,
-                                                 joint_list=joint_list)
+                                                 joint_list=joint_list,
+                                                 end_condition='')
 
     # %% collision avoidance
     def allow_collision(self,

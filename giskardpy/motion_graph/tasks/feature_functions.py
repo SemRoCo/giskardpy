@@ -4,12 +4,11 @@ from typing import Optional, Union
 
 from giskardpy import casadi_wrapper as cas
 from giskardpy.data_types.data_types import PrefixName, ColorRGBA
-from giskardpy.goals.goal import Goal
 from giskardpy.god_map import god_map
-from giskardpy.motion_graph.tasks.task import WEIGHT_BELOW_CA
+from giskardpy.motion_graph.tasks.task import WEIGHT_BELOW_CA, Task
 
 
-class FeatureFunctionGoal(Goal):
+class FeatureFunctionGoal(Task):
     def __init__(self,
                  tip_link: PrefixName,
                  root_link: PrefixName,
@@ -18,11 +17,7 @@ class FeatureFunctionGoal(Goal):
                  name: Optional[str] = None):
         self.root = root_link
         self.tip = tip_link
-        if name is None:
-            self.name = f'{self.__class__.__name__}/{self.root}/{self.tip}'
-        else:
-            self.name = name
-        super().__init__(self.name)
+        super().__init__(name=name)
         root_reference_feature = god_map.world.transform(self.root, reference_feature)
         tip_controlled_feature = god_map.world.transform(self.tip, controlled_feature)
 
@@ -60,11 +55,7 @@ class AlignPerpendicular(FeatureFunctionGoal):
                  reference_normal: cas.Vector3,
                  name: Optional[str] = None,
                  weight: int = WEIGHT_BELOW_CA,
-                 max_vel: float = 0.2,
-                 start_condition: cas.Expression = cas.BinaryTrue,
-                 pause_condition: cas.Expression = cas.BinaryFalse,
-                 end_condition: cas.Expression = cas.BinaryFalse
-                 ):
+                 max_vel: float = 0.2):
         super().__init__(tip_link=tip_link,
                          root_link=root_link,
                          reference_feature=reference_normal,
@@ -72,13 +63,11 @@ class AlignPerpendicular(FeatureFunctionGoal):
 
         expr = cas.dot(self.root_V_reference_feature[:3], self.root_V_controlled_feature[:3])
 
-        task = self.create_and_add_task()
-        task.add_equality_constraint(reference_velocity=max_vel,
+        self.add_equality_constraint(reference_velocity=max_vel,
                                      equality_bound=0 - expr,
                                      weight=weight,
                                      task_expression=expr,
                                      name=f'{self.name}_constraint')
-        self.connect_monitors_to_all_tasks(start_condition, pause_condition, end_condition)
 
 
 class HeightGoal(FeatureFunctionGoal):
@@ -91,11 +80,7 @@ class HeightGoal(FeatureFunctionGoal):
                  upper_limit: float,
                  name: Optional[str] = None,
                  weight: int = WEIGHT_BELOW_CA,
-                 max_vel: float = 0.2,
-                 start_condition: cas.Expression = cas.BinaryTrue,
-                 pause_condition: cas.Expression = cas.BinaryFalse,
-                 end_condition: cas.Expression = cas.BinaryFalse
-                 ):
+                 max_vel: float = 0.2):
         super().__init__(tip_link=tip_link,
                          root_link=root_link,
                          reference_feature=reference_point,
@@ -105,14 +90,12 @@ class HeightGoal(FeatureFunctionGoal):
         expr = cas.distance_projected_on_vector(self.root_P_controlled_feature, self.root_P_reference_feature,
                                                 cas.Vector3([0, 0, 1]))
 
-        task = self.create_and_add_task()
-        task.add_inequality_constraint(reference_velocity=max_vel,
+        self.add_inequality_constraint(reference_velocity=max_vel,
                                        upper_error=upper_limit - expr,
                                        lower_error=lower_limit - expr,
                                        weight=weight,
                                        task_expression=expr,
                                        name=f'{self.name}_constraint')
-        self.connect_monitors_to_all_tasks(start_condition, pause_condition, end_condition)
 
 
 class DistanceGoal(FeatureFunctionGoal):
@@ -125,10 +108,7 @@ class DistanceGoal(FeatureFunctionGoal):
                  upper_limit: float,
                  name: Optional[str] = None,
                  weight: int = WEIGHT_BELOW_CA,
-                 max_vel: float = 0.2,
-                 start_condition: cas.Expression = cas.BinaryTrue,
-                 pause_condition: cas.Expression = cas.BinaryFalse,
-                 end_condition: cas.Expression = cas.BinaryFalse):
+                 max_vel: float = 0.2):
         super().__init__(tip_link=tip_link,
                          root_link=root_link,
                          reference_feature=reference_point,
@@ -140,21 +120,20 @@ class DistanceGoal(FeatureFunctionGoal):
                                                                   cas.Vector3([0, 0, 1]))
         expr = cas.norm(projected_vector)
 
-        task = self.create_and_add_task()
-        task.add_inequality_constraint(reference_velocity=max_vel,
+        self.add_inequality_constraint(reference_velocity=max_vel,
                                        upper_error=upper_limit - expr,
                                        lower_error=lower_limit - expr,
                                        weight=weight,
                                        task_expression=expr,
                                        name=f'{self.name}_constraint')
         # An extra constraint that makes the execution more stable
-        task.add_inequality_constraint_vector(reference_velocities=[max_vel] * 3,
+        self.add_inequality_constraint_vector(reference_velocities=[max_vel] * 3,
                                               lower_errors=[0, 0, 0],
                                               upper_errors=[0, 0, 0],
                                               weights=[weight] * 3,
                                               task_expression=projected_vector[:3],
-                                              names=[f'{self.name}_extra1', f'{self.name}_extra2', f'{self.name}_extra3'])
-        self.connect_monitors_to_all_tasks(start_condition, pause_condition, end_condition)
+                                              names=[f'{self.name}_extra1', f'{self.name}_extra2',
+                                                     f'{self.name}_extra3'])
 
 
 class AngleGoal(FeatureFunctionGoal):
@@ -167,11 +146,7 @@ class AngleGoal(FeatureFunctionGoal):
                  upper_angle: float,
                  name: Optional[str] = None,
                  weight: int = WEIGHT_BELOW_CA,
-                 max_vel: float = 0.2,
-                 start_condition: cas.Expression = cas.BinaryTrue,
-                 pause_condition: cas.Expression = cas.BinaryFalse,
-                 end_condition: cas.Expression = cas.BinaryFalse
-                 ):
+                 max_vel: float = 0.2):
         super().__init__(tip_link=tip_link,
                          root_link=root_link,
                          reference_feature=reference_vector,
@@ -180,11 +155,9 @@ class AngleGoal(FeatureFunctionGoal):
 
         expr = cas.angle_between_vector(self.root_V_reference_feature, self.root_V_controlled_feature)
 
-        task = self.create_and_add_task()
-        task.add_inequality_constraint(reference_velocity=max_vel,
+        self.add_inequality_constraint(reference_velocity=max_vel,
                                        upper_error=upper_angle - expr,
                                        lower_error=lower_angle - expr,
                                        weight=weight,
                                        task_expression=expr,
                                        name=f'{self.name}_constraint')
-        self.connect_monitors_to_all_tasks(start_condition, pause_condition, end_condition)

@@ -671,9 +671,7 @@ class EqualityBounds(ProblemDataPart):
         for t in range(self.prediction_horizon):
             for c in self.get_eq_derivative_constraints(derivative):
                 if t < self.control_horizon:
-                    bound[f't{t:03}/{c.name}'] = cas.limit(c.bound[t] * self.dt,
-                                                           -c.normalization_factor * self.dt,
-                                                           c.normalization_factor * self.dt)
+                    bound[f't{t:03}/{c.name}'] = c.bound[t] * self.dt
         return bound
 
     @profile
@@ -770,12 +768,8 @@ class InequalityBounds(ProblemDataPart):
         for t in range(self.prediction_horizon):
             for c in self.get_derivative_constraints(derivative):
                 if t < self.control_horizon:
-                    lower[f't{t:03}/{c.name}'] = cas.limit(c.lower_limit[t] * self.dt,
-                                                           -c.normalization_factor * self.dt,
-                                                           c.normalization_factor * self.dt)
-                    upper[f't{t:03}/{c.name}'] = cas.limit(c.upper_limit[t] * self.dt,
-                                                           -c.normalization_factor * self.dt,
-                                                           c.normalization_factor * self.dt)
+                    lower[f't{t:03}/{c.name}'] = c.lower_limit[t] * self.dt
+                    upper[f't{t:03}/{c.name}'] = c.upper_limit[t] * self.dt
         return lower, upper
 
     def lower_inequality_constraint_bound(self):

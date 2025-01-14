@@ -205,8 +205,10 @@ class Trajectory:
             axs[-1].set_xlabel('time [s]')
             axs[Derivatives.position].set_ylabel(unit)
             axs[Derivatives.velocity].set_ylabel(unit + r'$/s$')
-            axs[Derivatives.acceleration].set_ylabel(unit + r'$/s^2$')
-            axs[Derivatives.jerk].set_ylabel(unit + r'$/s^3$')
+            if max_derivative >= Derivatives.acceleration:
+                axs[Derivatives.acceleration].set_ylabel(unit + r'$/s^2$')
+            if max_derivative >= Derivatives.jerk:
+                axs[Derivatives.jerk].set_ylabel(unit + r'$/s^3$')
 
             file_name = path_to_data_folder + file_name
             last_file_name = file_name.replace('.pdf', f'{history}.pdf')

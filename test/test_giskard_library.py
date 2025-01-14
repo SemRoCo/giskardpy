@@ -1,51 +1,84 @@
 import gc
-import threading
+import time
 import traceback
 from collections import defaultdict
 from datetime import datetime
 from itertools import combinations, chain
 from typing import Dict, List, Callable, Tuple, Optional
 
-from data_types.data_types import JointStates
-from hypothesis import strategies as st, settings, HealthCheck, example, reproduce_failure
-
+import giskardpy.casadi_wrapper as cas
 import numpy as np
+import pandas as pd
 import pytest
 import urdf_parser_py.urdf as up
-import pandas as pd
-import time
-import giskardpy.casadi_wrapper as cas
-from giskardpy.data_types.exceptions import EmptyProblemException
 from giskardpy.data_types.data_types import PrefixName, Derivatives, ColorRGBA
+from giskardpy.data_types.exceptions import EmptyProblemException
 from giskardpy.god_map import god_map
 from giskardpy.model.better_pybullet_syncer import BetterPyBulletSyncer
 from giskardpy.model.collision_avoidance_config import DefaultCollisionAvoidanceConfig
 from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
 from giskardpy.model.joints import OmniDrive, PrismaticJoint
 from giskardpy.model.links import Link, BoxGeometry
+from giskardpy.model.trajectory import Trajectory
 from giskardpy.model.utils import hacky_urdf_parser_fix
 from giskardpy.model.world import WorldTree
 from giskardpy.model.world_config import EmptyWorld, WorldWithOmniDriveRobot
 from giskardpy.motion_graph.monitors.cartesian_monitors import PoseReached
 from giskardpy.motion_graph.tasks.joint_tasks import JointPositionList
-from giskardpy.qp.qp_controller import QPController
-from giskardpy.symbol_manager import symbol_manager
-from giskardpy.utils.utils import suppress_stderr
-from giskardpy.model.collision_avoidance_config import DisableCollisionAvoidanceConfig
-from giskardpy.model.trajectory import Trajectory
 from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint
+from giskardpy.qp.qp_controller import QPController
 from giskardpy.qp.qp_controller import QPFormulation
 from giskardpy.qp.qp_solver_ids import SupportedQPSolver
-from hypothesis import given
-from motion_graph.tasks.cartesian_tasks import CartesianPoseAsTask, CartesianPosition, CartesianPositionVelocityLimit, \
-    CartesianPositionVelocityGoal
-from motion_graph.tasks.joint_tasks import JointVelocityLimit, JointVelocity
-from motion_graph.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE
+from giskardpy.symbol_manager import symbol_manager
+from giskardpy.utils.utils import suppress_stderr
+from model.collision_avoidance_config import CollisionAvoidanceConfig
+from model.collision_world_syncer import CollisionCheckerLib
+from motion_graph.tasks.cartesian_tasks import CartesianPoseAsTask, CartesianPosition, CartesianPositionVelocityGoal
+from motion_graph.tasks.joint_tasks import JointVelocity
+from motion_graph.tasks.task import WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE
 from qp.constraint import DerivativeEqualityConstraint
-from sympy.strategies.branch import condition
-from tensorflow.python.ops.gen_math_ops import accumulate_nv2
-from utils.math import limit, find_best_jerk_limit
+from utils.math import limit
 from utils_for_tests import pr2_urdf
+
+
+class PR2CollisionAvoidance(CollisionAvoidanceConfig):
+    def __init__(self, drive_joint_name: str = 'brumbrum',
+                 collision_checker: CollisionCheckerLib = CollisionCheckerLib.bpb):
+        super().__init__(collision_checker=collision_checker)
+        self.drive_joint_name = drive_joint_name
+
+    def setup(self):
+        self.load_self_collision_matrix('self_collision_matrices/iai/pr2.srdf')
+        self.set_default_external_collision_avoidance(soft_threshold=0.1,
+                                                      hard_threshold=0.0)
+        for joint_name in ['r_wrist_roll_joint', 'l_wrist_roll_joint']:
+            self.overwrite_external_collision_avoidance(joint_name,
+                                                        number_of_repeller=4,
+                                                        soft_threshold=0.05,
+                                                        hard_threshold=0.0,
+                                                        max_velocity=0.2)
+        for joint_name in ['r_wrist_flex_joint', 'l_wrist_flex_joint']:
+            self.overwrite_external_collision_avoidance(joint_name,
+                                                        number_of_repeller=2,
+                                                        soft_threshold=0.05,
+                                                        hard_threshold=0.0,
+                                                        max_velocity=0.2)
+        for joint_name in ['r_elbow_flex_joint', 'l_elbow_flex_joint']:
+            self.overwrite_external_collision_avoidance(joint_name,
+                                                        soft_threshold=0.05,
+                                                        hard_threshold=0.0)
+        for joint_name in ['r_forearm_roll_joint', 'l_forearm_roll_joint']:
+            self.overwrite_external_collision_avoidance(joint_name,
+                                                        soft_threshold=0.025,
+                                                        hard_threshold=0.0)
+        self.fix_joints_for_collision_avoidance([
+            'r_gripper_l_finger_joint',
+            'l_gripper_l_finger_joint'
+        ])
+        self.overwrite_external_collision_avoidance(self.drive_joint_name,
+                                                    number_of_repeller=2,
+                                                    soft_threshold=0.2,
+                                                    hard_threshold=0.1)
 
 try:
     import rospy
@@ -191,9 +224,45 @@ def pr2_world() -> WorldTree:
     with config.world.modify_world():
         config.setup()
     config.world.register_controlled_joints(config.world.movable_joint_names)
-    collision_avoidance = DisableCollisionAvoidanceConfig()
+    collision_avoidance = PR2CollisionAvoidance()
     collision_avoidance.setup()
     return config.world
+
+
+import yaml
+
+
+def parse_trajectory(file_path):
+    with open(file_path, 'r') as f:
+        content = f.read()  # Read the content to ensure the file stays open.
+
+    documents = yaml.safe_load_all(content)
+
+    results = []
+    for doc in documents:
+        if doc is None:  # Skip empty or malformed documents.
+            continue
+
+        if 'result' in doc and 'trajectory' in doc['result']:
+            trajectory_data = doc['result']['trajectory']
+            joint_names = trajectory_data.get('joint_names', [])
+            points = trajectory_data.get('points', [])
+
+            joint_dict = {joint: {'positions': [], 'velocities': []} for joint in joint_names}
+
+            for point in points:
+                positions = point.get('positions', [])
+                velocities = point.get('velocities', [])
+
+                for i, joint in enumerate(joint_names):
+                    if i < len(positions):
+                        joint_dict[joint]['positions'].append(positions[i])
+                    if i < len(velocities):
+                        joint_dict[joint]['velocities'].append(velocities[i])
+
+            results.append(joint_dict)
+
+    return results
 
 
 class TestWorld:
@@ -648,10 +717,11 @@ class Simulator:
                  jerk_limit: float,
                  alpha: float, graph_styles: Optional[List[Tuple[str, str]]],
                  qp_formulation: QPFormulation):
-        vel_limit = 1
+        # vel_limit = 1
         # if jerk_limit is None:
         #     jerk_limit = find_best_jerk_limit(h, mpc_dt, vel_limit)
         god_map.simulator = self
+        god_map.tmp_folder = 'tmp'
         world.update_default_weights({Derivatives.velocity: 0.01,
                                       Derivatives.acceleration: 0.0,
                                       Derivatives.jerk: 0.0})
@@ -660,6 +730,7 @@ class Simulator:
             Derivatives.acceleration: np.inf,
             Derivatives.jerk: jerk_limit
         })
+        god_map.collision_scene.sync()
         god_map.tmp_folder = '.'
         self.reset()
         self.world = world
@@ -686,6 +757,14 @@ class Simulator:
                                              qp_formulation=self.qp_formulation,
                                              alpha=self.alpha,
                                              verbose=False)
+
+    def put_in_joint_limits(self):
+        for v_name, v in god_map.world.free_variables.items():
+            if v.has_position_limits():
+                l = v.get_lower_limit(Derivatives.position, evaluated=True)
+                u = v.get_upper_limit(Derivatives.position, evaluated=True)
+                god_map.world.state[v_name].position = limit(god_map.world.state[v_name].position, l, u)
+
 
     def add_cart_goal(self, root_link: PrefixName, tip_link: PrefixName, x_goal: float, name: str = 'g1',
                       weight: float = WEIGHT_BELOW_CA):
@@ -720,7 +799,7 @@ class Simulator:
         self.goal_state[name] = (x_goal, weight)
         god_map.motion_graph_manager.add_task(task)
 
-    def add_joint_goal(self, joint_names: List[PrefixName], goal: float, name: str = 'g1',
+    def add_joint_goal(self, joint_names: List[PrefixName], goal: float, max_velocity: float = 1, name: str = 'g1',
                        weight: float = WEIGHT_BELOW_CA):
         joint_goal = {}
         goal_name = PrefixName(name)
@@ -729,7 +808,8 @@ class Simulator:
         for joint_name in joint_names:
             joint_goal[joint_name] = goal_symbol
         joint_task = JointPositionList(name=name, goal_state=joint_goal,
-                                       weight=weight_symbol
+                                       weight=weight_symbol,
+                                       max_velocity=max_velocity,
                                        )
         self.goal_state[goal_name] = (goal, weight)
 
@@ -788,6 +868,7 @@ class Simulator:
             joint_state.jerk = 0
 
     def step(self):
+        import time
         parameters = god_map.qp_controller.get_parameter_names()
         total_time_start = time.time()
         substitutions = symbol_manager.resolve_symbols(parameters)
@@ -796,30 +877,41 @@ class Simulator:
         qp_time_start = time.time()
         next_cmd = god_map.qp_controller.get_cmd(substitutions)
         qp_time = time.time() - qp_time_start
-        god_map.debug_expression_manager.eval_debug_expressions()
+        # god_map.debug_expression_manager.eval_debug_expressions()
 
+        update_world_time = time.time()
         self.world.update_state(next_cmd, self.control_dt, god_map.qp_controller.max_derivative)
-
         self.world.notify_state_change()
+        update_world_time = time.time() - update_world_time
+
+        collision_time = time.time()
+        collisions = god_map.collision_scene.check_collisions()
+        god_map.closest_point = collisions
+        collision_time = time.time() - collision_time
+
         total_time = time.time() - total_time_start
         self.traj.set(god_map.control_cycle_counter, self.world.state)
         god_map.time += self.control_dt
         god_map.control_cycle_counter += 1
-        return total_time, parameter_time, qp_time
+
+        return total_time, parameter_time, qp_time, update_world_time, collision_time
 
     def run(self, goal_function: Callable[[str, float], float], sim_time: float,
-            pos_noise: float, vel_noise: float, acc_noise: float,
-            plot_legend: bool = True, plot_kwargs: dict = dict()):
+            pos_noise: float, vel_noise: float, acc_noise: float, plot: bool = True,
+            plot_legend: bool = True, plot_kwargs: dict = dict(), catch: bool = False):
         np.random.seed(69)
-        total_times, parameter_times, qp_times = [], [], []
+        failed = False
+        total_times, parameter_times, qp_times, update_world_times, collision_times = [], [], [], [], []
         try:
             while god_map.time < sim_time:
-                total_time, parameter_time, qp_time = self.step()
+                total_time, parameter_time, qp_time, update_world_time, collision_time = self.step()
                 self.apply_noise(pos_noise, vel_noise, acc_noise)
 
                 total_times.append(total_time)
                 parameter_times.append(parameter_time)
                 qp_times.append(qp_time)
+                update_world_times.append(update_world_time)
+                collision_times.append(collision_time)
                 for goal_name in self.goal_state:
                     next_goal, next_weight = goal_function(goal_name, god_map.time)
                     self.update_goal(goal_name, next_goal, next_weight)
@@ -827,18 +919,23 @@ class Simulator:
         except Exception as e:
             traceback.print_exc()
             print(e)
-            assert False
+            failed = True
+            if not catch:
+                raise e
         finally:
-            self.plot_traj(plot_kwargs, plot_legend)
-        avg = np.average(qp_times)
-        print(f'avg time {avg} or {1 / avg}hz')
-        traj_dict = self.traj.to_dict(normalize_position=False, filter_0_vel=False, sort=True)
-        for free_variable in god_map.qp_controller.free_variables:
-            for d in Derivatives.range(Derivatives.position, Derivatives.jerk):
-                print(f'min {d.name}: {min(traj_dict[d][free_variable.name])}')
-                print(f'max {d.name}: {max(traj_dict[d][free_variable.name])}')
-                print(f'--------------------------------------------')
-        print('===========run end===========')
+            if plot:
+                self.plot_traj(plot_kwargs, plot_legend)
+        if plot:
+            avg = np.average(qp_times)
+            print(f'avg time {avg} or {1 / avg}hz')
+            traj_dict = self.traj.to_dict(normalize_position=False, filter_0_vel=False, sort=True)
+            # for free_variable in god_map.qp_controller.free_variables:
+            #     for d in Derivatives.range(Derivatives.position, Derivatives.jerk):
+            #         print(f'min {d.name}: {min(traj_dict[d][free_variable.name])}')
+            #         print(f'max {d.name}: {max(traj_dict[d][free_variable.name])}')
+            #         print(f'--------------------------------------------')
+        # print('===========run end===========')
+        return total_times, parameter_times, qp_times, update_world_times, collision_times, failed
 
     def apply_noise(self, pos: float, vel: float, acc: float, joint_names: List[str] = None):
         if joint_names is None:
@@ -860,17 +957,134 @@ class Simulator:
 
     def plot_traj(self, plot_kwargs: dict, plot_legend: bool = True):
         self.traj.plot_trajectory('test', sample_period=self.control_dt, filter_0_vel=True,
-                                  hspace=0.5, height_per_derivative=4)
+                                  hspace=0.7, height_per_derivative=4)
         color_map = defaultdict(lambda: self.graph_styles[len(color_map)])
         god_map.debug_expression_manager.raw_traj_to_traj(control_dt=self.control_dt).plot_trajectory('',
-            sample_period=self.control_dt, filter_0_vel=False,
-            hspace=1, height_per_derivative=3,
-            color_map=color_map,
-            plot0_lines=False,
-            legend=plot_legend,
-            sort=False,
-            **plot_kwargs
-        )
+                                                                                                      sample_period=self.control_dt,
+                                                                                                      filter_0_vel=False,
+                                                                                                      hspace=0.7,
+                                                                                                      height_per_derivative=4,
+                                                                                                      color_map=color_map,
+                                                                                                      plot0_lines=False,
+                                                                                                      legend=plot_legend,
+                                                                                                      sort=False,
+                                                                                                      **plot_kwargs
+                                                                                                      )
+
+
+class Benchmarker:
+    def __init__(self, solvers: List[SupportedQPSolver], formulations: List[QPFormulation], horizons: List[int],
+                 world: WorldTree, the_thing: Callable, joint_ids: List[int],
+                 sim_time: float = 1, goal: float = 1, mpc_dt: float = 0.01, control_dt: float = 0.01,
+                 alpha: float = .1):
+        self.the_thing = the_thing
+        self.joint_ids = joint_ids
+        self.date_str = datetime.now().strftime('%Yy-%mm-%dd--%Hh-%Mm-%Ss')
+        self.solvers = solvers
+        self.formulations = formulations
+        self.horizons = horizons
+        self.world = world
+        self.sim_time = sim_time
+        self.goal = goal
+        self.mpc_dt = mpc_dt
+        self.control_dt = control_dt
+        self.alpha = alpha
+
+    def just_do_it(self, benchmark_name: str):
+        for solver in self.solvers:
+            results = []
+            for formulation in self.formulations:
+                num_fails = 0
+                for horizon in self.horizons:
+                    for num_joints in self.joint_ids:
+                        print(f'{solver.name}  -  {formulation.name}  -  {horizon}  -  {num_joints}')
+                        gc.collect()
+                        self.simulator = Simulator(world=self.world,
+                                                   control_dt=self.control_dt,
+                                                   mpc_dt=self.mpc_dt,
+                                                   h=horizon,
+                                                   solver=solver,
+                                                   alpha=self.alpha,
+                                                   graph_styles=[],
+                                                   jerk_limit=None,
+                                                   qp_formulation=formulation)
+                        self.simulator.reset()
+                        self.the_thing(self.simulator, num_joints)
+                        self.simulator.compile()
+
+                        total_times, parameter_times, qp_times, update_world_times, collision_times = [], [], [], [], []
+                        failed = False
+                        try:
+                            total_times, parameter_times, qp_times, update_world_times, collision_times, failed = self.simulator.run(
+                                GoalSwapper(1, 1.5, 0),
+                                self.sim_time, 0, 0, 0,
+                                plot=False, catch=True)
+                        except Exception as e:
+                            print(e)
+                            num_fails += 1
+                        if failed:
+                            num_fails += 1
+                        h_density = god_map.qp_controller.qp_solver.H_density
+                        a_density = god_map.qp_controller.qp_solver.A_density
+                        e_density = god_map.qp_controller.qp_solver.E_density
+                        total_density = god_map.qp_controller.qp_solver.total_density
+                        # Append results to the list
+                        print(f'number of fails {num_fails}')
+                        results.append({
+                            'Solver': solver.name,
+                            'Formulation': formulation.name,
+                            'Num_Joints': num_joints,
+                            'Total_Time_Sum': np.sum(total_times) if total_times else 100,
+                            'Total_Time_Avg': np.average(total_times) if total_times else 100,
+                            'Total_Time_Std': np.std(total_times) if total_times else 100,
+                            'Total_Time_Min': np.min(total_times) if total_times else 100,
+                            'Total_Time_Max': np.max(total_times) if total_times else 100,
+                            'Total_Time_Median': np.median(total_times) if total_times else 100,
+                            'Parameter_Time_Sum': np.sum(parameter_times) if total_times else 100,
+                            'Parameter_Time_Avg': np.average(parameter_times) if total_times else 100,
+                            'Parameter_Time_Median': np.median(parameter_times) if total_times else 100,
+                            'Parameter_Time_Std': np.std(parameter_times) if total_times else 100,
+                            'Parameter_Time_Min': np.min(parameter_times) if total_times else 100,
+                            'Parameter_Time_Max': np.max(parameter_times) if total_times else 100,
+                            'QP_Time_Sum': np.sum(qp_times) if total_times else 100,
+                            'QP_Time_Avg': np.average(qp_times) if total_times else 100,
+                            'QP_Time_Median': np.median(qp_times) if total_times else 100,
+                            'QP_Time_Std': np.std(qp_times) if total_times else 100,
+                            'QP_Time_Min': np.min(qp_times) if total_times else 100,
+                            'QP_Time_Max': np.max(qp_times) if total_times else 100,
+                            'World_Time_Sum': np.sum(update_world_times) if total_times else 100,
+                            'World_Time_Avg': np.average(update_world_times) if total_times else 100,
+                            'World_Time_Median': np.median(update_world_times) if total_times else 100,
+                            'World_Time_Std': np.std(update_world_times) if total_times else 100,
+                            'World_Time_Min': np.min(update_world_times) if total_times else 100,
+                            'World_Time_Max': np.max(update_world_times) if total_times else 100,
+                            'Collision_Time_Sum': np.sum(collision_times) if total_times else 100,
+                            'Collision_Time_Avg': np.average(collision_times) if total_times else 100,
+                            'Collision_Time_Median': np.median(collision_times) if total_times else 100,
+                            'Collision_Time_Std': np.std(collision_times) if total_times else 100,
+                            'Collision_Time_Min': np.min(collision_times) if total_times else 100,
+                            'Collision_Time_Max': np.max(collision_times) if total_times else 100,
+                            'Num_Fails': num_fails,
+                            'Control dt': self.control_dt,
+                            'horizon': horizon,
+                            'MPC dt': self.mpc_dt,
+                            'Num_Variables': god_map.qp_controller.num_free_variables,
+                            'Num_Inequality_Constraints': god_map.qp_controller.num_ineq_constraints,
+                            'Num_Equality_Constraints': god_map.qp_controller.num_eq_constraints,
+                            'H_Density': h_density,
+                            'A_Density': a_density,
+                            'E_Density': e_density,
+                            'Combined_Density': total_density
+                        })
+            self.save(results, benchmark_name)
+
+    def save(self, results, benchmark_name: str):
+        # Convert results to a Pandas DataFrame
+        df = pd.DataFrame(results)
+        # df.to_csv(f'benchmark_results_{date_str}.csv', index=False)
+        file_name = f'/home/stelter/Documents/aidocs/src/phd_theses/stelter/data/benchmark_{benchmark_name}_results_{results[0]["Solver"]}_{self.date_str}.pkl'
+        df.to_pickle(file_name)
+        print(f'saved {file_name}')
 
 
 def joint_thing(jerk_limit: float, sim_time: float, control_dt: float, mpc_dt: float, h: int,
@@ -1164,7 +1378,7 @@ class TestController:
         ]
         x = np.linspace(0.8, sim_time, 1000)
         x2 = np.linspace(0.75, 1.75, 1000)
-        y = np.cos((x) * np.pi * x2*0.8) * 0.1 - 0.2
+        y = np.cos((x) * np.pi * x2 * 0.8) * 0.1 - 0.2
         goals.extend(list(zip(x.tolist(), y.tolist())))
         goal_f = GoalSequence(goals, noise)
 
@@ -1185,16 +1399,19 @@ class TestController:
         simulator.run(goal_f, sim_time, pos_noise, vel_noise, acc_noise,
                       plot_legend=True, plot_kwargs={'unit': 'rad', 'file_name': 'pos_limits.pdf'})
 
+    def test_plot_traj_msg(self, pr2_world: WorldTree):
+        data = parse_trajectory('../../../ros1_ws/results.txt')
+
     def test_joint_goal_pr2_fight(self, pr2_world: WorldTree):
-        jerk_limit = 711
-        sim_time = 2.5
+        jerk_limit = None
+        sim_time = 5
         h = 7
         noise = 0.00
-        control_dt = 0.0125
+        control_dt = 0.01
         pos_noise = 0.000
         vel_noise = 0
         acc_noise = 0
-        goal1 = 0.2
+        goal1 = 0.14
         goal2 = 0.5
         goal3 = 0.7
         graph_styles = [
@@ -1226,47 +1443,99 @@ class TestController:
         simulator.reset()
         simulator.add_joint_goal(
             joint_names=('pr2/r_wrist_roll_joint',),
-            name='g1',
+            name='t1',
             weight=1,
             goal=goal1)
         simulator.add_joint_goal(
             joint_names=('pr2/r_wrist_roll_joint',),
-            name='g2',
+            name='t2',
             weight=1,
             goal=goal2)
-        simulator.add_joint_goal(
-            joint_names=('pr2/r_wrist_roll_joint',),
-            name='g3',
-            weight=1,
-            goal=goal3)
+        # simulator.add_joint_goal(
+        #     joint_names=('pr2/r_wrist_roll_joint',),
+        #     name='g3',
+        #     weight=1,
+        #     goal=goal3)
         simulator.compile()
 
         def goal_function(name, time):
-            if name == 'g1':
+            if name == 't1':
                 return goal1, WEIGHT_BELOW_CA
-            if name == 'g2':
-                g2_weight = 0
-                if time > 0.5:
-                    g2_weight = WEIGHT_BELOW_CA
+            if name == 't2':
+                g2_weight = WEIGHT_COLLISION_AVOIDANCE
                 if time > 1:
+                    g2_weight = WEIGHT_BELOW_CA
+                if time > 2:
+                    g2_weight = 0
+                if time > 3:
+                    g2_weight = WEIGHT_BELOW_CA
+                if time > 4:
                     g2_weight = WEIGHT_COLLISION_AVOIDANCE
-                if time > 1.5:
+                if time > 4.2:
                     g2_weight = WEIGHT_BELOW_CA
-                if time > 1.75:
-                    g2_weight = 0
-                if time > 1.9:
+                if time > 5:
                     g2_weight = WEIGHT_BELOW_CA
-                if time > 2.1:
-                    g2_weight = 0
                 return goal2, g2_weight
             if name == 'g3':
                 return goal3, WEIGHT_BELOW_CA
 
         simulator.run(goal_function, sim_time, pos_noise, vel_noise, acc_noise,
+                      plot_legend=True, plot_kwargs={'unit': 'rad', 'file_name': 'weights.pdf'})
+
+    def test_joint_goal_pr2(self, pr2_world: WorldTree):
+        sim_time = 2.5
+        h = 4
+        noise = 0.00
+        control_dt = 0.01
+        pos_noise = 0.000
+        vel_noise = 0
+        acc_noise = 0
+        goal1 = 0.2
+        goal2 = 0.5
+        goal3 = 0.7
+        graph_styles = [
+            ['--', 'black'],
+            [':', 'black'],
+            [':', 'black'],
+            ['-', '#003399'],
+            ['-', '#003399'],
+            ['-', '#003399'],
+            ['-', '#003399'],
+
+            ['--', '#993000'],
+            [':', '#993000'],
+            [':', '#993000'],
+
+            ['--', '#993000'],
+            [':', '#993000'],
+            [':', '#993000'],
+        ]
+        simulator = Simulator(world=pr2_world,
+                              control_dt=control_dt,
+                              mpc_dt=control_dt,
+                              h=h,
+                              solver=SupportedQPSolver.clarabel,
+                              alpha=0.1,
+                              graph_styles=graph_styles,
+                              jerk_limit=None,
+                              qp_formulation=QPFormulation.explicit_no_acc)
+        simulator.reset()
+        simulator.add_joint_goal(
+            joint_names=pr2_world.movable_joint_names[:-1],
+            name='g1',
+            weight=1,
+            goal=goal1)
+        simulator.compile()
+
+        def goal_function(name, time):
+            if name == 'g1':
+                return goal1, WEIGHT_BELOW_CA
+
+        simulator.run(goal_function, sim_time, pos_noise, vel_noise, acc_noise,
                       plot_legend=True)
 
     def test_cart_goal_pr2_fight(self, pr2_world: WorldTree):
-        jerk_limit = 1111
+        jerk_limit = None
         sim_time = 5
         h = 7
         noise = 0.00
@@ -1298,44 +1567,47 @@ class TestController:
                               jerk_limit=jerk_limit,
                               qp_formulation=QPFormulation.explicit_no_acc)
         simulator.reset()
+        simulator.put_in_joint_limits()
         simulator.add_cart_position_goal(
             root_link='pr2/r_gripper_tool_frame',
             tip_link='pr2/l_gripper_tool_frame',
-            name='g1',
+            name='t1',
             weight=1,
             x_goal=goal1)
         simulator.add_cart_position_goal(
             root_link='pr2/r_gripper_tool_frame',
             tip_link='pr2/l_gripper_tool_frame',
-            name='g2',
+            name='t2',
             weight=1,
             x_goal=goal2)
         simulator.compile()
 
         def goal_function(name, time):
-            if name == 'g1':
+            if name == 't1':
                 return goal1, WEIGHT_BELOW_CA
-            if name == 'g2':
-                g2_weight = 0
-                if time > 0.5:
-                    g2_weight = WEIGHT_BELOW_CA
+            if name == 't2':
+                g2_weight = WEIGHT_COLLISION_AVOIDANCE
                 if time > 1:
+                    g2_weight = WEIGHT_BELOW_CA
+                if time > 2:
+                    g2_weight = 0
+                if time > 3:
+                    g2_weight = WEIGHT_BELOW_CA
+                if time > 4:
                     g2_weight = WEIGHT_COLLISION_AVOIDANCE
-                if time > 1.5:
+                if time > 4.15:
                     g2_weight = WEIGHT_BELOW_CA
-                if time > 1.75:
-                    g2_weight = 0
-                if time > 1.9:
+                if time > 5:
                     g2_weight = WEIGHT_BELOW_CA
-                if time > 2.1:
-                    g2_weight = 0
                 return goal2, g2_weight
+            # if name == 'g3':
+            #     return goal3, WEIGHT_BELOW_CA
 
         simulator.run(goal_function, sim_time, pos_noise, vel_noise, acc_noise,
-                      plot_legend=True)
+                      plot_legend=True, plot_kwargs={'unit': 'm', 'file_name': 'cart_pos_fight.05.pdf'})
 
     def test_cart_vel_goal_pr2_fight(self, pr2_world: WorldTree):
-        jerk_limit = 1111
+        jerk_limit = None
         sim_time = 5
         h = 7
         noise = 0.00
@@ -1343,8 +1615,8 @@ class TestController:
         pos_noise = 0.000
         vel_noise = 0
         acc_noise = 0
-        goal1 = 1
-        goal2 = -1.5
+        goal1 = 1.5
+        goal2 = -1
         graph_styles = [
             ['--', 'black'],
             # [':', 'black'],
@@ -1367,6 +1639,7 @@ class TestController:
                               jerk_limit=jerk_limit,
                               qp_formulation=QPFormulation.explicit_no_acc)
         simulator.reset()
+        simulator.put_in_joint_limits()
         simulator.add_cart_vel_goal(
             root_link='pr2/r_gripper_tool_frame',
             tip_link='pr2/l_gripper_tool_frame',
@@ -1386,17 +1659,23 @@ class TestController:
                 return goal1, WEIGHT_BELOW_CA
             if name == 'g2':
                 g2_weight = 0
-                if time > 2.5:
+                if time > 2.25:
                     g2_weight = WEIGHT_COLLISION_AVOIDANCE
+                if time > 3:
+                    g2_weight = WEIGHT_BELOW_CA
+                if time > 3.5:
+                    g2_weight = WEIGHT_COLLISION_AVOIDANCE
+                # if time > 4:
+                #     g2_weight = WEIGHT_BELOW_CA
                 return goal2, g2_weight
 
         simulator.run(goal_function, sim_time, pos_noise, vel_noise, acc_noise,
                       plot_legend=True,
-                      plot_kwargs={'unit': 'm'})
+                      plot_kwargs={'unit': 'm', 'file_name': 'cart_vel_fight.05.pdf'})
 
     def test_joint_goal_pr2_tune_guide(self, pr2_world: WorldTree):
-        sim_time = 4
-        noise = 0.05
+        sim_time = 3
+        noise = 0.01
         dt = 0.01
         pos_noise = 0.0005
         vel_noise = 0
@@ -1436,12 +1715,12 @@ class TestController:
                                  goal=first_goal)
         simulator.compile()
         simulator.run(goalf_f, sim_time, pos_noise, vel_noise, acc_noise,
-                      plot_legend=True, plot_kwargs={'unit': 'rad', 'file_name': 'tune_guide_h4.pdf'})
+                      plot_legend=False, plot_kwargs={'unit': 'rad', 'file_name': 'tune_guide_h4.pdf'})
         # %%
         simulator = Simulator(world=pr2_world,
                               control_dt=dt,
                               mpc_dt=dt,
-                              h=6,
+                              h=7,
                               solver=SupportedQPSolver.gurobi,
                               alpha=0.1,
                               graph_styles=graph_styles,
@@ -1452,12 +1731,12 @@ class TestController:
                                  goal=first_goal)
         simulator.compile()
         simulator.run(goalf_f, sim_time, pos_noise, vel_noise, acc_noise,
-                      plot_legend=True, plot_kwargs={'unit': 'rad', 'file_name': 'tune_guide_h6.pdf'})
+                      plot_legend=False, plot_kwargs={'unit': 'rad', 'file_name': 'tune_guide_h7.pdf'})
         # %%
         simulator = Simulator(world=pr2_world,
                               control_dt=dt,
                               mpc_dt=dt,
-                              h=8,
+                              h=10,
                               solver=SupportedQPSolver.gurobi,
                               alpha=0.1,
                               graph_styles=graph_styles,
@@ -1468,7 +1747,7 @@ class TestController:
                                  goal=first_goal)
         simulator.compile()
         simulator.run(goalf_f, sim_time, pos_noise, vel_noise, acc_noise,
-                      plot_legend=True, plot_kwargs={'unit': 'rad', 'file_name': 'tune_guide_h8.pdf'})
+                      plot_legend=True, plot_kwargs={'unit': 'rad', 'file_name': 'tune_guide_h10.pdf'})
 
     def test_joint_vel_goal_pr2(self, pr2_world: WorldTree):
         sim_time = 4
@@ -1692,133 +1971,91 @@ class TestController:
             simulator.plot_traj()
 
     def test_pr2_joint_benchmark(self, pr2_world: WorldTree):
-        # i = 4
-        # solvers = list(SupportedQPSolver)[i:i+1]
-        solvers = [
-            # SupportedQPSolver.qpSWIFT,
-            # SupportedQPSolver.qpalm,
-            # SupportedQPSolver.gurobi,
-            SupportedQPSolver.piqp,
-            # SupportedQPSolver.clarabel,
-            # SupportedQPSolver.cvxopt,
-            # SupportedQPSolver.osqp,
-            # SupportedQPSolver.proxsuite,
-            # SupportedQPSolver.daqp,
-        ]
-        formulations = [
-            # ControllerMode.explicit,
-            # ControllerMode.explicit_no_acc,
-            QPFormulation.implicit,
-            # ControllerMode.no_mpc
-        ]
-        max_number_of_joints_total = len(pr2_world.movable_joint_names) - 1  # the last joint doesn't work
-        sim_time = 4
-        goal = -0.9
-        mpc_dt = 0.05
-        control_dt = 0.05
-        alpha = .1
-        horizion = 9
-        pr2_world.update_default_weights({
-            Derivatives.velocity: 0.01,
-            Derivatives.acceleration: 0,
-            Derivatives.jerk: 0.0
-        })
+        def the_thing(simulator, i):
+            simulator.add_joint_goal(joint_names=simulator.world.movable_joint_names[0:i], name='g1',
+                                     weight=1, goal=1)
 
-        # List to store results
-        date_str = datetime.now().strftime('%Yy-%mm-%dd--%Hh-%Mm-%Ss')
-        for solver in solvers:
-            results = []
-            print(f'solver {solver.name}')
-            for formulation in formulations:
-                print(f'formulation {formulation.name}')
-                num_fails = 0
-                for num_joints in range(1, max_number_of_joints_total, 2):
-                    gc.collect()
-                    print(f'#joints {num_joints}')
-                    simulator = Simulator(
-                        world=pr2_world,
-                        control_dt=control_dt,
-                        mpc_dt=mpc_dt,
-                        h=horizion,
-                        solver=solver,
-                        alpha=alpha,
-                        qp_formulation=formulation
-                    )
-                    simulator.add_joint_goal(
-                        joint_names=pr2_world.movable_joint_names[0:num_joints],
-                        goal=goal)
-                    simulator.compile()
+        bm = Benchmarker(
+            solvers=[
+                SupportedQPSolver.qpSWIFT,
+                SupportedQPSolver.gurobi,
+                # SupportedQPSolver.piqp,
+                SupportedQPSolver.clarabel,
+                SupportedQPSolver.qpalm,
+                SupportedQPSolver.daqp,
+                # SupportedQPSolver.scs,
+                # SupportedQPSolver.cvxopt,
+                # SupportedQPSolver.proxsuite,
+                # SupportedQPSolver.mosek,
+                # SupportedQPSolver.osqp,
+            ],
+            formulations=[
+                QPFormulation.explicit_no_acc,
+                QPFormulation.implicit,
+                QPFormulation.no_mpc
+            ],
+            # horizons=list(range(4,20, 2)),
+            horizons=[4, 7, 10, 15],
+            # horizons=[7],
+            world=pr2_world,
+            the_thing=the_thing,
+            # joint_ids=[25],
+            joint_ids=list(range(1, len(pr2_world.movable_joint_names) - 1)),
+        )  # last joint is odom
+        bm.just_do_it(benchmark_name='joint_num')
 
-                    np.random.seed(69)
-                    swap_distance = 2
-                    next_swap = swap_distance
+    def test_pr2_cart_vel_benchmark(self, pr2_world: WorldTree):
+        chain_a, l, chain_b = pr2_world.compute_split_chain(
+            root_link_name=PrefixName('l_gripper_r_finger_tip_link', 'pr2'),
+            tip_link_name=PrefixName('r_gripper_r_finger_tip_link', 'pr2'),
+            add_joints=False, add_links=True, add_fixed_joints=False,
+            add_non_controlled_joints=False)
+        left_right_kin_chain = chain_a + l + chain_b
+        ids = []
+        tip_link = left_right_kin_chain[0]
+        last_actual_num_joints = 1
+        for i in range(1, len(left_right_kin_chain)):
+            root_link = left_right_kin_chain[i]
+            a, b, c = pr2_world.compute_split_chain(tip_link, root_link, add_joints=True, add_links=False,
+                                                    add_fixed_joints=False, add_non_controlled_joints=False)
+            actual_num_joints = len(a + b + c)
+            if actual_num_joints > last_actual_num_joints:
+                last_actual_num_joints = actual_num_joints
+                ids.append(i)
 
-                    # Variables to collect statistics
-                    total_times, parameter_times, qp_times = [], [], []
+        def the_thing(simulator, i):
+            tip_link = left_right_kin_chain[0]
+            root_link = left_right_kin_chain[i]
+            simulator.add_cart_vel_goal(root_link=tip_link,
+                                        tip_link=root_link,
+                                        x_goal=1)
+            simulator.add_cart_vel_goal(root_link=root_link,
+                                        tip_link=tip_link,
+                                        x_goal=1,
+                                        name='g2')
 
-                    try:
-                        while god_map.time < sim_time:
-                            total_time, parameter_time, qp_time = simulator.step()
-
-                            total_times.append(total_time)
-                            parameter_times.append(parameter_time)
-                            qp_times.append(qp_time)
-
-                            if god_map.time > next_swap:
-                                goal *= -1
-                                simulator.update_goal(goal)
-                                next_swap += swap_distance
-                    except Exception as e:
-                        # traceback.print_exc()
-                        print(e)
-                        num_fails += 1
-                    h_density = god_map.qp_controller.qp_solver.H_density
-                    a_density = god_map.qp_controller.qp_solver.A_density
-                    e_density = god_map.qp_controller.qp_solver.E_density
-                    total_density = god_map.qp_controller.qp_solver.total_density
-                    # Append results to the list
-                    print(f'number of fails {num_fails}')
-                    results.append({
-                        'Solver': solver.name,
-                        'Formulation': formulation.name,
-                        'Num_Joints': num_joints,
-                        'Total_Time_Sum': np.sum(total_times) if total_times else 100,
-                        'Total_Time_Avg': np.average(total_times) if total_times else 100,
-                        'Total_Time_Std': np.std(total_times) if total_times else 100,
-                        'Total_Time_Min': np.min(total_times) if total_times else 100,
-                        'Total_Time_Max': np.max(total_times) if total_times else 100,
-                        'Total_Time_Median': np.median(total_times) if total_times else 100,
-                        'Parameter_Time_Sum': np.sum(parameter_times) if total_times else 100,
-                        'Parameter_Time_Avg': np.average(parameter_times) if total_times else 100,
-                        'Parameter_Time_Median': np.median(parameter_times) if total_times else 100,
-                        'Parameter_Time_Std': np.std(parameter_times) if total_times else 100,
-                        'Parameter_Time_Min': np.min(parameter_times) if total_times else 100,
-                        'Parameter_Time_Max': np.max(parameter_times) if total_times else 100,
-                        'QP_Time_Sum': np.sum(qp_times) if total_times else 100,
-                        'QP_Time_Avg': np.average(qp_times) if total_times else 100,
-                        'QP_Time_Median': np.median(qp_times) if total_times else 100,
-                        'QP_Time_Std': np.std(qp_times) if total_times else 100,
-                        'QP_Time_Min': np.min(qp_times) if total_times else 100,
-                        'QP_Time_Max': np.max(qp_times) if total_times else 100,
-                        'Num_Fails': num_fails,
-                        'Control dt': control_dt,
-                        'horizon': horizion,
-                        'MPC dt': mpc_dt,
-                        'Num_Variables': god_map.qp_controller.num_free_variables,
-                        'Num_Inequality_Constraints': god_map.qp_controller.num_ineq_constraints,
-                        'Num_Equality_Constraints': god_map.qp_controller.num_eq_constraints,
-                        'H_Density': h_density,
-                        'A_Density': a_density,
-                        'E_Density': e_density,
-                        'Combined_Density': total_density
-                    })
-
-            # Convert results to a Pandas DataFrame
-            df = pd.DataFrame(results)
-            # df.to_csv(f'benchmark_results_{date_str}.csv', index=False)
-            file_name = f'benchmark_joint_results_{solver.name}_{date_str}.pkl'
-            df.to_pickle(file_name)
-            print(f'saved {file_name}')
+        bm = Benchmarker(
+            solvers=[
+                SupportedQPSolver.qpSWIFT,
+                # SupportedQPSolver.daqp,
+                # SupportedQPSolver.gurobi,
+                # SupportedQPSolver.piqp,
+                # SupportedQPSolver.clarabel,
+                # SupportedQPSolver.qpalm,
+            ],
+            formulations=[
+                # QPFormulation.explicit_no_acc,
+                # QPFormulation.implicit,
+                QPFormulation.no_mpc
+            ],
+            # horizons=[4, 7, 10, 15],
+            horizons=[10],
+            world=pr2_world,
+            the_thing=the_thing,
+            # joint_ids=[25],
+            joint_ids=ids,
+        )  # last joint is odom
+        bm.just_do_it('cart_vel_h')
 
     def test_pr2_cart_benchmark(self, pr2_world: WorldTree):
         # i = 4

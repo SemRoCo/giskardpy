@@ -51,7 +51,7 @@ class CartesianPosition(Task):
                                                               derivative=Derivatives.position,
                                                               derivatives_to_plot=[Derivatives.position])
 
-        cap = self.reference_velocity * god_map.qp_controller.sample_period * (
+        cap = self.reference_velocity * god_map.qp_controller.mpc_dt * (
                 god_map.qp_controller.prediction_horizon - 2)
         god_map.debug_expression_manager.add_debug_expression(f'{self.name}/upper_cap', root_P_goal.y + cap,
                                                               derivatives_to_plot=[
@@ -289,9 +289,9 @@ class CartesianPositionVelocityGoal(Task):
         self.add_velocity_eq_constraint_vector(velocity_goals=cas.Expression([x_vel, y_vel, z_vel]),
                                                task_expression=r_P_c,
                                                reference_velocities=[
-                                                   max(CartesianPosition.default_reference_velocity, abs(x_vel)),
-                                                   max(CartesianPosition.default_reference_velocity, abs(y_vel)),
-                                                   max(CartesianPosition.default_reference_velocity, abs(z_vel))
+                                                   CartesianPosition.default_reference_velocity,
+                                                   CartesianPosition.default_reference_velocity,
+                                                   CartesianPosition.default_reference_velocity,
                                                ],
                                                names=[
                                                    f'{name}/x',

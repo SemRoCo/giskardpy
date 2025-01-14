@@ -333,11 +333,7 @@ class OldGiskardWrapper(GiskardWrapper):
         If the trajectory is longer than new_length, Giskard will prempt the goal.
         :param new_length: in seconds
         """
-        max_length = self.monitors.add_check_trajectory_length(length=length, **kwargs)
-        name = f'Node {self.num_nodes}'
-        self.monitors.add_cancel_motion(start_condition=max_length,
-                                        name=name,
-                                        error=MaxTrajectoryLengthException(f'Trajectory longer than {length}'))
+        self.monitors.add_check_trajectory_length(length=length, **kwargs)
 
     def set_limit_cartesian_velocity_goal(self,
                                           tip_link: str,

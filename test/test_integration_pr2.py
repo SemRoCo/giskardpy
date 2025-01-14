@@ -1423,7 +1423,8 @@ class TestConstraints:
         zero_pose.set_cart_goal(base_goal, tip_link='base_footprint', root_link='map')
         result = zero_pose.execute(expected_error_type=MaxTrajectoryLengthException)
         dt = god_map.qp_controller.mpc_dt
-        np.testing.assert_almost_equal(len(result.trajectory.points) * dt, new_length + dt)
+        # due to rounding, its sometimes two or three steps longer, depending on dt
+        assert new_length + dt*2 <= len(result.trajectory.points) * dt <= new_length + dt*3
 
         zero_pose.set_cart_goal(base_goal, tip_link='base_footprint', root_link='map')
         result = zero_pose.execute(expected_error_type=MaxTrajectoryLengthException)

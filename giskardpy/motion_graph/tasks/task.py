@@ -11,7 +11,7 @@ from giskardpy.symbol_manager import symbol_manager
 from giskardpy.motion_graph.graph_node import MotionGraphNode
 from giskardpy.qp.weight_gain import QuadraticWeightGain, LinearWeightGain
 from giskardpy.qp.free_variable import FreeVariable
-from qp.constraint import DerivativeEqualityConstraint
+from giskardpy.qp.constraint import DerivativeEqualityConstraint
 
 WEIGHT_MAX = 10000
 WEIGHT_ABOVE_CA = 2500

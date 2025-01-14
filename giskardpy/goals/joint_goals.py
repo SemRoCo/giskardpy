@@ -1,6 +1,6 @@
 from __future__ import division
 
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, Tuple
 
 from giskardpy import casadi_wrapper as cas
 from giskardpy.data_types.data_types import Derivatives

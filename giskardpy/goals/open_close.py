@@ -61,7 +61,7 @@ class Open(Goal):
         self.expression = cas.logic_and(hinge_goal.expression, hold_handle.expression)
 
 
-class Close(Goal):
+class Close(Open):
     def __init__(self,
                  tip_link: PrefixName,
                  environment_link: PrefixName,
@@ -75,14 +75,14 @@ class Close(Goal):
         self.environment_link = environment_link
         if name is None:
             name = f'{self.__class__.__name__}'
-        super().__init__(name=name)
         joint_name = god_map.world.get_movable_parent_joint(self.environment_link)
         min_position, _ = god_map.world.get_joint_position_limits(joint_name)
         if goal_joint_state is None:
             goal_joint_state = min_position
         else:
             goal_joint_state = max(min_position, goal_joint_state)
-        self.add_constraints_of_goal(Open(tip_link=tip_link,
-                                          environment_link=environment_link,
-                                          goal_joint_state=goal_joint_state,
-                                          weight=weight))
+        super().__init__(name=name,
+                         tip_link=tip_link,
+                         environment_link=environment_link,
+                         goal_joint_state=goal_joint_state,
+                         weight=weight)

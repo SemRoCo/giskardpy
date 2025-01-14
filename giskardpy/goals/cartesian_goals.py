@@ -291,10 +291,7 @@ class CartesianPoseStraight(Goal):
                  reference_angular_velocity: Optional[float] = None,
                  weight: float = WEIGHT_ABOVE_CA,
                  absolute: bool = False,
-                 name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.BinaryTrue,
-                 pause_condition: cas.Expression = cas.BinaryFalse,
-                 end_condition: cas.Expression = cas.BinaryFalse):
+                 name: Optional[str] = None):
         """
         See CartesianPose. In contrast to it, this goal will try to move tip_link in a straight line.
         """
@@ -302,25 +299,19 @@ class CartesianPoseStraight(Goal):
         self.tip_link = tip_link
         if name is None:
             name = f'{self.__class__.__name__}/{self.root_link}/{self.tip_link}'
-        super().__init__(name)
+        super().__init__(name=name)
         self.add_constraints_of_goal(CartesianPositionStraight(root_link=root_link,
                                                                tip_link=tip_link,
                                                                goal_point=goal_pose.to_position(),
                                                                reference_velocity=reference_linear_velocity,
                                                                weight=weight,
-                                                               absolute=absolute,
-                                                               start_condition=start_condition,
-                                                               pause_condition=pause_condition,
-                                                               end_condition=end_condition))
+                                                               absolute=absolute))
         self.add_constraints_of_goal(CartesianOrientation(root_link=root_link,
                                                           tip_link=tip_link,
                                                           goal_orientation=goal_pose.to_rotation(),
                                                           reference_velocity=reference_angular_velocity,
                                                           absolute=absolute,
                                                           weight=weight,
-                                                          start_condition=start_condition,
-                                                          pause_condition=pause_condition,
-                                                          end_condition=end_condition,
                                                           point_of_debug_matrix=goal_pose.to_position()))
 
 

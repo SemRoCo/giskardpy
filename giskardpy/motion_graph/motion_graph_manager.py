@@ -23,7 +23,7 @@ from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, De
 from giskardpy.qp.weight_gain import QuadraticWeightGain, LinearWeightGain
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils.utils import get_all_classes_in_package, ImmutableDict
-from qp.constraint import DerivativeEqualityConstraint
+from giskardpy.qp.constraint import DerivativeEqualityConstraint
 
 
 def monitor_list_to_monitor_name_tuple(monitors: Iterable[Union[str, Monitor]]) -> Tuple[str, ...]:

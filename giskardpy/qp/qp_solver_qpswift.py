@@ -51,8 +51,8 @@ class QPSolverQPSwift(QPSWIFTFormatter):
             self.bE_filter[-len(bE_part):] = bE_part
 
         # self.num_filtered_neq_constraints = np.count_nonzero(np.invert(self.bA_part))
-        self.nlbA_filter_half = np.ones(int(self.nA_A.shape[0]/2), dtype=bool)
-        self.ubA_filter_half = np.ones(int(self.nA_A.shape[0]/2), dtype=bool)
+        self.nlbA_filter_half = np.ones(self.num_neq_constraints, dtype=bool)
+        self.ubA_filter_half = np.ones(self.num_neq_constraints, dtype=bool)
         if len(self.bA_part) > 0:
             self.nlbA_filter_half[-len(self.bA_part):] = self.bA_part
             self.ubA_filter_half[-len(self.bA_part):] = self.bA_part

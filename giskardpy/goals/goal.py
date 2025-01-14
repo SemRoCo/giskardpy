@@ -95,7 +95,7 @@ class Goal(MotionGraphNode):
         """
         A string referring to self on the god_map. Used with symbol manager.
         """
-        return f'god_map.motion_graph_manager.goal_state.get_node(\'{str(self)}\')'
+        return f'god_map.motion_graph_manager.goal_state.get_node(\'{self.name}\')'
 
     def __add__(self, other: str) -> str:
         if isinstance(other, str):

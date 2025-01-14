@@ -6,7 +6,7 @@ from giskardpy.goals.goal import Goal
 from giskardpy.model.collision_world_syncer import CollisionEntry
 from giskardpy.motion_graph.monitors.monitors import Monitor
 from giskardpy.motion_graph.monitors.payload_monitors import CollisionMatrixUpdater
-from giskardpy.motion_graph.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE
+from giskardpy.motion_graph.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE, Task
 from giskardpy.god_map import god_map
 from giskardpy.data_types.data_types import PrefixName
 from giskardpy.symbol_manager import symbol_manager
@@ -14,7 +14,7 @@ from giskardpy.middleware import get_middleware
 from line_profiler import profile
 
 
-class ExternalCollisionAvoidance(Goal):
+class ExternalCA(Goal):
 
     def __init__(self,
                  link_name: PrefixName,
@@ -24,10 +24,7 @@ class ExternalCollisionAvoidance(Goal):
                  name_prefix: Optional[str] = None,
                  soft_thresholds: Optional[Dict[PrefixName, float]] = None,
                  idx: int = 0,
-                 num_repeller: int = 1,
-                 start_condition: cas.Expression = cas.BinaryTrue,
-                 pause_condition: cas.Expression = cas.BinaryFalse,
-                 end_condition: cas.Expression = cas.BinaryFalse):
+                 num_repeller: int = 1):
         """
         Don't use me
         """
@@ -38,7 +35,7 @@ class ExternalCollisionAvoidance(Goal):
         self.link_name = link_name
         self.idx = idx
         name = f'{name_prefix}/{self.__class__.__name__}/{self.link_name}/{self.idx}'
-        super().__init__(name)
+        super().__init__(name=name, plot=False)
         self.root = god_map.world.root_link_name
         self.robot_name = robot_name
         self.control_horizon = god_map.qp_controller.prediction_horizon - (
@@ -103,7 +100,8 @@ class ExternalCollisionAvoidance(Goal):
         distance_monitor = Monitor(name=f'collision distance {self.name}', plot=False)
         distance_monitor.expression = cas.greater(actual_distance, 50)
         self.add_monitor(distance_monitor)
-        task = self.create_and_add_task('stay away')
+        task = Task(name=self.name + '/task', plot=False)
+        self.add_task(task)
         task.plot = False
         task.pause_condition = distance_monitor.get_observation_state_expression()
         task.add_inequality_constraint(reference_velocity=self.max_velocity,
@@ -113,7 +111,6 @@ class ExternalCollisionAvoidance(Goal):
                                        task_expression=dist,
                                        lower_slack_limit=-float('inf'),
                                        upper_slack_limit=upper_slack)
-        self.connect_monitors_to_all_tasks(start_condition, pause_condition, end_condition)
 
     def map_V_n_symbol(self):
         expr = f'god_map.closest_point.get_external_collisions(\'{self.link_name}\')[{self.idx}].map_V_n'
@@ -140,7 +137,7 @@ class ExternalCollisionAvoidance(Goal):
         return symbol_manager.get_symbol(expr)
 
 
-class SelfCollisionAvoidance(Goal):
+class SelfCA(Goal):
 
     def __init__(self,
                  link_a: PrefixName,
@@ -165,7 +162,7 @@ class SelfCollisionAvoidance(Goal):
         if self.link_a.prefix != self.link_b.prefix:
             raise Exception(f'Links {self.link_a} and {self.link_b} have different prefix.')
         name = f'{name_prefix}/{self.__class__.__name__}/{self.link_a}/{self.link_b}/{self.idx}'
-        super().__init__(name)
+        super().__init__(name=name, plot=False)
         self.root = god_map.world.root_link_name
         self.robot_name = robot_name
         self.control_horizon = god_map.qp_controller.prediction_horizon - (
@@ -212,7 +209,8 @@ class SelfCollisionAvoidance(Goal):
         distance_monitor = Monitor(name=f'collision distance {self.name}', plot=False)
         distance_monitor.expression = cas.greater(actual_distance, 50)
         self.add_monitor(distance_monitor)
-        task = self.create_and_add_task('stay away')
+        task = Task(name=self.name + '/task', plot=False)
+        self.add_task(task)
         task.plot = False
         task.pause_condition = distance_monitor.get_observation_state_expression()
         task.add_inequality_constraint(reference_velocity=self.max_velocity,
@@ -355,30 +353,23 @@ class CollisionAvoidance(Goal):
 
     def __init__(self,
                  collision_entries: List[CollisionEntry],
-                 name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.BinaryTrue,
-                 pause_condition: cas.Expression = cas.BinaryFalse,
-                 end_condition: cas.Expression = cas.BinaryFalse):
+                 name: Optional[str] = None):
         if name is None:
             name = self.__class__.__name__
-        super().__init__(name)
-        self.start_condition = start_condition
-        self.pause_condition = pause_condition
-        self.end_condition = end_condition
+        super().__init__(name=name)
         self.collision_matrix = god_map.collision_scene.create_collision_matrix(deepcopy(collision_entries))
         if not collision_entries or not god_map.collision_scene.is_allow_all_collision(collision_entries[-1]):
-            self.add_external_collision_avoidance_constraints(
-                soft_threshold_override=self.collision_matrix)
+            self.add_external_collision_avoidance_constraints(soft_threshold_override=self.collision_matrix)
         if not collision_entries or (not god_map.collision_scene.is_allow_all_collision(collision_entries[-1]) and
                                      not god_map.collision_scene.is_allow_all_self_collision(collision_entries[-1])):
             self.add_self_collision_avoidance_constraints()
-        if not cas.is_true_symbol(start_condition):
-            payload_monitor = CollisionMatrixUpdater(name=f'{self.name}/update collision matrix',
-                                                     start_condition=start_condition,
-                                                     new_collision_matrix=self.collision_matrix)
-            god_map.motion_graph_manager.add_monitor(payload_monitor)
-        else:
-            god_map.collision_scene.set_collision_matrix(self.collision_matrix)
+        # if not cas.is_true_symbol(start_condition):
+        #     payload_monitor = CollisionMatrixUpdater(name=f'{self.name}/update collision matrix',
+        #                                              start_condition=start_condition,
+        #                                              new_collision_matrix=self.collision_matrix)
+        #     god_map.motion_graph_manager.add_monitor(payload_monitor)
+        # else:
+        god_map.collision_scene.set_collision_matrix(self.collision_matrix)
 
     def _task_sanity_check(self):
         pass
@@ -405,16 +396,14 @@ class CollisionAvoidance(Goal):
                         soft_threshold = soft_threshold_override
                     else:
                         soft_threshold = configs[robot_name].external_collision_avoidance[joint_name].soft_threshold
-                    self.add_constraints_of_goal(ExternalCollisionAvoidance(robot_name=robot_name,
-                                                                            link_name=child_link,
-                                                                            name_prefix=self.name,
-                                                                            hard_threshold=hard_threshold,
-                                                                            soft_thresholds=soft_threshold,
-                                                                            idx=i,
-                                                                            num_repeller=number_of_repeller,
-                                                                            start_condition=self.start_condition,
-                                                                            pause_condition=self.pause_condition,
-                                                                            end_condition=self.end_condition))
+                    ca_goal = ExternalCA(robot_name=robot_name,
+                                         link_name=child_link,
+                                         name_prefix=self.name,
+                                         hard_threshold=hard_threshold,
+                                         soft_thresholds=soft_threshold,
+                                         idx=i,
+                                         num_repeller=number_of_repeller)
+                    self.add_goal(ca_goal)
                     num_constrains += 1
         get_middleware().loginfo(f'Adding {num_constrains} external collision avoidance constraints.')
 
@@ -472,16 +461,17 @@ class CollisionAvoidance(Goal):
                     robot_name = groups_a
                 else:
                     raise Exception(f'Could not find group containing the link {link_a} and {link_b}.')
-                self.add_constraints_of_goal(SelfCollisionAvoidance(link_a=link_a,
-                                                                    link_b=link_b,
-                                                                    robot_name=robot_name,
-                                                                    name_prefix=self.name,
-                                                                    hard_threshold=hard_threshold,
-                                                                    soft_threshold=soft_threshold,
-                                                                    idx=i,
-                                                                    num_repeller=number_of_repeller,
-                                                                    start_condition=self.start_condition,
-                                                                    pause_condition=self.pause_condition,
-                                                                    end_condition=self.end_condition))
+                ca_goal = SelfCA(link_a=link_a,
+                                 link_b=link_b,
+                                 robot_name=robot_name,
+                                 name_prefix=self.name,
+                                 hard_threshold=hard_threshold,
+                                 soft_threshold=soft_threshold,
+                                 idx=i,
+                                 num_repeller=number_of_repeller,
+                                 start_condition=self.start_condition,
+                                 pause_condition=self.pause_condition,
+                                 end_condition=self.end_condition)
+                self.add_goal(ca_goal)
                 num_constr += 1
         get_middleware().loginfo(f'Adding {num_constr} self collision avoidance constraints.')

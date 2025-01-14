@@ -56,7 +56,7 @@ class InsertCylinder(Goal):
         distance_to_line, root_P_on_line = cas.distance_point_to_line_segment(root_P_tip, root_P_hole, root_P_top)
         distance_to_hole = cas.norm(root_P_hole - root_P_tip)
 
-        reach_top = Task(name='reach top')
+        reach_top = Task(name='Reach Top')
         self.add_task(reach_top)
         reach_top.add_point_goal_constraints(frame_P_current=root_P_tip,
                                              frame_P_goal=root_P_top,
@@ -66,7 +66,7 @@ class InsertCylinder(Goal):
 
         # %% tilted orientation goal
         tilt_error = cas.angle_between_vector(root_V_cylinder_z, root_V_up)
-        tilt_task = Task(name='tilted')
+        tilt_task = Task(name='Slightly Tilted')
         self.add_task(tilt_task)
         tilt_task.add_position_constraint(expr_current=tilt_error,
                                           expr_goal=self.tilt,
@@ -81,7 +81,7 @@ class InsertCylinder(Goal):
         reach_top.end_condition = init_done
 
         # %% move down
-        stay_on_line = Task(name='straight line')
+        stay_on_line = Task(name='Stay on Straight Line ')
         self.add_task(stay_on_line)
         stay_on_line.add_point_goal_constraints(frame_P_current=root_P_tip,
                                                 frame_P_goal=root_P_on_line,
@@ -90,7 +90,7 @@ class InsertCylinder(Goal):
                                                 name='pregrasp')
         stay_on_line.expression = cas.less(distance_to_line, 0.01)
 
-        insert_task = Task(name='insert')
+        insert_task = Task(name='Insert')
         self.add_task(insert_task)
         insert_task.add_point_goal_constraints(frame_P_current=root_P_tip,
                                                frame_P_goal=root_P_hole,
@@ -107,7 +107,7 @@ class InsertCylinder(Goal):
         # %% tilt straight
         # tilt_monitor.expression = cas.less(tilt_error, 0.01)
 
-        tilt_straight_task = Task(name='tilt straight')
+        tilt_straight_task = Task(name='Tilt Straight')
         self.add_task(tilt_straight_task)
         tilt_straight_task.add_vector_goal_constraints(frame_V_current=root_V_cylinder_z,
                                                        frame_V_goal=root_V_up,

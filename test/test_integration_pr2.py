@@ -4670,17 +4670,18 @@ class TestEndMotionReason:
 
         mon_distance = zero_pose.monitors.add_distance(root_link='map', tip_link=zero_pose.r_tip,
                                                        reference_point=goal_point,
+                                                       name='distance',
                                                        tip_point=controlled_point, lower_limit=0, upper_limit=0)
         zero_pose.motion_goals.add_distance(root_link='base_link', tip_link=zero_pose.r_tip, reference_point=goal_point,
-                                            tip_point=controlled_point, lower_limit=0, upper_limit=0)
+                                            tip_point=controlled_point, lower_limit=0, upper_limit=0,
+                                            name='reach distance')
 
-        mon_trajectory = zero_pose.monitors.add_check_trajectory_length(length=1)
-        zero_pose.monitors.add_cancel_motion(mon_trajectory, error=Exception('stop motion'))
+        zero_pose.set_max_traj_length(1)
         zero_pose.monitors.add_end_motion(mon_distance)
         result = zero_pose.execute(expected_error_type=MaxTrajectoryLengthException,
                                    add_local_minimum_reached=False)
         reason = zero_pose.get_end_motion_reason(move_result=result)
-        assert len(reason) == 1 and list(reason.keys())[0] == 'M0 DistanceMonitor'
+        assert len(reason) == 1 and list(reason.keys())[0] == mon_distance
 
     def test_get_end_motion_reason_convoluted(self, zero_pose: PR2TestWrapper):
         goal_point = PointStamped()
@@ -4689,24 +4690,25 @@ class TestEndMotionReason:
         controlled_point = PointStamped()
         controlled_point.header.frame_id = zero_pose.r_tip
 
-        mon_sleep1 = zero_pose.monitors.add_sleep(10, name='sleep1')
-        mon_sleep2 = zero_pose.monitors.add_sleep(10, start_condition=mon_sleep1, name='sleep2')
+        mon_sleep1 = zero_pose.monitors.add_sleep(seconds=10, name='sleep1')
+        mon_sleep2 = zero_pose.monitors.add_sleep(seconds=10, start_condition=mon_sleep1, name='sleep2')
         mon_distance = zero_pose.monitors.add_distance(root_link='map', tip_link=zero_pose.r_tip,
                                                        reference_point=goal_point,
+                                                       name='mon_distance',
                                                        tip_point=controlled_point, lower_limit=0, upper_limit=0,
                                                        start_condition=mon_sleep2)
         zero_pose.motion_goals.add_distance(root_link='base_link', tip_link=zero_pose.r_tip, reference_point=goal_point,
+                                            name='distance',
                                             tip_point=controlled_point, lower_limit=0, upper_limit=0)
 
-        mon_trajectory = zero_pose.monitors.add_check_trajectory_length(length=1)
-        zero_pose.monitors.add_cancel_motion(mon_trajectory, error=Exception('stop motion'))
+        zero_pose.set_max_traj_length(1)
         zero_pose.monitors.add_end_motion(mon_distance)
         result = zero_pose.execute(expected_error_type=MaxTrajectoryLengthException,
                                    add_local_minimum_reached=False)
         reason = zero_pose.get_end_motion_reason(move_result=result)
         print(reason)
-        assert len(reason) == 3 and list(reason.keys())[0] == 'M2 DistanceMonitor' \
-               and list(reason.keys())[2] == 'M0 sleep1' and list(reason.keys())[1] == 'M1 sleep2'
+        assert len(reason) == 3 and list(reason.keys())[0] == mon_distance \
+               and list(reason.keys())[2] == mon_sleep1 and list(reason.keys())[1] == mon_sleep2
 
     def test_multiple_end_motion_monitors(self, zero_pose: PR2TestWrapper):
         goal_point = PointStamped()
@@ -4715,30 +4717,31 @@ class TestEndMotionReason:
         controlled_point = PointStamped()
         controlled_point.header.frame_id = zero_pose.r_tip
 
-        mon_sleep1 = zero_pose.monitors.add_sleep(10, name='sleep1')
-        mon_sleep2 = zero_pose.monitors.add_sleep(10, start_condition=mon_sleep1, name='sleep2')
+        mon_sleep1 = zero_pose.monitors.add_sleep(seconds=10, name='sleep1')
+        mon_sleep2 = zero_pose.monitors.add_sleep(seconds=10, start_condition=mon_sleep1, name='sleep2')
         mon_distance = zero_pose.monitors.add_distance(root_link='map', tip_link=zero_pose.r_tip,
                                                        reference_point=goal_point,
+                                                       name='g1',
                                                        tip_point=controlled_point, lower_limit=0, upper_limit=0,
                                                        start_condition=mon_sleep2)
         zero_pose.motion_goals.add_distance(root_link='base_link', tip_link=zero_pose.r_tip, reference_point=goal_point,
+                                            name='g2',
                                             tip_point=controlled_point, lower_limit=0, upper_limit=0)
 
-        mon_trajectory = zero_pose.monitors.add_check_trajectory_length(length=1)
-        zero_pose.monitors.add_cancel_motion(mon_trajectory, error=Exception('stop motion'))
-        zero_pose.monitors.add_end_motion(mon_distance)
+        zero_pose.set_max_traj_length(1)
+        zero_pose.monitors.add_end_motion(mon_distance, name='endmotion 1')
 
-        mon_sleep3 = zero_pose.monitors.add_sleep(20, name='sleep3')
-        mon_sleep4 = zero_pose.monitors.add_sleep(20, start_condition=mon_sleep3, name='sleep4')
+        mon_sleep3 = zero_pose.monitors.add_sleep(seconds=20, name='sleep3')
+        mon_sleep4 = zero_pose.monitors.add_sleep(seconds=20, start_condition=mon_sleep3, name='sleep4')
         zero_pose.monitors.add_end_motion(mon_sleep4)
 
         result = zero_pose.execute(expected_error_type=MaxTrajectoryLengthException,
                                    add_local_minimum_reached=False)
         reason = zero_pose.get_end_motion_reason(move_result=result)
         print(reason)
-        assert len(reason) == 5 and list(reason.keys())[0] == 'M2 DistanceMonitor' \
-               and list(reason.keys())[1] == 'M1 sleep2' and list(reason.keys())[2] == 'M0 sleep1' and \
-               list(reason.keys())[3] == 'M7 sleep4' and list(reason.keys())[4] == 'M6 sleep3'
+        assert len(reason) == 5 and list(reason.keys())[0] == mon_distance \
+               and list(reason.keys())[1] == mon_sleep2 and list(reason.keys())[2] == mon_sleep1 and \
+               list(reason.keys())[3] == mon_sleep4 and list(reason.keys())[4] == mon_sleep3
 
     # kernprof -lv py.test -s test/test_integration_pr2.py
 # time: [1-9][1-9]*.[1-9]* s

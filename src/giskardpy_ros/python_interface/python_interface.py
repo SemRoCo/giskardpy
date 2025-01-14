@@ -20,7 +20,7 @@ from giskardpy.data_types.data_types import goal_parameter
 from giskardpy.data_types.exceptions import LocalMinimumException, MaxTrajectoryLengthException
 from giskardpy.motion_graph.tasks.align_planes import AlignPlanes
 from giskardpy.goals.align_to_push_door import AlignToPushDoor
-from giskardpy.goals.cartesian_goals import CartesianPose, DiffDriveBaseGoal, CartesianVelocityLimit, \
+from giskardpy.goals.cartesian_goals import DiffDriveBaseGoal, CartesianVelocityLimit, \
     CartesianPoseStraight, CartesianPositionStraight
 from giskardpy.goals.collision_avoidance import CollisionAvoidance
 from giskardpy.motion_graph.tasks.grasp_bar import GraspBar
@@ -47,7 +47,7 @@ from giskardpy_ros.ros1 import msg_converter
 from giskardpy_ros.ros1.msg_converter import kwargs_to_json
 from giskardpy_ros.utils.utils import make_world_body_box
 from giskardpy.utils.utils import get_all_classes_in_package, ImmutableDict
-from giskardpy.goals.feature_functions import AlignPerpendicular, HeightGoal, AngleGoal, DistanceGoal
+from giskardpy.motion_graph.tasks.feature_functions import AlignPerpendicular, HeightGoal, AngleGoal, DistanceGoal
 from giskardpy.motion_graph.monitors.feature_monitors import PerpendicularMonitor, AngleMonitor, HeightMonitor, \
     DistanceMonitor
 from giskard_msgs.msg import ExecutionState
@@ -2154,6 +2154,7 @@ class MonitorWrapper(MotionStatechartNodeWrapper):
 
 
 class GiskardWrapper:
+    last_execution_state: ExecutionState
     last_feedback: MoveFeedback = None
     last_execution_state: ExecutionState = None
 
@@ -2344,8 +2345,8 @@ class GiskardWrapper:
     def _feedback_cb(self, msg: MoveFeedback):
         self.last_feedback = msg
 
-    def get_end_motion_reason(self, move_result: Optional[MoveResult] = None, show_all: bool = False) -> Dict[
-        str, bool]:
+    def get_end_motion_reason(self, move_result: Optional[MoveResult] = None, show_all: bool = False) \
+            -> Dict[str, bool]:
         """
         Analyzes a MoveResult msg to return a list of all monitors that hindered the EndMotion Monitors from becoming active.
         Uses the last received MoveResult msg from execute() or projection() when not explicitly given.
@@ -2366,8 +2367,9 @@ class GiskardWrapper:
                     zip(execution_state.monitors, execution_state.monitor_state)}
 
         failedEndMotion_ids = []
+        monitor: MotionStatechartNode
         for idx, monitor in enumerate(execution_state.monitors):
-            if monitor.monitor_class == 'EndMotion' and execution_state.monitor_state[idx] == 0:
+            if monitor.class_name == 'EndMotion' and execution_state.monitor_state[idx] != 1:
                 failedEndMotion_ids.append(idx)
 
         if len(failedEndMotion_ids) == 0:
@@ -2377,7 +2379,7 @@ class GiskardWrapper:
         def search_for_monitor_values_in_start_condition(start_condition: str):
             res = []
             for monitor, state in zip(execution_state.monitors, execution_state.monitor_state):
-                if f'\'{monitor.name}\'' in start_condition and state == 0:
+                if f'\'{monitor.name}\'' in start_condition and state != 1:
                     res.append(monitor)
             return res
 

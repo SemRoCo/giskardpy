@@ -98,7 +98,7 @@ class Counter(PayloadMonitor):
 
 
 class Pulse(PayloadMonitor):
-    def __init__(self, name: str, after_ticks: int, true_for_ticks: int):
+    def __init__(self, name: str, after_ticks: int, true_for_ticks: int = 1):
         super().__init__(name=name, run_call_in_thread=False)
         self.after_ticks = after_ticks
         self.true_for_ticks = true_for_ticks

@@ -74,7 +74,7 @@ class CartesianPosition(Task):
 
 
 class CartesianOrientation(Task):
-    default_reference_velocity = 0.5
+    default_reference_velocity = 0.2
 
     def __init__(self,
                  root_link: PrefixName,

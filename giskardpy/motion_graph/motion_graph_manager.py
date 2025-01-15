@@ -414,7 +414,7 @@ class MotionGraphManager:
 
     def has_payload_monitors_which_are_not_end_nor_cancel(self) -> bool:
         for m in self.monitor_state.nodes:
-            if not isinstance(m, (CancelMotion, EndMotion)) and isinstance(m, PayloadMonitor):
+            if not isinstance(m, (CancelMotion, EndMotion)):
                 return True
         return False
 

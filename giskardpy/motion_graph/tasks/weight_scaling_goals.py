@@ -9,7 +9,7 @@ from collections import defaultdict
 from giskardpy.motion_graph.tasks.task import Task
 
 
-class BaseArmWeightScaling(Goal):
+class BaseArmWeightScaling(Task):
     """
     This goals adds weight scaling constraints with the distance between a tip_link and its goal Position as a
     scaling expression. The larger the scaling expression the more is the base movement used toa achieve
@@ -24,17 +24,13 @@ class BaseArmWeightScaling(Goal):
                  arm_joints: List[str],
                  base_joints: List[str],
                  gain: float = 100000,
-                 name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.BinaryTrue,
-                 pause_condition: cas.Expression = cas.BinaryFalse,
-                 end_condition: cas.Expression = cas.BinaryFalse):
+                 name: Optional[str] = None):
         self.root_link = god_map.world.search_for_link_name(root_link, None)
         self.tip_link = god_map.world.search_for_link_name(tip_link, None)
         if name is None:
             name = f'{self.__class__.__name__}/{self.root_link}/{self.tip_link}'
-        super().__init__(name)
+        super().__init__(name=name)
 
-        task = self.create_and_add_task('weight_scaling')
         root_P_tip = god_map.world.compose_fk_expression(self.root_link, self.tip_link).to_position()
         root_P_goal = god_map.world.transform(self.root_link, tip_goal)
         scaling_exp = root_P_goal - root_P_tip
@@ -66,8 +62,7 @@ class BaseArmWeightScaling(Goal):
         god_map.debug_expression_manager.add_debug_expression('arm_scaling', gain * cas.norm(scaling_exp / arm_v.get_upper_limit(Derivatives.velocity)))
         god_map.debug_expression_manager.add_debug_expression('norm', cas.norm(scaling_exp))
         god_map.debug_expression_manager.add_debug_expression('division', 1 / cas.norm(scaling_exp))
-        task.add_quadratic_weight_gain('baseToArmScaling',
-                                       gains=list_gains)
+        self.add_quadratic_weight_gain('baseToArmScaling', gains=list_gains)
 
 
 class MaxManipulability(Task):
@@ -80,8 +75,7 @@ class MaxManipulability(Task):
                  tip_link: str,
                  gain: float = 0.5,
                  name: Optional[str] = None,
-                 m_threshold: float = 0.16,
-                 ):
+                 m_threshold: float = 0.16):
         self.root_link = god_map.world.search_for_link_name(root_link, None)
         self.tip_link = god_map.world.search_for_link_name(tip_link, None)
         if name is None:

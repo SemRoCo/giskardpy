@@ -5,8 +5,8 @@ from giskardpy.data_types.data_types import Derivatives, PrefixName
 from giskardpy.data_types.exceptions import GoalInitalizationException
 from giskardpy.god_map import god_map
 from giskardpy.model.joints import OneDofJoint, JustinTorso
-from giskardpy.motion_graph.monitors.joint_monitors import JointGoalReached
-from giskardpy.motion_graph.tasks.task import Task, WEIGHT_BELOW_CA
+from giskardpy.motion_statechart.monitors.joint_monitors import JointGoalReached
+from giskardpy.motion_statechart.tasks.task import Task, WEIGHT_BELOW_CA
 from giskardpy.qp.pos_in_vel_limits import b_profile
 from giskardpy.utils.math import find_best_jerk_limit
 

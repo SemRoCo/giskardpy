@@ -5,9 +5,9 @@ from typing import Optional
 from giskardpy.data_types.data_types import PrefixName
 from giskardpy.goals.cartesian_goals import CartesianPose
 from giskardpy.goals.goal import Goal
-from giskardpy.motion_graph.tasks.cartesian_tasks import CartesianPoseAsTask
-from giskardpy.motion_graph.tasks.joint_tasks import JointPositionList
-from giskardpy.motion_graph.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
+from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPoseAsTask
+from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
+from giskardpy.motion_statechart.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
 from giskardpy.god_map import god_map
 import giskardpy.casadi_wrapper as cas
 

@@ -5,7 +5,7 @@ from typing import Dict, Optional
 from geometry_msgs.msg import PoseStamped
 
 from giskardpy import casadi_wrapper as cas
-from giskardpy.motion_graph.monitors.monitors import PayloadMonitor
+from giskardpy.motion_statechart.monitors.monitors import PayloadMonitor
 from giskardpy.god_map import god_map
 from giskardpy.data_types.exceptions import GoalInitalizationException
 from giskardpy.model.joints import OmniDrive, DiffDrive, OmniDrivePR22

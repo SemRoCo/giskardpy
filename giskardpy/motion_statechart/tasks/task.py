@@ -8,7 +8,7 @@ from giskardpy.god_map import god_map
 from giskardpy.data_types.data_types import Derivatives, LifeCycleState
 from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint
 from giskardpy.symbol_manager import symbol_manager
-from giskardpy.motion_graph.graph_node import MotionStatechartNode
+from giskardpy.motion_statechart.graph_node import MotionStatechartNode
 from giskardpy.qp.weight_gain import QuadraticWeightGain, LinearWeightGain
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.constraint import DerivativeEqualityConstraint

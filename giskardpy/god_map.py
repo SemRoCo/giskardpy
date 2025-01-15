@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from giskardpy.model.trajectory import Trajectory
     from giskardpy.qp.qp_controller import QPController
     from giskardpy.data_types.data_types import PrefixName
-    from giskardpy.motion_graph.motion_graph_manager import MotionGraphManager
+    from giskardpy.motion_statechart.motion_graph_manager import MotionGraphManager
     from giskardpy.debug_expression_manager import DebugExpressionManager
     from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer, Collisions
 
@@ -48,7 +48,7 @@ class GodMap:
             from giskardpy.model.world import WorldTree
             self.world = WorldTree()
         elif item == 'motion_graph_manager':
-            from giskardpy.motion_graph.motion_graph_manager import MotionGraphManager
+            from giskardpy.motion_statechart.motion_graph_manager import MotionGraphManager
             self.motion_graph_manager = MotionGraphManager()
         elif item == 'debug_expression_manager':
             from giskardpy.debug_expression_manager import DebugExpressionManager

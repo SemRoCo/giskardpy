@@ -23,8 +23,8 @@ from giskardpy.model.trajectory import Trajectory
 from giskardpy.model.utils import hacky_urdf_parser_fix
 from giskardpy.model.world import WorldTree
 from giskardpy.model.world_config import EmptyWorld, WorldWithOmniDriveRobot
-from giskardpy.motion_graph.monitors.cartesian_monitors import PoseReached
-from giskardpy.motion_graph.tasks.joint_tasks import JointPositionList
+from giskardpy.motion_statechart.monitors.cartesian_monitors import PoseReached
+from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
 from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint
 from giskardpy.qp.qp_controller import QPController
 from giskardpy.qp.qp_controller import QPFormulation

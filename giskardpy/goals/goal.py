@@ -4,10 +4,10 @@ import abc
 from abc import ABC
 from typing import List, Union, Optional
 
-from giskardpy.motion_graph.graph_node import MotionStatechartNode
-from giskardpy.motion_graph.monitors.monitors import Monitor, Monitor
+from giskardpy.motion_statechart.graph_node import MotionStatechartNode
+from giskardpy.motion_statechart.monitors.monitors import Monitor, Monitor
 from giskardpy.god_map import god_map
-from giskardpy.motion_graph.tasks.task import Task
+from giskardpy.motion_statechart.tasks.task import Task
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils.utils import string_shortener
 from giskardpy.data_types.exceptions import GoalInitalizationException

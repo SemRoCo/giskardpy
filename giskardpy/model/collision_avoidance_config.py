@@ -44,10 +44,10 @@ class CollisionAvoidanceConfig(abc.ABC):
                                  'roslaunch giskardpy collision_matrix_tool.launch')
 
     def _create_collision_checker(self, collision_checker: CollisionCheckerLib):
-        if collision_checker.value not in CollisionCheckerLib:
+        if collision_checker not in CollisionCheckerLib:
             raise KeyError(f'Unknown collision checker {collision_checker}. '
                            f'Collision avoidance is disabled')
-        if collision_checker.value == CollisionCheckerLib.bpb.value:
+        if collision_checker == CollisionCheckerLib.bpb:
             get_middleware().loginfo('Using betterpybullet for collision checking.')
             try:
                 from giskardpy.model.better_pybullet_syncer import BetterPyBulletSyncer

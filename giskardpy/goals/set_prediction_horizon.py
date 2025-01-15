@@ -4,7 +4,7 @@ import giskardpy.casadi_wrapper as cas
 from giskardpy.data_types.exceptions import MonitorInitalizationException
 from giskardpy.god_map import god_map
 from giskardpy.middleware import get_middleware
-from giskardpy.motion_graph.monitors.monitors import PayloadMonitor
+from giskardpy.motion_statechart.monitors.monitors import PayloadMonitor
 from giskardpy.qp.qp_solver_ids import SupportedQPSolver
 
 

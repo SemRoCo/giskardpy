@@ -14,11 +14,11 @@ from giskardpy.data_types.exceptions import GiskardException, UnknownMonitorExce
 from giskardpy.goals.goal import Goal
 from giskardpy.god_map import god_map
 from giskardpy.middleware import get_middleware
-from giskardpy.motion_graph.graph_node import MotionStatechartNode
-from giskardpy.motion_graph.helpers import compile_graph_node_state_updater, MotionGraphNodeStateManager
-from giskardpy.motion_graph.monitors.monitors import Monitor, Monitor, EndMotion, CancelMotion
-from giskardpy.motion_graph.monitors.payload_monitors import PayloadMonitor
-from giskardpy.motion_graph.tasks.task import Task
+from giskardpy.motion_statechart.graph_node import MotionStatechartNode
+from giskardpy.motion_statechart.helpers import compile_graph_node_state_updater, MotionGraphNodeStateManager
+from giskardpy.motion_statechart.monitors.monitors import Monitor, Monitor, EndMotion, CancelMotion
+from giskardpy.motion_statechart.monitors.payload_monitors import PayloadMonitor
+from giskardpy.motion_statechart.tasks.task import Task
 from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint
 from giskardpy.qp.weight_gain import QuadraticWeightGain, LinearWeightGain
 from giskardpy.symbol_manager import symbol_manager
@@ -51,8 +51,8 @@ class MotionGraphManager:
         self.allowed_monitor_types = {}
         self.allowed_task_types = {}
         self.allowed_goal_types = {}
-        self.add_monitor_package_path('giskardpy.motion_graph.monitors')
-        self.add_task_package_path('giskardpy.motion_graph.tasks')
+        self.add_monitor_package_path('giskardpy.motion_statechart.monitors')
+        self.add_task_package_path('giskardpy.motion_statechart.tasks')
         self.add_goal_package_path('giskardpy.goals')
         self.reset()
 

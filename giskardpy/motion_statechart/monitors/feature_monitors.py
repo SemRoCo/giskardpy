@@ -2,7 +2,7 @@ from typing import Optional, Union
 
 import giskardpy.casadi_wrapper as cas
 from giskardpy.data_types.data_types import PrefixName
-from giskardpy.motion_graph.monitors.monitors import Monitor
+from giskardpy.motion_statechart.monitors.monitors import Monitor
 from giskardpy.god_map import god_map
 
 

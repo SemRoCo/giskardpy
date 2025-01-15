@@ -6,7 +6,7 @@ from giskardpy.god_map import god_map
 from giskardpy.data_types.data_types import Derivatives
 from collections import defaultdict
 
-from giskardpy.motion_graph.tasks.task import Task
+from giskardpy.motion_statechart.tasks.task import Task
 
 
 class BaseArmWeightScaling(Task):

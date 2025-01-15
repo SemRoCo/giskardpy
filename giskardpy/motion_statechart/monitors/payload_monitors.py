@@ -7,7 +7,7 @@ import giskardpy.casadi_wrapper as cas
 from giskardpy.data_types.data_types import ObservationState
 from giskardpy.god_map import god_map
 from giskardpy.middleware import get_middleware
-from giskardpy.motion_graph.monitors.monitors import PayloadMonitor, Monitor
+from giskardpy.motion_statechart.monitors.monitors import PayloadMonitor, Monitor
 from giskardpy.symbol_manager import symbol_manager
 
 

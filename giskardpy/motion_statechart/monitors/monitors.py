@@ -12,7 +12,7 @@ import giskardpy.casadi_wrapper as cas
 from giskardpy.data_types.data_types import Derivatives, PrefixName, ObservationState
 from giskardpy.data_types.exceptions import GiskardException, MonitorInitalizationException
 from giskardpy.god_map import god_map
-from giskardpy.motion_graph.graph_node import MotionStatechartNode
+from giskardpy.motion_statechart.graph_node import MotionStatechartNode
 from giskardpy.symbol_manager import symbol_manager
 
 

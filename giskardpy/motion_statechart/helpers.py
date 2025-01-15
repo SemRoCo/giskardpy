@@ -6,7 +6,7 @@ from giskardpy.casadi_wrapper import CompiledFunction
 from giskardpy.data_types.data_types import LifeCycleState, ObservationState
 from giskardpy.data_types.exceptions import GoalInitalizationException
 from giskardpy.god_map import god_map
-from giskardpy.motion_graph.graph_node import MotionStatechartNode
+from giskardpy.motion_statechart.graph_node import MotionStatechartNode
 import giskardpy.casadi_wrapper as cas
 from line_profiler import profile
 

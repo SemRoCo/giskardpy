@@ -4470,7 +4470,7 @@ class TestWeightScaling:
                                                tip_link='l_gripper_tool_frame')
         zero_pose.add_default_end_motion_conditions()
         zero_pose.allow_all_collisions()
-        zero_pose.execute()
+        zero_pose.execute(add_local_minimum_reached=False)
         assert god_map.debug_expression_manager.evaluated_debug_expressions['arm_scaling'][0] * 1000 < \
                god_map.debug_expression_manager.evaluated_debug_expressions['base_scaling'][0]
 

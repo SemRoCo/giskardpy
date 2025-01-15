@@ -9,10 +9,10 @@ from py_trees import Status
 from giskardpy.goals.collision_avoidance import CollisionAvoidance
 from giskardpy.goals.goal import Goal
 from giskardpy.middleware import get_middleware
-from giskardpy.motion_graph.graph_node import MotionStatechartNode
-from giskardpy.motion_graph.monitors.monitors import Monitor, EndMotion, CancelMotion
+from giskardpy.motion_statechart.graph_node import MotionStatechartNode
+from giskardpy.motion_statechart.monitors.monitors import Monitor, EndMotion, CancelMotion
 from giskardpy.god_map import god_map
-from giskardpy.motion_graph.tasks.task import LifeCycleState, Task
+from giskardpy.motion_statechart.tasks.task import LifeCycleState, Task
 from giskardpy_ros.tree.behaviors import plot_motion_graph
 from giskardpy_ros.tree.behaviors.plugin import GiskardBehavior
 from giskardpy_ros.tree.blackboard_utils import GiskardBlackboard

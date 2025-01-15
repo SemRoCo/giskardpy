@@ -13,7 +13,7 @@ from giskard_msgs.msg import ExecutionState, MotionStatechartNode
 from giskardpy.data_types.data_types import LifeCycleState, ObservationState
 from giskardpy.god_map import god_map
 from giskardpy.middleware import get_middleware
-from giskardpy.motion_graph.monitors.monitors import EndMotion, CancelMotion
+from giskardpy.motion_statechart.monitors.monitors import EndMotion, CancelMotion
 from giskardpy.utils.decorators import record_time
 from giskardpy.utils.utils import create_path
 from giskardpy_ros.ros1.msg_converter import json_str_to_ros_kwargs

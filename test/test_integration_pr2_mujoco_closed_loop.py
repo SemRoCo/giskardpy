@@ -17,10 +17,10 @@ from giskardpy_ros.configs.behavior_tree_config import ClosedLoopBTConfig
 from giskardpy_ros.configs.giskard import Giskard
 from giskardpy_ros.configs.iai_robots.pr2 import PR2CollisionAvoidance, PR2VelocityMujocoInterface, WorldWithPR2Config
 from giskardpy.qp.qp_controller_config import QPControllerConfig, SupportedQPSolver
-from giskardpy.motion_graph.tasks.task import WEIGHT_BELOW_CA
+from giskardpy.motion_statechart.tasks.task import WEIGHT_BELOW_CA
 from giskardpy_ros.tree.blackboard_utils import GiskardBlackboard
 from test_integration_pr2 import PR2TestWrapper, TestJointGoals
-from giskardpy.motion_graph.tasks.weight_scaling_goals import MaxManipulability
+from giskardpy.motion_statechart.tasks.weight_scaling_goals import MaxManipulability
 import giskardpy_ros.ros1.msg_converter as msg_converter
 
 

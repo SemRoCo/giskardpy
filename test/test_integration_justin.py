@@ -8,8 +8,8 @@ from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
 from giskard_msgs.msg import LinkName, GiskardError
 from giskardpy.data_types.exceptions import EmptyProblemException
-from giskardpy.motion_graph.tasks.cartesian_tasks import JustinTorsoLimitCart
-from giskardpy.motion_graph.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
+from giskardpy.motion_statechart.tasks.cartesian_tasks import JustinTorsoLimitCart
+from giskardpy.motion_statechart.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
 from giskardpy.utils.math import quaternion_from_rotation_matrix
 from giskardpy_ros.configs.behavior_tree_config import StandAloneBTConfig
 from giskardpy_ros.configs.giskard import Giskard

@@ -34,7 +34,7 @@ from giskardpy.god_map import god_map
 from giskardpy.middleware import get_middleware
 from giskardpy.model.collision_world_syncer import Collisions, Collision, CollisionEntry
 from giskardpy.model.joints import OneDofJoint, OmniDrive, DiffDrive, Joint
-from giskardpy.motion_graph.tasks.task import WEIGHT_ABOVE_CA
+from giskardpy.motion_statechart.tasks.task import WEIGHT_ABOVE_CA
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.qp_controller import available_solvers
 from giskardpy.qp.qp_solver_ids import SupportedQPSolver

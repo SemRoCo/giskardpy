@@ -16,7 +16,7 @@ from visualization_msgs.msg._InteractiveMarkerFeedback import InteractiveMarkerF
 from visualization_msgs.msg._Marker import Marker
 
 from giskardpy.middleware import get_middleware
-from giskardpy.motion_graph.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
+from giskardpy.motion_statechart.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
 from giskardpy_ros.python_interface.old_python_interface import OldGiskardWrapper
 from giskardpy.utils.math import qv_mult
 

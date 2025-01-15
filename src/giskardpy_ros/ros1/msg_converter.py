@@ -32,8 +32,8 @@ from rospy_message_converter.message_converter import \
     convert_dictionary_to_ros_message as original_convert_dictionary_to_ros_message, \
     convert_ros_message_to_dictionary as original_convert_ros_message_to_dictionary
 
-from giskardpy.motion_graph.monitors.monitors import EndMotion, CancelMotion, Monitor
-from giskardpy.motion_graph.tasks.task import Task
+from giskardpy.motion_statechart.monitors.monitors import EndMotion, CancelMotion, Monitor
+from giskardpy.motion_statechart.tasks.task import Task
 from giskardpy.utils.math import quaternion_from_rotation_matrix
 from giskardpy.utils.utils import get_all_classes_in_module
 from giskardpy_ros.ros1.visualization_mode import VisualizationMode

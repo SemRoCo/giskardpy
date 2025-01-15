@@ -15,7 +15,7 @@ from giskardpy.goals.goal import Goal
 from giskardpy.god_map import god_map
 from giskardpy.middleware import get_middleware
 from giskardpy.model.joints import OmniDrive, DiffDrive
-from giskardpy.motion_graph.monitors.monitors import TimeAbove, LocalMinimumReached, EndMotion, CancelMotion
+from giskardpy.motion_statechart.monitors.monitors import TimeAbove, LocalMinimumReached, EndMotion, CancelMotion
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils.decorators import record_time
 from giskardpy_ros.ros1.msg_converter import json_str_to_giskard_kwargs

@@ -22,17 +22,17 @@ from giskardpy.data_types.exceptions import GiskardException, MaxTrajectoryLengt
     UnknownJointException
 from giskardpy.goals.cartesian_goals import RelativePositionSequence
 from giskardpy.goals.collision_avoidance import CollisionAvoidanceHint
-from giskardpy.motion_graph.tasks.goals_tests import DebugGoal, CannotResolveSymbol
+from giskardpy.motion_statechart.tasks.goals_tests import DebugGoal, CannotResolveSymbol
 from giskardpy.goals.set_prediction_horizon import SetQPSolver
 from giskardpy.goals.tracebot import InsertCylinder
-from giskardpy.motion_graph.tasks.weight_scaling_goals import MaxManipulability, BaseArmWeightScaling
+from giskardpy.motion_statechart.tasks.weight_scaling_goals import MaxManipulability, BaseArmWeightScaling
 from giskardpy.god_map import god_map
 from giskardpy.middleware import get_middleware
 from giskardpy.model.utils import hacky_urdf_parser_fix
-from giskardpy.motion_graph.monitors.monitors import TrueMonitor
-from giskardpy.motion_graph.monitors.payload_monitors import Pulse
-from giskardpy.motion_graph.tasks.joint_tasks import JointVelocityLimit, UnlimitedJointGoal
-from giskardpy.motion_graph.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE
+from giskardpy.motion_statechart.monitors.monitors import TrueMonitor
+from giskardpy.motion_statechart.monitors.payload_monitors import Pulse
+from giskardpy.motion_statechart.tasks.joint_tasks import JointVelocityLimit, UnlimitedJointGoal
+from giskardpy.motion_statechart.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE
 from giskardpy.qp.qp_controller_config import SupportedQPSolver, QPControllerConfig
 from giskardpy_ros.configs.behavior_tree_config import StandAloneBTConfig
 from giskardpy_ros.configs.giskard import Giskard

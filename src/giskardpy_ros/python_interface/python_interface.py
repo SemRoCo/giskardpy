@@ -18,37 +18,37 @@ from giskard_msgs.srv import GetGroupInfo, GetGroupNames
 from giskard_msgs.srv import GetGroupNamesResponse, GetGroupInfoResponse
 from giskardpy.data_types.data_types import goal_parameter
 from giskardpy.data_types.exceptions import LocalMinimumException, MaxTrajectoryLengthException
-from giskardpy.motion_graph.tasks.align_planes import AlignPlanes
+from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
 from giskardpy.goals.align_to_push_door import AlignToPushDoor
 from giskardpy.goals.cartesian_goals import DiffDriveBaseGoal, CartesianVelocityLimit, \
     CartesianPoseStraight, CartesianPositionStraight
 from giskardpy.goals.collision_avoidance import CollisionAvoidance
-from giskardpy.motion_graph.tasks.grasp_bar import GraspBar
+from giskardpy.motion_statechart.tasks.grasp_bar import GraspBar
 from giskardpy.goals.open_close import Close, Open
-from giskardpy.motion_graph.tasks.joint_tasks import JointPositionLimitList, JointPositionList, AvoidJointLimits
-from giskardpy.motion_graph.tasks.pointing import Pointing
+from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionLimitList, JointPositionList, AvoidJointLimits
+from giskardpy.motion_statechart.tasks.pointing import Pointing
 from giskardpy.goals.pre_push_door import PrePushDoor
 from giskardpy.goals.set_prediction_horizon import SetPredictionHorizon
-from giskardpy.motion_graph.monitors.cartesian_monitors import PoseReached, PositionReached, OrientationReached, \
+from giskardpy.motion_statechart.monitors.cartesian_monitors import PoseReached, PositionReached, OrientationReached, \
     PointingAt, \
     VectorsAligned, DistanceToLine
-from giskardpy.motion_graph.monitors.joint_monitors import JointGoalReached
-from giskardpy.motion_graph.monitors.monitors import LocalMinimumReached, TimeAbove, Alternator, CancelMotion, \
+from giskardpy.motion_statechart.monitors.joint_monitors import JointGoalReached
+from giskardpy.motion_statechart.monitors.monitors import LocalMinimumReached, TimeAbove, Alternator, CancelMotion, \
     EndMotion, TrueMonitor, FalseMonitor
-from giskardpy.motion_graph.monitors.overwrite_state_monitors import SetOdometry, SetSeedConfiguration
-from giskardpy.motion_graph.monitors.payload_monitors import Print, Sleep, \
+from giskardpy.motion_statechart.monitors.overwrite_state_monitors import SetOdometry, SetSeedConfiguration
+from giskardpy.motion_statechart.monitors.payload_monitors import Print, Sleep, \
     PayloadAlternator, Pulse, CheckMaxTrajectoryLength
-from giskardpy.motion_graph.tasks.cartesian_tasks import CartesianPosition, CartesianOrientation, CartesianPoseAsTask, \
+from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPosition, CartesianOrientation, CartesianPoseAsTask, \
     JustinTorsoLimitCart
-from giskardpy.motion_graph.tasks.task import WEIGHT_ABOVE_CA
-from giskardpy.motion_graph.tasks.weight_scaling_goals import MaxManipulability
+from giskardpy.motion_statechart.tasks.task import WEIGHT_ABOVE_CA
+from giskardpy.motion_statechart.tasks.weight_scaling_goals import MaxManipulability
 from giskardpy_ros.goals.realtime_goals import CarryMyBullshit, RealTimePointing, FollowNavPath
 from giskardpy_ros.ros1 import msg_converter
 from giskardpy_ros.ros1.msg_converter import kwargs_to_json
 from giskardpy_ros.utils.utils import make_world_body_box
 from giskardpy.utils.utils import get_all_classes_in_package, ImmutableDict
-from giskardpy.motion_graph.tasks.feature_functions import AlignPerpendicular, HeightGoal, AngleGoal, DistanceGoal
-from giskardpy.motion_graph.monitors.feature_monitors import PerpendicularMonitor, AngleMonitor, HeightMonitor, \
+from giskardpy.motion_statechart.tasks.feature_functions import AlignPerpendicular, HeightGoal, AngleGoal, DistanceGoal
+from giskardpy.motion_statechart.monitors.feature_monitors import PerpendicularMonitor, AngleMonitor, HeightMonitor, \
     DistanceMonitor
 from giskard_msgs.msg import ExecutionState
 
@@ -373,7 +373,7 @@ class MotionStatechartNodeWrapper:
     def get_anded_nodes(self, add_nodes_without_end_condition: bool = True) -> str:
         nodes = []
         for node in self.motion_graph_nodes.values():
-            if (node.class_name not in get_all_classes_in_package('giskardpy.motion_graph.monitors',
+            if (node.class_name not in get_all_classes_in_package('giskardpy.motion_statechart.monitors',
                                                                  CancelMotion)
                     and (add_nodes_without_end_condition or node.end_condition != '')):
                 nodes.append(node.name)

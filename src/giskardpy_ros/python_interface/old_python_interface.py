@@ -9,10 +9,10 @@ from giskard_msgs.srv import DyeGroupResponse, GetGroupInfoResponse
 from giskardpy.data_types.data_types import goal_parameter
 from giskardpy.data_types.exceptions import MaxTrajectoryLengthException
 from giskardpy.goals.open_close import Open
-from giskardpy.motion_graph.tasks.align_planes import AlignPlanes
-from giskardpy.motion_graph.tasks.grasp_bar import GraspBar
+from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
+from giskardpy.motion_statechart.tasks.grasp_bar import GraspBar
 from giskardpy_ros.python_interface.python_interface import GiskardWrapper
-from giskardpy.motion_graph.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
+from giskardpy.motion_statechart.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
 
 
 class OldGiskardWrapper(GiskardWrapper):

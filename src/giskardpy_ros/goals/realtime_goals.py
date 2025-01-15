@@ -14,10 +14,10 @@ from giskardpy.goals.goal import Goal
 from giskardpy.god_map import god_map
 from giskardpy.middleware import get_middleware
 from giskardpy.model.joints import OmniDrive
-from giskardpy.motion_graph.monitors.monitors import Monitor, EndMotion
+from giskardpy.motion_statechart.monitors.monitors import Monitor, EndMotion
 from giskardpy.symbol_manager import symbol_manager
-from giskardpy.motion_graph.tasks.task import WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE, Task
-from giskardpy.motion_graph.tasks.pointing import Pointing
+from giskardpy.motion_statechart.tasks.task import WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE, Task
+from giskardpy.motion_statechart.tasks.pointing import Pointing
 import giskardpy.casadi_wrapper as cas
 import giskardpy_ros.ros1.msg_converter as msg_converter
 from giskardpy.utils.decorators import clear_memo, memoize_with_counter

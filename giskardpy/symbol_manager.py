@@ -19,7 +19,7 @@ class SymbolManager(metaclass=SingletonMeta):
     def get_symbol(self, symbol_reference: str) -> cas.Symbol:
         """
         Returns a symbol reference to the input parameter. If the symbol doesn't exist yet, it will be created.
-        :param symbol_reference: e.g. 'god_map.motion_graph_manager.monitors[0]'
+        :param symbol_reference: e.g. 'god_map.motion_statechart_manager.monitors[0]'
         :return: symbol reference
         """
         if symbol_reference not in self.symbol_str_to_lambda:

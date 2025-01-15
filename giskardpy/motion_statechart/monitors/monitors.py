@@ -26,13 +26,13 @@ class Monitor(MotionStatechartNode):
 
     def get_observation_state_expression(self) -> cas.Symbol:
         return symbol_manager.get_symbol(f'god_map'
-                                         f'.motion_graph_manager'
+                                         f'.motion_statechart_manager'
                                          f'.monitor_state'
                                          f'.get_observation_state(\'{self.name}\')')
 
     def get_life_cycle_state_expression(self) -> cas.Symbol:
         return symbol_manager.get_symbol(f'god_map'
-                                         f'.motion_graph_manager'
+                                         f'.motion_statechart_manager'
                                          f'.monitor_state'
                                          f'.get_life_cycle_state(\'{self.name}\')')
 

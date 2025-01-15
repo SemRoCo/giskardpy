@@ -1,7 +1,7 @@
 import ast
 from collections import OrderedDict
 from functools import cached_property
-from typing import List, Tuple, Dict, Optional, Callable, Union, Iterable, Set
+from typing import List, Tuple, Dict, Optional, Union, Iterable, Set
 from line_profiler import profile
 
 import numpy as np
@@ -9,14 +9,13 @@ import numpy as np
 import giskardpy.casadi_wrapper as cas
 from giskardpy.casadi_wrapper import CompiledFunction
 from giskardpy.data_types.data_types import LifeCycleState, ObservationState
-from giskardpy.data_types.exceptions import GiskardException, UnknownMonitorException, \
-    UnknownTaskException, GoalInitalizationException, UnknownGoalException
-from giskardpy.goals.goal import Goal
+from giskardpy.data_types.exceptions import GiskardException, GoalInitalizationException, UnknownGoalException
+from giskardpy.motion_statechart.goals.goal import Goal
 from giskardpy.god_map import god_map
 from giskardpy.middleware import get_middleware
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
 from giskardpy.motion_statechart.helpers import compile_graph_node_state_updater, MotionGraphNodeStateManager
-from giskardpy.motion_statechart.monitors.monitors import Monitor, Monitor, EndMotion, CancelMotion
+from giskardpy.motion_statechart.monitors.monitors import Monitor, EndMotion, CancelMotion
 from giskardpy.motion_statechart.monitors.payload_monitors import PayloadMonitor
 from giskardpy.motion_statechart.tasks.task import Task
 from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint
@@ -53,7 +52,7 @@ class MotionGraphManager:
         self.allowed_goal_types = {}
         self.add_monitor_package_path('giskardpy.motion_statechart.monitors')
         self.add_task_package_path('giskardpy.motion_statechart.tasks')
-        self.add_goal_package_path('giskardpy.goals')
+        self.add_goal_package_path('giskardpy.motion_statechart.goals')
         self.reset()
 
     def add_monitor_package_path(self, path: str) -> None:
@@ -76,9 +75,9 @@ class MotionGraphManager:
             del self.payload_monitor_filter
         except Exception as e:
             pass
-        self.task_state = MotionGraphNodeStateManager(god_map_path='god_map.motion_graph_manager.task_state')
-        self.monitor_state = MotionGraphNodeStateManager(god_map_path='god_map.motion_graph_manager.monitor_state')
-        self.goal_state = MotionGraphNodeStateManager(god_map_path='god_map.motion_graph_manager.goal_state')
+        self.task_state = MotionGraphNodeStateManager(god_map_path='god_map.motion_statechart_manager.task_state')
+        self.monitor_state = MotionGraphNodeStateManager(god_map_path='god_map.motion_statechart_manager.monitor_state')
+        self.goal_state = MotionGraphNodeStateManager(god_map_path='god_map.motion_statechart_manager.goal_state')
         self.task_state_history = []
         self.monitor_state_history = []
         self.goal_state_history = []
@@ -133,19 +132,19 @@ class MotionGraphManager:
 
         for (class_name, name, start, reset, pause, end, kwargs) in nodes:
             node = self.get_node(name)
-            start_condition = god_map.motion_graph_manager.logic_str_to_expr(
+            start_condition = god_map.motion_statechart_manager.logic_str_to_expr(
                 logic_str=start,
                 default=cas.BinaryTrue,
                 observation_state_symbols=observation_state_symbols)
-            pause_condition = god_map.motion_graph_manager.logic_str_to_expr(
+            pause_condition = god_map.motion_statechart_manager.logic_str_to_expr(
                 logic_str=pause,
                 default=cas.BinaryFalse,
                 observation_state_symbols=observation_state_symbols)
-            end_condition = god_map.motion_graph_manager.logic_str_to_expr(
+            end_condition = god_map.motion_statechart_manager.logic_str_to_expr(
                 logic_str=end,
                 default=cas.BinaryFalse,
                 observation_state_symbols=observation_state_symbols)
-            reset_condition = god_map.motion_graph_manager.logic_str_to_expr(
+            reset_condition = god_map.motion_statechart_manager.logic_str_to_expr(
                 logic_str=reset,
                 default=cas.BinaryFalse,
                 observation_state_symbols=observation_state_symbols)

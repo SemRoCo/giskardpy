@@ -166,5 +166,5 @@ def compile_graph_node_state_updater(node_state: MotionGraphNodeStateManager) ->
         state_updater.append(state_machine)
     state_updater = cas.Expression(state_updater)
 
-    symbols = node_state.get_life_cycle_state_symbols() + god_map.motion_graph_manager.get_observation_state_symbols()
+    symbols = node_state.get_life_cycle_state_symbols() + god_map.motion_statechart_manager.get_observation_state_symbols()
     return state_updater.compile(symbols)

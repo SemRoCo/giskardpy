@@ -5,9 +5,8 @@ from typing import Optional
 import numpy as np
 
 from giskardpy import casadi_wrapper as cas
-from giskardpy.goals.goal import Goal
+from giskardpy.motion_statechart.goals.goal import Goal
 from giskardpy.motion_statechart.tasks.task import WEIGHT_ABOVE_CA, Task
-from giskardpy.motion_statechart.monitors.monitors import Monitor
 from giskardpy.god_map import god_map
 
 

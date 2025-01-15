@@ -2,7 +2,7 @@ from __future__ import division
 
 import giskardpy.casadi_wrapper as cas
 from giskardpy.data_types.data_types import Derivatives, PrefixName
-from giskardpy.goals.goal import Goal
+from giskardpy.motion_statechart.goals.goal import Goal
 from giskardpy.god_map import god_map
 from giskardpy.model.joints import OmniDrive, OmniDrivePR22
 from giskardpy.symbol_manager import symbol_manager

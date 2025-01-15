@@ -2,10 +2,9 @@ from collections import defaultdict
 from copy import deepcopy
 from typing import Dict, Optional, List
 import giskardpy.casadi_wrapper as cas
-from giskardpy.goals.goal import Goal
+from giskardpy.motion_statechart.goals.goal import Goal
 from giskardpy.model.collision_world_syncer import CollisionEntry
 from giskardpy.motion_statechart.monitors.monitors import Monitor
-from giskardpy.motion_statechart.monitors.payload_monitors import CollisionMatrixUpdater
 from giskardpy.motion_statechart.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE, Task
 from giskardpy.god_map import god_map
 from giskardpy.data_types.data_types import PrefixName
@@ -365,7 +364,7 @@ class CollisionAvoidance(Goal):
         #     payload_monitor = CollisionMatrixUpdater(name=f'{self.name}/update collision matrix',
         #                                              start_condition=start_condition,
         #                                              new_collision_matrix=self.collision_matrix)
-        #     god_map.motion_graph_manager.add_monitor(payload_monitor)
+        #     god_map.motion_statechart_manager.add_monitor(payload_monitor)
         # else:
         god_map.collision_scene.set_collision_matrix(self.collision_matrix)
 

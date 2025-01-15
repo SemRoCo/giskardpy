@@ -4,7 +4,6 @@ from typing import Optional
 
 import giskardpy.casadi_wrapper as cas
 from giskardpy.data_types.data_types import PrefixName
-from giskardpy.goals.goal import Goal
 from giskardpy.motion_statechart.tasks.task import WEIGHT_ABOVE_CA, Task
 from giskardpy.god_map import god_map
 

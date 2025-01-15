@@ -1,11 +1,11 @@
 from __future__ import division
 
-from typing import Dict, Optional, List, Tuple
+from typing import Dict, Optional
 
 from giskardpy import casadi_wrapper as cas
 from giskardpy.data_types.data_types import Derivatives
 from giskardpy.data_types.exceptions import GoalInitalizationException
-from giskardpy.goals.goal import Goal
+from giskardpy.motion_statechart.goals.goal import Goal
 from giskardpy.god_map import god_map
 from giskardpy.model.joints import OneDofJoint
 from giskardpy.symbol_manager import symbol_manager

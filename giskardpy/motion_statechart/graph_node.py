@@ -65,11 +65,11 @@ class MotionStatechartNode:
                                           max_line_length=25)
         result = (f'{formatted_name}\n'
                   f'----start_condition----\n'
-                  f'{god_map.motion_graph_manager.format_condition(self.start_condition)}\n'
+                  f'{god_map.motion_statechart_manager.format_condition(self.start_condition)}\n'
                   f'----pause_condition----\n'
-                  f'{god_map.motion_graph_manager.format_condition(self.pause_condition)}\n'
+                  f'{god_map.motion_statechart_manager.format_condition(self.pause_condition)}\n'
                   f'----end_condition----\n'
-                  f'{god_map.motion_graph_manager.format_condition(self.end_condition)}')
+                  f'{god_map.motion_statechart_manager.format_condition(self.end_condition)}')
         if quoted:
             return '"' + result + '"'
         return result
@@ -77,7 +77,7 @@ class MotionStatechartNode:
     def update_expression_on_starting(self, expression: cas.PreservedCasType) -> cas.PreservedCasType:
         if len(expression.free_symbols()) == 0:
             return expression
-        return god_map.motion_graph_manager.register_expression_updater(expression, self)
+        return god_map.motion_statechart_manager.register_expression_updater(expression, self)
 
     @property
     def expression(self) -> cas.Expression:

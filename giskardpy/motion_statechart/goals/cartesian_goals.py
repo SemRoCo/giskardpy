@@ -6,13 +6,12 @@ import numpy as np
 
 from giskardpy import casadi_wrapper as cas
 from giskardpy.data_types.data_types import Derivatives, ColorRGBA, PrefixName
-from giskardpy.goals.goal import Goal
+from giskardpy.motion_statechart.goals.goal import Goal
 from giskardpy.god_map import god_map
 from giskardpy.model.joints import DiffDrive
-from giskardpy.motion_statechart.monitors.monitors import Monitor
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPosition, CartesianOrientation
 from giskardpy.symbol_manager import symbol_manager
-from giskardpy.motion_statechart.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, Task
+from giskardpy.motion_statechart.tasks.task import WEIGHT_ABOVE_CA, Task
 
 
 class CartesianPositionStraight(Goal):

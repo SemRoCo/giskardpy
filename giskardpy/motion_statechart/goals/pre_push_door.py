@@ -1,7 +1,7 @@
 from typing import Optional
 
 from giskardpy import casadi_wrapper as cas
-from giskardpy.goals.goal import Goal
+from giskardpy.motion_statechart.goals.goal import Goal
 from giskardpy.god_map import god_map
 from giskardpy.motion_statechart.tasks.task import WEIGHT_BELOW_CA, Task
 

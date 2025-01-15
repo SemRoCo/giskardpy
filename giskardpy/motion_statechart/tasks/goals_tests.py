@@ -3,7 +3,6 @@ from typing import Optional
 import numpy as np
 import giskardpy.casadi_wrapper as cas
 from giskardpy.data_types.data_types import Derivatives
-from giskardpy.goals.goal import Goal
 from giskardpy.god_map import god_map
 from giskardpy.motion_statechart.tasks.task import Task
 from giskardpy.symbol_manager import symbol_manager

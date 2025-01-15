@@ -29,13 +29,13 @@ class Goal(MotionStatechartNode):
 
     def get_observation_state_expression(self):
         return symbol_manager.get_symbol(f'god_map'
-                                         f'.motion_graph_manager'
+                                         f'.motion_statechart_manager'
                                          f'.goal_state'
                                          f'.get_observation_state(\'{self.name}\')')
 
     def get_life_cycle_state_expression(self):
         return symbol_manager.get_symbol(f'god_map'
-                                         f'.motion_graph_manager'
+                                         f'.motion_statechart_manager'
                                          f'.goal_state'
                                          f'.get_life_cycle_state(\'{self.name}\')')
 
@@ -95,7 +95,7 @@ class Goal(MotionStatechartNode):
         """
         A string referring to self on the god_map. Used with symbol manager.
         """
-        return f'god_map.motion_graph_manager.goal_state.get_node(\'{self.name}\')'
+        return f'god_map.motion_statechart_manager.goal_state.get_node(\'{self.name}\')'
 
     def __add__(self, other: str) -> str:
         if isinstance(other, str):

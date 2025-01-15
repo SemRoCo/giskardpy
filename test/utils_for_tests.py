@@ -24,12 +24,12 @@ import giskard_msgs.msg as giskard_msgs
 import giskardpy.casadi_wrapper as cas
 import giskardpy_ros.ros1.msg_converter as msg_converter
 import giskardpy_ros.ros1.tfwrapper as tf
-from giskard_msgs.msg import GiskardError, LinkName
+from giskard_msgs.msg import GiskardError
 from giskard_msgs.srv import DyeGroupResponse
 from giskardpy.data_types.data_types import KeyDefaultDict
 from giskardpy.data_types.data_types import PrefixName, Derivatives
 from giskardpy.data_types.exceptions import UnknownGroupException, DuplicateNameException, WorldException
-from giskardpy.goals.diff_drive_goals import DiffDriveTangentialToPoint, KeepHandInWorkspace
+from giskardpy.motion_statechart.goals.diff_drive_goals import DiffDriveTangentialToPoint, KeepHandInWorkspace
 from giskardpy.god_map import god_map
 from giskardpy.middleware import get_middleware
 from giskardpy.model.collision_world_syncer import Collisions, Collision, CollisionEntry

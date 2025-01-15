@@ -40,7 +40,7 @@ class CleanUp(GiskardBehavior):
         god_map.closest_point = Collisions(1)
         god_map.time = 0
         god_map.control_cycle_counter = 1
-        god_map.motion_graph_manager.reset()
+        god_map.motion_statechart_manager.reset()
         god_map.debug_expression_manager.reset()
 
         if hasattr(self.get_blackboard(), 'runtime'):

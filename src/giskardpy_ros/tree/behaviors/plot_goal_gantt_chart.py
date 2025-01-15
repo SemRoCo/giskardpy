@@ -1,18 +1,16 @@
 import traceback
 from copy import copy
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
 from line_profiler import profile
 from py_trees import Status
-from giskardpy.goals.collision_avoidance import CollisionAvoidance
-from giskardpy.goals.goal import Goal
+from giskardpy.motion_statechart.goals.collision_avoidance import CollisionAvoidance
 from giskardpy.middleware import get_middleware
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
-from giskardpy.motion_statechart.monitors.monitors import Monitor, EndMotion, CancelMotion
 from giskardpy.god_map import god_map
-from giskardpy.motion_statechart.tasks.task import LifeCycleState, Task
+from giskardpy.motion_statechart.tasks.task import LifeCycleState
 from giskardpy_ros.tree.behaviors import plot_motion_graph
 from giskardpy_ros.tree.behaviors.plugin import GiskardBehavior
 from giskardpy_ros.tree.blackboard_utils import GiskardBlackboard
@@ -28,8 +26,8 @@ class PlotGanttChart(GiskardBehavior):
 
     def plot_gantt_chart(self, tasks: List[MotionStatechartNode], monitors: List[MotionStatechartNode],
                          goals: List[MotionStatechartNode], file_name: str):
-        monitor_plot_filter = np.array([monitor.plot for monitor in god_map.motion_graph_manager.monitor_state.nodes])
-        goal_plot_filter = np.array([goal.plot for goal in god_map.motion_graph_manager.goal_state.nodes])
+        monitor_plot_filter = np.array([monitor.plot for monitor in god_map.motion_statechart_manager.monitor_state.nodes])
+        goal_plot_filter = np.array([goal.plot for goal in god_map.motion_statechart_manager.goal_state.nodes])
         task_plot_filter = np.array([not isinstance(g, CollisionAvoidance) for g in tasks])
 
         monitor_history, task_history, goal_history = self.get_new_history()
@@ -114,7 +112,7 @@ class PlotGanttChart(GiskardBehavior):
                      List[Tuple[float, Tuple[np.ndarray, np.ndarray]]]]:
         # because the monitor state doesn't get updated after the final end motion becomes true
         try:
-            god_map.motion_graph_manager.evaluate_node_states()
+            god_map.motion_statechart_manager.evaluate_node_states()
         except Exception as e:
             # if the motion was cancelled, this call will cause an exception
             pass
@@ -122,13 +120,13 @@ class PlotGanttChart(GiskardBehavior):
         # add Nones to make sure all bars gets "ended"
         new_end_time = god_map.time + god_map.qp_controller.mpc_dt
 
-        task_history = copy(god_map.motion_graph_manager.task_state_history)
+        task_history = copy(god_map.motion_statechart_manager.task_state_history)
         task_history.append((new_end_time, ([None] * len(task_history[0][1][0]),
                                             [None] * len(task_history[0][1][0]))))
-        monitor_history = copy(god_map.motion_graph_manager.monitor_state_history)
+        monitor_history = copy(god_map.motion_statechart_manager.monitor_state_history)
         monitor_history.append((new_end_time, ([None] * len(monitor_history[0][1][0]),
                                                [None] * len(monitor_history[0][1][0]))))
-        goal_history = copy(god_map.motion_graph_manager.goal_state_history)
+        goal_history = copy(god_map.motion_statechart_manager.goal_state_history)
         goal_history.append((new_end_time, ([None] * len(goal_history[0][1][0]),
                                             [None] * len(goal_history[0][1][0]))))
 
@@ -137,12 +135,12 @@ class PlotGanttChart(GiskardBehavior):
     @record_time
     @profile
     def update(self):
-        if not god_map.motion_graph_manager.monitor_state_history:
+        if not god_map.motion_statechart_manager.monitor_state_history:
             return Status.SUCCESS
         try:
-            tasks = god_map.motion_graph_manager.task_state.nodes
-            monitors = god_map.motion_graph_manager.monitor_state.nodes
-            goals = god_map.motion_graph_manager.goal_state.nodes
+            tasks = god_map.motion_statechart_manager.task_state.nodes
+            monitors = god_map.motion_statechart_manager.monitor_state.nodes
+            goals = god_map.motion_statechart_manager.goal_state.nodes
             file_name = god_map.tmp_folder + f'gantt_charts/goal_{GiskardBlackboard().move_action_server.goal_id}.pdf'
             self.plot_gantt_chart(tasks, monitors, goals, file_name)
         except Exception as e:

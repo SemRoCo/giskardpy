@@ -19,19 +19,17 @@ from giskard_msgs.srv import GetGroupNamesResponse, GetGroupInfoResponse
 from giskardpy.data_types.data_types import goal_parameter
 from giskardpy.data_types.exceptions import LocalMinimumException, MaxTrajectoryLengthException
 from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
-from giskardpy.goals.align_to_push_door import AlignToPushDoor
-from giskardpy.goals.cartesian_goals import DiffDriveBaseGoal, CartesianVelocityLimit, \
+from giskardpy.motion_statechart.goals.align_to_push_door import AlignToPushDoor
+from giskardpy.motion_statechart.goals.cartesian_goals import DiffDriveBaseGoal, CartesianVelocityLimit, \
     CartesianPoseStraight, CartesianPositionStraight
-from giskardpy.goals.collision_avoidance import CollisionAvoidance
+from giskardpy.motion_statechart.goals.collision_avoidance import CollisionAvoidance
 from giskardpy.motion_statechart.tasks.grasp_bar import GraspBar
-from giskardpy.goals.open_close import Close, Open
+from giskardpy.motion_statechart.goals.open_close import Close, Open
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionLimitList, JointPositionList, AvoidJointLimits
 from giskardpy.motion_statechart.tasks.pointing import Pointing
-from giskardpy.goals.pre_push_door import PrePushDoor
-from giskardpy.goals.set_prediction_horizon import SetPredictionHorizon
+from giskardpy.motion_statechart.goals.pre_push_door import PrePushDoor
 from giskardpy.motion_statechart.monitors.cartesian_monitors import PoseReached, PositionReached, OrientationReached, \
-    PointingAt, \
-    VectorsAligned, DistanceToLine
+    PointingAt, VectorsAligned, DistanceToLine
 from giskardpy.motion_statechart.monitors.joint_monitors import JointGoalReached
 from giskardpy.motion_statechart.monitors.monitors import LocalMinimumReached, TimeAbove, Alternator, CancelMotion, \
     EndMotion, TrueMonitor, FalseMonitor
@@ -1939,16 +1937,6 @@ class MonitorWrapper(MotionStatechartNodeWrapper):
                                 name=name,
                                 start_condition=start_condition,
                                 end_condition=name)
-
-    def add_set_prediction_horizon(self, prediction_horizon: int, **kwargs: goal_parameter):
-        """
-        Will overwrite the prediction horizon for a single goal.
-        Setting it to 1 will turn of acceleration and jerk limits.
-        :param prediction_horizon: size of the prediction horizon, a number that should be 1 or above 5.
-        """
-        self.add_monitor(class_name=SetPredictionHorizon.__name__,
-                         prediction_horizon=prediction_horizon,
-                         **kwargs)
 
     def add_alternator(self,
                        name: Optional[str] = None,

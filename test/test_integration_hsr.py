@@ -1,5 +1,4 @@
 from copy import deepcopy
-from typing import Optional
 
 import numpy as np
 import pytest
@@ -7,13 +6,10 @@ from geometry_msgs.msg import PoseStamped, Point, Quaternion, PointStamped, Vect
 from numpy import pi
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
-from giskard_msgs.msg import LinkName, GiskardError
+from giskard_msgs.msg import LinkName
 from giskardpy.data_types.exceptions import EmptyProblemException
-from giskardpy.goals.test import GraspSequence, Cutting
-from giskardpy.motion_statechart.monitors.monitors import FalseMonitor, TrueMonitor
-from giskardpy.motion_statechart.monitors.payload_monitors import Pulse
-from giskardpy.qp.qp_solver_ids import SupportedQPSolver
-from giskardpy.motion_statechart.tasks.task import WEIGHT_ABOVE_CA
+from giskardpy.motion_statechart.goals.test import GraspSequence, Cutting
+from giskardpy.motion_statechart.monitors.monitors import TrueMonitor
 from giskardpy_ros.configs.behavior_tree_config import StandAloneBTConfig
 from giskardpy_ros.configs.giskard import Giskard
 from giskardpy_ros.configs.iai_robots.hsr import HSRCollisionAvoidanceConfig, WorldWithHSRConfig, HSRStandaloneInterface

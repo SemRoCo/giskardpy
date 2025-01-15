@@ -15,16 +15,16 @@ import giskard_msgs.msg as giskard_msgs
 from giskard_msgs.msg import WorldBody, CollisionEntry, WorldGoal, LinkName
 from giskardpy.data_types.data_types import PrefixName
 from giskardpy.data_types.exceptions import GiskardException, MaxTrajectoryLengthException, UnknownGoalException, \
-    GoalInitalizationException, LocalMinimumException, \
+    LocalMinimumException, \
     DuplicateNameException, CorruptMeshException, UnknownGroupException, UnknownLinkException, \
     InvalidWorldOperationException, CorruptShapeException, TransformException, CorruptURDFException, \
     SelfCollisionViolatedException, HardConstraintsViolatedException, SetupException, EmptyProblemException, \
     UnknownJointException
-from giskardpy.goals.cartesian_goals import RelativePositionSequence
-from giskardpy.goals.collision_avoidance import CollisionAvoidanceHint
+from giskardpy.motion_statechart.goals.cartesian_goals import RelativePositionSequence
+from giskardpy.motion_statechart.goals.collision_avoidance import CollisionAvoidanceHint
 from giskardpy.motion_statechart.tasks.goals_tests import DebugGoal, CannotResolveSymbol
-from giskardpy.goals.set_prediction_horizon import SetQPSolver
-from giskardpy.goals.tracebot import InsertCylinder
+from giskardpy.motion_statechart.goals.set_prediction_horizon import SetQPSolver
+from giskardpy.motion_statechart.goals.tracebot import InsertCylinder
 from giskardpy.motion_statechart.tasks.weight_scaling_goals import MaxManipulability, BaseArmWeightScaling
 from giskardpy.god_map import god_map
 from giskardpy.middleware import get_middleware

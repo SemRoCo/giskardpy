@@ -1,16 +1,11 @@
 from typing import Dict, Optional, List, Tuple
 
 from geometry_msgs.msg import PoseStamped, PointStamped, QuaternionStamped, Vector3Stamped
-from pandas.core.dtypes.cast import ensure_dtype_can_hold_na
 
 import giskard_msgs.msg as giskard_msgs
 from giskard_msgs.msg import MoveResult, CollisionEntry, MoveGoal, WorldResult
 from giskard_msgs.srv import DyeGroupResponse, GetGroupInfoResponse
 from giskardpy.data_types.data_types import goal_parameter
-from giskardpy.data_types.exceptions import MaxTrajectoryLengthException
-from giskardpy.goals.open_close import Open
-from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
-from giskardpy.motion_statechart.tasks.grasp_bar import GraspBar
 from giskardpy_ros.python_interface.python_interface import GiskardWrapper
 from giskardpy.motion_statechart.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
 

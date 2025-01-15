@@ -1,22 +1,18 @@
 import traceback
-from typing import List, Union, Dict, Tuple
+from typing import List, Union, Tuple
 
 import genpy
-from line_profiler import profile
 from py_trees import Status
 
 import giskard_msgs.msg as giskard_msgs
 import giskardpy.casadi_wrapper as cas
 from giskard_msgs.msg import MoveGoal
-from giskardpy.data_types.exceptions import InvalidGoalException, UnknownGoalException, GiskardException, \
-    GoalInitalizationException, UnknownMonitorException, MonitorInitalizationException
-from giskardpy.goals.base_traj_follower import BaseTrajFollower
-from giskardpy.goals.goal import Goal
+from giskardpy.data_types.exceptions import InvalidGoalException
+from giskardpy.motion_statechart.goals.base_traj_follower import BaseTrajFollower
 from giskardpy.god_map import god_map
 from giskardpy.middleware import get_middleware
 from giskardpy.model.joints import OmniDrive, DiffDrive
 from giskardpy.motion_statechart.monitors.monitors import TimeAbove, LocalMinimumReached, EndMotion, CancelMotion
-from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils.decorators import record_time
 from giskardpy_ros.ros1.msg_converter import json_str_to_giskard_kwargs
 from giskardpy_ros.tree.behaviors.plugin import GiskardBehavior
@@ -45,13 +41,13 @@ class ParseActionGoal(GiskardBehavior):
             raise e
         self.sanity_check()
         # if god_map.is_collision_checking_enabled():
-        #     god_map.motion_graph_manager.parse_collision_entries(move_goal.collisions)
+        #     god_map.motion_statechart_manager.parse_collision_entries(move_goal.collisions)
         get_middleware().loginfo('Done parsing goal message.')
         return Status.SUCCESS
 
     def parse_motion_graph(self, move_goal: MoveGoal):
         node_data = self.parse_motion_graph_component(motion_graph_nodes=move_goal.nodes)
-        god_map.motion_graph_manager.parse_motion_graph(nodes=node_data)
+        god_map.motion_statechart_manager.parse_motion_graph(nodes=node_data)
 
     def parse_motion_graph_component(self, motion_graph_nodes: List[giskard_msgs.MotionStatechartNode]) \
             -> List[Tuple[str, str, str, str, str, str, dict]]:
@@ -67,12 +63,12 @@ class ParseActionGoal(GiskardBehavior):
         return parsed_nodes
 
     def sanity_check(self) -> None:
-        if (not god_map.motion_graph_manager.has_end_motion_monitor()
-                and not god_map.motion_graph_manager.has_cancel_motion_monitor()):
+        if (not god_map.motion_statechart_manager.has_end_motion_monitor()
+                and not god_map.motion_statechart_manager.has_cancel_motion_monitor()):
             get_middleware().logwarn(f'No {EndMotion.__name__} or {CancelMotion.__name__} monitor specified. '
                                      f'Motion will not stop unless cancelled externally.')
             return
-        if not god_map.motion_graph_manager.has_end_motion_monitor():
+        if not god_map.motion_statechart_manager.has_end_motion_monitor():
             get_middleware().logwarn(f'No {EndMotion.__name__} monitor specified. Motion can\'t end successfully.')
 
 
@@ -118,18 +114,18 @@ class AddBaseTrajFollowerGoal(GiskardBehavior):
     @profile
     def update(self):
         local_min = LocalMinimumReached('local min')
-        god_map.motion_graph_manager.add_monitor(local_min)
+        god_map.motion_statechart_manager.add_monitor(local_min)
 
         time_monitor = TimeAbove(threshold=god_map.trajectory.length_in_seconds)
-        god_map.motion_graph_manager.add_monitor(time_monitor)
+        god_map.motion_statechart_manager.add_monitor(time_monitor)
 
         end_motion = EndMotion(start_condition=cas.logic_and(local_min.get_observation_state_expression(),
                                                              time_monitor.get_observation_state_expression()))
-        god_map.motion_graph_manager.add_monitor(end_motion)
+        god_map.motion_statechart_manager.add_monitor(end_motion)
 
         goal = BaseTrajFollower(self.joint.name, track_only_velocity=True,
                                 end_condition=local_min.get_observation_state_expression())
         goal.connect_end_condition_to_all_tasks(time_monitor.get_observation_state_expression())
-        god_map.motion_graph_manager.add_motion_goal(goal)
-        god_map.motion_graph_manager.init_task_state()
+        god_map.motion_statechart_manager.add_motion_goal(goal)
+        god_map.motion_statechart_manager.init_task_state()
         return Status.SUCCESS

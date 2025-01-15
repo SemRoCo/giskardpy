@@ -1,16 +1,15 @@
 from __future__ import division
 import numpy as np
-from typing import Optional, List, Dict, Tuple
+from typing import Optional, List, Dict
 
 import rospy
-from geometry_msgs.msg import PointStamped, Point, Vector3
-from nav_msgs.msg import Path
+from geometry_msgs.msg import PointStamped, Point
 from sensor_msgs.msg import LaserScan
 from visualization_msgs.msg import MarkerArray, Marker
 
 from giskardpy.data_types.data_types import PrefixName, Derivatives
 from giskardpy.data_types.exceptions import GoalInitalizationException, ExecutionException
-from giskardpy.goals.goal import Goal
+from giskardpy.motion_statechart.goals.goal import Goal
 from giskardpy.god_map import god_map
 from giskardpy.middleware import get_middleware
 from giskardpy.model.joints import OmniDrive
@@ -20,7 +19,7 @@ from giskardpy.motion_statechart.tasks.task import WEIGHT_BELOW_CA, WEIGHT_COLLI
 from giskardpy.motion_statechart.tasks.pointing import Pointing
 import giskardpy.casadi_wrapper as cas
 import giskardpy_ros.ros1.msg_converter as msg_converter
-from giskardpy.utils.decorators import clear_memo, memoize_with_counter
+from giskardpy.utils.decorators import clear_memo
 from giskardpy_ros.tree.blackboard_utils import raise_to_blackboard
 
 

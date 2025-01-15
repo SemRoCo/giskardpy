@@ -336,10 +336,10 @@ class MotionStatechartNodeWrapper:
 
     def _add_motion_statechart_node(self, *,
                                     class_name: str,
-                                    name: str,
+                                    name: Optional[str] = None,
                                     start_condition: str = '',
                                     pause_condition: str = '',
-                                    end_condition: Optional[str] = None,
+                                    end_condition: Optional[str] = '',
                                     reset_condition: str = '',
                                     **kwargs) -> str:
         """
@@ -352,6 +352,8 @@ class MotionStatechartNodeWrapper:
         :param end_condition: a logical expression. Goal will become inactive when this becomes True.
         :param kwargs: kwargs for __init__ function of motion_goal_class
         """
+        if name is None:
+            name = f'{self._name_prefix}{len(self._motion_graph_nodes)} [{class_name}]'
         motion_goal = MotionStatechartNode()
         motion_goal.name = name
         motion_goal.class_name = class_name
@@ -410,10 +412,10 @@ class MotionGoalWrapper(MotionStatechartNodeWrapper):
 
     def add_motion_goal(self, *,
                         class_name: str,
-                        name: str,
                         start_condition: str = '',
                         pause_condition: str = '',
-                        end_condition: Optional[str] = None,
+                        name: Optional[str] = None,
+                        end_condition: Optional[str] = '',
                         **kwargs) -> str:
         """
         Generic function to add a motion goal.
@@ -433,19 +435,19 @@ class MotionGoalWrapper(MotionStatechartNodeWrapper):
                                                    **kwargs)
 
     def add_grasp_bar(self,
-                      name: str,
                       bar_center: PointStamped,
                       bar_axis: Vector3Stamped,
                       bar_length: float,
                       tip_link: Union[str, giskard_msgs.LinkName],
                       tip_grasp_axis: Vector3Stamped,
                       root_link: Union[str, giskard_msgs.LinkName],
+                      name: Optional[str] = None,
                       reference_linear_velocity: Optional[float] = None,
                       reference_angular_velocity: Optional[float] = None,
                       weight: Optional[float] = None,
                       start_condition: str = '',
                       pause_condition: str = '',
-                      end_condition: Optional[str] = None,
+                      end_condition: Optional[str] = '',
                       **kwargs: goal_parameter) -> str:
         """
         Like a CartesianPose but with more freedom.
@@ -481,17 +483,17 @@ class MotionGoalWrapper(MotionStatechartNodeWrapper):
                                     **kwargs)
 
     def add_cartesian_pose(self,
-                           name: str,
                            goal_pose: PoseStamped,
                            tip_link: Union[str, giskard_msgs.LinkName],
                            root_link: Union[str, giskard_msgs.LinkName],
+                           name: Optional[str] = None,
                            reference_linear_velocity: Optional[float] = None,
                            reference_angular_velocity: Optional[float] = None,
                            absolute: bool = False,
                            weight: Optional[float] = None,
                            start_condition: str = '',
                            pause_condition: str = '',
-                           end_condition: Optional[str] = None,
+                           end_condition: Optional[str] = '',
                            **kwargs: goal_parameter) -> str:
         """
         This goal will use the kinematic chain between root and tip link to move tip link to the goal pose.
@@ -525,12 +527,12 @@ class MotionGoalWrapper(MotionStatechartNodeWrapper):
                                     **kwargs)
 
     def add_maximize_manipulability(self,
-                                    name: str,
                                     tip_link: Union[str, giskard_msgs.LinkName],
                                     root_link: Union[str, giskard_msgs.LinkName],
+                                    name: Optional[str] = None,
                                     start_condition: str = '',
                                     pause_condition: str = '',
-                                    end_condition: Optional[str] = None,
+                                    end_condition: Optional[str] = '',
                                     **kwargs: goal_parameter) -> str:
         """
         This goal will use the kinematic chain between root and tip link to move tip link to the goal pose.
@@ -559,16 +561,16 @@ class MotionGoalWrapper(MotionStatechartNodeWrapper):
                                     **kwargs)
 
     def add_align_planes(self,
-                         name: str,
                          goal_normal: Vector3Stamped,
                          tip_link: Union[str, giskard_msgs.LinkName],
                          tip_normal: Vector3Stamped,
                          root_link: Union[str, giskard_msgs.LinkName],
+                         name: Optional[str] = None,
                          reference_angular_velocity: Optional[float] = None,
                          weight: Optional[float] = None,
                          start_condition: str = '',
                          pause_condition: str = '',
-                         end_condition: Optional[str] = None,
+                         end_condition: Optional[str] = '',
                          **kwargs: goal_parameter) -> str:
         """
         This goal will use the kinematic chain between tip and root to align tip_normal with goal_normal.
@@ -597,13 +599,13 @@ class MotionGoalWrapper(MotionStatechartNodeWrapper):
                                     **kwargs)
 
     def add_joint_position(self,
-                           name: str,
                            goal_state: Dict[str, float],
+                           name: Optional[str] = None,
                            weight: Optional[float] = None,
                            max_velocity: Optional[float] = None,
                            start_condition: str = '',
                            pause_condition: str = '',
-                           end_condition: Optional[str] = None,
+                           end_condition: Optional[str] = '',
                            **kwargs: goal_parameter) -> str:
         """
         Sets joint position goals for all pairs in goal_state
@@ -622,13 +624,13 @@ class MotionGoalWrapper(MotionStatechartNodeWrapper):
                                     **kwargs)
 
     def add_joint_position_limit(self,
-                                 name: str,
                                  lower_upper_limits: Dict[str, Tuple[float, float]],
+                                 name: Optional[str] = None,
                                  weight: Optional[float] = None,
                                  max_velocity: Optional[float] = None,
                                  start_condition: str = '',
                                  pause_condition: str = '',
-                                 end_condition: Optional[str] = None,
+                                 end_condition: Optional[str] = '',
                                  **kwargs: goal_parameter) -> str:
         """
         Sets joint position goals for all pairs in goal_state
@@ -647,7 +649,7 @@ class MotionGoalWrapper(MotionStatechartNodeWrapper):
                                     **kwargs)
 
     def add_justin_torso_limit(self,
-                               name: str,
+                               name: Optional[str] = None,
                                root_link: Union[str, giskard_msgs.LinkName] = 'torso1',
                                tip_link: Union[str, giskard_msgs.LinkName] = 'torso4',
                                forward_distance: float = 0.05,
@@ -655,7 +657,7 @@ class MotionGoalWrapper(MotionStatechartNodeWrapper):
                                weight: float = WEIGHT_ABOVE_CA,
                                start_condition: str = '',
                                pause_condition: str = '',
-                               end_condition: Optional[str] = None,
+                               end_condition: Optional[str] = '',
                                **kwargs: goal_parameter) -> str:
         if isinstance(root_link, str):
             root_link = giskard_msgs.LinkName(name=root_link)
@@ -674,16 +676,16 @@ class MotionGoalWrapper(MotionStatechartNodeWrapper):
                                     **kwargs)
 
     def add_cartesian_position(self,
-                               name: str,
                                goal_point: PointStamped,
                                tip_link: Union[str, giskard_msgs.LinkName],
                                root_link: Union[str, giskard_msgs.LinkName],
+                               name: Optional[str] = None,
                                reference_velocity: Optional[float] = 0.2,
                                weight: Optional[float] = None,
                                absolute: bool = False,
                                start_condition: str = '',
                                pause_condition: str = '',
-                               end_condition: Optional[str] = None,
+                               end_condition: Optional[str] = '',
                                **kwargs: goal_parameter) -> str:
         """
         Will use kinematic chain between root_link and tip_link to move tip_link to goal_point.
@@ -712,16 +714,16 @@ class MotionGoalWrapper(MotionStatechartNodeWrapper):
                                     **kwargs)
 
     def add_cartesian_orientation(self,
-                                  name: str,
                                   goal_orientation: QuaternionStamped,
                                   tip_link: Union[str, giskard_msgs.LinkName],
                                   root_link: Union[str, giskard_msgs.LinkName],
+                                  name: Optional[str] = None,
                                   reference_velocity: Optional[float] = None,
                                   weight: Optional[float] = None,
                                   absolute: bool = False,
                                   start_condition: str = '',
                                   pause_condition: str = '',
-                                  end_condition: Optional[str] = None,
+                                  end_condition: Optional[str] = '',
                                   **kwargs: goal_parameter) -> str:
         """
         Will use kinematic chain between root_link and tip_link to move tip_link to goal_orientation.
@@ -751,17 +753,17 @@ class MotionGoalWrapper(MotionStatechartNodeWrapper):
                                     **kwargs)
 
     def add_pointing(self,
-                     name: str,
                      goal_point: PointStamped,
                      tip_link: Union[str, giskard_msgs.LinkName],
                      pointing_axis: Vector3Stamped,
                      root_link: Union[str, giskard_msgs.LinkName],
+                     name: Optional[str] = None,
                      max_velocity: float = 0.3,
                      threshold: float = 0.01,
                      weight: Optional[float] = None,
                      start_condition: str = '',
                      pause_condition: str = '',
-                     end_condition: Optional[str] = None,
+                     end_condition: Optional[str] = '',
                      **kwargs: goal_parameter) -> str:
         """
         Will orient pointing_axis at goal_point.
@@ -912,13 +914,13 @@ class MotionGoalWrapper(MotionStatechartNodeWrapper):
                                       end_condition=end_condition)
 
     def add_avoid_joint_limits(self,
-                               name: str,
+                               name: Optional[str] = None,
                                percentage: int = 15,
                                joint_list: Optional[List[str]] = None,
                                weight: Optional[float] = None,
                                start_condition: str = '',
                                pause_condition: str = '',
-                               end_condition: Optional[str] = None) -> str:
+                               end_condition: str = '') -> str:
         """
         This goal will push joints away from their position limits. For example if percentage is 15 and the joint
         limits are 0-100, it will push it into the 15-85 range.
@@ -933,14 +935,14 @@ class MotionGoalWrapper(MotionStatechartNodeWrapper):
                                     end_condition=end_condition)
 
     def add_close_container(self,
-                            name: str,
                             tip_link: Union[str, giskard_msgs.LinkName],
                             environment_link: Union[str, giskard_msgs.LinkName],
+                            name: Optional[str] = None,
                             goal_joint_state: Optional[float] = None,
                             weight: Optional[float] = None,
                             start_condition: str = '',
                             pause_condition: str = '',
-                            end_condition: Optional[str] = None) -> str:
+                            end_condition: str = '') -> str:
         """
         Same as Open, but will use minimum value as default for goal_joint_state
         """
@@ -959,14 +961,14 @@ class MotionGoalWrapper(MotionStatechartNodeWrapper):
                                     end_condition=end_condition)
 
     def add_open_container(self,
-                           name: str,
                            tip_link: Union[str, giskard_msgs.LinkName],
                            environment_link: Union[str, giskard_msgs.LinkName],
+                           name: Optional[str] = None,
                            goal_joint_state: Optional[float] = None,
                            weight: Optional[float] = None,
                            start_condition: str = '',
                            pause_condition: str = '',
-                           end_condition: Optional[str] = None) -> str:
+                           end_condition: str = '') -> str:
         """
         Open a container in an environment.
         Only works with the environment was added as urdf.
@@ -992,18 +994,18 @@ class MotionGoalWrapper(MotionStatechartNodeWrapper):
                                     end_condition=end_condition)
 
     def add_align_to_push_door(self,
-                               name: str,
                                root_link: str,
                                tip_link: str,
                                door_object: str,
                                door_handle: str,
                                tip_gripper_axis: Vector3Stamped,
                                weight: float,
+                               name: Optional[str] = None,
                                tip_group: Optional[str] = None,
                                root_group: Optional[str] = None,
                                start_condition: str = '',
                                pause_condition: str = '',
-                               end_condition: Optional[str] = None) -> str:
+                               end_condition: str = '') -> str:
         """
         Aligns the tip_link with the door_object to push it open. Only works if the door object is part of the urdf.
         The door has to be open a little before aligning.
@@ -1031,19 +1033,19 @@ class MotionGoalWrapper(MotionStatechartNodeWrapper):
                                     end_condition=end_condition)
 
     def add_pre_push_door(self,
-                          name: str,
                           root_link: str,
                           tip_link: str,
                           door_object: str,
                           door_handle: str,
                           weight: float,
+                          name: Optional[str] = None,
                           tip_group: Optional[str] = None,
                           root_group: Optional[str] = None,
                           reference_linear_velocity: Optional[float] = None,
                           reference_angular_velocity: Optional[float] = None,
                           start_condition: str = '',
                           pause_condition: str = '',
-                          end_condition: Optional[str] = None) -> str:
+                          end_condition: str = '') -> str:
         """
         Positions the gripper in contact with the door before pushing to open.
         : param root_link: root link of the kinematic chain
@@ -1069,16 +1071,16 @@ class MotionGoalWrapper(MotionStatechartNodeWrapper):
                                     end_condition=end_condition)
 
     def add_diff_drive_base(self,
-                            name: str,
                             goal_pose: PoseStamped,
                             tip_link: Union[str, giskard_msgs.LinkName],
                             root_link: Union[str, giskard_msgs.LinkName],
+                            name: Optional[str] = None,
                             reference_linear_velocity: Optional[float] = None,
                             reference_angular_velocity: Optional[float] = None,
                             weight: Optional[float] = None,
                             start_condition: str = '',
                             pause_condition: str = '',
-                            end_condition: Optional[str] = None,
+                            end_condition: Optional[str] = '',
                             **kwargs: goal_parameter) -> str:
         """
         This goal will use the kinematic chain between root and tip link to move tip link into the goal pose.
@@ -1110,16 +1112,16 @@ class MotionGoalWrapper(MotionStatechartNodeWrapper):
                                     **kwargs)
 
     def add_limit_cartesian_velocity(self,
-                                     name: str,
                                      tip_link: Union[str, giskard_msgs.LinkName],
                                      root_link: Union[str, giskard_msgs.LinkName],
+                                     name: Optional[str] = None,
                                      max_linear_velocity: float = 0.1,
                                      max_angular_velocity: float = 0.5,
                                      weight: Optional[float] = None,
                                      hard: bool = False,
                                      start_condition: str = '',
                                      pause_condition: str = '',
-                                     end_condition: Optional[str] = None,
+                                     end_condition: Optional[str] = '',
                                      **kwargs: goal_parameter) -> str:
         """
         This goal will use put a strict limit on the Cartesian velocity. This will require a lot of constraints, thus
@@ -1148,18 +1150,18 @@ class MotionGoalWrapper(MotionStatechartNodeWrapper):
                                     **kwargs)
 
     def add_real_time_pointing(self,
-                               name: str,
                                tip_link: str,
                                pointing_axis: Vector3Stamped,
                                root_link: str,
                                topic_name: str,
+                               name: Optional[str] = None,
                                tip_group: Optional[str] = None,
                                root_group: Optional[str] = None,
                                max_velocity: float = 0.3,
                                weight: Optional[float] = None,
                                start_condition: str = '',
                                pause_condition: str = '',
-                               end_condition: Optional[str] = None,
+                               end_condition: Optional[str] = '',
                                **kwargs: goal_parameter) -> str:
         """
         Will orient pointing_axis at goal_point.
@@ -1187,7 +1189,7 @@ class MotionGoalWrapper(MotionStatechartNodeWrapper):
                                     **kwargs)
 
     def add_carry_my_luggage(self,
-                             name: str,
+                             name: Optional[str] = None,
                              tracked_human_position_topic_name: str = '/robokudovanessa/human_position',
                              laser_topic_name: str = '/hsrb/base_scan',
                              point_cloud_laser_topic_name: Optional[str] = None,
@@ -1215,7 +1217,7 @@ class MotionGoalWrapper(MotionStatechartNodeWrapper):
                              enable_laser_avoidance: bool = True,
                              start_condition: str = '',
                              pause_condition: str = '',
-                             end_condition: Optional[str] = None) -> str:
+                             end_condition: str = '') -> str:
         """
         :param name: name of the goal
         :param tracked_human_position_topic_name: name of the topic where the tracked human is published
@@ -1284,8 +1286,8 @@ class MotionGoalWrapper(MotionStatechartNodeWrapper):
                                     end_condition=end_condition)
 
     def add_follow_nav_path(self,
-                            name: str,
                             path: Path,
+                            name: Optional[str] = None,
                             laser_topics: Tuple[str] = ('/hsrb/base_scan',),
                             odom_joint_name: Optional[str] = None,
                             root_link: Optional[str] = None,
@@ -1305,7 +1307,7 @@ class MotionGoalWrapper(MotionStatechartNodeWrapper):
                             laser_frame_id: str = 'base_range_sensor_link',
                             start_condition: str = '',
                             pause_condition: str = '',
-                            end_condition: Optional[str] = None) -> str:
+                            end_condition: str = '') -> str:
         """
         Will follow the path, orienting itself and the head towards the next points in the list.
         At the end orient itself according to the final orientation in it. All other orientations will be ignored.
@@ -1359,7 +1361,7 @@ class MotionGoalWrapper(MotionStatechartNodeWrapper):
 
     def set_seed_configuration(self,
                                seed_configuration: Dict[str, float],
-                               name: str,
+                               name: Optional[str] = None,
                                group_name: Optional[str] = None):
         """
         Only meant for use with projection. Changes the world state to seed_configuration before starting planning,
@@ -1369,7 +1371,7 @@ class MotionGoalWrapper(MotionStatechartNodeWrapper):
 
     def set_seed_odometry(self,
                           base_pose: PoseStamped,
-                          name: str,
+                          name: Optional[str] = None,
                           group_name: Optional[str] = None):
         """
         Only meant for use with projection. Overwrites the odometry transform with base_pose.
@@ -1377,17 +1379,17 @@ class MotionGoalWrapper(MotionStatechartNodeWrapper):
         raise DeprecationWarning('please use monitors.set_seed_odometry instead')
 
     def add_cartesian_pose_straight(self,
-                                    name: str,
                                     goal_pose: PoseStamped,
                                     tip_link: Union[str, giskard_msgs.LinkName],
                                     root_link: Union[str, giskard_msgs.LinkName],
+                                    name: Optional[str] = None,
                                     reference_linear_velocity: Optional[float] = None,
                                     reference_angular_velocity: Optional[float] = None,
                                     weight: Optional[float] = None,
                                     absolute: bool = False,
                                     start_condition: str = '',
                                     pause_condition: str = '',
-                                    end_condition: Optional[str] = None,
+                                    end_condition: Optional[str] = '',
                                     **kwargs: goal_parameter) -> str:
         """
         This goal will use the kinematic chain between root and tip link to move tip link into the goal pose.
@@ -1421,16 +1423,16 @@ class MotionGoalWrapper(MotionStatechartNodeWrapper):
                                     **kwargs)
 
     def add_cartesian_position_straight(self,
-                                        name: str,
                                         goal_point: PointStamped,
                                         tip_link: Union[str, giskard_msgs.LinkName],
                                         root_link: Union[str, giskard_msgs.LinkName],
+                                        name: Optional[str] = None,
                                         reference_velocity: float = None,
                                         weight: Optional[float] = None,
                                         absolute: bool = False,
                                         start_condition: str = '',
                                         pause_condition: str = '',
-                                        end_condition: Optional[str] = None,
+                                        end_condition: Optional[str] = '',
                                         **kwargs: goal_parameter) -> str:
         """
         Same as set_translation_goal, but will try to move in a straight line.
@@ -1453,16 +1455,16 @@ class MotionGoalWrapper(MotionStatechartNodeWrapper):
                                     **kwargs)
 
     def add_align_perpendicular(self,
-                                name: str,
                                 reference_normal: Vector3Stamped,
                                 tip_link: Union[str, giskard_msgs.LinkName],
                                 tip_normal: Vector3Stamped,
                                 root_link: Union[str, giskard_msgs.LinkName],
+                                name: Optional[str] = None,
                                 reference_velocity: Optional[float] = None,
                                 weight: Optional[float] = None,
                                 start_condition: str = '',
                                 pause_condition: str = '',
-                                end_condition: Optional[str] = None,
+                                end_condition: Optional[str] = '',
                                 **kwargs: goal_parameter) -> str:
         if isinstance(root_link, str):
             root_link = giskard_msgs.LinkName(name=root_link)
@@ -1482,18 +1484,18 @@ class MotionGoalWrapper(MotionStatechartNodeWrapper):
                                     **kwargs)
 
     def add_height(self,
-                   name: str,
                    reference_point: PointStamped,
                    tip_point: PointStamped,
                    tip_link: Union[str, giskard_msgs.LinkName],
                    root_link: Union[str, giskard_msgs.LinkName],
                    lower_limit: float,
                    upper_limit: float,
+                   name: Optional[str] = None,
                    reference_velocity: Optional[float] = None,
                    weight: Optional[float] = None,
                    start_condition: str = '',
                    pause_condition: str = '',
-                   end_condition: Optional[str] = None,
+                   end_condition: Optional[str] = '',
                    **kwargs: goal_parameter) -> str:
         if isinstance(root_link, str):
             root_link = giskard_msgs.LinkName(name=root_link)
@@ -1515,18 +1517,18 @@ class MotionGoalWrapper(MotionStatechartNodeWrapper):
                                     **kwargs)
 
     def add_distance(self,
-                     name: str,
                      reference_point: PointStamped,
                      tip_point: PointStamped,
                      tip_link: Union[str, giskard_msgs.LinkName],
                      root_link: Union[str, giskard_msgs.LinkName],
                      lower_limit: float,
                      upper_limit: float,
+                     name: Optional[str] = None,
                      reference_velocity: Optional[float] = None,
                      weight: Optional[float] = None,
                      start_condition: str = '',
                      pause_condition: str = '',
-                     end_condition: Optional[str] = None,
+                     end_condition: Optional[str] = '',
                      **kwargs: goal_parameter) -> str:
         if isinstance(root_link, str):
             root_link = giskard_msgs.LinkName(name=root_link)
@@ -1548,18 +1550,18 @@ class MotionGoalWrapper(MotionStatechartNodeWrapper):
                                     **kwargs)
 
     def add_angle(self,
-                  name: str,
                   reference_vector: Vector3Stamped,
                   tip_link: Union[str, giskard_msgs.LinkName],
                   tip_vector: Vector3Stamped,
                   root_link: Union[str, giskard_msgs.LinkName],
                   lower_angle: float,
                   upper_angle: float,
+                  name: Optional[str] = None,
                   reference_velocity: Optional[float] = None,
                   weight: Optional[float] = None,
                   start_condition: str = '',
                   pause_condition: str = '',
-                  end_condition: Optional[str] = None,
+                  end_condition: Optional[str] = '',
                   **kwargs: goal_parameter) -> str:
         if isinstance(root_link, str):
             root_link = giskard_msgs.LinkName(name=root_link)
@@ -1590,10 +1592,10 @@ class MonitorWrapper(MotionStatechartNodeWrapper):
 
     def add_monitor(self, *,
                     class_name: str,
-                    name: str,
+                    name: Optional[str] = None,
                     start_condition: str = '',
                     pause_condition: str = '',
-                    end_condition: Optional[str] = None,
+                    end_condition: Optional[str] = '',
                     reset_condition: str = '',
                     **kwargs) -> str:
         """
@@ -1616,10 +1618,10 @@ class MonitorWrapper(MotionStatechartNodeWrapper):
                                                    **kwargs)
 
     def add_local_minimum_reached(self,
-                                  name: str,
+                                  name: Optional[str] = None,
                                   start_condition: str = '',
                                   pause_condition: str = '',
-                                  end_condition: Optional[str] = None) -> str:
+                                  end_condition: str = '') -> str:
         """
         True if the world is currently in a local minimum.
         """
@@ -1631,10 +1633,10 @@ class MonitorWrapper(MotionStatechartNodeWrapper):
 
     def add_time_above(self,
                        threshold: float,
-                       name: str,
+                       name: Optional[str] = None,
                        start_condition: str = '',
                        pause_condition: str = '',
-                       end_condition: Optional[str] = None) -> str:
+                       end_condition: str = '') -> str:
         """
         True if the length of the trajectory is above threshold
         """
@@ -1646,12 +1648,12 @@ class MonitorWrapper(MotionStatechartNodeWrapper):
                                 threshold=threshold)
 
     def add_joint_position(self,
-                           name: str,
                            goal_state: Dict[str, float],
+                           name: Optional[str] = None,
                            threshold: float = 0.01,
                            start_condition: str = '',
                            pause_condition: str = '',
-                           end_condition: Optional[str] = None) -> str:
+                           end_condition: str = '') -> str:
         """
         True if all joints in goal_state are closer than threshold to their respective value.
         """
@@ -1664,16 +1666,16 @@ class MonitorWrapper(MotionStatechartNodeWrapper):
                                 end_condition=end_condition)
 
     def add_cartesian_pose(self,
-                           name: str,
                            root_link: Union[str, giskard_msgs.LinkName],
                            tip_link: Union[str, giskard_msgs.LinkName],
                            goal_pose: PoseStamped,
+                           name: Optional[str] = None,
                            position_threshold: float = 0.01,
                            orientation_threshold: float = 0.01,
                            absolute: bool = False,
                            start_condition: str = '',
                            pause_condition: str = '',
-                           end_condition: Optional[str] = None) -> str:
+                           end_condition: str = '') -> str:
         """
         True if tip_link is closer than the thresholds to goal_pose.
         """
@@ -1694,15 +1696,15 @@ class MonitorWrapper(MotionStatechartNodeWrapper):
                                 orientation_threshold=orientation_threshold)
 
     def add_cartesian_position(self,
-                               name: str,
                                root_link: Union[str, giskard_msgs.LinkName],
                                tip_link: Union[str, giskard_msgs.LinkName],
                                goal_point: PointStamped,
+                               name: Optional[str] = None,
                                threshold: float = 0.01,
                                absolute: bool = False,
                                start_condition: str = '',
                                pause_condition: str = '',
-                               end_condition: Optional[str] = None) -> str:
+                               end_condition: str = '') -> str:
         """
         True if tip_link is closer than threshold to goal_point.
         """
@@ -1727,11 +1729,10 @@ class MonitorWrapper(MotionStatechartNodeWrapper):
                              center_point: PointStamped,
                              line_axis: Vector3Stamped,
                              line_length: float,
-                             name: str,
-                             stay_true: bool = True,
+                             name: Optional[str] = None,
                              start_condition: str = '',
                              pause_condition: str = '',
-                             end_condition: Optional[str] = None,
+                             end_condition: Optional[str] = '',
                              threshold: float = 0.01) -> str:
         """
         True if tip_link is closer than threshold to the line defined by center_point, line_axis and line_length.
@@ -1753,15 +1754,15 @@ class MonitorWrapper(MotionStatechartNodeWrapper):
                                 threshold=threshold)
 
     def add_cartesian_orientation(self,
-                                  name: str,
                                   root_link: Union[str, giskard_msgs.LinkName],
                                   tip_link: Union[str, giskard_msgs.LinkName],
                                   goal_orientation: QuaternionStamped,
+                                  name: Optional[str] = None,
                                   threshold: float = 0.01,
                                   absolute: bool = False,
                                   start_condition: str = '',
                                   pause_condition: str = '',
-                                  end_condition: Optional[str] = None) -> str:
+                                  end_condition: str = '') -> str:
         """
         True if tip_link is closer than threshold to goal_orientation
         """
@@ -1785,10 +1786,10 @@ class MonitorWrapper(MotionStatechartNodeWrapper):
                         tip_link: Union[str, giskard_msgs.LinkName],
                         pointing_axis: Vector3Stamped,
                         root_link: Union[str, giskard_msgs.LinkName],
-                        name: str,
+                        name: Optional[str] = None,
                         start_condition: str = '',
                         pause_condition: str = '',
-                        end_condition: Optional[str] = None,
+                        end_condition: Optional[str] = '',
                         threshold: float = 0.01) -> str:
         """
         True if pointing_axis of tip_link is pointing at goal_point withing threshold.
@@ -1813,10 +1814,10 @@ class MonitorWrapper(MotionStatechartNodeWrapper):
                             tip_link: Union[str, giskard_msgs.LinkName],
                             goal_normal: Vector3Stamped,
                             tip_normal: Vector3Stamped,
-                            name: str,
+                            name: Optional[str] = None,
                             start_condition: str = '',
                             pause_condition: str = '',
-                            end_condition: Optional[str] = None,
+                            end_condition: Optional[str] = '',
                             threshold: float = 0.01) -> str:
         """
         True if tip_normal of tip_link is aligned with goal_normal within threshold.
@@ -1892,11 +1893,12 @@ class MonitorWrapper(MotionStatechartNodeWrapper):
         return self.add_monitor(class_name=Print.__name__,
                                 name=name,
                                 message=message,
-                                start_condition=start_condition)
+                                start_condition=start_condition,
+                                end_condition=name)
 
     def add_sleep(self,
-                  name: str,
                   seconds: float,
+                  name: Optional[str] = None,
                   start_condition: str = '') -> str:
         """
         Calls rospy.sleep(seconds) when start_condition are True and turns True itself afterward.
@@ -1904,11 +1906,12 @@ class MonitorWrapper(MotionStatechartNodeWrapper):
         return self.add_monitor(class_name=Sleep.__name__,
                                 name=name,
                                 seconds=seconds,
-                                start_condition=start_condition)
+                                start_condition=start_condition,
+                                end_condition=name)
 
     def add_set_seed_configuration(self,
                                    seed_configuration: Dict[str, float],
-                                   name: str,
+                                   name: Optional[str] = None,
                                    group_name: Optional[str] = None,
                                    start_condition: str = '') -> str:
         """
@@ -1919,11 +1922,12 @@ class MonitorWrapper(MotionStatechartNodeWrapper):
                                 seed_configuration=seed_configuration,
                                 group_name=group_name,
                                 name=name,
-                                start_condition=start_condition)
+                                start_condition=start_condition,
+                                end_condition=name)
 
     def add_set_seed_odometry(self,
                               base_pose: PoseStamped,
-                              name: str,
+                              name: Optional[str] = None,
                               group_name: Optional[str] = None,
                               start_condition: str = '') -> str:
         """
@@ -1933,7 +1937,8 @@ class MonitorWrapper(MotionStatechartNodeWrapper):
                                 group_name=group_name,
                                 base_pose=base_pose,
                                 name=name,
-                                start_condition=start_condition)
+                                start_condition=start_condition,
+                                end_condition=name)
 
     def add_set_prediction_horizon(self, prediction_horizon: int, **kwargs: goal_parameter):
         """
@@ -1946,10 +1951,10 @@ class MonitorWrapper(MotionStatechartNodeWrapper):
                          **kwargs)
 
     def add_alternator(self,
-                       name: str,
+                       name: Optional[str] = None,
                        start_condition: str = '',
                        pause_condition: str = '',
-                       end_condition: Optional[str] = None,
+                       end_condition: Optional[str] = '',
                        mod: int = 2) -> str:
         """
         Testing monitor.
@@ -1965,10 +1970,10 @@ class MonitorWrapper(MotionStatechartNodeWrapper):
                                 mod=mod)
 
     def add_payload_alternator(self,
-                               name: str,
+                               name: Optional[str] = None,
                                start_condition: str = '',
                                pause_condition: str = '',
-                               end_condition: Optional[str] = None,
+                               end_condition: Optional[str] = '',
                                mod: int = 2) -> str:
         """
         Testing monitor.
@@ -1984,12 +1989,12 @@ class MonitorWrapper(MotionStatechartNodeWrapper):
                                 mod=mod)
 
     def add_pulse(self,
-                  name: str,
                   after_ticks: int,
+                  name: Optional[str] = None,
                   true_for_ticks: int = 1,
                   start_condition: str = '',
                   pause_condition: str = '',
-                  end_condition: Optional[str] = None) -> str:
+                  end_condition: str = '') -> str:
         """
         Testing monitor.
         Like add_alternator but as a PayloadMonitor.
@@ -2003,10 +2008,10 @@ class MonitorWrapper(MotionStatechartNodeWrapper):
                                 end_condition=end_condition)
 
     def add_const_true(self,
-                       name: str,
+                       name: Optional[str] = None,
                        start_condition: str = '',
                        pause_condition: str = '',
-                       end_condition: Optional[str] = None) -> str:
+                       end_condition: str = '') -> str:
         """
         Testing monitor.
         Like add_alternator but as a PayloadMonitor.
@@ -2018,10 +2023,10 @@ class MonitorWrapper(MotionStatechartNodeWrapper):
                                 end_condition=end_condition)
 
     def add_const_false(self,
-                        name: str,
+                        name: Optional[str] = None,
                         start_condition: str = '',
                         pause_condition: str = '',
-                        end_condition: Optional[str] = None) -> str:
+                        end_condition: str = '') -> str:
         """
         Testing monitor.
         Like add_alternator but as a PayloadMonitor.
@@ -2037,10 +2042,10 @@ class MonitorWrapper(MotionStatechartNodeWrapper):
                                   tip_link: Union[str, giskard_msgs.LinkName],
                                   reference_normal: Vector3Stamped,
                                   tip_normal: Vector3Stamped,
-                                  name: str,
+                                  name: Optional[str] = None,
                                   start_condition: str = '',
                                   pause_condition: str = '',
-                                  end_condition: Optional[str] = None,
+                                  end_condition: Optional[str] = '',
                                   threshold: float = 0.01) -> str:
         """
         True if tip_normal of tip_link is perpendicular to goal_normal within threshold.
@@ -2067,10 +2072,10 @@ class MonitorWrapper(MotionStatechartNodeWrapper):
                   tip_vector: Vector3Stamped,
                   lower_angle: float,
                   upper_angle: float,
-                  name: str,
+                  name: Optional[str] = None,
                   start_condition: str = '',
                   pause_condition: str = '',
-                  end_condition: Optional[str] = None) -> str:
+                  end_condition: str = '') -> str:
         """
         True if angle between tip_vector and reference_vector is within lower and upper angle.
         """
@@ -2097,10 +2102,10 @@ class MonitorWrapper(MotionStatechartNodeWrapper):
                    tip_point: PointStamped,
                    lower_limit: float,
                    upper_limit: float,
-                   name: str,
+                   name: Optional[str] = None,
                    start_condition: str = '',
                    pause_condition: str = '',
-                   end_condition: Optional[str] = None) -> str:
+                   end_condition: str = '') -> str:
         """
         True if distance along the z-axis of root_link between tip_point and reference_point
         is within lower and upper limit.
@@ -2128,10 +2133,10 @@ class MonitorWrapper(MotionStatechartNodeWrapper):
                      tip_point: PointStamped,
                      lower_limit: float,
                      upper_limit: float,
-                     name: str,
+                     name: Optional[str] = None,
                      start_condition: str = '',
                      pause_condition: str = '',
-                     end_condition: Optional[str] = None) -> str:
+                     end_condition: str = '') -> str:
         """
         True if distance between tip_point and reference_point on the plane (that has the z-axis of
         root_link as a normal vector) is within lower and upper limit.
@@ -2248,7 +2253,10 @@ class GiskardWrapper:
             end_motion_condition += f'{monitor_part}'
         motion_goal_part = self.motion_goals.get_anded_nodes(add_nodes_without_end_condition=False)
         if len(motion_goal_part) > 0:
-            end_motion_condition += f' and {motion_goal_part}'
+            if len(end_motion_condition) > 0:
+                end_motion_condition += f' and {motion_goal_part}'
+            else:
+                end_motion_condition = motion_goal_part
         self.monitors.add_end_motion(start_condition=end_motion_condition)
         self.monitors.add_cancel_motion(start_condition=local_min_reached_monitor_name,
                                         error=LocalMinimumException(f'local minimum reached'))

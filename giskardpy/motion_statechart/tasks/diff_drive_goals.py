@@ -4,28 +4,23 @@ from typing import Optional
 
 import giskardpy.casadi_wrapper as cas
 from giskardpy.data_types.data_types import PrefixName
-from giskardpy.motion_statechart.goals.goal import Goal
-from giskardpy.motion_statechart.tasks.task import WEIGHT_ABOVE_CA
 from giskardpy.god_map import god_map
+from giskardpy.motion_statechart.tasks.task import WEIGHT_ABOVE_CA, Task
 
 
-class DiffDriveTangentialToPoint(Goal):
+class DiffDriveTangentialToPoint(Task):
 
     def __init__(self,
                  goal_point: cas.Point3,
                  forward: Optional[cas.Vector3] = None,
                  group_name: Optional[str] = None,
-                 reference_velocity: float = 0.5, weight: bool = WEIGHT_ABOVE_CA, drive: bool = False,
-                 name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.BinaryTrue,
-                 pause_condition: cas.Expression = cas.BinaryFalse,
-                 end_condition: cas.Expression = cas.BinaryFalse
-                 ):
+                 weight: bool = WEIGHT_ABOVE_CA, drive: bool = False,
+                 name: Optional[str] = None):
         self.tip = god_map.world.search_for_link_name('base_footprint', group_name)
         self.root = god_map.world.root_link_name
         if name is None:
             name = f'{self.__class__.__name__}/{self.root}/{self.tip}'
-        super().__init__(name)
+        super().__init__(name=name)
         self.goal_point = god_map.world.transform(god_map.world.root_link_name, goal_point)
         self.goal_point.z = 0
         self.weight = weight
@@ -47,10 +42,9 @@ class DiffDriveTangentialToPoint(Goal):
         tip_V_pointing_axis = cas.Vector3(self.tip_V_pointing_axis)
         map_V_forward = cas.dot(map_T_base, tip_V_pointing_axis)
 
-        task = self.create_and_add_task()
         if self.drive:
             angle = cas.abs(cas.angle_between_vector(map_V_forward, map_V_tangent))
-            task.add_equality_constraint(reference_velocity=0.5,
+            self.add_equality_constraint(reference_velocity=0.5,
                                          equality_bound=-angle,
                                          weight=self.weight,
                                          task_expression=angle,
@@ -63,14 +57,14 @@ class DiffDriveTangentialToPoint(Goal):
             axis, map_current_angle = map_R_base.to_axis_angle()
             map_current_angle = cas.if_greater_zero(axis[2], map_current_angle, -map_current_angle)
             angle_error = cas.shortest_angular_distance(map_current_angle, goal_angle)
-            task.add_equality_constraint(reference_velocity=0.5,
+            self.add_equality_constraint(reference_velocity=0.5,
                                          equality_bound=angle_error,
                                          weight=self.weight,
                                          task_expression=map_current_angle,
                                          name='/rot')
 
 
-class KeepHandInWorkspace(Goal):
+class KeepHandInWorkspace(Task):
     def __init__(self,
                  tip_link: PrefixName,
                  base_footprint: Optional[PrefixName] = None,
@@ -78,11 +72,7 @@ class KeepHandInWorkspace(Goal):
                  pointing_axis: Optional[cas.Vector3] = None,
                  max_velocity: float = 0.3,
                  weight: float = WEIGHT_ABOVE_CA,
-                 name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.BinaryTrue,
-                 pause_condition: cas.Expression = cas.BinaryFalse,
-                 end_condition: cas.Expression = cas.BinaryFalse
-                 ):
+                 name: Optional[str] = None):
         if base_footprint is None:
             base_footprint = god_map.world.search_for_link_name('base_footprint')
         if map_frame is None:
@@ -94,7 +84,7 @@ class KeepHandInWorkspace(Goal):
         self.base_footprint = base_footprint
         if name is None:
             name = f'{self.__class__.__name__}/{self.base_footprint}/{self.tip_link}'
-        super().__init__(name)
+        super().__init__(name=name)
 
         if pointing_axis is not None:
             self.map_V_pointing_axis = god_map.world.transform(self.base_footprint, pointing_axis)
@@ -119,11 +109,9 @@ class KeepHandInWorkspace(Goal):
 
         map_V_tip.scale(1)
         angle_error = cas.angle_between_vector(base_footprint_V_tip, map_V_pointing_axis)
-        task = self.create_and_add_task()
-        task.add_inequality_constraint(reference_velocity=0.5,
+        self.add_inequality_constraint(reference_velocity=0.5,
                                        lower_error=-angle_error - 0.2,
                                        upper_error=-angle_error + 0.2,
                                        weight=weight,
                                        task_expression=angle_error,
                                        name='/rot')
-        self.connect_monitors_to_all_tasks(start_condition, pause_condition, end_condition)

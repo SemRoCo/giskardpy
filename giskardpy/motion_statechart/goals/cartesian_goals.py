@@ -10,7 +10,7 @@ from giskardpy.motion_statechart.goals.goal import Goal
 from giskardpy.god_map import god_map
 from giskardpy.model.joints import DiffDrive
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPosition, CartesianOrientation, \
-    CartesianPositionStraight
+    CartesianPositionStraight, CartesianPose
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.motion_statechart.tasks.task import WEIGHT_ABOVE_CA, Task
 
@@ -199,18 +199,18 @@ class RelativePositionSequence(Goal):
         super().__init__(name=name)
         name1 = f'{self.name}/goal1'
         name2 = f'{self.name}/goal2'
-        goal1 = CartesianPose(root_link=root_link,
+        task1 = CartesianPose(root_link=root_link,
                               tip_link=tip_link,
                               goal_pose=goal1,
                               name=name1,
                               absolute=True)
-        self.add_goal(goal1)
-        goal2 = CartesianPose(root_link=root_link,
+        self.add_task(task1)
+        task2 = CartesianPose(root_link=root_link,
                               tip_link=tip_link,
                               goal_pose=goal2,
                               name=name2,
                               absolute=True)
-        self.add_goal(goal2)
-        goal2.start_condition = goal1.get_observation_state_expression()
-        goal1.end_condition = goal1.get_observation_state_expression()
-        self.expression = goal2.expression
+        self.add_task(task2)
+        task2.start_condition = task1.get_observation_state_expression()
+        task1.end_condition = task1.get_observation_state_expression()
+        self.expression = task2.expression

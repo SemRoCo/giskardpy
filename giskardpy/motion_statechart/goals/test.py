@@ -5,7 +5,7 @@ from typing import Optional
 from giskardpy.data_types.data_types import PrefixName
 from giskardpy.motion_statechart.goals.goal import Goal
 from giskardpy.motion_statechart.monitors.monitors import TrueMonitor, CancelMotion
-from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPoseAsTask
+from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
 from giskardpy.motion_statechart.tasks.task import WEIGHT_ABOVE_CA
 from giskardpy.god_map import god_map
@@ -47,21 +47,21 @@ class GraspSequence(Goal):
                                            weight=self.weight)
         self.add_task(gripper_closed)
 
-        grasp = CartesianPoseAsTask(root_link=self.root_link,
-                                    tip_link=self.tip_link,
-                                    name=f'{self.name}/grasp',
-                                    goal_pose=goal_pose,
-                                    weight=self.weight)
+        grasp = CartesianPose(root_link=self.root_link,
+                              tip_link=self.tip_link,
+                              name=f'{self.name}/grasp',
+                              goal_pose=goal_pose,
+                              weight=self.weight)
         self.add_task(grasp)
 
         lift_pose = god_map.world.transform(god_map.world.root_link_name, goal_pose)
         lift_pose.z += 0.1
 
-        lift = CartesianPoseAsTask(root_link=self.root_link,
-                                   tip_link=self.tip_link,
-                                   name=f'{self.name}/lift',
-                                   goal_pose=lift_pose,
-                                   weight=self.weight)
+        lift = CartesianPose(root_link=self.root_link,
+                             tip_link=self.tip_link,
+                             name=f'{self.name}/lift',
+                             goal_pose=lift_pose,
+                             weight=self.weight)
         self.add_task(lift)
         self.arrange_in_sequence([gripper_open, grasp, gripper_closed, lift])
         self.expression = lift.get_observation_state_expression()
@@ -93,11 +93,11 @@ class Cutting(Goal):
 
         schnibble_down_pose = god_map.world.compute_fk(root_link=self.tip_link, tip_link=self.tip_link)
         schnibble_down_pose.x = -depth
-        cut_down = CartesianPoseAsTask(root_link=self.root_link,
-                                       name=f'{self.name}/Down',
-                                       goal_pose=schnibble_down_pose,
-                                       tip_link=self.tip_link,
-                                       absolute=False)
+        cut_down = CartesianPose(root_link=self.root_link,
+                                 name=f'{self.name}/Down',
+                                 goal_pose=schnibble_down_pose,
+                                 tip_link=self.tip_link,
+                                 absolute=False)
         self.add_task(cut_down)
 
         made_contact = TrueMonitor(name=f'{self.name}/Made Contact?')
@@ -112,20 +112,20 @@ class Cutting(Goal):
 
         schnibble_up_pose = god_map.world.compute_fk(root_link=self.tip_link, tip_link=self.tip_link)
         schnibble_up_pose.x = depth
-        cut_up = CartesianPoseAsTask(root_link=self.root_link,
-                                     name=f'{self.name}/Up',
-                                     goal_pose=schnibble_up_pose,
-                                     tip_link=self.tip_link,
-                                     absolute=False)
+        cut_up = CartesianPose(root_link=self.root_link,
+                               name=f'{self.name}/Up',
+                               goal_pose=schnibble_up_pose,
+                               tip_link=self.tip_link,
+                               absolute=False)
         self.add_task(cut_up)
 
         schnibble_right_pose = god_map.world.compute_fk(root_link=self.tip_link, tip_link=self.tip_link)
         schnibble_right_pose.y = right_shift
-        move_right = CartesianPoseAsTask(root_link=self.root_link,
-                                         name=f'{self.name}/Move Right',
-                                         goal_pose=schnibble_right_pose,
-                                         tip_link=self.tip_link,
-                                         absolute=False)
+        move_right = CartesianPose(root_link=self.root_link,
+                                   name=f'{self.name}/Move Right',
+                                   goal_pose=schnibble_right_pose,
+                                   tip_link=self.tip_link,
+                                   absolute=False)
         self.add_task(move_right)
 
         self.arrange_in_sequence([cut_down, cut_up, move_right])

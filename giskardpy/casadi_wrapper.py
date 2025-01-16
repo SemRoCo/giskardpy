@@ -1586,10 +1586,23 @@ def logic_and(*args):
         return Expression(ca.logic_and(args[0].s, logic_and(*args[1:]).s))
 
 
-def logic_and3(a, b):
-    cas_a = _to_sx(a)
-    cas_b = _to_sx(b)
-    return min(cas_a, cas_b)
+def logic_and3(*args):
+    assert len(args) >= 2, 'and must be called with at least 2 arguments'
+    # if there is any False, return False
+    if [x for x in args if is_false_symbol(x)]:
+        return TrinaryFalse
+    # filter all True
+    args = [x for x in args if not is_true_symbol(x)]
+    if len(args) == 0:
+        return TrinaryTrue
+    if len(args) == 1:
+        return args[0]
+    if len(args) == 2:
+        cas_a = _to_sx(args[0])
+        cas_b = _to_sx(args[1])
+        return min(cas_a, cas_b)
+    else:
+        return logic_and3(args[0], logic_and3(*args[1:]))
 
 
 def logic_any(args):
@@ -1629,7 +1642,7 @@ def logic_not(expr):
 
 
 def logic_not3(expr):
-    return Expression(1-expr)
+    return Expression(1 - expr)
 
 
 def if_greater(a, b, if_result, else_result):

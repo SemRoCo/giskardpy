@@ -7,6 +7,7 @@ from giskardpy.god_map import god_map
 from giskardpy.motion_statechart.monitors.cartesian_monitors import PositionReached, OrientationReached
 from giskardpy.motion_statechart.tasks.task import Task, WEIGHT_ABOVE_CA
 from giskardpy.symbol_manager import symbol_manager
+import numpy as np
 
 
 class CartesianPosition(Task):
@@ -73,6 +74,72 @@ class CartesianPosition(Task):
         self.expression = cas.less(distance_to_goal, threshold)
 
 
+class CartesianPositionStraight(Task):
+    def __init__(self,
+                 root_link: PrefixName,
+                 tip_link: PrefixName,
+                 goal_point: cas.Point3,
+                 reference_velocity: Optional[float] = None,
+                 name: Optional[str] = None,
+                 absolute: bool = False,
+                 weight: float = WEIGHT_ABOVE_CA):
+        """
+        Same as CartesianPosition, but tries to move the tip_link in a straight line to the goal_point.
+        """
+        super().__init__(name=name)
+        if reference_velocity is None:
+            reference_velocity = CartesianPosition.default_reference_velocity
+        self.reference_velocity = reference_velocity
+        self.weight = weight
+        self.root_link = root_link
+        self.tip_link = tip_link
+
+        if absolute:
+            root_P_goal = god_map.world.transform(self.root_link, goal_point)
+        else:
+            root_T_x = god_map.world.compose_fk_expression(self.root_link, goal_point.reference_frame)
+            root_P_goal = root_T_x.dot(goal_point)
+            root_P_goal = self.update_expression_on_starting(root_P_goal)
+
+        root_P_tip = god_map.world.compose_fk_expression(self.root_link, self.tip_link).to_position()
+        t_T_r = god_map.world.compose_fk_expression(self.tip_link, self.root_link)
+        tip_P_goal = t_T_r.dot(root_P_goal)
+
+        # Create rotation matrix, which rotates the tip link frame
+        # such that its x-axis shows towards the goal position.
+        # The goal frame is called 'a'.
+        # Thus, the rotation matrix is called t_R_a.
+        tip_V_error = cas.Vector3(tip_P_goal)
+        trans_error = tip_V_error.norm()
+        # x-axis
+        tip_V_intermediate_error = cas.save_division(tip_V_error, trans_error)
+        # y- and z-axis
+        tip_V_intermediate_y = cas.Vector3(np.random.random((3,)))
+        tip_V_intermediate_y.scale(1)
+        y = tip_V_intermediate_error.cross(tip_V_intermediate_y)
+        z = tip_V_intermediate_error.cross(y)
+        t_R_a = cas.RotationMatrix.from_vectors(x=tip_V_intermediate_error, y=-z, z=y)
+
+        # Apply rotation matrix on the fk of the tip link
+        a_T_t = t_R_a.inverse().dot(
+            god_map.world.compose_fk_evaluated_expression(self.tip_link, self.root_link)).dot(
+            god_map.world.compose_fk_expression(self.root_link, self.tip_link))
+        expr_p = a_T_t.to_position()
+        dist = cas.norm(root_P_goal - root_P_tip)
+
+        self.add_equality_constraint_vector(reference_velocities=[self.reference_velocity] * 3,
+                                            equality_bounds=[dist, 0, 0],
+                                            weights=[WEIGHT_ABOVE_CA, WEIGHT_ABOVE_CA * 2, WEIGHT_ABOVE_CA * 2],
+                                            task_expression=expr_p[:3],
+                                            names=['line/x',
+                                                   'line/y',
+                                                   'line/z'])
+        god_map.debug_expression_manager.add_debug_expression(f'{self.name}/current_point', root_P_tip,
+                                                              color=ColorRGBA(r=1, g=0, b=0, a=1))
+        god_map.debug_expression_manager.add_debug_expression(f'{self.name}/goal_point', root_P_goal,
+                                                              color=ColorRGBA(r=0, g=0, b=1, a=1))
+
+
 class CartesianOrientation(Task):
     default_reference_velocity = 0.2
 
@@ -136,7 +203,7 @@ class CartesianOrientation(Task):
         self.expression = cas.less(cas.abs(rotation_error), threshold)
 
 
-class CartesianPoseAsTask(Task):
+class CartesianPose(Task):
     def __init__(self,
                  root_link: PrefixName,
                  tip_link: PrefixName,
@@ -236,8 +303,6 @@ class CartesianPositionVelocityLimit(Task):
         slowing down the system noticeably.
         :param root_link: root link of the kinematic chain
         :param tip_link: tip link of the kinematic chain
-        :param root_group: if the root_link is not unique, use this to say to which group the link belongs
-        :param tip_group: if the tip_link is not unique, use this to say to which group the link belongs
         :param max_linear_velocity: m/s
         :param max_angular_velocity: rad/s
         :param weight: default WEIGHT_ABOVE_CA
@@ -252,7 +317,61 @@ class CartesianPositionVelocityLimit(Task):
                                               weight=weight)
 
 
-class CartesianPositionVelocityGoal(Task):
+class CartesianRotationVelocityLimit(Task):
+    def __init__(self,
+                 name: str,
+                 root_link: PrefixName,
+                 tip_link: PrefixName,
+                 weight=WEIGHT_ABOVE_CA,
+                 max_velocity: Optional[float] = None):
+        """
+        See CartesianVelocityLimit
+        """
+        self.root_link = root_link
+        self.tip_link = tip_link
+        super().__init__(name=name)
+        self.weight = weight
+        self.max_velocity = max_velocity
+
+        r_R_c = god_map.world.compose_fk_expression(self.root_link, self.tip_link).to_rotation()
+
+        self.add_rotational_velocity_limit(frame_R_current=r_R_c,
+                                           max_velocity=self.max_velocity,
+                                           weight=self.weight)
+
+
+class CartesianVelocityLimit(Task):
+    def __init__(self,
+                 name: str,
+                 root_link: PrefixName,
+                 tip_link: PrefixName,
+                 max_linear_velocity: float = 0.1,
+                 max_angular_velocity: float = 0.5,
+                 weight: float = WEIGHT_ABOVE_CA):
+        """
+        This goal will use put a strict limit on the Cartesian velocity. This will require a lot of constraints, thus
+        slowing down the system noticeably.
+        :param root_link: root link of the kinematic chain
+        :param tip_link: tip link of the kinematic chain
+        :param max_linear_velocity: m/s
+        :param max_angular_velocity: rad/s
+        :param weight: default WEIGHT_ABOVE_CA
+        """
+        self.root_link = root_link
+        self.tip_link = tip_link
+        super().__init__(name=name)
+        r_T_c = god_map.world.compose_fk_expression(self.root_link, self.tip_link)
+        r_P_c = r_T_c.to_position()
+        r_R_c = r_T_c.to_rotation()
+        self.add_translational_velocity_limit(frame_P_current=r_P_c,
+                                              max_velocity=max_linear_velocity,
+                                              weight=weight)
+        self.add_rotational_velocity_limit(frame_R_current=r_R_c,
+                                           max_velocity=max_angular_velocity,
+                                           weight=weight)
+
+
+class CartesianPositionVelocityTarget(Task):
     def __init__(self,
                  root_link: PrefixName,
                  tip_link: PrefixName,

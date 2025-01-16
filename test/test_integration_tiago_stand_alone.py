@@ -101,7 +101,7 @@ class TiagoTestWrapper(GiskardTestWrapper):
                               collision_avoidance_config=TiagoCollisionAvoidanceConfig(),
                               robot_interface_config=TiagoStandaloneInterface(),
                               behavior_tree_config=StandAloneBTConfig(debug_mode=True),
-                              qp_controller_config=QPControllerConfig())
+                              qp_controller_config=QPControllerConfig(mpc_dt=0.05))
         super().__init__(giskard)
 
     def move_base(self, goal_pose: PoseStamped, add_monitor: bool = True):

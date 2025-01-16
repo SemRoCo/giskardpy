@@ -20,7 +20,7 @@ from giskardpy.data_types.data_types import goal_parameter
 from giskardpy.data_types.exceptions import LocalMinimumException, MaxTrajectoryLengthException
 from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
 from giskardpy.motion_statechart.goals.align_to_push_door import AlignToPushDoor
-from giskardpy.motion_statechart.goals.cartesian_goals import DiffDriveBaseGoal, CartesianVelocityLimit, \
+from giskardpy.motion_statechart.goals.cartesian_goals import DiffDriveBaseGoal, \
     CartesianPoseStraight, CartesianPositionStraight
 from giskardpy.motion_statechart.goals.collision_avoidance import CollisionAvoidance
 from giskardpy.motion_statechart.tasks.grasp_bar import GraspBar
@@ -37,8 +37,8 @@ from giskardpy.motion_statechart.monitors.overwrite_state_monitors import SetOdo
 from giskardpy.motion_statechart.monitors.payload_monitors import Print, Sleep, \
     PayloadAlternator, Pulse, CheckMaxTrajectoryLength
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPosition, CartesianOrientation, \
-    CartesianPoseAsTask, \
-    JustinTorsoLimitCart
+    CartesianPose, \
+    JustinTorsoLimitCart, CartesianVelocityLimit
 from giskardpy.motion_statechart.tasks.task import WEIGHT_ABOVE_CA
 from giskardpy.motion_statechart.tasks.weight_scaling_goals import MaxManipulability
 from giskardpy_ros.goals.realtime_goals import CarryMyBullshit, RealTimePointing, FollowNavPath
@@ -511,7 +511,7 @@ class MotionGoalWrapper(MotionStatechartNodeWrapper):
             root_link = giskard_msgs.LinkName(name=root_link)
         if isinstance(tip_link, str):
             tip_link = giskard_msgs.LinkName(name=tip_link)
-        return self.add_motion_goal(class_name=CartesianPoseAsTask.__name__,
+        return self.add_motion_goal(class_name=CartesianPose.__name__,
                                     goal_pose=goal_pose,
                                     tip_link=tip_link,
                                     root_link=root_link,
@@ -2260,10 +2260,10 @@ class GiskardWrapper:
         #         node.end_condition = f'({node.end_condition}) and {local_min_reached_monitor_name}'
         #     else:
         #         node.end_condition = local_min_reached_monitor_name
-        end_motion_condition = ''
+        end_motion_condition = local_min_reached_monitor_name
         monitor_part = self.monitors.get_anded_nodes(add_nodes_without_end_condition=False)
         if len(monitor_part) > 0:
-            end_motion_condition += f'{monitor_part}'
+            end_motion_condition += f' and {monitor_part}'
         motion_goal_part = self.motion_goals.get_anded_nodes(add_nodes_without_end_condition=False)
         if len(motion_goal_part) > 0:
             if len(end_motion_condition) > 0:
@@ -2271,8 +2271,8 @@ class GiskardWrapper:
             else:
                 end_motion_condition = motion_goal_part
         self.monitors.add_end_motion(start_condition=end_motion_condition)
-        self.monitors.add_cancel_motion(start_condition=local_min_reached_monitor_name,
-                                        error=LocalMinimumException(f'local minimum reached'))
+        # self.monitors.add_cancel_motion(start_condition=local_min_reached_monitor_name,
+        #                                 error=LocalMinimumException(f'local minimum reached'))
         if not self.monitors.max_trajectory_length_set:
             self.monitors.add_check_trajectory_length()
         self.monitors.max_trajectory_length_set = False

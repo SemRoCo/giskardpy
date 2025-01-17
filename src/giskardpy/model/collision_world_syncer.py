@@ -743,6 +743,7 @@ class CollisionWorldSynchronizer:
     def set_joint_state_to_zero(self) -> None:
         for free_variable in god_map.world.free_variables:
             god_map.world.state[free_variable].position = 0
+        god_map.world.notify_state_change()
 
     def set_default_joint_state(self, group: WorldBranch):
         for joint_name in group.movable_joint_names:
@@ -752,6 +753,7 @@ class CollisionWorldSynchronizer:
                     lower_limit = free_variable.get_lower_limit(Derivatives.position)
                     upper_limit = free_variable.get_upper_limit(Derivatives.position)
                     god_map.world.state[free_variable.name].position = (upper_limit + lower_limit) / 2
+        god_map.world.notify_state_change()
 
     @profile
     def set_rnd_joint_state(self, group: WorldBranch):
@@ -765,6 +767,7 @@ class CollisionWorldSynchronizer:
                 else:
                     rnd_position = np.random.random() * np.pi * 2
                 god_map.world.state[joint_name].position = rnd_position
+        god_map.world.notify_state_change()
 
     def has_self_collision_matrix(self) -> bool:
         return len(self.self_collision_matrix_cache) > 0

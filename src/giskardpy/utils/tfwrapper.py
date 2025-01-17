@@ -1,4 +1,5 @@
 from copy import copy
+from typing import List
 
 import PyKDL
 import numpy as np
@@ -10,6 +11,7 @@ from std_msgs.msg import ColorRGBA
 from tf.transformations import quaternion_from_matrix, quaternion_matrix
 from tf2_geometry_msgs import do_transform_pose, do_transform_vector3, do_transform_point
 from tf2_kdl import transform_to_kdl as transform_stamped_to_kdl
+from tf2_msgs.msg import TFMessage
 from tf2_py import InvalidArgumentException
 from tf2_ros import Buffer, TransformListener
 from visualization_msgs.msg import MarkerArray, Marker
@@ -123,6 +125,29 @@ def lookup_transform(target_frame, source_frame, time=None, timeout=5.0):
                                      str(source_frame),  # source frame
                                      time,
                                      rospy.Duration(timeout))
+
+
+__tf_messages: List[TransformStamped] = [TransformStamped() for _ in range(10000)]
+
+
+def create_tf_message_batch(size: int) -> List[TransformStamped]:
+    global __tf_messages
+    return __tf_messages[:size]
+
+
+class TransformStampedPool:
+    pool: List[TransformStamped] = []
+
+    def __init__(self, size):
+        self.pool = [TransformStamped() for _ in range(size)]
+        self.index = 0
+
+    def get(self):
+        if self.index >= len(self.pool):
+            self.index = 0
+        obj = self.pool[self.index]
+        self.index += 1
+        return obj
 
 
 def make_transform(parent_frame: PrefixName, child_frame: PrefixName, pose: Pose, normalize_quaternion: bool = True) \

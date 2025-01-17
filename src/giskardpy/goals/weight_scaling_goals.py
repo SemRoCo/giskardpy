@@ -6,7 +6,6 @@ from giskardpy.god_map import god_map
 from geometry_msgs.msg import PointStamped
 from giskardpy.utils.expression_definition_utils import transform_msg_and_turn_to_expr
 from giskardpy.data_types import Derivatives
-from giskardpy.tasks.task import WEIGHT_ABOVE_CA
 from collections import defaultdict
 
 

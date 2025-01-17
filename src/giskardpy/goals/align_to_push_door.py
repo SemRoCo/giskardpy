@@ -1,14 +1,13 @@
 from typing import Optional
 import numpy as np
 
-from geometry_msgs.msg import Vector3Stamped, PointStamped, Quaternion
+from geometry_msgs.msg import Vector3Stamped
 from std_msgs.msg import ColorRGBA
 
 from giskardpy import casadi_wrapper as cas
 from giskardpy.goals.goal import Goal
 from giskardpy.god_map import god_map
-from giskardpy.symbol_manager import symbol_manager
-from giskardpy.tasks.task import WEIGHT_BELOW_CA
+from giskardpy.motion_graph.tasks.task import WEIGHT_BELOW_CA
 from giskardpy.utils import tfwrapper as tf
 from giskardpy.exceptions import GoalInitalizationException
 

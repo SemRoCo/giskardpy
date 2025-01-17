@@ -1,19 +1,17 @@
-import math
 from copy import deepcopy
 from typing import Optional
 
 import numpy as np
 from numpy import pi
 import pytest
-import math
 import rospy
 from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, PointStamped
 from sensor_msgs.msg import JointState
 from std_srvs.srv import Trigger
-from tf.transformations import quaternion_from_matrix, quaternion_about_axis, quaternion_multiply
+from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
 import giskardpy.utils.tfwrapper as tf
-from giskard_msgs.msg import MoveResult, MoveGoal, GiskardError
+from giskard_msgs.msg import MoveGoal, GiskardError
 from giskardpy.configs.behavior_tree_config import ClosedLoopBTConfig
 from giskardpy.configs.giskard import Giskard
 from giskardpy.configs.iai_robots.pr2 import PR2CollisionAvoidance, PR2VelocityMujocoInterface, WorldWithPR2Config
@@ -21,8 +19,8 @@ from giskardpy.configs.qp_controller_config import QPControllerConfig, Supported
 from giskardpy.data_types import JointStates
 from giskardpy.goals.base_traj_follower import CarryMyBullshit
 from giskardpy.god_map import god_map
-from giskardpy.tasks.task import WEIGHT_BELOW_CA
-from test_integration_pr2 import PR2TestWrapper, TestJointGoals, pocky_pose
+from giskardpy.motion_graph.tasks.task import WEIGHT_BELOW_CA
+from test_integration_pr2 import PR2TestWrapper, TestJointGoals
 from giskardpy.goals.weight_scaling_goals import MaxManipulabilityLinWeight
 
 
@@ -63,7 +61,7 @@ class PR2TestWrapperMujoco(PR2TestWrapper):
                           collision_avoidance_config=PR2CollisionAvoidance(),
                           robot_interface_config=PR2VelocityMujocoInterface(),
                           behavior_tree_config=ClosedLoopBTConfig(debug_mode=True, control_loop_max_hz=50),
-                          qp_controller_config=QPControllerConfig(qp_solver=SupportedQPSolver.gurobi))
+                          qp_controller_config=QPControllerConfig(qp_solver=SupportedQPSolver.qpSWIFT))
         super().__init__(giskard)
 
     def reset_base(self):

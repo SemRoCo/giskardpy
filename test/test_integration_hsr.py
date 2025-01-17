@@ -36,7 +36,9 @@ class HSRTestWrapper(GiskardTestWrapper):
             giskard = Giskard(world_config=WorldWithHSRConfig(),
                               collision_avoidance_config=HSRCollisionAvoidanceConfig(),
                               robot_interface_config=HSRStandaloneInterface(),
-                              behavior_tree_config=StandAloneBTConfig(debug_mode=True, publish_js=True),
+                              behavior_tree_config=StandAloneBTConfig(debug_mode=True,
+                                                                      publish_tf=False,
+                                                                      publish_js=False),
                               qp_controller_config=QPControllerConfig())
         super().__init__(giskard)
         self.gripper_group = 'gripper'
@@ -60,7 +62,6 @@ class HSRTestWrapper(GiskardTestWrapper):
         self.register_group('gripper',
                             root_link_group_name=self.robot_name,
                             root_link_name='hand_palm_link')
-
 
 
 @pytest.fixture(scope='module')
@@ -332,6 +333,71 @@ class TestConstraints:
         kitchen_setup.set_joint_goal(kitchen_setup.better_pose)
         kitchen_setup.allow_self_collision()
         kitchen_setup.plan_and_execute()
+
+    def test_open_fridge_sequence(self, kitchen_setup: HSRTestWrapper):
+        handle_frame_id = 'iai_kitchen/iai_fridge_door_handle'
+        handle_name = 'iai_fridge_door_handle'
+        kitchen_setup.open_gripper()
+        base_goal = PoseStamped()
+        base_goal.header.frame_id = 'map'
+        base_goal.pose.position = Point(0.3, -0.5, 0)
+        base_goal.pose.orientation.w = 1
+        kitchen_setup.allow_all_collisions()
+        kitchen_setup.move_base(base_goal)
+
+        bar_axis = Vector3Stamped()
+        bar_axis.header.frame_id = handle_frame_id
+        bar_axis.vector.z = 1
+
+        bar_center = PointStamped()
+        bar_center.header.frame_id = handle_frame_id
+
+        tip_grasp_axis = Vector3Stamped()
+        tip_grasp_axis.header.frame_id = kitchen_setup.tip
+        tip_grasp_axis.vector.x = 1
+
+        # %% phase 1
+        bar_grasped = kitchen_setup.monitors.add_distance_to_line(name='bar grasped',
+                                                                  root_link=kitchen_setup.default_root,
+                                                                  tip_link=kitchen_setup.tip,
+                                                                  center_point=bar_center,
+                                                                  line_axis=bar_axis,
+                                                                  line_length=.4)
+        kitchen_setup.motion_goals.add_grasp_bar(root_link=kitchen_setup.default_root,
+                                                 tip_link=kitchen_setup.tip,
+                                                 tip_grasp_axis=tip_grasp_axis,
+                                                 bar_center=bar_center,
+                                                 bar_axis=bar_axis,
+                                                 bar_length=.4,
+                                                 name='grasp bar',
+                                                 end_condition=bar_grasped)
+        x_gripper = Vector3Stamped()
+        x_gripper.header.frame_id = kitchen_setup.tip
+        x_gripper.vector.z = 1
+
+        x_goal = Vector3Stamped()
+        x_goal.header.frame_id = handle_frame_id
+        x_goal.vector.x = -1
+        kitchen_setup.motion_goals.add_align_planes(tip_link=kitchen_setup.tip,
+                                                    tip_normal=x_gripper,
+                                                    goal_normal=x_goal,
+                                                    root_link='map',
+                                                    name='orient to door',
+                                                    end_condition=bar_grasped)
+
+        # %% phase 2 open door
+        door_open = kitchen_setup.monitors.add_local_minimum_reached(name='door open',
+                                                                     start_condition=bar_grasped)
+        kitchen_setup.motion_goals.add_open_container(tip_link=kitchen_setup.tip,
+                                                      environment_link=handle_name,
+                                                      goal_joint_state=1.5,
+                                                      name='open door',
+                                                      start_condition=bar_grasped,
+                                                      end_condition=door_open)
+
+        kitchen_setup.allow_all_collisions()
+        kitchen_setup.monitors.add_end_motion(start_condition=door_open)
+        kitchen_setup.execute(add_local_minimum_reached=False)
 
 
 class TestCollisionAvoidanceGoals:

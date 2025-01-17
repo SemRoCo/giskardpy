@@ -1,17 +1,14 @@
 from __future__ import division
 
-from typing import Optional, List
+from typing import Optional
 
 from geometry_msgs.msg import Vector3Stamped, PointStamped
 
 import giskardpy.utils.tfwrapper as tf
 import giskardpy.casadi_wrapper as cas
 from giskardpy.goals.goal import Goal
-from giskardpy.monitors.monitors import ExpressionMonitor
-from giskardpy.tasks.task import WEIGHT_ABOVE_CA, Task
+from giskardpy.motion_graph.tasks.task import WEIGHT_ABOVE_CA
 from giskardpy.god_map import god_map
-from giskardpy.model.joints import OmniDrivePR22
-from giskardpy.data_types import Derivatives
 from giskardpy.utils.expression_definition_utils import transform_msg
 
 

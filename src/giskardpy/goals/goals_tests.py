@@ -1,10 +1,9 @@
-from typing import Optional, List
+from typing import Optional
 
 import numpy as np
 from geometry_msgs.msg import QuaternionStamped, PointStamped, PoseStamped, Vector3Stamped
 import giskardpy.casadi_wrapper as cas
 from giskardpy.goals.goal import Goal
-from giskardpy.monitors.monitors import ExpressionMonitor
 from giskardpy.god_map import god_map
 from giskardpy.symbol_manager import symbol_manager
 

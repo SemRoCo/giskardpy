@@ -1,7 +1,6 @@
 from __future__ import annotations
-from typing import overload, Union, Optional, List, TYPE_CHECKING
+from typing import overload, TYPE_CHECKING
 
-import rospy
 from geometry_msgs.msg import PoseStamped, PointStamped, Vector3Stamped, QuaternionStamped
 
 from giskardpy.exceptions import UnknownGroupException
@@ -11,7 +10,7 @@ import giskardpy.utils.tfwrapper as tf
 import giskardpy.casadi_wrapper as cas
 
 if TYPE_CHECKING:
-    from giskardpy.monitors.monitors import ExpressionMonitor
+    pass
 
 
 @overload

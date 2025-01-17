@@ -91,7 +91,10 @@ class ProcessWorldUpdate(GiskardBehavior):
     def get_group_names_cb(self, req: GetGroupNamesRequest) -> GetGroupNamesResponse:
         group_names = god_map.world.group_names
         res = GetGroupNamesResponse()
-        res.group_names = list(sorted(group_names))
+        groups = list(sorted(group_names))
+        # make sure robots are at the front
+        groups = list(sorted(groups, key=lambda elem: elem not in god_map.world.robot_names))
+        res.group_names = groups
         return res
 
     @profile

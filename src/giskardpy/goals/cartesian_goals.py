@@ -13,9 +13,9 @@ from giskardpy.data_types import Derivatives
 from giskardpy.goals.goal import Goal
 from giskardpy.god_map import god_map
 from giskardpy.model.joints import DiffDrive
-from giskardpy.monitors.monitors import ExpressionMonitor
+from giskardpy.motion_graph.monitors.monitors import ExpressionMonitor
 from giskardpy.symbol_manager import symbol_manager
-from giskardpy.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
+from giskardpy.motion_graph.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
 from giskardpy.utils.expression_definition_utils import transform_msg_and_turn_to_expr, transform_msg
 from giskardpy.utils.tfwrapper import normalize
 from giskardpy.utils.utils import split_pose_stamped
@@ -116,7 +116,11 @@ class CartesianOrientation(Goal):
             point = transform_msg_and_turn_to_expr(self.root_link, point_of_debug_matrix, update_condition)
         debug_trans_matrix = cas.TransMatrix.from_point_rotation_matrix(point=point,
                                                                         rotation_matrix=root_R_goal)
+        debug_current_trans_matrix = cas.TransMatrix.from_point_rotation_matrix(point=r_T_c.to_position(),
+                                                                                rotation_matrix=r_R_c)
         god_map.debug_expression_manager.add_debug_expression(f'{self.name}/goal_orientation', debug_trans_matrix)
+        god_map.debug_expression_manager.add_debug_expression(f'{self.name}/current_orientation',
+                                                              debug_current_trans_matrix)
         self.connect_monitors_to_all_tasks(start_condition, hold_condition, end_condition)
 
 
@@ -591,14 +595,14 @@ class RelativePositionSequence(Goal):
         root_P_goal1 = cas.Point3(self.root_P_goal1)
 
         error1 = cas.euclidean_distance(root_P_goal1, root_P_current)
-        error1_monitor = ExpressionMonitor(name='p1',
-                                           stay_true=True)
+        error1_monitor = ExpressionMonitor(name='p1')
         self.add_monitor(error1_monitor)
+        error1_monitor.end_condition = error1_monitor.get_state_expression()
         error1_monitor.expression = cas.less(cas.abs(error1), 0.01)
 
-        error2_monitor = ExpressionMonitor(name='p2',
-                                           stay_true=True)
+        error2_monitor = ExpressionMonitor(name='p2')
         self.add_monitor(error2_monitor)
+        error2_monitor.end_condition = error2_monitor.get_state_expression()
 
         root_P_goal2_cached = transform_msg_and_turn_to_expr(self.root_link,
                                                              self.tip_P_goal2,

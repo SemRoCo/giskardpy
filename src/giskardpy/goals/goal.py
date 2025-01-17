@@ -2,19 +2,15 @@ from __future__ import annotations
 
 import abc
 from abc import ABC
-from collections import OrderedDict
-from typing import Optional, Tuple, Dict, List, Union
+from typing import List, Union
 
-from giskardpy.monitors.monitors import ExpressionMonitor, Monitor
+from giskardpy.motion_graph.monitors.monitors import ExpressionMonitor, Monitor
 from giskardpy.god_map import god_map
-from giskardpy.symbol_manager import symbol_manager
-from giskardpy.tasks.task import Task
+from giskardpy.motion_graph.tasks.task import Task
 from giskardpy.utils.utils import string_shortener
-import giskardpy.casadi_wrapper as cas
 from giskardpy.exceptions import GoalInitalizationException
 from giskardpy.model.joints import OneDofJoint
 from giskardpy.data_types import PrefixName, Derivatives
-from giskardpy.qp.constraint import InequalityConstraint, EqualityConstraint, DerivativeInequalityConstraint
 import giskardpy.casadi_wrapper as cas
 
 
@@ -86,7 +82,7 @@ class Goal(ABC):
         for task in self.tasks:
             if cas.is_false(task.end_condition):
                 task.end_condition = condition
-            else:
+            elif not cas.is_false(condition):
                 task.end_condition = cas.logic_and(task.end_condition, condition)
 
     def connect_monitors_to_all_tasks(self,

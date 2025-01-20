@@ -16,12 +16,15 @@ class JointPositionList(Task):
                  goal_state: Dict[str, float],
                  group_name: Optional[str] = None,
                  threshold: float = 0.01,
-                 weight: float = WEIGHT_BELOW_CA,
-                 max_velocity: float = 1,
+                 weight: Optional[float] = None,
+                 max_velocity: Optional[float] = None,
                  name: Optional[str] = None,
                  plot: bool = True):
         super().__init__(name=name, plot=plot)
-
+        if weight is None:
+            weight = WEIGHT_BELOW_CA
+        if max_velocity is None:
+            max_velocity = 1.0
         self.current_positions = []
         self.goal_positions = []
         self.velocity_limits = []

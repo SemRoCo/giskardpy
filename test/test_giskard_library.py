@@ -313,10 +313,10 @@ class TestWorld:
                                   goal_pose=cas.TransMatrix.from_xyz_rpy(x=goal[0], y=goal[1], z=goal[2],
                                                                          reference_frame=box_world.root_link_name))
 
-        god_map.motion_graph_manager.add_motion_goal(cart_goal)
-        god_map.motion_graph_manager.init_task_state()
+        god_map.motion_statechart_manager.add_motion_goal(cart_goal)
+        god_map.motion_statechart_manager.init_task_state()
 
-        eq, neq, neqd, lin_weight, quad_weight = god_map.motion_graph_manager.get_constraints_from_goals()
+        eq, neq, neqd, lin_weight, quad_weight = god_map.motion_statechart_manager.get_constraints_from_goals()
         controller = QPController(mpc_dt=dt)
         controller.init(free_variables=list(box_world.free_variables.values()),
                         equality_constraints=eq)
@@ -345,7 +345,7 @@ class TestWorld:
                                    root_link=box_world.root_link_name,
                                    tip_link=box_name,
                                    goal_pose=goal1)
-        god_map.motion_graph_manager.add_monitor(cart_monitor)
+        god_map.motion_statechart_manager.add_monitor(cart_monitor)
 
         cart_goal1 = CartesianPose(name='g1',
                                    root_link=box_world.root_link_name,
@@ -359,13 +359,13 @@ class TestWorld:
                                    absolute=True,
                                    start_condition=cart_monitor.get_observation_state_expression())
 
-        god_map.motion_graph_manager.add_motion_goal(cart_goal1)
-        god_map.motion_graph_manager.add_motion_goal(cart_goal2)
+        god_map.motion_statechart_manager.add_motion_goal(cart_goal1)
+        god_map.motion_statechart_manager.add_motion_goal(cart_goal2)
 
-        god_map.motion_graph_manager.compile_node_state_updaters()
-        god_map.motion_graph_manager.init_task_state()
+        god_map.motion_statechart_manager.compile_node_state_updaters()
+        god_map.motion_statechart_manager.init_task_state()
 
-        eq, neq, neqd, lin_weight, quad_weight = god_map.motion_graph_manager.get_constraints_from_goals()
+        eq, neq, neqd, lin_weight, quad_weight = god_map.motion_statechart_manager.get_constraints_from_goals()
         controller = QPController(mpc_dt=dt)
         controller.init(free_variables=list(box_world.free_variables.values()),
                         equality_constraints=eq)
@@ -381,7 +381,7 @@ class TestWorld:
             box_world.update_state(next_cmd, dt, Derivatives.jerk)
             box_world.notify_state_change()
 
-            god_map.motion_graph_manager.evaluate_node_states()
+            god_map.motion_statechart_manager.evaluate_node_states()
             traj.append(box_world.state[joint_name].position)
             god_map.time += controller.mpc_dt
             god_map.control_cycle_counter += 1
@@ -400,7 +400,7 @@ class TestWorld:
                                    root_link=box_world.root_link_name,
                                    tip_link=box_name,
                                    goal_pose=goal1)
-        god_map.motion_graph_manager.add_monitor(cart_monitor)
+        god_map.motion_statechart_manager.add_monitor(cart_monitor)
 
         cart_goal1 = CartesianPose(name='g1',
                                    root_link=box_world.root_link_name,
@@ -413,13 +413,13 @@ class TestWorld:
                                    goal_pose=goal2,
                                    start_condition=cart_monitor.get_observation_state_expression())
 
-        god_map.motion_graph_manager.add_motion_goal(cart_goal1)
-        god_map.motion_graph_manager.add_motion_goal(cart_goal2)
+        god_map.motion_statechart_manager.add_motion_goal(cart_goal1)
+        god_map.motion_statechart_manager.add_motion_goal(cart_goal2)
 
-        god_map.motion_graph_manager.compile_node_state_updaters()
-        god_map.motion_graph_manager.init_task_state()
+        god_map.motion_statechart_manager.compile_node_state_updaters()
+        god_map.motion_statechart_manager.init_task_state()
 
-        eq, neq, neqd, lin_weight, quad_weight = god_map.motion_graph_manager.get_constraints_from_goals()
+        eq, neq, neqd, lin_weight, quad_weight = god_map.motion_statechart_manager.get_constraints_from_goals()
         controller = QPController(mpc_dt=dt)
         controller.init(free_variables=list(box_world.free_variables.values()),
                         equality_constraints=eq)
@@ -433,7 +433,7 @@ class TestWorld:
             next_cmd = controller.get_cmd(substitutions)
             box_world.update_state(next_cmd, dt, Derivatives.jerk)
             box_world.notify_state_change()
-            god_map.motion_graph_manager.evaluate_node_states()
+            god_map.motion_statechart_manager.evaluate_node_states()
             traj.append((box_world.state[box_world.joints[joint_name].x_name].position,
                          box_world.state[box_world.joints[joint_name].y_name].position))
             god_map.time += controller.mpc_dt
@@ -783,7 +783,7 @@ class Simulator:
         task = CartesianPose(name=name, root_link=root_link, tip_link=tip_link,
                                    goal_pose=cart_goal, absolute=True, weight=weight_symbol)
         self.goal_state[name] = (x_goal, weight)
-        god_map.motion_graph_manager.add_task(task)
+        god_map.motion_statechart_manager.add_task(task)
 
     def add_cart_position_goal(self, root_link: PrefixName, tip_link: PrefixName, x_goal: float, name: str = 'g1',
                                weight: float = WEIGHT_BELOW_CA):
@@ -795,7 +795,7 @@ class Simulator:
         task = CartesianPosition(name=name, root_link=root_link, tip_link=tip_link,
                                  goal_point=cart_goal.to_position(), absolute=True, weight=weight_symbol)
         self.goal_state[name] = (x_goal, weight)
-        god_map.motion_graph_manager.add_task(task)
+        god_map.motion_statechart_manager.add_task(task)
 
     def add_cart_vel_goal(self, root_link: PrefixName, tip_link: PrefixName, x_goal: float, name: str = 'g1',
                           weight: float = WEIGHT_BELOW_CA):
@@ -804,7 +804,7 @@ class Simulator:
         task = CartesianPositionVelocityTarget(name=name, root_link=root_link, tip_link=tip_link,
                                              x_vel=0, y_vel=x_goal, z_vel=0, weight=weight_symbol)
         self.goal_state[name] = (x_goal, weight)
-        god_map.motion_graph_manager.add_task(task)
+        god_map.motion_statechart_manager.add_task(task)
 
     def add_joint_goal(self, joint_names: List[PrefixName], goal: float, max_velocity: float = 1, name: str = 'g1',
                        weight: float = WEIGHT_BELOW_CA):
@@ -820,7 +820,7 @@ class Simulator:
                                        )
         self.goal_state[goal_name] = (goal, weight)
 
-        god_map.motion_graph_manager.add_task(joint_task)
+        god_map.motion_statechart_manager.add_task(joint_task)
 
     def add_joint_vel_goal(self, joint_names: List[PrefixName], goal: float):
         self.joint_goal = {}
@@ -832,12 +832,12 @@ class Simulator:
         joint_task = JointVelocity(name='g1', joint_names=joint_names, vel_goal=v.get_symbol(Derivatives.position))
         # joint_task = JointVelocityLimit(name='g1', joint_names=joint_names, max_velocity=goal)
 
-        god_map.motion_graph_manager.add_task(joint_task)
+        god_map.motion_statechart_manager.add_task(joint_task)
 
     def compile(self):
-        god_map.motion_graph_manager.initialize_states()
+        god_map.motion_statechart_manager.initialize_states()
 
-        eq, neq, eqd, neqd, lin_weight, quad_weight = god_map.motion_graph_manager.get_constraints_from_tasks()
+        eq, neq, eqd, neqd, lin_weight, quad_weight = god_map.motion_statechart_manager.get_constraints_from_tasks()
         god_map.qp_controller.init(free_variables=self.get_active_free_symbols(eq, neq, eqd, neqd),
                                    equality_constraints=eq,
                                    inequality_constraints=neq,
@@ -866,7 +866,7 @@ class Simulator:
         self.goal_state = {}
         god_map.time = 0
         god_map.control_cycle_counter = 0
-        god_map.motion_graph_manager.reset()
+        god_map.motion_statechart_manager.reset()
         god_map.debug_expression_manager.reset()
         for joint_state in god_map.world.state.values():
             joint_state.position = 0
@@ -1173,7 +1173,8 @@ class GoalSin:
 
 class TestController:
     def test_joint_goal(self, giskard_pr2: GiskardWrapper):
-        giskard_pr2
+        giskard_pr2.motion_goals.add_joint_position({'r_wrist_roll_joint': -1}, name='joint goal')
+        giskard_pr2.execute()
 
     def test_joint_goal_pr2_dt_vs_jerk(self, pr2_world: WorldTree):
         jerk_limit = 2500

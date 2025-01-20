@@ -28,16 +28,18 @@ from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
 from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint
 from giskardpy.qp.qp_controller import QPController
 from giskardpy.qp.qp_controller import QPFormulation
+from giskardpy.qp.qp_controller_config import QPControllerConfig
 from giskardpy.qp.qp_solver_ids import SupportedQPSolver
 from giskardpy.symbol_manager import symbol_manager
+from giskardpy.user_interface import GiskardWrapper
 from giskardpy.utils.utils import suppress_stderr
-from model.collision_avoidance_config import CollisionAvoidanceConfig
-from model.collision_world_syncer import CollisionCheckerLib
-from motion_graph.tasks.cartesian_tasks import CartesianPoseAsTask, CartesianPosition, CartesianPositionVelocityGoal
-from motion_graph.tasks.joint_tasks import JointVelocity
-from motion_graph.tasks.task import WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE
-from qp.constraint import DerivativeEqualityConstraint
-from utils.math import limit
+from giskardpy.model.collision_avoidance_config import CollisionAvoidanceConfig
+from giskardpy.model.collision_world_syncer import CollisionCheckerLib
+from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose, CartesianPosition, CartesianPositionVelocityTarget
+from giskardpy.motion_statechart.tasks.joint_tasks import JointVelocity
+from giskardpy.motion_statechart.tasks.task import WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE
+from giskardpy.qp.constraint import DerivativeEqualityConstraint
+from giskardpy.utils.math import limit
 from utils_for_tests import pr2_urdf
 
 
@@ -224,10 +226,15 @@ def pr2_world() -> WorldTree:
     with config.world.modify_world():
         config.setup()
     config.world.register_controlled_joints(config.world.movable_joint_names)
-    collision_avoidance = PR2CollisionAvoidance()
-    collision_avoidance.setup()
     return config.world
 
+@pytest.fixture()
+def giskard_pr2() -> GiskardWrapper:
+    urdf = open('urdfs/pr2.urdf', 'r').read()
+    giskard = GiskardWrapper(world_config=WorldWithOmniDriveRobot(urdf=urdf),
+                             collision_avoidance_config=PR2CollisionAvoidance(),
+                             qp_controller_config=QPControllerConfig())
+    return giskard
 
 import yaml
 
@@ -773,7 +780,7 @@ class Simulator:
         cart_goal = cas.TransMatrix.from_xyz_rpy(x=goal_symbol,
                                                  reference_frame=root_link,
                                                  child_frame=tip_link)
-        task = CartesianPoseAsTask(name=name, root_link=root_link, tip_link=tip_link,
+        task = CartesianPose(name=name, root_link=root_link, tip_link=tip_link,
                                    goal_pose=cart_goal, absolute=True, weight=weight_symbol)
         self.goal_state[name] = (x_goal, weight)
         god_map.motion_graph_manager.add_task(task)
@@ -794,7 +801,7 @@ class Simulator:
                           weight: float = WEIGHT_BELOW_CA):
         goal_symbol = symbol_manager.get_symbol(f'god_map.simulator.goal_state[\"{name}\"][0]')
         weight_symbol = symbol_manager.get_symbol(f'god_map.simulator.goal_state[\"{name}\"][1]')
-        task = CartesianPositionVelocityGoal(name=name, root_link=root_link, tip_link=tip_link,
+        task = CartesianPositionVelocityTarget(name=name, root_link=root_link, tip_link=tip_link,
                                              x_vel=0, y_vel=x_goal, z_vel=0, weight=weight_symbol)
         self.goal_state[name] = (x_goal, weight)
         god_map.motion_graph_manager.add_task(task)
@@ -1165,48 +1172,8 @@ class GoalSin:
 
 
 class TestController:
-    def test_joint_goal(self, box_world_prismatic: WorldTree):
-        sim_time = 5
-        joint_name = box_world_prismatic.joint_names[0]
-        goal = 2
-        box_world_prismatic.update_default_weights({Derivatives.velocity: 0.01,
-                                                    Derivatives.acceleration: 0,
-                                                    Derivatives.jerk: 0.0})
-        box_world_prismatic.state[joint_name].position = 2
-        simulator = Simulator(world=box_world_prismatic,
-                              control_dt=0.05,
-                              mpc_dt=0.05,
-                              h=9,
-                              solver=SupportedQPSolver.qpSWIFT,
-                              alpha=0.1,
-                              qp_formulation=QPFormulation.explicit)
-        simulator.add_joint_goal(joint_names=[joint_name], goal=goal)
-        simulator.compile()
-
-        np.random.seed(69)
-        swap_distance = 2
-        next_swap = swap_distance
-        try:
-            while god_map.time < sim_time:
-                # box_world_prismatic.state[goal_name].position = np.random.rand() * 2 -1
-                simulator.step()
-                if god_map.time > next_swap:
-                    # goal *= -1
-                    simulator.update_goal(goal)
-                    next_swap += swap_distance
-
-        except Exception as e:
-            traceback.print_exc()
-            print(e)
-        simulator.plot_traj()
-        # fk = box_world_prismatic.compute_fk_point(root_link=box_world_prismatic.root_link_name,
-        #                                           tip_link=box_name).to_np()
-        # np.testing.assert_almost_equal(fk[0], box_world_prismatic.state[v.name].position, decimal=3)
-        vel_profile = simulator.traj.to_dict()[Derivatives.velocity][joint_name]
-        vel_limit = box_world_prismatic.joints[joint_name].free_variables[0].get_upper_limit(Derivatives.velocity)
-        print(f'max violation {np.max(np.abs(vel_profile) - vel_limit)}')
-        violated = np.all(np.abs(vel_profile) < vel_limit + 1e-4)
-        assert violated, f'violation {np.max(np.abs(vel_profile) - vel_limit)}'
+    def test_joint_goal(self, giskard_pr2: GiskardWrapper):
+        giskard_pr2
 
     def test_joint_goal_pr2_dt_vs_jerk(self, pr2_world: WorldTree):
         jerk_limit = 2500

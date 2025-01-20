@@ -1,3 +1,4 @@
+import re
 import traceback
 from collections import defaultdict
 from itertools import chain
@@ -22,6 +23,66 @@ from giskardpy.motion_statechart.tasks.task import WEIGHT_BELOW_CA
 from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeEqualityConstraint, \
     DerivativeInequalityConstraint
 from giskardpy.symbol_manager import symbol_manager
+from giskardpy.motion_statechart.monitors.monitors import EndMotion
+
+
+def quote_node_names(condition: str) -> str:
+    operators = {'and', 'or', 'not', '(', ')'}
+    pattern = r'(\b(?:and|or|not)\b|\(|\))'
+    tokens = re.split(pattern, condition)
+    result = []
+    for token in tokens:
+        if token in operators:
+            result.append(token)
+        elif token.strip() == '':
+            result.append(token)
+        else:
+            # Check if token is already quoted
+            stripped = token.strip()
+            if (stripped.startswith('"') and stripped.endswith('"')) or \
+                    (stripped.startswith("'") and stripped.endswith("'")):
+                result.append(token)
+            else:
+                # Wrap stripped token in quotes, and preserve leading/trailing spaces
+                leading_spaces = len(token) - len(token.lstrip())
+                trailing_spaces = len(token) - len(token.rstrip())
+                leading = token[:leading_spaces]
+                trailing = token[len(token.rstrip()):]
+                result.append(f'{leading}"{stripped}"{trailing}')
+    return ''.join(result)
+
+class MonitorWrapper:
+    _name_prefix = 'M'
+    _conditions: Dict[str, Tuple[str, str, str, str]]  # node name to start, pause, end, reset
+
+    def __init__(self):
+        self._conditions = {}
+
+    def add_monitor(self, *,
+                    monitor: Monitor,
+                    start_condition: str = '',
+                    pause_condition: str = '',
+                    end_condition: str = '',
+                    reset_condition: str = '') -> str:
+        god_map.motion_statechart_manager.add_monitor(monitor)
+        self._conditions[monitor.name] = (quote_node_names(start_condition),
+                                          quote_node_names(pause_condition),
+                                          quote_node_names(end_condition),
+                                          quote_node_names(reset_condition))
+        return monitor.name
+
+    def add_end_motion(self,
+                       start_condition: str,
+                       name: str = 'Done') -> str:
+        """
+        Ends the motion execution/planning if all start_condition are True.
+        Use this to describe when your motion should end.
+        """
+        return self.add_monitor(monitor=EndMotion(name=name),
+                                start_condition=start_condition,
+                                pause_condition='',
+                                end_condition='',
+                                reset_condition='')
 
 
 class MotionGoalWrapper:
@@ -38,12 +99,10 @@ class MotionGoalWrapper:
 
     def add_motion_goal(self, *,
                         goal: Union[Task, Goal],
-                        name: Optional[str] = None,
                         start_condition: str = '',
                         pause_condition: str = '',
                         end_condition: str = '',
-                        reset_condition: str = '',
-                        **kwargs) -> str:
+                        reset_condition: str = '') -> str:
         """
         Generic function to add a motion goal.
         :param class_name: Name of a class defined in src/giskardpy/goals
@@ -55,6 +114,10 @@ class MotionGoalWrapper:
         :param kwargs: kwargs for __init__ function of motion_goal_class
         """
         god_map.motion_statechart_manager.add_task(goal)
+        self._conditions[goal.name] = (quote_node_names(start_condition),
+                                       quote_node_names(pause_condition),
+                                       quote_node_names(end_condition),
+                                       quote_node_names(reset_condition))
         return goal.name
 
     def add_joint_position(self,
@@ -76,11 +139,11 @@ class MotionGoalWrapper:
                                        goal_state=goal_state,
                                        weight=weight,
                                        max_velocity=max_velocity)
-        self._conditions[name] = (start_condition, pause_condition, end_condition, reset_condition)
         return self.add_motion_goal(goal=joint_task,
                                     start_condition=start_condition,
                                     pause_condition=pause_condition,
-                                    end_condition=end_condition, )
+                                    end_condition=end_condition,
+                                    reset_condition=reset_condition)
 
     def _add_collision_avoidance(self,
                                  collisions: List[CollisionEntry],
@@ -126,7 +189,7 @@ class GiskardWrapper:
                  additional_goal_package_paths: Optional[List[str]] = None,
                  additional_monitor_package_paths: Optional[List[str]] = None):
         # self.world = WorldWrapper(node_name)
-        # self.monitors = MonitorWrapper(self)
+        self.monitors = MonitorWrapper()
         self.motion_goals = MotionGoalWrapper()
         # self.clear_motion_goals_and_monitors()
         # self.clear_motion_goals_and_monitors()
@@ -180,14 +243,13 @@ class GiskardWrapper:
         god_map.motion_statechart_manager.add_monitor_package_path(package_name)
 
     def compile(self):
-        god_map.motion_statechart_manager.initialize_states()
-
         task_state_symbols = god_map.motion_statechart_manager.task_state.get_observation_state_symbol_map()
         monitor_state_symbols = god_map.motion_statechart_manager.monitor_state.get_observation_state_symbol_map()
         goal_state_symbols = god_map.motion_statechart_manager.goal_state.get_observation_state_symbol_map()
         observation_state_symbols = {**task_state_symbols, **monitor_state_symbols, **goal_state_symbols}
 
-        for (name, (start, reset, pause, end)) in self.motion_goals._conditions.items():
+        for (name, (start, reset, pause, end)) in chain(self.motion_goals._conditions.items(),
+                                                        self.monitors._conditions.items()):
             node = god_map.motion_statechart_manager.get_node(name)
             start_condition = god_map.motion_statechart_manager.logic_str_to_expr(
                 logic_str=start,
@@ -210,6 +272,9 @@ class GiskardWrapper:
                                 pause_condition=pause_condition,
                                 end_condition=end_condition)
 
+        god_map.motion_statechart_manager.compile_node_state_updaters()
+        god_map.motion_statechart_manager.initialize_states()
+
         eq, neq, eqd, neqd, lin_weight, quad_weight = god_map.motion_statechart_manager.get_constraints_from_tasks()
         god_map.qp_controller.init(free_variables=self.get_active_free_symbols(eq, neq, eqd, neqd),
                                    equality_constraints=eq,
@@ -219,7 +284,6 @@ class GiskardWrapper:
         god_map.qp_controller.compile()
         god_map.debug_expression_manager.compile_debug_expressions()
         self.traj = Trajectory()
-
 
     def get_active_free_symbols(self,
                                 eq_constraints: List[EqualityConstraint],
@@ -248,9 +312,11 @@ class GiskardWrapper:
             joint_state.acceleration = 0
             joint_state.jerk = 0
 
-
     def step(self):
         import time
+
+        done = god_map.motion_statechart_manager.evaluate_node_states()
+
         parameters = god_map.qp_controller.get_parameter_names()
         total_time_start = time.time()
         substitutions = symbol_manager.resolve_symbols(parameters)
@@ -276,12 +342,14 @@ class GiskardWrapper:
         god_map.time += god_map.qp_controller.control_dt
         god_map.control_cycle_counter += 1
 
-        return total_time, parameter_time, qp_time, update_world_time, collision_time
+        return total_time, parameter_time, qp_time, update_world_time, collision_time, done
 
     def execute(self, sim_time: float = 5, plot: bool = True, plot_kwargs: dict = {}, plot_legend: bool = True):
         self.compile()
         while god_map.time < sim_time:
-            total_time, parameter_time, qp_time, update_world_time, collision_time = self.step()
+            total_time, parameter_time, qp_time, update_world_time, collision_time, done = self.step()
+            if done:
+                break
             # self.apply_noise(pos_noise, vel_noise, acc_noise)
 
             # total_times.append(total_time)
@@ -307,14 +375,15 @@ class GiskardWrapper:
         self.traj.plot_trajectory('test', sample_period=god_map.qp_controller.control_dt, filter_0_vel=True,
                                   hspace=0.7, height_per_derivative=4)
         color_map = defaultdict(lambda: self.graph_styles[len(color_map)])
-        god_map.debug_expression_manager.raw_traj_to_traj(control_dt=god_map.qp_controller.control_dt).plot_trajectory('',
-                                                                                                      sample_period=god_map.qp_controller.control_dt,
-                                                                                                      filter_0_vel=False,
-                                                                                                      hspace=0.7,
-                                                                                                      height_per_derivative=4,
-                                                                                                      color_map=color_map,
-                                                                                                      plot0_lines=False,
-                                                                                                      legend=plot_legend,
-                                                                                                      sort=False,
-                                                                                                      **plot_kwargs
-                                                                                                      )
+        god_map.debug_expression_manager.raw_traj_to_traj(control_dt=god_map.qp_controller.control_dt).plot_trajectory(
+            '',
+            sample_period=god_map.qp_controller.control_dt,
+            filter_0_vel=False,
+            hspace=0.7,
+            height_per_derivative=4,
+            color_map=color_map,
+            plot0_lines=False,
+            legend=plot_legend,
+            sort=False,
+            **plot_kwargs
+            )

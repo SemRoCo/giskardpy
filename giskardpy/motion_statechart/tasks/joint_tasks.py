@@ -13,12 +13,12 @@ from giskardpy.utils.math import find_best_jerk_limit
 
 class JointPositionList(Task):
     def __init__(self, *,
+                 name: str,
                  goal_state: Dict[str, float],
                  group_name: Optional[str] = None,
                  threshold: float = 0.01,
                  weight: Optional[float] = None,
                  max_velocity: Optional[float] = None,
-                 name: Optional[str] = None,
                  plot: bool = True):
         super().__init__(name=name, plot=plot)
         if weight is None:

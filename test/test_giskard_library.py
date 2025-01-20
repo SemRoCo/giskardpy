@@ -1173,7 +1173,8 @@ class GoalSin:
 
 class TestController:
     def test_joint_goal(self, giskard_pr2: GiskardWrapper):
-        giskard_pr2.motion_goals.add_joint_position({'r_wrist_roll_joint': -1}, name='joint goal')
+        goal = giskard_pr2.motion_goals.add_joint_position({'r_wrist_roll_joint': -1}, name='joint goal')
+        giskard_pr2.monitors.add_end_motion(start_condition=goal)
         giskard_pr2.execute()
 
     def test_joint_goal_pr2_dt_vs_jerk(self, pr2_world: WorldTree):

@@ -14,7 +14,7 @@ from giskardpy.model.collision_world_syncer import CollisionEntry
 from giskardpy.model.world_config import WorldConfig
 from giskardpy.motion_statechart.goals.collision_avoidance import CollisionAvoidance
 from giskardpy.motion_statechart.goals.goal import Goal
-from giskardpy.motion_statechart.monitors.monitors import Monitor
+from giskardpy.motion_statechart.monitors.monitors import Monitor, LocalMinimumReached
 from giskardpy.motion_statechart.monitors.overwrite_state_monitors import SetSeedConfiguration, SetOdometry
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
@@ -119,6 +119,23 @@ class MonitorWrapper:
                                 end_condition=monitor.name,
                                 reset_condition=reset_condition)
 
+    def add_local_minimum_reached(self,
+                                  name: Optional[str] = None,
+                                  start_condition: str = '',
+                                  pause_condition: str = '',
+                                  end_condition: str = '',
+                                  reset_condition: str = '') -> str:
+        """
+        True if the world is currently in a local minimum.
+        """
+        name = self._generate_default_name(LocalMinimumReached, name)
+        monitor = LocalMinimumReached(name=name)
+        return self.add_monitor(monitor=monitor,
+                                start_condition=start_condition,
+                                pause_condition=pause_condition,
+                                end_condition=end_condition,
+                                reset_condition=reset_condition)
+
     def add_end_motion(self,
                        start_condition: str,
                        name: str = 'Done') -> str:
@@ -126,6 +143,7 @@ class MonitorWrapper:
         Ends the motion execution/planning if all start_condition are True.
         Use this to describe when your motion should end.
         """
+        name = self._generate_default_name(EndMotion, name)
         return self.add_monitor(monitor=EndMotion(name=name),
                                 start_condition=start_condition,
                                 pause_condition='',

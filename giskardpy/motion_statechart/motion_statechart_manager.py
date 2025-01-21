@@ -29,7 +29,7 @@ def monitor_list_to_monitor_name_tuple(monitors: Iterable[Union[str, Monitor]]) 
     return tuple(sorted(monitor.name if isinstance(monitor, Monitor) else monitor for monitor in monitors))
 
 
-class MotionGraphManager:
+class MotionStatechartManager:
     task_state: MotionGraphNodeStateManager[Task]
     monitor_state: MotionGraphNodeStateManager[Monitor]
     goal_state: MotionGraphNodeStateManager[Goal]
@@ -84,6 +84,16 @@ class MotionGraphManager:
 
     def get_all_node_names(self) -> Set[str]:
         return self.task_state.get_node_names() | self.monitor_state.get_node_names() | self.goal_state.get_node_names()
+
+    def add_node(self, node: Union[Monitor, Task, Goal]) -> None:
+        if isinstance(node, Monitor):
+            self.add_monitor(node)
+        elif isinstance(node, Task):
+            self.add_task(node)
+        elif isinstance(node, Goal):
+            self.add_goal(node)
+        else:
+            raise NotImplementedError(f'Cannot add node type {type(node)}.')
 
     def add_monitor(self, monitor: Monitor) -> None:
         self.check_if_node_name_unique(monitor.name)

@@ -2,7 +2,7 @@ import keyword
 
 import hypothesis.strategies as st
 import numpy as np
-from angles import shortest_angular_distance
+from giskardpy.utils.math import shortest_angular_distance
 from hypothesis import assume
 from hypothesis.strategies import composite
 from numpy import pi

@@ -17,10 +17,7 @@ class SetSeedConfiguration(PayloadMonitor):
     def __init__(self,
                  seed_configuration: Dict[str, float],
                  group_name: Optional[str] = None,
-                 name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.BinaryTrue,
-                 pause_condition: cas.Expression = cas.BinaryFalse,
-                 end_condition: cas.Expression = cas.BinaryFalse):
+                 name: Optional[str] = None):
         """
         Overwrite the configuration of the world to allow starting the planning from a different state.
         CAUTION! don't use this to overwrite the robot's state outside standalone mode!
@@ -52,10 +49,7 @@ class SetOdometry(PayloadMonitor):
     def __init__(self,
                  base_pose: cas.TransMatrix,
                  group_name: Optional[str] = None,
-                 name: Optional[str] = None,
-                 start_condition: cas.Expression = cas.BinaryTrue,
-                 pause_condition: cas.Expression = cas.BinaryFalse,
-                 end_condition: cas.Expression = cas.BinaryFalse):
+                 name: Optional[str] = None):
         self.group_name = group_name
         if name is None:
             name = f'{self.__class__.__name__}/{self.group_name}'

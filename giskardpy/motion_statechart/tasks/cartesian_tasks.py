@@ -227,10 +227,10 @@ class CartesianPose(Task):
         :param reference_angular_velocity: rad/s
         :param weight: default WEIGHT_ABOVE_CA
         """
+        if weight is None:
+            weight = WEIGHT_ABOVE_CA
         self.root_link = root_link
         self.tip_link = tip_link
-        if name is None:
-            name = f'{self.__class__.__name__}/{self.root_link}/{self.tip_link}'
         super().__init__(name=name)
         if reference_linear_velocity is None:
             reference_linear_velocity = CartesianOrientation.default_reference_velocity

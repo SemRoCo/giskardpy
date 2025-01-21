@@ -35,7 +35,8 @@ from giskardpy.user_interface import GiskardWrapper
 from giskardpy.utils.utils import suppress_stderr
 from giskardpy.model.collision_avoidance_config import CollisionAvoidanceConfig
 from giskardpy.model.collision_world_syncer import CollisionCheckerLib
-from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose, CartesianPosition, CartesianPositionVelocityTarget
+from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose, CartesianPosition, \
+    CartesianPositionVelocityTarget
 from giskardpy.motion_statechart.tasks.joint_tasks import JointVelocity
 from giskardpy.motion_statechart.tasks.task import WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE
 from giskardpy.qp.constraint import DerivativeEqualityConstraint
@@ -81,6 +82,7 @@ class PR2CollisionAvoidance(CollisionAvoidanceConfig):
                                                     number_of_repeller=2,
                                                     soft_threshold=0.2,
                                                     hard_threshold=0.1)
+
 
 try:
     import rospy
@@ -228,6 +230,7 @@ def pr2_world() -> WorldTree:
     config.world.register_controlled_joints(config.world.movable_joint_names)
     return config.world
 
+
 @pytest.fixture()
 def giskard_pr2() -> GiskardWrapper:
     urdf = open('urdfs/pr2.urdf', 'r').read()
@@ -235,6 +238,7 @@ def giskard_pr2() -> GiskardWrapper:
                              collision_avoidance_config=PR2CollisionAvoidance(),
                              qp_controller_config=QPControllerConfig())
     return giskard
+
 
 import yaml
 
@@ -772,7 +776,6 @@ class Simulator:
                 u = v.get_upper_limit(Derivatives.position, evaluated=True)
                 god_map.world.state[v_name].position = limit(god_map.world.state[v_name].position, l, u)
 
-
     def add_cart_goal(self, root_link: PrefixName, tip_link: PrefixName, x_goal: float, name: str = 'g1',
                       weight: float = WEIGHT_BELOW_CA):
         goal_symbol = symbol_manager.get_symbol(f'god_map.simulator.goal_state[\"{name}\"][0]')
@@ -781,7 +784,7 @@ class Simulator:
                                                  reference_frame=root_link,
                                                  child_frame=tip_link)
         task = CartesianPose(name=name, root_link=root_link, tip_link=tip_link,
-                                   goal_pose=cart_goal, absolute=True, weight=weight_symbol)
+                             goal_pose=cart_goal, absolute=True, weight=weight_symbol)
         self.goal_state[name] = (x_goal, weight)
         god_map.motion_statechart_manager.add_task(task)
 
@@ -802,7 +805,7 @@ class Simulator:
         goal_symbol = symbol_manager.get_symbol(f'god_map.simulator.goal_state[\"{name}\"][0]')
         weight_symbol = symbol_manager.get_symbol(f'god_map.simulator.goal_state[\"{name}\"][1]')
         task = CartesianPositionVelocityTarget(name=name, root_link=root_link, tip_link=tip_link,
-                                             x_vel=0, y_vel=x_goal, z_vel=0, weight=weight_symbol)
+                                               x_vel=0, y_vel=x_goal, z_vel=0, weight=weight_symbol)
         self.goal_state[name] = (x_goal, weight)
         god_map.motion_statechart_manager.add_task(task)
 
@@ -1173,9 +1176,44 @@ class GoalSin:
 
 class TestController:
     def test_joint_goal(self, giskard_pr2: GiskardWrapper):
-        goal = giskard_pr2.motion_goals.add_joint_position({'r_wrist_roll_joint': -1}, name='joint goal')
-        giskard_pr2.monitors.add_end_motion(start_condition=goal)
+        init = 'init'
+        g1 = 'g1'
+        g2 = 'g2'
+        giskard_pr2.monitors.add_set_seed_configuration(seed_configuration={'r_wrist_roll_joint': 2},
+                                                        name=init)
+        giskard_pr2.motion_goals.add_joint_position({'r_wrist_roll_joint': -1}, name=g1,
+                                                    start_condition=init,
+                                                    end_condition=g1)
+        giskard_pr2.motion_goals.add_joint_position({'r_wrist_roll_joint': 1}, name=g2,
+                                                    start_condition=g1)
+        giskard_pr2.monitors.add_end_motion(start_condition=g2)
         giskard_pr2.execute()
+
+    def test_cart_goal(self, giskard_pr2: GiskardWrapper):
+        init = 'init'
+        g1 = 'g1'
+        g2 = 'g2'
+        init_goal1 = cas.TransMatrix(reference_frame=PrefixName('map'))
+        init_goal1.x = -0.5
+
+        base_goal1 = cas.TransMatrix(reference_frame=PrefixName('map'))
+        base_goal1.x = 1.0
+
+        base_goal2 = cas.TransMatrix(reference_frame=PrefixName('map'))
+        base_goal2.x = -1.0
+
+        giskard_pr2.monitors.add_set_seed_odometry(base_pose=init_goal1, name=init)
+        giskard_pr2.motion_goals.add_cartesian_pose(goal_pose=base_goal1, name=g1,
+                                                    root_link='map',
+                                                    tip_link='base_footprint',
+                                                    start_condition=init,
+                                                    end_condition=g1)
+        giskard_pr2.motion_goals.add_cartesian_pose(goal_pose=base_goal2, name=g2,
+                                                    root_link='map',
+                                                    tip_link='base_footprint',
+                                                    start_condition=g1)
+        giskard_pr2.monitors.add_end_motion(start_condition=g2)
+        giskard_pr2.execute(sim_time=20)
 
     def test_joint_goal_pr2_dt_vs_jerk(self, pr2_world: WorldTree):
         jerk_limit = 2500

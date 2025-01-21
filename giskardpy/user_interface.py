@@ -2,8 +2,9 @@ import re
 import traceback
 from collections import defaultdict
 from itertools import chain
-from typing import Optional, List, Dict, Tuple, Union
+from typing import Optional, List, Dict, Tuple, Union, Type
 import giskardpy.casadi_wrapper as cas
+from giskardpy.data_types.data_types import PrefixName
 from giskardpy.data_types.exceptions import EmptyProblemException
 from giskardpy.data_types.exceptions import SetupException
 from giskardpy.god_map import god_map
@@ -14,6 +15,8 @@ from giskardpy.model.world_config import WorldConfig
 from giskardpy.motion_statechart.goals.collision_avoidance import CollisionAvoidance
 from giskardpy.motion_statechart.goals.goal import Goal
 from giskardpy.motion_statechart.monitors.monitors import Monitor
+from giskardpy.motion_statechart.monitors.overwrite_state_monitors import SetSeedConfiguration, SetOdometry
+from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
 from giskardpy.motion_statechart.tasks.task import Task
 from giskardpy.qp.qp_controller_config import QPControllerConfig
@@ -51,12 +54,18 @@ def quote_node_names(condition: str) -> str:
                 result.append(f'{leading}"{stripped}"{trailing}')
     return ''.join(result)
 
+
 class MonitorWrapper:
     _name_prefix = 'M'
     _conditions: Dict[str, Tuple[str, str, str, str]]  # node name to start, pause, end, reset
 
     def __init__(self):
         self._conditions = {}
+
+    def _generate_default_name(self, class_type: Type[Monitor], name: Optional[str]):
+        if name is None:
+            name = f'{class_type.__name__}{len(self._conditions)}'
+        return name
 
     def add_monitor(self, *,
                     monitor: Monitor,
@@ -70,6 +79,45 @@ class MonitorWrapper:
                                           quote_node_names(end_condition),
                                           quote_node_names(reset_condition))
         return monitor.name
+
+    def add_set_seed_configuration(self,
+                                   seed_configuration: Dict[str, float],
+                                   name: Optional[str] = None,
+                                   group_name: Optional[str] = None,
+                                   start_condition: str = '',
+                                   reset_condition: str = '') -> str:
+        """
+        Only meant for use with projection. Changes the world state to seed_configuration before starting planning,
+        without having to plan a motion to it like with add_joint_position
+        """
+        name = self._generate_default_name(SetSeedConfiguration, name)
+        monitor = SetSeedConfiguration(seed_configuration=seed_configuration,
+                                       group_name=group_name,
+                                       name=name)
+        return self.add_monitor(monitor=monitor,
+                                start_condition=start_condition,
+                                pause_condition='',
+                                end_condition=monitor.name,
+                                reset_condition=reset_condition)
+
+    def add_set_seed_odometry(self,
+                              base_pose: cas.TransMatrix,
+                              name: Optional[str] = None,
+                              group_name: Optional[str] = None,
+                              start_condition: str = '',
+                              reset_condition: str = '') -> str:
+        """
+        Only meant for use with projection. Overwrites the odometry transform with base_pose.
+        """
+        name = self._generate_default_name(SetOdometry, name)
+        monitor = SetOdometry(base_pose=base_pose,
+                              group_name=group_name,
+                              name=name)
+        return self.add_monitor(monitor=monitor,
+                                start_condition=start_condition,
+                                pause_condition='',
+                                end_condition=monitor.name,
+                                reset_condition=reset_condition)
 
     def add_end_motion(self,
                        start_condition: str,
@@ -94,6 +142,11 @@ class MotionGoalWrapper:
         self._conditions = {}
         self._collision_entries = {}
 
+    def _generate_default_name(self, class_type: Union[Type[Task], Type[Goal]], name: Optional[str]):
+        if name is None:
+            name = f'{class_type.__name__}{len(self._conditions)}'
+        return name
+
     def reset(self):
         self._collision_entries = defaultdict(list)
 
@@ -111,7 +164,6 @@ class MotionGoalWrapper:
                                     not 'monitor1' and ('monitor2' or 'monitor3')
         :param pause_condition: a logical expression. Goal will be on hold if it is True and active otherwise
         :param end_condition: a logical expression. Goal will become inactive when this becomes True.
-        :param kwargs: kwargs for __init__ function of motion_goal_class
         """
         god_map.motion_statechart_manager.add_task(goal)
         self._conditions[goal.name] = (quote_node_names(start_condition),
@@ -135,11 +187,57 @@ class MotionGoalWrapper:
         :param weight: None = use default weight
         :param max_velocity: will be applied to all joints
         """
+        name = self._generate_default_name(JointPositionList, name)
         joint_task = JointPositionList(name=name,
                                        goal_state=goal_state,
                                        weight=weight,
                                        max_velocity=max_velocity)
         return self.add_motion_goal(goal=joint_task,
+                                    start_condition=start_condition,
+                                    pause_condition=pause_condition,
+                                    end_condition=end_condition,
+                                    reset_condition=reset_condition)
+
+    def add_cartesian_pose(self,
+                           goal_pose: cas.TransMatrix,
+                           tip_link: Union[str, PrefixName],
+                           root_link: Union[str, PrefixName],
+                           name: Optional[str] = None,
+                           reference_linear_velocity: Optional[float] = None,
+                           reference_angular_velocity: Optional[float] = None,
+                           absolute: bool = False,
+                           weight: Optional[float] = None,
+                           start_condition: str = '',
+                           pause_condition: str = '',
+                           end_condition: str = '',
+                           reset_condition: str = '') -> str:
+        """
+        This goal will use the kinematic chain between root and tip link to move tip link to the goal pose.
+        The max velocities enforce a strict limit, but require a lot of additional constraints, thus making the
+        system noticeably slower.
+        The reference velocities don't enforce a strict limit, but also don't require any additional constraints.
+        :param root_link: name of the root link of the kin chain
+        :param tip_link: name of the tip link of the kin chain
+        :param goal_pose: the goal pose
+        :param absolute: if False, the goal pose is reevaluated if start_condition turns True.
+        :param reference_linear_velocity: m/s
+        :param reference_angular_velocity: rad/s
+        :param weight: None = use default weight
+        """
+        if isinstance(root_link, str):
+            root_link = god_map.world.search_for_link_name(root_link)
+        if isinstance(tip_link, str):
+            tip_link = god_map.world.search_for_link_name(tip_link)
+        name = self._generate_default_name(CartesianPose, name)
+        goal = CartesianPose(root_link=root_link,
+                             tip_link=tip_link,
+                             goal_pose=goal_pose,
+                             name=name,
+                             reference_linear_velocity=reference_linear_velocity,
+                             reference_angular_velocity=reference_angular_velocity,
+                             weight=weight,
+                             absolute=absolute)
+        return self.add_motion_goal(goal=goal,
                                     start_condition=start_condition,
                                     pause_condition=pause_condition,
                                     end_condition=end_condition,
@@ -305,12 +403,6 @@ class GiskardWrapper:
         god_map.time = 0
         god_map.control_cycle_counter = 0
         god_map.motion_statechart_manager.reset()
-        god_map.debug_expression_manager.reset()
-        for joint_state in god_map.world.state.values():
-            joint_state.position = 0
-            joint_state.velocity = 0
-            joint_state.acceleration = 0
-            joint_state.jerk = 0
 
     def step(self):
         import time
@@ -386,4 +478,4 @@ class GiskardWrapper:
             legend=plot_legend,
             sort=False,
             **plot_kwargs
-            )
+        )

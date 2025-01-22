@@ -1,6 +1,7 @@
 import ast
 from collections import OrderedDict
 from functools import cached_property
+from itertools import chain
 from typing import List, Tuple, Dict, Optional, Union, Iterable, Set
 from line_profiler import profile
 
@@ -117,45 +118,28 @@ class MotionStatechartManager:
         if node_name in self.get_all_node_names():
             raise ValueError(f'Node "{node_name}" already exists')
 
-    def parse_motion_graph(self, *, nodes: List[Tuple[str, str, str, str, str, str, dict]]) -> None:
-        for class_name, name, start, reset, pause, end, kwargs in nodes:
-            get_middleware().loginfo(f'Adding node of type: \'{class_name}\'')
-            if class_name in self.allowed_monitor_types:
-                C = self.allowed_monitor_types[class_name]
-                monitor: Monitor = C(name=name, **kwargs)
-                self.add_monitor(monitor)
-            elif class_name in self.allowed_task_types:
-                C = self.allowed_task_types[class_name]
-                task: Task = C(name=name, **kwargs)
-                self.add_task(task)
-            elif class_name in self.allowed_goal_types:
-                C = self.allowed_goal_types[class_name]
-                goal: Goal = C(name=name, **kwargs)
-                self.add_goal(goal)
-            else:
-                raise UnknownGoalException(f'unknown task type: \'{class_name}\'.')
+    def parse_motion_graph(self) -> None:
 
         task_state_symbols = self.task_state.get_observation_state_symbol_map()
         monitor_state_symbols = self.monitor_state.get_observation_state_symbol_map()
         goal_state_symbols = self.goal_state.get_observation_state_symbol_map()
         observation_state_symbols = {**task_state_symbols, **monitor_state_symbols, **goal_state_symbols}
 
-        for (class_name, name, start, reset, pause, end, kwargs) in nodes:
-            node = self.get_node(name)
+        for node in chain(self.monitor_state.nodes, self.task_state.nodes, self.goal_state.nodes):
             start_condition = god_map.motion_statechart_manager.logic_str_to_expr(
-                logic_str=start,
+                logic_str=node.start_condition,
                 default=cas.BinaryTrue,
                 observation_state_symbols=observation_state_symbols)
             pause_condition = god_map.motion_statechart_manager.logic_str_to_expr(
-                logic_str=pause,
+                logic_str=node.pause_condition,
                 default=cas.BinaryFalse,
                 observation_state_symbols=observation_state_symbols)
             end_condition = god_map.motion_statechart_manager.logic_str_to_expr(
-                logic_str=end,
+                logic_str=node.end_condition,
                 default=cas.BinaryFalse,
                 observation_state_symbols=observation_state_symbols)
             reset_condition = god_map.motion_statechart_manager.logic_str_to_expr(
-                logic_str=reset,
+                logic_str=node.reset_condition,
                 default=cas.BinaryFalse,
                 observation_state_symbols=observation_state_symbols)
             node.set_conditions(start_condition=start_condition,
@@ -168,20 +152,20 @@ class MotionStatechartManager:
             if self.get_parent_node_name_of_node(goal) == '':
                 self.apply_conditions_to_sub_nodes(goal)
 
-    def create_logic3_conditions(self) -> None:
-        for node in self.task_state.nodes + self.monitor_state.nodes + self.goal_state.nodes:
-            node.logic3_start_condition = cas.replace_with_three_logic(node.start_condition)
-            node.logic3_pause_condition = cas.replace_with_three_logic(node.pause_condition)
-            node.logic3_end_condition = cas.replace_with_three_logic(node.end_condition)
-            node.logic3_reset_condition = cas.replace_with_three_logic(node.reset_condition)
+    # def create_logic3_conditions(self) -> None:
+    #     for node in self.task_state.nodes + self.monitor_state.nodes + self.goal_state.nodes:
+    #         node.logic3_start_condition = cas.replace_with_three_logic(node.start_condition)
+    #         node.logic3_pause_condition = cas.replace_with_three_logic(node.pause_condition)
+    #         node.logic3_end_condition = cas.replace_with_three_logic(node.end_condition)
+    #         node.logic3_reset_condition = cas.replace_with_three_logic(node.reset_condition)
 
     def apply_conditions_to_sub_nodes(self, goal: Goal):
         for node in goal.tasks + goal.monitors + goal.goals:
-            if cas.is_true_symbol(node.start_condition):
+            if cas.is_true_symbol(node.logic3_start_condition):
                 node.start_condition = goal.start_condition
-            node.reset_condition = cas.logic_or(node.reset_condition, goal.reset_condition)
-            node.pause_condition = cas.logic_or(node.pause_condition, goal.pause_condition)
-            node.end_condition = cas.logic_or(node.end_condition, goal.end_condition)
+            node.pause_condition = cas.logic_or3(node.logic3_pause_condition, goal.logic3_pause_condition)
+            node.end_condition = cas.logic_or3(node.logic3_end_condition, goal.logic3_end_condition)
+            node.reset_condition = cas.logic_or3(node.logic3_reset_condition, goal.logic3_reset_condition)
             if isinstance(node, Goal):
                 self.apply_conditions_to_sub_nodes(node)
 
@@ -189,12 +173,12 @@ class MotionStatechartManager:
                              observation_state_symbols: Dict[str, cas.Expression]) -> cas.Expression:
         if isinstance(node, ast.BoolOp):
             if isinstance(node.op, ast.And):
-                return cas.logic_and(*[self.parse_ast_expression(x, observation_state_symbols) for x in node.values])
+                return cas.logic_and3(*[self.parse_ast_expression(x, observation_state_symbols) for x in node.values])
             elif isinstance(node.op, ast.Or):
-                return cas.logic_or(*[self.parse_ast_expression(x, observation_state_symbols) for x in node.values])
+                return cas.logic_or3(*[self.parse_ast_expression(x, observation_state_symbols) for x in node.values])
         elif isinstance(node, ast.UnaryOp):
             if isinstance(node.op, ast.Not):
-                return cas.logic_not(self.parse_ast_expression(node.operand, observation_state_symbols))
+                return cas.logic_not3(self.parse_ast_expression(node.operand, observation_state_symbols))
         elif isinstance(node, ast.Str):
             # replace monitor name with its state expression
             return observation_state_symbols[node.value]
@@ -215,7 +199,7 @@ class MotionStatechartManager:
 
     @profile
     def compile_node_state_updaters(self) -> None:
-        self.create_logic3_conditions()
+        # self.create_logic3_conditions()
         self.compiled_task_observation_state, self.compiled_task_life_cycle_state = self.compile_node_state_updater(
             self.task_state)
         self.compiled_monitor_observation_state, self.compiled_monitor_life_cycle_state = self.compile_node_state_updater(
@@ -360,14 +344,11 @@ class MotionStatechartManager:
                                     self.goal_state.observation_state))
 
         # %% update life cycle state
-        args = np.concatenate((self.task_state.life_cycle_state,
-                               obs_state))
+        args = np.concatenate((self.task_state.life_cycle_state, obs_state))
         self.task_state.life_cycle_state = self.compiled_task_life_cycle_state.fast_call(args)
-        args = np.concatenate((self.monitor_state.life_cycle_state,
-                               obs_state))
+        args = np.concatenate((self.monitor_state.life_cycle_state, obs_state))
         self.monitor_state.life_cycle_state = self.compiled_monitor_life_cycle_state.fast_call(args)
-        args = np.concatenate((self.goal_state.life_cycle_state,
-                               obs_state))
+        args = np.concatenate((self.goal_state.life_cycle_state, obs_state))
         self.goal_state.life_cycle_state = self.compiled_goal_life_cycle_state.fast_call(args)
 
         self.trigger_update_triggers()

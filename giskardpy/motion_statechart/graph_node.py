@@ -9,14 +9,16 @@ from giskardpy.utils.utils import string_shortener
 
 
 class MotionStatechartNode:
-    _start_condition: cas.Expression
-    _reset_condition: cas.Expression
-    _pause_condition: cas.Expression
-    _end_condition: cas.Expression
+    _unparsed_start_condition: Optional[str]
+    _unparsed_pause_condition: Optional[str]
+    _unparsed_end_condition: Optional[str]
+    _unparsed_reset_condition: Optional[str]
+
     _expression: cas.Expression
     _name: str
     _id: int
     plot: bool
+    _parsed: bool
 
     logic3_start_condition: cas.Expression
     logic3_pause_condition: cas.Expression
@@ -24,27 +26,41 @@ class MotionStatechartNode:
     logic3_reset_condition: cas.Expression
 
     def __init__(self, *,
-                 name: Optional[str] = None,
+                 name: str,
                  plot: bool = True):
-        self._name = name or self.__class__.__name__
         self._expression = cas.TrinaryUnknown
         self.plot = plot
         self._id = -1
+        self._parsed = False
         self._name = name
-        self._start_condition = cas.BinaryTrue
-        self._pause_condition = cas.BinaryFalse
-        self._end_condition = cas.BinaryFalse
-        self._reset_condition = cas.BinaryFalse
+        self._unparsed_start_condition = None
+        self._unparsed_pause_condition = None
+        self._unparsed_end_condition = None
+        self._unparsed_reset_condition = None
+
+    def set_unparsed_conditions(self,
+                                start_condition: Optional[str] = None,
+                                pause_condition: Optional[str] = None,
+                                end_condition: Optional[str] = None,
+                                reset_condition: Optional[str] = None):
+        if start_condition is not None:
+            self._unparsed_start_condition = start_condition
+        if pause_condition is not None:
+            self._unparsed_pause_condition = pause_condition
+        if end_condition is not None:
+            self._unparsed_end_condition = end_condition
+        if reset_condition is not None:
+            self._unparsed_reset_condition = reset_condition
 
     def set_conditions(self,
                        start_condition: cas.Expression,
                        pause_condition: cas.Expression,
                        end_condition: cas.Expression,
                        reset_condition: cas.Expression):
-        self._start_condition = start_condition
-        self._pause_condition = pause_condition
-        self._end_condition = end_condition
-        self._reset_condition = reset_condition
+        self.logic3_start_condition = start_condition
+        self.logic3_pause_condition = pause_condition
+        self.logic3_end_condition = end_condition
+        self.logic3_reset_condition = reset_condition
 
     @property
     def name(self) -> str:
@@ -94,36 +110,36 @@ class MotionStatechartNode:
         raise NotImplementedError('get_life_cycle_state_expression is not implemented')
 
     @property
-    def start_condition(self) -> cas.Expression:
-        return self._start_condition
+    def start_condition(self) -> str:
+        return self._unparsed_start_condition
 
     @start_condition.setter
-    def start_condition(self, value: cas.Expression) -> None:
-        self._start_condition = value
+    def start_condition(self, value: str) -> None:
+        self._unparsed_start_condition = value
 
     @property
-    def pause_condition(self) -> cas.Expression:
-        return self._pause_condition
+    def pause_condition(self) -> str:
+        return self._unparsed_pause_condition
 
     @pause_condition.setter
-    def pause_condition(self, value: cas.Expression) -> None:
-        self._pause_condition = value
+    def pause_condition(self, value: str) -> None:
+        self._unparsed_pause_condition = value
 
     @property
-    def end_condition(self) -> cas.Expression:
-        return self._end_condition
+    def end_condition(self) -> str:
+        return self._unparsed_end_condition
 
     @end_condition.setter
-    def end_condition(self, value: cas.Expression) -> None:
-        self._end_condition = value
+    def end_condition(self, value: str) -> None:
+        self._unparsed_end_condition = value
 
     @property
-    def reset_condition(self) -> cas.Expression:
-        return self._reset_condition
+    def reset_condition(self) -> str:
+        return self._unparsed_reset_condition
 
     @reset_condition.setter
-    def reset_condition(self, value: cas.Expression) -> None:
-        self._reset_condition = value
+    def reset_condition(self, value: str) -> None:
+        self._unparsed_reset_condition = value
 
     def pre_compile(self) -> None:
         """

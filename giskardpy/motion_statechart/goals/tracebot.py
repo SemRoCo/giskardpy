@@ -74,8 +74,7 @@ class InsertCylinder(Goal):
         root_V_cylinder_z.vis_frame = self.tip
         tilt_task.expression = cas.less_equal(cas.abs(tilt_error - self.tilt), 0.01)
 
-        init_done = cas.logic_and(reach_top.get_observation_state_expression(),
-                                  tilt_task.get_observation_state_expression())
+        init_done = f'{reach_top.name} and {tilt_task.name}'
 
         reach_top.end_condition = init_done
 
@@ -99,8 +98,7 @@ class InsertCylinder(Goal):
         insert_task.start_condition = init_done
         insert_task.expression = cas.less(distance_to_hole, 0.01)
 
-        bottom_reached = cas.logic_and(insert_task.get_observation_state_expression(),
-                                       stay_on_line.get_observation_state_expression())
+        bottom_reached = f'{insert_task.name} and {stay_on_line.name}'
 
         tilt_task.end_condition = bottom_reached
         # %% tilt straight

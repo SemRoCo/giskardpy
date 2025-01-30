@@ -454,7 +454,8 @@ class GiskardWrapper:
 
         return total_time, parameter_time, qp_time, update_world_time, collision_time, done
 
-    def execute(self, sim_time: float = 5, plot: bool = True, plot_kwargs: dict = {}, plot_legend: bool = True):
+    def execute(self, sim_time: float = 5, plot: bool = True, plot_kwargs: dict = {}, plot_legend: bool = True) \
+            -> Trajectory:
         self.compile()
         while god_map.time < sim_time:
             total_time, parameter_time, qp_time, update_world_time, collision_time, done = self.step()
@@ -480,9 +481,12 @@ class GiskardWrapper:
         # finally:
         if plot:
             self.plot_traj(plot_kwargs, plot_legend)
+        result = self.traj
+        self.reset()
+        return result
 
     def plot_traj(self, plot_kwargs: dict, plot_legend: bool = True):
-        self.traj.plot_trajectory('test', sample_period=god_map.qp_controller.control_dt, filter_0_vel=True,
+        self.traj.plot_trajectory('', sample_period=god_map.qp_controller.control_dt, filter_0_vel=True,
                                   hspace=0.7, height_per_derivative=4)
         color_map = defaultdict(lambda: self.graph_styles[len(color_map)])
         god_map.debug_expression_manager.raw_traj_to_traj(control_dt=god_map.qp_controller.control_dt).plot_trajectory(

@@ -2,7 +2,7 @@
 
 import re
 from collections import defaultdict
-from typing import List, Dict, Tuple, Optional, Union
+from typing import List, Dict, Tuple, Optional, Union, Set
 
 import pydot
 from line_profiler import profile
@@ -22,9 +22,9 @@ from giskardpy_ros.tree.behaviors.publish_feedback import giskard_state_to_execu
 from giskardpy_ros.tree.blackboard_utils import catch_and_raise_to_blackboard, GiskardBlackboard
 
 
-def extract_node_names_from_condition(condition: str) -> List[str]:
-    return set(re.findall(r"'(.*?)'", condition))
-
+def extract_node_names_from_condition(condition: str) -> Set[str]:
+    matches = re.findall(r'"(.*?)"|\'(.*?)\'', condition)
+    return set(match for group in matches for match in group if match)
 
 def format_condition(condition: str) -> str:
     condition = condition.replace(' and ', '<BR/>       and ')

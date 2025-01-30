@@ -202,7 +202,7 @@ class CarryMyBullshit(Goal):
             last_target_age = symbol_manager.get_symbol(self.ref_str + '.last_target_age')
             target_lost = Monitor(name='target out of sight')
             self.add_monitor(target_lost)
-            target_lost.expression = cas.greater_equal(last_target_age, self.target_age_threshold)
+            target_lost.observation_expression = cas.greater_equal(last_target_age, self.target_age_threshold)
 
         next_x = symbol_manager.get_symbol(self.ref_str + '.get_current_target()[\'next_x\']')
         next_y = symbol_manager.get_symbol(self.ref_str + '.get_current_target()[\'next_y\']')
@@ -287,10 +287,10 @@ class CarryMyBullshit(Goal):
 
         laser_violated = Monitor(name='laser violated')
         self.add_monitor(laser_violated)
-        laser_violated.expression = cas.less(closest_laser_reading, 0)
+        laser_violated.observation_expression = cas.less(closest_laser_reading, 0)
         if self.drive_back:
             oriented_towards_next = Monitor(name='oriented towards next')
-            oriented_towards_next.expression = cas.abs(map_angle_error) > self.base_orientation_threshold
+            oriented_towards_next.observation_expression = cas.abs(map_angle_error) > self.base_orientation_threshold
             self.add_monitor(oriented_towards_next)
 
             follow_next_point.pause_condition = (laser_violated.get_observation_state_expression()
@@ -298,7 +298,7 @@ class CarryMyBullshit(Goal):
         else:
             target_too_close = Monitor(name='target close')
             self.add_monitor(target_too_close)
-            target_too_close.expression = cas.less_equal(distance_to_human, self.min_distance_to_target)
+            target_too_close.observation_expression = cas.less_equal(distance_to_human, self.min_distance_to_target)
 
             follow_next_point.pause_condition = (laser_violated.get_observation_state_expression() |
                                                  (~target_lost.get_observation_state_expression()
@@ -335,7 +335,7 @@ class CarryMyBullshit(Goal):
 
             active = Monitor(name='too far from path')
             self.add_monitor(active)
-            active.expression = cas.greater(distance_to_closest_point, self.traj_tracking_radius)
+            active.observation_expression = cas.greater(distance_to_closest_point, self.traj_tracking_radius)
 
             buffer = self.laser_avoidance_sideways_buffer / 2
 
@@ -353,7 +353,7 @@ class CarryMyBullshit(Goal):
             first_point = cas.Point3([first_traj_x, first_traj_y, 0])
             goal_reached = Monitor(name='goal reached?')
             self.add_monitor(goal_reached)
-            goal_reached.expression = cas.euclidean_distance(first_point, root_P_bf) < self.traj_tracking_radius
+            goal_reached.observation_expression = cas.euclidean_distance(first_point, root_P_bf) < self.traj_tracking_radius
             self.connect_end_condition_to_all_tasks(goal_reached.get_observation_state_expression())
             end = EndMotion(name='done')
             end.start_condition = goal_reached.get_observation_state_expression()

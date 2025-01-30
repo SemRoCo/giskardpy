@@ -6,13 +6,16 @@ from py_trees import Status
 
 import giskard_msgs.msg as giskard_msgs
 import giskardpy.casadi_wrapper as cas
-from giskard_msgs.msg import MoveGoal
-from giskardpy.data_types.exceptions import InvalidGoalException
+from giskard_msgs.msg import MoveGoal, MotionStatechartNode
+from giskardpy.data_types.exceptions import InvalidGoalException, UnknownGoalException
 from giskardpy.motion_statechart.goals.base_traj_follower import BaseTrajFollower
 from giskardpy.god_map import god_map
 from giskardpy.middleware import get_middleware
 from giskardpy.model.joints import OmniDrive, DiffDrive
-from giskardpy.motion_statechart.monitors.monitors import TimeAbove, LocalMinimumReached, EndMotion, CancelMotion
+from giskardpy.motion_statechart.goals.goal import Goal
+from giskardpy.motion_statechart.monitors.monitors import TimeAbove, LocalMinimumReached, EndMotion, CancelMotion, \
+    Monitor
+from giskardpy.motion_statechart.tasks.task import Task
 from giskardpy.utils.decorators import record_time
 from giskardpy_ros.ros1.msg_converter import json_str_to_giskard_kwargs
 from giskardpy_ros.tree.behaviors.plugin import GiskardBehavior
@@ -45,22 +48,31 @@ class ParseActionGoal(GiskardBehavior):
         get_middleware().loginfo('Done parsing goal message.')
         return Status.SUCCESS
 
-    def parse_motion_graph(self, move_goal: MoveGoal):
-        node_data = self.parse_motion_graph_component(motion_graph_nodes=move_goal.nodes)
-        god_map.motion_statechart_manager.parse_motion_graph(nodes=node_data)
+    def parse_motion_graph(self, move_goal: MoveGoal) -> None:
+        for msg_node in move_goal.nodes:
+            parsed_kwargs = json_str_to_giskard_kwargs(msg_node.kwargs, god_map.world)
+            get_middleware().loginfo(f'Adding node of type: \'{msg_node.class_name}\'')
+            msg_node: MotionStatechartNode
+            if msg_node.class_name in god_map.motion_statechart_manager.allowed_monitor_types:
+                C = god_map.motion_statechart_manager.allowed_monitor_types[msg_node.class_name]
+                node: Monitor = C(name=msg_node.name, **parsed_kwargs)
+                god_map.motion_statechart_manager.add_monitor(node)
+            elif msg_node.class_name in god_map.motion_statechart_manager.allowed_task_types:
+                C = god_map.motion_statechart_manager.allowed_task_types[msg_node.class_name]
+                node: Task = C(name=msg_node.name, **parsed_kwargs)
+                god_map.motion_statechart_manager.add_task(node)
+            elif msg_node.class_name in god_map.motion_statechart_manager.allowed_goal_types:
+                C = god_map.motion_statechart_manager.allowed_goal_types[msg_node.class_name]
+                node: Goal = C(name=msg_node.name, **parsed_kwargs)
+                god_map.motion_statechart_manager.add_goal(node)
+            else:
+                raise UnknownGoalException(f'unknown task type: \'{msg_node.class_name}\'.')
+            node.start_condition = msg_node.start_condition
+            node.pause_condition = msg_node.pause_condition
+            node.end_condition = msg_node.end_condition
+            node.reset_condition = msg_node.reset_condition
 
-    def parse_motion_graph_component(self, motion_graph_nodes: List[giskard_msgs.MotionStatechartNode]) \
-            -> List[Tuple[str, str, str, str, str, str, dict]]:
-        parsed_nodes = []
-        for node in motion_graph_nodes:
-            parsed_nodes.append((node.class_name,
-                                 node.name,
-                                 node.start_condition,
-                                 node.reset_condition,
-                                 node.pause_condition,
-                                 node.end_condition,
-                                 json_str_to_giskard_kwargs(node.kwargs, god_map.world)))
-        return parsed_nodes
+        god_map.motion_statechart_manager.parse_conditions()
 
     def sanity_check(self) -> None:
         if (not god_map.motion_statechart_manager.has_end_motion_monitor()

@@ -40,8 +40,8 @@ class HSRTestWrapper(GiskardTestWrapper):
                               behavior_tree_config=StandAloneBTConfig(debug_mode=True,
                                                                       publish_tf=True,
                                                                       publish_js=False),
-                              qp_controller_config=QPControllerConfig(mpc_dt=0.01,
-                                                                      control_dt=0.01))
+                              qp_controller_config=QPControllerConfig(mpc_dt=0.0125,
+                                                                      control_dt=0.0125))
         super().__init__(giskard)
         self.gripper_group = 'gripper'
         # self.r_gripper = rospy.ServiceProxy('r_gripper_simulator/set_joint_states', SetJointState)
@@ -694,43 +694,43 @@ class TestCollisionAvoidanceGoals:
                                                                                   [0, -1, 0, 0],
                                                                                   [1, 0, 0, 0],
                                                                                   [0, 0, 0, 1]]))
-        pre_schnibble = box_setup.tasks.add_cartesian_pose(name='Position Knife',
-                                                           goal_pose=pre_schnibble_pose,
-                                                           tip_link=box_setup.tip,
-                                                           root_link='map')
+        pre_schnibble = box_setup.motion_goals.add_cartesian_pose(name='Position Knife',
+                                                                  goal_pose=pre_schnibble_pose,
+                                                                  tip_link=box_setup.tip,
+                                                                  root_link='map')
 
         schnibble_down_pose = PoseStamped()
         schnibble_down_pose.header.frame_id = box_name
         schnibble_down_pose.pose.position.x = -0.1
         schnibble_down_pose.pose.orientation.w = 1.0
-        schnibble_down = box_setup.tasks.add_cartesian_pose(name='Cut Down',
-                                                            goal_pose=schnibble_down_pose,
-                                                            tip_link=box_name,
-                                                            root_link='map',
-                                                            absolute=False,
-                                                            start_condition=pre_schnibble)
+        schnibble_down = box_setup.motion_goals.add_cartesian_pose(name='Cut Down',
+                                                                   goal_pose=schnibble_down_pose,
+                                                                   tip_link=box_name,
+                                                                   root_link='map',
+                                                                   absolute=False,
+                                                                   start_condition=pre_schnibble)
 
         schnibble_up_pose = PoseStamped()
         schnibble_up_pose.header.frame_id = box_name
         schnibble_up_pose.pose.position.x = 0.1
         schnibble_up_pose.pose.orientation.w = 1.0
-        schnibble_up = box_setup.tasks.add_cartesian_pose(name='Knife Up',
-                                                          goal_pose=schnibble_up_pose,
-                                                          tip_link=box_name,
-                                                          root_link='map',
-                                                          absolute=False,
-                                                          start_condition=schnibble_down)
+        schnibble_up = box_setup.motion_goals.add_cartesian_pose(name='Knife Up',
+                                                                 goal_pose=schnibble_up_pose,
+                                                                 tip_link=box_name,
+                                                                 root_link='map',
+                                                                 absolute=False,
+                                                                 start_condition=schnibble_down)
 
         right_pose = PoseStamped()
         right_pose.header.frame_id = box_name
         right_pose.pose.position.y = 0.02
         right_pose.pose.orientation.w = 1.0
-        move_right = box_setup.tasks.add_cartesian_pose(name='Move Right',
-                                                        goal_pose=right_pose,
-                                                        tip_link=box_name,
-                                                        root_link='map',
-                                                        absolute=False,
-                                                        start_condition=schnibble_up)
+        move_right = box_setup.motion_goals.add_cartesian_pose(name='Move Right',
+                                                               goal_pose=right_pose,
+                                                               tip_link=box_name,
+                                                               root_link='map',
+                                                               absolute=False,
+                                                               start_condition=schnibble_up)
 
         human_close = box_setup.monitors.add_pulse(name='Human Close?',
                                                    after_ticks=60,
@@ -754,7 +754,6 @@ class TestCollisionAvoidanceGoals:
         box_setup.update_pause_condition(node_name=schnibble_down, condition=human_close)
         box_setup.update_pause_condition(node_name=schnibble_up, condition=human_close)
         box_setup.update_pause_condition(node_name=move_right, condition=human_close)
-
 
         box_setup.monitors.add_end_motion(start_condition=schnibbel_done)
         box_setup.monitors.add_cancel_motion(start_condition=f'not {no_contact}', error=Exception('no contact'))
@@ -786,10 +785,12 @@ class TestCollisionAvoidanceGoals:
                                                                                   [0, -1, 0, 0],
                                                                                   [1, 0, 0, 0],
                                                                                   [0, 0, 0, 1]]))
-        pre_schnibble = box_setup.tasks.add_cartesian_pose(name='Position Knife',
-                                                           goal_pose=pre_schnibble_pose,
-                                                           tip_link=box_setup.tip,
-                                                           root_link='map')
+        pre_schnibble = 'Position Knife'
+        box_setup.motion_goals.add_cartesian_pose(name=pre_schnibble,
+                                                  goal_pose=pre_schnibble_pose,
+                                                  tip_link=box_setup.tip,
+                                                  root_link='map',
+                                                  end_condition=pre_schnibble)
         human_close = box_setup.monitors.add_pulse(name='Human Close?',
                                                    after_ticks=50,
                                                    true_for_ticks=50,
@@ -808,7 +809,7 @@ class TestCollisionAvoidanceGoals:
         #                                                start_condition=schnibble_down)
 
         schnibbel_done = box_setup.monitors.add_time_above(name='Done?',
-                                                           threshold=3.5,
+                                                           threshold=5,
                                                            start_condition=cut)
 
         reset = f'not {schnibbel_done}'
@@ -817,7 +818,6 @@ class TestCollisionAvoidanceGoals:
         box_setup.update_end_condition(node_name=human_close, condition=schnibbel_done)
 
         box_setup.update_pause_condition(node_name=cut, condition=human_close)
-
 
         box_setup.monitors.add_end_motion(start_condition=schnibbel_done)
         # box_setup.monitors.add_cancel_motion(start_condition=f'not {no_contact}', error=Exception('no contact'))

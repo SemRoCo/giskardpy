@@ -22,4 +22,4 @@ class JointGoalReached(Monitor):
             comparison_list.append(cas.less(cas.abs(error), threshold))
         expression = cas.logic_all(cas.Expression(comparison_list))
         super().__init__(name=name)
-        self.expression = expression
+        self.observation_expression = expression

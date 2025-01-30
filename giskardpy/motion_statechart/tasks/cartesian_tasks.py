@@ -71,7 +71,7 @@ class CartesianPosition(Task):
                                                               )
 
         distance_to_goal = cas.euclidean_distance(root_P_goal, r_P_c)
-        self.expression = cas.less(distance_to_goal, threshold)
+        self.observation_expression = cas.less(distance_to_goal, threshold)
 
 
 class CartesianPositionStraight(Task):
@@ -200,7 +200,7 @@ class CartesianOrientation(Task):
         #                                                       debug_current_trans_matrix)
 
         rotation_error = cas.rotational_error(r_R_c, root_R_goal)
-        self.expression = cas.less(cas.abs(rotation_error), threshold)
+        self.observation_expression = cas.less(cas.abs(rotation_error), threshold)
 
 
 class CartesianPose(Task):
@@ -264,8 +264,9 @@ class CartesianPose(Task):
         if tip_link in ['rollin_justin/r_gripper_tool_frame']:
             god_map.debug_expression_manager.add_debug_expression(f'{self.name}/r/current_point', r_P_c,
                                                                   color=ColorRGBA(r=1.0, g=0.0, b=0.0, a=1.0))
-        # god_map.debug_expression_manager.add_debug_expression(f'{self.name}/goal_point', root_P_goal,
-        #                                                       color=ColorRGBA(r=0.0, g=0.0, b=1.0, a=1.0))
+        if tip_link in ['Schnibbler/Schnibbler']:
+            god_map.debug_expression_manager.add_debug_expression(f'{self.name}/r_P_c', r_P_c,
+                                                                  color=ColorRGBA(r=0.0, g=0.0, b=1.0, a=1.0))
 
         distance_to_goal = cas.euclidean_distance(root_P_goal, r_P_c)
 
@@ -287,7 +288,7 @@ class CartesianPose(Task):
         #                                                       debug_current_trans_matrix)
 
         rotation_error = cas.rotational_error(r_R_c, root_R_goal)
-        self.expression = cas.logic_and(cas.less(cas.abs(rotation_error), threshold),
+        self.observation_expression = cas.logic_and(cas.less(cas.abs(rotation_error), threshold),
                                         cas.less(distance_to_goal, threshold))
 
 
@@ -458,4 +459,4 @@ class JustinTorsoLimitCart(Task):
                                        weight=weight,
                                        task_expression=distance,
                                        name=f'{name}/distance')
-        self.expression = cas.less_equal(distance, forward_distance)
+        self.observation_expression = cas.less_equal(distance, forward_distance)

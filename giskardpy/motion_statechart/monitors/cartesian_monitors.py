@@ -35,7 +35,7 @@ class PoseReached(Monitor):
         rotation_error = cas.rotational_error(r_R_c, r_R_g)
         orientation_reached = cas.less(cas.abs(rotation_error), orientation_threshold)
 
-        self.expression = cas.logic_and(position_reached, orientation_reached)
+        self.observation_expression = cas.logic_and(position_reached, orientation_reached)
 
 
 class PositionReached(Monitor):
@@ -56,7 +56,7 @@ class PositionReached(Monitor):
 
         r_P_c = god_map.world.compose_fk_expression(root_link, tip_link).to_position()
         distance_to_goal = cas.euclidean_distance(root_P_goal, r_P_c)
-        self.expression = cas.less(distance_to_goal, threshold)
+        self.observation_expression = cas.less(distance_to_goal, threshold)
 
 
 class OrientationReached(Monitor):
@@ -77,7 +77,7 @@ class OrientationReached(Monitor):
 
         r_R_c = god_map.world.compose_fk_expression(root_link, tip_link).to_rotation()
         rotation_error = cas.rotational_error(r_R_c, r_R_g)
-        self.expression = cas.less(cas.abs(rotation_error), threshold)
+        self.observation_expression = cas.less(cas.abs(rotation_error), threshold)
 
 
 class PointingAt(Monitor):
@@ -104,7 +104,7 @@ class PointingAt(Monitor):
                                               frame_P_line_point=root_P_tip,
                                               frame_V_line_direction=root_V_pointing_axis)
         expr = cas.less(cas.abs(distance), threshold)
-        self.expression = expr
+        self.observation_expression = expr
 
 
 class VectorsAligned(Monitor):
@@ -129,7 +129,7 @@ class VectorsAligned(Monitor):
         root_V_tip_normal = root_R_tip.dot(self.tip_V_tip_normal)
         error = cas.angle_between_vector(root_V_tip_normal, self.root_V_root_normal)
         expr = cas.less(error, threshold)
-        self.expression = expr
+        self.observation_expression = expr
 
 
 class DistanceToLine(Monitor):
@@ -156,4 +156,4 @@ class DistanceToLine(Monitor):
                                                                      frame_P_line_start=root_P_line_start,
                                                                      frame_P_line_end=root_P_line_end)
         expr = cas.less(distance, threshold)
-        self.expression = expr
+        self.observation_expression = expr

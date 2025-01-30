@@ -97,12 +97,12 @@ class ExternalCA(Goal):
         weight = cas.save_division(WEIGHT_COLLISION_AVOIDANCE,  # divide by number of active repeller per link
                                    cas.min(number_of_external_collisions, self.num_repeller))
         distance_monitor = Monitor(name=f'collision distance {self.name}', plot=False)
-        distance_monitor.expression = cas.greater(actual_distance, 50)
+        distance_monitor.observation_expression = cas.greater(actual_distance, 50)
         self.add_monitor(distance_monitor)
         task = Task(name=self.name + '/task', plot=False)
         self.add_task(task)
         task.plot = False
-        task.pause_condition = distance_monitor.get_observation_state_expression()
+        task.pause_condition = distance_monitor
         task.add_inequality_constraint(reference_velocity=self.max_velocity,
                                        lower_error=lower_limit,
                                        upper_error=float('inf'),
@@ -206,12 +206,12 @@ class SelfCA(Goal):
         weight = cas.save_division(WEIGHT_COLLISION_AVOIDANCE,  # divide by number of active repeller per link
                                    cas.min(number_of_self_collisions, self.num_repeller))
         distance_monitor = Monitor(name=f'collision distance {self.name}', plot=False)
-        distance_monitor.expression = cas.greater(actual_distance, 50)
+        distance_monitor.observation_expression = cas.greater(actual_distance, 50)
         self.add_monitor(distance_monitor)
         task = Task(name=self.name + '/task', plot=False)
         self.add_task(task)
         task.plot = False
-        task.pause_condition = distance_monitor.get_observation_state_expression()
+        task.pause_condition = distance_monitor
         task.add_inequality_constraint(reference_velocity=self.max_velocity,
                                        lower_error=lower_limit,
                                        upper_error=float('inf'),
@@ -219,7 +219,6 @@ class SelfCA(Goal):
                                        task_expression=dist,
                                        lower_slack_limit=-float('inf'),
                                        upper_slack_limit=upper_slack)
-        self.connect_monitors_to_all_tasks(start_condition, pause_condition, end_condition)
 
     def get_contact_normal_in_b(self):
         expr = f'god_map.closest_point.get_self_collisions(\'{self.link_a}\', \'{self.link_b}\')[{self.idx}].new_b_V_n'
@@ -328,7 +327,7 @@ class CollisionAvoidanceHint(Goal):
                                      equality_bound=max_velocity,
                                      weight=weight,
                                      task_expression=expr)
-        self.expression = cas.TrinaryUnknown
+        self.observation_expression = cas.TrinaryUnknown
 
     def get_actual_distance(self):
         expr = f'god_map.closest_point.get_external_collisions_long_key(\'{self.key[0]}\', \'{self.key[1]}\').contact_distance'

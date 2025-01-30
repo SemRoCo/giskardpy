@@ -65,4 +65,4 @@ class Pointing(Task):
                                          frame_V_goal=root_V_goal_axis,
                                          reference_velocity=self.max_velocity,
                                          weight=self.weight)
-        self.expression = cas.less_equal(cas.angle_between_vector(root_V_pointing_axis, root_V_goal_axis), threshold)
+        self.observation_expression = cas.less_equal(cas.angle_between_vector(root_V_pointing_axis, root_V_goal_axis), threshold)

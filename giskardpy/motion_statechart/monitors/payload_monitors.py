@@ -19,7 +19,7 @@ class CheckMaxTrajectoryLength(Monitor):
                  length: float):
         super().__init__(name=name)
         self.length = length
-        self.expression = cas.greater(symbol_manager.time, self.length)
+        self.observation_expression = cas.greater(symbol_manager.time, self.length)
 
 
 class Print(PayloadMonitor):

@@ -82,4 +82,4 @@ class GraspBar(Task):
                                         reference_velocity=self.reference_linear_velocity,
                                         weight=self.weight)
 
-        self.expression = cas.less_equal(dist, threshold)
+        self.observation_expression = cas.less_equal(dist, threshold)

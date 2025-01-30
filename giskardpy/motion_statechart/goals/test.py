@@ -64,7 +64,7 @@ class GraspSequence(Goal):
                              weight=self.weight)
         self.add_task(lift)
         self.arrange_in_sequence([gripper_open, grasp, gripper_closed, lift])
-        self.expression = lift.get_observation_state_expression()
+        self.observation_expression = lift.get_observation_state_expression()
 
 
 class Cutting(Goal):
@@ -102,12 +102,12 @@ class Cutting(Goal):
 
         made_contact = TrueMonitor(name=f'{self.name}/Made Contact?')
         self.add_monitor(made_contact)
-        made_contact.start_condition = cut_down.get_observation_state_expression()
-        made_contact.end_condition = made_contact.get_observation_state_expression()
+        made_contact.start_condition = cut_down
+        made_contact.end_condition = made_contact
 
         cancel = CancelMotion(name=f'{self.name}/CancelMotion', exception=Exception('no contact'))
         self.add_monitor(cancel)
-        cancel.start_condition = cas.logic_not(made_contact.get_observation_state_expression())
+        cancel.start_condition = f'not {made_contact}'
 
 
         schnibble_up_pose = god_map.world.compute_fk(root_link=self.tip_link, tip_link=self.tip_link)
@@ -129,6 +129,6 @@ class Cutting(Goal):
         self.add_task(move_right)
 
         self.arrange_in_sequence([cut_down, cut_up, move_right])
-        self.expression = cas.if_else(cas.is_true3(move_right.get_observation_state_expression()),
+        self.observation_expression = cas.if_else(cas.is_true3(move_right.get_observation_state_expression()),
                                       cas.TrinaryTrue,
                                       cas.TrinaryFalse)

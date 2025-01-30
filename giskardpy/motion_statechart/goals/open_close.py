@@ -57,7 +57,7 @@ class Open(Goal):
                                     goal_pose=handle_pose,
                                     weight=self.weight)
         self.add_task(hold_handle)
-        self.expression = cas.logic_and(hinge_goal.expression, hold_handle.expression)
+        self.observation_expression = cas.logic_and(hinge_goal.observation_expression, hold_handle.observation_expression)
 
 
 class Close(Open):

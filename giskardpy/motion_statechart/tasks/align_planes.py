@@ -63,4 +63,4 @@ class AlignPlanes(Task):
                                                               self.root_V_root_normal,
                                                               color=ColorRGBA(r=0, g=0, b=1, a=1))
 
-        self.expression = cas.less_equal(cas.angle_between_vector(root_V_tip_normal, self.root_V_root_normal), threshold)
+        self.observation_expression = cas.less_equal(cas.angle_between_vector(root_V_tip_normal, self.root_V_root_normal), threshold)

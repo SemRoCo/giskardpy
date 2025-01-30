@@ -125,7 +125,7 @@ class LocalMinimumReached(Monitor):
                     joint_vel_symbol = symbol_manager.get_symbol(expr)
                 condition_list.append(cas.less(cas.abs(joint_vel_symbol), velocity_limit))
 
-        self.expression = cas.logic_all(cas.Expression(condition_list))
+        self.observation_expression = cas.logic_all(cas.Expression(condition_list))
 
 
 class TimeAbove(Monitor):
@@ -137,7 +137,7 @@ class TimeAbove(Monitor):
             threshold = god_map.qp_controller_config.max_trajectory_length
         traj_length_in_sec = symbol_manager.time
         condition = cas.greater(traj_length_in_sec, threshold)
-        self.expression = condition
+        self.observation_expression = condition
 
 
 class Alternator(Monitor):
@@ -150,7 +150,7 @@ class Alternator(Monitor):
                          plot=plot)
         time = symbol_manager.time
         expr = cas.equal(cas.fmod(cas.floor(time), mod), 0)
-        self.expression = expr
+        self.observation_expression = expr
 
 
 class TrueMonitor(Monitor):
@@ -159,7 +159,7 @@ class TrueMonitor(Monitor):
                  plot: bool = True):
         super().__init__(name=name,
                          plot=plot)
-        self.expression = cas.BinaryTrue
+        self.observation_expression = cas.BinaryTrue
 
 
 class FalseMonitor(Monitor):
@@ -168,4 +168,4 @@ class FalseMonitor(Monitor):
                  plot: bool = True):
         super().__init__(name=name,
                          plot=plot)
-        self.expression = cas.BinaryFalse
+        self.observation_expression = cas.BinaryFalse

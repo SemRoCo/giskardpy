@@ -139,7 +139,7 @@ class JointPositionList(Task):
             #                                                           derivatives_to_plot=[d])
         joint_monitor = JointGoalReached(goal_state=goal_state,
                                          threshold=threshold)
-        self.expression = joint_monitor.expression
+        self.observation_expression = joint_monitor.observation_expression
 
 
 class JointPositionLimitList(Task):

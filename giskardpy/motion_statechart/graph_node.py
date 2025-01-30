@@ -1,11 +1,11 @@
 from __future__ import annotations
-from typing import Optional
+from typing import Optional, Union
 
 import giskardpy.casadi_wrapper as cas
 from giskardpy.data_types.data_types import LifeCycleState
 from giskardpy.data_types.exceptions import GiskardException
 from giskardpy.god_map import god_map
-from giskardpy.utils.utils import string_shortener
+from giskardpy.utils.utils import string_shortener, quote_node_names
 
 
 class MotionStatechartNode:
@@ -14,11 +14,10 @@ class MotionStatechartNode:
     _unparsed_end_condition: Optional[str]
     _unparsed_reset_condition: Optional[str]
 
-    _expression: cas.Expression
+    _observation_expression: cas.Expression
     _name: str
     _id: int
     plot: bool
-    _parsed: bool
 
     logic3_start_condition: cas.Expression
     logic3_pause_condition: cas.Expression
@@ -28,10 +27,9 @@ class MotionStatechartNode:
     def __init__(self, *,
                  name: str,
                  plot: bool = True):
-        self._expression = cas.TrinaryUnknown
+        self._observation_expression = cas.TrinaryUnknown
         self.plot = plot
         self._id = -1
-        self._parsed = False
         self._name = name
         self._unparsed_start_condition = None
         self._unparsed_pause_condition = None
@@ -96,12 +94,12 @@ class MotionStatechartNode:
         return god_map.motion_statechart_manager.register_expression_updater(expression, self)
 
     @property
-    def expression(self) -> cas.Expression:
-        return self._expression
+    def observation_expression(self) -> cas.Expression:
+        return self._observation_expression
 
-    @expression.setter
-    def expression(self, expression: cas.Expression) -> None:
-        self._expression = expression
+    @observation_expression.setter
+    def observation_expression(self, expression: cas.Expression) -> None:
+        self._observation_expression = expression
 
     def get_observation_state_expression(self) -> cas.Symbol:
         raise NotImplementedError('get_state_expression is not implemented')
@@ -111,34 +109,58 @@ class MotionStatechartNode:
 
     @property
     def start_condition(self) -> str:
-        return self._unparsed_start_condition
+        if self._unparsed_start_condition is None:
+            return 'True'
+        return quote_node_names(self._unparsed_start_condition)
 
     @start_condition.setter
-    def start_condition(self, value: str) -> None:
+    def start_condition(self, value: Union[str, MotionStatechartNode]) -> None:
+        if isinstance(value, MotionStatechartNode):
+            value = value.name
+        if value == '':
+            value = 'True'
         self._unparsed_start_condition = value
 
     @property
     def pause_condition(self) -> str:
-        return self._unparsed_pause_condition
+        if self._unparsed_pause_condition is None:
+            return 'False'
+        return quote_node_names(self._unparsed_pause_condition)
 
     @pause_condition.setter
-    def pause_condition(self, value: str) -> None:
+    def pause_condition(self, value: Union[str, MotionStatechartNode]) -> None:
+        if isinstance(value, MotionStatechartNode):
+            value = value.name
+        if value == '':
+            value = 'False'
         self._unparsed_pause_condition = value
 
     @property
     def end_condition(self) -> str:
-        return self._unparsed_end_condition
+        if self._unparsed_end_condition is None:
+            return 'False'
+        return quote_node_names(self._unparsed_end_condition)
 
     @end_condition.setter
-    def end_condition(self, value: str) -> None:
+    def end_condition(self, value: Union[str, MotionStatechartNode]) -> None:
+        if isinstance(value, MotionStatechartNode):
+            value = value.name
+        if value == '':
+            value = 'False'
         self._unparsed_end_condition = value
 
     @property
     def reset_condition(self) -> str:
-        return self._unparsed_reset_condition
+        if self._unparsed_reset_condition is None:
+            return 'False'
+        return quote_node_names(self._unparsed_reset_condition)
 
     @reset_condition.setter
-    def reset_condition(self, value: str) -> None:
+    def reset_condition(self, value: Union[str, MotionStatechartNode]) -> None:
+        if isinstance(value, MotionStatechartNode):
+            value = value.name
+        if value == '':
+            value = 'False'
         self._unparsed_reset_condition = value
 
     def pre_compile(self) -> None:

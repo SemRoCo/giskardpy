@@ -61,7 +61,7 @@ class InsertCylinder(Goal):
                                              frame_P_goal=root_P_top,
                                              reference_velocity=0.1,
                                              weight=self.weight)
-        reach_top.expression = cas.less(distance_to_top, 0.01)
+        reach_top.observation_expression = cas.less(distance_to_top, 0.01)
 
         # %% tilted orientation goal
         tilt_error = cas.angle_between_vector(root_V_cylinder_z, root_V_up)
@@ -72,21 +72,21 @@ class InsertCylinder(Goal):
                                           reference_velocity=0.1,
                                           weight=self.weight)
         root_V_cylinder_z.vis_frame = self.tip
-        tilt_task.expression = cas.less_equal(cas.abs(tilt_error - self.tilt), 0.01)
+        tilt_task.observation_expression = cas.less_equal(cas.abs(tilt_error - self.tilt), 0.01)
 
-        init_done = f'{reach_top.name} and {tilt_task.name}'
+        init_done = f'{reach_top} and {tilt_task}'
 
         reach_top.end_condition = init_done
 
         # %% move down
-        stay_on_line = Task(name='Stay on Straight Line ')
+        stay_on_line = Task(name='Stay on Straight Line')
         self.add_task(stay_on_line)
         stay_on_line.add_point_goal_constraints(frame_P_current=root_P_tip,
                                                 frame_P_goal=root_P_on_line,
                                                 reference_velocity=0.1,
                                                 weight=self.weight,
                                                 name='pregrasp')
-        stay_on_line.expression = cas.less(distance_to_line, 0.01)
+        stay_on_line.observation_expression = cas.less(distance_to_line, 0.01)
 
         insert_task = Task(name='Insert')
         self.add_task(insert_task)
@@ -96,13 +96,13 @@ class InsertCylinder(Goal):
                                                weight=self.weight,
                                                name='insertion')
         insert_task.start_condition = init_done
-        insert_task.expression = cas.less(distance_to_hole, 0.01)
+        insert_task.observation_expression = cas.less(distance_to_hole, 0.01)
 
-        bottom_reached = f'{insert_task.name} and {stay_on_line.name}'
+        bottom_reached = f'{insert_task} and {stay_on_line}'
 
         tilt_task.end_condition = bottom_reached
         # %% tilt straight
-        # tilt_monitor.expression = cas.less(tilt_error, 0.01)
+        # tilt_monitor.observation_expression = cas.less(tilt_error, 0.01)
 
         tilt_straight_task = Task(name='Tilt Straight')
         self.add_task(tilt_straight_task)
@@ -112,6 +112,6 @@ class InsertCylinder(Goal):
                                                        weight=self.weight)
         tilt_straight_task.start_condition = bottom_reached
         # tilt_straight_task.end_condition = tilt_monitor.get_observation_state_expression()
-        tilt_straight_task.expression = cas.less_equal(tilt_error, 0.01)
+        tilt_straight_task.observation_expression = cas.less_equal(tilt_error, 0.01)
 
-        self.expression = tilt_straight_task.expression
+        self.observation_expression = tilt_straight_task.observation_expression

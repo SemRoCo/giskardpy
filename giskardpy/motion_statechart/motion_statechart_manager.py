@@ -118,7 +118,10 @@ class MotionStatechartManager:
         if node_name in self.get_all_node_names():
             raise ValueError(f'Node "{node_name}" already exists')
 
-    def parse_motion_graph(self) -> None:
+    def parse_conditions(self) -> None:
+        for goal in self.goal_state.nodes:
+            if self.get_parent_node_name_of_node(goal) == '':
+                self.apply_conditions_to_sub_nodes(goal)
 
         task_state_symbols = self.task_state.get_observation_state_symbol_map()
         monitor_state_symbols = self.monitor_state.get_observation_state_symbol_map()
@@ -147,25 +150,34 @@ class MotionStatechartManager:
                                 pause_condition=pause_condition,
                                 end_condition=end_condition)
 
-        # %% apply goal conditions to sub nodes
-        for goal in self.goal_state.nodes:
-            if self.get_parent_node_name_of_node(goal) == '':
-                self.apply_conditions_to_sub_nodes(goal)
 
-    # def create_logic3_conditions(self) -> None:
-    #     for node in self.task_state.nodes + self.monitor_state.nodes + self.goal_state.nodes:
-    #         node.logic3_start_condition = cas.replace_with_three_logic(node.start_condition)
-    #         node.logic3_pause_condition = cas.replace_with_three_logic(node.pause_condition)
-    #         node.logic3_end_condition = cas.replace_with_three_logic(node.end_condition)
-    #         node.logic3_reset_condition = cas.replace_with_three_logic(node.reset_condition)
+
+    # def _parse_layer(self, monitors: List[Monitor], tasks: List[Task], goals: List[Goal]):
+    #     for goal in goals:
+    #         if self.get_parent_node_name_of_node(goal) == '':
+    #             self.apply_conditions_to_sub_nodes(goal)
+
 
     def apply_conditions_to_sub_nodes(self, goal: Goal):
         for node in goal.tasks + goal.monitors + goal.goals:
-            if cas.is_true_symbol(node.logic3_start_condition):
+            if node.start_condition == 'True':
                 node.start_condition = goal.start_condition
-            node.pause_condition = cas.logic_or3(node.logic3_pause_condition, goal.logic3_pause_condition)
-            node.end_condition = cas.logic_or3(node.logic3_end_condition, goal.logic3_end_condition)
-            node.reset_condition = cas.logic_or3(node.logic3_reset_condition, goal.logic3_reset_condition)
+
+            if node.pause_condition == 'False':
+                node.pause_condition = goal.pause_condition
+            elif goal.pause_condition != 'False':
+                node.pause_condition = f'({node.pause_condition}) or ({goal.pause_condition})'
+
+            if node.end_condition == 'False':
+                node.end_condition = goal.end_condition
+            elif goal.pause_condition != 'False':
+                node.end_condition = f'({node.end_condition}) or ({goal.end_condition})'
+
+            if node.reset_condition == 'False':
+                node.reset_condition = goal.reset_condition
+            elif goal.pause_condition != 'False':
+                node.reset_condition = f'({node.reset_condition}) or ({goal.reset_condition})'
+
             if isinstance(node, Goal):
                 self.apply_conditions_to_sub_nodes(node)
 
@@ -182,6 +194,12 @@ class MotionStatechartManager:
         elif isinstance(node, ast.Str):
             # replace monitor name with its state expression
             return observation_state_symbols[node.value]
+        elif isinstance(node, ast.Constant):  # Handle True, False, and other literals
+            if isinstance(node.value, bool):  # Check if it's True or False
+                if node.value:
+                    return cas.TrinaryTrue
+                else:
+                    return cas.TrinaryFalse
         raise Exception(f'failed to parse {node}')
 
     def logic_str_to_expr(self, logic_str: str, default: cas.Expression,
@@ -286,7 +304,7 @@ class MotionStatechartManager:
             if isinstance(node, PayloadMonitor):
                 expression = state_symbol  # if payload monitor, copy last state
             else:
-                expression = node.expression
+                expression = node.observation_expression
             state_f = cas.if_eq_cases(a=node.get_life_cycle_state_expression(),
                                       b_result_cases=[(int(LifeCycleState.running), expression),
                                                       (int(LifeCycleState.not_started), ObservationState.unknown)],

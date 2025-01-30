@@ -50,7 +50,7 @@ class HeightMonitor(FeatureMonitor):
         distance = cas.distance_projected_on_vector(self.root_P_controlled_feature, self.root_P_reference_feature,
                                                     cas.Vector3([0, 0, 1]))
         expr = cas.logic_and(cas.greater_equal(distance, lower_limit), cas.less_equal(distance, upper_limit))
-        self.expression = expr
+        self.observation_expression = expr
 
 
 class PerpendicularMonitor(FeatureMonitor):
@@ -67,7 +67,7 @@ class PerpendicularMonitor(FeatureMonitor):
                          name=name)
 
         expr = cas.dot(self.root_V_reference_feature[:3], self.root_V_controlled_feature[:3])
-        self.expression = cas.less_equal(cas.abs(expr), threshold)
+        self.observation_expression = cas.less_equal(cas.abs(expr), threshold)
 
 
 class DistanceMonitor(FeatureMonitor):
@@ -88,7 +88,7 @@ class DistanceMonitor(FeatureMonitor):
         distance = cas.norm(cas.distance_vector_projected_on_plane(self.root_P_controlled_feature,
                                                                    self.root_P_reference_feature,
                                                                    cas.Vector3([0, 0, 1])))
-        self.expression = cas.logic_and(cas.greater_equal(distance, lower_limit), cas.less_equal(distance, upper_limit))
+        self.observation_expression = cas.logic_and(cas.greater_equal(distance, lower_limit), cas.less_equal(distance, upper_limit))
 
 
 class AngleMonitor(FeatureMonitor):
@@ -107,4 +107,4 @@ class AngleMonitor(FeatureMonitor):
                          name=name)
 
         expr = cas.angle_between_vector(self.root_V_reference_feature, self.root_V_controlled_feature)
-        self.expression = cas.logic_and(cas.greater(expr, lower_angle), cas.less(expr, upper_angle))
+        self.observation_expression = cas.logic_and(cas.greater(expr, lower_angle), cas.less(expr, upper_angle))

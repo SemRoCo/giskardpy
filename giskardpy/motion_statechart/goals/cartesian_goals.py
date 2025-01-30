@@ -121,7 +121,7 @@ class DiffDriveBaseGoal(Goal):
                                                equality_bound=rotate_to_goal_error,
                                                weight=self.weight,
                                                task_expression=map_current_angle)
-        orient_to_goal.expression = cas.less_equal(cas.abs(rotate_to_goal_error), eps)
+        orient_to_goal.observation_expression = cas.less_equal(cas.abs(rotate_to_goal_error), eps)
 
         drive_to_goal = Task(name='drive_to_goal')
         self.add_task(drive_to_goal)
@@ -129,7 +129,7 @@ class DiffDriveBaseGoal(Goal):
                                                  frame_P_goal=map_P_base_footprint_goal,
                                                  reference_velocity=self.max_linear_velocity,
                                                  weight=self.weight)
-        drive_to_goal.expression = cas.less_equal(cas.abs(distance), eps * 2)
+        drive_to_goal.observation_expression = cas.less_equal(cas.abs(distance), eps * 2)
 
         final_orientation = Task(name='final_orientation')
         self.add_task(final_orientation)
@@ -137,17 +137,17 @@ class DiffDriveBaseGoal(Goal):
                                                   equality_bound=final_rotation_error,
                                                   weight=self.weight,
                                                   task_expression=map_current_angle)
-        final_orientation.expression = cas.less_equal(cas.abs(final_rotation_error), eps)
+        final_orientation.observation_expression = cas.less_equal(cas.abs(final_rotation_error), eps)
 
         god_map.debug_expression_manager.add_debug_expression('distance', distance)
-        # god_map.debug_expression_manager.add_debug_expression('final_orientation.expression', final_orientation.expression)
+        # god_map.debug_expression_manager.add_debug_expression('final_orientation.observation_expression', final_orientation.observation_expression)
 
-        orient_to_goal.end_condition = orient_to_goal.get_observation_state_expression()
-        drive_to_goal.start_condition = orient_to_goal.get_observation_state_expression()
-        drive_to_goal.end_condition = drive_to_goal.get_observation_state_expression()
-        final_orientation.start_condition = drive_to_goal.get_observation_state_expression()
-        self.expression = cas.logic_and3(drive_to_goal.expression,
-                                         final_orientation.expression)
+        orient_to_goal.end_condition = orient_to_goal
+        drive_to_goal.start_condition = orient_to_goal
+        drive_to_goal.end_condition = drive_to_goal
+        final_orientation.start_condition = drive_to_goal
+        self.observation_expression = cas.logic_and3(drive_to_goal.observation_expression,
+                                                     final_orientation.observation_expression)
 
 
 
@@ -211,6 +211,6 @@ class RelativePositionSequence(Goal):
                               name=name2,
                               absolute=True)
         self.add_task(task2)
-        task2.start_condition = task1.get_observation_state_expression()
-        task1.end_condition = task1.get_observation_state_expression()
-        self.expression = task2.expression
+        task2.start_condition = task1
+        task1.end_condition = task1
+        self.observation_expression = task2.observation_expression

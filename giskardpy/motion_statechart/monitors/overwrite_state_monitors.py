@@ -2,8 +2,6 @@ from __future__ import division
 
 from typing import Dict, Optional
 
-from geometry_msgs.msg import PoseStamped
-
 from giskardpy import casadi_wrapper as cas
 from giskardpy.motion_statechart.monitors.monitors import PayloadMonitor
 from giskardpy.god_map import god_map

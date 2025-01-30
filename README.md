@@ -12,8 +12,8 @@ echo "source /usr/share/virtualenvwrapper/virtualenvwrapper.sh" >> ~/.bashrc
 source ~/.bashrc
 mkdir -p $WORKON_HOME
 
+# --system-site-packages is only required if you are using ROS
 mkvirtualenv giskardpy --system-site-packages
-ls $WORKON_HOME
 ```
 To use it do:
 ```

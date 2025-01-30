@@ -5,10 +5,8 @@ from enum import Enum
 from itertools import product, combinations_with_replacement, combinations
 from typing import List, Dict, Optional, Tuple, Iterable, Set, DefaultDict, Callable
 
-import pkg_resources
 from pkg_resources import resource_filename
 
-import giskardpy.casadi_wrapper as cas
 import numpy as np
 from lxml import etree
 

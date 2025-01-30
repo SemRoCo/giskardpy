@@ -54,5 +54,5 @@ if __name__ == '__main__':
     giskard = GiskardWrapper(world_config=WorldWithOmniDriveRobot(urdf=urdf),
                              collision_avoidance_config=DisableCollisionAvoidanceConfig(),
                              qp_controller_config=QPControllerConfig())
-    print(execute_cart_goal(giskard).to_dict())
-    print(execute_joint_goal(giskard).to_dict())
+    print(execute_cart_goal(giskard))
+    print(execute_joint_goal(giskard))

@@ -45,7 +45,7 @@ jobs:
     runs-on: ubuntu-20.04
     strategy:
       matrix:
-        qp_solver: [qpSWIFT]
+        qp_solver: [ qpSWIFT ]
     env:
       QP_SOLVER: ${{ matrix.qp_solver }}
     steps:
@@ -84,7 +84,65 @@ jobs:
         with:
           path: 'ros_ws/src/giskardpy_ros'
           repository: SemRoCo/giskardpy_ros
+      - name: Find Corresponding PR in Second Repo
+        if: github.event_name == 'pull_request'
+        id: find_pr
+        run: |
+          REPO_2="MideCry/giskardpy"
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          PR_URL="${{ github.event.pull_request.url }}"
+
+          echo "Searching for PR related to #$PR_NUMBER in $REPO_2"
+
+          # Find PR by matching title or linked issues
+          PR_JSON=$(gh pr list --repo "$REPO_2" --state open \
+            --json number,title,body,baseRefName,url,mergeable,headRefName,headRepository,headRepositoryOwner | jq -r \
+            ".[] | select(.body | contains(\"#$PR_NUMBER\") or contains(\"${PR_TITLE}\") or contains(\"${PR_URL}\")) | @base64")
+
+          if [[ -n "$PR_JSON" ]]; then
+            PR_INFO=$(echo "$PR_JSON" | base64 --decode)
+            PR_URL=$(echo "$PR_INFO" | jq -r '.url')
+            PR_INTO_BRANCH=$(echo "$PR_INFO" | jq -r '.baseRefName')
+            PR_FROM_BRANCH=$(echo "$PR_INFO" | jq -r '.headRefName')
+            PR_FROM_REPO=$(echo "$PR_INFO" | jq -r '.headRepository.name')
+            PR_FROM_OWNER=$(echo "$PR_INFO" | jq -r '.headRepositoryOwner.login')
+            PR_MERGEABLE=$(echo "$PR_INFO" | jq -r '.mergeable')
+
+            echo "Found related PR in second repo: $PR_URL (Branch: $PR_BRANCH)"
+            echo "pr_found=true" >> $GITHUB_ENV
+            echo "pr_into_branch=$PR_INTO_BRANCH" >> $GITHUB_ENV
+            echo "pr_from_branch=$PR_FROM_BRANCH" >> $GITHUB_ENV
+            echo "pr_from_repo=$PR_FROM_REPO" >> $GITHUB_ENV
+            echo "pr_from_owner=$PR_FROM_OWNER" >> $GITHUB_ENV
+            echo "pr_mergeable=$PR_MERGEABLE" >> $GITHUB_ENV
+          else
+            echo "No matching PR found in second repo."
+            echo "pr_found=false" >> $GITHUB_ENV
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Checkout Second Repo PR Branch
+        if: github.event_name == 'pull_request' && env.pr_found == 'true' && env.pr_mergeable == 'MERGEABLE'
+        run: |
+          git config --global user.email "github-actions@github.com"
+          git config --global user.name "GitHub Actions"
+          
+          git clone https://github.com/MideCry/giskardpy.git
+          cd giskardpy
+          git checkout ${{ env.pr_into_branch }}
+          
+          git pull origin ${{ env.pr_into_branch }}
+
+          echo "Adding remote fork: ${{ env.pr_from_owner }}/${{ env.pr_from_repo }}"
+          git remote add from_repo https://github.com/${{ env.pr_from_owner }}/${{ env.pr_from_repo }}.git
+          git fetch from_repo
+
+          echo "Merging PR branch (${{ env.pr_from_branch }}) into ${{ env.pr_into_branch }}"
+          git checkout ${{ env.pr_into_branch }}
+          git merge  --no-commit --no-ff from_repo/${{ env.pr_from_branch }}
       - uses: actions/checkout@v3
+        if: github.event_name == 'push' || env.pr_found == 'false' || env.pr_mergeable != 'MERGEABLE'
         with:
           path: 'giskardpy'
           repository: SemRoCo/giskardpy

@@ -26,55 +26,40 @@ on:
         description: 'Test scenario tags'
         required: false
         type: boolean
+
 jobs:
-  build_dependencies:
-    uses: ./.github/workflows/build_dependencies.yml
-  build:
-    needs: [ build_dependencies ]
+  # GitHub Repository-Owners can have uppercase letters.
+  # Container Registry URLs need to be lowercase.
+  # There is no easy way to get it to lowercase (that i found)
+  to-lowercase:
+    runs-on: ubuntu-latest
+    outputs:
+      repo_lowercase: ${{ steps.lowercase.outputs.repository }}
+    steps:
+      - id: lowercase
+        run: |
+          echo "repository=${GITHUB_REPOSITORY@L}" >> $GITHUB_OUTPUT
+  test:
+    needs: to-lowercase
     strategy:
+      # Lets all tests finish, even if one test fails
+      fail-fast: false
       matrix:
         tests: [ "test_cas_wrapper", "test_symbol_manager", "test_math", "test_giskard_library"]
-        ubuntu_version: [ "ubuntu-20.04", "ubuntu-24.04"]
-    runs-on: ${{ matrix.ubuntu_version }}
+        ubuntu_version: [ "20.04", "24.04"]
+    runs-on: ubuntu-latest
+    container: # Login and start specified container image. Ubuntu20.04 isn't supported on GitHub-Workflow as of 04.2025
+      image: ghcr.io/${{ needs.to-lowercase.outputs.repo_lowercase }}:${{ matrix.ubuntu_version }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
     env:
-      QP_SOLVER: ${{ matrix.qp_solver }}
+      HOME: /root/
     steps:
       - name: Checkout main repo
         uses: actions/checkout@v4
         with:
           path: 'giskardpy'
-      #load cache ------------------------------------------------------------------------------------------------------
-      - name: load pip cache
-        id: pip-load
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: pip
-      - name: load qpSWIFT
-        id: load-qpSWIFT
-        uses: actions/cache@v4
-        with:
-          path: ~/qpSWIFT
-          key: qpSWIFT
-      - name: install qpSWIFT python wrapper
-        run: |
-          sudo pip3 install numpy
-          cd ~/qpSWIFT/python
-          sudo python3 setup.py install
-      - name: load bpb # -----------------------------------------------------------------------------------------------
-        id: load-bpb
-        uses: actions/cache@v4
-        with:
-          path: ~/bpb
-          key: bpb
-      - name: add bpb to bashrc
-        run: |
-          cd ~/bpb/bullet3
-          echo 'export PYTHONPATH=${PYTHONPATH}':"${PWD}/build_cmake/better_python:${PWD}/examples/pybullet" >> ~/.bashrc
-      - name: install pip dependencies
-        run: |
-          python3 -m pip install --upgrade pip
-          pip3 install -r giskardpy/requirements.txt
       - name: test
         run: |
           cd giskardpy

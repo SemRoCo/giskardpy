@@ -84,19 +84,22 @@ jobs:
         with:
           path: 'ros_ws/src/giskardpy_ros'
           repository: SemRoCo/giskardpy_ros
-      - name: Find Corresponding PR in Second Repo
+      - name: Find Corresponding PR in giskardpy
+        # searches for pull-request in giskardpy matich the pull-request that triggered the workflow.
+        # Uses the pr-url, pr-number or pr-title to search the open pr's on giskardpy to find a description,
+        # which contains one of them.
         if: github.event_name == 'pull_request'
         id: find_pr
         run: |
-          REPO_2="MideCry/giskardpy"
+          REPO="SemRoCo/giskardpy"
           PR_NUMBER="${{ github.event.pull_request.number }}"
           PR_TITLE="${{ github.event.pull_request.title }}"
           PR_URL="${{ github.event.pull_request.url }}"
 
-          echo "Searching for PR related to #$PR_NUMBER in $REPO_2"
+          echo "Searching for PR related to #$PR_NUMBER in $REPO"
 
           # Find PR by matching title or linked issues
-          PR_JSON=$(gh pr list --repo "$REPO_2" --state open \
+          PR_JSON=$(gh pr list --repo "$REPO" --state open \
             --json number,title,body,baseRefName,url,mergeable,headRefName,headRepository,headRepositoryOwner | jq -r \
             ".[] | select(.body | contains(\"#$PR_NUMBER\") or contains(\"${PR_TITLE}\") or contains(\"${PR_URL}\")) | @base64")
 
@@ -122,13 +125,14 @@ jobs:
           fi
         env:
           GH_TOKEN: ${{ github.token }}
-      - name: Checkout Second Repo PR Branch
+      - name: Checkout giskardpy PR Branch
+        # when a matching pr is found and merge-able, clone the repo and merge the branches of the pr.
         if: github.event_name == 'pull_request' && env.pr_found == 'true' && env.pr_mergeable == 'MERGEABLE'
         run: |
           git config --global user.email "github-actions@github.com"
           git config --global user.name "GitHub Actions"
           
-          git clone https://github.com/MideCry/giskardpy.git
+          git clone https://github.com/SemRoCo/giskardpy.git
           cd giskardpy
           git checkout ${{ env.pr_into_branch }}
           
@@ -140,9 +144,10 @@ jobs:
 
           echo "Merging PR branch (${{ env.pr_from_branch }}) into ${{ env.pr_into_branch }}"
           git checkout ${{ env.pr_into_branch }}
-          git merge  --no-commit --no-ff from_repo/${{ env.pr_from_branch }}
+          git merge --no-commit --no-ff from_repo/${{ env.pr_from_branch }}
       - uses: actions/checkout@v3
         if: github.event_name == 'push' || env.pr_found == 'false' || env.pr_mergeable != 'MERGEABLE'
+        # fallback repo and branch, if event is push or no merge-able pr is found
         with:
           path: 'giskardpy'
           repository: SemRoCo/giskardpy

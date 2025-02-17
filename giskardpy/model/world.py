@@ -695,6 +695,15 @@ class WorldTree(WorldTreeInterface):
     def get_parent_link_of_link(self, link_name: PrefixName) -> PrefixName:
         return self.joints[self.links[link_name].parent_joint_name].parent_link_name
 
+    def get_links_in_branch_of_link(self, link_name: PrefixName) -> [PrefixName]:
+        links = []
+        link = link_name
+        links.append(link)
+        while len(self.links[self.get_parent_link_of_link(link)].child_joint_names) == 1:
+            link = self.get_parent_link_of_link(link)
+            links.append(link)
+        return links
+
     def get_group_of_joint(self, joint_name: PrefixName):
         ret = set()
         for group_name, subtree in self.groups.items():

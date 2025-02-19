@@ -2096,6 +2096,28 @@ def distance_point_to_plane_signed(frame_P_current, frame_V_v1, frame_V_v2):
     return d, nearest
 
 
+def project_to_cone(frame_V_current, frame_V_cone_axis, cone_theta):
+    frame_V_cone_axis_norm = frame_V_cone_axis / norm(frame_V_cone_axis)
+    beta = dot(frame_V_current, frame_V_cone_axis_norm)
+    norm_v = norm(frame_V_current)
+
+    # Compute the perpendicular component.
+    v_perp = frame_V_current - beta * frame_V_cone_axis_norm
+    norm_v_perp = norm(v_perp)
+
+    s = beta * cos(cone_theta) + norm_v_perp * sin(cone_theta)
+
+    # Handle the case when v is collinear with a.
+    project_on_cone_boundary = if_less(a=norm_v_perp, b=1e-8,
+                                       if_result=norm_v * cos(cone_theta) * frame_V_cone_axis_norm,
+                                       else_result=s * (cos(cone_theta) * frame_V_cone_axis_norm + sin(cone_theta) * (
+                                                   v_perp / norm_v_perp)))
+
+    return if_greater_eq(a=beta, b=norm_v * np.cos(cone_theta),
+                         if_result=frame_V_current,
+                         else_result=project_on_cone_boundary)
+
+
 def angle_between_vector(v1, v2):
     v1 = v1[:3]
     v2 = v2[:3]

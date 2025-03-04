@@ -10,6 +10,7 @@ from giskard_msgs.msg import LinkName
 from giskardpy.data_types.exceptions import EmptyProblemException
 from giskardpy.motion_statechart.goals.test import GraspSequence, Cutting
 from giskardpy.motion_statechart.monitors.monitors import TrueMonitor
+from giskardpy.motion_statechart.tasks.pointing import PointingCone, Pointing
 from giskardpy_ros.configs.behavior_tree_config import StandAloneBTConfig
 from giskardpy_ros.configs.giskard import Giskard
 from giskardpy_ros.configs.iai_robots.hsr import HSRCollisionAvoidanceConfig, WorldWithHSRConfig, HSRStandaloneInterface
@@ -264,6 +265,28 @@ class TestCartGoals:
 
 
 class TestConstraints:
+
+    def test_PointingCone(self, zero_pose: HSRTestWrapper):
+        tip_link = 'head_center_camera_frame'
+        goal_point = PointStamped()
+        goal_point.header.frame_id = 'map'
+        goal_point.point.x = 0.5
+        goal_point.point.y = -0.5
+        goal_point.point.z = 1
+
+        pointing_axis = Vector3Stamped()
+        pointing_axis.header.frame_id = tip_link
+        pointing_axis.vector.z = 1
+
+        zero_pose.motion_goals.add_motion_goal(class_name=Pointing.__name__,
+                                               name='pointy_cone',
+                                               tip_link=LinkName(tip_link, ''),
+                                               root_link=LinkName('map', ''),
+                                               goal_point=goal_point,
+                                               pointing_axis=pointing_axis)
+        zero_pose.allow_all_collisions()
+        zero_pose.add_default_end_motion_conditions()
+        zero_pose.execute(add_local_minimum_reached=False)
 
     def test_open_fridge(self, kitchen_setup: HSRTestWrapper):
         handle_frame_id = 'iai_kitchen/iai_fridge_door_handle'

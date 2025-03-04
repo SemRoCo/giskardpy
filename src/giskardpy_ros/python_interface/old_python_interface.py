@@ -318,7 +318,6 @@ class OldGiskardWrapper(GiskardWrapper):
                                           max_linear_velocity: float = 0.1,
                                           max_angular_velocity: float = 0.5,
                                           weight: float = WEIGHT_ABOVE_CA,
-                                          hard: bool = False,
                                           **kwargs: goal_parameter):
         """
         This goal will use put a strict limit on the Cartesian velocity. This will require a lot of constraints, thus
@@ -330,7 +329,6 @@ class OldGiskardWrapper(GiskardWrapper):
         :param max_linear_velocity: m/s
         :param max_angular_velocity: rad/s
         :param weight: default WEIGHT_ABOVE_CA
-        :param hard: Turn this into a hard constraint. This make create unsolvable optimization problems
         """
         root_link = giskard_msgs.LinkName(name=root_link, group_name=root_group)
         tip_link = giskard_msgs.LinkName(name=tip_link, group_name=tip_group)
@@ -339,7 +337,6 @@ class OldGiskardWrapper(GiskardWrapper):
                                                        weight=weight,
                                                        max_linear_velocity=max_linear_velocity,
                                                        max_angular_velocity=max_angular_velocity,
-                                                       hard=hard,
                                                        end_condition='',
                                                        **kwargs)
 

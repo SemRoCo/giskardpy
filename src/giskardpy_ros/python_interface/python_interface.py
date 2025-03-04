@@ -1117,7 +1117,6 @@ class MotionGoalWrapper(MotionStatechartNodeWrapper):
                                      max_linear_velocity: float = 0.1,
                                      max_angular_velocity: float = 0.5,
                                      weight: Optional[float] = None,
-                                     hard: bool = False,
                                      start_condition: str = '',
                                      pause_condition: str = '',
                                      end_condition: str = '',
@@ -1129,7 +1128,6 @@ class MotionGoalWrapper(MotionStatechartNodeWrapper):
         :param tip_link: tip link of the kinematic chain
         :param max_linear_velocity: m/s
         :param max_angular_velocity: rad/s
-        :param hard: Turn this into a hard constraint. This make create unsolvable optimization problems
         """
         if isinstance(root_link, str):
             root_link = giskard_msgs.LinkName(name=root_link)
@@ -1141,7 +1139,6 @@ class MotionGoalWrapper(MotionStatechartNodeWrapper):
                                     weight=weight,
                                     max_linear_velocity=max_linear_velocity,
                                     max_angular_velocity=max_angular_velocity,
-                                    hard=hard,
                                     name=name,
                                     start_condition=start_condition,
                                     pause_condition=pause_condition,
@@ -1870,12 +1867,14 @@ class MonitorWrapper(MotionStatechartNodeWrapper):
 
     def add_cancel_motion(self,
                           start_condition: str,
-                          error: Exception,
+                          error: Optional[Exception] = None,
                           name: Optional[str] = None) -> str:
         """
         Cancels the motion if all start_condition are True and will make Giskard return the specified error code.
         Use this to describe when failure conditions.
         """
+        if error is None:
+            error = Exception(start_condition)
         error = msg_converter.exception_to_error_msg(error)
         return self.add_monitor(class_name=CancelMotion.__name__,
                                 name=name,
@@ -2276,6 +2275,10 @@ class GiskardWrapper:
         if not self.monitors.max_trajectory_length_set:
             self.monitors.add_check_trajectory_length()
         self.monitors.max_trajectory_length_set = False
+
+    def add_end_on_local_minimum(self) -> None:
+        local_min_reached_monitor_name = self.monitors.add_local_minimum_reached('local min reached')
+        self.monitors.add_end_motion(start_condition=local_min_reached_monitor_name)
 
     @property
     def robot_name(self):

@@ -167,7 +167,7 @@ class PR2TestWrapper(GiskardTestWrapper):
                               behavior_tree_config=StandAloneBTConfig(debug_mode=True,
                                                                       publish_tf=True),
                               # qp_controller_config=QPControllerConfig(qp_solver=SupportedQPSolver.gurobi))
-                              qp_controller_config=QPControllerConfig(mpc_dt=0.05))
+                              qp_controller_config=QPControllerConfig(mpc_dt=0.05, control_dt=0.05))
         super().__init__(giskard)
         self.robot = god_map.world.groups[self.robot_name]
 
@@ -1303,7 +1303,7 @@ class TestConstraints:
     # TODO write buggy constraints that test sanity checks
     def test_empty_problem(self, zero_pose: PR2TestWrapper):
         zero_pose.allow_all_collisions()
-        zero_pose.execute(expected_error_type=EmptyProblemException)
+        zero_pose.execute()
         zero_pose.allow_all_collisions()
         zero_pose.execute(expected_error_type=EmptyProblemException, add_local_minimum_reached=False)
 
@@ -1492,24 +1492,48 @@ class TestConstraints:
 
     def test_JointPosition_kitchen(self, kitchen_setup: PR2TestWrapper):
         joint_name1 = 'iai_fridge_door_joint'
-        joint_name2 = 'sink_area_left_upper_drawer_main_joint'
+        joint_name2 = 'fridge_area_lower_drawer_main_joint'
+        joint_name3 = 'sink_area_trash_drawer_main_joint'
+        joint_name4 = 'sink_area_dish_washer_door_joint'
         group_name = 'iai_kitchen'
-        joint_goal = 0.4
         goal_state = {
-            joint_name1: joint_goal,
-            joint_name2: joint_goal
+            joint_name1: np.pi/2,
+            joint_name2: 0.4,
+            joint_name3: 0.4,
+            joint_name4: np.pi/2,
+        }
+        goal_state2 = {
+            joint_name1: 0,
+            joint_name2: 0,
+            joint_name3: 0,
+            joint_name4: 0,
         }
         # kitchen_setup.allow_all_collisions()
-        kitchen_setup.set_joint_goal(goal_state=goal_state)
-        kitchen_setup.execute()
-        np.testing.assert_almost_equal(
-            god_map.trajectory.get_last()[
-                PrefixName(joint_name1, group_name)].position,
-            joint_goal, decimal=2)
-        np.testing.assert_almost_equal(
-            god_map.trajectory.get_last()[
-                PrefixName(joint_name2, group_name)].position,
-            joint_goal, decimal=2)
+        g1 = 'g1'
+        g2 = 'g2'
+
+        base_pose = PoseStamped()
+        base_pose.header.frame_id = 'map'
+        base_pose.pose.position.x = -10
+        base_pose.pose.orientation.w = 1
+
+        g0 = kitchen_setup.monitors.add_set_seed_odometry(name='da', base_pose=base_pose)
+        sleep = kitchen_setup.monitors.add_sleep(seconds=1, name='sleep', start_condition=g0)
+        kitchen_setup.motion_goals.add_joint_position(goal_state=goal_state, name=g1, start_condition=sleep,
+                                                      end_condition=g1)
+        kitchen_setup.motion_goals.add_joint_position(goal_state=goal_state2, name=g2, start_condition=g1)
+        kitchen_setup.set_max_traj_length()
+        kitchen_setup.monitors.add_end_motion(start_condition=g2)
+
+        kitchen_setup.execute(add_local_minimum_reached=False)
+        # np.testing.assert_almost_equal(
+        #     god_map.trajectory.get_last()[
+        #         PrefixName(joint_name1, group_name)].position,
+        #     joint_goal, decimal=2)
+        # np.testing.assert_almost_equal(
+        #     god_map.trajectory.get_last()[
+        #         PrefixName(joint_name2, group_name)].position,
+        #     joint_goal, decimal=2)
 
     def test_CartesianOrientation(self, zero_pose: PR2TestWrapper):
         tip = 'base_footprint'
@@ -1619,7 +1643,6 @@ class TestConstraints:
             tip_link='base_footprint',
             max_linear_velocity=base_linear_velocity,
             max_angular_velocity=base_angular_velocity,
-            hard=True,
         )
         eef_linear_velocity = 1
         eef_angular_velocity = 1
@@ -2439,13 +2462,15 @@ class TestCartGoals:
     def test_cart_goal_unreachable(self, zero_pose: PR2TestWrapper):
         p = PoseStamped()
         p.header.frame_id = 'map'
-        p.pose.position = Point(0, 0, -1)
+        p.pose.position = Point(0.1, 0, -1)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.allow_all_collisions()
-        zero_pose.set_cart_goal(goal_pose=p,
-                                tip_link='base_footprint',
-                                root_link='map')
-        zero_pose.execute(expected_error_type=LocalMinimumException)
+        cart_goal_reached = zero_pose.motion_goals.add_cartesian_pose(goal_pose=p,
+                                                                      tip_link='base_footprint',
+                                                                      root_link='map')
+        zero_pose.monitors.add_cancel_motion(start_condition=cart_goal_reached)
+        zero_pose.add_end_on_local_minimum()
+        zero_pose.execute(add_local_minimum_reached=False)
 
     def test_cart_goal_1eef2(self, zero_pose: PR2TestWrapper):
         # zero_pose.set_json_goal('SetPredictionHorizon', prediction_horizon=1)

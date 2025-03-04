@@ -120,7 +120,7 @@ class JustinTestWrapper(GiskardTestWrapper):
             giskard = Giskard(world_config=WorldWithJustinConfig(),
                               collision_avoidance_config=JustinCollisionAvoidanceConfig(),
                               robot_interface_config=JustinStandaloneInterface(),
-                              behavior_tree_config=StandAloneBTConfig(publish_tf=False, debug_mode=False,
+                              behavior_tree_config=StandAloneBTConfig(publish_tf=True, debug_mode=False,
                                                                       visualization_mode=VisualizationMode.VisualsFrameLocked),
                               qp_controller_config=QPControllerConfig(mpc_dt=0.0125,
                                                                       control_dt=None))
@@ -336,21 +336,22 @@ class TestEuRobin:
                                                                                        [0, 0, -1, 0],
                                                                                        [0, 0, 0, 1]]))
         pre_grasp_pose.pose.position.z = 0.35
-        box_pre_grasped = dlr_kitchen_setup.tasks.add_cartesian_pose(name='pregrasp pose',
-                                                                     goal_pose=pre_grasp_pose,
-                                                                     tip_link=dlr_kitchen_setup.r_tip,
-                                                                     root_link='map')
+        box_pre_grasped = 'pregrasp pose'
+        dlr_kitchen_setup.motion_goals.add_cartesian_pose(name=box_pre_grasped,
+                                                          goal_pose=pre_grasp_pose,
+                                                          tip_link=dlr_kitchen_setup.r_tip,
+                                                          root_link='map', end_condition=box_pre_grasped)
 
         grasp_pose = deepcopy(pre_grasp_pose)
         grasp_pose.pose.position.z -= 0.2
-        box_grasped = dlr_kitchen_setup.tasks.add_cartesian_pose(name='grasp box',
-                                                                 goal_pose=grasp_pose,
-                                                                 tip_link=dlr_kitchen_setup.r_tip,
-                                                                 root_link='map',
-                                                                 start_condition=box_pre_grasped)
-        right_hand_closed = dlr_kitchen_setup.tasks.add_joint_position(name='close right hand',
-                                                                       goal_state=dlr_kitchen_setup.right_closed,
-                                                                       start_condition=box_pre_grasped)
+        box_grasped = dlr_kitchen_setup.motion_goals.add_cartesian_pose(name='grasp box',
+                                                                        goal_pose=grasp_pose,
+                                                                        tip_link=dlr_kitchen_setup.r_tip,
+                                                                        root_link='map',
+                                                                        start_condition=box_pre_grasped)
+        right_hand_closed = dlr_kitchen_setup.motion_goals.add_joint_position(name='close right hand',
+                                                                              goal_state=dlr_kitchen_setup.right_closed,
+                                                                              start_condition=box_pre_grasped)
 
         # dlr_kitchen_setup.tasks.add_maximize_manipulability(name='maximize manipulability right',
         #                                                     tip_link=dlr_kitchen_setup.r_tip,
@@ -360,7 +361,7 @@ class TestEuRobin:
         # dlr_kitchen_setup.motion_goals.allow_self_collision(end_condition=box_pre_grasped)
         dlr_kitchen_setup.motion_goals.allow_collision(group1=dlr_kitchen_setup.robot_name, group2=box_name)
         dlr_kitchen_setup.motion_goals.allow_self_collision()
-        dlr_kitchen_setup.tasks.add_justin_torso_limit(name='torso4_joint', end_condition='')
+        dlr_kitchen_setup.motion_goals.add_justin_torso_limit(name='torso4_joint', end_condition='')
         dlr_kitchen_setup.execute(add_local_minimum_reached=False)
 
         # %%
@@ -371,10 +372,10 @@ class TestEuRobin:
         base_pose.header.frame_id = 'base_footprint'
         base_pose.pose.orientation.w = 1.0
         base_pose.pose.position.x = -1
-        drove_back = dlr_kitchen_setup.tasks.add_cartesian_pose(name='drive back',
-                                                                goal_pose=base_pose,
-                                                                tip_link='base_footprint',
-                                                                root_link='map')
+        drove_back = dlr_kitchen_setup.motion_goals.add_cartesian_pose(name='drive back',
+                                                                       goal_pose=base_pose,
+                                                                       tip_link='base_footprint',
+                                                                       root_link='map')
 
         hand_over_pose = PoseStamped()
         hand_over_pose.header.frame_id = dlr_kitchen_setup.l_tip
@@ -383,18 +384,26 @@ class TestEuRobin:
                                                                                        [0, 0, -1, 0],
                                                                                        [0, 0, 0, 1]]))
         hand_over_pose.pose.position.z = 0.3
-        handed_over = dlr_kitchen_setup.tasks.add_cartesian_pose(name='hand over',
-                                                                 goal_pose=hand_over_pose,
-                                                                 tip_link=dlr_kitchen_setup.r_tip,
-                                                                 root_link=dlr_kitchen_setup.l_tip)
-        left_hand_opened = dlr_kitchen_setup.tasks.add_joint_position(name='open left hand',
-                                                                      goal_state=dlr_kitchen_setup.left_open)
-        left_hand_closed = dlr_kitchen_setup.tasks.add_joint_position(name='close left hand',
-                                                                      goal_state=dlr_kitchen_setup.left_closed,
-                                                                      start_condition=f'{handed_over} and {left_hand_opened}')
-        right_hand_opened = dlr_kitchen_setup.tasks.add_joint_position(name='open right hand',
-                                                                       goal_state=dlr_kitchen_setup.right_open,
-                                                                       start_condition=f'{left_hand_closed}')
+        handed_over = 'hand over'
+        dlr_kitchen_setup.motion_goals.add_cartesian_pose(name=handed_over,
+                                                          goal_pose=hand_over_pose,
+                                                          tip_link=dlr_kitchen_setup.r_tip,
+                                                          root_link=dlr_kitchen_setup.l_tip,
+                                                          end_condition=handed_over)
+        left_hand_opened = 'open left hand'
+        dlr_kitchen_setup.motion_goals.add_joint_position(name=left_hand_opened,
+                                                          goal_state=dlr_kitchen_setup.left_open,
+                                                          end_condition=left_hand_opened)
+        left_hand_closed = 'close left hand'
+        dlr_kitchen_setup.motion_goals.add_joint_position(name=left_hand_closed,
+                                                          goal_state=dlr_kitchen_setup.left_closed,
+                                                          start_condition=f'{handed_over} and {left_hand_opened}',
+                                                          end_condition=left_hand_closed)
+        right_hand_opened = 'open right hand'
+        dlr_kitchen_setup.motion_goals.add_joint_position(name=right_hand_opened,
+                                                          goal_state=dlr_kitchen_setup.right_open,
+                                                          start_condition=f'{left_hand_closed}',
+                                                          end_condition=right_hand_opened)
         # dlr_kitchen_setup.tasks.add_maximize_manipulability(name='maximize manipulability right',
         #                                                     tip_link=dlr_kitchen_setup.r_tip,
         #                                                     root_link='torso4')
@@ -405,14 +414,16 @@ class TestEuRobin:
         dlr_kitchen_setup.monitors.add_end_motion(start_condition=f'{right_hand_opened} and {drove_back}')
         dlr_kitchen_setup.motion_goals.allow_collision(group1=dlr_kitchen_setup.robot_name, group2=box_name)
         dlr_kitchen_setup.motion_goals.allow_self_collision()
-        dlr_kitchen_setup.tasks.add_justin_torso_limit(name='torso4_joint', end_condition='')
+        dlr_kitchen_setup.motion_goals.add_justin_torso_limit(name='torso4_joint', end_condition='')
         dlr_kitchen_setup.execute(add_local_minimum_reached=False)
 
         # %%
         dlr_kitchen_setup.world.update_parent_link_of_group(name=box_name, parent_link=dlr_kitchen_setup.l_tip)
         # %% PLACE
-        in_default_pose = dlr_kitchen_setup.tasks.add_joint_position(name='default joint pose',
-                                                                     goal_state=dlr_kitchen_setup.better_pose)
+        in_default_pose = 'default joint pose'
+        dlr_kitchen_setup.motion_goals.add_joint_position(name=in_default_pose,
+                                                          goal_state=dlr_kitchen_setup.better_pose,
+                                                          end_condition=in_default_pose)
         handle_grasp_pose = PoseStamped()
         handle_grasp_pose.header.frame_id = handle_frame_id
         handle_grasp_pose.pose.orientation = Quaternion(*quaternion_from_rotation_matrix([[0, 0, 1, 0],
@@ -420,23 +431,30 @@ class TestEuRobin:
                                                                                           [0, 1, 0, 0],
                                                                                           [0, 0, 0, 1]]))
         handle_grasp_pose.pose.position.x = -0.12
-        handle_graped = dlr_kitchen_setup.tasks.add_cartesian_pose(name='grasp handle',
-                                                                   goal_pose=handle_grasp_pose,
-                                                                   tip_link=dlr_kitchen_setup.r_tip,
-                                                                   root_link='map',
-                                                                   start_condition=in_default_pose)
-        right_hand_closed = dlr_kitchen_setup.tasks.add_joint_position(name='close right hand',
-                                                                       goal_state=dlr_kitchen_setup.right_closed,
-                                                                       start_condition=f'{handle_graped}')
+        handle_graped = 'grasp handle'
+        dlr_kitchen_setup.motion_goals.add_cartesian_pose(name=handle_graped,
+                                                          goal_pose=handle_grasp_pose,
+                                                          tip_link=dlr_kitchen_setup.r_tip,
+                                                          root_link='map',
+                                                          start_condition=in_default_pose,
+                                                          end_condition=handle_graped)
+        right_hand_closed = 'close right hand'
+        dlr_kitchen_setup.motion_goals.add_joint_position(name=right_hand_closed,
+                                                          goal_state=dlr_kitchen_setup.right_closed,
+                                                          start_condition=f'{handle_graped}',
+                                                          end_condition=right_hand_closed)
 
-        door_open = dlr_kitchen_setup.motion_goals.add_open_container(name='open fridge',
-                                                                      tip_link=dlr_kitchen_setup.r_tip,
-                                                                      environment_link=handle_name,
-                                                                      start_condition=right_hand_closed,
-                                                                      end_condition='')
-        door_half_open = dlr_kitchen_setup.monitors.add_joint_position(name='is door half open?',
-                                                                       goal_state={door_joint: np.pi / 4},
-                                                                       start_condition=handle_graped)
+        door_open = 'open fridge'
+        dlr_kitchen_setup.motion_goals.add_open_container(name=door_open,
+                                                          tip_link=dlr_kitchen_setup.r_tip,
+                                                          environment_link=handle_name,
+                                                          start_condition=right_hand_closed,
+                                                          end_condition='')
+        door_half_open = 'is door half open?'
+        dlr_kitchen_setup.monitors.add_joint_position(name=door_half_open,
+                                                      goal_state={door_joint: np.pi / 4},
+                                                      start_condition=handle_graped,
+                                                      end_condition=door_half_open)
 
         place_pose = PoseStamped()
         place_pose.header.frame_id = fridge
@@ -446,21 +464,25 @@ class TestEuRobin:
                                                                                    [0, 0, 0, 1]]))
         place_pose.pose.position.z = 0.4
         place_pose.pose.position.x = 0.
-        box_placed = dlr_kitchen_setup.tasks.add_cartesian_pose(name='place box',
-                                                                goal_pose=place_pose,
-                                                                tip_link=box_name,
-                                                                root_link='map',
-                                                                start_condition=door_half_open)
-        left_hand_opened = dlr_kitchen_setup.tasks.add_joint_position(name='open left hand',
-                                                                      goal_state=dlr_kitchen_setup.left_open,
-                                                                      start_condition=f'{box_placed}')
+        box_placed = 'place box'
+        dlr_kitchen_setup.motion_goals.add_cartesian_pose(name=box_placed,
+                                                          goal_pose=place_pose,
+                                                          tip_link=box_name,
+                                                          root_link='map',
+                                                          start_condition=door_half_open,
+                                                          end_condition=box_placed)
+        left_hand_opened = 'open left hand'
+        dlr_kitchen_setup.motion_goals.add_joint_position(name=left_hand_opened,
+                                                          goal_state=dlr_kitchen_setup.left_open,
+                                                          start_condition=f'{box_placed}',
+                                                          end_condition=left_hand_opened)
 
         done = f'{door_open} and {left_hand_opened}'
         dlr_kitchen_setup.monitors.add_end_motion(start_condition=done)
         dlr_kitchen_setup.allow_collision(group2=dlr_kitchen_setup.right_hand_group,
                                           group1=dlr_kitchen_setup.default_env_name)
         dlr_kitchen_setup.allow_self_collision()
-        dlr_kitchen_setup.tasks.add_justin_torso_limit(name='torso4_joint', end_condition='')
+        dlr_kitchen_setup.motion_goals.add_justin_torso_limit(name='torso4_joint', end_condition='')
         dlr_kitchen_setup.execute(add_local_minimum_reached=False)
 
         # %%
@@ -471,8 +493,10 @@ class TestEuRobin:
         retract_pose.header.frame_id = dlr_kitchen_setup.l_tip
         retract_pose.pose.orientation.w = 1.0
         retract_pose.pose.position.z = -0.5
-        retracted = dlr_kitchen_setup.tasks.add_joint_position(name='retract left hand',
-                                                               goal_state=dlr_kitchen_setup.default_left_arm)
+        retracted = 'retract left hand'
+        dlr_kitchen_setup.motion_goals.add_joint_position(name=retracted,
+                                                          goal_state=dlr_kitchen_setup.default_left_arm,
+                                                          end_condition=retracted)
         delay = dlr_kitchen_setup.monitors.add_sleep(name='wait 1s', seconds=1)
         dlr_kitchen_setup.motion_goals.add_open_container(name='hold handle',
                                                           tip_link=dlr_kitchen_setup.r_tip,
@@ -487,5 +511,5 @@ class TestEuRobin:
         dlr_kitchen_setup.allow_collision(group2=dlr_kitchen_setup.right_hand_group,
                                           group1=dlr_kitchen_setup.default_env_name)
         dlr_kitchen_setup.allow_self_collision()
-        dlr_kitchen_setup.tasks.add_justin_torso_limit(name='torso4_joint', end_condition='')
+        dlr_kitchen_setup.motion_goals.add_justin_torso_limit(name='torso4_joint', end_condition='')
         dlr_kitchen_setup.execute(add_local_minimum_reached=False)

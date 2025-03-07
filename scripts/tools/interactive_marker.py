@@ -187,7 +187,7 @@ class IMServer(object):
                 p.header.frame_id = feedback.header.frame_id
                 p.pose = feedback.pose
                 # self.giskard.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
-                self.giskard.tasks.add_cartesian_pose(name='goal',
+                self.giskard.motion_goals.add_cartesian_pose(name='goal',
                                                                       root_link=self.root_link,
                                                                       tip_link=self.tip_link,
                                                                       goal_pose=p,

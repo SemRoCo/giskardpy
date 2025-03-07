@@ -25,7 +25,8 @@ from giskardpy.motion_statechart.goals.cartesian_goals import DiffDriveBaseGoal,
 from giskardpy.motion_statechart.goals.collision_avoidance import CollisionAvoidance
 from giskardpy.motion_statechart.tasks.grasp_bar import GraspBar
 from giskardpy.motion_statechart.goals.open_close import Close, Open
-from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionLimitList, JointPositionList, AvoidJointLimits
+from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionLimitList, JointPositionList, AvoidJointLimits, \
+    MirrorJointPosition
 from giskardpy.motion_statechart.tasks.pointing import Pointing
 from giskardpy.motion_statechart.goals.pre_push_door import PrePushDoor
 from giskardpy.motion_statechart.monitors.cartesian_monitors import PoseReached, PositionReached, OrientationReached, \
@@ -614,6 +615,31 @@ class MotionGoalWrapper(MotionStatechartNodeWrapper):
         """
         return self.add_motion_goal(class_name=JointPositionList.__name__,
                                     goal_state=goal_state,
+                                    weight=weight,
+                                    max_velocity=max_velocity,
+                                    name=name,
+                                    start_condition=start_condition,
+                                    pause_condition=pause_condition,
+                                    end_condition=end_condition,
+                                    **kwargs)
+
+    def add_mirror_joint_position(self,
+                                  mapping: Dict[str, str],
+                                  name: Optional[str] = None,
+                                  weight: Optional[float] = None,
+                                  max_velocity: Optional[float] = None,
+                                  start_condition: str = '',
+                                  pause_condition: str = '',
+                                  end_condition: str = '',
+                                  **kwargs: goal_parameter) -> str:
+        """
+        Sets joint position goals for all pairs in goal_state
+        :param goal_state: maps joint_name to goal position
+        :param weight: None = use default weight
+        :param max_velocity: will be applied to all joints
+        """
+        return self.add_motion_goal(class_name=MirrorJointPosition.__name__,
+                                    mapping=mapping,
                                     weight=weight,
                                     max_velocity=max_velocity,
                                     name=name,

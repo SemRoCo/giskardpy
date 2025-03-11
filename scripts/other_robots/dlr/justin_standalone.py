@@ -2,7 +2,7 @@
 import rospy
 
 from giskardpy.middleware import set_middleware
-from giskardpy.qp.qp_controller_config import QPControllerConfig
+from giskardpy.qp.qp_controller_config import QPControllerConfig, SupportedQPSolver
 from giskardpy_ros.configs.behavior_tree_config import OpenLoopBTConfig, StandAloneBTConfig
 from giskardpy_ros.configs.giskard import Giskard
 from giskardpy_ros.configs.other_robots.justin import WorldWithJustinConfig, JustinStandaloneInterface, JustinCollisionAvoidanceConfig
@@ -17,5 +17,5 @@ if __name__ == '__main__':
                       robot_interface_config=JustinStandaloneInterface(),
                       behavior_tree_config=StandAloneBTConfig(publish_tf=True, debug_mode=True,
                                                               visualization_mode=VisualizationMode.VisualsFrameLocked),
-                      qp_controller_config=QPControllerConfig())
+                      qp_controller_config=QPControllerConfig(qp_solver=SupportedQPSolver.qpalm))
     giskard.live()

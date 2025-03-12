@@ -17,5 +17,5 @@ if __name__ == '__main__':
                       robot_interface_config=JustinStandaloneInterface(),
                       behavior_tree_config=StandAloneBTConfig(publish_tf=True, debug_mode=True,
                                                               visualization_mode=VisualizationMode.VisualsFrameLocked),
-                      qp_controller_config=QPControllerConfig(qp_solver=SupportedQPSolver.qpalm))
+                      qp_controller_config=QPControllerConfig(qp_solver=SupportedQPSolver.qpalm, mpc_dt=0.05))
     giskard.live()

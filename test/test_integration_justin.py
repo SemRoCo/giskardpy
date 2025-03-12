@@ -2,25 +2,18 @@ from copy import deepcopy
 
 import numpy as np
 import pytest
-from geometry_msgs.msg import PoseStamped, Point, Quaternion, PointStamped, Vector3Stamped
-from numpy import pi
-from tf.transformations import quaternion_from_matrix, quaternion_about_axis
+from geometry_msgs.msg import PoseStamped, Quaternion, PointStamped, Vector3Stamped
 
-from giskard_msgs.msg import LinkName, GiskardError
-from giskardpy.data_types.exceptions import EmptyProblemException
-from giskardpy.motion_statechart.tasks.cartesian_tasks import JustinTorsoLimitCart
-from giskardpy.motion_statechart.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
+from giskardpy.god_map import god_map
+from giskardpy.qp.qp_controller_config import QPControllerConfig
 from giskardpy.utils.math import quaternion_from_rotation_matrix
 from giskardpy_ros.configs.behavior_tree_config import StandAloneBTConfig
 from giskardpy_ros.configs.giskard import Giskard
-from giskardpy_ros.configs.iai_robots.hsr import HSRCollisionAvoidanceConfig, WorldWithHSRConfig, HSRStandaloneInterface
-from giskardpy.qp.qp_controller_config import QPControllerConfig
-from giskardpy.god_map import god_map
 from giskardpy_ros.configs.other_robots.justin import WorldWithJustinConfig, JustinStandaloneInterface, \
     JustinCollisionAvoidanceConfig
 from giskardpy_ros.ros1.visualization_mode import VisualizationMode
+from utils_for_tests import GiskardTestWrapper
 from utils_for_tests import launch_launchfile
-from utils_for_tests import compare_poses, GiskardTestWrapper
 
 
 class JustinTestWrapper(GiskardTestWrapper):
@@ -120,7 +113,7 @@ class JustinTestWrapper(GiskardTestWrapper):
             giskard = Giskard(world_config=WorldWithJustinConfig(),
                               collision_avoidance_config=JustinCollisionAvoidanceConfig(),
                               robot_interface_config=JustinStandaloneInterface(),
-                              behavior_tree_config=StandAloneBTConfig(publish_tf=True, debug_mode=False,
+                              behavior_tree_config=StandAloneBTConfig(publish_tf=True, debug_mode=True,
                                                                       visualization_mode=VisualizationMode.VisualsFrameLocked),
                               qp_controller_config=QPControllerConfig(mpc_dt=0.0125,
                                                                       control_dt=None))
@@ -179,7 +172,7 @@ class TestJointGoals:
             "right_arm6_joint": 0.0,
             "right_arm7_joint": 0.0,
         }
-        zero_pose.tasks.add_joint_position(name='js', goal_state=js)
+        zero_pose.motion_goals.add_joint_position(name='js', goal_state=js)
         zero_pose.allow_all_collisions()
         zero_pose.execute()
 
@@ -212,8 +205,8 @@ class TestJointGoals:
             "right_2tip2_joint": 0.5,
             "right_2tip3_joint": 0.5,
         }
-        zero_pose.tasks.add_joint_position(name='close left hand', goal_state=l_js)
-        zero_pose.tasks.add_joint_position(name='close right hand', goal_state=r_js)
+        zero_pose.motion_goals.add_joint_position(name='close left hand', goal_state=l_js)
+        zero_pose.motion_goals.add_joint_position(name='close right hand', goal_state=r_js)
         zero_pose.allow_all_collisions()
         zero_pose.execute()
 
@@ -222,8 +215,8 @@ class TestJointGoals:
             "torso2_joint": -1,
             "torso3_joint": 0.2,
         }
-        zero_pose.tasks.add_joint_position(name='g1', goal_state=js)
-        zero_pose.tasks.add_justin_torso_limit(name='torso4_joint', end_condition='')
+        zero_pose.motion_goals.add_joint_position(name='g1', goal_state=js)
+        zero_pose.motion_goals.add_justin_torso_limit(name='torso4_joint', end_condition='')
         zero_pose.motion_goals.allow_all_collisions()
         local_min = zero_pose.monitors.add_local_minimum_reached(name='local_min')
         zero_pose.monitors.add_end_motion(start_condition=local_min)
@@ -233,8 +226,8 @@ class TestJointGoals:
             "torso2_joint": 0,
             "torso3_joint": 2,
         }
-        zero_pose.tasks.add_joint_position(name='g2', goal_state=js)
-        zero_pose.tasks.add_justin_torso_limit(name='torso4_joint', end_condition='')
+        zero_pose.motion_goals.add_joint_position(name='g2', goal_state=js)
+        zero_pose.motion_goals.add_justin_torso_limit(name='torso4_joint', end_condition='')
         zero_pose.motion_goals.allow_all_collisions()
         local_min = zero_pose.monitors.add_local_minimum_reached(name='local_min')
         zero_pose.monitors.add_end_motion(start_condition=local_min)
@@ -353,7 +346,7 @@ class TestEuRobin:
                                                                               goal_state=dlr_kitchen_setup.right_closed,
                                                                               start_condition=box_pre_grasped)
 
-        # dlr_kitchen_setup.tasks.add_maximize_manipulability(name='maximize manipulability right',
+        # dlr_kitchen_setup.motion_goals.add_maximize_manipulability(name='maximize manipulability right',
         #                                                     tip_link=dlr_kitchen_setup.r_tip,
         #                                                     root_link='torso4')
 
@@ -404,10 +397,10 @@ class TestEuRobin:
                                                           goal_state=dlr_kitchen_setup.right_open,
                                                           start_condition=f'{left_hand_closed}',
                                                           end_condition=right_hand_opened)
-        # dlr_kitchen_setup.tasks.add_maximize_manipulability(name='maximize manipulability right',
+        # dlr_kitchen_setup.motion_goals.add_maximize_manipulability(name='maximize manipulability right',
         #                                                     tip_link=dlr_kitchen_setup.r_tip,
         #                                                     root_link='torso4')
-        # dlr_kitchen_setup.tasks.add_maximize_manipulability(name='maximize manipulability left',
+        # dlr_kitchen_setup.motion_goals.add_maximize_manipulability(name='maximize manipulability left',
         #                                                     tip_link=dlr_kitchen_setup.l_tip,
         #                                                     root_link='torso4')
 

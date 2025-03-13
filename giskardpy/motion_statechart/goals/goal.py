@@ -61,31 +61,31 @@ class Goal(MotionStatechartNode):
             return joint.get_symbol(Derivatives.position)
         raise TypeError(f'get_joint_position_symbol is only supported for OneDofJoint, not {type(joint)}')
 
-    def connect_start_condition_to_all_tasks(self, condition: cas.Expression) -> None:
+    def connect_start_condition_to_all_tasks(self, condition: str) -> None:
         for task in self.tasks:
-            if cas.is_true_symbol(task.start_condition):
+            if task.start_condition == 'True':
                 task.start_condition = condition
             else:
-                task.start_condition = cas.logic_and(task.start_condition, condition)
+                task.start_condition = f'{task.start_condition} and {condition}'
 
-    def connect_pause_condition_to_all_tasks(self, condition: cas.Expression) -> None:
+    def connect_pause_condition_to_all_tasks(self, condition: str) -> None:
         for task in self.tasks:
-            if cas.is_false_symbol(task.pause_condition):
+            if task.pause_condition == 'False':
                 task.pause_condition = condition
             else:
-                task.pause_condition = cas.logic_or(task.pause_condition, condition)
+                task.pause_condition = f'{task.pause_condition} or {condition}'
 
-    def connect_end_condition_to_all_tasks(self, condition: cas.Expression) -> None:
+    def connect_end_condition_to_all_tasks(self, condition: str) -> None:
         for task in self.tasks:
-            if cas.is_false_symbol(task.end_condition):
+            if task.end_condition == 'False':
                 task.end_condition = condition
-            elif not cas.is_false_symbol(condition):
-                task.end_condition = cas.logic_and(task.end_condition, condition)
+            elif not condition == 'False':
+                task.end_condition = f'{task.end_condition} and {condition}'
 
     def connect_monitors_to_all_tasks(self,
-                                      start_condition: cas.Expression,
-                                      pause_condition: cas.Expression,
-                                      end_condition: cas.Expression):
+                                      start_condition: str,
+                                      pause_condition: str,
+                                      end_condition: str):
         self.connect_start_condition_to_all_tasks(start_condition)
         self.connect_pause_condition_to_all_tasks(pause_condition)
         self.connect_end_condition_to_all_tasks(end_condition)

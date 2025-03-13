@@ -223,6 +223,9 @@ class WorldWithFixedRobot(WorldConfig):
         self.map_name = PrefixName(map_name)
 
     def setup(self, robot_name: Optional[str] = None) -> None:
+        self.set_default_limits({Derivatives.velocity: 1,
+                                 Derivatives.acceleration: np.inf,
+                                 Derivatives.jerk: None})
         self.add_empty_link(self.map_name)
         self.add_robot_urdf(self.urdf, robot_name)
         root_link_name = self.get_root_link_of_group(self.robot_group_name)

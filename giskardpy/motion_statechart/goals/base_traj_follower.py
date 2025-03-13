@@ -6,7 +6,7 @@ from giskardpy.motion_statechart.goals.goal import Goal
 from giskardpy.god_map import god_map
 from giskardpy.model.joints import OmniDrive, OmniDrivePR22
 from giskardpy.symbol_manager import symbol_manager
-from giskardpy.motion_statechart.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
+from giskardpy.motion_statechart.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA, Task
 from line_profiler import profile
 
 
@@ -14,10 +14,7 @@ class BaseTrajFollower(Goal):
     def __init__(self,
                  joint_name: PrefixName,
                  track_only_velocity: bool = False,
-                 weight: float = WEIGHT_ABOVE_CA,
-                 start_condition: cas.Expression = cas.BinaryTrue,
-                 pause_condition: cas.Expression = cas.BinaryFalse,
-                 end_condition: cas.Expression = cas.BinaryFalse):
+                 weight: float = WEIGHT_ABOVE_CA):
         self.weight = weight
         self.joint_name = joint_name
         super().__init__(name=f'{self.__class__.__name__}/{self.joint_name}')
@@ -25,12 +22,12 @@ class BaseTrajFollower(Goal):
         self.odom_link = self.joint.parent_link_name
         self.base_footprint_link = self.joint.child_link_name
         self.track_only_velocity = track_only_velocity
-        self.task = self.create_and_add_task()
+        self.task = Task(name='base')
+        self.add_task(self.task)
         trajectory = god_map.trajectory
         self.trajectory_length = len(trajectory.items())
         self.add_trans_constraints()
         self.add_rot_constraints()
-        self.connect_monitors_to_all_tasks(start_condition, pause_condition, end_condition)
 
     @profile
     def x_symbol(self, t: int, free_variable_name: PrefixName, derivative: Derivatives = Derivatives.position) \

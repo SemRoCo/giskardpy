@@ -79,6 +79,7 @@ class CartesianPositionStraight(Task):
                  root_link: PrefixName,
                  tip_link: PrefixName,
                  goal_point: cas.Point3,
+                 threshold: float = 0.01,
                  reference_velocity: Optional[float] = None,
                  name: Optional[str] = None,
                  absolute: bool = False,
@@ -93,6 +94,7 @@ class CartesianPositionStraight(Task):
         self.weight = weight
         self.root_link = root_link
         self.tip_link = tip_link
+        self.threshold = threshold
 
         if absolute:
             root_P_goal = god_map.world.transform(self.root_link, goal_point)
@@ -138,6 +140,7 @@ class CartesianPositionStraight(Task):
                                                               color=ColorRGBA(r=1, g=0, b=0, a=1))
         god_map.debug_expression_manager.add_debug_expression(f'{self.name}/goal_point', root_P_goal,
                                                               color=ColorRGBA(r=0, g=0, b=1, a=1))
+        self.observation_expression = cas.less(dist, self.threshold)
 
 
 class CartesianOrientation(Task):
@@ -289,7 +292,7 @@ class CartesianPose(Task):
 
         rotation_error = cas.rotational_error(r_R_c, root_R_goal)
         self.observation_expression = cas.logic_and(cas.less(cas.abs(rotation_error), threshold),
-                                        cas.less(distance_to_goal, threshold))
+                                                    cas.less(distance_to_goal, threshold))
 
 
 class CartesianPositionVelocityLimit(Task):

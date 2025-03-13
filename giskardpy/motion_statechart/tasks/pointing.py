@@ -61,6 +61,9 @@ class Pointing(Task):
         god_map.debug_expression_manager.add_debug_expression('goal_point',
                                                               root_P_goal_point,
                                                               color=ColorRGBA(r=0, g=0, b=1, a=1))
+        god_map.debug_expression_manager.add_debug_expression('root_V_goal_axis',
+                                                              root_V_goal_axis,
+                                                              color=ColorRGBA(r=0, g=1, b=0, a=1))
         self.add_vector_goal_constraints(frame_V_current=root_V_pointing_axis,
                                          frame_V_goal=root_V_goal_axis,
                                          reference_velocity=self.max_velocity,

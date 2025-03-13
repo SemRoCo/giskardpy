@@ -2335,7 +2335,9 @@ def substitute(expression, old_symbols, new_symbols):
     old_symbols = Expression([_to_sx(s) for s in old_symbols]).s
     new_symbols = Expression([_to_sx(s) for s in new_symbols]).s
     sx = ca.substitute(sx, old_symbols, new_symbols)
-    return type(expression)(sx)
+    result = copy(expression)
+    result.s = sx
+    return result
 
 
 def matrix_inverse(a):

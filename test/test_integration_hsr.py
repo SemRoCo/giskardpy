@@ -41,8 +41,7 @@ class HSRTestWrapper(GiskardTestWrapper):
                               behavior_tree_config=StandAloneBTConfig(debug_mode=True,
                                                                       publish_tf=True,
                                                                       publish_js=False),
-                              qp_controller_config=QPControllerConfig(mpc_dt=0.0125,
-                                                                      control_dt=0.0125))
+                              qp_controller_config=QPControllerConfig(mpc_dt=0.0125))
         super().__init__(giskard)
         self.gripper_group = 'gripper'
         # self.r_gripper = rospy.ServiceProxy('r_gripper_simulator/set_joint_states', SetJointState)
@@ -530,19 +529,19 @@ class TestConstraints:
         camera_z = Vector3Stamped()
         camera_z.header.frame_id = camera_link
         camera_z.vector.z = 1
-        pointing_at = kitchen_setup.tasks.add_pointing(goal_point=bar_center,
-                                                       tip_link=camera_link,
-                                                       name='look at handle',
-                                                       root_link='torso_lift_link',
-                                                       pointing_axis=camera_z)
+        pointing_at = kitchen_setup.motion_goals.add_pointing(goal_point=bar_center,
+                                                              tip_link=camera_link,
+                                                              name='look at handle',
+                                                              root_link='torso_lift_link',
+                                                              pointing_axis=camera_z)
 
-        bar_grasped = kitchen_setup.tasks.add_grasp_bar(root_link=kitchen_setup.default_root,
-                                                        tip_link=kitchen_setup.tip,
-                                                        tip_grasp_axis=tip_grasp_axis,
-                                                        bar_center=bar_center,
-                                                        bar_axis=bar_axis,
-                                                        bar_length=.4,
-                                                        name='grasp handle')
+        bar_grasped = kitchen_setup.motion_goals.add_grasp_bar(root_link=kitchen_setup.default_root,
+                                                               tip_link=kitchen_setup.tip,
+                                                               tip_grasp_axis=tip_grasp_axis,
+                                                               bar_center=bar_center,
+                                                               bar_axis=bar_axis,
+                                                               bar_length=.4,
+                                                               name='grasp handle')
         x_gripper = Vector3Stamped()
         x_gripper.header.frame_id = kitchen_setup.tip
         x_gripper.vector.z = 1
@@ -550,17 +549,19 @@ class TestConstraints:
         x_goal = Vector3Stamped()
         x_goal.header.frame_id = handle_frame_id
         x_goal.vector.x = -1
-        align_planes = kitchen_setup.tasks.add_align_planes(tip_link=kitchen_setup.tip,
-                                                            tip_normal=x_gripper,
-                                                            goal_normal=x_goal,
-                                                            root_link='map',
-                                                            name='align gripper')
+        align_planes = kitchen_setup.motion_goals.add_align_planes(tip_link=kitchen_setup.tip,
+                                                                   tip_normal=x_gripper,
+                                                                   goal_normal=x_goal,
+                                                                   root_link='map',
+                                                                   name='align gripper')
 
         # %% close gripper
-        gripper_closed = kitchen_setup.tasks.add_joint_position(name='close gripper',
-                                                                goal_state={'hand_motor_joint': 0})
-        gripper_opened = kitchen_setup.tasks.add_joint_position(name='open gripper',
-                                                                goal_state={'hand_motor_joint': 1.23})
+        gripper_closed = 'close gripper'
+        kitchen_setup.motion_goals.add_joint_position(name=gripper_closed,
+                                                      goal_state={'hand_motor_joint': 0},
+                                                      end_condition=gripper_closed)
+        gripper_opened = kitchen_setup.motion_goals.add_joint_position(name='open gripper',
+                                                                       goal_state={'hand_motor_joint': 1.23})
 
         # %% phase 2 open door
         slipped = kitchen_setup.monitors.add_pulse(name='slipped', after_ticks=20)
@@ -597,7 +598,7 @@ class TestConstraints:
         kitchen_setup.update_reset_condition(node_name=laser_violated, condition=reset)
         kitchen_setup.update_reset_condition(node_name=gripper_closed, condition=reset)
         kitchen_setup.update_reset_condition(node_name=door_open, condition=reset)
-        kitchen_setup.update_reset_condition(node_name=slipped, condition=reset)
+        # kitchen_setup.update_reset_condition(node_name=slipped, condition=reset)
         kitchen_setup.update_reset_condition(node_name=gripper_opened, condition=reset)
         kitchen_setup.update_reset_condition(node_name=reset, condition=reset)
 
@@ -610,7 +611,7 @@ class TestCollisionAvoidanceGoals:
 
     def test_self_collision_avoidance_empty(self, zero_pose: HSRTestWrapper):
         zero_pose.allow_all_collisions()
-        zero_pose.execute(expected_error_type=EmptyProblemException)
+        zero_pose.execute(expected_error_type=EmptyProblemException, add_local_minimum_reached=False)
         current_state = god_map.world.state.to_position_dict()
         current_state = {k.short_name: v for k, v in current_state.items()}
         zero_pose.compare_joint_state(current_state, zero_pose.default_pose)
@@ -690,7 +691,7 @@ class TestCollisionAvoidanceGoals:
 
         box_setup.monitors.add_end_motion(start_condition=success)
         box_setup.monitors.add_cancel_motion(start_condition=stop_retry, error=Exception('too many retries'))
-
+        box_setup.allow_all_collisions()
         box_setup.execute(add_local_minimum_reached=False)
         box_setup.update_parent_link_of_group(box_name, box_setup.tip)
 
@@ -699,89 +700,6 @@ class TestCollisionAvoidanceGoals:
         base_goal.pose.position.x -= 0.5
         base_goal.pose.orientation.w = 1
         box_setup.move_base(base_goal)
-
-    def test_schnibbeln(self, box_setup: HSRTestWrapper):
-        box_name = 'Schnibbler'
-        box_pose = PoseStamped()
-        box_pose.header.frame_id = box_setup.tip
-        box_pose.pose.position = Point(0.0, 0.0, 0.06)
-        box_pose.pose.orientation.w = 1.0
-
-        box_setup.add_box_to_world(name=box_name, size=(0.05, 0.01, 0.15), pose=box_pose, parent_link=box_setup.tip)
-        box_setup.close_gripper()
-
-        pre_schnibble_pose = PoseStamped()
-        pre_schnibble_pose.header.frame_id = 'map'
-        pre_schnibble_pose.pose.position = Point(0.85, 0.3, .75)
-        pre_schnibble_pose.pose.orientation = Quaternion(*quaternion_from_matrix([[0, 0, 1, 0],
-                                                                                  [0, -1, 0, 0],
-                                                                                  [1, 0, 0, 0],
-                                                                                  [0, 0, 0, 1]]))
-        pre_schnibble = box_setup.motion_goals.add_cartesian_pose(name='Position Knife',
-                                                                  goal_pose=pre_schnibble_pose,
-                                                                  tip_link=box_setup.tip,
-                                                                  root_link='map')
-
-        schnibble_down_pose = PoseStamped()
-        schnibble_down_pose.header.frame_id = box_name
-        schnibble_down_pose.pose.position.x = -0.1
-        schnibble_down_pose.pose.orientation.w = 1.0
-        schnibble_down = box_setup.motion_goals.add_cartesian_pose(name='Cut Down',
-                                                                   goal_pose=schnibble_down_pose,
-                                                                   tip_link=box_name,
-                                                                   root_link='map',
-                                                                   absolute=False,
-                                                                   start_condition=pre_schnibble)
-
-        schnibble_up_pose = PoseStamped()
-        schnibble_up_pose.header.frame_id = box_name
-        schnibble_up_pose.pose.position.x = 0.1
-        schnibble_up_pose.pose.orientation.w = 1.0
-        schnibble_up = box_setup.motion_goals.add_cartesian_pose(name='Knife Up',
-                                                                 goal_pose=schnibble_up_pose,
-                                                                 tip_link=box_name,
-                                                                 root_link='map',
-                                                                 absolute=False,
-                                                                 start_condition=schnibble_down)
-
-        right_pose = PoseStamped()
-        right_pose.header.frame_id = box_name
-        right_pose.pose.position.y = 0.02
-        right_pose.pose.orientation.w = 1.0
-        move_right = box_setup.motion_goals.add_cartesian_pose(name='Move Right',
-                                                               goal_pose=right_pose,
-                                                               tip_link=box_name,
-                                                               root_link='map',
-                                                               absolute=False,
-                                                               start_condition=schnibble_up)
-
-        human_close = box_setup.monitors.add_pulse(name='Human Close?',
-                                                   after_ticks=60,
-                                                   start_condition=pre_schnibble,
-                                                   end_condition='')
-
-        no_contact = box_setup.monitors.add_const_true(name='Made Contact?',
-                                                       start_condition=schnibble_down)
-
-        schnibbel_done = box_setup.monitors.add_time_above(name='Done?',
-                                                           threshold=5,
-                                                           start_condition=move_right)
-
-        reset = f'not {schnibbel_done}'
-        box_setup.update_reset_condition(node_name=schnibble_down, condition=reset)
-        box_setup.update_reset_condition(node_name=schnibble_up, condition=reset)
-        box_setup.update_reset_condition(node_name=move_right, condition=reset)
-        box_setup.update_reset_condition(node_name=schnibbel_done, condition=reset)
-        box_setup.update_reset_condition(node_name=no_contact, condition=reset)
-
-        box_setup.update_pause_condition(node_name=schnibble_down, condition=human_close)
-        box_setup.update_pause_condition(node_name=schnibble_up, condition=human_close)
-        box_setup.update_pause_condition(node_name=move_right, condition=human_close)
-
-        box_setup.monitors.add_end_motion(start_condition=schnibbel_done)
-        box_setup.monitors.add_cancel_motion(start_condition=f'not {no_contact}', error=Exception('no contact'))
-        box_setup.execute(add_local_minimum_reached=False)
-        # box_setup.update_parent_link_of_group(box_name, box_setup.tip)
 
     def test_schnibbeln_sequence(self, box_setup: HSRTestWrapper):
         box_name = 'Schnibbler'

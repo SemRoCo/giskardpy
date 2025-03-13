@@ -182,6 +182,10 @@ class CartesianPoseStraight(Goal):
                                            absolute=absolute,
                                            weight=weight,
                                            point_of_debug_matrix=goal_pose.to_position()))
+        obs_expressions = []
+        for task in self.tasks:
+            obs_expressions.append(task.observation_expression)
+        self.observation_expression = cas.logic_and(*obs_expressions)
 
 
 class RelativePositionSequence(Goal):

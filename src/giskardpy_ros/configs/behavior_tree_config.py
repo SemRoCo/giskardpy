@@ -154,7 +154,7 @@ class BehaviorTreeConfig(ABC):
             self.tree.control_loop_branch.add_evaluate_debug_expressions(log_traj=False)
         else:
             self.tree.control_loop_branch.add_evaluate_debug_expressions(log_traj=True)
-        if GiskardBlackboard().tree.is_open_loop():
+        if GiskardBlackboard().tree.is_open_loop() and hasattr(GiskardBlackboard().tree.execute_traj, 'prepare_base_control'):
             GiskardBlackboard().tree.execute_traj.prepare_base_control.add_compile_debug_expressions()
             GiskardBlackboard().tree.execute_traj.base_closed_loop.add_evaluate_debug_expressions(log_traj=False)
 

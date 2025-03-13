@@ -128,16 +128,16 @@ class AddBaseTrajFollowerGoal(GiskardBehavior):
         local_min = LocalMinimumReached('local min')
         god_map.motion_statechart_manager.add_monitor(local_min)
 
-        time_monitor = TimeAbove(threshold=god_map.trajectory.length_in_seconds)
+        time_monitor = TimeAbove(threshold=god_map.trajectory.length_in_seconds, name='timeout')
         god_map.motion_statechart_manager.add_monitor(time_monitor)
 
-        end_motion = EndMotion(start_condition=cas.logic_and(local_min.get_observation_state_expression(),
-                                                             time_monitor.get_observation_state_expression()))
+        end_motion = EndMotion(name='end motion')
+        end_motion.start_condition = f'{local_min.name} and {time_monitor.name}'
         god_map.motion_statechart_manager.add_monitor(end_motion)
 
-        goal = BaseTrajFollower(self.joint.name, track_only_velocity=True,
-                                end_condition=local_min.get_observation_state_expression())
-        goal.connect_end_condition_to_all_tasks(time_monitor.get_observation_state_expression())
-        god_map.motion_statechart_manager.add_motion_goal(goal)
-        god_map.motion_statechart_manager.init_task_state()
+        goal = BaseTrajFollower(self.joint.name, track_only_velocity=True)
+        goal.end_condition = f'{local_min.name}'
+        goal.connect_end_condition_to_all_tasks(time_monitor.name)
+        god_map.motion_statechart_manager.add_goal(goal)
+        god_map.motion_statechart_manager.parse_conditions()
         return Status.SUCCESS

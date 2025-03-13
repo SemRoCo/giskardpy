@@ -12,7 +12,8 @@ from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
 import giskardpy_ros.ros1.tfwrapper as tf
 from giskard_msgs.msg import MoveGoal, GiskardError
-from giskardpy.data_types.exceptions import PreemptedException
+from giskardpy.data_types.exceptions import PreemptedException, InvalidGoalException, SetupException, \
+    GoalInitalizationException
 from giskardpy_ros.configs.behavior_tree_config import ClosedLoopBTConfig
 from giskardpy_ros.configs.giskard import Giskard
 from giskardpy_ros.configs.iai_robots.pr2 import PR2CollisionAvoidance, PR2VelocityMujocoInterface, WorldWithPR2Config
@@ -385,11 +386,11 @@ class TestConstraints:
     def test_SetSeedConfiguration_execute(self, zero_pose: PR2TestWrapper):
         zero_pose.set_seed_configuration(seed_configuration=zero_pose.better_pose)
         zero_pose.set_joint_goal(zero_pose.default_pose)
-        zero_pose.execute(expected_error_code=GiskardError.GOAL_INITIALIZATION_ERROR)
+        zero_pose.execute(expected_error_type=GoalInitalizationException)
 
     def test_SetSeedConfiguration_execute2(self, zero_pose: PR2TestWrapper):
         zero_pose.set_seed_configuration(seed_configuration=zero_pose.better_pose)
-        zero_pose.execute(expected_error_code=GiskardError.CONSTRAINT_INITIALIZATION_ERROR)
+        zero_pose.execute(expected_error_type=GoalInitalizationException)
 
     def test_SetSeedConfiguration_project(self, zero_pose: PR2TestWrapper):
         zero_pose.set_seed_configuration(seed_configuration=zero_pose.better_pose)
@@ -566,7 +567,7 @@ class TestActionServerEvents:
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.set_cart_goal(goal_pose=p, tip_link='base_footprint', root_link='map')
         zero_pose.allow_all_collisions()
-        zero_pose.execute(expected_error_code=GiskardError.PREEMPTED, stop_after=1)
+        zero_pose.execute(expected_error_type=PreemptedException, stop_after=1)
 
     def test_interrupt2(self, zero_pose: PR2TestWrapper):
         p = PoseStamped()
@@ -575,15 +576,15 @@ class TestActionServerEvents:
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.set_cart_goal(goal_pose=p, tip_link='base_footprint', root_link='map')
         zero_pose.allow_all_collisions()
-        zero_pose.execute(expected_error_code=GiskardError.PREEMPTED, stop_after=6)
+        zero_pose.execute(expected_error_type=PreemptedException, stop_after=6)
 
     def test_undefined_type(self, zero_pose: PR2TestWrapper):
         zero_pose.allow_all_collisions()
-        zero_pose.send_goal(goal_type=MoveGoal.UNDEFINED, expected_error_code=GiskardError.INVALID_GOAL)
+        zero_pose.send_goal(goal_type=MoveGoal.UNDEFINED, expected_error_type=InvalidGoalException)
 
     def test_empty_goal(self, zero_pose: PR2TestWrapper):
         zero_pose.cmd_seq = []
-        zero_pose.execute(expected_error_code=GiskardError.INVALID_GOAL)
+        zero_pose.execute(expected_error_type=InvalidGoalException)
 
 
 class TestManipulability:
@@ -639,10 +640,10 @@ class TestManipulability:
 class TestMonitors:
     def test_only_payload_monitors(self, zero_pose: PR2TestWrapper):
         sleep = zero_pose.monitors.add_sleep(2)
-        zero_pose.monitors.add_cancel_motion(start_condition=sleep, error_message='time up',
-                                             error_code=GiskardError.SETUP_ERROR)
+        zero_pose.monitors.add_cancel_motion(start_condition=sleep, name='cancel',
+                                             error=SetupException('time up'))
         zero_pose.allow_all_collisions()
-        zero_pose.execute(add_local_minimum_reached=False, expected_error_code=GiskardError.SETUP_ERROR)
+        zero_pose.execute(add_local_minimum_reached=False, expected_error_type=SetupException)
 
 # kernprof -lv py.test -s test/test_integration_pr2.py
 # time: [1-9][1-9]*.[1-9]* s

@@ -28,6 +28,9 @@ class QPSolverPIQP(QPSolverGurobi):
         solver = piqp.SparseSolver()
         # solver.settings.eps_abs = 1e-3
         # solver.settings.eps_rel = 1e-4
+        solver.settings.eps_duality_gap_rel = 5e-7
+        # solver.settings.iterative_refinement_always_enabled = True
+        solver.settings.delta_init = 7e-3
         if len(h) == 0:
             solver.setup(P=H, c=g, A=E, b=b, G=None, h=None, x_lb=lb, x_ub=ub)
         else:

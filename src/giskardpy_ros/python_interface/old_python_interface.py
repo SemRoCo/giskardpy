@@ -93,7 +93,7 @@ class OldGiskardWrapper(GiskardWrapper):
                                              reference_linear_velocity=reference_linear_velocity,
                                              reference_angular_velocity=reference_angular_velocity,
                                              weight=weight,
-                                             end_condition=None if add_monitor else '',
+                                             end_condition='',
                                              **kwargs)
 
     def set_diff_drive_base_goal(self,
@@ -124,7 +124,7 @@ class OldGiskardWrapper(GiskardWrapper):
         """
         root_link = giskard_msgs.LinkName(name=root_link, group_name=root_group)
         tip_link = giskard_msgs.LinkName(name=tip_link, group_name=tip_group)
-        self.motion_goals.add_diff_drive_base(end_condition=None if add_monitor else '',
+        self.motion_goals.add_diff_drive_base(end_condition='',
                                               goal_pose=goal_pose,
                                               tip_link=tip_link,
                                               root_link=root_link,
@@ -162,7 +162,7 @@ class OldGiskardWrapper(GiskardWrapper):
         """
         root_link = giskard_msgs.LinkName(name=root_link, group_name=root_group)
         tip_link = giskard_msgs.LinkName(name=tip_link, group_name=tip_group)
-        self.motion_goals.add_cartesian_pose_straight(end_condition=None if add_monitor else '',
+        self.motion_goals.add_cartesian_pose_straight(end_condition='',
                                                       goal_pose=goal_pose,
                                                       tip_link=tip_link,
                                                       root_link=root_link,
@@ -194,7 +194,7 @@ class OldGiskardWrapper(GiskardWrapper):
         """
         root_link = giskard_msgs.LinkName(name=root_link, group_name=root_group)
         tip_link = giskard_msgs.LinkName(name=tip_link, group_name=tip_group)
-        self.motion_goals.add_cartesian_position(end_condition=None if add_monitor else '',
+        self.motion_goals.add_cartesian_position(end_condition='',
                                                  goal_point=goal_point,
                                                  tip_link=tip_link,
                                                  root_link=root_link,
@@ -221,7 +221,7 @@ class OldGiskardWrapper(GiskardWrapper):
         """
         root_link = giskard_msgs.LinkName(name=root_link, group_name=root_group)
         tip_link = giskard_msgs.LinkName(name=tip_link, group_name=tip_group)
-        self.motion_goals.add_cartesian_position_straight(end_condition=None if add_monitor else '',
+        self.motion_goals.add_cartesian_position_straight(end_condition='',
                                                           goal_point=goal_point,
                                                           tip_link=tip_link,
                                                           root_link=root_link,
@@ -252,7 +252,7 @@ class OldGiskardWrapper(GiskardWrapper):
         """
         root_link = giskard_msgs.LinkName(name=root_link, group_name=root_group)
         tip_link = giskard_msgs.LinkName(name=tip_link, group_name=tip_group)
-        self.motion_goals.add_cartesian_orientation(end_condition=None if add_monitor else '',
+        self.motion_goals.add_cartesian_orientation(end_condition='',
                                                     goal_orientation=goal_orientation,
                                                     tip_link=tip_link,
                                                     root_link=root_link,
@@ -507,7 +507,7 @@ class OldGiskardWrapper(GiskardWrapper):
         """
         root_link = giskard_msgs.LinkName(name=root_link, group_name=root_group)
         tip_link = giskard_msgs.LinkName(name=tip_link, group_name=tip_group)
-        self.motion_goals.add_pointing(end_condition=None if add_monitor else '',
+        self.motion_goals.add_pointing(end_condition='',
                                        tip_link=tip_link,
                                        goal_point=goal_point,
                                        root_link=root_link,

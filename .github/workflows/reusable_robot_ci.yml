@@ -91,7 +91,7 @@ jobs:
         if: github.event_name == 'pull_request'
         id: find_pr
         run: |
-          REPO="SemRoCo/giskardpy"
+          REPO="${{ github.repository_owner }}/giskardpy"
           PR_NUMBER="${{ github.event.pull_request.number }}"
           PR_TITLE="${{ github.event.pull_request.title }}"
           PR_URL="${{ github.event.pull_request.url }}"
@@ -132,7 +132,7 @@ jobs:
           git config --global user.email "github-actions@github.com"
           git config --global user.name "GitHub Actions"
           
-          git clone https://github.com/SemRoCo/giskardpy.git
+          git clone https://github.com/${{ github.repository_owner }}/giskardpy.git
           cd giskardpy
           git checkout ${{ env.pr_into_branch }}
           
@@ -150,7 +150,7 @@ jobs:
         # fallback repo and branch, if event is push or no merge-able pr is found
         with:
           path: 'giskardpy'
-          repository: SemRoCo/giskardpy
+          repository: ${{ github.repository_owner }}/giskardpy
           ref: giskard_library
       - name: install pip dependencies
         run: |

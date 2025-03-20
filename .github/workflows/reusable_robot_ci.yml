@@ -42,44 +42,18 @@ on:
         type: string
 jobs:
   test_standalone:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
+    container: # Login and start specified container image. Ubuntu20.04 isn't supported on GitHub-Workflow as of 04.2025
+      image: ghcr.io/${{ needs.to-lowercase.outputs.repo_lowercase }}:20.04
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
     strategy:
       matrix:
         qp_solver: [ qpSWIFT ]
     env:
       QP_SOLVER: ${{ matrix.qp_solver }}
     steps:
-      #load cache ------------------------------------------------------------------------------------------------------
-      - name: load pip cache
-        id: pip-load
-        uses: actions/cache@v3
-        with:
-          path: ~/.cache/pip
-          key: pip
-      - if: ${{ matrix.qp_solver == 'qpSWIFT'}}
-        name: load qpSWIFT
-        id: load-qpSWIFT
-        uses: actions/cache@v3
-        with:
-          path: ~/qpSWIFT
-          key: qpSWIFT
-      - if: ${{ matrix.qp_solver == 'qpSWIFT'}}
-        name: install qpSWIFT python wrapper
-        run: |
-          sudo pip3 install numpy
-          cd ~/qpSWIFT/python
-          sudo python3 setup.py install
-      - name: load bpb # -----------------------------------------------------------------------------------------------
-        id: load-bpb
-        uses: actions/cache@v3
-        with:
-          path: ~/bpb
-          key: bpb
-      - name: add bpb to bashrc
-        run: |
-          cd ~/bpb/bullet3
-          echo 'export PYTHONPATH=${PYTHONPATH}':"${PWD}/build_cmake/better_python:${PWD}/examples/pybullet" >> ~/.bashrc
-      #pull github deps ================================================================================================
       - uses: actions/checkout@v3
         with:
           path: 'ros_ws/src/giskardpy_ros'

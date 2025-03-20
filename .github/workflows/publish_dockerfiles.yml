@@ -2,10 +2,12 @@ name: Publish Custom Docker image
 
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - '**/Dockerfile'
   push:
     paths:
       - '**/Dockerfile'
-
 
 jobs:
   build_and_push_to_registry:

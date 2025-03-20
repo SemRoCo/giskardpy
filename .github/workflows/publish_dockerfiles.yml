@@ -36,7 +36,13 @@ jobs:
       # Setup Download-URL for requirements.txt for python dependencies
       - name: Set Download URL
         run: | 
-          echo "DOWNLOAD_URL=https://raw.githubusercontent.com/${{ github.repository }}/${{ github.ref_name }}/requirements.txt" >> $GITHUB_ENV
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            # For PR events, use the specific SHA of the HEAD commit in the PR
+            echo "DOWNLOAD_URL=https://raw.githubusercontent.com/${{ github.repository }}/${{ github.event.pull_request.head.sha }}/requirements.txt" >> $GITHUB_ENV
+          else
+            # For push events, use the branch/tag name
+            echo "DOWNLOAD_URL=https://raw.githubusercontent.com/${{ github.repository }}/${{ github.ref_name }}/requirements.txt" >> $GITHUB_ENV
+          fi
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3

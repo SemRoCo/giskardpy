@@ -26,71 +26,44 @@ on:
         description: 'Test scenario tags'
         required: false
         type: boolean
+
 jobs:
-  build:
-    runs-on: ubuntu-20.04
+  # GitHub Repository-Owners can have uppercase letters.
+  # Container Registry URLs need to be lowercase.
+  # There is no easy way to get it to lowercase (that i found)
+  to-lowercase:
+    runs-on: ubuntu-latest
+    outputs:
+      repo_lowercase: ${{ steps.lowercase.outputs.repository }}
     steps:
-      - uses: actions/checkout@v3
-        with:
-          path: 'ros_ws/src/giskardpy'
-          repository: SemRoCo/giskardpy
-      - name: Checkout giskard msgs
-        uses: actions/checkout@v3
-        with:
-          path: 'ros_ws/src/giskard_msgs'
-          repository: SemRoCo/giskard_msgs
-          ref: devel
-      - name: Checkout qpoases
-        uses: actions/checkout@v3
-        with:
-          path: 'ros_ws/src/qpOASES'
-          repository: SemRoCo/qpOASES
-          ref: noetic
-      - name: Checkout iai_pr2
-        uses: actions/checkout@v3
-        with:
-          path: 'ros_ws/src/iai_pr2'
-          repository: code-iai/iai_pr2
-          ref: mujoco_sim_setup
-      - name: Checkout iai_maps
-        uses: actions/checkout@v3
-        with:
-          path: 'ros_ws/src/iai_maps'
-          repository: code-iai/iai_maps
-          ref: master
-      - name: Setup Giskard workspace
-        uses: betwo/github-setup-catkin@master
-        env:
-              ACTIONS_ALLOW_UNSECURE_COMMANDS: true
-        with:
-          # Version range or exact version of ROS version to use, using SemVer's version range syntax.
-          ros-version: noetic
-          build-tool: 'catkin_tools'
-          # Root directory of the catkin workspace
-          workspace: $GITHUB_WORKSPACE/ros_ws
-      - name: install pip dependencies
+      - id: lowercase
         run: |
-          python3 -m pip install --upgrade pip
-          pip3 install -r ros_ws/src/giskardpy/requirements.txt
-      - name: build Giskard
+          echo "repository=${GITHUB_REPOSITORY@L}" >> $GITHUB_OUTPUT
+  test:
+    needs: to-lowercase
+    strategy:
+      # Lets all tests finish, even if one test fails
+      fail-fast: false
+      matrix:
+        tests: [ "test_cas_wrapper", "test_symbol_manager", "test_math", "test_giskard_library"]
+        ubuntu_version: [ "20.04", "24.04"]
+    runs-on: ubuntu-latest
+    container: # Login and start specified container image. Ubuntu20.04 isn't supported on GitHub-Workflow as of 04.2025
+      image: ghcr.io/${{ needs.to-lowercase.outputs.repo_lowercase }}:${{ matrix.ubuntu_version }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    env:
+      HOME: /root/
+    steps:
+      - name: Checkout main repo
+        uses: actions/checkout@v4
+        with:
+          path: 'giskardpy'
+      - name: test
         run: |
-          cd ros_ws
-          touch src/iai_pr2/iai_pr2_sim/CATKIN_IGNORE
-          touch src/iai_pr2/iai_pr2_donbot/CATKIN_IGNORE
-          catkin build
-          echo 'export ROS_HOSTNAME=localhost' >> ~/.bashrc
-          echo 'source $GITHUB_WORKSPACE/ros_ws/devel/setup.bash' >> ~/.bashrc
-      - name: start roscore
-        run: |
-          roscore &
-      - name: casadi wrapper
-        run: |
-          roscd giskardpy
-          python3 -m pytest -s test/test_cas_wrapper.py
-      - name: exceptions
-        run: |
-          roscd giskardpy
-          python3 -m pytest -s test/test_exceptions.py
+          cd giskardpy
+          python3 -m pytest -s test/${{ matrix.tests }}.py
   #    - name: Setup upterm session
   ##      if: always()
   #      if: failure()

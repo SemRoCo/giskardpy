@@ -7,6 +7,7 @@ on:
     branches:
       - master
       - devel
+      - library_standalone
   pull_request:
 #    branches:
 #      - master

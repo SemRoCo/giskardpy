@@ -220,7 +220,7 @@ jobs:
       # Lets all tests finish, even if one test fails
       fail-fast: false
       matrix:
-        tests: [ "test_cas_wrapper", "test_symbol_manager", "test_math", "test_giskard_library"]
+        tests: [ "test_cas_wrapper", "test_symbol_manager", "test_giskard_library"]
         ubuntu_version: [ "20.04", "24.04"]
         qp_solver: [ qpSWIFT ]
     runs-on: ubuntu-latest

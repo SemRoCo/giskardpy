@@ -6,7 +6,7 @@ import numpy as np
 from giskardpy.data_types.exceptions import InfeasibleException
 from giskardpy.qp.qp_solver_ids import SupportedQPSolver
 from line_profiler import profile
-from qp.qp_solver_qpalm import QPSolverQPalm
+from giskardpy.qp.qp_solver_qpalm import QPSolverQPalm
 from scipy import sparse as sp
 
 

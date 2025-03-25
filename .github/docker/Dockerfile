@@ -11,6 +11,7 @@ RUN apt-get install -y curl \
             python3-pip \
             python3-wstool \
             python3-catkin-tools \
+            python3-numpy \
             ros-noetic-py-trees-ros \
             ros-noetic-geometry2 \
             ros-noetic-tf2-bullet \
@@ -37,11 +38,13 @@ RUN sudo apt install libeigen3-dev && \
 
 # Install qpSWIFT
 RUN cd ~ && \
-    git clone https://github.com/qpSWIFT/qpSWIFT && \
+    git clone https://github.com/SemRoCo/qpSWIFT && \
     cd qpSWIFT && \
     cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && \
     cmake --build build --config Release && \
-    cmake --build build --target install
+    cmake --build build --target install && \
+    cd python && \
+    python3 setup.py install
 
 # Install betterpybullet
 RUN mkdir -p ~/bpb && \

@@ -224,10 +224,6 @@ jobs:
           catkin build
           echo 'export ROS_HOSTNAME=localhost' >> ~/.bashrc
           echo 'source $GITHUB_WORKSPACE/ros_ws/devel/setup.bash' >> ~/.bashrc
-      - name: debug echo
-        run: |
-          cd ~
-          ll
       #tests ===========================================================================================================
       - name: start roscore
         run: roscore &

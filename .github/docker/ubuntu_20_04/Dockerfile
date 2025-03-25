@@ -7,7 +7,7 @@ SHELL ["/bin/bash", "-c"]
 # Install Dependencies, tzdata install noninteractive, because of Timezone setup
 RUN apt-get update
 RUN DEBIAN_FRONTEND=noninteractive TZ=Europe/Berlin apt-get -y install tzdata
-RUN apt-get install -y curl python3 python3-pip git-all cmake sudo pkg-config
+RUN apt-get install -y curl python3 python3-pip git-all cmake sudo pkg-config python3-numpy
 
 # Get requirements.txt from DOWNLOAD_URL-Parameter
 RUN curl -fsSL $DOWNLOAD_URL -o requirements.txt
@@ -22,7 +22,10 @@ RUN cd ~ && \
     cd qpSWIFT && \
     cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && \
     cmake --build build --config Release && \
-    cmake --build build --target install
+    cmake --build build --target install && \
+    cd python && \
+    python3 setup.py install && \
+    mv build/lib.linux-x86_64-cpython-38/qpSWIFT.cpython-38-x86_64-linux-gnu.so /usr/local/lib/python3.8/dist-packages/
 
 # Install betterpybullet
 RUN mkdir -p ~/bpb && \

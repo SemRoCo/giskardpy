@@ -37,7 +37,9 @@ RUN cd ~ && \
     cd qpSWIFT && \
     cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && \
     cmake --build build --config Release && \
-    cmake --build build --target install
+    cmake --build build --target install && \
+    cd python && \
+    python3 setup.py install
 
 # Install betterpybullet
 RUN mkdir -p ~/bpb && \

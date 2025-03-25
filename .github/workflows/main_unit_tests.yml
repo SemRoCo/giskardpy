@@ -47,6 +47,7 @@ jobs:
       matrix:
         tests: [ "test_cas_wrapper", "test_symbol_manager", "test_math", "test_giskard_library"]
         ubuntu_version: [ "20.04", "24.04"]
+        qp_solver: [ qpSWIFT ]
     runs-on: ubuntu-latest
     container: # Login and start specified container image. Ubuntu20.04 isn't supported on GitHub-Workflow as of 04.2025
       image: ghcr.io/${{ needs.to-lowercase.outputs.repo_lowercase }}:${{ matrix.ubuntu_version }}
@@ -54,6 +55,7 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
     env:
+      QP_SOLVER: ${{ matrix.qp_solver }}
       HOME: /root/
     steps:
       - name: Checkout main repo

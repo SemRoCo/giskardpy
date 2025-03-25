@@ -41,10 +41,22 @@ on:
         required: false
         type: string
 jobs:
+  # GitHub Repository-Owners can have uppercase letters.
+  # Container Registry URLs need to be lowercase.
+  # There is no easy way to get it to lowercase (that i found)
+  to-lowercase:
+    runs-on: ubuntu-latest
+    outputs:
+      repo_lowercase: ${{ steps.lowercase.outputs.repository }}
+    steps:
+      - id: lowercase
+        run: |
+          echo "repository=${GITHUB_REPOSITORY@L}" >> $GITHUB_OUTPUT
   test_standalone:
+    needs: to-lowercase
     runs-on: ubuntu-latest
     container: # Login and start specified container image. Ubuntu20.04 isn't supported on GitHub-Workflow as of 04.2025
-      image: ghcr.io/${{ needs.to-lowercase.outputs.repo_lowercase }}:20.04
+      image: ghcr.io/${{ needs.to-lowercase.outputs.repo_lowercase }}:noetic
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -53,6 +65,7 @@ jobs:
         qp_solver: [ qpSWIFT ]
     env:
       QP_SOLVER: ${{ matrix.qp_solver }}
+      HOME: /root/
     steps:
       - uses: actions/checkout@v3
         with:
@@ -211,6 +224,10 @@ jobs:
           catkin build
           echo 'export ROS_HOSTNAME=localhost' >> ~/.bashrc
           echo 'source $GITHUB_WORKSPACE/ros_ws/devel/setup.bash' >> ~/.bashrc
+      - name: debug echo
+        run: |
+          cd ~
+          ll
       #tests ===========================================================================================================
       - name: start roscore
         run: roscore &

@@ -7,24 +7,24 @@ SHELL ["/bin/bash", "-c"]
 # Install Dependencies, tzdata install noninteractive, because of Timezone setup
 RUN apt-get update
 RUN apt-get install -y curl \
-    python3 \
-    python3-pip \
-    python3-wstool \
-    python3-catkin-tools \
-    ros-noetic-py-trees-ros \
-    ros-noetic-geometry2 \
-    ros-noetic-tf2-bullet \
-    ros-noetic-tf2-sensor-msgs \
-    ros-noetic-tf2-tools \
-    ros-noetic-urdfdom-py \
-    ros-noetic-rqt-py-trees \
-    ros-noetic-rospy-message-converter \
-    ros-noetic-pr2-description \
-    ros-noetic-effort-controllers \
-    ros-noetic-map-server \
-    ros-noetic-map-server \
-    ros-noetic-joint-trajectory-controller \
-    git-all
+            python3 \
+            python3-pip \
+            python3-wstool \
+            python3-catkin-tools \
+            ros-noetic-py-trees-ros \
+            ros-noetic-geometry2 \
+            ros-noetic-tf2-bullet \
+            ros-noetic-tf2-sensor-msgs \
+            ros-noetic-tf2-tools \
+            ros-noetic-urdfdom-py \
+            ros-noetic-rqt-py-trees \
+            ros-noetic-rospy-message-converter \
+            ros-noetic-pr2-description \
+            ros-noetic-effort-controllers \
+            ros-noetic-map-server \
+            ros-noetic-map-server \
+            ros-noetic-joint-trajectory-controller \
+            git-all
 
 RUN echo "source /opt/ros/noetic/setup.bash" >> ~/.bashrc
 

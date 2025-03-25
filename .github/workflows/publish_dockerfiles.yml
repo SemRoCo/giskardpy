@@ -55,9 +55,9 @@ jobs:
       - name: Find Dockerfiles and Build Images
         run: |
           for dockerfilepath in $(find . -name 'Dockerfile' | rev | cut -d'/' -f2- | rev); do
-            UBUNTU_VERSION=$(grep -oP '(?<=FROM ubuntu:)[0-9]+(\.[0-9]+)?' "$dockerfilepath"/Dockerfile)
+            ROS_DISTRO=$(grep -oP '(?<=FROM osrf/ros:)[a-z]+' "$dockerfilepath"/Dockerfile)
 
-            if [ -z "$UBUNTU_VERSION" ]; then
+            if [ -z "$ROS_DISTRO" ]; then
               echo "No Ubuntu version found in $dockerfile, skipping..."
               continue
             fi
@@ -65,7 +65,7 @@ jobs:
             docker buildx build \
               --platform linux/amd64 \
               --build-arg DOWNLOAD_URL=${DOWNLOAD_URL} \
-              -t ${IMAGE_NAME}:${UBUNTU_VERSION} \
+              -t ${IMAGE_NAME}:${ROS_DISTRO} \
               --push \
               $dockerfilepath
           done

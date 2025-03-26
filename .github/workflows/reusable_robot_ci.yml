@@ -70,7 +70,7 @@ jobs:
       - uses: actions/checkout@v3
         with:
           path: 'ros_ws/src/giskardpy_ros'
-          repository: SemRoCo/giskardpy_ros
+          repository: ${{ github.repository_owner }}/giskardpy_ros
       - name: Find Corresponding PR in giskardpy
         # searches for pull-request in giskardpy matich the pull-request that triggered the workflow.
         # Uses the pr-url, pr-number or pr-title to search the open pr's on giskardpy to find a description,

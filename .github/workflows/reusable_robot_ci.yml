@@ -138,7 +138,7 @@ jobs:
         with:
           path: 'giskardpy'
           repository: ${{ github.repository_owner }}/giskardpy
-          ref: giskard_library
+          ref: library_standalone
       - name: install pip dependencies
         run: |
           python3 -m pip install --upgrade pip

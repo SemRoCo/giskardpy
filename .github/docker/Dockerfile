@@ -12,6 +12,8 @@ RUN apt-get install -y curl \
             python3-wstool \
             python3-catkin-tools \
             python3-numpy \
+            jq \
+            gh \
             ros-noetic-py-trees-ros \
             ros-noetic-geometry2 \
             ros-noetic-tf2-bullet \

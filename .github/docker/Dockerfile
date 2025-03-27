@@ -13,7 +13,7 @@ RUN apt-get install -y curl \
             python3-catkin-tools \
             python3-numpy \
             jq \
-            gh \
+            wget \
             ros-noetic-py-trees-ros \
             ros-noetic-geometry2 \
             ros-noetic-tf2-bullet \
@@ -28,6 +28,16 @@ RUN apt-get install -y curl \
             ros-noetic-map-server \
             ros-noetic-joint-trajectory-controller \
             git-all
+
+# Install gh cli for github workflow commands (can't use apt normally unlike ubuntu24.04)
+RUN (type -p wget >/dev/null || (sudo apt update && sudo apt-get install wget -y)) \
+	&& sudo mkdir -p -m 755 /etc/apt/keyrings \
+    && out=$(mktemp) && wget -nv -O$out https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+    && cat $out | sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null \
+	&& sudo chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg \
+	&& echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+	&& sudo apt update \
+	&& sudo apt install gh -y
 
 RUN echo "source /opt/ros/noetic/setup.bash" >> ~/.bashrc
 

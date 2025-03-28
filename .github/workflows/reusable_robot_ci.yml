@@ -45,13 +45,11 @@ on:
         required: false
         type: boolean
         default: false
-        hidden: true
       pr_id:
         description: 'ID of PR from giskardpy'
         required: false
         type: string
         default: ""
-        hidden: true
 jobs:
   # GitHub Repository-Owners can have uppercase letters.
   # Container Registry URLs need to be lowercase.

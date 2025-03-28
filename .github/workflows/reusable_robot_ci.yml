@@ -116,6 +116,8 @@ jobs:
           cd giskardpy
           
           gh pr checkout --repo ${{ github.repository_owner }}/giskardpy ${{ env.pr_id }}
+        env:
+          GH_TOKEN: ${{ github.token }}
       - uses: actions/checkout@v3
         if: github.event_name == 'push' || env.pr_found == 'false' || env.pr_mergeable != 'MERGEABLE'
         # fallback repo and branch, if event is push or no merge-able pr is found

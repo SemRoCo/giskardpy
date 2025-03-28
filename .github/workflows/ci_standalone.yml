@@ -30,11 +30,13 @@ on:
         required: false
         type: boolean
         default: false
+        hidden: true
       pr_id:
         description: 'ID of PR from giskardpy'
         required: false
         type: string
         default: ""
+        hidden: true
 jobs:
   hsr:
     uses: ./.github/workflows/reusable_robot_ci.yml

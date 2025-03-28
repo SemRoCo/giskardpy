@@ -45,15 +45,17 @@ on:
         required: false
         type: boolean
         default: false
+        hidden: true
       pr_id:
         description: 'ID of PR from giskardpy'
         required: false
         type: string
         default: ""
+        hidden: true
 jobs:
   # GitHub Repository-Owners can have uppercase letters.
   # Container Registry URLs need to be lowercase.
-  # There is no easy way to get it to lowercase (that i found)
+  # There is no easy way to get it to lowercase (that I found)
   to-lowercase:
     runs-on: ubuntu-latest
     outputs:
@@ -123,7 +125,7 @@ jobs:
             echo "pr_mergeable='MERGEABLE'" >> $GITHUB_ENV
       - name: Checkout giskardpy PR Branch
         # when a matching pr is found and merge-able, clone the repo and merge the branches of the pr.
-        if: github.event_name == 'pull_request' && env.pr_found == 'true' && env.pr_mergeable == 'MERGEABLE'
+        if: env.pr_found == 'true' && env.pr_mergeable == 'MERGEABLE'
         run: |
           git config --global user.email "github-actions@github.com"
           git config --global user.name "GitHub Actions"

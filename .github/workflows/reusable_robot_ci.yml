@@ -40,6 +40,14 @@ on:
       test10:
         required: false
         type: string
+      is_trigger:
+        description: 'Is trigger from giskardpy'
+        required: false
+        type: boolean
+      pr_id:
+        description: 'Is trigger from giskardpy'
+        required: false
+        type: number
 jobs:
   # GitHub Repository-Owners can have uppercase letters.
   # Container Registry URLs need to be lowercase.
@@ -105,6 +113,12 @@ jobs:
           fi
         env:
           GH_TOKEN: ${{ github.token }}
+      - name: Check if triggered from giskardpy
+        if: inputs.is_trigger == 'true'
+        run: |
+            echo "pr_found=true" >> $GITHUB_ENV
+            echo "pr_id=${{ inputs.pr_id }}" >> $GITHUB_ENV
+            echo "pr_mergeable='MERGEABLE'" >> $GITHUB_ENV
       - name: Checkout giskardpy PR Branch
         # when a matching pr is found and merge-able, clone the repo and merge the branches of the pr.
         if: github.event_name == 'pull_request' && env.pr_found == 'true' && env.pr_mergeable == 'MERGEABLE'

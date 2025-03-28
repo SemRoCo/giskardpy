@@ -25,6 +25,14 @@ on:
         description: 'Test scenario tags'
         required: false
         type: boolean
+      is_trigger:
+        description: 'Is trigger from giskardpy'
+        required: false
+        type: boolean
+      pr_id:
+        description: 'Is trigger from giskardpy'
+        required: false
+        type: number
 jobs:
   hsr:
     uses: ./.github/workflows/reusable_robot_ci.yml
@@ -33,6 +41,8 @@ jobs:
       test1: test_integration_hsr.py::TestJointGoals
       test2: test_integration_hsr.py::TestCollisionAvoidanceGoals
       test3: test_integration_hsr.py::TestConstraints
+      is_trigger: ${{ inputs.is_trigger }}
+      pr_id: ${{ inputs.pr_id }}
   donbot:
     uses: ./.github/workflows/reusable_robot_ci.yml
     with:
@@ -40,6 +50,8 @@ jobs:
       test1: test_integration_donbot.py::TestCartGoals
       test2: test_integration_donbot.py::TestConstraints
       test3: test_integration_donbot.py::TestJointGoals
+      is_trigger: ${{ inputs.is_trigger }}
+      pr_id: ${{ inputs.pr_id }}
   pr2_part1:
     uses: ./.github/workflows/reusable_robot_ci.yml
     with:
@@ -50,6 +62,8 @@ jobs:
       test4: test_integration_pr2.py::TestWeightScaling
       test5: test_integration_pr2.py::TestFeatureFunctions
       test6: test_integration_pr2.py::TestEndMotionReason
+      is_trigger: ${{ inputs.is_trigger }}
+      pr_id: ${{ inputs.pr_id }}
   pr2_part2:
     uses: ./.github/workflows/reusable_robot_ci.yml
     with:
@@ -60,6 +74,8 @@ jobs:
       test4: test_integration_pr2.py::TestInfoServices
       test5: test_integration_pr2.py::TestJointGoals
       test6: test_integration_pr2.py::TestMonitors
+      is_trigger: ${{ inputs.is_trigger }}
+      pr_id: ${{ inputs.pr_id }}
   tiago:
     uses: ./.github/workflows/reusable_robot_ci.yml
     with:
@@ -68,3 +84,5 @@ jobs:
       test2: test_integration_tiago_stand_alone.py::TestJointGoals
       test3: test_integration_tiago_stand_alone.py::TestCollisionAvoidance
       test4: test_integration_tiago_stand_alone.py::TestCartGoals
+      is_trigger: ${{ inputs.is_trigger }}
+      pr_id: ${{ inputs.pr_id }}

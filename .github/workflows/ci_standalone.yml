@@ -29,10 +29,12 @@ on:
         description: 'Is trigger from giskardpy'
         required: false
         type: boolean
+        default: false
       pr_id:
         description: 'Is trigger from giskardpy'
         required: false
-        type: number
+        type: string
+        default: ''
 jobs:
   hsr:
     uses: ./.github/workflows/reusable_robot_ci.yml

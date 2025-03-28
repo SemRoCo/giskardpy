@@ -46,10 +46,10 @@ on:
         type: boolean
         default: false
       pr_id:
-        description: 'Is trigger from giskardpy'
+        description: 'ID of PR from giskardpy'
         required: false
         type: string
-        default: ''
+        default: ""
 jobs:
   # GitHub Repository-Owners can have uppercase letters.
   # Container Registry URLs need to be lowercase.

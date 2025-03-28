@@ -116,7 +116,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
       - name: Check if triggered from giskardpy
-        if: inputs.is_trigger == 'true'
+        if: inputs.is_trigger
         run: |
             echo "pr_found=true" >> $GITHUB_ENV
             echo "pr_id=${{ inputs.pr_id }}" >> $GITHUB_ENV

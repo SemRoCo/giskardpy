@@ -27,7 +27,7 @@ on:
         type: boolean
       is_trigger:
         description: 'Is trigger from giskardpy'
-        required: false
+        required: true
         type: boolean
         default: false
         hidden: true
@@ -35,7 +35,6 @@ on:
         description: 'ID of PR from giskardpy'
         required: false
         type: string
-        default: ""
         hidden: true
 jobs:
   hsr:
@@ -45,8 +44,8 @@ jobs:
       test1: test_integration_hsr.py::TestJointGoals
       test2: test_integration_hsr.py::TestCollisionAvoidanceGoals
       test3: test_integration_hsr.py::TestConstraints
-      is_trigger: ${{ inputs.is_trigger }}
-      pr_id: ${{ inputs.pr_id }}
+      is_trigger: ${{ inputs.is_trigger || false }} # Default values don't seem to work correctly, using this instead
+      pr_id: ${{ inputs.pr_id || null }}
   donbot:
     uses: ./.github/workflows/reusable_robot_ci.yml
     with:
@@ -54,8 +53,8 @@ jobs:
       test1: test_integration_donbot.py::TestCartGoals
       test2: test_integration_donbot.py::TestConstraints
       test3: test_integration_donbot.py::TestJointGoals
-      is_trigger: ${{ inputs.is_trigger }}
-      pr_id: ${{ inputs.pr_id }}
+      is_trigger: ${{ inputs.is_trigger || false }}
+      pr_id: ${{ inputs.pr_id || null }}
   pr2_part1:
     uses: ./.github/workflows/reusable_robot_ci.yml
     with:
@@ -66,8 +65,8 @@ jobs:
       test4: test_integration_pr2.py::TestWeightScaling
       test5: test_integration_pr2.py::TestFeatureFunctions
       test6: test_integration_pr2.py::TestEndMotionReason
-      is_trigger: ${{ inputs.is_trigger }}
-      pr_id: ${{ inputs.pr_id }}
+      is_trigger: ${{ inputs.is_trigger || false }}
+      pr_id: ${{ inputs.pr_id || null }}
   pr2_part2:
     uses: ./.github/workflows/reusable_robot_ci.yml
     with:
@@ -78,8 +77,8 @@ jobs:
       test4: test_integration_pr2.py::TestInfoServices
       test5: test_integration_pr2.py::TestJointGoals
       test6: test_integration_pr2.py::TestMonitors
-      is_trigger: ${{ inputs.is_trigger }}
-      pr_id: ${{ inputs.pr_id }}
+      is_trigger: ${{ inputs.is_trigger || false }}
+      pr_id: ${{ inputs.pr_id || null }}
   tiago:
     uses: ./.github/workflows/reusable_robot_ci.yml
     with:
@@ -88,5 +87,5 @@ jobs:
       test2: test_integration_tiago_stand_alone.py::TestJointGoals
       test3: test_integration_tiago_stand_alone.py::TestCollisionAvoidance
       test4: test_integration_tiago_stand_alone.py::TestCartGoals
-      is_trigger: ${{ inputs.is_trigger }}
-      pr_id: ${{ inputs.pr_id }}
+      is_trigger: ${{ inputs.is_trigger || false }}
+      pr_id: ${{ inputs.pr_id || null }}

@@ -24,8 +24,7 @@ RUN cd ~ && \
     cmake --build build --config Release && \
     cmake --build build --target install && \
     cd python && \
-    python3 setup.py install && \
-    mv build/lib.linux-x86_64-cpython-38/qpSWIFT.cpython-38-x86_64-linux-gnu.so /usr/local/lib/python3.8/dist-packages/
+    python3 setup.py install
 
 # Install betterpybullet
 RUN mkdir -p ~/bpb && \

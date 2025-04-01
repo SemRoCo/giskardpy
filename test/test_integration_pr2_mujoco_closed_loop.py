@@ -26,6 +26,28 @@ import giskardpy_ros.ros1.msg_converter as msg_converter
 
 
 class PR2TestWrapperMujoco(PR2TestWrapper):
+    default_pose = {
+        'r_elbow_flex_joint': -0.15,
+        'r_forearm_roll_joint': 0,
+        'r_shoulder_lift_joint': 0,
+        'r_shoulder_pan_joint': 0,
+        'r_upper_arm_roll_joint': 0,
+        'r_wrist_flex_joint': -0.10001,
+        'r_wrist_roll_joint': 0,
+        'l_elbow_flex_joint': -0.15,
+        'l_forearm_roll_joint': 0,
+        'l_shoulder_lift_joint': 0,
+        'l_shoulder_pan_joint': 0,
+        'l_upper_arm_roll_joint': 0,
+        'l_wrist_flex_joint': -0.10001,
+        'l_wrist_roll_joint': 0,
+        # 'torso_lift_joint': 0.2,
+        'head_pan_joint': 0,
+        'head_tilt_joint': 0,
+        'l_gripper_l_finger_joint': 0.55,
+        'r_gripper_l_finger_joint': 0.55
+    }
+
     better_pose = {'r_shoulder_pan_joint': -1.7125,
                    'r_shoulder_lift_joint': -0.25672,
                    'r_upper_arm_roll_joint': -1.46335,
@@ -40,7 +62,7 @@ class PR2TestWrapperMujoco(PR2TestWrapper):
                    'l_forearm_roll_joint': 16.99,
                    'l_wrist_flex_joint': - 0.10001,
                    'l_wrist_roll_joint': 0,
-                   'torso_lift_joint': 0.2,
+                   # 'torso_lift_joint': 0.2,
                    # 'l_gripper_l_finger_joint': 0.55,
                    # 'r_gripper_l_finger_joint': 0.55,
                    'head_pan_joint': 0,

@@ -40,55 +40,105 @@ on:
       test10:
         required: false
         type: string
+      is_trigger:
+        description: 'Is trigger from giskardpy'
+        required: true
+        type: boolean
+      pr_id:
+        description: 'ID of PR from giskardpy'
+        required: false
+        type: string
 jobs:
+  # GitHub Repository-Owners can have uppercase letters.
+  # Container Registry URLs need to be lowercase.
+  # There is no easy way to get it to lowercase (that I found)
+  to-lowercase:
+    runs-on: ubuntu-latest
+    outputs:
+      repo_lowercase: ${{ steps.lowercase.outputs.repository }}
+    steps:
+      - id: lowercase
+        run: |
+          echo "repository=${GITHUB_REPOSITORY@L}" >> $GITHUB_OUTPUT
   test_standalone:
-    runs-on: ubuntu-20.04
+    needs: to-lowercase
+    runs-on: ubuntu-latest
+    container: # Login and start specified container image. Ubuntu20.04 isn't supported on GitHub-Workflow as of 04.2025
+      image: ghcr.io/${{ needs.to-lowercase.outputs.repo_lowercase }}:noetic
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
     strategy:
       matrix:
-        qp_solver: [qpSWIFT]
+        qp_solver: [ qpSWIFT ]
     env:
       QP_SOLVER: ${{ matrix.qp_solver }}
+      HOME: /root/
     steps:
-      #load cache ------------------------------------------------------------------------------------------------------
-      - name: load pip cache
-        id: pip-load
-        uses: actions/cache@v3
-        with:
-          path: ~/.cache/pip
-          key: pip
-      - if: ${{ matrix.qp_solver == 'qpSWIFT'}}
-        name: load qpSWIFT
-        id: load-qpSWIFT
-        uses: actions/cache@v3
-        with:
-          path: ~/qpSWIFT
-          key: qpSWIFT
-      - if: ${{ matrix.qp_solver == 'qpSWIFT'}}
-        name: install qpSWIFT python wrapper
-        run: |
-          sudo pip3 install numpy
-          cd ~/qpSWIFT/python
-          sudo python3 setup.py install
-      - name: load bpb # -----------------------------------------------------------------------------------------------
-        id: load-bpb
-        uses: actions/cache@v3
-        with:
-          path: ~/bpb
-          key: bpb
-      - name: add bpb to bashrc
-        run: |
-          cd ~/bpb/bullet3
-          echo 'export PYTHONPATH=${PYTHONPATH}':"${PWD}/build_cmake/better_python:${PWD}/examples/pybullet" >> ~/.bashrc
-      #pull github deps ================================================================================================
       - uses: actions/checkout@v3
         with:
           path: 'ros_ws/src/giskardpy_ros'
-          repository: SemRoCo/giskardpy_ros
+          repository: ${{ github.repository_owner }}/giskardpy_ros
+      - name: Find Corresponding PR in giskardpy
+        # searches for pull-request in giskardpy match the pull-request that triggered the workflow.
+        # Uses the pr-url, pr-number or pr-title to search the open pr's on giskardpy to find a description,
+        # which contains one of them.
+        if: github.event_name == 'pull_request'
+        run: |
+          REPO="${{ github.repository_owner }}/giskardpy"
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          PR_URL="${{ github.event.pull_request.url }}"
+
+          echo "Searching for PR related to #$PR_NUMBER in $REPO"
+
+          # Find PR by matching title or linked issues
+          PR_JSON=$(gh pr list --repo "$REPO" --state open \
+            --json number,body,url,mergeable | jq -r \
+            ".[] | select(.body | contains(\"#$PR_NUMBER\") or contains(\"${PR_TITLE}\") or contains(\"${PR_URL}\")) | @base64")
+
+          if [[ -n "$PR_JSON" ]]; then
+            PR_INFO=$(echo "$PR_JSON" | base64 --decode)
+            PR_URL=$(echo "$PR_INFO" | jq -r '.url')
+            PR_ID=$(echo "$PR_INFO" | jq -r '.number')
+            PR_MERGEABLE=$(echo "$PR_INFO" | jq -r '.mergeable')
+
+            echo "Found related PR in second repo: $PR_URL"
+            echo "pr_found=true" >> $GITHUB_ENV
+            echo "pr_id=$PR_ID" >> $GITHUB_ENV
+            echo "pr_mergeable=$PR_MERGEABLE" >> $GITHUB_ENV
+          else
+            echo "No matching PR found in second repo."
+            echo "pr_found=false" >> $GITHUB_ENV
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Check if triggered from giskardpy
+        if: inputs.is_trigger
+        run: |
+          echo "pr_found=true" >> $GITHUB_ENV
+          echo "pr_id=${{ inputs.pr_id }}" >> $GITHUB_ENV
+          echo "pr_mergeable=MERGEABLE" >> $GITHUB_ENV
+      - name: Checkout giskardpy PR Branch
+        # when a matching pr is found and merge-able, clone the repo and merge the branches of the pr.
+        if: env.pr_found == 'true' && env.pr_mergeable == 'MERGEABLE'
+        run: |
+          git config --global user.email "github-actions@github.com"
+          git config --global user.name "GitHub Actions"
+          
+          git clone https://github.com/${{ github.repository_owner }}/giskardpy.git
+          cd giskardpy
+          
+          gh pr checkout --repo ${{ github.repository_owner }}/giskardpy ${{ env.pr_id }}
+        env:
+          GH_TOKEN: ${{ github.token }}
       - uses: actions/checkout@v3
+        if: inputs.is_trigger == false || env.pr_found == 'false' || env.pr_mergeable != 'MERGEABLE'
+        # fallback repo and branch, if event is push or no merge-able pr is found
         with:
           path: 'giskardpy'
-          repository: SemRoCo/giskardpy
-          ref: giskard_library
+          repository: ${{ github.repository_owner }}/giskardpy
+          ref: library_standalone
       - name: install pip dependencies
         run: |
           python3 -m pip install --upgrade pip
@@ -101,7 +151,7 @@ jobs:
         with:
           path: 'ros_ws/src/giskard_msgs'
           repository: SemRoCo/giskard_msgs
-          ref: giskard_library
+          ref: lib_motion_graph_reset
       - name: Checkout iai_maps
         uses: actions/checkout@v3
         with:

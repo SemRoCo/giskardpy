@@ -46,7 +46,7 @@
   <disable_self_collision link1="head1" link2="torso2" reason="Never"/>
   <disable_self_collision link1="head1" link2="torso3" reason="Never"/>
   <disable_self_collision link1="head1" link2="torso4" reason="Default"/>
-  <disable_self_collision link1="head2" link2="head2" reason="Unknown"/>
+  <disable_self_collision link1="head2" link2="head2" reason="Adjacent"/>
   <disable_self_collision link1="head2" link2="left_arm1" reason="Never"/>
   <disable_self_collision link1="head2" link2="right_arm1" reason="Never"/>
   <disable_self_collision link1="head2" link2="torso1" reason="Never"/>

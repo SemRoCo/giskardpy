@@ -1,4 +1,5 @@
 from copy import deepcopy
+from typing import Optional
 
 import numpy as np
 import pytest
@@ -9,11 +10,15 @@ from giskardpy.qp.qp_controller_config import QPControllerConfig
 from giskardpy.utils.math import quaternion_from_rotation_matrix
 from giskardpy_ros.configs.behavior_tree_config import StandAloneBTConfig
 from giskardpy_ros.configs.giskard import Giskard
+from giskardpy_ros.configs.iai_robots.hsr import HSRCollisionAvoidanceConfig, WorldWithHSRConfig, HSRStandaloneInterface
+from giskardpy.qp.qp_controller_config import QPControllerConfig
+from giskardpy.god_map import god_map
 from giskardpy_ros.configs.other_robots.justin import WorldWithJustinConfig, JustinStandaloneInterface, \
     JustinCollisionAvoidanceConfig
 from giskardpy_ros.ros1.visualization_mode import VisualizationMode
 from utils_for_tests import GiskardTestWrapper
 from utils_for_tests import launch_launchfile
+from utils_for_tests import compare_poses, GiskardTestWrapper
 
 
 class JustinTestWrapper(GiskardTestWrapper):
@@ -506,3 +511,9 @@ class TestEuRobin:
         dlr_kitchen_setup.allow_self_collision()
         dlr_kitchen_setup.motion_goals.add_justin_torso_limit(name='torso4_joint', end_condition='')
         dlr_kitchen_setup.execute(add_local_minimum_reached=False)
+
+        dlr_kitchen_setup.set_env_state({handle_joint: 0})
+
+        dlr_kitchen_setup.set_joint_goal(dlr_kitchen_setup.better_pose)
+        dlr_kitchen_setup.allow_all_collisions()
+        dlr_kitchen_setup.execute()

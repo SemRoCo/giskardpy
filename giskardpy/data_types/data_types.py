@@ -85,7 +85,7 @@ class ColorRGBA:
     _a: float
 
     def __init__(self, r: float, g: float, b: float, a: float):
-        self.r, self.g, self.b, self.a = r, g, b, a
+        self.r, self.g, self.b, self.a = float(r), float(g), float(b), float(a)
 
     @property
     def r(self):

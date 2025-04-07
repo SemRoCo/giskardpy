@@ -42,7 +42,7 @@ reason_color_map = {
     DisableCollisionReason.AlmostAlways: (233, 163, 231),  # purple
     DisableCollisionReason.Default: (233, 231, 163),  # yellow
     DisableCollisionReason.Unknown: (153, 76, 0),  # brown
-    None: (255, 255, 255),
+    None: (0, 255, 0),
 }
 
 

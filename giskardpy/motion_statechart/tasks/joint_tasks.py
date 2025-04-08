@@ -46,7 +46,7 @@ class JointPositionList(Task):
             velocity_limit = cas.limit(max_velocity, ll_vel, ul_vel)
 
             joint: OneDofJoint = god_map.world.joints[joint_name]
-            self.current_positions.append(joint.free_variable.get_symbol(Derivatives.position))
+            self.current_positions.append(joint.get_symbol(Derivatives.position))
             self.goal_positions.append(goal_position)
             self.velocity_limits.append(velocity_limit)
 
@@ -172,8 +172,8 @@ class MirrorJointPosition(Task):
 
             joint: OneDofJoint = god_map.world.joints[joint_name]
             target_joint: OneDofJoint = god_map.world.joints[target_joint_name]
-            self.current_positions.append(joint.free_variable.get_symbol(Derivatives.position))
-            self.goal_positions.append(target_joint.free_variable.get_symbol(Derivatives.position))
+            self.current_positions.append(joint.get_symbol(Derivatives.position))
+            self.goal_positions.append(target_joint.get_symbol(Derivatives.position))
             self.velocity_limits.append(velocity_limit)
             goal_state[joint_name.short_name] = self.goal_positions[-1]
 

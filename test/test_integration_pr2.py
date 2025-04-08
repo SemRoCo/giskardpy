@@ -167,7 +167,7 @@ class PR2TestWrapper(GiskardTestWrapper):
                                                                       publish_tf=True),
                               # qp_controller_config=QPControllerConfig(qp_solver=SupportedQPSolver.gurobi))
                               qp_controller_config=QPControllerConfig(mpc_dt=0.05,
-                                                                      retries_with_relaxed_constraints=1000,
+                                                                      retries_with_relaxed_constraints=10,
                                                                       # qp_solver=SupportedQPSolver.gurobi,
                                                                       ))
         super().__init__(giskard)

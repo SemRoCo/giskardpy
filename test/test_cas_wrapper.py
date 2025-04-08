@@ -1,6 +1,5 @@
 import math
 import unittest
-from copy import deepcopy
 from datetime import timedelta
 
 import PyKDL
@@ -17,7 +16,7 @@ from giskardpy import casadi_wrapper as cas
 from giskardpy.qp import pos_in_vel_limits as cas2
 import giskardpy.utils.math as giskard_math
 from giskardpy.utils.math import compare_orientations, axis_angle_from_quaternion, rotation_matrix_from_quaternion
-from utils_for_tests import float_no_nan_no_inf, unit_vector, quaternion, vector, \
+from giskardpy_ros.utils.utils_for_tests import float_no_nan_no_inf, unit_vector, quaternion, vector, \
     pykdl_frame_to_numpy, lists_of_same_length, random_angle, compare_axis_angle, angle_positive, sq_matrix, \
     float_no_nan_no_inf_min_max
 

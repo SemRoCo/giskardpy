@@ -15,7 +15,6 @@ import giskard_msgs.msg as giskard_msgs
 from giskard_msgs.msg import WorldBody, CollisionEntry, WorldGoal, LinkName
 from giskardpy.data_types.data_types import PrefixName
 from giskardpy.data_types.exceptions import GiskardException, MaxTrajectoryLengthException, UnknownGoalException, \
-    LocalMinimumException, \
     DuplicateNameException, CorruptMeshException, UnknownGroupException, UnknownLinkException, \
     InvalidWorldOperationException, CorruptShapeException, TransformException, CorruptURDFException, \
     SelfCollisionViolatedException, HardConstraintsViolatedException, SetupException, EmptyProblemException, \
@@ -39,8 +38,8 @@ from giskardpy_ros.configs.giskard import Giskard
 from giskardpy_ros.configs.iai_robots.pr2 import PR2CollisionAvoidance, PR2StandaloneInterface, WorldWithPR2Config
 from giskardpy_ros.python_interface.old_python_interface import OldGiskardWrapper
 from giskardpy_ros.tree.blackboard_utils import GiskardBlackboard
-from utils_for_tests import compare_poses, publish_marker_vector, GiskardTestWrapper, compare_points
-from utils_for_tests import launch_launchfile
+from giskardpy_ros.utils.utils_for_tests import compare_poses, publish_marker_vector, GiskardTestWrapper, compare_points
+from giskardpy_ros.utils.utils_for_tests import launch_launchfile
 
 # scopes = ['module', 'class', 'function']
 pocky_pose = {'r_elbow_flex_joint': -1.29610152504,

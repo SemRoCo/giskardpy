@@ -10,9 +10,9 @@ from giskardpy.model.joints import OneDofJoint
 from giskardpy.utils.math import quaternion_from_axis_angle
 from giskardpy_ros.ros1.interface import ROS1Wrapper
 from giskardpy_ros.tree.blackboard_utils import GiskardBlackboard
-from utils_for_tests import launch_launchfile
+from giskardpy_ros.utils.utils_for_tests import launch_launchfile
 
-from utils_for_tests import GiskardTestWrapper
+from giskardpy_ros.utils.utils_for_tests import GiskardTestWrapper
 
 
 @pytest.fixture(scope='module')

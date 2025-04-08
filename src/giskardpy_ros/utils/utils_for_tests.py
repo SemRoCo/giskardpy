@@ -187,25 +187,25 @@ def pr2_urdf():
 
 
 def pr2_without_base_urdf():
-    with open('urdfs/pr2.urdf', 'r') as f:
+    with open('../../../test/urdfs/pr2.urdf', 'r') as f:
         urdf_string = f.read()
     return urdf_string
 
 
 def base_bot_urdf():
-    with open('urdfs/2d_base_bot.urdf', 'r') as f:
+    with open('../../../test/urdfs/2d_base_bot.urdf', 'r') as f:
         urdf_string = f.read()
     return urdf_string
 
 
 def donbot_urdf():
-    with open('urdfs/iai_donbot.urdf', 'r') as f:
+    with open('../../../test/urdfs/iai_donbot.urdf', 'r') as f:
         urdf_string = f.read()
     return urdf_string
 
 
 def boxy_urdf():
-    with open('urdfs/boxy.urdf', 'r') as f:
+    with open('../../../test/urdfs/boxy.urdf', 'r') as f:
         urdf_string = f.read()
     return urdf_string
 

@@ -10,14 +10,14 @@ from giskard_msgs.msg import LinkName
 from giskardpy.data_types.exceptions import EmptyProblemException
 from giskardpy.motion_statechart.goals.test import GraspSequence, Cutting
 from giskardpy.motion_statechart.monitors.monitors import TrueMonitor
-from giskardpy.motion_statechart.tasks.pointing import PointingCone, Pointing
+from giskardpy.motion_statechart.tasks.pointing import Pointing
 from giskardpy_ros.configs.behavior_tree_config import StandAloneBTConfig
 from giskardpy_ros.configs.giskard import Giskard
 from giskardpy_ros.configs.iai_robots.hsr import HSRCollisionAvoidanceConfig, WorldWithHSRConfig, HSRStandaloneInterface
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from giskardpy.god_map import god_map
-from utils_for_tests import launch_launchfile
-from utils_for_tests import compare_poses, GiskardTestWrapper
+from giskardpy_ros.utils.utils_for_tests import launch_launchfile
+from giskardpy_ros.utils.utils_for_tests import compare_poses, GiskardTestWrapper
 
 
 class HSRTestWrapper(GiskardTestWrapper):

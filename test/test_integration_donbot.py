@@ -12,9 +12,8 @@ from giskardpy_ros.configs.behavior_tree_config import StandAloneBTConfig
 from giskardpy_ros.configs.iai_robots.donbot import WorldWithBoxyBaseConfig, DonbotCollisionAvoidanceConfig, DonbotStandaloneInterfaceConfig
 from giskardpy_ros.configs.giskard import Giskard
 from giskardpy.qp.qp_controller_config import QPControllerConfig
-from giskardpy.god_map import god_map
-from utils_for_tests import launch_launchfile
-from utils_for_tests import GiskardTestWrapper
+from giskardpy_ros.utils.utils_for_tests import launch_launchfile
+from giskardpy_ros.utils.utils_for_tests import GiskardTestWrapper
 
 # TODO roslaunch iai_donbot_sim ros_control_sim.launch
 

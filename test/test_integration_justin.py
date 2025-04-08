@@ -1,24 +1,19 @@
 from copy import deepcopy
-from typing import Optional
 
 import numpy as np
 import pytest
 from geometry_msgs.msg import PoseStamped, Quaternion, PointStamped, Vector3Stamped
 
-from giskardpy.god_map import god_map
-from giskardpy.qp.qp_controller_config import QPControllerConfig
 from giskardpy.utils.math import quaternion_from_rotation_matrix
 from giskardpy_ros.configs.behavior_tree_config import StandAloneBTConfig
 from giskardpy_ros.configs.giskard import Giskard
-from giskardpy_ros.configs.iai_robots.hsr import HSRCollisionAvoidanceConfig, WorldWithHSRConfig, HSRStandaloneInterface
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from giskardpy.god_map import god_map
 from giskardpy_ros.configs.other_robots.justin import WorldWithJustinConfig, JustinStandaloneInterface, \
     JustinCollisionAvoidanceConfig
 from giskardpy_ros.ros1.visualization_mode import VisualizationMode
-from utils_for_tests import GiskardTestWrapper
-from utils_for_tests import launch_launchfile
-from utils_for_tests import compare_poses, GiskardTestWrapper
+from giskardpy_ros.utils.utils_for_tests import launch_launchfile
+from giskardpy_ros.utils.utils_for_tests import GiskardTestWrapper
 
 
 class JustinTestWrapper(GiskardTestWrapper):

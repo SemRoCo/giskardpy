@@ -75,6 +75,12 @@ class QPSolver(ABC):
                  E: cas.Expression, E_slack: cas.Expression, bE: cas.Expression):
         pass
 
+    def update_settings(self, retries_with_relaxed_constraints: float, retry_added_slack: float,
+                        retry_weight_factor: float):
+        self.retries_with_relaxed_constraints = retries_with_relaxed_constraints
+        self.retry_added_slack = retry_added_slack
+        self.retry_weight_factor = retry_weight_factor
+
     def set_density(self, weights: cas.Expression, E: cas.Expression, E_slack: cas.Expression, A: cas.Expression,
                     A_slack: cas.Expression):
         if len(weights) > 0:

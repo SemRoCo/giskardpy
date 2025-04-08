@@ -1563,7 +1563,7 @@ class QPController:
                  control_dt: Optional[float] = None,
                  max_derivative: Derivatives = Derivatives.jerk,
                  solver_id: Optional[SupportedQPSolver] = None,
-                 retries_with_relaxed_constraints: int = 0,
+                 retries_with_relaxed_constraints: int = 5,
                  retry_added_slack: float = 100,
                  retry_weight_factor: float = 100,
                  qp_formulation: QPFormulation = QPFormulation.explicit_no_acc,
@@ -1731,6 +1731,9 @@ class QPController:
         self.qp_solver = self.qp_solver_class(weights=weights, g=g, lb=lb, ub=ub,
                                               E=E, E_slack=E_slack, bE=bE,
                                               A=A, A_slack=A_slack, lbA=lbA, ubA=ubA)
+        self.qp_solver.update_settings(retries_with_relaxed_constraints=self.retries_with_relaxed_constraints,
+                                       retry_added_slack=self.retry_added_slack,
+                                       retry_weight_factor=self.retry_weight_factor)
 
         self.num_free_variables = weights.shape[0]
         self.num_eq_constraints = bE.shape[0]

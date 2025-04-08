@@ -923,7 +923,8 @@ class GiskardTestWrapper(OldGiskardWrapper):
         tip = self.get_odometry_joint().child_link_name
         self.motion_goals.add_cartesian_pose(goal_pose=goal_pose, tip_link=tip.short_name, root_link='map',
                                              name='base goal')
-        self.execute()
+        self.add_end_on_local_minimum()
+        self.execute(add_local_minimum_reached=False)
 
     def reset(self):
         pass

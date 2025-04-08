@@ -166,7 +166,10 @@ class PR2TestWrapper(GiskardTestWrapper):
                               behavior_tree_config=StandAloneBTConfig(debug_mode=True,
                                                                       publish_tf=True),
                               # qp_controller_config=QPControllerConfig(qp_solver=SupportedQPSolver.gurobi))
-                              qp_controller_config=QPControllerConfig(mpc_dt=0.05))
+                              qp_controller_config=QPControllerConfig(mpc_dt=0.05,
+                                                                      retries_with_relaxed_constraints=1000,
+                                                                      # qp_solver=SupportedQPSolver.gurobi,
+                                                                      ))
         super().__init__(giskard)
         self.robot = god_map.world.groups[self.robot_name]
 
@@ -4144,7 +4147,8 @@ class TestCollisionAvoidanceGoals:
         kitchen_setup.allow_collision(kitchen_setup.robot_name, tray_name)
         kitchen_setup.set_avoid_joint_limits_goal(percentage=percentage)
         # grasp tray
-        kitchen_setup.execute()
+        kitchen_setup.add_end_on_local_minimum()
+        kitchen_setup.execute(add_local_minimum_reached=False)
 
         kitchen_setup.update_parent_link_of_group(tray_name, kitchen_setup.r_tip)
 
@@ -4190,7 +4194,8 @@ class TestCollisionAvoidanceGoals:
         kitchen_setup.allow_collision(group1=tray_name,
                                       group2=kitchen_setup.l_gripper_group)
         kitchen_setup.set_cart_goal(tray_goal, tray_name, 'base_footprint', add_monitor=False)
-        kitchen_setup.execute()
+        kitchen_setup.add_end_on_local_minimum()
+        kitchen_setup.execute(add_local_minimum_reached=False)
 
     # TODO FIXME attaching and detach of urdf objects that listen to joint states
 

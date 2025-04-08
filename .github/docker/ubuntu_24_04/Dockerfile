@@ -39,11 +39,13 @@ RUN cd ~ && \
     cmake --build build --config Release && \
     cmake --build build --target install && \
     cd python && \
-    python3 setup.py install
+    workon giskardpy && \
+    pip install .
 
 # Install betterpybullet
 RUN mkdir -p ~/bpb && \
     cd ~/bpb && \
     git clone -b jazzy https://github.com/SemRoCo/bullet3.git && \
     cd bullet3 && \
+    workon giskardpy && \
     ./build_better_pybullet.sh

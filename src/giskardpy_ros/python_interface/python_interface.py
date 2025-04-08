@@ -2429,7 +2429,7 @@ class GiskardWrapper:
         def search_for_monitor_values_in_start_condition(start_condition: str):
             res = []
             for monitor, state in zip(execution_state.monitors, execution_state.monitor_state):
-                if f'\'{monitor.name}\'' in start_condition and state != 1:
+                if f'\'{monitor.name}\'' in start_condition or f'"{monitor.name}"' in start_condition and state != 1:
                     res.append(monitor)
             return res
 

@@ -64,10 +64,6 @@ jobs:
               echo "Dockerfile changes detected in PR"
               DOCKERFILE_CHANGED=true
             fi
-            if git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} | grep -q "Dockerfile"; then
-              echo "Dockerfile changes detected in PR"
-              DOCKERFILE_CHANGED=true
-            fi
 
           elif [[ "${{ github.event_name }}" == "push" ]]; then
             # For pushes, check if any Dockerfiles changed in the push

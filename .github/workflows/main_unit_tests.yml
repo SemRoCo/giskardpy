@@ -55,6 +55,15 @@ jobs:
           elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
             # For PRs, check if any Dockerfiles changed in the PR
             echo "Checking for Dockerfile changes in PR"
+          
+            # Fetch the PR head for PRs from forks
+            git fetch origin pull/${{ github.event.pull_request.number }}/head:pr-${{ github.event.pull_request.number }}
+            
+            # Compare base to PR head
+            if git diff --name-only origin/${{ github.event.pull_request.base.ref }} pr-${{ github.event.pull_request.number }} | grep -q "Dockerfile"; then
+              echo "Dockerfile changes detected in PR"
+              DOCKERFILE_CHANGED=true
+            fi
             if git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} | grep -q "Dockerfile"; then
               echo "Dockerfile changes detected in PR"
               DOCKERFILE_CHANGED=true

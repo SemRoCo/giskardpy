@@ -697,12 +697,12 @@ class CollisionWorldSynchronizer:
 
         # %% disabled links
         for link_name in sorted(disabled_links):
-            child = etree.SubElement(root, 'disable_all_collisions')
+            child = etree.SubElement(root, self.srdf_disable_all_collisions)
             child.set('link', link_name.short_name)
 
         # %% self collision matrix
         for (link_a, link_b), reason in sorted(self_collision_matrix.items()):
-            child = etree.SubElement(root, 'disable_self_collision')
+            child = etree.SubElement(root, self.srdf_disable_self_collision)
             child.set('link1', link_a.short_name)
             child.set('link2', link_b.short_name)
             child.set('reason', reason.name)

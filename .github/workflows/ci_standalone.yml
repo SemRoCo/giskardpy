@@ -37,7 +37,104 @@ on:
         type: string
         hidden: true
 jobs:
+  docker:
+      name: Docker Check and Build
+      runs-on: ubuntu-latest
+
+      permissions:
+        contents: read
+        packages: write
+
+      steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for Dockerfile changes
+        id: check_changes
+        run: |
+          DOCKERFILE_CHANGED=false
+
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            # For manual triggers, always build Docker images
+            echo "Manual workflow trigger, will build Docker images"
+            DOCKERFILE_CHANGED=false
+
+          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            # For PRs, check if any Dockerfiles changed in the PR
+            echo "Checking for Dockerfile changes in PR"
+            if git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} | grep -q "Dockerfile"; then
+              echo "Dockerfile changes detected in PR"
+              DOCKERFILE_CHANGED=true
+            fi
+
+          elif [[ "${{ github.event_name }}" == "push" ]]; then
+            # For pushes, check if any Dockerfiles changed in the push
+            echo "Checking for Dockerfile changes in push"
+            if git diff --name-only ${{ github.event.before }} ${{ github.event.after }} | grep -q "Dockerfile"; then
+              echo "Dockerfile changes detected in push"
+              DOCKERFILE_CHANGED=true
+            fi
+          fi
+
+          echo "changed=${DOCKERFILE_CHANGED}" >> $GITHUB_OUTPUT
+          echo "Dockerfile changed: ${DOCKERFILE_CHANGED}"
+
+      - name: Set up Docker Buildx
+        if: steps.check_changes.outputs.changed == 'true'
+        uses: docker/setup-buildx-action@v3
+
+      # ghcr.io link needs to be lowercase, as such the following echo to $GITHUB_ENV
+      - name: create Image Name
+        if: steps.check_changes.outputs.changed == 'true'
+        run: |
+          echo "IMAGE_NAME=ghcr.io/${OWNER,,}/$(echo ${{ github.repository }} | cut -d'/' -f2)" >> $GITHUB_ENV
+        env:
+          OWNER: '${{ github.repository_owner }}'
+
+      # Setup Download-URL for requirements.txt for python dependencies
+      - name: Set Download URL
+        if: steps.check_changes.outputs.changed == 'true'
+        run: | 
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            # For PR events, use the specific SHA of the HEAD commit in the PR
+            echo "DOWNLOAD_URL=https://raw.githubusercontent.com/${{ github.repository }}/${{ github.event.pull_request.head.sha }}/requirements.txt" >> $GITHUB_ENV
+          else
+            # For push events, use the branch/tag name
+            echo "DOWNLOAD_URL=https://raw.githubusercontent.com/${{ github.repository }}/${{ github.ref_name }}/requirements.txt" >> $GITHUB_ENV
+          fi
+
+      - name: Login to GitHub Container Registry
+        if: steps.check_changes.outputs.changed == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Builds docker images and uploads them to the GitHub Container Registry
+      - name: Find Dockerfiles and Build Images
+        if: steps.check_changes.outputs.changed == 'true'
+        run: |
+          for dockerfilepath in $(find . -name 'Dockerfile' | rev | cut -d'/' -f2- | rev); do
+            ROS_DISTRO=$(grep -oP '(?<=FROM osrf/ros:)[a-z]+' "$dockerfilepath"/Dockerfile)
+
+            if [ -z "$ROS_DISTRO" ]; then
+              echo "No Ubuntu version found in $dockerfile, skipping..."
+              continue
+            fi
+            
+            docker buildx build \
+              --platform linux/amd64 \
+              --build-arg DOWNLOAD_URL=${DOWNLOAD_URL} \
+              -t ${IMAGE_NAME}:${ROS_DISTRO} \
+              --push \
+              $dockerfilepath
+            
+          done
   hsr:
+    needs: docker
     uses: ./.github/workflows/reusable_robot_ci.yml
     with:
       robot: hsr
@@ -47,6 +144,7 @@ jobs:
       is_trigger: ${{ inputs.is_trigger || false }} # Default values don't seem to work correctly, using this instead
       pr_id: ${{ inputs.pr_id || null }}
   donbot:
+    needs: docker
     uses: ./.github/workflows/reusable_robot_ci.yml
     with:
       robot: donbot
@@ -56,6 +154,7 @@ jobs:
       is_trigger: ${{ inputs.is_trigger || false }}
       pr_id: ${{ inputs.pr_id || null }}
   pr2_part1:
+    needs: docker
     uses: ./.github/workflows/reusable_robot_ci.yml
     with:
       robot: pr2
@@ -68,6 +167,7 @@ jobs:
       is_trigger: ${{ inputs.is_trigger || false }}
       pr_id: ${{ inputs.pr_id || null }}
   pr2_part2:
+    needs: docker
     uses: ./.github/workflows/reusable_robot_ci.yml
     with:
       robot: pr2
@@ -80,6 +180,7 @@ jobs:
       is_trigger: ${{ inputs.is_trigger || false }}
       pr_id: ${{ inputs.pr_id || null }}
   tiago:
+    needs: docker
     uses: ./.github/workflows/reusable_robot_ci.yml
     with:
       robot: tiago

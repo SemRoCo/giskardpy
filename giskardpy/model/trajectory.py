@@ -5,16 +5,15 @@ from collections import OrderedDict, defaultdict
 from copy import deepcopy
 from itertools import product
 from threading import Lock
-from typing import Dict, Tuple, Optional, List
+from typing import Dict, Tuple, Optional
+
 import numpy as np
-import matplotlib.colors as mcolors
-import pylab as plt
 from sortedcontainers import SortedDict
 from line_profiler import profile
 
 from giskardpy.data_types.data_types import JointStates
-from giskardpy.god_map import god_map
 from giskardpy.data_types.data_types import PrefixName, Derivatives
+from giskardpy.god_map import god_map
 from giskardpy.middleware import get_middleware
 from giskardpy.utils.utils import cm_to_inch
 
@@ -125,6 +124,8 @@ class Trajectory:
         :param normalize_position: centers the joint positions around 0 on the y axis
         :param tick_stride: the distance between ticks in the plot. if tick_stride <= 0 pyplot determines the ticks automatically
         """
+        import matplotlib.colors as mcolors
+        import pylab as plt
         cm_per_second = cm_to_inch(cm_per_second)
         height_per_derivative = cm_to_inch(height_per_derivative)
         hspace = cm_to_inch(hspace)

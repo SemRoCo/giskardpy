@@ -1,13 +1,17 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import scipy.sparse as sp
+
 import numpy as np
-from giskardpy.qp.qp_solver_gurobi import QPSolverGurobi
 from qpsolvers import solve_qp
 
-from giskardpy.data_types.exceptions import QPSolverException, InfeasibleException, HardConstraintsViolatedException
-from giskardpy.qp.qp_solver import QPSolver
+from giskardpy.data_types.exceptions import InfeasibleException
+from giskardpy.qp.qp_solver_gurobi import QPSolverGurobi
 from giskardpy.qp.qp_solver_ids import SupportedQPSolver
 from line_profiler import profile
-import scipy.sparse as sp
-
 
 class QPSolverQPSolvers(QPSolverGurobi):
     """
@@ -24,11 +28,12 @@ class QPSolverQPSolvers(QPSolverGurobi):
     def solver_call(self, H: np.ndarray, g: np.ndarray, E: sp.csc_matrix, b: np.ndarray, A: sp.csc_matrix,
                     lb: np.ndarray,
                     ub: np.ndarray, h: np.ndarray) -> np.ndarray:
+        import scipy.sparse as sp
         H = sp.diags(H, offsets=0, format='csc')
         # H = np.diag(H+self.regularization_value)
         # E = E.toarray()
         # try:
-            # A = A.toarray()
+        # A = A.toarray()
         # except:
         #     A = None
         #     h = None

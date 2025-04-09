@@ -1,19 +1,16 @@
 from copy import deepcopy
-from typing import Dict, Optional, List, Tuple, Union
+from typing import Dict, Optional, List, Union
 
 import numpy as np
-import pandas as pd
-from giskardpy.data_types.data_types import Derivatives
-from line_profiler import profile
 
 import giskardpy.casadi_wrapper as cas
+from giskardpy.data_types.data_types import Derivatives
 from giskardpy.data_types.data_types import JointStates, ColorRGBA
-from giskardpy.god_map import god_map
-from giskardpy.model.trajectory import Trajectory
 from giskardpy.data_types.data_types import PrefixName
-from giskardpy.symbol_manager import symbol_manager
 from giskardpy.middleware import get_middleware
-
+from giskardpy.model.trajectory import Trajectory
+from giskardpy.symbol_manager import symbol_manager
+from line_profiler import profile
 
 class DebugExpressionManager:
     debug_expressions: Dict[PrefixName, cas.Expression]
@@ -120,6 +117,7 @@ class DebugExpressionManager:
             next_js[name][i] = next_js[name][i] + next_js[name][i + 1] * dt
 
     def to_pandas(self):
+        import pandas as pd
         p_debug = {}
         for name, value in self.evaluated_debug_expressions.items():
             if isinstance(value, np.ndarray):

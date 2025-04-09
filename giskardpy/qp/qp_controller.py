@@ -6,29 +6,28 @@ from collections import defaultdict
 from copy import deepcopy
 from enum import IntEnum
 from typing import List, Dict, Tuple, Type, Union, Optional, DefaultDict
-import matplotlib.pyplot as plt
+
 import numpy as np
-import pandas as pd
 
 import giskardpy.casadi_wrapper as cas
+import giskardpy.utils.math as giskard_math
+from giskardpy.data_types.data_types import Derivatives
 from giskardpy.data_types.exceptions import HardConstraintsViolatedException, QPSolverException, InfeasibleException, \
     VelocityLimitUnreachableException
 from giskardpy.god_map import god_map
-from giskardpy.data_types.data_types import Derivatives
+from giskardpy.middleware import get_middleware
+from giskardpy.qp.constraint import DerivativeEqualityConstraint
 from giskardpy.qp.constraint import InequalityConstraint, EqualityConstraint, DerivativeInequalityConstraint
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.next_command import NextCommands
-from giskardpy.qp.pos_in_vel_limits import b_profile, implicit_vel_profile
+from giskardpy.qp.pos_in_vel_limits import b_profile
 from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.qp.qp_solver_ids import SupportedQPSolver
-from giskardpy.symbol_manager import symbol_manager
-from giskardpy.middleware import get_middleware
-from giskardpy.utils.utils import create_path, get_all_classes_in_package
-from giskardpy.utils.decorators import memoize
-import giskardpy.utils.math as giskard_math
 from giskardpy.qp.weight_gain import QuadraticWeightGain, LinearWeightGain
+from giskardpy.symbol_manager import symbol_manager
+from giskardpy.utils.decorators import memoize
+from giskardpy.utils.utils import create_path, get_all_classes_in_package, get_all_classes_in_module
 from line_profiler import profile
-from giskardpy.qp.constraint import DerivativeEqualityConstraint
 
 # used for saving pandas in the same folder every time within a run
 date_str = datetime.datetime.now().strftime('%Yy-%mm-%dd--%Hh-%Mm-%Ss')
@@ -73,6 +72,7 @@ class QPFormulation(IntEnum):
 
 
 def save_pandas(dfs, names, path, time: float, folder_name: Optional[str] = None):
+    import pandas as pd
     if folder_name is None:
         folder_name = ''
     folder_name = f'{path}/pandas/{folder_name}_{date_str}/{time}/'
@@ -1528,11 +1528,13 @@ def detect_solvers():
     global available_solvers
     solver_name: str
     qp_solver_class: Type[QPSolver]
-    for solver_name, qp_solver_class in get_all_classes_in_package('giskardpy.qp', QPSolver, silent=True).items():
+    for qp_solver_name in SupportedQPSolver:
+        module_name = f'giskardpy.qp.qp_solver_{qp_solver_name.name}'
         try:
-            available_solvers[qp_solver_class.solver_id] = qp_solver_class
+            qp_solver_class = list(get_all_classes_in_module(module_name, QPSolver).items())[0][1]
+            available_solvers[qp_solver_name] = qp_solver_class
         except Exception:
-            pass
+            continue
     solver_names = [solver_name.name for solver_name in available_solvers.keys()]
     print(f'Found these qp solvers: {solver_names}')
 
@@ -1814,6 +1816,7 @@ class QPController:
         get_middleware().loginfo('No slack limit violation detected.')
 
     def _viz_mpc(self, joint_name):
+        import matplotlib.pyplot as plt
         def pad(a, desired_length, pad_value):
             tmp = np.ones(desired_length) * pad_value
             tmp[:len(a)] = a
@@ -1882,6 +1885,7 @@ class QPController:
 
     @profile
     def _create_debug_pandas(self, qp_solver: QPSolver):
+        import pandas as pd
         weights, g, lb, ub, E, bE, A, lbA, ubA, weight_filter, bE_filter, bA_filter = qp_solver.get_problem_data()
         self.free_variable_names = self.free_variable_bounds.names[weight_filter]
         self.equality_constr_names = self.equality_bounds.names[bE_filter]
@@ -1953,6 +1957,16 @@ class QPController:
         self.p_debug = god_map.debug_expression_manager.to_pandas()
 
     def _print_iis(self):
+        import pandas as pd
+
+        def print_iis_matrix(row_filter: np.ndarray, column_filter: np.ndarray, matrix: pd.DataFrame,
+                              bounds: pd.DataFrame):
+            if len(row_filter) == 0:
+                return
+            filtered_matrix = matrix.loc[row_filter, column_filter]
+            filtered_matrix['bounds'] = bounds.loc[row_filter]
+            print(filtered_matrix)
+
         result = self.qp_solver.analyze_infeasibility()
         if result is None:
             get_middleware().loginfo(f'Can only compute possible causes with gurobi, '
@@ -1968,16 +1982,10 @@ class QPController:
             free_variables = free_variables.rename(columns={'data': 'lb'})
             print(free_variables)
             get_middleware().loginfo('  Equality constraints:')
-            self._print_iis_matrix(eq_ids, b_ids, self.p_E, self.p_bE)
+            print_iis_matrix(eq_ids, b_ids, self.p_E, self.p_bE)
             get_middleware().loginfo('  Inequality constraint lower bounds:')
-            self._print_iis_matrix(lbA_ids, b_ids, self.p_A, self.p_lbA)
+            print_iis_matrix(lbA_ids, b_ids, self.p_A, self.p_lbA)
             get_middleware().loginfo('  Inequality constraint upper bounds:')
-            self._print_iis_matrix(ubA_ids, b_ids, self.p_A, self.p_ubA)
+            print_iis_matrix(ubA_ids, b_ids, self.p_A, self.p_ubA)
 
-    def _print_iis_matrix(self, row_filter: np.ndarray, column_filter: np.ndarray, matrix: pd.DataFrame,
-                          bounds: pd.DataFrame):
-        if len(row_filter) == 0:
-            return
-        filtered_matrix = matrix.loc[row_filter, column_filter]
-        filtered_matrix['bounds'] = bounds.loc[row_filter]
-        print(filtered_matrix)
+

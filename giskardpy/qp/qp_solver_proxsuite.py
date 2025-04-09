@@ -1,14 +1,14 @@
 from typing import Tuple
 
 import numpy as np
-import scipy.sparse as sp
-from giskardpy.data_types.exceptions import QPSolverException, HardConstraintsViolatedException, InfeasibleException
 from proxsuite.proxsuite_pywrap_avx2 import proxqp
-from line_profiler import profile
+
+import giskardpy.casadi_wrapper as cas
+from giskardpy.data_types.exceptions import QPSolverException, HardConstraintsViolatedException, InfeasibleException
 from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.qp.qp_solver_ids import SupportedQPSolver
 from giskardpy.utils.decorators import record_time
-import giskardpy.casadi_wrapper as cas
+
 
 class QPSolverProxsuite(QPSolver):
     solver_id = SupportedQPSolver.proxsuite
@@ -21,7 +21,7 @@ class QPSolverProxsuite(QPSolver):
     sparse = True
     compute_nI_I = True
 
-    @profile
+    
     def __init__(self, weights: cas.Expression, g: cas.Expression, lb: cas.Expression, ub: cas.Expression,
                  E: cas.Expression, E_slack: cas.Expression, bE: cas.Expression,
                  A: cas.Expression, A_slack: cas.Expression, lbA: cas.Expression, ubA: cas.Expression):
@@ -74,14 +74,14 @@ class QPSolverProxsuite(QPSolver):
         ubA = np.concatenate((ub, bE, ubA))
         return self.solver_call(H, g, A2, lbA, ubA)
 
-    @profile
+    
     def evaluate_functions(self, substitutions: np.ndarray):
         self.lb, self.lbA, self.weights, self.g, self.bE, self.ub, self.ubA, self.lb_lbA, self.ub_ubA = self.combined_vector_f.fast_call(
             substitutions)
         self.E = self.E_f.fast_call(substitutions)
         self.A = self.A_f.fast_call(substitutions)
 
-    @profile
+    
     def update_filters(self):
         self.weight_filter = self.weights != 0
         self.weight_filter[:-self.num_slack_variables] = True  # filter only slack variables with weight 0
@@ -105,7 +105,7 @@ class QPSolverProxsuite(QPSolver):
         if len(self.bA_part) > 0:
             self.bA_filter[-len(self.bA_part):] = self.bA_part
 
-    @profile
+    
     def apply_filters(self):
         self.weights = self.weights[self.weight_filter]
         self.g = self.g[self.weight_filter]
@@ -125,8 +125,9 @@ class QPSolverProxsuite(QPSolver):
             # then only the rows need to be filtered for inf lb/ub
             self.Ai = self._direct_limit_model(self.weights.shape[0], self.Ai_inf_filter)
 
-    @profile
+    
     def problem_data_to_qp_format(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        import scipy.sparse as sp
         # H = np.diag(self.weights)
         H = sp.diags(self.weights+self.regularization_value, offsets=0, format='csc')
         E = self.E
@@ -142,7 +143,7 @@ class QPSolverProxsuite(QPSolver):
         return H, self.g, E, self.bE, A, self.lbA, self.ubA, self.lb, self.ub
 
     @record_time
-    @profile
+    
     def solver_call(self, H: np.ndarray, g: np.ndarray, E: np.ndarray, b: np.ndarray, A: np.ndarray,
                     lbA: np.ndarray, ubA: np.ndarray, lb: np.ndarray, ub: np.ndarray) -> np.ndarray:
         lx = np.concatenate((lb, lbA))
@@ -169,7 +170,7 @@ class QPSolverProxsuite(QPSolver):
         ub_with_inf = ub_with_inf[self.weight_filter]
         return lb_with_inf, ub_with_inf
 
-    @profile
+    
     def get_problem_data(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray,
                                         np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """
@@ -189,7 +190,7 @@ class QPSolverProxsuite(QPSolver):
 
         return weights, g, self.lb, self.ub, E, bE, A, self.lbA, self.ubA, self.weight_filter, self.bE_filter, self.bA_filter
 
-    @profile
+    
     def relaxed_problem_data_to_qp_format(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         self.retries_with_relaxed_constraints -= 1
         if self.retries_with_relaxed_constraints <= 0:
@@ -207,7 +208,7 @@ class QPSolverProxsuite(QPSolver):
         # self.retries_with_relaxed_constraints += 1
         # raise InfeasibleException('')
 
-    @profile
+    
     def compute_violated_constraints(self, filtered_lb: np.ndarray, filtered_ub: np.ndarray):
         lb_relaxed = filtered_lb.copy()
         ub_relaxed = filtered_ub.copy()

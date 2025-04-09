@@ -24,6 +24,7 @@ def _operation_type_error(arg1: object, operation: str, arg2: object) -> TypeErr
 class StackedCompiledFunction:
     compiled_f: CompiledFunction
     split_out_view: List[np.ndarray]
+    str_params: List[str]
 
     def __init__(self, expressions: List[Expression], parameters: Optional[List[str]] = None,
                  additional_views: Optional[List[slice]] = None): ...

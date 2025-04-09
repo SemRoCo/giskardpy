@@ -1,12 +1,16 @@
+from __future__ import annotations
+
 import sys
-from copy import deepcopy
-from line_profiler import profile
+from typing import TYPE_CHECKING
+
 import mosek
 import numpy as np
+
 from giskardpy.qp.qp_solver_gurobi import QPSolverGurobi
 from giskardpy.qp.qp_solver_ids import SupportedQPSolver
-from scipy import sparse as sp
 
+if TYPE_CHECKING:
+    import scipy.sparse as sp
 
 unknown = [mosek.solsta.unknown]
 
@@ -31,7 +35,7 @@ class QPSolverMosek(QPSolverGurobi):
     """
     solver_id = SupportedQPSolver.mosek
 
-    @profile
+    
     def solver_call(self, H: sp.csc_matrix, g: np.ndarray, E: sp.csc_matrix, b: np.ndarray,
                     A: sp.csc_matrix, lb: np.ndarray, ub: np.ndarray, h: np.ndarray) -> np.ndarray:
         """
@@ -41,6 +45,7 @@ class QPSolverMosek(QPSolverGurobi):
                         A x <= h
                         lb <= x <= ub
         """
+        import scipy.sparse as sp
         H = sp.diags(H+self.regularization_value, offsets=0, format='coo')
 
         # Helper function to print log output from MOSEK

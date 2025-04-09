@@ -1,47 +1,25 @@
-import gc
-import time
-import traceback
-from collections import defaultdict
-from datetime import datetime
-from itertools import combinations, chain
-from typing import Dict, List, Callable, Tuple, Optional
+from itertools import combinations
 
 import giskardpy.casadi_wrapper as cas
 import numpy as np
-import pandas as pd
 import pytest
 import urdf_parser_py.urdf as up
 from giskardpy.data_types.data_types import PrefixName, Derivatives, ColorRGBA
-from giskardpy.data_types.exceptions import EmptyProblemException
 from giskardpy.god_map import god_map
 from giskardpy.model.better_pybullet_syncer import BetterPyBulletSyncer
 from giskardpy.model.collision_avoidance_config import DefaultCollisionAvoidanceConfig
 from giskardpy.model.collision_world_syncer import CollisionWorldSynchronizer
 from giskardpy.model.joints import OmniDrive, PrismaticJoint
 from giskardpy.model.links import Link, BoxGeometry
-from giskardpy.model.trajectory import Trajectory
 from giskardpy.model.utils import hacky_urdf_parser_fix
 from giskardpy.model.world import WorldTree
 from giskardpy.model.world_config import EmptyWorld, WorldWithOmniDriveRobot
-from giskardpy.motion_statechart.monitors.cartesian_monitors import PoseReached
-from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
-from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint
-from giskardpy.qp.qp_controller import QPController
-from giskardpy.qp.qp_controller import QPFormulation
 from giskardpy.qp.qp_controller_config import QPControllerConfig
-from giskardpy.qp.qp_solver_ids import SupportedQPSolver
-from giskardpy.symbol_manager import symbol_manager
 from giskardpy.user_interface import GiskardWrapper
 from giskardpy.utils.utils import suppress_stderr
 from giskardpy.model.collision_avoidance_config import CollisionAvoidanceConfig
 from giskardpy.model.collision_world_syncer import CollisionCheckerLib
-from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose, CartesianPosition, \
-    CartesianPositionVelocityTarget
-from giskardpy.motion_statechart.tasks.joint_tasks import JointVelocity
-from giskardpy.motion_statechart.tasks.task import WEIGHT_BELOW_CA, WEIGHT_COLLISION_AVOIDANCE
-from giskardpy.qp.constraint import DerivativeEqualityConstraint
-from giskardpy.utils.math import limit
-from utils_for_tests import pr2_urdf
+from giskardpy.utils.utils_for_tests import pr2_urdf
 
 
 class PR2CollisionAvoidance(CollisionAvoidanceConfig):
@@ -238,9 +216,6 @@ def giskard_pr2() -> GiskardWrapper:
                              collision_avoidance_config=PR2CollisionAvoidance(),
                              qp_controller_config=QPControllerConfig())
     return giskard
-
-
-import yaml
 
 
 class TestWorld:

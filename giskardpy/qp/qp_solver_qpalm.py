@@ -1,16 +1,12 @@
-from collections import defaultdict
 from enum import IntEnum
-from typing import Tuple, Dict
+from typing import Tuple
 
 import numpy as np
 import qpalm
-from scipy import sparse as sp
-from line_profiler import profile
-
-from giskardpy.data_types.exceptions import QPSolverException, InfeasibleException, HardConstraintsViolatedException
-from giskardpy.qp.qp_solver import QPSolver
 
 import giskardpy.casadi_wrapper as cas
+from giskardpy.data_types.exceptions import QPSolverException, InfeasibleException, HardConstraintsViolatedException
+from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.qp.qp_solver_ids import SupportedQPSolver
 
 
@@ -42,7 +38,7 @@ class QPSolverQPalm(QPSolver):
 
     # settings.max_iter = 100
 
-    @profile
+    
     def __init__(self, weights: cas.Expression, g: cas.Expression, lb: cas.Expression, ub: cas.Expression,
                  E: cas.Expression, E_slack: cas.Expression, bE: cas.Expression,
                  A: cas.Expression, A_slack: cas.Expression, lbA: cas.Expression, ubA: cas.Expression):
@@ -93,14 +89,14 @@ class QPSolverQPalm(QPSolver):
         if self.compute_nI_I:
             self._nAi_Ai_cache = {}
 
-    @profile
+    
     def evaluate_functions(self, substitutions: np.ndarray):
 
         self.weights, self.lb, self.bE, self.lbA, self.ub, _, self.ubA, self.g, self.lb_bE_lbA, self.ub_bE_ubA = self.combined_vector_f.fast_call(
             substitutions)
         self.A = self.A_f.fast_call(substitutions)
 
-    @profile
+    
     def update_filters(self):
         self.weight_filter = self.weights != 0
         self.weight_filter[:-self.num_slack_variables] = True
@@ -125,7 +121,7 @@ class QPSolverQPalm(QPSolver):
         if len(self.bA_part) > 0:
             self.bA_filter_view[-len(self.bA_part):] = self.bA_part
 
-    @profile
+    
     def apply_filters(self):
         self.weights = self.weights[self.weight_filter]
         self.g = self.g[self.weight_filter]
@@ -137,7 +133,7 @@ class QPSolverQPalm(QPSolver):
             # then only the rows need to be filtered for inf lb/ub
             self.Ai = self._direct_limit_model(self.weights.shape[0], self.Ai_inf_filter)
 
-    @profile
+    
     def solver_call(self, H: np.ndarray, g: np.ndarray, A: np.ndarray, lbA: np.ndarray, ubA: np.ndarray) \
             -> np.ndarray:
         data = qpalm.Data(A.shape[1], A.shape[0])
@@ -164,7 +160,7 @@ class QPSolverQPalm(QPSolver):
         ubA = np.concatenate((ub, bE, ubA))
         return self.solver_call(H, g, A2, lbA, ubA)
 
-    @profile
+    
     def relaxed_problem_data_to_qp_format(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         self.retries_with_relaxed_constraints -= 1
         if self.retries_with_relaxed_constraints <= 0:
@@ -182,7 +178,7 @@ class QPSolverQPalm(QPSolver):
         # self.retries_with_relaxed_constraints += 1
         # raise InfeasibleException('')
 
-    @profile
+    
     def compute_violated_constraints(self, filtered_lb: np.ndarray, filtered_ub: np.ndarray):
         lb_relaxed = filtered_lb.copy()
         ub_relaxed = filtered_ub.copy()
@@ -215,8 +211,9 @@ class QPSolverQPalm(QPSolver):
         ubA_relaxed[:ub_relaxed.shape[0]] = ub_relaxed
         return lower_violations, lbA_relaxed, upper_violations, ubA_relaxed, (H, g, A, all_lbA_relaxed, all_ubA_relaxed)
 
-    @profile
+    
     def problem_data_to_qp_format(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        from scipy import sparse as sp
         H = sp.diags(self.weights)
         A = sp.vstack((self.Ai, self.A))
         return H, self.g, A, self.lb_bE_lbA, self.ub_bE_ubA
@@ -230,7 +227,7 @@ class QPSolverQPalm(QPSolver):
         ub_with_inf = ub_with_inf[self.weight_filter]
         return lb_with_inf, ub_with_inf
 
-    @profile
+    
     def get_problem_data(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray,
     np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """

@@ -6,14 +6,12 @@ import hypothesis.strategies as st
 import numpy as np
 from hypothesis import given, assume, settings
 
-from giskardpy import casadi_wrapper as cas
-from giskardpy.data_types.data_types import ObservationState
-from giskardpy.qp import pos_in_vel_limits as cas2
 import giskardpy.utils.math as giskard_math
-from test.utils_for_tests import float_no_nan_no_inf, unit_vector, quaternion, vector, \
+from giskardpy import casadi_wrapper as cas
+from giskardpy.qp import pos_in_vel_limits as cas2
+from giskardpy.utils.utils_for_tests import float_no_nan_no_inf, unit_vector, quaternion, vector, \
     lists_of_same_length, random_angle, compare_axis_angle, angle_positive, sq_matrix, \
     float_no_nan_no_inf_min_max, compare_orientations
-
 
 
 def logic_not(a):

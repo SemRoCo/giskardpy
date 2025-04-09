@@ -17,7 +17,13 @@ jobs:
             -H "Accept: application/vnd.github+json" \
             -H "Authorization: token ${{ secrets.giskardpy_ros_test_trigger }}" \
             https://api.github.com/repos/${{ github.repository_owner }}/giskardpy_ros/actions/workflows/ci_standalone.yml/dispatches \
-            -d '{"ref":"${{ matrix.branch }}"}')
+            -d '{
+              "ref":"${{ matrix.branch }}",
+              "inputs": {
+                "is_trigger": true,
+                "pr_id": "${{ github.event.pull_request.number }}"
+              }
+            }')
 
           # Extract the response body and HTTP status code from the response
           HTTP_STATUS=$(echo "$RESPONSE" | tail -n1)

@@ -33,15 +33,19 @@ RUN workon giskardpy && \
 
 # Install qpSWIFT
 RUN cd ~ && \
-    git clone https://github.com/qpSWIFT/qpSWIFT && \
+    git clone https://github.com/SemRoCo/qpSWIFT && \
     cd qpSWIFT && \
     cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && \
     cmake --build build --config Release && \
-    cmake --build build --target install
+    cmake --build build --target install && \
+    cd python && \
+    workon giskardpy && \
+    pip install .
 
 # Install betterpybullet
 RUN mkdir -p ~/bpb && \
     cd ~/bpb && \
     git clone -b jazzy https://github.com/SemRoCo/bullet3.git && \
     cd bullet3 && \
+    workon giskardpy && \
     ./build_better_pybullet.sh

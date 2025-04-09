@@ -35,13 +35,8 @@ class MotionStatechartManager:
     monitor_state: MotionGraphNodeStateManager[Monitor]
     goal_state: MotionGraphNodeStateManager[Goal]
 
-    compiled_task_observation_state: CompiledFunction
-    compiled_monitor_observation_state: CompiledFunction
-    compiled_goal_observation_state: CompiledFunction
-
-    compiled_task_life_cycle_state: CompiledFunction
-    compiled_monitor_life_cycle_state: CompiledFunction
-    compiled_goal_life_cycle_state: CompiledFunction
+    observation_state_updater: cas.StackedCompiledFunction
+    life_cycle_updater: cas.StackedCompiledFunction
 
     task_state_history: List[Tuple[float, Tuple[np.ndarray, np.ndarray]]]  # time -> (state, life_cycle_state)
     monitor_state_history: List[Tuple[float, Tuple[np.ndarray, np.ndarray]]]  # time -> (state, life_cycle_state)
@@ -150,13 +145,10 @@ class MotionStatechartManager:
                                 pause_condition=pause_condition,
                                 end_condition=end_condition)
 
-
-
     # def _parse_layer(self, monitors: List[Monitor], tasks: List[Task], goals: List[Goal]):
     #     for goal in goals:
     #         if self.get_parent_node_name_of_node(goal) == '':
     #             self.apply_conditions_to_sub_nodes(goal)
-
 
     def apply_conditions_to_sub_nodes(self, goal: Goal):
         for node in goal.tasks + goal.monitors + goal.goals:
@@ -217,13 +209,25 @@ class MotionStatechartManager:
 
     @profile
     def compile_node_state_updaters(self) -> None:
-        # self.create_logic3_conditions()
-        self.compiled_task_observation_state, self.compiled_task_life_cycle_state = self.compile_node_state_updater(
-            self.task_state)
-        self.compiled_monitor_observation_state, self.compiled_monitor_life_cycle_state = self.compile_node_state_updater(
-            self.monitor_state)
-        self.compiled_goal_observation_state, self.compiled_goal_life_cycle_state = self.compile_node_state_updater(
-            self.goal_state)
+        task_life_cycle_expr, task_obs_expr = self.compile_node_state_updater(self.task_state)
+        monitor_life_cycle_expr, monitor_obs_expr = self.compile_node_state_updater(self.monitor_state)
+        goal_life_cycle_expr, goal_obs_expr = self.compile_node_state_updater(self.goal_state)
+
+        self.life_cycle_updater = cas.StackedCompiledFunction(
+            expressions=[task_life_cycle_expr,
+                         monitor_life_cycle_expr,
+                         goal_life_cycle_expr],
+            parameters=self.task_state.get_life_cycle_state_symbols()
+                       + self.monitor_state.get_life_cycle_state_symbols()
+                       + self.goal_state.get_life_cycle_state_symbols()
+                       + god_map.motion_statechart_manager.get_observation_state_symbols())
+
+        self.observation_state_updater = cas.StackedCompiledFunction(
+            expressions=[task_obs_expr,
+                         monitor_obs_expr,
+                         goal_obs_expr],
+            parameters=task_obs_expr.free_symbols() + monitor_obs_expr.free_symbols() + goal_obs_expr.free_symbols())
+
         self.initialize_states()
 
     def get_observation_state_symbols(self) -> List[cas.Symbol]:
@@ -295,7 +299,7 @@ class MotionStatechartManager:
 
     @profile
     def compile_node_state_updater(self, node_state: MotionGraphNodeStateManager) \
-            -> Tuple[cas.CompiledFunction, cas.CompiledFunction]:
+            -> Tuple[cas.Expression, cas.Expression]:
         observation_state_updater = []
         node: MotionStatechartNode
         for node in node_state.nodes:
@@ -311,9 +315,8 @@ class MotionStatechartManager:
                                       else_result=state_symbol)
             observation_state_updater.append(state_f)
         observation_state_updater = cas.Expression(observation_state_updater)
-        compiled_node_observation_state = observation_state_updater.compile(observation_state_updater.free_symbols())
-        compiled_node_life_cycle_state = compile_graph_node_state_updater(node_state)
-        return compiled_node_observation_state, compiled_node_life_cycle_state
+        life_cycle_expression = compile_graph_node_state_updater(node_state)
+        return life_cycle_expression, observation_state_updater
 
     @property
     def payload_monitors(self) -> List[PayloadMonitor]:
@@ -345,29 +348,24 @@ class MotionStatechartManager:
     @profile
     def evaluate_node_states(self) -> bool:
         # %% update observation state
-        task_args = symbol_manager.resolve_symbols(self.compiled_task_observation_state.str_params)
-        monitor_args = symbol_manager.resolve_symbols(self.compiled_monitor_observation_state.str_params)
-        goal_args = symbol_manager.resolve_symbols(self.compiled_goal_observation_state.str_params)
+        obs_args = symbol_manager.resolve_symbols(self.observation_state_updater.str_params)
 
         next_state, done, exception = self.evaluate_payload_monitors()
 
-        self.task_state.observation_state = self.compiled_task_observation_state.fast_call(task_args)
-        self.monitor_state.observation_state = self.compiled_monitor_observation_state.fast_call(monitor_args)
-        self.goal_state.observation_state = self.compiled_goal_observation_state.fast_call(goal_args)
+        obs_result = self.observation_state_updater.fast_call(obs_args)
+        self.task_state.observation_state = obs_result[0]
+        self.monitor_state.observation_state = obs_result[1]
+        self.goal_state.observation_state = obs_result[2]
+
         if len(self.payload_monitors) > 0:
             self.monitor_state.observation_state[self.payload_monitor_filter] = next_state
 
-        obs_state = np.concatenate((self.task_state.observation_state,
-                                    self.monitor_state.observation_state,
-                                    self.goal_state.observation_state))
-
         # %% update life cycle state
-        args = np.concatenate((self.task_state.life_cycle_state, obs_state))
-        self.task_state.life_cycle_state = self.compiled_task_life_cycle_state.fast_call(args)
-        args = np.concatenate((self.monitor_state.life_cycle_state, obs_state))
-        self.monitor_state.life_cycle_state = self.compiled_monitor_life_cycle_state.fast_call(args)
-        args = np.concatenate((self.goal_state.life_cycle_state, obs_state))
-        self.goal_state.life_cycle_state = self.compiled_goal_life_cycle_state.fast_call(args)
+        args = symbol_manager.resolve_symbols(self.life_cycle_updater.str_params)
+        life_cycle_result = self.life_cycle_updater.fast_call(args)
+        self.task_state.life_cycle_state = life_cycle_result[0]
+        self.monitor_state.life_cycle_state = life_cycle_result[1]
+        self.goal_state.life_cycle_state = life_cycle_result[2]
 
         self.trigger_update_triggers()
 

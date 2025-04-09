@@ -1,17 +1,16 @@
 from collections import defaultdict
-from typing import Dict, Optional, List, Union
-import giskardpy.casadi_wrapper as cas
+from typing import Dict, Optional, Union
+
 import numpy as np
-from giskardpy.god_map import god_map
+
+import giskardpy.casadi_wrapper as cas
 from giskardpy.data_types.data_types import Derivatives, PrefixName
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils.decorators import memoize
-
 from line_profiler import profile
-from scipy.optimize import fsolve
-
 
 def my_cycloid(x_in: float, weight: float, h: int, alpha: float) -> float:
+    from scipy.optimize import fsolve
     start_y = weight * alpha
     end_y = weight
     x = (x_in / h) * (np.pi / 2)
@@ -28,6 +27,7 @@ def my_cycloid(x_in: float, weight: float, h: int, alpha: float) -> float:
     return y
 
 def my_cycloid2(x_in: float, weight: float, h: int, alpha: float, q: float) -> float:
+    from scipy.optimize import fsolve
     x_in *= q
     start_y = weight * alpha
     end_y = weight

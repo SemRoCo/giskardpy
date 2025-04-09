@@ -2,11 +2,10 @@ from typing import Tuple
 
 import numpy as np
 import osqp
+
 from giskardpy.data_types.exceptions import InfeasibleException
 from giskardpy.qp.qp_solver_ids import SupportedQPSolver
-from line_profiler import profile
-from qp.qp_solver_qpalm import QPSolverQPalm
-from scipy import sparse as sp
+from giskardpy.qp.qp_solver_qpalm import QPSolverQPalm
 
 
 class QPSolverOSQP(QPSolverQPalm):
@@ -26,13 +25,14 @@ class QPSolverOSQP(QPSolverQPalm):
         # 'polish_refine_iter': 10, # default 3
     }
 
-    @profile
+
     def problem_data_to_qp_format(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        import scipy.sparse as sp
         H = sp.diags(self.weights + self.regularization_value)
         A = sp.vstack((self.Ai, self.A))
         return H, self.g, A, self.lb_bE_lbA, self.ub_bE_ubA
 
-    @profile
+
     def solver_call(self, H: np.ndarray, g: np.ndarray, A: np.ndarray, lbA: np.ndarray, ubA: np.ndarray) \
             -> np.ndarray:
         m = osqp.OSQP()

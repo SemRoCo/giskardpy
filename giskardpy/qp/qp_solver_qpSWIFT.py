@@ -1,17 +1,20 @@
-from collections import defaultdict
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import scipy.sparse as sp
 from enum import IntEnum
-from typing import Tuple, Dict
+from typing import Tuple
 
 import numpy as np
 
 from giskardpy.data_types.exceptions import QPSolverException, InfeasibleException
 from giskardpy.qp.qp_solver import QPSWIFTFormatter
 import qpSWIFT
-import scipy.sparse as sp
-from line_profiler import profile
 
 from giskardpy.qp.qp_solver_ids import SupportedQPSolver
-from scipy import sparse
+
 
 class QPSWIFTExitFlags(IntEnum):
     Optimal = 0  # Solution Found
@@ -37,7 +40,6 @@ class QPSolverQPSwift(QPSWIFTFormatter):
         # 'VERBOSE': 1  # 0 = no print; 1 = print
     }
 
-    @profile
     def update_filters(self):
         self.weight_filter = self.weights != 0
         self.weight_filter[:-self.num_slack_variables] = True
@@ -74,7 +76,6 @@ class QPSolverQPSwift(QPSWIFTFormatter):
             self.nAi_Ai_filter = np.concatenate((self.lb_finite_filter[self.weight_filter],
                                                  self.ub_finite_filter[self.weight_filter]))
 
-    @profile
     def apply_filters(self):
         self.weights = self.weights[self.weight_filter]
         self.g = self.g[self.weight_filter]
@@ -94,7 +95,6 @@ class QPSolverQPSwift(QPSWIFTFormatter):
             # then only the rows need to be filtered for inf lb/ub
             self.nAi_Ai = self._direct_limit_model(self.weights.shape[0], self.nAi_Ai_filter, True)
 
-    @profile
     def solver_call(self, H: np.ndarray, g: np.ndarray, E: sp.csc_matrix, b: np.ndarray, A: sp.csc_matrix,
                     h: np.ndarray) -> np.ndarray:
         result = qpSWIFT.run_sparse(c=g, h=h, P=H, G=A, A=E, b=b, opts=self.opts)
@@ -194,13 +194,12 @@ class QPSolverQPSwift(QPSWIFTFormatter):
         ub_relaxed[upper_violations] += self.retry_added_slack
         return self.lb_filter, nlb_relaxed, self.ub_filter, ub_relaxed
 
-    @profile
     def problem_data_to_qp_format(self) \
             -> Tuple[sp.csc_matrix, np.ndarray, sp.csc_matrix, np.ndarray, sp.csc_matrix, np.ndarray]:
-        H = sp.diags(self.weights, offsets=0, format='csc')
+        import scipy.sparse as sp
         if np.product(self.nA_A.shape) > 0:
             A = sp.vstack((self.nAi_Ai, self.nA_A))
         else:
             A = self.nAi_Ai
         nlb_ub_nlbA_ubA = np.concatenate((self.nlb, self.ub, self.nlbA_ubA))
-        return H, self.g, self.E, self.bE, A, nlb_ub_nlbA_ubA
+        return self.weights, self.g, self.E, self.bE, A, nlb_ub_nlbA_ubA

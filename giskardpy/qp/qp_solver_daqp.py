@@ -1,13 +1,16 @@
+from __future__ import annotations
 from ctypes import c_int
-from typing import Tuple
+from typing import Tuple, TYPE_CHECKING
 
 import daqp
 import numpy as np
+
 from giskardpy.data_types.exceptions import InfeasibleException
 from giskardpy.qp.qp_solver_ids import SupportedQPSolver
-from line_profiler import profile
 from giskardpy.qp.qp_solver_qpalm import QPSolverQPalm
-from scipy import sparse as sp
+
+if TYPE_CHECKING:
+    import scipy.sparse as sp
 
 
 class QPSolverDAQP(QPSolverQPalm):
@@ -22,7 +25,7 @@ class QPSolverDAQP(QPSolverQPalm):
     sparse = True
     compute_nI_I = False
 
-    @profile
+    
     def update_filters(self):
         self.weight_filter = self.weights != 0
         self.weight_filter[:-self.num_slack_variables] = True
@@ -45,13 +48,13 @@ class QPSolverDAQP(QPSolverQPalm):
         if len(self.bA_part) > 0:
             self.bA_filter_view[-len(self.bA_part):] = self.bA_part
 
-    @profile
+    
     def problem_data_to_qp_format(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         H = np.diag(self.weights + self.regularization_value)
         A = self.A.toarray()
         return H, self.g, A, self.lb_bE_lbA, self.ub_bE_ubA
 
-    @profile
+    
     def solver_call(self, H: np.ndarray, g: np.ndarray, A: sp.csc_matrix, lbA: np.ndarray, ubA: np.ndarray) -> np.ndarray:
         sense = np.zeros(lbA.shape, dtype=c_int)
         sense[len(self.b_zero_inf_filter_view):len(self.b_zero_inf_filter_view)+len(self.bE_filter_view)] = 5

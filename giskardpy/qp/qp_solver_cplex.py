@@ -33,7 +33,7 @@ limit_infeasible = [cplex.SolutionInterface.status.mem_limit_infeasible, cplex.S
 
 class QPSolverCplex(QPSolver):
 
-    @profile
+    
     def init(self, H, g, A, lb, ub, lbA, ubA):
         # TODO potential speed up by reusing model
         self.qpProblem = cplex.Cplex()
@@ -80,7 +80,7 @@ class QPSolverCplex(QPSolver):
     def round(self, data, decimal_places):
         return np.round(data, decimal_places)
 
-    @profile
+    
     def solve(self, H, g, A, lb, ub, lbA, ubA, tries=1, decimal_places=4):
         """
         x^T*H*x + x^T*g

@@ -1,17 +1,19 @@
+from __future__ import annotations
 from collections import defaultdict
-from typing import Tuple, Dict
+from typing import Tuple, Dict, TYPE_CHECKING
 
 import gurobipy
 import numpy as np
 from gurobipy import GRB
 from gurobipy.gurobipy import GurobiError
-from scipy import sparse as sp
 from line_profiler import profile
-
 from giskardpy.data_types.exceptions import QPSolverException, InfeasibleException
-from giskardpy.qp.qp_solver import QPSWIFTFormatter
 from giskardpy.middleware import get_middleware
+from giskardpy.qp.qp_solver import QPSWIFTFormatter
 from giskardpy.qp.qp_solver_ids import SupportedQPSolver
+
+if TYPE_CHECKING:
+    import scipy.sparse as sp
 
 gurobipy.setParam(gurobipy.GRB.Param.LogToConsole, False)
 gurobipy.setParam(gurobipy.GRB.Param.FeasibilityTol, 2.5e-5)
@@ -66,6 +68,7 @@ class QPSolverGurobi(QPSWIFTFormatter):
     @profile
     def init(self, H: np.ndarray, g: np.ndarray, E: np.ndarray, b: np.ndarray, A: np.ndarray, lb: np.ndarray,
              ub: np.ndarray, h: np.ndarray):
+        import scipy.sparse as sp
         self.qpProblem = gurobipy.Model('qp')
         self.x = self.qpProblem.addMVar(H.shape[0], lb=lb, ub=ub)
         H = sp.diags(H, 0)

@@ -1,10 +1,15 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import scipy.sparse as sp
+
 import numpy as np
 import piqp
-from giskardpy.data_types.exceptions import QPSolverException, InfeasibleException
+from giskardpy.data_types.exceptions import InfeasibleException
 from giskardpy.qp.qp_solver_ids import SupportedQPSolver
-from line_profiler import profile
 from giskardpy.qp.qp_solver_gurobi import QPSolverGurobi
-from scipy import sparse as sp
 
 
 class QPSolverPIQP(QPSolverGurobi):
@@ -20,11 +25,10 @@ class QPSolverPIQP(QPSolverGurobi):
     def analyze_infeasibility(self):
         pass
 
-    @profile
     def solver_call(self, H: np.ndarray, g: np.ndarray, E: sp.csc_matrix, b: np.ndarray, A: sp.csc_matrix,
                     lb: np.ndarray, ub: np.ndarray, h: np.ndarray) -> np.ndarray:
-
-        H = sp.diags(H+self.regularization_value*10, offsets=0, format='csc')
+        import scipy.sparse as sp
+        H = sp.diags(H + self.regularization_value * 10, offsets=0, format='csc')
         solver = piqp.SparseSolver()
         # solver.settings.eps_abs = 1e-3
         # solver.settings.eps_rel = 1e-4

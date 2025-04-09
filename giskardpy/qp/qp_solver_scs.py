@@ -1,11 +1,14 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import scipy.sparse as sp
 import numpy as np
 import scs
-from data_types.exceptions import InfeasibleException
-from qp.qp_solver_clarabel import QPSolverClarabel
-from qp.qp_solver_ids import SupportedQPSolver
-from scipy import sparse as sp
-
-from line_profiler import profile
+from giskardpy.data_types.exceptions import InfeasibleException
+from giskardpy.qp.qp_solver_clarabel import QPSolverClarabel
+from giskardpy.qp.qp_solver_ids import SupportedQPSolver
 
 
 class QPSolverSCS(QPSolverClarabel):
@@ -16,9 +19,9 @@ class QPSolverSCS(QPSolverClarabel):
           Gx <= h
     """
 
-    @profile
     def solver_call(self, H: sp.csc, g: np.ndarray, E: sp.csc_matrix, b: np.ndarray, A: sp.csc_matrix,
                     h: np.ndarray) -> np.ndarray:
+        import scipy.sparse as sp
         data = {
             'P': H,
             'A': sp.vstack([E, A]),

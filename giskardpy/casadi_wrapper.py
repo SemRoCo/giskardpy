@@ -1,18 +1,13 @@
 from __future__ import annotations
 
 import builtins
+import math
 from copy import copy
 from enum import IntEnum
-import re
-from typing import Union, TypeVar, Optional
-import math
-from line_profiler import profile
-import casadi
+from typing import Union, TypeVar
+
 import casadi as ca
 import numpy as np
-from scipy import sparse as sp
-
-from giskardpy.utils.decorators import memoize
 
 builtin_max = builtins.max
 builtin_min = builtins.min
@@ -26,6 +21,7 @@ class StackedCompiledFunction:
     def __init__(self, expressions, parameters=None, additional_views=None):
         combined_expression = vstack(expressions)
         self.compiled_f = combined_expression.compile(parameters=parameters)
+        self.str_params = self.compiled_f.str_params
         slices = []
         start = 0
         for expression in expressions[:-1]:
@@ -37,7 +33,7 @@ class StackedCompiledFunction:
             for expression_slice in additional_views:
                 self.split_out_view.append(self.compiled_f.out[expression_slice])
 
-    @profile
+    
     def fast_call(self, filtered_args):
         self.compiled_f.fast_call(filtered_args)
         return self.split_out_view
@@ -45,6 +41,8 @@ class StackedCompiledFunction:
 
 class CompiledFunction:
     def __init__(self, expression, parameters=None, sparse=False):
+        from scipy import sparse as sp
+
         self.sparse = sparse
         if len(expression) == 0:
             self.sparse = False
@@ -91,7 +89,7 @@ class CompiledFunction:
         filtered_args = np.array(filtered_args, dtype=float)
         return self.fast_call(filtered_args)
 
-    @profile
+    
     def fast_call(self, filtered_args):
         """
         :param filtered_args: parameter values in the same order as in self.str_params
@@ -317,14 +315,14 @@ class Symbol(Symbol_):
 
 
 class Expression(Symbol_):
-    @profile
+    
     def __init__(self, data=None):
         if data is None:
             data = []
         if isinstance(data, ca.SX):
             self.s = data
         elif isinstance(data, Symbol_):
-            self.s = copy(data.s)
+            self.s = data.s
         elif isinstance(data, (int, float, np.ndarray)):
             self.s = ca.SX(data)
         else:
@@ -524,7 +522,7 @@ class GeometricType:
 
 
 class TransMatrix(Symbol_, GeometricType):
-    @profile
+    
     def __init__(self, data=None, reference_frame=None, child_frame=None, sanity_check=True):
         self.reference_frame = reference_frame
         self.child_frame = child_frame
@@ -540,7 +538,7 @@ class TransMatrix(Symbol_, GeometricType):
             if isinstance(data, TransMatrix):
                 self.child_frame = self.child_frame or data.child_frame
         else:
-            self.s = copy(Expression(data).s)
+            self.s = Expression(data).s
         if sanity_check:
             if self.shape[0] != 4 or self.shape[1] != 4:
                 raise ValueError(f'{self.__class__.__name__} can only be initialized with 4x4 shaped data.')
@@ -585,7 +583,7 @@ class TransMatrix(Symbol_, GeometricType):
             a_T_b[2, 3] = point.z
         return a_T_b
 
-    @profile
+    
     def dot(self, other):
         if isinstance(other, (Vector3, Point3, RotationMatrix, TransMatrix)):
             result = ca.mtimes(self.s, other.s)
@@ -604,7 +602,7 @@ class TransMatrix(Symbol_, GeometricType):
                 return result
         raise _operation_type_error(self, 'dot', other)
 
-    @profile
+    
     def inverse(self):
         inv = TransMatrix(child_frame=self.reference_frame, reference_frame=self.child_frame)
         inv[:3, :3] = self[:3, :3].T
@@ -612,7 +610,7 @@ class TransMatrix(Symbol_, GeometricType):
         return inv
 
     @classmethod
-    @profile
+    
     def from_xyz_rpy(cls, x=None, y=None, z=None, roll=None, pitch=None, yaw=None, reference_frame=None,
                      child_frame=None):
         p = Point3.from_xyz(x, y, z)
@@ -638,7 +636,7 @@ class TransMatrix(Symbol_, GeometricType):
 
 
 class RotationMatrix(Symbol_, GeometricType):
-    @profile
+    
     def __init__(self, data=None, reference_frame=None, child_frame=None, sanity_check=True):
         self.reference_frame = reference_frame
         self.child_frame = child_frame
@@ -669,7 +667,7 @@ class RotationMatrix(Symbol_, GeometricType):
             self[3, 3] = 1
 
     @classmethod
-    @profile
+    
     def from_axis_angle(cls, axis, angle, reference_frame=None):
         """
         Conversion of unit axis and angle to 4x4 rotation matrix according to:
@@ -785,7 +783,7 @@ class RotationMatrix(Symbol_, GeometricType):
         return R
 
     @classmethod
-    @profile
+    
     def from_rpy(cls, roll=None, pitch=None, yaw=None, reference_frame=None):
         """
         Conversion of roll, pitch, yaw to 4x4 rotation matrix according to:
@@ -859,7 +857,7 @@ class RotationMatrix(Symbol_, GeometricType):
 
 
 class Point3(Symbol_, GeometricType):
-    @profile
+    
     def __init__(self, data=None, reference_frame=None):
         self.reference_frame = reference_frame
         if data is None:
@@ -1015,7 +1013,7 @@ class Point3(Symbol_, GeometricType):
 
 
 class Vector3(Symbol_, GeometricType):
-    @profile
+    
     def __init__(self, data=None, reference_frame=None):
         point = Point3(data, reference_frame=reference_frame)
         self.s = point.s
@@ -1378,7 +1376,7 @@ def diag(args):
         return Expression(ca.diag(Expression(args).s))
 
 
-@profile
+
 def jacobian(expressions, symbols):
     expressions = Expression(expressions)
     return Expression(ca.jacobian(expressions.s, Expression(symbols).s))
@@ -1706,7 +1704,7 @@ def if_eq(a, b, if_result, else_result):
     return if_else(ca.eq(a, b), if_result, else_result)
 
 
-@profile
+
 def if_eq_cases(a, b_result_cases, else_result):
     """
     if a == b_result_cases[0][0]:
@@ -1727,7 +1725,7 @@ def if_eq_cases(a, b_result_cases, else_result):
     return Expression(result)
 
 
-@profile
+
 def if_cases(cases, else_result):
     """
     if cases[0][0]:
@@ -1747,7 +1745,7 @@ def if_cases(cases, else_result):
     return Expression(result)
 
 
-@profile
+
 def if_less_eq_cases(a, b_result_cases, else_result):
     """
     This only works if b_result_cases is sorted in ascending order.
@@ -1914,7 +1912,7 @@ def normalize_angle(angle):
     return if_greater(a, ca.pi, a - 2.0 * ca.pi, a)
 
 
-@profile
+
 def shortest_angular_distance(from_angle, to_angle):
     """
     Given 2 angles, this returns the shortest angular

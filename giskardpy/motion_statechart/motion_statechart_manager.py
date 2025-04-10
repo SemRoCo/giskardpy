@@ -213,20 +213,25 @@ class MotionStatechartManager:
         monitor_life_cycle_expr, monitor_obs_expr = self.compile_node_state_updater(self.monitor_state)
         goal_life_cycle_expr, goal_obs_expr = self.compile_node_state_updater(self.goal_state)
 
+        params = list(set(self.task_state.get_life_cycle_state_symbols()
+                          + self.monitor_state.get_life_cycle_state_symbols()
+                          + self.goal_state.get_life_cycle_state_symbols()
+                          + god_map.motion_statechart_manager.get_observation_state_symbols()))
         self.life_cycle_updater = cas.StackedCompiledFunction(
             expressions=[task_life_cycle_expr,
                          monitor_life_cycle_expr,
                          goal_life_cycle_expr],
-            parameters=self.task_state.get_life_cycle_state_symbols()
-                       + self.monitor_state.get_life_cycle_state_symbols()
-                       + self.goal_state.get_life_cycle_state_symbols()
-                       + god_map.motion_statechart_manager.get_observation_state_symbols())
+            parameters=params)
+
+        params = list(set(task_obs_expr.free_symbols()
+                          + monitor_obs_expr.free_symbols()
+                          + goal_obs_expr.free_symbols()))
 
         self.observation_state_updater = cas.StackedCompiledFunction(
             expressions=[task_obs_expr,
                          monitor_obs_expr,
                          goal_obs_expr],
-            parameters=task_obs_expr.free_symbols() + monitor_obs_expr.free_symbols() + goal_obs_expr.free_symbols())
+            parameters=params)
 
         self.initialize_states()
 

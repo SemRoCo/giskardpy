@@ -1,3 +1,4 @@
+from copy import copy
 from typing import List
 
 import numpy as np
@@ -84,8 +85,8 @@ def compute_slowdown_asap_vel_profile(current_vel, current_acc, target_vel_profi
                                                       cas.logic_and(skip_first, cas.equal(i, 0)))
         vel_profile.append(next_vel)
         acc_profile.append(next_acc)
-    acc_profile = cas.Expression(acc_profile)
-    acc_profile2 = cas.Expression(acc_profile)
+    acc_profile = copy(cas.Expression(acc_profile))
+    acc_profile2 = copy(cas.Expression(acc_profile))
     acc_profile2[1:] = acc_profile[:-1]
     acc_profile2[0] = current_acc
     jerk_profile = (acc_profile - acc_profile2) / dt
@@ -148,8 +149,8 @@ def b_profile(current_pos, current_vel, current_acc,
         one_step_change_lb = cas.limit(one_step_change_lb, -vel_limit, vel_limit)
         one_step_change_ub = cas.max(cas.min(0, pos_error_ub/dt), -one_step_change_)
         one_step_change_ub = cas.limit(one_step_change_ub, -vel_limit, vel_limit)
-        pos_vel_profile_lb[0] = cas.if_greater(pos_error_lb, 0, one_step_change_lb, pos_vel_profile_lb[0])
-        pos_vel_profile_ub[0] = cas.if_less(pos_error_ub, 0, one_step_change_ub, pos_vel_profile_ub[0])
+        pos_vel_profile_lb[0] = cas.if_greater(pos_error_lb, 0, one_step_change_lb, copy(pos_vel_profile_lb[0]))
+        pos_vel_profile_ub[0] = cas.if_less(pos_error_ub, 0, one_step_change_ub, copy(pos_vel_profile_ub[0]))
 
         # all 0, unless lower or upper position limits are violated
         goal_profile = cas.max(pos_vel_profile_lb, 0) + cas.min(pos_vel_profile_ub, 0)

@@ -353,6 +353,9 @@ class Expression(Symbol_):
         parts = [Expression(self.s.dep(i)) for i in range(self.s.n_dep())]
         return parts
 
+    def __copy__(self):
+        return Expression(copy(self.s))
+
     def __add__(self, other):
         if isinstance(other, (int, float)):
             return Expression(self.s.__add__(other))
@@ -532,7 +535,7 @@ class TransMatrix(Symbol_, GeometricType):
         elif isinstance(data, ca.SX):
             self.s = data
         elif isinstance(data, (Expression, RotationMatrix, TransMatrix)):
-            self.s = copy(data.s)
+            self.s = data.s
             if isinstance(data, RotationMatrix):
                 self.reference_frame = self.reference_frame or data.reference_frame
             if isinstance(data, TransMatrix):

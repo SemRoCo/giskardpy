@@ -79,7 +79,7 @@ class MotionGraphNodeStateManager(Generic[T]):
         self.observation_state = np.ones(len(self.nodes)) * ObservationState.unknown
         life_cycle_state = np.zeros(len(self.nodes))
         for node_id, node in enumerate(self.nodes):
-            if cas.is_true_symbol(node.start_condition):
+            if node.start_condition == 'True':
                 life_cycle_state[node_id] = LifeCycleState.running
             else:
                 life_cycle_state[node_id] = LifeCycleState.not_started

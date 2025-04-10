@@ -32,7 +32,7 @@ class AsyncBehavior(GiskardBehavior, Composite):
 
     def initialise(self) -> None:
         self.looped_once = False
-        self.update_thread = Thread(target=self.loop_over_plugins, name=self.name)
+        self.update_thread = Thread(target=self.loop_over_plugins, name=f'async {self.name}')
         self.update_thread.start()
         super().initialise()
 

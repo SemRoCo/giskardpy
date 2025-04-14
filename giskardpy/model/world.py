@@ -32,6 +32,7 @@ from giskardpy.utils.utils import suppress_stderr, clear_cached_properties
 from giskardpy.utils.decorators import memoize, copy_memoize, clear_memo
 from line_profiler import profile
 
+
 class TravelCompanion:
     def link_call(self, link_name: PrefixName) -> bool:
         """
@@ -596,8 +597,8 @@ class WorldTree(WorldTreeInterface):
     def update_state(self, next_commands: NextCommands, dt: float, max_derivative: Derivatives) -> None:
         for free_variable_name, command in next_commands.free_variable_data.items():
             self.state[free_variable_name][max_derivative] = command[-1]
-            for i in range(max_derivative-1, -1, -1):
-                self.state[free_variable_name][i] += self.state[free_variable_name][i+1] * dt
+            for i in range(max_derivative - 1, -1, -1):
+                self.state[free_variable_name][i] += self.state[free_variable_name][i + 1] * dt
         for joint in self.joints.values():
             if isinstance(joint, VirtualFreeVariables):
                 joint.update_state(dt)
@@ -1208,29 +1209,31 @@ class WorldTree(WorldTreeInterface):
             compiled_collision_fks: CompiledFunction
             compiled_all_fks: CompiledFunction
             str_params: List[str]
+            fks: np.ndarray
+            fks_exprs: Dict[PrefixName, cas.TransMatrix]
 
             def __init__(self, world: WorldTree):
                 self.world = world
-                self.fks = {self.world.root_link_name: cas.TransMatrix()}
+                self.fks_exprs = {self.world.root_link_name: cas.TransMatrix()}
                 self.tf = OrderedDict()
 
             @profile
             def joint_call(self, joint_name: PrefixName) -> bool:
                 joint = self.world.joints[joint_name]
-                map_T_parent = self.fks[joint.parent_link_name]
-                self.fks[joint.child_link_name] = map_T_parent.dot(joint.parent_T_child)
+                map_T_parent = self.fks_exprs[joint.parent_link_name]
+                self.fks_exprs[joint.child_link_name] = map_T_parent.dot(joint.parent_T_child)
                 self.tf[(joint.parent_link_name, joint.child_link_name)] = joint.parent_T_child_as_pos_quaternion()
                 return False
 
             @profile
             def compile_fks(self):
-                all_fks = cas.vstack([self.fks[link_name] for link_name in self.world.link_names_as_set])
+                all_fks = cas.vstack([self.fks_exprs[link_name] for link_name in self.world.link_names_as_set])
                 tf = cas.vstack([pose for pose in self.tf.values()])
                 collision_fks = []
                 for link_name in sorted(self.world.link_names_with_collisions):
                     if link_name == self.world.root_link_name:
                         continue
-                    collision_fks.append(self.fks[link_name])
+                    collision_fks.append(self.fks_exprs[link_name])
                 collision_fks = cas.vstack(collision_fks)
                 params = set()
                 params.update(all_fks.free_symbols())
@@ -1254,17 +1257,26 @@ class WorldTree(WorldTreeInterface):
             @memoize
             @profile
             def compute_fk_np(self, root: PrefixName, tip: PrefixName) -> np.ndarray:
-                if root == self.world.root_link_name:
-                    map_T_root = np.eye(4)
-                else:
-                    map_T_root = self.fks[self.idx_start[root]:self.idx_start[root] + 4]
-                if tip == self.world.root_link_name:
-                    map_T_tip = np.eye(4)
-                else:
-                    map_T_tip = self.fks[self.idx_start[tip]:self.idx_start[tip] + 4]
-                root_T_map = mymath.inverse_frame(map_T_root)
-                root_T_tip = np.dot(root_T_map, map_T_tip)
-                return root_T_tip
+                root_is_world = root == self.world.root_link_name
+                tip_is_world = tip == self.world.root_link_name
+
+                if not tip_is_world:
+                    i = self.idx_start[tip]
+                    map_T_tip = self.fks[i:i + 4]
+                    if root_is_world:
+                        return map_T_tip
+
+                if not root_is_world:
+                    i = self.idx_start[root]
+                    map_T_root = self.fks[i:i + 4]
+                    root_T_map = mymath.inverse_frame(map_T_root)
+                    if tip_is_world:
+                        return root_T_map
+
+                if tip_is_world and root_is_world:
+                    return np.eye(4)
+
+                return root_T_map @ map_T_tip
 
         new_fks = ExpressionCompanion(self)
         self._travel_branch(self.root_link_name, new_fks)

@@ -377,9 +377,13 @@ def inverse_frame(f1_T_f2: np.ndarray) -> np.ndarray:
     :param f1_T_f2: 4x4 Matrix
     :return: f2_T_f1
     """
-    f2_T_f1 = np.eye(4)
-    f2_T_f1[:3, :3] = f1_T_f2[:3, :3].T
-    f2_T_f1[:3, 3] = np.dot(-f2_T_f1[:3, :3], f1_T_f2[:3, 3])
+    R = f1_T_f2[:3, :3]
+    t = f1_T_f2[:3, 3]
+    Rt = R.T
+    f2_T_f1 = np.empty((4, 4), dtype=f1_T_f2.dtype)
+    f2_T_f1[:3, :3] = Rt
+    f2_T_f1[:3, 3] = -Rt @ t
+    f2_T_f1[3] = [0, 0, 0, 1]
     return f2_T_f1
 
 

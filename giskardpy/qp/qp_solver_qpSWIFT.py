@@ -52,23 +52,22 @@ class QPSolverQPSwift(QPSWIFTFormatter):
         if self.num_filtered_eq_constraints > 0:
             self.bE_filter[-len(bE_part):] = bE_part
 
-        # self.num_filtered_neq_constraints = np.count_nonzero(np.invert(self.bA_part))
-        self.nlbA_filter_half = np.ones(self.num_neq_constraints, dtype=bool)
-        self.ubA_filter_half = np.ones(self.num_neq_constraints, dtype=bool)
+        lnbA_ubA_filter = np.ones(self.num_neq_constraints * 2, dtype=bool)
         if len(self.bA_part) > 0:
-            self.nlbA_filter_half[-len(self.bA_part):] = self.bA_part
-            self.ubA_filter_half[-len(self.bA_part):] = self.bA_part
-            self.nlbA_filter_half = self.nlbA_filter_half[self.nlbA_finite_filter]
-            self.ubA_filter_half = self.ubA_filter_half[self.ubA_finite_filter]
-        self.bA_filter = np.concatenate((self.nlbA_filter_half, self.ubA_filter_half))
+            l_bA = len(self.bA_part)
+            lnbA_ubA_filter[self.num_neq_constraints - l_bA:self.num_neq_constraints] = self.bA_part
+            lnbA_ubA_filter[self.num_neq_constraints * 2 - l_bA:self.num_neq_constraints * 2] = self.bA_part
+            self.bA_filter = lnbA_ubA_filter[self.nlbA_ubA_finite_filter]
+        else:
+            self.bA_filter = np.empty(0, dtype=bool)
 
         self.nlb_secondary_finite_filter = np.isfinite(self.nlb)
-        self.lb_finite_filter = self.static_lb_finite_filter.copy()
+        np.copyto(self.static_lb_finite_filter, self.lb_finite_filter)
         self.lb_finite_filter[self.lb_finite_filter] = (self.lb_finite_filter[self.lb_finite_filter]
                                                         & self.nlb_secondary_finite_filter)
 
         self.ub_secondary_finite_filter = np.isfinite(self.ub)
-        self.ub_finite_filter = self.static_ub_finite_filter.copy()
+        np.copyto(self.static_ub_finite_filter, self.ub_finite_filter)
         self.ub_finite_filter[self.ub_finite_filter] = (self.ub_finite_filter[self.ub_finite_filter]
                                                         & self.ub_secondary_finite_filter)
 
@@ -88,7 +87,7 @@ class QPSolverQPSwift(QPSWIFTFormatter):
             self.E = self.E[:, :self.weight_filter.sum()]
         self.bE = self.bE[self.bE_filter]
         if len(self.nA_A.shape) > 1 and self.nA_A.shape[0] * self.nA_A.shape[1] > 0:
-            self.nA_A = self.nA_A = self.nA_A[self.bA_filter][:, self.weight_filter]
+            self.nA_A = self.nA_A[:, self.weight_filter][self.bA_filter, :]
         self.nlbA_ubA = self.nlbA_ubA[self.bA_filter]
         if self.compute_nI_I:
             # for constraints, both rows and columns are filtered, so I can start with weights dims

@@ -126,10 +126,9 @@ class MotionGraphNodeStateManager(Generic[T]):
         prev_life_cycle_state = self.life_cycle_history[-2]
         life_cycle_state = self.life_cycle_history[-1]
         condition = (prev_life_cycle_state == LifeCycleState.not_started) & (life_cycle_state == LifeCycleState.running)
-        for idx in np.argwhere(condition).flatten():
-            node_name = self.nodes[idx].name
-            if node_name in self.substitution_values:
-                self.update_substitution_values(node_name=node_name)
+        indices = [i for i in np.flatnonzero(condition) if self.nodes[i].name in self.substitution_values]
+        for idx in indices:
+            self.update_substitution_values(node_name=self.nodes[idx].name)
 
     def __repr__(self) -> str:
         self_as_dict = self.get_state_as_dict()

@@ -298,6 +298,7 @@ class QPSWIFTFormatter(QPSolver):
         A_without_inf = A[self.ubA_finite_filter]
         A_slack_without_inf = A_slack[self.ubA_finite_filter]
         self.nlbA_ubA_finite_filter = np.concatenate((self.nlbA_finite_filter, self.ubA_finite_filter))
+        self.nlbA_finite_filter_size = self.nlbA_finite_filter.sum()
         self.len_lbA = nlbA_without_inf.shape[0]
         self.len_ubA = ubA_without_inf.shape[0]
 

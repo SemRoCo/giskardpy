@@ -58,6 +58,8 @@ class QPSolverQPSwift(QPSWIFTFormatter):
             lnbA_ubA_filter[self.num_neq_constraints - l_bA:self.num_neq_constraints] = self.bA_part
             lnbA_ubA_filter[self.num_neq_constraints * 2 - l_bA:self.num_neq_constraints * 2] = self.bA_part
             self.bA_filter = lnbA_ubA_filter[self.nlbA_ubA_finite_filter]
+            self.nlbA_filter_half = self.bA_filter[:self.nlbA_finite_filter_size]
+            self.ubA_filter_half = self.bA_filter[self.nlbA_finite_filter_size:]
         else:
             self.bA_filter = np.empty(0, dtype=bool)
 

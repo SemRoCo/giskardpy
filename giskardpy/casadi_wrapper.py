@@ -637,6 +637,9 @@ class TransMatrix(Symbol_, GeometricType):
     def to_rotation(self):
         return RotationMatrix(self)
 
+    def to_quaternion(self):
+        return Quaternion.from_rotation_matrix(self)
+
 
 class RotationMatrix(Symbol_, GeometricType):
     

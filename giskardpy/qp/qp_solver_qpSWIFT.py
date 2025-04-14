@@ -85,10 +85,10 @@ class QPSolverQPSwift(QPSWIFTFormatter):
             self.E = self.E[self.bE_filter, :][:, self.weight_filter]
         else:
             # when no eq constraints were filtered, we can just cut off at the end, because that section is always all 0
-            self.E = self.E[:, :np.count_nonzero(self.weight_filter)]
+            self.E = self.E[:, :self.weight_filter.sum()]
         self.bE = self.bE[self.bE_filter]
         if len(self.nA_A.shape) > 1 and self.nA_A.shape[0] * self.nA_A.shape[1] > 0:
-            self.nA_A = self.nA_A[:, self.weight_filter][self.bA_filter, :]
+            self.nA_A = self.nA_A = self.nA_A[self.bA_filter][:, self.weight_filter]
         self.nlbA_ubA = self.nlbA_ubA[self.bA_filter]
         if self.compute_nI_I:
             # for constraints, both rows and columns are filtered, so I can start with weights dims
@@ -197,7 +197,7 @@ class QPSolverQPSwift(QPSWIFTFormatter):
     def problem_data_to_qp_format(self) \
             -> Tuple[sp.csc_matrix, np.ndarray, sp.csc_matrix, np.ndarray, sp.csc_matrix, np.ndarray]:
         import scipy.sparse as sp
-        if np.product(self.nA_A.shape) > 0:
+        if np.prod(self.nA_A.shape) > 0:
             A = sp.vstack((self.nAi_Ai, self.nA_A))
         else:
             A = self.nAi_Ai

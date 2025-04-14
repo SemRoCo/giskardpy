@@ -177,6 +177,7 @@ class FreeVariable:
             upper_limits[derivative] = self.get_upper_limit(derivative, default=False, evaluated=True)
         return upper_limits
 
+    @memoize
     def has_position_limits(self) -> bool:
         try:
             lower_limit = self.get_lower_limit(Derivatives.position)

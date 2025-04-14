@@ -180,7 +180,7 @@ class QPSolver(ABC):
         if Ai_inf_filter is None:
             key = hash(dimensions_after_zero_filter)
         else:
-            key = hash((dimensions_after_zero_filter, Ai_inf_filter.tostring()))
+            key = hash((dimensions_after_zero_filter, Ai_inf_filter.tobytes()))
         if key not in self._nAi_Ai_cache:
             nI_I = self._cached_eyes(dimensions_after_zero_filter, nAi_Ai)
             if Ai_inf_filter is None:
@@ -282,11 +282,15 @@ class QPSWIFTFormatter(QPSolver):
 
         self.static_lb_finite_filter = self.to_finite_filter(lb)
         self.static_ub_finite_filter = self.to_finite_filter(ub)
+        # these copies will be reused later to avoid reallocating the same memory all the time
+        self.lb_finite_filter = self.static_lb_finite_filter.copy()
+        self.ub_finite_filter = self.static_ub_finite_filter.copy()
         nlb_without_inf = -lb[self.static_lb_finite_filter]
         ub_without_inf = ub[self.static_ub_finite_filter]
 
         self.nlbA_finite_filter = self.to_finite_filter(lbA)
         self.ubA_finite_filter = self.to_finite_filter(ubA)
+        self.lnbA_ubA_finite_filter = np.concatenate((self.nlbA_finite_filter, self.ubA_finite_filter))
         nlbA_without_inf = -lbA[self.nlbA_finite_filter]
         ubA_without_inf = ubA[self.ubA_finite_filter]
         nA_without_inf = -A[self.nlbA_finite_filter]

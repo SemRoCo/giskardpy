@@ -183,10 +183,10 @@ class MotionStatechartManager:
         elif isinstance(node, ast.UnaryOp):
             if isinstance(node.op, ast.Not):
                 return cas.logic_not3(self.parse_ast_expression(node.operand, observation_state_symbols))
-        elif isinstance(node, ast.Str):
+        elif isinstance(node, ast.Constant):
             # replace monitor name with its state expression
-            return observation_state_symbols[node.value]
-        elif isinstance(node, ast.Constant):  # Handle True, False, and other literals
+            if isinstance(node.value, str):
+                return observation_state_symbols[node.value]
             if isinstance(node.value, bool):  # Check if it's True or False
                 if node.value:
                     return cas.TrinaryTrue

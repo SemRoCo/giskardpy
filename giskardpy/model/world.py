@@ -1219,9 +1219,7 @@ class WorldTree(WorldTreeInterface):
                 joint = self.world.joints[joint_name]
                 map_T_parent = self.fks[joint.parent_link_name]
                 self.fks[joint.child_link_name] = map_T_parent.dot(joint.parent_T_child)
-                position = joint.parent_T_child.to_position()[:3]
-                orientation = joint.parent_T_child.to_rotation().to_quaternion()
-                self.tf[(joint.parent_link_name, joint.child_link_name)] = cas.vstack([position, orientation]).T
+                self.tf[(joint.parent_link_name, joint.child_link_name)] = joint.parent_T_child_as_pos_quaternion()
                 return False
 
             @profile

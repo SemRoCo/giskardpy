@@ -28,7 +28,7 @@ class QPSolverClarabel(QPSolverQPSwift):
             -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         from scipy import sparse as sp
         H = sp.diags(self.weights, offsets=0, format='csc')
-        if np.product(self.nA_A.shape) > 0:
+        if np.prod(self.nA_A.shape) > 0:
             A = sp.vstack((self.nAi_Ai, self.nA_A))
         else:
             A = self.nAi_Ai

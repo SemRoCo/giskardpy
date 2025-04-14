@@ -131,12 +131,12 @@ class QPSolverProxsuite(QPSolver):
         # H = np.diag(self.weights)
         H = sp.diags(self.weights+self.regularization_value, offsets=0, format='csc')
         E = self.E
-        # if np.product(self.A.shape) == 0:
+        # if np.prod(self.A.shape) == 0:
         #     A = self.A
         # else:
         #     A = self.A.toarray()
         # E = self.E.toarray()
-        if np.product(self.A.shape) > 0:
+        if np.prod(self.A.shape) > 0:
             A = sp.vstack((self.Ai, self.A))
         else:
             A = self.Ai
@@ -185,7 +185,7 @@ class QPSolverProxsuite(QPSolver):
         A = self.A
         if self.sparse:
             E = E.toarray()
-            if np.product(A.shape) > 0:
+            if np.prod(A.shape) > 0:
                 A = A.toarray()
 
         return weights, g, self.lb, self.ub, E, bE, A, self.lbA, self.ubA, self.weight_filter, self.bE_filter, self.bA_filter

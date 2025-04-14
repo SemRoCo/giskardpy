@@ -19,7 +19,7 @@ class QPSolverQuadprog(QPSolverClarabel):
     def problem_data_to_qp_format(self) \
             -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         H = np.diag(self.weights + self.regularization_value)
-        if np.product(self.nA_A.shape) > 0:
+        if np.prod(self.nA_A.shape) > 0:
             A = np.vstack((self.nAi_Ai.toarray(), self.nA_A.toarray()))
         else:
             A = self.nAi_Ai.toarray()

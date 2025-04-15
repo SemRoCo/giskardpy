@@ -60,10 +60,10 @@ class ExternalCA(Goal):
         actual_link_b_hash = self.get_link_b_hash()
         parent_joint = god_map.world.links[self.link_name].parent_joint_name
         direct_children = set(god_map.world.get_directly_controlled_child_links_with_collisions(parent_joint))
-        b_result_cases = [(k[1].__hash__(), v) for k, v in self.soft_thresholds.items() if k[0] in direct_children]
+        b_result_cases = {(k[1].__hash__(), v) for k, v in self.soft_thresholds.items() if k[0] in direct_children}
         soft_threshold = cas.if_eq_cases(a=actual_link_b_hash,
-                                         b_result_cases=b_result_cases,
-                                         else_result=soft_threshold)
+                                                 b_result_cases=b_result_cases,
+                                                 else_result=soft_threshold)
 
         hard_threshold = cas.min(self.hard_threshold, soft_threshold / 2)
         lower_limit = soft_threshold - actual_distance

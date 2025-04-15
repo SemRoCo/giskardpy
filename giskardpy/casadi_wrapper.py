@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import builtins
 import math
+from collections import defaultdict
 from copy import copy
 from enum import IntEnum
 from typing import Union, TypeVar
@@ -1617,21 +1618,22 @@ def logic_all(args):
     return Expression(ca.logic_all(args.s))
 
 
-def logic_or(*args):
+def logic_or(*args, simplify = True):
     assert len(args) >= 2, 'and must be called with at least 2 arguments'
     # if there is any True, return True
-    if [x for x in args if is_true_symbol(x)]:
+    if simplify and [x for x in args if is_true_symbol(x)]:
         return BinaryTrue
     # filter all False
-    args = [x for x in args if not is_false_symbol(x)]
+    if simplify:
+        args = [x for x in args if not is_false_symbol(x)]
     if len(args) == 0:
         return BinaryFalse
     if len(args) == 1:
         return args[0]
     if len(args) == 2:
-        return Expression(ca.logic_or(args[0].s, args[1].s))
+        return Expression(ca.logic_or(_to_sx(args[0]), _to_sx(args[1])))
     else:
-        return Expression(ca.logic_or(args[0].s, logic_or(*args[1:]).s))
+        return Expression(ca.logic_or(_to_sx(args[0]), _to_sx(logic_or(*args[1:], False))))
 
 
 def logic_or3(a, b):
@@ -1722,12 +1724,33 @@ def if_eq_cases(a, b_result_cases, else_result):
         return else_result
     """
     a = _to_sx(a)
-    else_result = _to_sx(else_result)
     result = _to_sx(else_result)
-    for i in range(len(b_result_cases)):
-        b = _to_sx(b_result_cases[i][0])
-        b_result = _to_sx(b_result_cases[i][1])
+    for b, b_result in b_result_cases:
+        b = _to_sx(b)
+        b_result = _to_sx(b_result)
         result = ca.if_else(ca.eq(a, b), b_result, result)
+    return Expression(result)
+
+
+def if_eq_cases_grouped(a, b_result_cases, else_result):
+    """
+    a: symbol (hash)
+    grouped_cases: list of tuples (hash_list, outcome) where hash_list is a list of hashes mapping to outcome.
+    else_result: default outcome if no hash matches.
+    """
+    groups = defaultdict(list)
+    for h, res in b_result_cases:
+        groups[res].append(_to_sx(h))
+    # Rearrange into (hash_list, result) tuples:
+    grouped_cases = [(hash_list, _to_sx(result)) for result, hash_list in groups.items()]
+    a = _to_sx(a)
+    result = _to_sx(else_result)
+    for hash_list, outcome in grouped_cases:
+        if len(hash_list) >= 2:
+            condition = _to_sx(logic_or(*[ca.eq(a, h) for h in hash_list], False))
+        else:
+            condition = ca.eq(a, hash_list[0])
+        result = ca.if_else(condition, outcome, result)
     return Expression(result)
 
 

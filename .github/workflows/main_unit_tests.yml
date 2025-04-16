@@ -42,6 +42,79 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Set up cache for dependency commits
+        uses: actions/cache@v3
+        id: cache_dependency_hashes
+        with:
+          path: ./.dependency-commits
+          key: dependency-last-checked-commits
+
+      - name: Check for updates in first repository
+        id: check_qpswift
+        run: |
+          # Get the latest commit SHA for first repository
+          LATEST_SHA_QPSWIFT=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            https://api.github.com/repos/${OWNER,,}/qpswift/commits/main | jq -r '.sha')
+
+          # If cache directory doesn't exist, create it
+          mkdir -p ./.dependency-commits
+
+          # If cache file exists for qpswift, read the last checked commit
+          if [ -f ./.dependency-commits/qpswift ]; then
+            LAST_CHECKED_QPSWIFT=$(cat ./.dependency-commits/qpswift)
+          else
+            LAST_CHECKED_QPSWIFT=""
+          fi
+
+          # Compare and set output
+          if [ "$LATEST_SHA_QPSWIFT" != "$LAST_CHECKED_QPSWIFT" ]; then
+            echo "QPSWIFT_CHANGED=true" >> $GITHUB_OUTPUT
+            echo "QPSwift has changed: $LATEST_SHA_QPSWIFT"
+          else
+            echo "QPSWIFT_CHANGED=false" >> $GITHUB_OUTPUT
+            echo "QPSwift unchanged"
+          fi
+
+          # Always update the stored commit hash
+          echo $LATEST_SHA_QPSWIFT > ./.dependency-commits/qpswift
+
+      - name: Check for updates in second repository
+        id: check_bpb
+        run: |
+          # Get the latest commit SHA for second repository
+          LATEST_SHA_BPB=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            https://api.github.com/repos/${OWNER,,}/bullet3/commits/main | jq -r '.sha')
+
+          # If cache file exists for bpb, read the last checked commit
+          if [ -f ./.dependency-commits/bpb ]; then
+            LAST_CHECKED_BPB=$(cat ./.dependency-commits/bpb)
+          else
+            LAST_CHECKED_BPB=""
+          fi
+
+          # Compare and set output
+          if [ "$LATEST_SHA_BPB" != "$LAST_CHECKED_BPB" ]; then
+            echo "BPB_CHANGED=true" >> $GITHUB_OUTPUT
+            echo "Betterpybullet has changed: $LATEST_SHA_BPB"
+          else
+            echo "BPB_CHANGED=false" >> $GITHUB_OUTPUT
+            echo "Betterpybullet unchanged"
+          fi
+
+          # Always update the stored commit hash
+          echo $LATEST_SHA_BPB > ./.dependency-commits/bpb
+
+      - name: Determine if rebuild is needed
+        id: check_repos
+        run: |
+          if [[ "${{ steps.check_qpswift.outputs.QPSWIFT_CHANGED }}" == "true" || "${{ steps.check_bpb.outputs.BPB_CHANGED }}" == "true" ]]; then
+            echo "NEEDS_REBUILD=true" >> $GITHUB_OUTPUT
+            echo "Rebuild needed due to changes in dependencies"
+          else
+            echo "NEEDS_REBUILD=false" >> $GITHUB_OUTPUT
+            echo "No changes detected in dependencies, skipping rebuild"
+          fi
+
       - name: Check for Dockerfile changes
         id: check_changes
         run: |
@@ -78,7 +151,7 @@ jobs:
           echo "Dockerfile changed: ${DOCKERFILE_CHANGED}"
 
       - name: Set up Docker Buildx
-        if: steps.check_changes.outputs.changed == 'true'
+        if: steps.check_changes.outputs.changed == 'true' && steps.check_repos.outputs.NEEDS_REBUILD == 'true'
         uses: docker/setup-buildx-action@v3
 
       # ghcr.io link needs to be lowercase, as such the following echo to $GITHUB_ENV

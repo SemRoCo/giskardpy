@@ -114,7 +114,7 @@ jobs:
             echo "Rebuild needed due to changes in dependencies"
           else
             echo "NEEDS_REBUILD=false" >> $GITHUB_OUTPUT
-            echo "No changes detected in dependencies, skipping rebuild"
+            echo "No changes detected in dependencies"
           fi
 
       - name: Check for Dockerfile changes

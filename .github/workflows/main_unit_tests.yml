@@ -54,7 +54,7 @@ jobs:
         run: |
           # Get the latest commit SHA for first repository
           LATEST_SHA_QPSWIFT=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            https://api.github.com/repos/${OWNER,,}/qpswift/commits/main | jq -r '.sha')
+            https://api.github.com/repos/SemRoCo/qpswift/commits/main | jq -r '.sha')
 
           # If cache directory doesn't exist, create it
           mkdir -p ./.dependency-commits
@@ -83,7 +83,7 @@ jobs:
         run: |
           # Get the latest commit SHA for second repository
           LATEST_SHA_BPB=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            https://api.github.com/repos/${OWNER,,}/bullet3/commits/main | jq -r '.sha')
+            https://api.github.com/repos/SemRoCo/bullet3/commits/main | jq -r '.sha')
 
           # If cache file exists for bpb, read the last checked commit
           if [ -f ./.dependency-commits/bpb ]; then

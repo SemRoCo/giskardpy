@@ -49,7 +49,7 @@ jobs:
           path: ./.dependency-commits
           key: dependency-last-checked-commits
 
-      - name: Check for updates in first repository
+      - name: Check for updates in QPSwift
         id: check_qpswift
         run: |
           # Get the latest commit SHA for first repository
@@ -78,7 +78,7 @@ jobs:
           # Always update the stored commit hash
           echo $LATEST_SHA_QPSWIFT > ./.dependency-commits/qpswift
 
-      - name: Check for updates in second repository
+      - name: Check for updates in BetterPyBullet
         id: check_bpb
         run: |
           # Get the latest commit SHA for second repository
@@ -95,10 +95,10 @@ jobs:
           # Compare and set output
           if [ "$LATEST_SHA_BPB" != "$LAST_CHECKED_BPB" ]; then
             echo "BPB_CHANGED=true" >> $GITHUB_OUTPUT
-            echo "Betterpybullet has changed: $LATEST_SHA_BPB"
+            echo "BetterPyBullet has changed: $LATEST_SHA_BPB"
           else
             echo "BPB_CHANGED=false" >> $GITHUB_OUTPUT
-            echo "Betterpybullet unchanged"
+            echo "BetterPyBullet unchanged"
           fi
 
           # Always update the stored commit hash

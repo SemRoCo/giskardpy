@@ -151,7 +151,7 @@ jobs:
           echo "Dockerfile changed: ${DOCKERFILE_CHANGED}"
 
       - name: Set up Docker Buildx
-        if: steps.check_changes.outputs.changed == 'true' && steps.check_repos.outputs.NEEDS_REBUILD == 'true'
+        if: steps.check_changes.outputs.changed == 'true' || steps.check_repos.outputs.NEEDS_REBUILD == 'true'
         uses: docker/setup-buildx-action@v3
 
       # ghcr.io link needs to be lowercase, as such the following echo to $GITHUB_ENV
@@ -164,7 +164,7 @@ jobs:
 
       # Setup Download-URL for requirements.txt for python dependencies
       - name: Set Download URL
-        if: steps.check_changes.outputs.changed == 'true'
+        if: steps.check_changes.outputs.changed == 'true' || steps.check_repos.outputs.NEEDS_REBUILD == 'true'
         run: |
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             # For PR events, use the specific SHA of the HEAD commit in the PR
@@ -175,7 +175,7 @@ jobs:
           fi
 
       - name: Login to GitHub Container Registry
-        if: steps.check_changes.outputs.changed == 'true'
+        if: steps.check_changes.outputs.changed == 'true' || steps.check_repos.outputs.NEEDS_REBUILD == 'true'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -184,7 +184,7 @@ jobs:
 
       # Builds docker images and uploads them to the GitHub Container Registry
       - name: Find Dockerfiles and Build Images
-        if: steps.check_changes.outputs.changed == 'true'
+        if: steps.check_changes.outputs.changed == 'true' || steps.check_repos.outputs.NEEDS_REBUILD == 'true'
         run: |
           for dockerfilepath in $(find . -name 'Dockerfile' | rev | cut -d'/' -f2- | rev); do
             UBUNTU_VERSION=$(grep -oP '(?<=FROM ubuntu:)[0-9]+(\.[0-9]+)?' "$dockerfilepath"/Dockerfile)

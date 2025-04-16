@@ -51,6 +51,13 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Set up cache for dependency commits
+        uses: actions/cache@v3
+        id: cache_dependency_hashes
+        with:
+          path: ./.dependency-commits/ros1-noetic
+          key: dependency-last-checked-commits
+
       - name: Check for updates in QPSwift
         id: check_qpswift
         run: |
@@ -59,11 +66,11 @@ jobs:
             https://api.github.com/repos/SemRoCo/qpswift/commits/main | jq -r '.sha')
 
           # If cache directory doesn't exist, create it
-          mkdir -p ./.dependency-commits
+          mkdir -p ./.dependency-commits/ros1-noetic
 
           # If cache file exists for qpswift, read the last checked commit
-          if [ -f ./.dependency-commits/qpswift ]; then
-            LAST_CHECKED_QPSWIFT=$(cat ./.dependency-commits/qpswift)
+          if [ -f ./.dependency-commits/ros1-noetic/qpswift ]; then
+            LAST_CHECKED_QPSWIFT=$(cat ./.dependency-commits/ros1-noetic/qpswift)
           else
             LAST_CHECKED_QPSWIFT=""
           fi
@@ -78,7 +85,7 @@ jobs:
           fi
 
           # Always update the stored commit hash
-          echo $LATEST_SHA_QPSWIFT > ./.dependency-commits/qpswift
+          echo $LATEST_SHA_QPSWIFT > ./.dependency-commits/ros1-noetic/qpswift
 
       - name: Check for updates in BetterPyBullet
         id: check_bpb
@@ -88,8 +95,8 @@ jobs:
             https://api.github.com/repos/SemRoCo/bullet3/commits/main | jq -r '.sha')
 
           # If cache file exists for bpb, read the last checked commit
-          if [ -f ./.dependency-commits/bpb ]; then
-            LAST_CHECKED_BPB=$(cat ./.dependency-commits/bpb)
+          if [ -f ./.dependency-commits/ros1-noetic/bpb ]; then
+            LAST_CHECKED_BPB=$(cat ./.dependency-commits/ros1-noetic/bpb)
           else
             LAST_CHECKED_BPB=""
           fi
@@ -104,7 +111,7 @@ jobs:
           fi
 
           # Always update the stored commit hash
-          echo $LATEST_SHA_BPB > ./.dependency-commits/bpb
+          echo $LATEST_SHA_BPB > ./.dependency-commits/ros1-noetic/bpb
 
       - name: Determine if rebuild is needed
         id: check_repos

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     import scipy.sparse as sp
@@ -96,9 +96,13 @@ class QPSolverQPSwift(QPSWIFTFormatter):
             # then only the rows need to be filtered for inf lb/ub
             self.nAi_Ai = self._direct_limit_model(self.weights.shape[0], self.nAi_Ai_filter, True)
 
-    def solver_call(self, H: np.ndarray, g: np.ndarray, E: sp.csc_matrix, b: np.ndarray, A: sp.csc_matrix,
-                    h: np.ndarray) -> np.ndarray:
-        result = qpSWIFT.run_sparse(c=g, h=h, P=H, G=A, A=E, b=b, opts=self.opts)
+    def solver_call(self, H: np.ndarray, g: np.ndarray, E: sp.csc_matrix, b: np.ndarray,
+                    A_box: sp.csc_matrix, h_box: np.ndarray,
+                    A: Optional[sp.csc_matrix] = None, h: Optional[np.ndarray] = None) -> np.ndarray:
+        if A is None:
+            result = qpSWIFT.run_sparse(c=g, h=h_box, P=H, G=A_box, A=E, b=b, opts=self.opts)
+        else:
+            result = qpSWIFT.run_sparse_with_box_constraints(c=g, h_box=h_box, h=h, P=H, G_box=A_box, G=A, A=E, b=b, opts=self.opts)
         exit_flag = result['basicInfo']['ExitFlag']
         if exit_flag != 0:
             error_code = QPSWIFTExitFlags(exit_flag)
@@ -196,11 +200,8 @@ class QPSolverQPSwift(QPSWIFTFormatter):
         return self.lb_filter, nlb_relaxed, self.ub_filter, ub_relaxed
 
     def problem_data_to_qp_format(self) \
-            -> Tuple[sp.csc_matrix, np.ndarray, sp.csc_matrix, np.ndarray, sp.csc_matrix, np.ndarray]:
-        import scipy.sparse as sp
-        if np.prod(self.nA_A.shape) > 0:
-            A = sp.vstack((self.nAi_Ai, self.nA_A))
-        else:
-            A = self.nAi_Ai
-        nlb_ub_nlbA_ubA = np.concatenate((self.nlb, self.ub, self.nlbA_ubA))
-        return self.weights, self.g, self.E, self.bE, A, nlb_ub_nlbA_ubA
+            -> Tuple[sp.csc_matrix, np.ndarray, sp.csc_matrix, np.ndarray, sp.csc_matrix, np.ndarray, Optional[sp.csc_matrix], Optional[np.ndarray]]:
+        nlb_ub = np.concatenate((self.nlb, self.ub))
+        if np.prod(self.nA_A.shape) == 0:
+            return self.weights, self.g, self.E, self.bE, self.nAi_Ai, nlb_ub, None, None
+        return self.weights, self.g, self.E, self.bE, self.nAi_Ai, nlb_ub, self.nA_A, self.nlbA_ubA

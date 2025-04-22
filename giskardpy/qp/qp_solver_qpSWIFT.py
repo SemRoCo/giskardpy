@@ -171,9 +171,9 @@ class QPSolverQPSwift(QPSWIFTFormatter):
         # nlb_relaxed += 0.01
         # ub_relaxed += 0.01
         try:
-            H, g, E, bE, A, _ = self.problem_data_to_qp_format()
-            nlb_ub_nlbA_ubA = np.concatenate((nlb_relaxed, ub_relaxed, self.nlbA_ubA))
-            xdot_full = self.solver_call(H=H, g=g, E=E, b=bE, A=A, h=nlb_ub_nlbA_ubA)
+            H, g, E, bE, A_box, _, A, _ = self.problem_data_to_qp_format()
+            h_box = np.concatenate((nlb_relaxed, ub_relaxed))
+            xdot_full = self.solver_call(H=H, g=g, E=E, b=bE, A_box=A_box, h_box=h_box, A=A, h=self.nlbA_ubA)
         except QPSolverException as e:
             self.retries_with_relaxed_constraints += 1
             raise e
@@ -200,7 +200,7 @@ class QPSolverQPSwift(QPSWIFTFormatter):
         return self.lb_filter, nlb_relaxed, self.ub_filter, ub_relaxed
 
     def problem_data_to_qp_format(self) \
-            -> Tuple[sp.csc_matrix, np.ndarray, sp.csc_matrix, np.ndarray, sp.csc_matrix, np.ndarray, Optional[sp.csc_matrix], Optional[np.ndarray]]:
+            -> Tuple[np.array, np.ndarray, sp.csc_matrix, np.ndarray, sp.csc_matrix, np.ndarray, Optional[sp.csc_matrix], Optional[np.ndarray]]:
         nlb_ub = np.concatenate((self.nlb, self.ub))
         if np.prod(self.nA_A.shape) == 0:
             return self.weights, self.g, self.E, self.bE, self.nAi_Ai, nlb_ub, None, None

@@ -5,11 +5,10 @@ defaults:
 on:
   push:
     branches:
-      - master
-      - devel
-      - library_standalone
+      - giskard_library
   pull_request:
-#    branches:
+    branches:
+      - giskard_library
 #      - master
 #      - devel
   workflow_dispatch:

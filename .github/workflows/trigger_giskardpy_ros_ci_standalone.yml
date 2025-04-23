@@ -30,18 +30,26 @@ jobs:
       # Triggers ci_standalone workflow of giskardpy_ros repo. Needs setup secret token to work
       - name: Trigger workflow in giskardpy_ros
         run: |
-          RESPONSE=$(curl -L -w "%{http_code}\\n"\
-            -X POST \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: token ${{ secrets.giskardpy_ros_test_trigger }}" \
-            https://api.github.com/repos/${{ github.repository_owner }}/giskardpy_ros/actions/workflows/ci_standalone.yml/dispatches \
-            -d '{
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            DATA='{
               "ref":"${{ matrix.branch }}",
               "inputs": {
                 "is_trigger": true,
                 "pr_id": "${{ github.event.pull_request.number }}"
               }
-            }')
+            }'
+          else
+            DATA='{
+              "ref":"${{ matrix.branch }}"
+            }'
+          fi
+          
+          RESPONSE=$(curl -L -w "%{http_code}\\n" \
+            -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: token ${{ secrets.giskardpy_ros_test_trigger }}" \
+            https://api.github.com/repos/${{ github.repository_owner }}/giskardpy_ros/actions/workflows/ci_standalone.yml/dispatches \
+            -d "$DATA")
 
           # Extract the response body and HTTP status code from the response
           HTTP_STATUS=$(echo "$RESPONSE" | tail -n1)

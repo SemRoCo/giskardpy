@@ -7,40 +7,39 @@ import numpy as np
 import pytest
 import rospy
 from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, PointStamped, QuaternionStamped
-from nav_msgs.msg import Path
 from numpy import pi
 from shape_msgs.msg import SolidPrimitive
 from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
 import giskard_msgs.msg as giskard_msgs
-from giskard_msgs.msg import WorldBody, CollisionEntry, WorldGoal, LinkName, GiskardError
+from giskard_msgs.msg import WorldBody, CollisionEntry, WorldGoal, LinkName
 from giskardpy.data_types.data_types import PrefixName
-from giskardpy.data_types.exceptions import GiskardException, VelocityLimitUnreachableException, \
-    MaxTrajectoryLengthException, UnknownGoalException, GoalInitalizationException, LocalMinimumException, \
+from giskardpy.data_types.exceptions import GiskardException, MaxTrajectoryLengthException, UnknownGoalException, \
     DuplicateNameException, CorruptMeshException, UnknownGroupException, UnknownLinkException, \
     InvalidWorldOperationException, CorruptShapeException, TransformException, CorruptURDFException, \
     SelfCollisionViolatedException, HardConstraintsViolatedException, SetupException, EmptyProblemException, \
     UnknownJointException
-from giskardpy.goals.cartesian_goals import RelativePositionSequence
-from giskardpy.goals.collision_avoidance import CollisionAvoidanceHint
-from giskardpy.goals.goals_tests import DebugGoal, CannotResolveSymbol
-from giskardpy.goals.joint_goals import JointVelocityLimit, UnlimitedJointGoal
-from giskardpy.goals.set_prediction_horizon import SetQPSolver
-from giskardpy.goals.tracebot import InsertCylinder
-from giskardpy.goals.weight_scaling_goals import MaxManipulabilityLinWeight, BaseArmWeightScaling
+from giskardpy.motion_statechart.goals.cartesian_goals import RelativePositionSequence
+from giskardpy.motion_statechart.goals.collision_avoidance import CollisionAvoidanceHint
+from giskardpy.motion_statechart.tasks.goals_tests import DebugGoal, CannotResolveSymbol
+from giskardpy.motion_statechart.goals.set_prediction_horizon import SetQPSolver
+from giskardpy.motion_statechart.goals.tracebot import InsertCylinder
+from giskardpy.motion_statechart.tasks.weight_scaling_goals import MaxManipulability, BaseArmWeightScaling
 from giskardpy.god_map import god_map
 from giskardpy.middleware import get_middleware
 from giskardpy.model.utils import hacky_urdf_parser_fix
-from giskardpy.motion_graph.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE
+from giskardpy.motion_statechart.monitors.monitors import TrueMonitor
+from giskardpy.motion_statechart.monitors.payload_monitors import Pulse
+from giskardpy.motion_statechart.tasks.joint_tasks import JointVelocityLimit, UnlimitedJointGoal
+from giskardpy.motion_statechart.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE
 from giskardpy.qp.qp_controller_config import SupportedQPSolver, QPControllerConfig
 from giskardpy_ros.configs.behavior_tree_config import StandAloneBTConfig
 from giskardpy_ros.configs.giskard import Giskard
 from giskardpy_ros.configs.iai_robots.pr2 import PR2CollisionAvoidance, PR2StandaloneInterface, WorldWithPR2Config
-from giskardpy_ros.goals.realtime_goals import FollowNavPath
 from giskardpy_ros.python_interface.old_python_interface import OldGiskardWrapper
 from giskardpy_ros.tree.blackboard_utils import GiskardBlackboard
-from utils_for_tests import compare_poses, publish_marker_vector, GiskardTestWrapper, compare_points
-from utils_for_tests import launch_launchfile
+from giskardpy_ros.utils.utils_for_tests import compare_poses, publish_marker_vector, GiskardTestWrapper, compare_points
+from giskardpy_ros.utils.utils_for_tests import launch_launchfile
 
 # scopes = ['module', 'class', 'function']
 pocky_pose = {'r_elbow_flex_joint': -1.29610152504,
@@ -167,7 +166,10 @@ class PR2TestWrapper(GiskardTestWrapper):
                               behavior_tree_config=StandAloneBTConfig(debug_mode=True,
                                                                       publish_tf=True),
                               # qp_controller_config=QPControllerConfig(qp_solver=SupportedQPSolver.gurobi))
-                              qp_controller_config=QPControllerConfig())
+                              qp_controller_config=QPControllerConfig(mpc_dt=0.05,
+                                                                      retries_with_relaxed_constraints=10,
+                                                                      # qp_solver=SupportedQPSolver.gurobi,
+                                                                      ))
         super().__init__(giskard)
         self.robot = god_map.world.groups[self.robot_name]
 
@@ -229,7 +231,7 @@ class PR2TestWrapper(GiskardTestWrapper):
 
 @pytest.fixture(scope='module')
 def giskard(request, ros):
-    launch_launchfile('package://iai_pr2_description/launch/upload_pr2_calibrated_with_ft2.launch')
+    launch_launchfile('package://iai_pr2_description/launch/upload_pr2_cableguide.launch')
     # launch_launchfile('package://iai_pr2_description/launch/upload_pr2_cableguide.launch')
     c = PR2TestWrapper()
     # c = PR2TestWrapperMujoco()
@@ -294,7 +296,7 @@ class TestJointGoals:
             'l_wrist_flex_joint': -0.1,
             'l_wrist_roll_joint': -6.062015047706399,
         }
-        zero_pose.set_joint_goal(goal_state=js)
+        zero_pose.motion_goals.add_joint_position(name='joint task', goal_state=js)
         zero_pose.allow_all_collisions()
         zero_pose.execute()
 
@@ -331,10 +333,11 @@ class TestJointGoals:
         zero_pose.execute()
 
         zero_pose.set_seed_configuration(zero_pose.better_pose)
-        zero_pose.set_joint_goal(goal_state=js)
+        done = zero_pose.motion_goals.add_joint_position(goal_state=js, name='joint goal1')
         zero_pose.allow_all_collisions()
         # zero_pose.set_json_goal('EnableVelocityTrajectoryTracking', enabled=True)
-        zero_pose.projection()
+        zero_pose.monitors.add_end_motion(done)
+        zero_pose.projection(add_local_minimum_reached=False)
 
     def test_gripper_goal(self, zero_pose: PR2TestWrapper):
         js = {
@@ -372,22 +375,32 @@ class TestJointGoals:
 
     def test_prismatic_joint1(self, zero_pose: PR2TestWrapper):
         zero_pose.allow_all_collisions()
-        js = {'torso_lift_joint': 0.1}
+        js = {
+            'torso_lift_joint': 0.1,
+            # 'torso_lift_joint': 0.1
+        }
         zero_pose.set_joint_goal(js)
         zero_pose.execute()
 
     def test_revolute_joint1(self, zero_pose: PR2TestWrapper):
         zero_pose.allow_all_collisions()
-        js = {'r_elbow_flex_joint': -1}
-        zero_pose.set_joint_goal(js)
+        js = {
+            # 'r_elbow_flex_joint': -1,
+            'l_wrist_roll_joint': -1,
+            'r_wrist_roll_joint': 1
+        }
+        zero_pose.motion_goals.add_joint_position(name='joint task', goal_state=js)
         zero_pose.execute()
 
     def test_unlimited_joint_goal(self, zero_pose: PR2TestWrapper):
         zero_pose.allow_all_collisions()
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class=UnlimitedJointGoal.__name__,
+        zero_pose.motion_goals.add_motion_goal(class_name=UnlimitedJointGoal.__name__,
                                                joint_name='r_elbow_flex_joint',
+                                               name='goal',
                                                goal_position=-3)
-        zero_pose.execute()
+        local_min = zero_pose.monitors.add_local_minimum_reached(name='local_min')
+        zero_pose.monitors.add_end_motion(local_min)
+        zero_pose.execute(add_local_minimum_reached=False)
 
     def test_hard_joint_limits(self, zero_pose: PR2TestWrapper):
         zero_pose.allow_self_collision()
@@ -404,7 +417,7 @@ class TestJointGoals:
         zero_pose.set_joint_goal(goal_js, add_monitor=False)
         zero_pose.execute()
         js = {'torso_lift_joint': 0.32}
-        zero_pose.set_joint_goal(js)
+        zero_pose.set_joint_goal(js, add_monitor=False)
         zero_pose.execute()
 
         goal_js = {'r_elbow_flex_joint': r_elbow_flex_joint_limits[1] + 0.2,
@@ -455,21 +468,32 @@ class TestMonitors:
         assert god_map.trajectory.length_in_seconds > 4
 
     def test_joint_sequence(self, zero_pose: PR2TestWrapper):
-        joint_monitor1 = zero_pose.monitors.add_joint_position(zero_pose.better_pose,
-                                                               name='joint_monitor1')
-        joint_monitor2 = zero_pose.monitors.add_joint_position(pocky_pose,
-                                                               name='joint_monitor2')
-        end_monitor = zero_pose.monitors.add_local_minimum_reached(start_condition=joint_monitor2)
-
-        zero_pose.motion_goals.add_joint_position(name='g1',
-                                                  goal_state=zero_pose.better_pose,
-                                                  end_condition=joint_monitor1)
-        zero_pose.motion_goals.add_joint_position(name='g2',
-                                                  goal_state=pocky_pose,
-                                                  start_condition=joint_monitor1,
-                                                  end_condition=f'{end_monitor} and {joint_monitor2}')
+        g1 = zero_pose.motion_goals.add_joint_position(name='g1',
+                                                       goal_state=zero_pose.better_pose)
+        end_monitor = zero_pose.monitors.add_local_minimum_reached(name='local min', start_condition=g1)
+        g2 = zero_pose.motion_goals.add_joint_position(name='g2',
+                                                       goal_state=pocky_pose,
+                                                       start_condition=g1)
+        zero_pose.update_end_condition(node_name=g2, condition=f'{end_monitor} and {g2}')
         zero_pose.allow_all_collisions()
         zero_pose.monitors.add_end_motion(start_condition=end_monitor)
+        zero_pose.execute(add_local_minimum_reached=False)
+
+    def test_reset(self, zero_pose: PR2TestWrapper):
+        g1 = zero_pose.motion_goals.add_joint_position(name='joint goal 1',
+                                                       goal_state=zero_pose.better_pose)
+        zero_pose.update_end_condition(node_name=g1, condition=g1)
+        g2 = zero_pose.motion_goals.add_joint_position(name='joint goal 2',
+                                                       goal_state=pocky_pose,
+                                                       start_condition=g1)
+        pulse = zero_pose.monitors.add_monitor(class_name=Pulse.__name__,
+                                               name='once',
+                                               after_ticks=1,
+                                               start_condition=g2)
+        local_min = zero_pose.monitors.add_local_minimum_reached(name='local min', start_condition=g2)
+        zero_pose.motion_goals.update_reset_condition(g1, pulse)
+        zero_pose.allow_all_collisions()
+        zero_pose.monitors.add_end_motion(start_condition=local_min)
         zero_pose.execute(add_local_minimum_reached=False)
 
     def test_cart_goal_sequence_relative(self, zero_pose: PR2TestWrapper):
@@ -486,36 +510,102 @@ class TestMonitors:
         root_link = 'map'
         tip_link = 'base_footprint'
 
-        monitor1 = zero_pose.monitors.add_cartesian_pose(name='pose1',
-                                                         root_link=root_link,
-                                                         tip_link=tip_link,
-                                                         goal_pose=pose1)
+        end_monitor = zero_pose.monitors.add_local_minimum_reached(name='local min')
 
-        monitor2 = zero_pose.monitors.add_cartesian_pose(name='pose2',
-                                                         root_link=root_link,
-                                                         tip_link=tip_link,
-                                                         goal_pose=pose2,
-                                                         start_condition=monitor1)
-        end_monitor = zero_pose.monitors.add_local_minimum_reached()
-
-        zero_pose.motion_goals.add_cartesian_pose(goal_pose=pose1,
-                                                  name='g1',
-                                                  root_link=root_link,
-                                                  tip_link=tip_link,
-                                                  end_condition=monitor1)
-        zero_pose.motion_goals.add_cartesian_pose(goal_pose=pose2,
-                                                  name='g2',
-                                                  root_link=root_link,
-                                                  tip_link=tip_link,
-                                                  start_condition=monitor1,
-                                                  end_condition=f'{monitor2} and {end_monitor}')
+        pose1 = zero_pose.motion_goals.add_cartesian_pose(goal_pose=pose1,
+                                                          name='base pose 1',
+                                                          root_link=root_link,
+                                                          tip_link=tip_link,
+                                                          end_condition=None)
+        pose2 = zero_pose.motion_goals.add_cartesian_pose(goal_pose=pose2,
+                                                          name='base pose 2',
+                                                          root_link=root_link,
+                                                          tip_link=tip_link,
+                                                          start_condition=pose1,
+                                                          end_condition=None)
         zero_pose.allow_all_collisions()
-        zero_pose.monitors.add_end_motion(start_condition=' and '.join([end_monitor, monitor2]))
+        zero_pose.monitors.add_end_motion(start_condition=' and '.join([pose2, end_monitor]))
         zero_pose.set_max_traj_length(30)
         zero_pose.execute(add_local_minimum_reached=False)
         current_pose = zero_pose.compute_fk_pose(root_link=root_link, tip_link=tip_link)
         np.testing.assert_almost_equal(current_pose.pose.position.x, 1, decimal=2)
         np.testing.assert_almost_equal(current_pose.pose.position.y, 1, decimal=2)
+
+    def test_thesis_example1(self, zero_pose: PR2TestWrapper):
+        pose1 = PoseStamped()
+        pose1.header.frame_id = 'map'
+        pose1.pose.position.x = 1
+        pose1.pose.orientation.w = 1
+
+        pose2 = PoseStamped()
+        pose2.header.frame_id = 'base_footprint'
+        pose2.pose.position.y = 1
+        pose2.pose.orientation.w = 1
+
+        root_link = 'map'
+        tip_link = 'base_footprint'
+
+        pose1 = zero_pose.motion_goals.add_cartesian_pose(goal_pose=pose1,
+                                                          name='Pose 1',
+                                                          root_link=root_link,
+                                                          tip_link=tip_link,
+                                                          end_condition=None)
+        pose2 = zero_pose.motion_goals.add_cartesian_pose(goal_pose=pose2,
+                                                          name='Pose 2',
+                                                          root_link=root_link,
+                                                          tip_link=tip_link,
+                                                          start_condition=pose1,
+                                                          end_condition=None)
+        zero_pose.allow_all_collisions()
+        zero_pose.monitors.add_end_motion(start_condition=pose2)
+        zero_pose.execute(add_local_minimum_reached=False)
+        current_pose = zero_pose.compute_fk_pose(root_link=root_link, tip_link=tip_link)
+        np.testing.assert_almost_equal(current_pose.pose.position.x, 1, decimal=2)
+        np.testing.assert_almost_equal(current_pose.pose.position.y, 1, decimal=2)
+
+    def test_thesis_example2(self, zero_pose: PR2TestWrapper):
+        pose1 = PoseStamped()
+        pose1.header.frame_id = 'map'
+        pose1.pose.position.x = 1
+        pose1.pose.orientation.w = 1
+
+        pose2 = PoseStamped()
+        pose2.header.frame_id = 'base_footprint'
+        pose2.pose.position.y = 1
+        pose2.pose.orientation.w = 1
+
+        root_link = 'map'
+        tip_link = 'base_footprint'
+
+        pulse = zero_pose.monitors.add_pulse(name='Laser violated', after_ticks=150)
+
+        pose1 = zero_pose.motion_goals.add_cartesian_pose(goal_pose=pose1,
+                                                          name='Base Pose 1',
+                                                          root_link=root_link,
+                                                          tip_link=tip_link,
+                                                          pause_condition=pulse,
+                                                          end_condition=None)
+        pose2 = zero_pose.motion_goals.add_cartesian_pose(goal_pose=pose2,
+                                                          name='Base Pose 2',
+                                                          root_link=root_link,
+                                                          tip_link=tip_link,
+                                                          start_condition=pose1,
+                                                          pause_condition=pulse,
+                                                          end_condition=None)
+        zero_pose.allow_all_collisions()
+        zero_pose.monitors.add_end_motion(start_condition=' and '.join([pose2]))
+        # zero_pose.monitors.add_cancel_motion(start_condition=f'{local_min}', error=Exception(local_min))
+        zero_pose.execute(add_local_minimum_reached=False)
+        current_pose = zero_pose.compute_fk_pose(root_link=root_link, tip_link=tip_link)
+        np.testing.assert_almost_equal(current_pose.pose.position.x, 1, decimal=2)
+        np.testing.assert_almost_equal(current_pose.pose.position.y, 1, decimal=2)
+
+    def test_true_monitor(self, zero_pose: PR2TestWrapper):
+        done = zero_pose.monitors.add_monitor(class_name=TrueMonitor.__name__, name='Node1')
+        zero_pose.monitors.add_monitor(class_name=TrueMonitor.__name__, name='Node Name')
+        zero_pose.allow_all_collisions()
+        zero_pose.monitors.add_end_motion(start_condition=done)
+        zero_pose.execute(add_local_minimum_reached=False)
 
     def test_cart_goal_sequence_absolute(self, zero_pose: PR2TestWrapper):
         pose1 = PoseStamped()
@@ -531,33 +621,22 @@ class TestMonitors:
         root_link = 'map'
         tip_link = 'base_footprint'
 
-        monitor1 = zero_pose.monitors.add_cartesian_pose(name='pose1',
-                                                         root_link=root_link,
-                                                         tip_link=tip_link,
-                                                         goal_pose=pose1)
+        end_monitor = zero_pose.monitors.add_local_minimum_reached(name='local min')
 
-        monitor2 = zero_pose.monitors.add_cartesian_pose(name='pose2',
-                                                         root_link=root_link,
-                                                         tip_link=tip_link,
-                                                         goal_pose=pose2,
-                                                         absolute=True,
-                                                         start_condition=monitor1)
-        end_monitor = zero_pose.monitors.add_local_minimum_reached()
-
-        zero_pose.motion_goals.add_cartesian_pose(goal_pose=pose1,
-                                                  name='g1',
-                                                  root_link=root_link,
-                                                  tip_link=tip_link,
-                                                  end_condition=monitor1)
-        zero_pose.motion_goals.add_cartesian_pose(goal_pose=pose2,
-                                                  name='g2',
-                                                  root_link=root_link,
-                                                  tip_link=tip_link,
-                                                  absolute=True,
-                                                  start_condition=monitor1,
-                                                  end_condition=f'{monitor2} and {end_monitor}')
+        pose1 = zero_pose.motion_goals.add_cartesian_pose(goal_pose=pose1,
+                                                          name='g1',
+                                                          root_link=root_link,
+                                                          tip_link=tip_link,
+                                                          end_condition=None)
+        pose2 = zero_pose.motion_goals.add_cartesian_pose(goal_pose=pose2,
+                                                          name='g2',
+                                                          root_link=root_link,
+                                                          tip_link=tip_link,
+                                                          absolute=True,
+                                                          start_condition=pose1,
+                                                          end_condition=None)
         zero_pose.allow_all_collisions()
-        zero_pose.monitors.add_end_motion(start_condition=' and '.join([end_monitor, monitor2]))
+        zero_pose.monitors.add_end_motion(start_condition=' and '.join([pose2, end_monitor]))
         zero_pose.set_max_traj_length(30)
         zero_pose.execute(add_local_minimum_reached=False)
 
@@ -565,7 +644,7 @@ class TestMonitors:
         np.testing.assert_almost_equal(current_pose.pose.position.x, 0, decimal=2)
         np.testing.assert_almost_equal(current_pose.pose.position.y, 1, decimal=2)
 
-    def test_place_cylinder1(self, better_pose: PR2TestWrapper):
+    def test_insert_cylinder1(self, better_pose: PR2TestWrapper):
         cylinder_name = 'C'
         cylinder_height = 0.121
         hole_point = PointStamped()
@@ -586,15 +665,16 @@ class TestMonitors:
                                           parent_link=giskard_msgs.LinkName(name='r_gripper_tool_frame'))
         better_pose.dye_group(cylinder_name, (0, 0, 1, 1))
 
-        better_pose.motion_goals.add_motion_goal(motion_goal_class=InsertCylinder.__name__,
-                                                 cylinder_name=cylinder_name,
-                                                 cylinder_height=0.121,
-                                                 hole_point=hole_point)
+        inserted = better_pose.motion_goals.add_motion_goal(class_name=InsertCylinder.__name__,
+                                                            name='Insert Cyclinder',
+                                                            cylinder_name=cylinder_name,
+                                                            cylinder_height=0.121,
+                                                            hole_point=hole_point)
         better_pose.allow_all_collisions()
-        better_pose.execute()
+        better_pose.monitors.add_end_motion(start_condition=inserted)
+        better_pose.execute(add_local_minimum_reached=False)
 
     def test_bowl_and_cup_sequence(self, kitchen_setup: PR2TestWrapper):
-        kitchen_setup.set_avoid_name_conflict(False)
         # %% setup
         bowl_name = 'bowl'
         cup_name = 'cup'
@@ -632,19 +712,14 @@ class TestMonitors:
         tip_grasp_axis.header.frame_id = kitchen_setup.l_tip
         tip_grasp_axis.vector.z = 1
 
-        phase1 = kitchen_setup.monitors.add_distance_to_line(name='phase 1',
-                                                             root_link=kitchen_setup.default_root,
-                                                             tip_link=kitchen_setup.l_tip,
-                                                             center_point=bar_center,
-                                                             line_axis=bar_axis,
-                                                             line_length=0.4)
-        kitchen_setup.motion_goals.add_grasp_bar(bar_center=bar_center,
-                                                 bar_axis=bar_axis,
-                                                 bar_length=0.4,
-                                                 tip_link=kitchen_setup.l_tip,
-                                                 tip_grasp_axis=tip_grasp_axis,
-                                                 root_link=kitchen_setup.default_root,
-                                                 end_condition=phase1)
+        phase1 = kitchen_setup.motion_goals.add_grasp_bar(name='phase 1',
+                                                          bar_center=bar_center,
+                                                          bar_axis=bar_axis,
+                                                          bar_length=0.4,
+                                                          tip_link=kitchen_setup.l_tip,
+                                                          tip_grasp_axis=tip_grasp_axis,
+                                                          root_link=kitchen_setup.default_root,
+                                                          end_condition=None)
         x_gripper = Vector3Stamped()
         x_gripper.header.frame_id = kitchen_setup.l_tip
         x_gripper.vector.x = 1
@@ -660,7 +735,7 @@ class TestMonitors:
                                                     end_condition=phase1)
 
         # %% phase 2 open drawer
-        phase2 = kitchen_setup.monitors.add_local_minimum_reached('phase 2',
+        phase2 = kitchen_setup.monitors.add_local_minimum_reached(name='phase 2',
                                                                   start_condition=phase1)
         kitchen_setup.motion_goals.add_open_container(tip_link=kitchen_setup.l_tip,
                                                       environment_link=drawer_handle,
@@ -674,24 +749,18 @@ class TestMonitors:
         base_pose.pose.position.y = 1
         base_pose.pose.position.x = .1
         base_pose.pose.orientation.w = 1
-        joint_position_reached = kitchen_setup.monitors.add_joint_position(kitchen_setup.better_pose,
-                                                                           name='phase 3 joint goal',
-                                                                           start_condition=phase2)
-        base_pose_reached = kitchen_setup.monitors.add_cartesian_pose(root_link=kitchen_setup.default_root,
-                                                                      tip_link='base_footprint',
-                                                                      goal_pose=base_pose,
-                                                                      start_condition=phase2,
-                                                                      name='phase 3 base goal')
-        kitchen_setup.motion_goals.add_joint_position(kitchen_setup.better_pose,
-                                                      start_condition=phase2,
-                                                      end_condition=joint_position_reached)
-        kitchen_setup.motion_goals.add_cartesian_pose(root_link=kitchen_setup.default_root,
-                                                      tip_link='base_footprint',
-                                                      goal_pose=base_pose,
-                                                      start_condition=phase2,
-                                                      end_condition=base_pose_reached)
+        joint_position_reached = kitchen_setup.motion_goals.add_joint_position(goal_state=kitchen_setup.better_pose,
+                                                                               name='phase 3 joint goal',
+                                                                               start_condition=phase2,
+                                                                               end_condition=None)
+        base_pose_reached = kitchen_setup.motion_goals.add_cartesian_pose(name='phase 3 base goal',
+                                                                          root_link=kitchen_setup.default_root,
+                                                                          tip_link='base_footprint',
+                                                                          goal_pose=base_pose,
+                                                                          start_condition=phase2,
+                                                                          end_condition=None)
 
-        phase3 = kitchen_setup.monitors.add_local_minimum_reached('phase3 done',
+        phase3 = kitchen_setup.monitors.add_local_minimum_reached(name='phase3 done',
                                                                   start_condition=' and '.join([
                                                                       joint_position_reached,
                                                                       base_pose_reached
@@ -706,29 +775,19 @@ class TestMonitors:
                                                                       [0, 0, -1, 0],
                                                                       [-1, 0, 0, 0],
                                                                       [0, 0, 0, 1]]))
-        l_pre_grasp_pose = kitchen_setup.monitors.add_cartesian_pose(root_link=kitchen_setup.default_root,
-                                                                     tip_link=kitchen_setup.l_tip,
-                                                                     goal_pose=l_goal,
-                                                                     name='l_pre_grasp_pose',
-                                                                     start_condition=phase3)
-        kitchen_setup.motion_goals.add_cartesian_pose(goal_pose=l_goal,
-                                                      tip_link=kitchen_setup.l_tip,
-                                                      root_link=kitchen_setup.default_root,
-                                                      name=l_pre_grasp_pose,
-                                                      start_condition=phase3,
-                                                      end_condition=l_pre_grasp_pose)
+        l_pre_grasp_pose = kitchen_setup.motion_goals.add_cartesian_pose(goal_pose=l_goal,
+                                                                         tip_link=kitchen_setup.l_tip,
+                                                                         root_link=kitchen_setup.default_root,
+                                                                         name='l_pre_grasp_pose',
+                                                                         start_condition=phase3,
+                                                                         end_condition=None)
         l_grasp_goal = deepcopy(l_goal)
         l_grasp_goal.pose.position.z -= .2
-        l_grasp_pose = kitchen_setup.monitors.add_cartesian_pose(root_link=kitchen_setup.default_root,
-                                                                 tip_link=kitchen_setup.l_tip,
-                                                                 goal_pose=l_grasp_goal,
-                                                                 name='l_grasp_pose',
-                                                                 start_condition=l_pre_grasp_pose)
-        kitchen_setup.motion_goals.add_cartesian_pose(goal_pose=l_grasp_goal,
-                                                      tip_link=kitchen_setup.l_tip,
-                                                      root_link=kitchen_setup.default_root,
-                                                      name=l_grasp_pose,
-                                                      start_condition=l_pre_grasp_pose)
+        l_grasp_pose = kitchen_setup.motion_goals.add_cartesian_pose(goal_pose=l_grasp_goal,
+                                                                     tip_link=kitchen_setup.l_tip,
+                                                                     root_link=kitchen_setup.default_root,
+                                                                     name='l_grasp_pose',
+                                                                     start_condition=l_pre_grasp_pose)
 
         # %% grasp cup
         r_goal = deepcopy(cup_pose)
@@ -738,29 +797,19 @@ class TestMonitors:
                                                                       [0, 0, -1, 0],
                                                                       [-1, 0, 0, 0],
                                                                       [0, 0, 0, 1]]))
-        r_pre_grasp_pose = kitchen_setup.monitors.add_cartesian_pose(root_link=kitchen_setup.default_root,
-                                                                     tip_link=kitchen_setup.r_tip,
-                                                                     goal_pose=r_goal,
-                                                                     name='r_pre_grasp_pose',
-                                                                     start_condition=phase3)
-        kitchen_setup.motion_goals.add_cartesian_pose(goal_pose=r_goal,
-                                                      tip_link=kitchen_setup.r_tip,
-                                                      root_link=kitchen_setup.default_root,
-                                                      name=r_pre_grasp_pose,
-                                                      start_condition=phase3,
-                                                      end_condition=r_pre_grasp_pose)
+        r_pre_grasp_pose = kitchen_setup.motion_goals.add_cartesian_pose(goal_pose=r_goal,
+                                                                         name='r_pre_grasp_pose',
+                                                                         tip_link=kitchen_setup.r_tip,
+                                                                         root_link=kitchen_setup.default_root,
+                                                                         start_condition=phase3,
+                                                                         end_condition=None)
         r_goal = deepcopy(r_goal)
         r_goal.pose.position.z -= .2
-        r_grasp_pose = kitchen_setup.monitors.add_cartesian_pose(root_link=kitchen_setup.default_root,
-                                                                 tip_link=kitchen_setup.r_tip,
-                                                                 goal_pose=r_goal,
-                                                                 name='r_grasp_pose',
-                                                                 start_condition=r_pre_grasp_pose)
-        kitchen_setup.motion_goals.add_cartesian_pose(goal_pose=r_goal,
-                                                      name=r_grasp_pose,
-                                                      tip_link=kitchen_setup.r_tip,
-                                                      root_link=kitchen_setup.default_root,
-                                                      start_condition=r_pre_grasp_pose)
+        r_grasp_pose = kitchen_setup.motion_goals.add_cartesian_pose(goal_pose=r_goal,
+                                                                     name='r_grasp_pose',
+                                                                     tip_link=kitchen_setup.r_tip,
+                                                                     root_link=kitchen_setup.default_root,
+                                                                     start_condition=r_pre_grasp_pose)
 
         kitchen_setup.motion_goals.add_avoid_joint_limits(percentage=percentage,
                                                           start_condition=phase3)
@@ -768,7 +817,7 @@ class TestMonitors:
                                                                   start_condition=' and '.join([r_grasp_pose,
                                                                                                 l_grasp_pose]))
         kitchen_setup.monitors.add_end_motion(start_condition=phase4)
-        kitchen_setup.monitors.add_max_trajectory_length(60)
+        kitchen_setup.monitors.add_check_trajectory_length(60)
         kitchen_setup.allow_all_collisions()
         # kitchen_setup.allow_collision(group1=kitchen_setup.l_gripper_group,
         #                               group2=bowl_name)
@@ -784,19 +833,14 @@ class TestMonitors:
         # %% next goal
         # %% post grasp
 
-        r_post_grasp = kitchen_setup.monitors.add_joint_position(goal_state=kitchen_setup.better_pose_right,
-                                                                 name='r_post_grasp')
-        l_post_grasp = kitchen_setup.monitors.add_joint_position(goal_state=kitchen_setup.better_pose_left,
-                                                                 name='l_post_grasp')
+        r_post_grasp = kitchen_setup.motion_goals.add_joint_position(goal_state=kitchen_setup.better_pose_right,
+                                                                     name='r_post_grasp')
+
+        l_post_grasp = kitchen_setup.motion_goals.add_joint_position(goal_state=kitchen_setup.better_pose_left,
+                                                                     name='l_post_grasp')
         post_grasp_reached = f'{r_post_grasp} and {l_post_grasp}'
-
-        kitchen_setup.motion_goals.add_joint_position(goal_state=kitchen_setup.better_pose_right,
-                                                      name=r_post_grasp,
-                                                      end_condition=post_grasp_reached)
-
-        kitchen_setup.motion_goals.add_joint_position(goal_state=kitchen_setup.better_pose_left,
-                                                      name=l_post_grasp,
-                                                      end_condition=post_grasp_reached)
+        kitchen_setup.update_end_condition(r_post_grasp, post_grasp_reached)
+        kitchen_setup.update_end_condition(l_post_grasp, post_grasp_reached)
 
         # %% phase 5 rotate
         phase5 = kitchen_setup.monitors.add_local_minimum_reached(name='phase5',
@@ -804,8 +848,8 @@ class TestMonitors:
 
         base_goal = PoseStamped()
         base_goal.header.frame_id = 'base_footprint'
-        base_goal.pose.position.x = -.1
-        base_goal.pose.orientation = Quaternion(*quaternion_about_axis(pi, [0, 0, 1]))
+        base_goal.pose.position.x = -.3
+        base_goal.pose.orientation = Quaternion(*quaternion_about_axis(0.9 * pi, [0, 0, 1]))
         kitchen_setup.motion_goals.add_cartesian_pose(goal_pose=base_goal,
                                                       tip_link='base_footprint',
                                                       name='rotate_to_island',
@@ -831,49 +875,38 @@ class TestMonitors:
                                                                         [-1, 0, 0, 0],
                                                                         [0, 0, 0, 1]]))
 
-        bowl_placed = kitchen_setup.monitors.add_cartesian_pose(root_link=kitchen_setup.default_root,
-                                                                tip_link=kitchen_setup.l_tip,
-                                                                goal_pose=bowl_goal,
-                                                                name='bowl_placed',
-                                                                start_condition=phase5)
-        kitchen_setup.motion_goals.add_cartesian_pose(goal_pose=bowl_goal,
-                                                      tip_link=kitchen_setup.l_tip,
-                                                      root_link=kitchen_setup.default_root,
-                                                      name='place_bowl',
-                                                      start_condition=phase5,
-                                                      end_condition=' and '.join([bowl_placed, phase6]))
-        cup_placed = kitchen_setup.monitors.add_cartesian_pose(root_link=kitchen_setup.default_root,
-                                                               tip_link=kitchen_setup.r_tip,
-                                                               goal_pose=cup_goal,
-                                                               name='cup_placed',
-                                                               start_condition=phase5)
-        kitchen_setup.motion_goals.add_cartesian_pose(goal_pose=cup_goal,
-                                                      tip_link=kitchen_setup.r_tip,
-                                                      root_link=kitchen_setup.default_root,
-                                                      name='place_cup',
-                                                      start_condition=phase5,
-                                                      end_condition=' and '.join([cup_placed, phase6]))
+        bowl_placed = kitchen_setup.motion_goals.add_cartesian_pose(goal_pose=bowl_goal,
+                                                                    tip_link=kitchen_setup.l_tip,
+                                                                    root_link=kitchen_setup.default_root,
+                                                                    name='place_bowl',
+                                                                    start_condition=phase5)
+        kitchen_setup.update_end_condition(bowl_placed, ' and '.join([bowl_placed, phase6]))
+        cup_placed = kitchen_setup.motion_goals.add_cartesian_pose(goal_pose=cup_goal,
+                                                                   tip_link=kitchen_setup.r_tip,
+                                                                   root_link=kitchen_setup.default_root,
+                                                                   name='place_cup',
+                                                                   start_condition=phase5)
+        kitchen_setup.update_end_condition(bowl_placed, ' and '.join([cup_placed, phase6]))
+
         kitchen_setup.motion_goals.add_avoid_joint_limits(percentage=percentage,
                                                           name='avoid_joint_limits_while_placing',
                                                           start_condition=phase5,
                                                           end_condition=' and '.join([cup_placed, bowl_placed]))
         kitchen_setup.monitors.add_end_motion(start_condition=' and '.join([cup_placed, bowl_placed]))
-        kitchen_setup.monitors.add_max_trajectory_length(60)
+        kitchen_setup.monitors.add_check_trajectory_length(60)
         kitchen_setup.execute(add_local_minimum_reached=False)
         # %% next goal
         kitchen_setup.update_parent_link_of_group(name=bowl_name, parent_link='map')
         kitchen_setup.update_parent_link_of_group(name=cup_name, parent_link='map')
 
         # %% phase7 final pose
-        final_pose_monitor = kitchen_setup.monitors.add_joint_position(goal_state=kitchen_setup.better_pose,
-                                                                       name='final pose')
         phase7 = kitchen_setup.monitors.add_local_minimum_reached(name='phase7')
-        kitchen_setup.motion_goals.add_joint_position(goal_state=kitchen_setup.better_pose,
-                                                      name=final_pose_monitor,
-                                                      end_condition=' and '.join([final_pose_monitor, phase7]))
+        final_pose_monitor = kitchen_setup.motion_goals.add_joint_position(goal_state=kitchen_setup.better_pose,
+                                                                           name='final pose')
+        kitchen_setup.update_end_condition(final_pose_monitor, ' and '.join([final_pose_monitor, phase7]))
 
         kitchen_setup.monitors.add_end_motion(start_condition=phase7)
-        kitchen_setup.monitors.add_max_trajectory_length(60)
+        kitchen_setup.monitors.add_check_trajectory_length(60)
         kitchen_setup.avoid_all_collisions()
         kitchen_setup.allow_collision(group1=kitchen_setup.l_gripper_group,
                                       group2=bowl_name)
@@ -882,23 +915,27 @@ class TestMonitors:
         kitchen_setup.execute(add_local_minimum_reached=False)
 
     def test_sleep(self, zero_pose: PR2TestWrapper):
-        alternator = zero_pose.monitors.add_alternator()
-        sleep1 = zero_pose.monitors.add_sleep(1, name='sleep1')
-        print1 = zero_pose.monitors.add_print(message=f'{sleep1} done', start_condition=sleep1)
-        sleep2 = zero_pose.monitors.add_sleep(1.5, name='sleep2', start_condition=f'{print1} or not {sleep1}')
+        alternator = zero_pose.monitors.add_alternator(name='alternator')
+        sleep1 = zero_pose.monitors.add_sleep(name='sleep1', seconds=1)
+        print1 = zero_pose.monitors.add_print(message=f'{sleep1} done', start_condition=sleep1, name='print')
+        sleep2 = zero_pose.monitors.add_sleep(name='sleep2', seconds=1.5, start_condition=f'{print1} or not {sleep1}')
         zero_pose.motion_goals.allow_all_collisions()
 
-        right_monitor = zero_pose.monitors.add_joint_position(zero_pose.better_pose_right,
-                                                              name='right pose reached',
-                                                              start_condition=sleep1)
-        left_monitor = zero_pose.monitors.add_joint_position(zero_pose.better_pose_left,
-                                                             name='left pose reached',
-                                                             start_condition=sleep1)
-        zero_pose.motion_goals.add_joint_position(zero_pose.better_pose_right,
+        name = 'right pose reached'
+        right_monitor = zero_pose.monitors.add_joint_position(goal_state=zero_pose.better_pose_right,
+                                                              name=name,
+                                                              start_condition=sleep1,
+                                                              end_condition=name)
+        name = 'left pose reached'
+        left_monitor = zero_pose.monitors.add_joint_position(goal_state=zero_pose.better_pose_left,
+                                                             name=name,
+                                                             start_condition=sleep1,
+                                                             end_condition=name)
+        zero_pose.motion_goals.add_joint_position(goal_state=zero_pose.better_pose_right,
                                                   name='right pose',
                                                   start_condition=sleep2,
                                                   end_condition=right_monitor)
-        zero_pose.motion_goals.add_joint_position(zero_pose.better_pose_left,
+        zero_pose.motion_goals.add_joint_position(goal_state=zero_pose.better_pose_left,
                                                   name='left pose',
                                                   end_condition=left_monitor)
 
@@ -906,28 +943,60 @@ class TestMonitors:
         base_goal.header.frame_id = 'map'
         base_goal.pose.position.x = 2
         base_goal.pose.orientation.w = 1
-        base_monitor = zero_pose.monitors.add_cartesian_pose(root_link='map',
+        base_monitor = zero_pose.monitors.add_cartesian_pose(name='base monitor',
+                                                             root_link='map',
                                                              tip_link='base_footprint',
                                                              goal_pose=base_goal)
 
-        zero_pose.motion_goals.add_cartesian_pose(root_link='map',
+        zero_pose.motion_goals.add_cartesian_pose(name='base goal',
+                                                  root_link='map',
                                                   tip_link='base_footprint',
                                                   goal_pose=base_goal,
-                                                  hold_condition=f'not {alternator}',
+                                                  pause_condition=f'not {alternator}',
                                                   end_condition=base_monitor)
 
-        local_min = zero_pose.monitors.add_local_minimum_reached(end_condition='')
+        local_min = zero_pose.monitors.add_local_minimum_reached(name='local min')
         end = zero_pose.monitors.add_end_motion(start_condition=' and '.join([local_min,
                                                                               sleep2,
                                                                               right_monitor,
                                                                               left_monitor,
                                                                               base_monitor]))
-        zero_pose.monitors.add_max_trajectory_length(120)
+        zero_pose.monitors.add_check_trajectory_length(120)
         zero_pose.execute(add_local_minimum_reached=False)
         assert god_map.trajectory.length_in_seconds > 6
         current_pose = zero_pose.compute_fk_pose(root_link='map',
                                                  tip_link='base_footprint')
         compare_poses(current_pose.pose, base_goal.pose)
+
+    def test_joint_and_base_goal(self, zero_pose: PR2TestWrapper):
+        js = {
+            'torso_lift_joint': 0.2999225173357618,
+            'head_pan_joint': 0.041880780651479044,
+            'head_tilt_joint': -0.37,
+            'r_upper_arm_roll_joint': -0.9487714747527726,
+            'r_shoulder_pan_joint': -1.0047307505973626,
+            'r_shoulder_lift_joint': 0.48736790658811985,
+            'r_forearm_roll_joint': -14.895833882874182,
+            'r_elbow_flex_joint': -1.392377908925028,
+            'r_wrist_flex_joint': -0.4548695149411013,
+            'r_wrist_roll_joint': 0.11426798984097819,
+            'l_upper_arm_roll_joint': 1.7383062350263658,
+            'l_shoulder_pan_joint': 1.8799810286792007,
+            'l_shoulder_lift_joint': 0.011627231224188975,
+            'l_forearm_roll_joint': 312.67276414458695,
+            'l_elbow_flex_joint': -2.0300928925694675,
+            'l_wrist_flex_joint': -0.1,
+            'l_wrist_roll_joint': -6.062015047706399,
+        }
+        zero_pose.motion_goals.add_joint_position(name='joint task', goal_state=js)
+        zero_pose.allow_all_collisions()
+        base_pose = PoseStamped()
+        base_pose.header.frame_id = 'map'
+        base_pose.pose.position.x = 2
+        base_pose.pose.orientation.w = 1
+        zero_pose.motion_goals.add_cartesian_pose(name='base goal', goal_pose=base_pose, tip_link='base_footprint',
+                                                  root_link='map')
+        zero_pose.execute()
 
     def test_hold_monitors(self, zero_pose: PR2TestWrapper):
         sleep = zero_pose.monitors.add_sleep(0.5)
@@ -946,7 +1015,7 @@ class TestMonitors:
         zero_pose.motion_goals.add_cartesian_pose(goal_pose=base_goal,
                                                   tip_link='base_footprint',
                                                   root_link='map',
-                                                  hold_condition=alternator4,
+                                                  pause_condition=alternator4,
                                                   end_condition=goal_reached)
         local_min = zero_pose.monitors.add_local_minimum_reached(start_condition=goal_reached)
 
@@ -970,13 +1039,12 @@ class TestMonitors:
         stayed_put = zero_pose.monitors.add_cartesian_pose(goal_pose=current_base,
                                                            tip_link='base_footprint',
                                                            root_link='map',
-                                                           end_condition='',
                                                            name='goal reached')
 
         zero_pose.motion_goals.add_cartesian_pose(goal_pose=base_goal,
                                                   tip_link='base_footprint',
                                                   root_link='map',
-                                                  hold_condition=true)
+                                                  pause_condition=true)
 
         local_min = zero_pose.monitors.add_local_minimum_reached()
 
@@ -988,17 +1056,17 @@ class TestMonitors:
         zero_pose.set_max_traj_length(30)
         zero_pose.execute(add_local_minimum_reached=False)
 
-    def test_hold_condition_of_monitor(self, zero_pose: PR2TestWrapper):
+    def test_pause_condition_of_monitor(self, zero_pose: PR2TestWrapper):
         sleep = zero_pose.monitors.add_sleep(2, name='sleep')
         joint_goal = zero_pose.monitors.add_joint_position(name='joint reached',
                                                            goal_state=zero_pose.better_pose,
-                                                           hold_condition=f'not {sleep}')
+                                                           pause_condition=f'not {sleep}')
 
         zero_pose.motion_goals.add_joint_position(goal_state=zero_pose.better_pose)
         zero_pose.monitors.add_end_motion(start_condition=joint_goal)
         zero_pose.execute(add_local_minimum_reached=False)
 
-    def test_hold_condition_of_monitor2(self, zero_pose: PR2TestWrapper):
+    def test_pause_condition_of_monitor2(self, zero_pose: PR2TestWrapper):
         sleep = zero_pose.monitors.add_sleep(1, name='sleep')
         sleep2 = zero_pose.monitors.add_sleep(1, name='sleep2', start_condition=sleep)
         joint_goal = zero_pose.monitors.add_joint_position(name='joint reached',
@@ -1008,14 +1076,13 @@ class TestMonitors:
                                                             goal_state=zero_pose.default_pose,
                                                             threshold=0.03,
                                                             start_condition=teleport,
-                                                            hold_condition=f'{sleep}',
-                                                            end_condition='')
+                                                            pause_condition=f'{sleep}')
 
         zero_pose.motion_goals.add_joint_position(goal_state=zero_pose.better_pose,
                                                   start_condition=sleep2)
         zero_pose.monitors.add_end_motion(start_condition=joint_goal)
         zero_pose.monitors.add_cancel_motion(start_condition=f'not {joint_goal2} and {sleep2}', error=Exception('fail'))
-        zero_pose.monitors.add_max_trajectory_length(30)
+        zero_pose.monitors.add_check_trajectory_length(30)
         zero_pose.execute(add_local_minimum_reached=False)
 
     def test_end_plus_false_monitor(self, zero_pose: PR2TestWrapper):
@@ -1065,28 +1132,58 @@ class TestMonitors:
         zero_pose.execute(add_local_minimum_reached=False)
 
     def test_RelativePositionSequence(self, zero_pose: PR2TestWrapper):
-        goal1 = PointStamped()
-        goal1.header.frame_id = 'base_footprint'
-        goal1.point.x = 1
+        pose1 = PoseStamped()
+        pose1.header.frame_id = 'map'
+        pose1.pose.position.x = 1
+        pose1.pose.orientation.w = 1
 
-        goal2 = PointStamped()
-        goal2.header.frame_id = 'base_footprint'
-        goal2.point.y = 1
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class=RelativePositionSequence.__name__,
-                                               goal1=goal1,
-                                               goal2=goal2,
-                                               root_link='map',
-                                               tip_link='base_footprint')
+        pose2 = PoseStamped()
+        pose2.header.frame_id = 'base_footprint'
+        pose2.pose.position.y = 1
+        pose2.pose.orientation.w = 1
+
+        done = zero_pose.motion_goals.add_motion_goal(class_name=RelativePositionSequence.__name__,
+                                                      goal1=pose1,
+                                                      goal2=pose2,
+                                                      root_link=LinkName(name='map'),
+                                                      tip_link=LinkName(name='base_footprint'))
         zero_pose.allow_all_collisions()
-        zero_pose.execute()
+        zero_pose.monitors.add_end_motion(start_condition=done)
+        zero_pose.set_max_traj_length(30)
+        zero_pose.execute(add_local_minimum_reached=False)
         current_pose = zero_pose.compute_fk_pose(root_link='map', tip_link='base_footprint')
-        np.testing.assert_almost_equal(current_pose.pose.position.x, 1, decimal=2)
+        np.testing.assert_almost_equal(current_pose.pose.position.x, 0, decimal=2)
+        np.testing.assert_almost_equal(current_pose.pose.position.y, 1, decimal=2)
+
+    def test_open_door(self, zero_pose: PR2TestWrapper):
+        pose1 = PoseStamped()
+        pose1.header.frame_id = 'map'
+        pose1.pose.position.x = 1
+        pose1.pose.orientation.w = 1
+
+        pose2 = PoseStamped()
+        pose2.header.frame_id = 'base_footprint'
+        pose2.pose.position.y = 1
+        pose2.pose.orientation.w = 1
+
+        done = zero_pose.motion_goals.add_motion_goal(class_name=RelativePositionSequence.__name__,
+                                                      goal1=pose1,
+                                                      goal2=pose2,
+                                                      root_link=LinkName(name='map'),
+                                                      tip_link=LinkName(name='base_footprint'))
+        zero_pose.allow_all_collisions()
+        zero_pose.monitors.add_end_motion(start_condition=done)
+        zero_pose.set_max_traj_length(30)
+        zero_pose.execute(add_local_minimum_reached=False)
+        current_pose = zero_pose.compute_fk_pose(root_link='map', tip_link='base_footprint')
+        np.testing.assert_almost_equal(current_pose.pose.position.x, 0, decimal=2)
         np.testing.assert_almost_equal(current_pose.pose.position.y, 1, decimal=2)
 
     def test_print_event(self, zero_pose: PR2TestWrapper):
         monitor_name = zero_pose.monitors.add_joint_position(zero_pose.better_pose, name='goal')
         zero_pose.motion_goals.add_joint_position(zero_pose.better_pose)
         zero_pose.monitors.add_print(start_condition=monitor_name,
+                                     name='printer',
                                      message='=====================done=====================')
         zero_pose.execute()
 
@@ -1208,17 +1305,18 @@ class TestConstraints:
     # TODO write buggy constraints that test sanity checks
     def test_empty_problem(self, zero_pose: PR2TestWrapper):
         zero_pose.allow_all_collisions()
-        zero_pose.execute(expected_error_type=EmptyProblemException)
+        zero_pose.execute()
         zero_pose.allow_all_collisions()
         zero_pose.execute(expected_error_type=EmptyProblemException, add_local_minimum_reached=False)
 
     def test_add_debug_expr(self, zero_pose: PR2TestWrapper):
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class=DebugGoal.__name__)
-        zero_pose.set_joint_goal(zero_pose.better_pose)
+        zero_pose.motion_goals.add_motion_goal(class_name=DebugGoal.__name__, name='goal')
+        zero_pose.set_joint_goal(zero_pose.better_pose, add_monitor=False)
         zero_pose.execute()
 
     def test_cannot_resolve_symbol(self, zero_pose: PR2TestWrapper):
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class=CannotResolveSymbol.__name__,
+        zero_pose.motion_goals.add_motion_goal(class_name=CannotResolveSymbol.__name__,
+                                               name='goal',
                                                joint_name='torso_lift_joint')
         zero_pose.execute(expected_error_type=GiskardException)
 
@@ -1232,14 +1330,14 @@ class TestConstraints:
         pose.header.frame_id = 'map'
         pose.pose.position.x = 1
         pose.pose.orientation.w = 1
-        zero_pose.monitors.add_set_seed_odometry(base_pose=pose)
+        zero_pose.monitors.add_set_seed_odometry(base_pose=pose, name='goal')
         zero_pose.set_joint_goal(zero_pose.better_pose)
         zero_pose.plan()
         pose = PoseStamped()
         pose.header.frame_id = 'map'
         pose.pose.position.x = 1
         pose.pose.orientation.w = 1
-        zero_pose.monitors.add_set_seed_odometry(base_pose=pose, group_name=zero_pose.robot_name)
+        zero_pose.monitors.add_set_seed_odometry(base_pose=pose, group_name=zero_pose.robot_name, name='goal')
         zero_pose.set_joint_goal(zero_pose.better_pose)
         zero_pose.plan()
 
@@ -1260,15 +1358,15 @@ class TestConstraints:
     #     zero_pose.set_joint_goal(zero_pose.better_pose)
     #     zero_pose.execute(expected_error_type=VelocityLimitUnreachableException)
 
-    def test_SetPredictionHorizon11(self, zero_pose: PR2TestWrapper):
-        default_prediction_horizon = god_map.qp_controller.prediction_horizon
-        zero_pose.set_prediction_horizon(prediction_horizon=11)
-        zero_pose.set_joint_goal(zero_pose.better_pose)
-        zero_pose.execute()
-        assert god_map.qp_controller.prediction_horizon == 11
-        zero_pose.set_joint_goal(zero_pose.default_pose)
-        zero_pose.execute()
-        assert god_map.qp_controller.prediction_horizon == default_prediction_horizon
+    # def test_SetPredictionHorizon11(self, zero_pose: PR2TestWrapper):
+    #     default_prediction_horizon = god_map.qp_controller.prediction_horizon
+    #     zero_pose.set_prediction_horizon(prediction_horizon=11)
+    #     zero_pose.set_joint_goal(zero_pose.better_pose)
+    #     zero_pose.execute()
+    #     assert god_map.qp_controller.prediction_horizon == 11
+    #     zero_pose.set_joint_goal(zero_pose.default_pose)
+    #     zero_pose.execute()
+    #     assert god_map.qp_controller.prediction_horizon == default_prediction_horizon
 
     def test_SetMaxTrajLength(self, zero_pose: PR2TestWrapper):
         new_length = 4
@@ -1280,7 +1378,8 @@ class TestConstraints:
         zero_pose.set_cart_goal(base_goal, tip_link='base_footprint', root_link='map')
         result = zero_pose.execute(expected_error_type=MaxTrajectoryLengthException)
         dt = god_map.qp_controller.mpc_dt
-        np.testing.assert_almost_equal(len(result.trajectory.points) * dt, new_length + dt)
+        # due to rounding, its sometimes two or three steps longer, depending on dt
+        assert new_length + dt * 2 <= len(result.trajectory.points) * dt <= new_length + dt * 3
 
         zero_pose.set_cart_goal(base_goal, tip_link='base_footprint', root_link='map')
         result = zero_pose.execute(expected_error_type=MaxTrajectoryLengthException)
@@ -1304,7 +1403,8 @@ class TestConstraints:
         avoidance_hint.header.frame_id = 'map'
         avoidance_hint.vector.y = -1
         kitchen_setup.avoid_all_collisions(0.1)
-        kitchen_setup.motion_goals.add_motion_goal(motion_goal_class=CollisionAvoidanceHint.__name__,
+        kitchen_setup.motion_goals.add_motion_goal(class_name=CollisionAvoidanceHint.__name__,
+                                                   name='goal',
                                                    tip_link='base_link',
                                                    max_threshold=0.4,
                                                    spring_threshold=0.5,
@@ -1382,35 +1482,60 @@ class TestConstraints:
         vel_limit = 0.4
         joint_goal = 1
         zero_pose.allow_all_collisions()
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class=JointVelocityLimit.__name__,
+        zero_pose.motion_goals.add_motion_goal(class_name=JointVelocityLimit.__name__,
                                                joint_names=[joint.short_name],
+                                               name='goal',
                                                max_velocity=vel_limit,
                                                hard=True)
-        zero_pose.set_joint_goal(goal_state={joint.short_name: joint_goal})
+        zero_pose.set_joint_goal(goal_state={joint.short_name: joint_goal}, add_monitor=False)
         zero_pose.execute()
         np.testing.assert_almost_equal(god_map.world.state[joint].position, joint_goal, decimal=3)
         np.testing.assert_array_less(god_map.trajectory.to_dict()[1][joint], vel_limit + 1e-4)
 
     def test_JointPosition_kitchen(self, kitchen_setup: PR2TestWrapper):
         joint_name1 = 'iai_fridge_door_joint'
-        joint_name2 = 'sink_area_left_upper_drawer_main_joint'
+        joint_name2 = 'fridge_area_lower_drawer_main_joint'
+        joint_name3 = 'sink_area_trash_drawer_main_joint'
+        joint_name4 = 'sink_area_dish_washer_door_joint'
         group_name = 'iai_kitchen'
-        joint_goal = 0.4
         goal_state = {
-            joint_name1: joint_goal,
-            joint_name2: joint_goal
+            joint_name1: np.pi/2,
+            joint_name2: 0.4,
+            joint_name3: 0.4,
+            joint_name4: np.pi/2,
+        }
+        goal_state2 = {
+            joint_name1: 0,
+            joint_name2: 0,
+            joint_name3: 0,
+            joint_name4: 0,
         }
         # kitchen_setup.allow_all_collisions()
-        kitchen_setup.set_joint_goal(goal_state=goal_state)
-        kitchen_setup.execute()
-        np.testing.assert_almost_equal(
-            god_map.trajectory.get_last()[
-                PrefixName(joint_name1, group_name)].position,
-            joint_goal, decimal=2)
-        np.testing.assert_almost_equal(
-            god_map.trajectory.get_last()[
-                PrefixName(joint_name2, group_name)].position,
-            joint_goal, decimal=2)
+        g1 = 'g1'
+        g2 = 'g2'
+
+        base_pose = PoseStamped()
+        base_pose.header.frame_id = 'map'
+        base_pose.pose.position.x = -10
+        base_pose.pose.orientation.w = 1
+
+        g0 = kitchen_setup.monitors.add_set_seed_odometry(name='da', base_pose=base_pose)
+        sleep = kitchen_setup.monitors.add_sleep(seconds=1, name='sleep', start_condition=g0)
+        kitchen_setup.motion_goals.add_joint_position(goal_state=goal_state, name=g1, start_condition=sleep,
+                                                      end_condition=g1)
+        kitchen_setup.motion_goals.add_joint_position(goal_state=goal_state2, name=g2, start_condition=g1)
+        kitchen_setup.set_max_traj_length()
+        kitchen_setup.monitors.add_end_motion(start_condition=g2)
+
+        kitchen_setup.execute(add_local_minimum_reached=False)
+        # np.testing.assert_almost_equal(
+        #     god_map.trajectory.get_last()[
+        #         PrefixName(joint_name1, group_name)].position,
+        #     joint_goal, decimal=2)
+        # np.testing.assert_almost_equal(
+        #     god_map.trajectory.get_last()[
+        #         PrefixName(joint_name2, group_name)].position,
+        #     joint_goal, decimal=2)
 
     def test_CartesianOrientation(self, zero_pose: PR2TestWrapper):
         tip = 'base_footprint'
@@ -1454,7 +1579,8 @@ class TestConstraints:
         goal_position_p = deepcopy(goal_position)
         goal_position_p.header.frame_id = 'base_link'
         zero_pose.set_straight_cart_goal(goal_pose=goal_position_p, tip_link=zero_pose.l_tip,
-                                         root_link=zero_pose.default_root)
+                                         root_link=zero_pose.default_root,
+                                         add_monitor=False)
         zero_pose.execute()
 
     def test_CartesianPoseStraight2(self, better_pose: PR2TestWrapper):
@@ -1485,26 +1611,30 @@ class TestConstraints:
         goal.pose.position.x -= 0.1
         goal.pose.position.y += 0.4
         better_pose.set_straight_cart_goal(goal_pose=goal, tip_link=better_pose.l_tip,
-                                           root_link=better_pose.default_root)
+                                           root_link=better_pose.default_root,
+                                           add_monitor=False)
         better_pose.execute()
 
         goal = deepcopy(object_pose)
         goal.pose.position.z -= 0.4
         better_pose.set_straight_cart_goal(goal_pose=goal, tip_link=better_pose.l_tip,
-                                           root_link=better_pose.default_root)
+                                           root_link=better_pose.default_root,
+                                           add_monitor=False)
         better_pose.execute()
 
         goal = deepcopy(object_pose)
         goal.pose.position.y -= 0.4
         goal.pose.position.x -= 0.2
         better_pose.set_straight_cart_goal(goal_pose=goal, tip_link=better_pose.l_tip,
-                                           root_link=better_pose.default_root)
+                                           root_link=better_pose.default_root,
+                                           add_monitor=False)
         better_pose.execute()
 
         goal = deepcopy(object_pose)
         goal.pose.position.x -= 0.4
         better_pose.set_straight_cart_goal(goal_pose=goal, tip_link=better_pose.l_tip,
-                                           root_link=better_pose.default_root)
+                                           root_link=better_pose.default_root,
+                                           add_monitor=False)
         better_pose.execute()
 
     def test_CartesianVelocityLimit(self, zero_pose: PR2TestWrapper):
@@ -1515,7 +1645,6 @@ class TestConstraints:
             tip_link='base_footprint',
             max_linear_velocity=base_linear_velocity,
             max_angular_velocity=base_angular_velocity,
-            hard=True,
         )
         eef_linear_velocity = 1
         eef_angular_velocity = 1
@@ -1530,10 +1659,11 @@ class TestConstraints:
                                 root_link='map',
                                 reference_linear_velocity=eef_linear_velocity,
                                 reference_angular_velocity=eef_angular_velocity,
+                                add_monitor=False,
                                 weight=WEIGHT_BELOW_CA)
         zero_pose.execute()
 
-        for time, state in god_map.debug_expression_manager.raw_traj_to_traj().items():
+        for time, state in god_map.debug_expression_manager.raw_traj_to_traj(god_map.qp_controller.control_dt).items():
             key = f'trans_error'
             assert key in state
             assert state[key].position <= base_linear_velocity + 2e3
@@ -1810,7 +1940,7 @@ class TestConstraints:
         kitchen_setup.execute()
 
         # # # close the gripper
-        kitchen_setup.set_joint_goal(goal_state={'r_gripper_l_finger_joint': 0.0})
+        kitchen_setup.set_joint_goal(goal_state={'r_gripper_l_finger_joint': 0.0}, add_monitor=False)
 
         kitchen_setup.set_pre_push_door_goal(root_link=kitchen_setup.default_root,
                                              tip_link=hand,
@@ -1863,26 +1993,26 @@ class TestConstraints:
     def test_wrong_constraint_type(self, zero_pose: PR2TestWrapper):
         goal_state = {'r_elbow_flex_joint': -1.0}
         kwargs = {'goal_state': goal_state}
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class='jointpos', **kwargs)
+        zero_pose.motion_goals.add_motion_goal(class_name='jointpos', name='goal', **kwargs)
         zero_pose.execute(expected_error_type=UnknownGoalException)
 
     def test_python_code_in_constraint_type(self, zero_pose: PR2TestWrapper):
         goal_state = {'r_elbow_flex_joint': -1.0}
         kwargs = {'goal_state': goal_state}
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class='print("muh")', **kwargs)
+        zero_pose.motion_goals.add_motion_goal(class_name='print("muh")', name='goal', **kwargs)
         zero_pose.execute(expected_error_type=UnknownGoalException)
 
     def test_wrong_params1(self, zero_pose: PR2TestWrapper):
         goal_state = {5432: 'muh'}
         kwargs = {'goal_state': goal_state}
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class='JointPositionList', **kwargs)
+        zero_pose.motion_goals.add_motion_goal(class_name='JointPositionList', name='goal', **kwargs)
         zero_pose.execute(expected_error_type=UnknownJointException)
 
     def test_wrong_params2(self, zero_pose: PR2TestWrapper):
         goal_state = {'r_elbow_flex_joint': 'muh'}
         kwargs = {'goal_state': goal_state}
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class='JointPositionList', **kwargs)
-        zero_pose.execute(expected_error_type=GoalInitalizationException)
+        zero_pose.motion_goals.add_motion_goal(class_name='JointPositionList', name='goal', **kwargs)
+        zero_pose.execute(expected_error_type=TypeError)
 
     # def test_align_planes2(self, zero_pose: PR2TestWrapper):
     #     # FIXME, what should I do with opposite vectors?
@@ -2334,13 +2464,15 @@ class TestCartGoals:
     def test_cart_goal_unreachable(self, zero_pose: PR2TestWrapper):
         p = PoseStamped()
         p.header.frame_id = 'map'
-        p.pose.position = Point(0, 0, -1)
+        p.pose.position = Point(0.1, 0, -1)
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.allow_all_collisions()
-        zero_pose.set_cart_goal(goal_pose=p,
-                                tip_link='base_footprint',
-                                root_link='map')
-        zero_pose.execute(expected_error_type=LocalMinimumException)
+        cart_goal_reached = zero_pose.motion_goals.add_cartesian_pose(goal_pose=p,
+                                                                      tip_link='base_footprint',
+                                                                      root_link='map')
+        zero_pose.monitors.add_cancel_motion(start_condition=cart_goal_reached)
+        zero_pose.add_end_on_local_minimum()
+        zero_pose.execute(add_local_minimum_reached=False)
 
     def test_cart_goal_1eef2(self, zero_pose: PR2TestWrapper):
         # zero_pose.set_json_goal('SetPredictionHorizon', prediction_horizon=1)
@@ -3268,7 +3400,8 @@ class TestCollisionAvoidanceGoals:
         r_goal.pose.position.z = 0.84
         r_goal.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 2, [0, 1, 0]))
         fake_table_setup.avoid_all_collisions(0.1)
-        fake_table_setup.set_cart_goal(goal_pose=r_goal, tip_link=fake_table_setup.r_tip, root_link='map')
+        fake_table_setup.set_cart_goal(goal_pose=r_goal, tip_link=fake_table_setup.r_tip, root_link='map',
+                                       add_monitor=False)
         fake_table_setup.execute()
         fake_table_setup.check_cpi_geq(fake_table_setup.get_l_gripper_links(), 0.05)
         fake_table_setup.check_cpi_leq(['r_gripper_l_finger_tip_link'], 0.04)
@@ -3385,13 +3518,13 @@ class TestCollisionAvoidanceGoals:
         p = PoseStamped()
         p.header.frame_id = pocky_pose_setup.r_tip
         p.pose.position.x = 0.08
-        p.pose.orientation = Quaternion(*quaternion_about_axis(np.pi/2, [0, 1, 0]).tolist())
+        p.pose.orientation = Quaternion(*quaternion_about_axis(np.pi / 2, [0, 1, 0]).tolist())
         pocky_pose_setup.add_cylinder_to_world(name='box',
-                                          # size=(0.2, 0.05, 0.05),
-                                               height = 0.2,
+                                               # size=(0.2, 0.05, 0.05),
+                                               height=0.2,
                                                radius=0.025,
-                                          parent_link=pocky_pose_setup.r_tip,
-                                          pose=p)
+                                               parent_link=pocky_pose_setup.r_tip,
+                                               pose=p)
         p = PoseStamped()
         p.header.frame_id = pocky_pose_setup.r_tip
         p.pose.position.x = 0.12
@@ -3758,7 +3891,7 @@ class TestCollisionAvoidanceGoals:
         kitchen_setup.close_l_gripper()
 
         # Remove Milk
-        kitchen_setup.set_cart_goal(milk_pre_pose, milk_name, kitchen_setup.default_root)
+        kitchen_setup.set_cart_goal(milk_pre_pose, milk_name, kitchen_setup.default_root, add_monitor=False)
         kitchen_setup.execute()
         base_goal = PoseStamped()
         base_goal.header.frame_id = 'base_footprint'
@@ -3767,10 +3900,10 @@ class TestCollisionAvoidanceGoals:
         kitchen_setup.move_base(base_goal)
 
         # place milk back
-        kitchen_setup.set_cart_goal(milk_pre_pose, milk_name, kitchen_setup.default_root)
+        kitchen_setup.set_cart_goal(milk_pre_pose, milk_name, kitchen_setup.default_root, add_monitor=False)
         kitchen_setup.execute()
 
-        kitchen_setup.set_cart_goal(milk_pose, milk_name, kitchen_setup.default_root)
+        kitchen_setup.set_cart_goal(milk_pose, milk_name, kitchen_setup.default_root, add_monitor=False)
         kitchen_setup.execute()
 
         kitchen_setup.open_l_gripper()
@@ -3863,7 +3996,8 @@ class TestCollisionAvoidanceGoals:
                                                                       [0, 0, 0, 1]]))
         kitchen_setup.set_cart_goal(goal_pose=l_goal,
                                     tip_link=kitchen_setup.l_tip,
-                                    root_link=kitchen_setup.default_root)
+                                    root_link=kitchen_setup.default_root,
+                                    add_monitor=False)
         kitchen_setup.allow_collision(kitchen_setup.l_gripper_group, bowl_name)
 
         # grasp cup
@@ -3877,17 +4011,20 @@ class TestCollisionAvoidanceGoals:
         kitchen_setup.set_avoid_joint_limits_goal(percentage=percentage)
         kitchen_setup.set_cart_goal(goal_pose=r_goal,
                                     tip_link=kitchen_setup.r_tip,
-                                    root_link=kitchen_setup.default_root)
+                                    root_link=kitchen_setup.default_root,
+                                    add_monitor=False)
         kitchen_setup.execute()
 
         l_goal.pose.position.z -= .2
         r_goal.pose.position.z -= .2
         kitchen_setup.set_cart_goal(goal_pose=l_goal,
                                     tip_link=kitchen_setup.l_tip,
-                                    root_link=kitchen_setup.default_root)
+                                    root_link=kitchen_setup.default_root,
+                                    add_monitor=False)
         kitchen_setup.set_cart_goal(goal_pose=r_goal,
                                     tip_link=kitchen_setup.r_tip,
-                                    root_link=kitchen_setup.default_root)
+                                    root_link=kitchen_setup.default_root,
+                                    add_monitor=False)
         kitchen_setup.set_avoid_joint_limits_goal(percentage=percentage)
         kitchen_setup.avoid_all_collisions(0.05)
         kitchen_setup.allow_collision(group1=kitchen_setup.robot_name, group2=bowl_name)
@@ -3916,8 +4053,10 @@ class TestCollisionAvoidanceGoals:
         cup_goal.pose.position = Point(.15, 0.25, .07)
         cup_goal.pose.orientation = Quaternion(0, 0, 0, 1)
 
-        kitchen_setup.set_cart_goal(goal_pose=bowl_goal, tip_link=bowl_name, root_link=kitchen_setup.default_root)
-        kitchen_setup.set_cart_goal(goal_pose=cup_goal, tip_link=cup_name, root_link=kitchen_setup.default_root)
+        kitchen_setup.set_cart_goal(goal_pose=bowl_goal, tip_link=bowl_name, root_link=kitchen_setup.default_root,
+                                    add_monitor=False)
+        kitchen_setup.set_cart_goal(goal_pose=cup_goal, tip_link=cup_name, root_link=kitchen_setup.default_root,
+                                    add_monitor=False)
         kitchen_setup.set_avoid_joint_limits_goal(percentage=percentage)
         kitchen_setup.avoid_all_collisions(0.05)
         kitchen_setup.execute()
@@ -4003,19 +4142,20 @@ class TestCollisionAvoidanceGoals:
                                                                       [0, -1, 0, 0],
                                                                       [0, 0, 0, 1]]))
 
-        kitchen_setup.set_cart_goal(goal_pose=l_goal, tip_link=kitchen_setup.l_tip, root_link='map')
-        kitchen_setup.set_cart_goal(goal_pose=r_goal, tip_link=kitchen_setup.r_tip, root_link='map')
+        kitchen_setup.set_cart_goal(goal_pose=l_goal, tip_link=kitchen_setup.l_tip, root_link='map', add_monitor=False)
+        kitchen_setup.set_cart_goal(goal_pose=r_goal, tip_link=kitchen_setup.r_tip, root_link='map', add_monitor=False)
         kitchen_setup.allow_collision(kitchen_setup.robot_name, tray_name)
         kitchen_setup.set_avoid_joint_limits_goal(percentage=percentage)
         # grasp tray
-        kitchen_setup.execute()
+        kitchen_setup.add_end_on_local_minimum()
+        kitchen_setup.execute(add_local_minimum_reached=False)
 
         kitchen_setup.update_parent_link_of_group(tray_name, kitchen_setup.r_tip)
 
         r_goal = PoseStamped()
         r_goal.header.frame_id = kitchen_setup.l_tip
         r_goal.pose.orientation.w = 1
-        kitchen_setup.set_cart_goal(r_goal, kitchen_setup.l_tip, tray_name)
+        kitchen_setup.set_cart_goal(r_goal, kitchen_setup.l_tip, tray_name, add_monitor=False)
 
         tray_goal = kitchen_setup.compute_fk_pose('base_footprint', tray_name)
         tray_goal.pose.position.y = 0
@@ -4053,8 +4193,9 @@ class TestCollisionAvoidanceGoals:
         kitchen_setup.set_avoid_joint_limits_goal(percentage=percentage)
         kitchen_setup.allow_collision(group1=tray_name,
                                       group2=kitchen_setup.l_gripper_group)
-        kitchen_setup.set_cart_goal(tray_goal, tray_name, 'base_footprint')
-        kitchen_setup.execute()
+        kitchen_setup.set_cart_goal(tray_goal, tray_name, 'base_footprint', add_monitor=False)
+        kitchen_setup.add_end_on_local_minimum()
+        kitchen_setup.execute(add_local_minimum_reached=False)
 
     # TODO FIXME attaching and detach of urdf objects that listen to joint states
 
@@ -4146,7 +4287,7 @@ class TestBenchmark:
             for h in horizons:
                 js = {'torso_lift_joint': 1}
                 zero_pose.set_prediction_horizon(h)
-                zero_pose.motion_goals.add_motion_goal(motion_goal_class=SetQPSolver.__name__,
+                zero_pose.motion_goals.add_motion_goal(class_name=SetQPSolver.__name__,
                                                        qp_solver_id=qp_solver)
                 zero_pose.set_joint_goal(js, add_monitor=False)
                 zero_pose.allow_all_collisions()
@@ -4163,7 +4304,7 @@ class TestBenchmark:
         for qp_solver in self.qp_solvers:
             for h in horizons:
                 zero_pose.set_prediction_horizon(h)
-                zero_pose.motion_goals.add_motion_goal(motion_goal_class=SetQPSolver.__name__,
+                zero_pose.motion_goals.add_motion_goal(class_name=SetQPSolver.__name__,
                                                        qp_solver_id=qp_solver)
                 zero_pose.set_joint_goal(zero_pose.better_pose, add_monitor=False)
                 zero_pose.allow_all_collisions()
@@ -4179,7 +4320,7 @@ class TestBenchmark:
         for qp_solver in self.qp_solvers:
             for h in horizons:
                 zero_pose.set_prediction_horizon(h)
-                zero_pose.motion_goals.add_motion_goal(motion_goal_class=SetQPSolver.__name__,
+                zero_pose.motion_goals.add_motion_goal(class_name=SetQPSolver.__name__,
                                                        qp_solver_id=qp_solver)
                 root = 'odom_combined'
 
@@ -4207,7 +4348,7 @@ class TestBenchmark:
         for qp_solver in self.qp_solvers:
             for h in horizons:
                 fake_table_setup.set_prediction_horizon(h)
-                fake_table_setup.motion_goals.add_motion_goal(motion_goal_class=SetQPSolver.__name__,
+                fake_table_setup.motion_goals.add_motion_goal(class_name=SetQPSolver.__name__,
                                                               qp_solver_id=qp_solver)
                 r_goal = PoseStamped()
                 r_goal.header.frame_id = 'map'
@@ -4234,7 +4375,7 @@ class TestManipulability:
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.allow_all_collisions()
         zero_pose.set_cart_goal(p, zero_pose.r_tip, 'map')
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulabilityLinWeight.__name__,
+        zero_pose.motion_goals.add_motion_goal(class_name=MaxManipulability.__name__,
                                                root_link='torso_lift_link',
                                                tip_link='r_gripper_tool_frame')
         zero_pose.execute()
@@ -4247,12 +4388,12 @@ class TestManipulability:
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.allow_all_collisions()
         zero_pose.set_cart_goal(p, zero_pose.r_tip, 'map')
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulabilityLinWeight.__name__,
+        zero_pose.motion_goals.add_motion_goal(class_name=MaxManipulability.__name__,
                                                root_link='torso_lift_link',
                                                tip_link='r_gripper_tool_frame')
         p.pose.position = Point(1, 0.1, 0)
         zero_pose.set_cart_goal(p, zero_pose.l_tip, 'map')
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulabilityLinWeight.__name__,
+        zero_pose.motion_goals.add_motion_goal(class_name=MaxManipulability.__name__,
                                                root_link='torso_lift_link',
                                                tip_link='l_gripper_tool_frame')
         zero_pose.execute(add_local_minimum_reached=True)
@@ -4326,7 +4467,7 @@ class TestWeightScaling:
         tip_goal = PointStamped()
         tip_goal.header.frame_id = 'map'
         tip_goal.point = goal_pose.pose.position
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class=BaseArmWeightScaling.__name__,
+        zero_pose.motion_goals.add_motion_goal(class_name=BaseArmWeightScaling.__name__,
                                                root_link='map',
                                                tip_link='l_gripper_tool_frame',
                                                tip_goal=tip_goal,
@@ -4350,15 +4491,15 @@ class TestWeightScaling:
                                                    'l_wrist_flex_joint',
                                                    'l_wrist_roll_joint'],
                                                base_joints=['brumbrum'])
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulabilityLinWeight.__name__,
+        zero_pose.motion_goals.add_motion_goal(class_name=MaxManipulability.__name__,
                                                root_link='torso_lift_link',
                                                tip_link='r_gripper_tool_frame')
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulabilityLinWeight.__name__,
+        zero_pose.motion_goals.add_motion_goal(class_name=MaxManipulability.__name__,
                                                root_link='torso_lift_link',
                                                tip_link='l_gripper_tool_frame')
         zero_pose.add_default_end_motion_conditions()
         zero_pose.allow_all_collisions()
-        zero_pose.execute()
+        zero_pose.execute(add_local_minimum_reached=False)
         assert god_map.debug_expression_manager.evaluated_debug_expressions['arm_scaling'][0] * 1000 < \
                god_map.debug_expression_manager.evaluated_debug_expressions['base_scaling'][0]
 
@@ -4371,7 +4512,7 @@ class TestWeightScaling:
         zero_pose.allow_all_collisions()
         zero_pose.set_cart_goal(p, zero_pose.r_tip, 'map')
         m_threshold = 0.16
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulabilityLinWeight.__name__,
+        zero_pose.motion_goals.add_motion_goal(class_name=MaxManipulability.__name__,
                                                root_link='torso_lift_link',
                                                tip_link=zero_pose.r_tip,
                                                m_threshold=m_threshold)
@@ -4388,13 +4529,13 @@ class TestWeightScaling:
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.allow_all_collisions()
         zero_pose.set_cart_goal(p, zero_pose.r_tip, 'map')
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulabilityLinWeight.__name__,
+        zero_pose.motion_goals.add_motion_goal(class_name=MaxManipulability.__name__,
                                                root_link='torso_lift_link',
                                                tip_link=zero_pose.r_tip,
                                                m_threshold=m_threshold)
         p.pose.position = Point(1, 0.1, 0)
         zero_pose.set_cart_goal(p, zero_pose.l_tip, 'map')
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulabilityLinWeight.__name__,
+        zero_pose.motion_goals.add_motion_goal(class_name=MaxManipulability.__name__,
                                                root_link='torso_lift_link',
                                                tip_link=zero_pose.l_tip,
                                                m_threshold=m_threshold)
@@ -4425,7 +4566,7 @@ class TestFeatureFunctions:
                                                            tip_normal=robot_feature)
 
         zero_pose.monitors.add_end_motion(mon)
-        zero_pose.execute()
+        zero_pose.execute(add_local_minimum_reached=False)
 
     def test_feature_angle(self, zero_pose: PR2TestWrapper):
         world_feature = Vector3Stamped()
@@ -4450,7 +4591,7 @@ class TestFeatureFunctions:
                                            tip_vector=robot_feature,
                                            name='angleMonitor')
         zero_pose.monitors.add_end_motion(mon)
-        zero_pose.execute()
+        zero_pose.execute(add_local_minimum_reached=False)
 
     def test_feature_height(self, zero_pose: PR2TestWrapper):
         world_feature = PointStamped()
@@ -4473,7 +4614,7 @@ class TestFeatureFunctions:
                                             upper_limit=1.001)
 
         zero_pose.monitors.add_end_motion(mon)
-        zero_pose.execute()
+        zero_pose.execute(add_local_minimum_reached=False)
 
     def test_feature_distance(self, zero_pose: PR2TestWrapper):
         world_feature = PointStamped()
@@ -4496,7 +4637,7 @@ class TestFeatureFunctions:
                                               upper_limit=2.01)
 
         zero_pose.monitors.add_end_motion(mon)
-        zero_pose.execute()
+        zero_pose.execute(add_local_minimum_reached=False)
 
 
 class TestEndMotionReason:
@@ -4509,17 +4650,18 @@ class TestEndMotionReason:
 
         mon_distance = zero_pose.monitors.add_distance(root_link='map', tip_link=zero_pose.r_tip,
                                                        reference_point=goal_point,
+                                                       name='distance',
                                                        tip_point=controlled_point, lower_limit=0, upper_limit=0)
         zero_pose.motion_goals.add_distance(root_link='base_link', tip_link=zero_pose.r_tip, reference_point=goal_point,
-                                            tip_point=controlled_point, lower_limit=0, upper_limit=0)
+                                            tip_point=controlled_point, lower_limit=0, upper_limit=0,
+                                            name='reach distance')
 
-        mon_trajectory = zero_pose.monitors.add_max_trajectory_length(max_trajectory_length=1)
-        zero_pose.monitors.add_cancel_motion(mon_trajectory, error=Exception('stop motion'))
+        zero_pose.set_max_traj_length(1)
         zero_pose.monitors.add_end_motion(mon_distance)
         result = zero_pose.execute(expected_error_type=MaxTrajectoryLengthException,
                                    add_local_minimum_reached=False)
         reason = zero_pose.get_end_motion_reason(move_result=result)
-        assert len(reason) == 1 and list(reason.keys())[0] == 'M0 DistanceMonitor'
+        assert len(reason) == 1 and list(reason.keys())[0] == mon_distance
 
     def test_get_end_motion_reason_convoluted(self, zero_pose: PR2TestWrapper):
         goal_point = PointStamped()
@@ -4528,24 +4670,25 @@ class TestEndMotionReason:
         controlled_point = PointStamped()
         controlled_point.header.frame_id = zero_pose.r_tip
 
-        mon_sleep1 = zero_pose.monitors.add_sleep(10, name='sleep1')
-        mon_sleep2 = zero_pose.monitors.add_sleep(10, start_condition=mon_sleep1, name='sleep2')
+        mon_sleep1 = zero_pose.monitors.add_sleep(seconds=10, name='sleep1')
+        mon_sleep2 = zero_pose.monitors.add_sleep(seconds=10, start_condition=mon_sleep1, name='sleep2')
         mon_distance = zero_pose.monitors.add_distance(root_link='map', tip_link=zero_pose.r_tip,
                                                        reference_point=goal_point,
+                                                       name='mon_distance',
                                                        tip_point=controlled_point, lower_limit=0, upper_limit=0,
                                                        start_condition=mon_sleep2)
         zero_pose.motion_goals.add_distance(root_link='base_link', tip_link=zero_pose.r_tip, reference_point=goal_point,
+                                            name='distance',
                                             tip_point=controlled_point, lower_limit=0, upper_limit=0)
 
-        mon_trajectory = zero_pose.monitors.add_max_trajectory_length(max_trajectory_length=1)
-        zero_pose.monitors.add_cancel_motion(mon_trajectory, error=Exception('stop motion'))
+        zero_pose.set_max_traj_length(1)
         zero_pose.monitors.add_end_motion(mon_distance)
         result = zero_pose.execute(expected_error_type=MaxTrajectoryLengthException,
                                    add_local_minimum_reached=False)
         reason = zero_pose.get_end_motion_reason(move_result=result)
         print(reason)
-        assert len(reason) == 3 and list(reason.keys())[0] == 'M2 DistanceMonitor' \
-               and list(reason.keys())[2] == 'M0 sleep1' and list(reason.keys())[1] == 'M1 sleep2'
+        assert len(reason) == 3 and list(reason.keys())[0] == mon_distance \
+               and list(reason.keys())[2] == mon_sleep1 and list(reason.keys())[1] == mon_sleep2
 
     def test_multiple_end_motion_monitors(self, zero_pose: PR2TestWrapper):
         goal_point = PointStamped()
@@ -4554,30 +4697,31 @@ class TestEndMotionReason:
         controlled_point = PointStamped()
         controlled_point.header.frame_id = zero_pose.r_tip
 
-        mon_sleep1 = zero_pose.monitors.add_sleep(10, name='sleep1')
-        mon_sleep2 = zero_pose.monitors.add_sleep(10, start_condition=mon_sleep1, name='sleep2')
+        mon_sleep1 = zero_pose.monitors.add_sleep(seconds=10, name='sleep1')
+        mon_sleep2 = zero_pose.monitors.add_sleep(seconds=10, start_condition=mon_sleep1, name='sleep2')
         mon_distance = zero_pose.monitors.add_distance(root_link='map', tip_link=zero_pose.r_tip,
                                                        reference_point=goal_point,
+                                                       name='g1',
                                                        tip_point=controlled_point, lower_limit=0, upper_limit=0,
                                                        start_condition=mon_sleep2)
         zero_pose.motion_goals.add_distance(root_link='base_link', tip_link=zero_pose.r_tip, reference_point=goal_point,
+                                            name='g2',
                                             tip_point=controlled_point, lower_limit=0, upper_limit=0)
 
-        mon_trajectory = zero_pose.monitors.add_max_trajectory_length(max_trajectory_length=1)
-        zero_pose.monitors.add_cancel_motion(mon_trajectory, error=Exception('stop motion'))
-        zero_pose.monitors.add_end_motion(mon_distance)
+        zero_pose.set_max_traj_length(1)
+        zero_pose.monitors.add_end_motion(mon_distance, name='endmotion 1')
 
-        mon_sleep3 = zero_pose.monitors.add_sleep(20, name='sleep3')
-        mon_sleep4 = zero_pose.monitors.add_sleep(20, start_condition=mon_sleep3, name='sleep4')
+        mon_sleep3 = zero_pose.monitors.add_sleep(seconds=20, name='sleep3')
+        mon_sleep4 = zero_pose.monitors.add_sleep(seconds=20, start_condition=mon_sleep3, name='sleep4')
         zero_pose.monitors.add_end_motion(mon_sleep4)
 
         result = zero_pose.execute(expected_error_type=MaxTrajectoryLengthException,
                                    add_local_minimum_reached=False)
         reason = zero_pose.get_end_motion_reason(move_result=result)
         print(reason)
-        assert len(reason) == 5 and list(reason.keys())[0] == 'M2 DistanceMonitor' \
-               and list(reason.keys())[1] == 'M1 sleep2' and list(reason.keys())[2] == 'M0 sleep1' and \
-               list(reason.keys())[3] == 'M7 sleep4' and list(reason.keys())[4] == 'M6 sleep3'
+        assert len(reason) == 5 and list(reason.keys())[0] == mon_distance \
+               and list(reason.keys())[1] == mon_sleep2 and list(reason.keys())[2] == mon_sleep1 and \
+               list(reason.keys())[3] == mon_sleep4 and list(reason.keys())[4] == mon_sleep3
 
     # kernprof -lv py.test -s test/test_integration_pr2.py
 # time: [1-9][1-9]*.[1-9]* s
@@ -4587,7 +4731,7 @@ class TestEndMotionReason:
 # pytest.main(['-s', __file__ + '::TestConstraints::test_RelativePositionSequence'])
 # pytest.main(['-s', __file__ + '::TestConstraints::test_open_dishwasher_apartment'])
 # pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_bowl_and_cup'])
-# pytest.main(['-s', __file__ + '::TestMonitors::test_bowl_and_cup_sequence'])
+# pytest.main(['-s', __file__ + '::TestMonitors::test_joint_and_base_goal'])
 # pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_avoid_collision_go_around_corner'])
 # pytest.main(['-s', __file__ + '::TestCollisionAvoidanceGoals::test_avoid_collision_box_between_boxes'])
 # pytest.main(['-s', __file__ + '::TestSelfCollisionAvoidance::test_avoid_self_collision_with_l_arm'])

@@ -14,5 +14,6 @@ class EvaluateMonitors(GiskardBehavior):
     @catch_and_raise_to_blackboard
     @record_time
     def update(self):
-        god_map.monitor_manager.evaluate_monitors()
-        return Status.SUCCESS
+        if god_map.motion_statechart_manager.evaluate_node_states():
+            return Status.SUCCESS
+        return Status.RUNNING

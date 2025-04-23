@@ -12,11 +12,11 @@ from giskardpy_ros.configs.giskard import Giskard
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from giskardpy_ros.configs.iai_robots.tiago import TiagoStandaloneInterface, TiagoCollisionAvoidanceConfig
 from giskardpy.model.world_config import WorldWithDiffDriveRobot
-from giskardpy.motion_graph.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
+from giskardpy.motion_statechart.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
 from giskardpy.god_map import god_map
 from giskardpy.data_types.data_types import PrefixName
-from utils_for_tests import launch_launchfile
-from utils_for_tests import GiskardTestWrapper
+from giskardpy_ros.utils.utils_for_tests import launch_launchfile
+from giskardpy_ros.utils.utils_for_tests import GiskardTestWrapper
 
 
 @pytest.fixture(scope='module')
@@ -101,7 +101,7 @@ class TiagoTestWrapper(GiskardTestWrapper):
                               collision_avoidance_config=TiagoCollisionAvoidanceConfig(),
                               robot_interface_config=TiagoStandaloneInterface(),
                               behavior_tree_config=StandAloneBTConfig(debug_mode=True),
-                              qp_controller_config=QPControllerConfig())
+                              qp_controller_config=QPControllerConfig(mpc_dt=0.05))
         super().__init__(giskard)
 
     def move_base(self, goal_pose: PoseStamped, add_monitor: bool = True):

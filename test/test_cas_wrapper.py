@@ -1,6 +1,5 @@
 import math
 import unittest
-from copy import deepcopy
 from datetime import timedelta
 
 import PyKDL
@@ -17,7 +16,7 @@ from giskardpy import casadi_wrapper as cas
 from giskardpy.qp import pos_in_vel_limits as cas2
 import giskardpy.utils.math as giskard_math
 from giskardpy.utils.math import compare_orientations, axis_angle_from_quaternion, rotation_matrix_from_quaternion
-from utils_for_tests import float_no_nan_no_inf, unit_vector, quaternion, vector, \
+from giskardpy_ros.utils.utils_for_tests import float_no_nan_no_inf, unit_vector, quaternion, vector, \
     pykdl_frame_to_numpy, lists_of_same_length, random_angle, compare_axis_angle, angle_positive, sq_matrix, \
     float_no_nan_no_inf_min_max
 
@@ -198,15 +197,15 @@ class TestExpression(unittest.TestCase):
     def test_logic_and(self):
         s1 = cas.Symbol('s1')
         s2 = cas.Symbol('s2')
-        expr = cas.logic_and(cas.TrueSymbol, s1)
+        expr = cas.logic_and(cas.BinaryTrue, s1)
         assert not cas.is_true_symbol(expr) and not cas.is_false_symbol(expr)
-        expr = cas.logic_and(cas.FalseSymbol, s1)
+        expr = cas.logic_and(cas.BinaryFalse, s1)
         assert cas.is_false_symbol(expr)
-        expr = cas.logic_and(cas.TrueSymbol, cas.TrueSymbol)
+        expr = cas.logic_and(cas.BinaryTrue, cas.BinaryTrue)
         assert cas.is_true_symbol(expr)
-        expr = cas.logic_and(cas.FalseSymbol, cas.TrueSymbol)
+        expr = cas.logic_and(cas.BinaryFalse, cas.BinaryTrue)
         assert cas.is_false_symbol(expr)
-        expr = cas.logic_and(cas.FalseSymbol, cas.FalseSymbol)
+        expr = cas.logic_and(cas.BinaryFalse, cas.BinaryFalse)
         assert cas.is_false_symbol(expr)
         expr = cas.logic_and(s1, s2)
         assert not cas.is_true_symbol(expr) and not cas.is_false_symbol(expr)
@@ -214,15 +213,15 @@ class TestExpression(unittest.TestCase):
     def test_logic_or(self):
         s1 = cas.Symbol('s1')
         s2 = cas.Symbol('s2')
-        expr = cas.logic_or(cas.FalseSymbol, s1)
+        expr = cas.logic_or(cas.BinaryFalse, s1)
         assert not cas.is_true_symbol(expr) and not cas.is_false_symbol(expr)
-        expr = cas.logic_or(cas.TrueSymbol, s1)
+        expr = cas.logic_or(cas.BinaryTrue, s1)
         assert cas.is_true_symbol(expr)
-        expr = cas.logic_or(cas.TrueSymbol, cas.TrueSymbol)
+        expr = cas.logic_or(cas.BinaryTrue, cas.BinaryTrue)
         assert cas.is_true_symbol(expr)
-        expr = cas.logic_or(cas.FalseSymbol, cas.TrueSymbol)
+        expr = cas.logic_or(cas.BinaryFalse, cas.BinaryTrue)
         assert cas.is_true_symbol(expr)
-        expr = cas.logic_or(cas.FalseSymbol, cas.FalseSymbol)
+        expr = cas.logic_or(cas.BinaryFalse, cas.BinaryFalse)
         assert cas.is_false_symbol(expr)
         expr = cas.logic_or(s1, s2)
         assert not cas.is_true_symbol(expr) and not cas.is_false_symbol(expr)

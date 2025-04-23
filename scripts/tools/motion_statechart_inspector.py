@@ -1,14 +1,16 @@
 import sys
 import rospy
-import pydot
 from PyQt5.QtGui import QPainter
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QComboBox, QHBoxLayout, QPushButton, QSizePolicy, QLabel
 from PyQt5.QtSvg import QSvgWidget
 from PyQt5.QtCore import Qt, QTimer, QRectF
 from giskard_msgs.msg import ExecutionState
-from giskardpy_ros.tree.behaviors.plot_motion_graph import execution_state_to_dot_graph
 from PyQt5.QtCore import QMutex, QMutexLocker
 
+from giskardpy_ros.tree.behaviors.plot_motion_graph import ExecutionStateToDotParser
+
+
+compact = False
 
 class MySvgWidget(QSvgWidget):
 
@@ -44,7 +46,7 @@ class DotGraphViewer(QWidget):
         self.last_goal_id = -1
 
         # Initialize the ROS node
-        rospy.init_node('motion_graph_viewer', anonymous=True)
+        rospy.init_node('motion_statechart_viewer', anonymous=True)
 
         # Set up the GUI components
         self.svg_widget = MySvgWidget(self)
@@ -94,7 +96,7 @@ class DotGraphViewer(QWidget):
         layout.addLayout(nav_layout)
         self.setLayout(layout)
 
-        self.setWindowTitle('Motion Graph Viewer')
+        self.setWindowTitle('Motion Statechart Viewer')
         self.resize(800, 600)
 
         # Initialize graph history and goal tracking
@@ -148,7 +150,8 @@ class DotGraphViewer(QWidget):
             self.graphs_by_goal[goal_id] = []
             self.goals.append(goal_id)
 
-        graph = execution_state_to_dot_graph(msg, use_state_color=True)
+        parser = ExecutionStateToDotParser(msg, compact=compact)
+        graph = parser.to_dot_graph()
 
         self.graphs_by_goal[goal_id].append(graph)
 
@@ -172,10 +175,9 @@ class DotGraphViewer(QWidget):
 
         svg_path = 'graph.svg'
         graph.write_svg(svg_path)
-        # graph.write_pdf('graph.pdf')
+        graph.write_pdf('graph.pdf')
         with QMutexLocker(self.svg_widget.mutex):  # Lock the mutex during SVG loading
             self.svg_widget.load(svg_path)
-
 
     def update_position_label(self) -> None:
         goal_count = len(self.goals)

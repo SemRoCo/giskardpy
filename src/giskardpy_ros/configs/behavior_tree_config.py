@@ -3,7 +3,7 @@ from typing import Optional
 
 from giskardpy.data_types.exceptions import SetupException
 from giskardpy.god_map import god_map
-from giskardpy_ros.ros1.ros_msg_visualization import VisualizationMode
+from giskardpy_ros.ros1.visualization_mode import VisualizationMode
 from giskardpy_ros.tree.behaviors.tf_publisher import TfPublishingModes
 from giskardpy_ros.tree.blackboard_utils import GiskardBlackboard
 from giskardpy_ros.tree.branches.giskard_bt import GiskardBT
@@ -154,7 +154,7 @@ class BehaviorTreeConfig(ABC):
             self.tree.control_loop_branch.add_evaluate_debug_expressions(log_traj=False)
         else:
             self.tree.control_loop_branch.add_evaluate_debug_expressions(log_traj=True)
-        if GiskardBlackboard().tree.is_open_loop():
+        if GiskardBlackboard().tree.is_open_loop() and hasattr(GiskardBlackboard().tree.execute_traj, 'prepare_base_control'):
             GiskardBlackboard().tree.execute_traj.prepare_base_control.add_compile_debug_expressions()
             GiskardBlackboard().tree.execute_traj.base_closed_loop.add_evaluate_debug_expressions(log_traj=False)
 

@@ -10,9 +10,9 @@ from giskardpy.model.joints import OneDofJoint
 from giskardpy.utils.math import quaternion_from_axis_angle
 from giskardpy_ros.ros1.interface import ROS1Wrapper
 from giskardpy_ros.tree.blackboard_utils import GiskardBlackboard
-from utils_for_tests import launch_launchfile
+from giskardpy_ros.utils.utils_for_tests import launch_launchfile
 
-from utils_for_tests import GiskardTestWrapper
+from giskardpy_ros.utils.utils_for_tests import GiskardTestWrapper
 
 
 @pytest.fixture(scope='module')
@@ -56,7 +56,7 @@ def resetted_giskard(giskard: GiskardTestWrapper) -> GiskardTestWrapper:
         zero = PoseStamped()
         zero.header.frame_id = 'map'
         zero.pose.orientation.w = 1
-        done = giskard.monitors.add_set_seed_odometry(zero)
+        done = giskard.monitors.add_set_seed_odometry(zero, name='initial pose')
         giskard.allow_all_collisions()
         giskard.monitors.add_end_motion(start_condition=done)
         giskard.execute(add_local_minimum_reached=False)
@@ -68,21 +68,24 @@ def resetted_giskard(giskard: GiskardTestWrapper) -> GiskardTestWrapper:
 @pytest.fixture()
 def zero_pose(resetted_giskard: GiskardTestWrapper) -> GiskardTestWrapper:
     if GiskardBlackboard().tree.is_standalone():
-        done = resetted_giskard.monitors.add_set_seed_configuration(resetted_giskard.default_pose)
+        done = resetted_giskard.monitors.add_set_seed_configuration(resetted_giskard.default_pose,
+                                                                    name='initial joint state')
         resetted_giskard.allow_all_collisions()
         resetted_giskard.monitors.add_end_motion(start_condition=done)
         resetted_giskard.execute(add_local_minimum_reached=False)
     else:
         resetted_giskard.allow_all_collisions()
-        resetted_giskard.set_joint_goal(resetted_giskard.default_pose)
-        resetted_giskard.execute()
+        done = resetted_giskard.motion_goals.add_joint_position(name='joint goal', goal_state=resetted_giskard.default_pose)
+        resetted_giskard.monitors.add_end_motion(start_condition=done)
+        resetted_giskard.execute(add_local_minimum_reached=False)
     return resetted_giskard
 
 
 @pytest.fixture()
 def better_pose(resetted_giskard: GiskardTestWrapper) -> GiskardTestWrapper:
     if GiskardBlackboard().tree.is_standalone():
-        done = resetted_giskard.monitors.add_set_seed_configuration(resetted_giskard.better_pose)
+        done = resetted_giskard.monitors.add_set_seed_configuration(resetted_giskard.better_pose,
+                                                                    name='initial joint state')
         resetted_giskard.allow_all_collisions()
         resetted_giskard.monitors.add_end_motion(start_condition=done)
         resetted_giskard.execute(add_local_minimum_reached=False)

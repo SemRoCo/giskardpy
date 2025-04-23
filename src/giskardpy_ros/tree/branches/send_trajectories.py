@@ -20,12 +20,6 @@ class ExecuteTraj(Sequence):
         super().__init__(name)
         self.move_robots = Parallel(name='move robot', policy=ParallelPolicy.SuccessOnAll(synchronise=True))
         self.add_child(self.move_robots)
-        self.prepare_base_control = PrepareBaseTrajControlLoop()
-        self.insert_child(self.prepare_base_control, 0)
-
-        self.base_closed_loop = ControlLoop(log_traj=False)
-        self.base_closed_loop.add_closed_loop_behaviors()
-        self.move_robots.add_child(self.base_closed_loop)
 
     def add_follow_joint_traj_action_server(self, namespace: str, group_name: str,
                                             fill_velocity_values: bool,
@@ -36,5 +30,11 @@ class ExecuteTraj(Sequence):
 
     def add_base_traj_action_server(self, cmd_vel_topic: str, track_only_velocity: bool = False,
                                     joint_name: PrefixName = None):
+        if not hasattr(self, 'prepare_base_control'):
+            self.prepare_base_control = PrepareBaseTrajControlLoop()
+            self.insert_child(self.prepare_base_control, 0)
+            self.base_closed_loop = ControlLoop(log_traj=False)
+            self.base_closed_loop.add_closed_loop_behaviors()
+            self.move_robots.add_child(self.base_closed_loop)
         self.base_closed_loop.send_controls.add_send_cmd_velocity(cmd_vel_topic=cmd_vel_topic,
                                                                   joint_name=joint_name)

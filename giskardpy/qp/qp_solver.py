@@ -378,7 +378,10 @@ class QPSWIFTFormatter(QPSolver):
         g = self.g
         lb, ub = self.lb_ub_with_inf(self.nlb, self.ub)
 
-        num_nA_rows = np.where(self.nlbA_filter_half)[0].shape[0]
+        try:
+            num_nA_rows = np.where(self.nlbA_filter_half)[0].shape[0]
+        except:
+            num_nA_rows = 0
         # num_A_rows = np.where(self.ubA_filter_half)[0].shape[0]
         nA = self.nA_A[:num_nA_rows]
         A = self.nA_A[num_nA_rows:]

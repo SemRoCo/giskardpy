@@ -7,9 +7,8 @@ on:
     branches:
       - ros1-noetic-main
   pull_request:
-#    branches:
-#      - master
-#      - devel
+    branches:
+      - ros1-noetic-main
   workflow_dispatch:
     inputs:
       logLevel:

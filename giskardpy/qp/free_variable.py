@@ -1,17 +1,16 @@
 from collections import defaultdict
-from typing import Dict, Optional, List, Union
-import giskardpy.casadi_wrapper as cas
+from typing import Dict, Optional, Union
+
 import numpy as np
-from giskardpy.god_map import god_map
+
+import giskardpy.casadi_wrapper as cas
 from giskardpy.data_types.data_types import Derivatives, PrefixName
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils.decorators import memoize
-
 from line_profiler import profile
-from scipy.optimize import fsolve
-
 
 def my_cycloid(x_in: float, weight: float, h: int, alpha: float) -> float:
+    from scipy.optimize import fsolve
     start_y = weight * alpha
     end_y = weight
     x = (x_in / h) * (np.pi / 2)
@@ -28,6 +27,7 @@ def my_cycloid(x_in: float, weight: float, h: int, alpha: float) -> float:
     return y
 
 def my_cycloid2(x_in: float, weight: float, h: int, alpha: float, q: float) -> float:
+    from scipy.optimize import fsolve
     x_in *= q
     start_y = weight * alpha
     end_y = weight
@@ -177,6 +177,7 @@ class FreeVariable:
             upper_limits[derivative] = self.get_upper_limit(derivative, default=False, evaluated=True)
         return upper_limits
 
+    @memoize
     def has_position_limits(self) -> bool:
         try:
             lower_limit = self.get_lower_limit(Derivatives.position)
@@ -187,7 +188,7 @@ class FreeVariable:
 
     @memoize
     @profile
-    def normalized_weight(self, t: int, derivative: Derivatives, prediction_horizon: int, alpha: float = 0.1,
+    def normalized_weight(self, t: int, derivative: Derivatives, prediction_horizon: int, alpha: float,
                           evaluated: bool = False) -> Union[Union[cas.Symbol, float], float]:
         limit = self.get_upper_limit(derivative)
         if limit is None:

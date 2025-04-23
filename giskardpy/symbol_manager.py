@@ -19,7 +19,7 @@ class SymbolManager(metaclass=SingletonMeta):
     def get_symbol(self, symbol_reference: str) -> cas.Symbol:
         """
         Returns a symbol reference to the input parameter. If the symbol doesn't exist yet, it will be created.
-        :param symbol_reference: e.g. 'god_map.monitor_manager.monitors[0]'
+        :param symbol_reference: e.g. 'god_map.motion_statechart_manager.monitors[0]'
         :return: symbol reference
         """
         if symbol_reference not in self.symbol_str_to_lambda:
@@ -109,7 +109,6 @@ class SymbolManager(metaclass=SingletonMeta):
                                     will be ignored if input_type_hint is a ROS message.
         :return:
         """
-        # TODO remove geo deps here
         if input_type_hint is None:
             try:
                 data = eval(variable_ref_str)
@@ -118,7 +117,7 @@ class SymbolManager(metaclass=SingletonMeta):
                 raise type(e)(f'No data in \'{variable_ref_str}\' ({e}), '
                               f'can\'t determine input_type_hint, please set it.')
 
-        if input_type_hint in {list, tuple, np.ndarray}:
+        if input_type_hint in {list, tuple, np.ndarray, cas.Point3}:
             if output_type_hint == cas.TransMatrix:
                 return self._list_to_transmatrix(variable_ref_str)
             if output_type_hint == cas.Point3:
@@ -129,6 +128,8 @@ class SymbolManager(metaclass=SingletonMeta):
                 return self._list_to_quaternion(variable_ref_str)
             if output_type_hint == cas.RotationMatrix:
                 return self._list_to_rotation_matrix(variable_ref_str)
+            if output_type_hint == cas.Point3:
+                return self._point3_to_point3(variable_ref_str)
             raise ValueError(f'If input_type_hint is [list, tuple, np.ndarray], please specify output_type_hint out of'
                              f'[cas.TransMatrix, cas.Point3, cas.Vector3, cas.Quaternion, cas.RotationMatrix]')
 
@@ -192,6 +193,11 @@ class SymbolManager(metaclass=SingletonMeta):
         return cas.Point3((self.get_symbol(variable_ref_str + '[0]'),
                            self.get_symbol(variable_ref_str + '[1]'),
                            self.get_symbol(variable_ref_str + '[2]')))
+
+    def _point3_to_point3(self, variable_ref_str: str) -> cas.Point3:
+        return cas.Point3((self.get_symbol(variable_ref_str + '.x'),
+                           self.get_symbol(variable_ref_str + '.y'),
+                           self.get_symbol(variable_ref_str + '.z')))
 
     def _list_to_vector3(self, variable_ref_str: str) -> cas.Vector3:
         return cas.Vector3((self.get_symbol(variable_ref_str + '[0]'),

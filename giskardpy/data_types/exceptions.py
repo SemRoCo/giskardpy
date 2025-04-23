@@ -101,6 +101,14 @@ class MonitorInitalizationException(MotionBuildingException):
     pass
 
 
+class UnknownTaskException(MotionBuildingException, KeyError):
+    pass
+
+
+class TaskInitalizationException(MotionBuildingException):
+    pass
+
+
 # %% errors during planning
 class PlanningException(GiskardException):
     pass

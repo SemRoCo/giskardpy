@@ -1,18 +1,14 @@
 from __future__ import annotations
 
 import builtins
+import math
+from collections import defaultdict
 from copy import copy
 from enum import IntEnum
-import re
-from typing import Union, TypeVar, Optional
-import math
-from line_profiler import profile
-import casadi
+from typing import Union, TypeVar
+
 import casadi as ca
 import numpy as np
-from scipy import sparse as sp
-
-from giskardpy.utils.decorators import memoize
 
 builtin_max = builtins.max
 builtin_min = builtins.min
@@ -26,6 +22,7 @@ class StackedCompiledFunction:
     def __init__(self, expressions, parameters=None, additional_views=None):
         combined_expression = vstack(expressions)
         self.compiled_f = combined_expression.compile(parameters=parameters)
+        self.str_params = self.compiled_f.str_params
         slices = []
         start = 0
         for expression in expressions[:-1]:
@@ -37,7 +34,7 @@ class StackedCompiledFunction:
             for expression_slice in additional_views:
                 self.split_out_view.append(self.compiled_f.out[expression_slice])
 
-    @profile
+    
     def fast_call(self, filtered_args):
         self.compiled_f.fast_call(filtered_args)
         return self.split_out_view
@@ -45,6 +42,8 @@ class StackedCompiledFunction:
 
 class CompiledFunction:
     def __init__(self, expression, parameters=None, sparse=False):
+        from scipy import sparse as sp
+
         self.sparse = sparse
         if len(expression) == 0:
             self.sparse = False
@@ -91,7 +90,7 @@ class CompiledFunction:
         filtered_args = np.array(filtered_args, dtype=float)
         return self.fast_call(filtered_args)
 
-    @profile
+    
     def fast_call(self, filtered_args):
         """
         :param filtered_args: parameter values in the same order as in self.str_params
@@ -317,14 +316,14 @@ class Symbol(Symbol_):
 
 
 class Expression(Symbol_):
-    @profile
+    
     def __init__(self, data=None):
         if data is None:
             data = []
         if isinstance(data, ca.SX):
             self.s = data
         elif isinstance(data, Symbol_):
-            self.s = copy(data.s)
+            self.s = data.s
         elif isinstance(data, (int, float, np.ndarray)):
             self.s = ca.SX(data)
         else:
@@ -354,6 +353,9 @@ class Expression(Symbol_):
         assert self.shape[0] == 1 and self.shape[1] == 1
         parts = [Expression(self.s.dep(i)) for i in range(self.s.n_dep())]
         return parts
+
+    def __copy__(self):
+        return Expression(copy(self.s))
 
     def __add__(self, other):
         if isinstance(other, (int, float)):
@@ -515,8 +517,8 @@ TrinaryFalse = 0
 TrinaryUnknown = 0.5
 TrinaryTrue = 1
 
-BinaryTrue = TrueSymbol = Expression(True)
-BinaryFalse = FalseSymbol = Expression(False)
+BinaryTrue = Expression(True)
+BinaryFalse = Expression(False)
 
 
 class GeometricType:
@@ -524,7 +526,7 @@ class GeometricType:
 
 
 class TransMatrix(Symbol_, GeometricType):
-    @profile
+    
     def __init__(self, data=None, reference_frame=None, child_frame=None, sanity_check=True):
         self.reference_frame = reference_frame
         self.child_frame = child_frame
@@ -534,13 +536,13 @@ class TransMatrix(Symbol_, GeometricType):
         elif isinstance(data, ca.SX):
             self.s = data
         elif isinstance(data, (Expression, RotationMatrix, TransMatrix)):
-            self.s = copy(data.s)
+            self.s = data.s
             if isinstance(data, RotationMatrix):
                 self.reference_frame = self.reference_frame or data.reference_frame
             if isinstance(data, TransMatrix):
                 self.child_frame = self.child_frame or data.child_frame
         else:
-            self.s = copy(Expression(data).s)
+            self.s = Expression(data).s
         if sanity_check:
             if self.shape[0] != 4 or self.shape[1] != 4:
                 raise ValueError(f'{self.__class__.__name__} can only be initialized with 4x4 shaped data.')
@@ -585,7 +587,7 @@ class TransMatrix(Symbol_, GeometricType):
             a_T_b[2, 3] = point.z
         return a_T_b
 
-    @profile
+    
     def dot(self, other):
         if isinstance(other, (Vector3, Point3, RotationMatrix, TransMatrix)):
             result = ca.mtimes(self.s, other.s)
@@ -604,7 +606,7 @@ class TransMatrix(Symbol_, GeometricType):
                 return result
         raise _operation_type_error(self, 'dot', other)
 
-    @profile
+    
     def inverse(self):
         inv = TransMatrix(child_frame=self.reference_frame, reference_frame=self.child_frame)
         inv[:3, :3] = self[:3, :3].T
@@ -612,7 +614,7 @@ class TransMatrix(Symbol_, GeometricType):
         return inv
 
     @classmethod
-    @profile
+    
     def from_xyz_rpy(cls, x=None, y=None, z=None, roll=None, pitch=None, yaw=None, reference_frame=None,
                      child_frame=None):
         p = Point3.from_xyz(x, y, z)
@@ -636,9 +638,12 @@ class TransMatrix(Symbol_, GeometricType):
     def to_rotation(self):
         return RotationMatrix(self)
 
+    def to_quaternion(self):
+        return Quaternion.from_rotation_matrix(self)
+
 
 class RotationMatrix(Symbol_, GeometricType):
-    @profile
+    
     def __init__(self, data=None, reference_frame=None, child_frame=None, sanity_check=True):
         self.reference_frame = reference_frame
         self.child_frame = child_frame
@@ -669,7 +674,7 @@ class RotationMatrix(Symbol_, GeometricType):
             self[3, 3] = 1
 
     @classmethod
-    @profile
+    
     def from_axis_angle(cls, axis, angle, reference_frame=None):
         """
         Conversion of unit axis and angle to 4x4 rotation matrix according to:
@@ -785,7 +790,7 @@ class RotationMatrix(Symbol_, GeometricType):
         return R
 
     @classmethod
-    @profile
+    
     def from_rpy(cls, roll=None, pitch=None, yaw=None, reference_frame=None):
         """
         Conversion of roll, pitch, yaw to 4x4 rotation matrix according to:
@@ -859,7 +864,7 @@ class RotationMatrix(Symbol_, GeometricType):
 
 
 class Point3(Symbol_, GeometricType):
-    @profile
+    
     def __init__(self, data=None, reference_frame=None):
         self.reference_frame = reference_frame
         if data is None:
@@ -1015,7 +1020,7 @@ class Point3(Symbol_, GeometricType):
 
 
 class Vector3(Symbol_, GeometricType):
-    @profile
+    
     def __init__(self, data=None, reference_frame=None):
         point = Point3(data, reference_frame=reference_frame)
         self.s = point.s
@@ -1378,7 +1383,7 @@ def diag(args):
         return Expression(ca.diag(Expression(args).s))
 
 
-@profile
+
 def jacobian(expressions, symbols):
     expressions = Expression(expressions)
     return Expression(ca.jacobian(expressions.s, Expression(symbols).s))
@@ -1467,6 +1472,10 @@ def zeros(rows, columns):
 
 def ones(x, y):
     return Expression(ca.SX.ones(x, y))
+
+
+def tri(dimension):
+    return Expression(np.tri(dimension))
 
 
 def abs(x):
@@ -1582,10 +1591,23 @@ def logic_and(*args):
         return Expression(ca.logic_and(args[0].s, logic_and(*args[1:]).s))
 
 
-def logic_and3(a, b):
-    cas_a = _to_sx(a)
-    cas_b = _to_sx(b)
-    return min(cas_a, cas_b)
+def logic_and3(*args):
+    assert len(args) >= 2, 'and must be called with at least 2 arguments'
+    # if there is any False, return False
+    if [x for x in args if is_false_symbol(x)]:
+        return TrinaryFalse
+    # filter all True
+    args = [x for x in args if not is_true_symbol(x)]
+    if len(args) == 0:
+        return TrinaryTrue
+    if len(args) == 1:
+        return args[0]
+    if len(args) == 2:
+        cas_a = _to_sx(args[0])
+        cas_b = _to_sx(args[1])
+        return min(cas_a, cas_b)
+    else:
+        return logic_and3(args[0], logic_and3(*args[1:]))
 
 
 def logic_any(args):
@@ -1596,21 +1618,22 @@ def logic_all(args):
     return Expression(ca.logic_all(args.s))
 
 
-def logic_or(*args):
+def logic_or(*args, simplify = True):
     assert len(args) >= 2, 'and must be called with at least 2 arguments'
     # if there is any True, return True
-    if [x for x in args if is_true_symbol(x)]:
+    if simplify and [x for x in args if is_true_symbol(x)]:
         return BinaryTrue
     # filter all False
-    args = [x for x in args if not is_false_symbol(x)]
+    if simplify:
+        args = [x for x in args if not is_false_symbol(x)]
     if len(args) == 0:
         return BinaryFalse
     if len(args) == 1:
         return args[0]
     if len(args) == 2:
-        return Expression(ca.logic_or(args[0].s, args[1].s))
+        return Expression(ca.logic_or(_to_sx(args[0]), _to_sx(args[1])))
     else:
-        return Expression(ca.logic_or(args[0].s, logic_or(*args[1:]).s))
+        return Expression(ca.logic_or(_to_sx(args[0]), _to_sx(logic_or(*args[1:], False))))
 
 
 def logic_or3(a, b):
@@ -1625,7 +1648,7 @@ def logic_not(expr):
 
 
 def logic_not3(expr):
-    return Expression(1-expr)
+    return Expression(1 - expr)
 
 
 def if_greater(a, b, if_result, else_result):
@@ -1689,7 +1712,7 @@ def if_eq(a, b, if_result, else_result):
     return if_else(ca.eq(a, b), if_result, else_result)
 
 
-@profile
+
 def if_eq_cases(a, b_result_cases, else_result):
     """
     if a == b_result_cases[0][0]:
@@ -1701,16 +1724,37 @@ def if_eq_cases(a, b_result_cases, else_result):
         return else_result
     """
     a = _to_sx(a)
-    else_result = _to_sx(else_result)
     result = _to_sx(else_result)
-    for i in range(len(b_result_cases)):
-        b = _to_sx(b_result_cases[i][0])
-        b_result = _to_sx(b_result_cases[i][1])
+    for b, b_result in b_result_cases:
+        b = _to_sx(b)
+        b_result = _to_sx(b_result)
         result = ca.if_else(ca.eq(a, b), b_result, result)
     return Expression(result)
 
 
-@profile
+def if_eq_cases_grouped(a, b_result_cases, else_result):
+    """
+    a: symbol (hash)
+    grouped_cases: list of tuples (hash_list, outcome) where hash_list is a list of hashes mapping to outcome.
+    else_result: default outcome if no hash matches.
+    """
+    groups = defaultdict(list)
+    for h, res in b_result_cases:
+        groups[res].append(_to_sx(h))
+    # Rearrange into (hash_list, result) tuples:
+    grouped_cases = [(hash_list, _to_sx(result)) for result, hash_list in groups.items()]
+    a = _to_sx(a)
+    result = _to_sx(else_result)
+    for hash_list, outcome in grouped_cases:
+        if len(hash_list) >= 2:
+            condition = _to_sx(logic_or(*[ca.eq(a, h) for h in hash_list], False))
+        else:
+            condition = ca.eq(a, hash_list[0])
+        result = ca.if_else(condition, outcome, result)
+    return Expression(result)
+
+
+
 def if_cases(cases, else_result):
     """
     if cases[0][0]:
@@ -1730,7 +1774,7 @@ def if_cases(cases, else_result):
     return Expression(result)
 
 
-@profile
+
 def if_less_eq_cases(a, b_result_cases, else_result):
     """
     This only works if b_result_cases is sorted in ascending order.
@@ -1897,7 +1941,7 @@ def normalize_angle(angle):
     return if_greater(a, ca.pi, a - 2.0 * ca.pi, a)
 
 
-@profile
+
 def shortest_angular_distance(from_angle, to_angle):
     """
     Given 2 angles, this returns the shortest angular
@@ -2068,7 +2112,37 @@ def distance_point_to_plane(frame_P_current, frame_V_v1, frame_V_v2):
     d = normal.dot(frame_P_current)
     normal.scale(d)
     nearest = frame_P_current - normal
-    return norm(nearest-frame_P_current), nearest
+    return norm(nearest - frame_P_current), nearest
+
+
+def distance_point_to_plane_signed(frame_P_current, frame_V_v1, frame_V_v2):
+    normal = cross(frame_V_v1, frame_V_v2)
+    normal = normal / norm(normal)  # Normalize the normal vector
+    d = normal.dot(frame_P_current)  # Signed distance to the plane
+    nearest = frame_P_current - normal * d  # Nearest point on the plane
+    return d, nearest
+
+
+def project_to_cone(frame_V_current, frame_V_cone_axis, cone_theta):
+    frame_V_cone_axis_norm = frame_V_cone_axis / norm(frame_V_cone_axis)
+    beta = dot(frame_V_current, frame_V_cone_axis_norm)
+    norm_v = norm(frame_V_current)
+
+    # Compute the perpendicular component.
+    v_perp = frame_V_current - beta * frame_V_cone_axis_norm
+    norm_v_perp = norm(v_perp)
+
+    s = beta * cos(cone_theta) + norm_v_perp * sin(cone_theta)
+
+    # Handle the case when v is collinear with a.
+    project_on_cone_boundary = if_less(a=norm_v_perp, b=1e-8,
+                                       if_result=norm_v * cos(cone_theta) * frame_V_cone_axis_norm,
+                                       else_result=s * (cos(cone_theta) * frame_V_cone_axis_norm + sin(cone_theta) * (
+                                                   v_perp / norm_v_perp)))
+
+    return if_greater_eq(a=beta, b=norm_v * np.cos(cone_theta),
+                         if_result=frame_V_current,
+                         else_result=project_on_cone_boundary)
 
 
 def angle_between_vector(v1, v2):
@@ -2288,7 +2362,9 @@ def substitute(expression, old_symbols, new_symbols):
     old_symbols = Expression([_to_sx(s) for s in old_symbols]).s
     new_symbols = Expression([_to_sx(s) for s in new_symbols]).s
     sx = ca.substitute(sx, old_symbols, new_symbols)
-    return type(expression)(sx)
+    result = copy(expression)
+    result.s = sx
+    return result
 
 
 def matrix_inverse(a):

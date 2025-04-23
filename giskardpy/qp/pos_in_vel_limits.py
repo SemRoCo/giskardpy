@@ -1,3 +1,4 @@
+from copy import copy
 from typing import List
 
 import numpy as np
@@ -31,13 +32,26 @@ def shifted_velocity_profile(vel_profile, acc_profile, distance, dt):
     return shifted_vel_profile, shifted_acc_profile
 
 
+def r_gauss(integral):
+    return cas.sqrt(2 * integral + (1 / 4)) - 1 / 2
+
 def acc_cap(current_vel, jerk_limit, dt):
     acc_integral = cas.abs(current_vel) / dt
     jerk_step = jerk_limit * dt
-    n = cas.floor(cas.r_gauss(cas.abs(acc_integral / jerk_step)))
+    n = cas.floor(r_gauss(cas.abs(acc_integral / jerk_step)))
     x = (- cas.gauss(n) * jerk_limit * dt + acc_integral) / (n + 1)
     return cas.abs(n * jerk_limit * dt + x)
 
+# def compute_next_vel_and_acc(current_vel, current_acc, vel_limit, jerk_limit, dt):
+#     next_acc_min = current_acc - jerk_limit * dt  # what are the next possible acc limits given jerk limits
+#     next_acc_max = current_acc + jerk_limit * dt
+#
+#     acc_to_vel = (vel_limit - current_vel) / dt  # the acc needed to fix the vel in one step
+#
+#     next_acc = cas.limit(acc_to_vel, next_acc_min, next_acc_max)  # apply acc limits imposed by current acc and jerk
+#
+#     next_vel = current_vel + next_acc * dt
+#     return next_vel, next_acc
 
 def compute_next_vel_and_acc(current_vel, current_acc, vel_limit, jerk_limit, dt, remaining_ph, no_cap):
     acc_cap1 = acc_cap(current_vel, jerk_limit, dt)  # if we start at arbitrary horizon and jerk as strongly as possible, which acc do we have when we reach the vel limit
@@ -71,8 +85,8 @@ def compute_slowdown_asap_vel_profile(current_vel, current_acc, target_vel_profi
                                                       cas.logic_and(skip_first, cas.equal(i, 0)))
         vel_profile.append(next_vel)
         acc_profile.append(next_acc)
-    acc_profile = cas.Expression(acc_profile)
-    acc_profile2 = cas.Expression(acc_profile)
+    acc_profile = copy(cas.Expression(acc_profile))
+    acc_profile2 = copy(cas.Expression(acc_profile))
     acc_profile2[1:] = acc_profile[:-1]
     acc_profile2[0] = current_acc
     jerk_profile = (acc_profile - acc_profile2) / dt
@@ -135,8 +149,8 @@ def b_profile(current_pos, current_vel, current_acc,
         one_step_change_lb = cas.limit(one_step_change_lb, -vel_limit, vel_limit)
         one_step_change_ub = cas.max(cas.min(0, pos_error_ub/dt), -one_step_change_)
         one_step_change_ub = cas.limit(one_step_change_ub, -vel_limit, vel_limit)
-        pos_vel_profile_lb[0] = cas.if_greater(pos_error_lb, 0, one_step_change_lb, pos_vel_profile_lb[0])
-        pos_vel_profile_ub[0] = cas.if_less(pos_error_ub, 0, one_step_change_ub, pos_vel_profile_ub[0])
+        pos_vel_profile_lb[0] = cas.if_greater(pos_error_lb, 0, one_step_change_lb, copy(pos_vel_profile_lb[0]))
+        pos_vel_profile_ub[0] = cas.if_less(pos_error_ub, 0, one_step_change_ub, copy(pos_vel_profile_ub[0]))
 
         # all 0, unless lower or upper position limits are violated
         goal_profile = cas.max(pos_vel_profile_lb, 0) + cas.min(pos_vel_profile_ub, 0)

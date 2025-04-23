@@ -6,12 +6,98 @@ import hypothesis.strategies as st
 import numpy as np
 from hypothesis import given, assume, settings
 
+import giskardpy.utils.math as giskard_math
 from giskardpy import casadi_wrapper as cas
 from giskardpy.qp import pos_in_vel_limits as cas2
-import giskardpy.utils.math as giskard_math
-from test.utils_for_tests import float_no_nan_no_inf, unit_vector, quaternion, vector, \
+from giskardpy.utils.utils_for_tests import float_no_nan_no_inf, unit_vector, quaternion, vector, \
     lists_of_same_length, random_angle, compare_axis_angle, angle_positive, sq_matrix, \
     float_no_nan_no_inf_min_max, compare_orientations
+
+
+def logic_not(a):
+    if a == cas.TrinaryTrue:
+        return cas.TrinaryFalse
+    elif a == cas.TrinaryFalse:
+        return cas.TrinaryTrue
+    elif a == cas.TrinaryUnknown:
+        return cas.TrinaryUnknown
+    else:
+        raise ValueError(f'Invalid truth value: {a}')
+
+
+def logic_and(a, b):
+    if a == cas.TrinaryFalse or b == cas.TrinaryFalse:
+        return cas.TrinaryFalse
+    elif a == cas.TrinaryTrue and b == cas.TrinaryTrue:
+        return cas.TrinaryTrue
+    elif a == cas.TrinaryUnknown or b == cas.TrinaryUnknown:
+        return cas.TrinaryUnknown
+    else:
+        raise ValueError(f'Invalid truth values: {a}, {b}')
+
+
+def logic_or(a, b):
+    if a == cas.TrinaryTrue or b == cas.TrinaryTrue:
+        return cas.TrinaryTrue
+    elif a == cas.TrinaryFalse and b == cas.TrinaryFalse:
+        return cas.TrinaryFalse
+    elif a == cas.TrinaryUnknown or b == cas.TrinaryUnknown:
+        return cas.TrinaryUnknown
+    else:
+        raise ValueError(f'Invalid truth values: {a}, {b}')
+
+
+class TestUndefinedLogic(unittest.TestCase):
+    values = [cas.TrinaryTrue, cas.TrinaryFalse, cas.TrinaryUnknown]
+
+    def test_and3(self):
+        s = cas.Symbol('a')
+        s2 = cas.Symbol('b')
+        expr = cas.logic_and3(s, s2)
+        f = expr.compile()
+        for i in self.values:
+            for j in self.values:
+                expected = logic_and(i, j)
+                actual = f(a=i, b=j)
+                assert expected == actual, f'a={i}, b={j}, expected {expected}, actual {actual}'
+
+    def test_or3(self):
+        s = cas.Symbol('a')
+        s2 = cas.Symbol('b')
+        expr = cas.logic_or3(s, s2)
+        f = expr.compile()
+        for i in self.values:
+            for j in self.values:
+                expected = logic_or(i, j)
+                actual = f(a=i, b=j)
+                assert expected == actual, f'a={i}, b={j}, expected {expected}, actual {actual}'
+
+    def test_not3(self):
+        s = cas.Symbol('muh')
+        expr = cas.logic_not3(s)
+        f = expr.compile()
+        for i in self.values:
+            expected = logic_not(i)
+            actual = f(muh=i)
+            assert expected == actual, f'a={i}, expected {expected}, actual {actual}'
+
+    def test_sub_logic_operators(self):
+        def reference_function(a, b, c):
+            not_c = logic_not(c)
+            or_result = logic_or(b, not_c)
+            result = logic_and(a, or_result)
+            return result
+
+        a, b, c = cas.create_symbols(['a', 'b', 'c'])
+        expr = cas.logic_and(a, cas.logic_or(b, cas.logic_not(c)))
+        new_expr = cas.replace_with_three_logic(expr)
+        f = new_expr.compile()
+        for i in self.values:
+            for j in self.values:
+                for k in self.values:
+                    computed_result = f(a=i, b=j, c=k)
+                    expected_result = reference_function(i, j, k)
+                    assert computed_result == expected_result, f"Mismatch for inputs i={i}, j={j}, k={k}. Expected {expected_result}, got {computed_result}"
 
 
 class TestSymbol:
@@ -99,7 +185,7 @@ class TestExpression(unittest.TestCase):
         filter_[5] = True
         actual = e[filter_].to_np()
         expected = e_np[filter_]
-        assert np.all(actual.T == expected)
+        assert np.all(actual == expected)
 
     def test_filter2(self):
         e_np = np.arange(16) * 2
@@ -190,15 +276,15 @@ class TestExpression(unittest.TestCase):
     def test_logic_and(self):
         s1 = cas.Symbol('s1')
         s2 = cas.Symbol('s2')
-        expr = cas.logic_and(cas.TrueSymbol, s1)
+        expr = cas.logic_and(cas.BinaryTrue, s1)
         assert not cas.is_true_symbol(expr) and not cas.is_false_symbol(expr)
-        expr = cas.logic_and(cas.FalseSymbol, s1)
+        expr = cas.logic_and(cas.BinaryFalse, s1)
         assert cas.is_false_symbol(expr)
-        expr = cas.logic_and(cas.TrueSymbol, cas.TrueSymbol)
+        expr = cas.logic_and(cas.BinaryTrue, cas.BinaryTrue)
         assert cas.is_true_symbol(expr)
-        expr = cas.logic_and(cas.FalseSymbol, cas.TrueSymbol)
+        expr = cas.logic_and(cas.BinaryFalse, cas.BinaryTrue)
         assert cas.is_false_symbol(expr)
-        expr = cas.logic_and(cas.FalseSymbol, cas.FalseSymbol)
+        expr = cas.logic_and(cas.BinaryFalse, cas.BinaryFalse)
         assert cas.is_false_symbol(expr)
         expr = cas.logic_and(s1, s2)
         assert not cas.is_true_symbol(expr) and not cas.is_false_symbol(expr)
@@ -206,17 +292,21 @@ class TestExpression(unittest.TestCase):
     def test_logic_or(self):
         s1 = cas.Symbol('s1')
         s2 = cas.Symbol('s2')
-        expr = cas.logic_or(cas.FalseSymbol, s1)
+        s3 = cas.Symbol('s3')
+        expr = cas.logic_or(cas.BinaryFalse, s1)
         assert not cas.is_true_symbol(expr) and not cas.is_false_symbol(expr)
-        expr = cas.logic_or(cas.TrueSymbol, s1)
+        expr = cas.logic_or(cas.BinaryTrue, s1)
         assert cas.is_true_symbol(expr)
-        expr = cas.logic_or(cas.TrueSymbol, cas.TrueSymbol)
+        expr = cas.logic_or(cas.BinaryTrue, cas.BinaryTrue)
         assert cas.is_true_symbol(expr)
-        expr = cas.logic_or(cas.FalseSymbol, cas.TrueSymbol)
+        expr = cas.logic_or(cas.BinaryFalse, cas.BinaryTrue)
         assert cas.is_true_symbol(expr)
-        expr = cas.logic_or(cas.FalseSymbol, cas.FalseSymbol)
+        expr = cas.logic_or(cas.BinaryFalse, cas.BinaryFalse)
         assert cas.is_false_symbol(expr)
         expr = cas.logic_or(s1, s2)
+        assert not cas.is_true_symbol(expr) and not cas.is_false_symbol(expr)
+
+        expr = cas.logic_or(s1, s2, s3)
         assert not cas.is_true_symbol(expr) and not cas.is_false_symbol(expr)
 
     def test_lt(self):
@@ -619,7 +709,7 @@ class TestQuaternion(unittest.TestCase):
     def test_quaternion_from_matrix(self, q):
         matrix = giskard_math.rotation_matrix_from_quaternion(*q)
         q2 = giskard_math.quaternion_from_rotation_matrix(matrix)
-        q1_2 = cas.Quaternion.from_rotation_matrix(cas.RotationMatrix(matrix)).to_np().T
+        q1_2 = cas.Quaternion.from_rotation_matrix(cas.RotationMatrix(matrix)).to_np()
         self.assertTrue(np.isclose(q1_2, q2).all() or np.isclose(q1_2, -q2).all(), msg=f'{q} != {q1_2}')
 
     @given(quaternion(), quaternion())
@@ -1493,6 +1583,45 @@ class TestCASWrapper(unittest.TestCase):
         expected = float(reference(a, b_result_cases, 0))
         self.assertAlmostEqual(actual, expected)
 
+    @given(float_no_nan_no_inf())
+    def test_if_eq_cases_set(self, a):
+        b_result_cases = {(1, 1),
+                          (3, 3),
+                          (4, 4),
+                          (-1, -1),
+                          (0.5, 0.5),
+                          (-0.5, -0.5)}
+
+        def reference(a_, b_result_cases_, else_result):
+            for b, if_result in b_result_cases_:
+                if a_ == b:
+                    return if_result
+            return else_result
+
+        actual = cas.compile_and_execute(lambda a: cas.if_eq_cases(a, b_result_cases, 0), [a])
+        expected = float(reference(a, b_result_cases, 0))
+        self.assertAlmostEqual(actual, expected)
+
+
+    @given(float_no_nan_no_inf())
+    def test_if_eq_cases_grouped(self, a):
+        b_result_cases = [(1, 1),
+                          (3, 1),
+                          (4, 1),
+                          (-1, 3),
+                          (0.5, 3),
+                          (-0.5, 1)]
+
+        def reference(a_, b_result_cases_, else_result):
+            for b, if_result in b_result_cases_:
+                if a_ == b:
+                    return if_result
+            return else_result
+
+        actual = cas.compile_and_execute(lambda a: cas.if_eq_cases_grouped(a, b_result_cases, 0), [a])
+        expected = float(reference(a, b_result_cases, 0))
+        self.assertAlmostEqual(actual, expected)
+
     @given(float_no_nan_no_inf(10))
     def test_if_less_eq_cases(self, a):
         b_result_cases = [
@@ -1866,26 +1995,26 @@ class TestCASWrapper(unittest.TestCase):
 
     def test_velocity_profile(self):
         special_test_cases = [
-            # (2.75, -0.9, -1, 0, 0.01, 0.05, 100, 7, 0.1),
-            # (2.75, 0.05, -1, 0, 0.01, 0.01, 15, 7, 0.05),
+            (2.75, -0.9, -1, 0, 0.01, 0.05, 100, 7, 0.1),
+            (2.75, 0.05, -1, 0, 0.01, 0.01, 15, 7, 0.05),
             (2.75, -0.9, -1, 0, 2.07, 1, 15, 7, 0.1),
             (2.75, -0.9, -1, 0, 2.07, 1, 15, 9, 0.1),
-            # (2.75, 0.05, -1, 0, 0.01, 0.05, 15, 7, 0.05),
+            (2.75, 0.05, -1, 0, 0.01, 0.05, 15, 7, 0.05),
             (-2, -0.9, 20, 0, 2.07, 1, 100, 9, 0.05),
             # (-2, -0.01, -1, 0, 2.07, 0.05, 15, 14, 0.01),
             # (-2, 1, -1, 0, 2.07, 0.01, 100, 9, 0.01),
-            # (2.75, 1, -1, 0, 0.01, 0.05, 15, 14, 0.01),
+            (2.75, 1, -1, 0, 0.01, 0.05, 15, 14, 0.01),
             # (2.75, 1, -1, 0, 0.01, 0.01, 100, 7, 0.01),
-            # (-2, 1, -0.5, 0, 0.01, 0.05, 15, 14, 0.01),
+            (-2, 1, -0.5, 0, 0.01, 0.05, 15, 14, 0.01),
             # (2.75, -0.9, -1, 0, 0.01, 0.01, 15, 7, 0.01),
             (2.75, -0.9, -1, 0, 2.07, 0.5, 100, 7, 0.1),
-            # (0.01, 0.05, -1, -0.01, 0.01, 0.5, 15, 9, 0.05),
+            (0.01, 0.05, -1, -0.01, 0.01, 0.5, 15, 9, 0.05),
             (2.75, -0.9, -0.5, 0, 2.07, 1, 30, 14, 0.05),
             (2.75, 0.05, -1, 0, 0.01, 0.5, 15, 9, 0.05),
             (-2, -0.01, -0.5, 0, 2.07, 0.5, 30, 7, 0.05),
-            # (2.75, -0.9, -1, 0, 0.01, 0.01, 100, 7, 0.123),
+            (2.75, -0.9, -1, 0, 0.01, 0.01, 100, 7, 0.123),
             (2.75, -0.9, -1, 0, 2.07, 1, 15, 7, 0.123),
-            # (-2, -0.9, -1, 0, 0.01, 0.01, 100, 7, 0.123),
+            (-2, -0.9, -1, 0, 0.01, 0.01, 100, 7, 0.123),
             # (-2, 1, -1, 0, 0.01, 0.01, 15, 14, 0.01),
             (0, 0.05, -1, -0.01, 0.01, 0.1, 15, 7, 0.05),
         ]
@@ -1907,7 +2036,7 @@ class TestCASWrapper(unittest.TestCase):
         #                                                                   j_bs, phs, dts):
         for p_c, v_c, a_c, p_center, p_range, v_b, j_b, ph, dt in special_test_cases:
             # p_c, v_c, a_c, p_center, p_range, v_b, j_b, ph, dt = 0, 0.05, -1, -0.01, 0.01, 0.1, 15, 7, 0.05
-            vb2 = giskard_math.max_velocity_from_horizon_and_jerk(ph, j_b, dt)
+            vb2 = giskard_math.max_velocity_from_horizon_and_jerk(ph, np.inf, np.inf, j_b, dt, 3)
             if v_b > vb2:
                 continue
 
@@ -1933,23 +2062,23 @@ class TestCASWrapper(unittest.TestCase):
             ub = ub.to_np()
             b = np.hstack((lb, ub))
             lower_limits = (
-                tuple(lb.T[:ph].tolist()),
-                tuple(lb.T[ph:ph * 2].tolist()),
-                tuple(lb.T[-ph:].tolist())
+                tuple(lb[:ph].tolist()),
+                tuple(lb[ph:ph * 2].tolist()),
+                tuple(lb[-ph:].tolist())
             )
             upper_limits = (
-                tuple(ub.T[:ph].tolist()),
-                tuple(ub.T[ph:ph * 2].tolist()),
-                tuple(ub.T[-ph:].tolist())
+                tuple(ub[:ph].tolist()),
+                tuple(ub[ph:ph * 2].tolist()),
+                tuple(ub[-ph:].tolist())
             )
             lower_limits2 = (
-                tuple(lb.T[:ph].tolist()),
-                tuple(lb.T[ph:ph * 2].tolist()),
+                tuple(lb[:ph].tolist()),
+                tuple(lb[ph:ph * 2].tolist()),
                 (j_b,) * ph
             )
             upper_limits2 = (
-                tuple(ub.T[:ph].tolist()),
-                tuple(ub.T[ph:ph * 2].tolist()),
+                tuple(ub[:ph].tolist()),
+                tuple(ub[ph:ph * 2].tolist()),
                 (j_b,) * ph
             )
             current_values = (

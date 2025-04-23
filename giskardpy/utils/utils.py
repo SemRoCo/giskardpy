@@ -1,5 +1,6 @@
 from __future__ import division
 import hashlib
+import re
 
 # I only do this, because otherwise test/test_integration_pr2.py::TestWorldManipulation::test_unsupported_options
 # fails on github actions
@@ -234,3 +235,29 @@ def resolve_ros_iris_in_urdf(input_urdf):
         output_urdf += get_middleware().resolve_iri(line)
         output_urdf += '\n'
     return output_urdf
+
+
+def quote_node_names(condition: str) -> str:
+    operators = {'and', 'or', 'not', '(', ')', 'True', 'False'}
+    pattern = r'(\b(?:and|or|not)\b|\(|\))'
+    tokens = re.split(pattern, condition)
+    result = []
+    for token in tokens:
+        if token in operators:
+            result.append(token)
+        elif token.strip() == '':
+            result.append(token)
+        else:
+            # Check if token is already quoted
+            stripped = token.strip()
+            if (stripped.startswith('"') and stripped.endswith('"')) or \
+                    (stripped.startswith("'") and stripped.endswith("'")):
+                result.append(token)
+            else:
+                # Wrap stripped token in quotes, and preserve leading/trailing spaces
+                leading_spaces = len(token) - len(token.lstrip())
+                trailing_spaces = len(token) - len(token.rstrip())
+                leading = token[:leading_spaces]
+                trailing = token[len(token.rstrip()):]
+                result.append(f'{leading}"{stripped}"{trailing}')
+    return ''.join(result)

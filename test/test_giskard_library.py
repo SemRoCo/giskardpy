@@ -1,13 +1,10 @@
 from itertools import combinations
 
+import giskardpy.casadi_wrapper as cas
 import numpy as np
 import pytest
 import urdf_parser_py.urdf as up
-
-import giskardpy.casadi_wrapper as cas
 from giskardpy.data_types.data_types import PrefixName, Derivatives, ColorRGBA
-from giskardpy.goals.cartesian_goals import CartesianPose
-from giskardpy.goals.joint_goals import JointPositionList
 from giskardpy.god_map import god_map
 from giskardpy.model.better_pybullet_syncer import BetterPyBulletSyncer
 from giskardpy.model.collision_avoidance_config import DefaultCollisionAvoidanceConfig
@@ -17,11 +14,53 @@ from giskardpy.model.links import Link, BoxGeometry
 from giskardpy.model.utils import hacky_urdf_parser_fix
 from giskardpy.model.world import WorldTree
 from giskardpy.model.world_config import EmptyWorld, WorldWithOmniDriveRobot
-from giskardpy.monitors.cartesian_monitors import PoseReached
-from giskardpy.qp.qp_controller import QPController
-from giskardpy.symbol_manager import symbol_manager
+from giskardpy.qp.qp_controller_config import QPControllerConfig
+from giskardpy.user_interface import GiskardWrapper
 from giskardpy.utils.utils import suppress_stderr
-from utils_for_tests import pr2_urdf
+from giskardpy.model.collision_avoidance_config import CollisionAvoidanceConfig
+from giskardpy.model.collision_world_syncer import CollisionCheckerLib
+from giskardpy.utils.utils_for_tests import pr2_urdf
+
+
+class PR2CollisionAvoidance(CollisionAvoidanceConfig):
+    def __init__(self, drive_joint_name: str = 'brumbrum',
+                 collision_checker: CollisionCheckerLib = CollisionCheckerLib.bpb):
+        super().__init__(collision_checker=collision_checker)
+        self.drive_joint_name = drive_joint_name
+
+    def setup(self):
+        self.load_self_collision_matrix('self_collision_matrices/iai/pr2.srdf')
+        self.set_default_external_collision_avoidance(soft_threshold=0.1,
+                                                      hard_threshold=0.0)
+        for joint_name in ['r_wrist_roll_joint', 'l_wrist_roll_joint']:
+            self.overwrite_external_collision_avoidance(joint_name,
+                                                        number_of_repeller=4,
+                                                        soft_threshold=0.05,
+                                                        hard_threshold=0.0,
+                                                        max_velocity=0.2)
+        for joint_name in ['r_wrist_flex_joint', 'l_wrist_flex_joint']:
+            self.overwrite_external_collision_avoidance(joint_name,
+                                                        number_of_repeller=2,
+                                                        soft_threshold=0.05,
+                                                        hard_threshold=0.0,
+                                                        max_velocity=0.2)
+        for joint_name in ['r_elbow_flex_joint', 'l_elbow_flex_joint']:
+            self.overwrite_external_collision_avoidance(joint_name,
+                                                        soft_threshold=0.05,
+                                                        hard_threshold=0.0)
+        for joint_name in ['r_forearm_roll_joint', 'l_forearm_roll_joint']:
+            self.overwrite_external_collision_avoidance(joint_name,
+                                                        soft_threshold=0.025,
+                                                        hard_threshold=0.0)
+        self.fix_joints_for_collision_avoidance([
+            'r_gripper_l_finger_joint',
+            'l_gripper_l_finger_joint'
+        ])
+        self.overwrite_external_collision_avoidance(self.drive_joint_name,
+                                                    number_of_repeller=2,
+                                                    soft_threshold=0.2,
+                                                    hard_threshold=0.1)
+
 
 try:
     import rospy
@@ -33,11 +72,18 @@ try:
 except ImportError as e:
     pass
 
+try:
+    from giskardpy_ros.ros2 import rospy
+
+    rospy.init_node('giskard')
+except ImportError as e:
+    pass
+
 
 def visualize():
     god_map.world.notify_state_change()
     god_map.collision_scene.sync()
-    vis.publish_markers()
+    # vis.publish_markers()
 
 
 @pytest.fixture()
@@ -89,11 +135,11 @@ def box_world_prismatic() -> WorldTree:
                                        parent_link_name=self.world.root_link_name,
                                        child_link_name=self.box_name,
                                        axis=(1, 0, 0),
-                                       lower_limits={Derivatives.position: -10,
+                                       lower_limits={Derivatives.position: -1,
                                                      Derivatives.velocity: -1,
                                                      Derivatives.acceleration: -np.inf,
                                                      Derivatives.jerk: -30},
-                                       upper_limits={Derivatives.position: 10,
+                                       upper_limits={Derivatives.position: 1,
                                                      Derivatives.velocity: 1,
                                                      Derivatives.acceleration: np.inf,
                                                      Derivatives.jerk: 30})
@@ -153,6 +199,25 @@ def simple_two_arm_world() -> WorldTree:
     return config.world
 
 
+@pytest.fixture()
+def pr2_world() -> WorldTree:
+    urdf = open('urdfs/pr2.urdf', 'r').read()
+    config = WorldWithOmniDriveRobot(urdf=urdf)
+    with config.world.modify_world():
+        config.setup()
+    config.world.register_controlled_joints(config.world.movable_joint_names)
+    return config.world
+
+
+@pytest.fixture()
+def giskard_pr2() -> GiskardWrapper:
+    urdf = open('urdfs/pr2.urdf', 'r').read()
+    giskard = GiskardWrapper(world_config=WorldWithOmniDriveRobot(urdf=urdf),
+                             collision_avoidance_config=PR2CollisionAvoidance(),
+                             qp_controller_config=QPControllerConfig())
+    return giskard
+
+
 class TestWorld:
     def test_empty_world(self, empty_world: WorldTree):
         assert len(empty_world.joints) == 0
@@ -182,177 +247,6 @@ class TestWorld:
                                                   tip_link=box_name).to_np()
         assert fk[0] == 1
         visualize()
-
-    def test_joint_goal(self, box_world_prismatic: WorldTree):
-        joint_name = box_world_prismatic.joint_names[0]
-        box_name = box_world_prismatic.link_names[-1]
-        dt = 0.05
-        goal = 2
-
-        joint_goal = JointPositionList(goal_state={joint_name: goal})
-
-        god_map.motion_goal_manager.add_motion_goal(joint_goal)
-        god_map.motion_goal_manager.init_task_state()
-
-        eq, neq, neqd, lin_weight, quad_weight = god_map.motion_goal_manager.get_constraints_from_goals()
-        controller = QPController(mpc_dt=dt)
-        controller.init(free_variables=list(box_world_prismatic.free_variables.values()),
-                        equality_constraints=eq)
-        controller.compile()
-        traj = []
-        for i in range(100):
-            parameters = controller.get_parameter_names()
-            substitutions = symbol_manager.resolve_symbols(parameters)
-            next_cmd = controller.get_cmd(substitutions)
-            box_world_prismatic.update_state(next_cmd, dt, Derivatives.jerk)
-            box_world_prismatic.notify_state_change()
-            traj.append(box_world_prismatic.state[joint_name].position)
-            visualize()
-            if box_world_prismatic.state[joint_name].position >= goal - 1e-3:
-                break
-        fk = box_world_prismatic.compute_fk_point(root_link=box_world_prismatic.root_link_name,
-                                                  tip_link=box_name).to_np()
-        np.testing.assert_almost_equal(fk[0], goal, decimal=3)
-
-    def test_cart_goal(self, box_world: WorldTree):
-        joint_name = box_world.joint_names[0]
-        box_name = box_world.link_names[-1]
-        dt = 0.05
-        goal = [1, 1, 0]
-
-        cart_goal = CartesianPose(root_link=box_world.root_link_name,
-                                  tip_link=box_name,
-                                  goal_pose=cas.TransMatrix.from_xyz_rpy(x=goal[0], y=goal[1], z=goal[2],
-                                                                         reference_frame=box_world.root_link_name))
-
-        god_map.motion_goal_manager.add_motion_goal(cart_goal)
-        god_map.motion_goal_manager.init_task_state()
-
-        eq, neq, neqd, lin_weight, quad_weight = god_map.motion_goal_manager.get_constraints_from_goals()
-        controller = QPController(mpc_dt=dt)
-        controller.init(free_variables=list(box_world.free_variables.values()),
-                        equality_constraints=eq)
-        controller.compile()
-        traj = []
-        for i in range(100):
-            parameters = controller.get_parameter_names()
-            substitutions = symbol_manager.resolve_symbols(parameters)
-            next_cmd = controller.get_cmd(substitutions)
-            box_world.update_state(next_cmd, dt, Derivatives.jerk)
-            box_world.notify_state_change()
-            traj.append(box_world.state[joint_name].position)
-            visualize()
-        fk = box_world.compute_fk_point(root_link=box_world.root_link_name, tip_link=box_name).to_np()
-        np.testing.assert_almost_equal(fk[0], goal[0], decimal=3)
-        np.testing.assert_almost_equal(fk[1], goal[1], decimal=3)
-
-    def test_cart_goal_abs_sequence(self, box_world: WorldTree):
-        joint_name = box_world.joint_names[0]
-        box_name = box_world.link_names[-1]
-        dt = 0.05
-        goal1 = cas.TransMatrix.from_xyz_rpy(x=1, reference_frame=box_world.root_link_name)
-        goal2 = cas.TransMatrix.from_xyz_rpy(y=1, reference_frame=box_name)
-
-        cart_monitor = PoseReached(name='goal1 reached',
-                                   root_link=box_world.root_link_name,
-                                   tip_link=box_name,
-                                   goal_pose=goal1)
-        god_map.monitor_manager.add_monitor(cart_monitor)
-
-        cart_goal1 = CartesianPose(name='g1',
-                                   root_link=box_world.root_link_name,
-                                   tip_link=box_name,
-                                   goal_pose=goal1,
-                                   end_condition=cart_monitor.get_state_expression())
-        cart_goal2 = CartesianPose(name='g2',
-                                   root_link=box_world.root_link_name,
-                                   tip_link=box_name,
-                                   goal_pose=goal2,
-                                   absolute=True,
-                                   start_condition=cart_monitor.get_state_expression())
-
-        god_map.motion_goal_manager.add_motion_goal(cart_goal1)
-        god_map.motion_goal_manager.add_motion_goal(cart_goal2)
-
-        god_map.monitor_manager.compile_monitors()
-        god_map.motion_goal_manager.init_task_state()
-
-        eq, neq, neqd, lin_weight, quad_weight = god_map.motion_goal_manager.get_constraints_from_goals()
-        controller = QPController(mpc_dt=dt)
-        controller.init(free_variables=list(box_world.free_variables.values()),
-                        equality_constraints=eq)
-        controller.compile()
-        traj = []
-        god_map.time = 0
-        god_map.control_cycle_counter = 0
-        for i in range(200):
-            parameters = controller.get_parameter_names()
-            substitutions = symbol_manager.resolve_symbols(parameters)
-            next_cmd = controller.get_cmd(substitutions)
-
-            box_world.update_state(next_cmd, dt, Derivatives.jerk)
-            box_world.notify_state_change()
-
-            god_map.monitor_manager.evaluate_monitors()
-            traj.append(box_world.state[joint_name].position)
-            god_map.time += controller.mpc_dt
-            god_map.control_cycle_counter += 1
-        fk = box_world.compute_fk_point(root_link=box_world.root_link_name, tip_link=box_name).to_np()
-        np.testing.assert_almost_equal(fk[0], goal2.to_position().to_np()[0], decimal=3)
-        np.testing.assert_almost_equal(fk[1], goal2.to_position().to_np()[1], decimal=3)
-
-    def test_cart_goal_rel_sequence(self, box_world: WorldTree):
-        joint_name = box_world.joint_names[0]
-        box_name = box_world.link_names[-1]
-        dt = 0.05
-        goal1 = cas.TransMatrix.from_xyz_rpy(x=1, reference_frame=box_world.root_link_name)
-        goal2 = cas.TransMatrix.from_xyz_rpy(y=1, reference_frame=box_name)
-
-        cart_monitor = PoseReached(name='goal1 reached',
-                                   root_link=box_world.root_link_name,
-                                   tip_link=box_name,
-                                   goal_pose=goal1)
-        god_map.monitor_manager.add_monitor(cart_monitor)
-
-        cart_goal1 = CartesianPose(name='g1',
-                                   root_link=box_world.root_link_name,
-                                   tip_link=box_name,
-                                   goal_pose=goal1,
-                                   end_condition=cart_monitor.get_state_expression())
-        cart_goal2 = CartesianPose(name='g2',
-                                   root_link=box_world.root_link_name,
-                                   tip_link=box_name,
-                                   goal_pose=goal2,
-                                   start_condition=cart_monitor.get_state_expression())
-
-        god_map.motion_goal_manager.add_motion_goal(cart_goal1)
-        god_map.motion_goal_manager.add_motion_goal(cart_goal2)
-
-        god_map.monitor_manager.compile_monitors()
-        god_map.motion_goal_manager.init_task_state()
-
-        eq, neq, neqd, lin_weight, quad_weight = god_map.motion_goal_manager.get_constraints_from_goals()
-        controller = QPController(mpc_dt=dt)
-        controller.init(free_variables=list(box_world.free_variables.values()),
-                        equality_constraints=eq)
-        controller.compile()
-        traj = []
-        god_map.time = 0
-        god_map.control_cycle_counter = 0
-        for i in range(200):
-            parameters = controller.get_parameter_names()
-            substitutions = symbol_manager.resolve_symbols(parameters)
-            next_cmd = controller.get_cmd(substitutions)
-            box_world.update_state(next_cmd, dt, Derivatives.jerk)
-            box_world.notify_state_change()
-            god_map.monitor_manager.evaluate_monitors()
-            traj.append((box_world.state[box_world.joints[joint_name].x_name].position,
-                         box_world.state[box_world.joints[joint_name].y_name].position))
-            god_map.time += controller.mpc_dt
-            god_map.control_cycle_counter += 1
-        fk = box_world.compute_fk_point(root_link=box_world.root_link_name, tip_link=box_name).to_np()
-        np.testing.assert_almost_equal(fk[0], goal1.to_position().to_np()[0], decimal=2)
-        np.testing.assert_almost_equal(fk[1], goal2.to_position().to_np()[1], decimal=2)
 
     def test_compute_self_collision_matrix(self, pr2_world: WorldTree):
         disabled_links = {pr2_world.search_for_link_name('br_caster_l_wheel_link'),
@@ -627,3 +521,48 @@ class TestWorld:
             world_setup.compute_chain_reduced_to_controlled_joints(
                 world_setup.search_for_link_name('l_wrist_roll_link'),
                 world_setup.search_for_link_name('l_gripper_r_finger_link'))
+
+
+class TestController:
+    def test_joint_goal(self, giskard_pr2: GiskardWrapper):
+        init = 'init'
+        g1 = 'g1'
+        g2 = 'g2'
+        giskard_pr2.monitors.add_set_seed_configuration(seed_configuration={'r_wrist_roll_joint': 2},
+                                                        name=init)
+        giskard_pr2.motion_goals.add_joint_position({'r_wrist_roll_joint': -1}, name=g1,
+                                                    start_condition=init,
+                                                    end_condition=g1)
+        giskard_pr2.motion_goals.add_joint_position({'r_wrist_roll_joint': 1}, name=g2,
+                                                    start_condition=g1)
+        giskard_pr2.monitors.add_end_motion(start_condition=g2)
+        giskard_pr2.execute()
+
+    def test_cart_goal(self, giskard_pr2: GiskardWrapper):
+        init = 'init'
+        g1 = 'g1'
+        g2 = 'g2'
+        init_goal1 = cas.TransMatrix(reference_frame=PrefixName('map'))
+        init_goal1.x = -0.5
+
+        base_goal1 = cas.TransMatrix(reference_frame=PrefixName('map'))
+        base_goal1.x = 1.0
+
+        base_goal2 = cas.TransMatrix(reference_frame=PrefixName('map'))
+        base_goal2.x = -1.0
+
+        giskard_pr2.monitors.add_set_seed_odometry(base_pose=init_goal1, name=init)
+        giskard_pr2.motion_goals.add_cartesian_pose(goal_pose=base_goal1, name=g1,
+                                                    root_link='map',
+                                                    tip_link='base_footprint',
+                                                    start_condition=init,
+                                                    end_condition=g1)
+        giskard_pr2.motion_goals.add_cartesian_pose(goal_pose=base_goal2, name=g2,
+                                                    root_link='map',
+                                                    tip_link='base_footprint',
+                                                    start_condition=g1)
+        giskard_pr2.monitors.add_end_motion(start_condition=g2)
+        giskard_pr2.execute(sim_time=20)
+
+# import pytest
+# pytest.main(['-s', __file__ + '::TestController::test_joint_goal_pr2'])

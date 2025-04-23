@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 import abc
 from abc import ABC
 from collections import defaultdict
 from functools import wraps
 from time import time
-from typing import Tuple, List, Optional, Union, Dict
-import scipy.sparse as sp
+from typing import Tuple, List, Optional, Union, Dict, TYPE_CHECKING
+
 import numpy as np
 
 import giskardpy.casadi_wrapper as cas
@@ -12,9 +14,11 @@ from giskardpy.data_types.exceptions import HardConstraintsViolatedException, In
 from giskardpy.middleware import get_middleware
 from giskardpy.qp.qp_solver_ids import SupportedQPSolver
 from giskardpy.utils.decorators import memoize
-
 from giskardpy.utils.utils import is_running_in_pytest
 from line_profiler import profile
+
+if TYPE_CHECKING:
+    import scipy.sparse as sp
 
 
 def record_solver_call_time(function):
@@ -70,6 +74,12 @@ class QPSolver(ABC):
                  A: cas.Expression, A_slack: cas.Expression, lbA: cas.Expression, ubA: cas.Expression,
                  E: cas.Expression, E_slack: cas.Expression, bE: cas.Expression):
         pass
+
+    def update_settings(self, retries_with_relaxed_constraints: float, retry_added_slack: float,
+                        retry_weight_factor: float):
+        self.retries_with_relaxed_constraints = retries_with_relaxed_constraints
+        self.retry_added_slack = retry_added_slack
+        self.retry_weight_factor = retry_weight_factor
 
     def set_density(self, weights: cas.Expression, E: cas.Expression, E_slack: cas.Expression, A: cas.Expression,
                     A_slack: cas.Expression):
@@ -170,7 +180,7 @@ class QPSolver(ABC):
         if Ai_inf_filter is None:
             key = hash(dimensions_after_zero_filter)
         else:
-            key = hash((dimensions_after_zero_filter, Ai_inf_filter.tostring()))
+            key = hash((dimensions_after_zero_filter, Ai_inf_filter.tobytes()))
         if key not in self._nAi_Ai_cache:
             nI_I = self._cached_eyes(dimensions_after_zero_filter, nAi_Ai)
             if Ai_inf_filter is None:
@@ -181,6 +191,7 @@ class QPSolver(ABC):
 
     @memoize
     def _cached_eyes(self, dimensions: int, nAi_Ai: bool = False) -> Union[np.ndarray, sp.csc_matrix]:
+        from scipy import sparse as sp
         if self.sparse:
             if nAi_Ai:
                 d2 = dimensions * 2
@@ -271,11 +282,15 @@ class QPSWIFTFormatter(QPSolver):
 
         self.static_lb_finite_filter = self.to_finite_filter(lb)
         self.static_ub_finite_filter = self.to_finite_filter(ub)
+        # these copies will be reused later to avoid reallocating the same memory all the time
+        self.lb_finite_filter = self.static_lb_finite_filter.copy()
+        self.ub_finite_filter = self.static_ub_finite_filter.copy()
         nlb_without_inf = -lb[self.static_lb_finite_filter]
         ub_without_inf = ub[self.static_ub_finite_filter]
 
         self.nlbA_finite_filter = self.to_finite_filter(lbA)
         self.ubA_finite_filter = self.to_finite_filter(ubA)
+        self.lnbA_ubA_finite_filter = np.concatenate((self.nlbA_finite_filter, self.ubA_finite_filter))
         nlbA_without_inf = -lbA[self.nlbA_finite_filter]
         ubA_without_inf = ubA[self.ubA_finite_filter]
         nA_without_inf = -A[self.nlbA_finite_filter]
@@ -283,6 +298,7 @@ class QPSWIFTFormatter(QPSolver):
         A_without_inf = A[self.ubA_finite_filter]
         A_slack_without_inf = A_slack[self.ubA_finite_filter]
         self.nlbA_ubA_finite_filter = np.concatenate((self.nlbA_finite_filter, self.ubA_finite_filter))
+        self.nlbA_finite_filter_size = self.nlbA_finite_filter.sum()
         self.len_lbA = nlbA_without_inf.shape[0]
         self.len_ubA = ubA_without_inf.shape[0]
 
@@ -362,7 +378,10 @@ class QPSWIFTFormatter(QPSolver):
         g = self.g
         lb, ub = self.lb_ub_with_inf(self.nlb, self.ub)
 
-        num_nA_rows = np.where(self.nlbA_filter_half)[0].shape[0]
+        try:
+            num_nA_rows = np.where(self.nlbA_filter_half)[0].shape[0]
+        except:
+            num_nA_rows = 0
         # num_A_rows = np.where(self.ubA_filter_half)[0].shape[0]
         nA = self.nA_A[:num_nA_rows]
         A = self.nA_A[num_nA_rows:]

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import abc
 from abc import ABC
+from functools import cached_property
 from typing import Tuple, Optional, List, Union, Type
 
 import numpy as np
@@ -13,6 +14,9 @@ from giskardpy.god_map import god_map
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.symbol_manager import symbol_manager
 from line_profiler import profile
+
+from giskardpy.utils.decorators import memoize
+
 
 def urdf_joint_to_class(urdf_joint: up.Joint) -> Union[Type[FixedJoint], Type[RevoluteJoint], Type[PrismaticJoint]]:
     if urdf_joint.type == 'fixed':
@@ -143,6 +147,11 @@ class Joint(ABC):
     def from_urdf(cls, urdf_joint: up.Joint, prefix: str) -> Union[FixedJoint, RevoluteJoint, PrismaticJoint]:
         return urdf_to_joint(urdf_joint, prefix)
 
+    @memoize
+    def parent_T_child_as_pos_quaternion(self) -> cas.Expression:
+        position = self.parent_T_child.to_position()[:3]
+        orientation = self.parent_T_child.to_quaternion()
+        return cas.vstack([position, orientation]).T
 
 class VirtualFreeVariables(ABC):
     @abc.abstractmethod

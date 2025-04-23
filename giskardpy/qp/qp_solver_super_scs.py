@@ -1,9 +1,15 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import scipy.sparse as sp
+
 import numpy as np
 import scs
-from scipy import sparse
 
 from giskardpy.qp.qp_solver import QPSolver
-from line_profiler import profile
+
 
 class QPSolverSuperSCS(QPSolver):
     """
@@ -13,15 +19,13 @@ class QPSolverSuperSCS(QPSolver):
           lb <= x <= ub
     """
 
-
-
-    @profile
     def solve(self, weights: np.ndarray, g: np.ndarray, A: np.ndarray, lb: np.ndarray, ub: np.ndarray, lbA: np.ndarray,
               ubA: np.ndarray) -> np.ndarray:
+        import scipy.sparse as sp
         A_b = np.eye(lb.shape[0])
-        G = sparse.csc_matrix(np.vstack([-A_b, A_b, -A, A]))
+        G = sp.csc_matrix(np.vstack([-A_b, A_b, -A, A]))
         h = np.concatenate([-lb, ub, -lbA, ubA])
-        P = sparse.csc_matrix(np.diag(weights))
+        P = sp.csc_matrix(np.diag(weights))
         q = g
 
         data = {
@@ -39,7 +43,6 @@ class QPSolverSuperSCS(QPSolver):
 
         return solver.solve()['x']
 
-
-    # @profile
+    #
     def solve_and_retry(self, weights, g, A, lb, ub, lbA, ubA):
         return self.solve(weights, g, A, lb, ub, lbA, ubA)

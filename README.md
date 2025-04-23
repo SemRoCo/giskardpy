@@ -21,11 +21,11 @@ workon giskardpy
 ```
 
 ### Build Giskardpy
-Switch to your venv.
+Switch to your venv, if you use one.
 ```
 workon giskardpy
 ```
-Choose a place where you want to build giskardpy and clone it
+Choose a place where you want to build giskardpy and clone it. This should NOT be in a ROS workspace.
 ```
 mkdir -p ~/libs && cd ~/libs
 git clone -b giskard_library https://github.com/SemRoCo/giskardpy.git
@@ -36,6 +36,21 @@ Install Giskardpy, `-e` is optional but prevents you from having to rebuild ever
 pip3 install -r requirements.txt
 pip3 install -e .                           
 ```
+
+### Install qpSWIFT
+[https://github.com/SemRoCo/qpSWIFT/wiki/2.Installation](https://github.com/SemRoCo/qpSWIFT.git)
+
+#### Alternative QP solvers
+Giskard supports alternative QP solvers, but they are all slower than qpSWIFT.
+
+- `qpalm`: Default solver, if qpSWIFT is not installed.
+- `gurobi`: Commercial solver. Useful for debugging during development.
+  - ```sudo pip3 install gurobipy```
+  - You can apply for a free academic license or buy one here: https://www.gurobi.com/academia/academic-program-and-licenses/
+  - If you have vpn access to or are in the local network of the IAI of the University of Bremen, follow these instructions: https://ai.uni-bremen.de/wiki/intern/adm/gurobi
+
+[//]: # (- `Clarabel.rs`: `sudo pip3 install clarabel` &#40;https://github.com/oxfordcontrol/Clarabel.rs&#41;)
+
 
 ### (Optional) Build Custom Bullet Bindings
 Giskard uses Adrian Röfer's bullet bindings instead of the official ones, as they are much faster for our use case.
@@ -56,23 +71,16 @@ python3 -c "import betterpybullet"
 If it doesn't work, make sure that your ```$PYTHONPATH``` includes something like 
 ```/path/to/your/bullet3/build_cmake/better_python:/path/to/your/bullet3/examples/pybullet```. 
 
-#### Alternative QP solvers
-Giskard supports multiple QP solvers and will automatically use the fasted installed solver. 
-qpSWIFT is highly recommended.
-
-- `qpalm`: Default solver, because it is the easiest to install and still reasonably fast.
-- `qpSWIFT`: Fastest solver for Giskard. Download our fork: [https://github.com/SemRoCo/qpSWIFT](https://github.com/SemRoCo/qpSWIFT.git) and follow the [install instructions](https://github.com/SemRoCo/qpSWIFT/wiki/2.Installation)
-- `gurobi`: Commercial solver. Slower than `qpSWIFT`, faster than `qpalm`, useful for debugging during development.
-  - ```sudo pip3 install gurobipy```
-  - You can apply for a free academic license or buy one here: https://www.gurobi.com/academia/academic-program-and-licenses/
-  - If you have vpn access to or are in the local network of the IAI of the University of Bremen, follow these instructions: https://ai.uni-bremen.de/wiki/intern/adm/gurobi
-
-[//]: # (- `Clarabel.rs`: `sudo pip3 install clarabel` &#40;https://github.com/oxfordcontrol/Clarabel.rs&#41;)
-
 
 ### Tutorials
 https://github.com/SemRoCo/giskardpy/wiki
 
 ### How to cite
-Stelter, Simon, Georg Bartels, and Michael Beetz. "An open-source motion planning framework for mobile manipulators using constraint-based task space control with linear MPC." 2022 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS). IEEE, 2022.
-
+```
+@phdthesis{stelter25giskard,
+	author = {Simon Stelter},
+	title = {A Robot-Agnostic Kinematic Control Framework: Task Composition via Motion Statecharts and Linear Model Predictive Control},
+	year = {2025},
+	doi = {10.26092/elib/3743},	
+}
+```

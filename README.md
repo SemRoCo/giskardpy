@@ -39,6 +39,7 @@ pip3 install -e .
 
 ### Install qpSWIFT
 [https://github.com/SemRoCo/qpSWIFT/wiki/2.Installation](https://github.com/SemRoCo/qpSWIFT.git)
+If you are using a venv, activate it before installing qpSWIFT.
 
 #### Alternative QP solvers
 Giskard supports alternative QP solvers, but they are all slower than qpSWIFT.

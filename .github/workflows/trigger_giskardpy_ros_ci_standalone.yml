@@ -5,6 +5,21 @@ on:
   push:
     branches:
       - giskard_library
+  workflow_dispatch:
+    inputs:
+      logLevel:
+        description: 'Log level'
+        required: true
+        default: 'info'
+        type: choice
+        options:
+          - info
+          - warning
+          - debug
+      tags:
+        description: 'Test scenario tags'
+        required: false
+        type: boolean
 jobs:
   trigger_giskardpy_ros_ci_standalone:
     runs-on: ubuntu-latest

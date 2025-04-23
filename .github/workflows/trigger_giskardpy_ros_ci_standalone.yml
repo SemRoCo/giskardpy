@@ -2,6 +2,9 @@ name: Trigger giskardpy_ros ros1-noetic-main Tests
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+  push:
+    branches:
+      - giskard_library
 jobs:
   trigger_giskardpy_ros_ci_standalone:
     runs-on: ubuntu-latest

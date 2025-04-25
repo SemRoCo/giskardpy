@@ -1546,6 +1546,7 @@ class QPController:
     """
     Wraps around QP Solver. Builds the required matrices from constraints.
     """
+    free_variables: List[FreeVariable]
     inequality_constraints: List[InequalityConstraint]
     equality_constraints: List[EqualityConstraint]
     derivative_constraints: List[DerivativeInequalityConstraint]
@@ -1556,6 +1557,7 @@ class QPController:
     inequality_model: InequalityModel
     inequality_bounds: InequalityBounds
     qp_solver: QPSolver
+    qp_solver2: QPSolver
     prediction_horizon: int = None
 
     @profile

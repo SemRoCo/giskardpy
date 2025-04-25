@@ -404,14 +404,17 @@ class OmniDrive(MovableJoint, VirtualFreeVariables):
         self.pitch = god_map.world.add_virtual_free_variable(name=PrefixName('pitch', self.name))
         self.yaw = god_map.world.add_free_variable(name=self.yaw_vel_name,
                                                    lower_limits=rotation_lower_limits,
-                                                   upper_limits=self.rotation_limits)
+                                                   upper_limits=self.rotation_limits,
+                                                   is_base=True)
 
         self.x_vel = god_map.world.add_free_variable(name=PrefixName('x_vel', self.name),
                                                      lower_limits=translation_lower_limits,
-                                                     upper_limits=self.translation_limits)
+                                                     upper_limits=self.translation_limits,
+                                                     is_base=True)
         self.y_vel = god_map.world.add_free_variable(name=PrefixName('y_vel', self.name),
                                                      lower_limits=translation_lower_limits,
-                                                     upper_limits=self.translation_limits)
+                                                     upper_limits=self.translation_limits,
+                                                     is_base=True)
         self.free_variables = [self.x_vel, self.y_vel, self.yaw]
 
     def update_transform(self, new_parent_T_child: cas.TransMatrix) -> None:

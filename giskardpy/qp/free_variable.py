@@ -86,13 +86,17 @@ def parabel(x_in: float, weight: float, h: int, alpha: float, q: float) -> float
 
 
 class FreeVariable:
+    is_base: bool
+    threshold: float = 0.005
 
     def __init__(self,
                  name: PrefixName,
                  lower_limits: Dict[Derivatives, float],
                  upper_limits: Dict[Derivatives, float],
                  quadratic_weights: Dict[Derivatives, float],
-                 horizon_functions: Optional[Dict[Derivatives, float]] = None):
+                 horizon_functions: Optional[Dict[Derivatives, float]] = None,
+                 is_base: bool = False):
+        self.is_base = is_base
         self._symbols = {}
         self.name = name
         for derivative in Derivatives:

@@ -23,6 +23,7 @@ class GodMap:
     world: WorldTree
     collision_scene: CollisionWorldSynchronizer
     qp_controller: QPController
+    qp_controller2: QPController
 
     # %% managers
     motion_statechart_manager: MotionStatechartManager

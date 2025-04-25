@@ -570,11 +570,13 @@ class WorldTree(WorldTreeInterface):
     def add_free_variable(self,
                           name: PrefixName,
                           lower_limits: derivative_map,
-                          upper_limits: derivative_map) -> FreeVariable:
+                          upper_limits: derivative_map,
+                          is_base: bool = False) -> FreeVariable:
         free_variable = FreeVariable(name=name,
                                      lower_limits=lower_limits,
                                      upper_limits=upper_limits,
-                                     quadratic_weights=self._default_weights)
+                                     quadratic_weights=self._default_weights,
+                                     is_base=is_base)
         if free_variable.has_position_limits():
             lower_limit = free_variable.get_lower_limit(derivative=Derivatives.position,
                                                         evaluated=True)

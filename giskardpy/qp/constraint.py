@@ -1,3 +1,4 @@
+from copy import copy
 from collections import namedtuple, defaultdict
 from typing import List, Union, Optional, Callable
 
@@ -51,11 +52,23 @@ class InequalityConstraint(Constraint):
         if linear_weight is not None:
             self.linear_weight = linear_weight
 
+    def __copy__(self):
+        return InequalityConstraint(self._name,
+                                    self._parent_task_name,
+                                    copy(self.expression),
+                                    copy(self.lower_error),
+                                    copy(self.upper_error),
+                                    self.velocity_limit,
+                                    self.quadratic_weight,
+                                    self.linear_weight,
+                                    copy(self.lower_slack_limit),
+                                    copy(self.upper_slack_limit))
+
     def __str__(self):
         return self.name
 
     def normalized_weight(self, control_horizon: int) -> cas.Expression:
-        weight_normalized = self.quadratic_weight * (1 / (self.velocity_limit** 2 * control_horizon) )
+        weight_normalized = self.quadratic_weight * (1 / (self.velocity_limit ** 2 * control_horizon))
         return weight_normalized
 
     def capped_lower_error(self, dt: float, control_horizon: int) -> cas.Expression:
@@ -97,11 +110,22 @@ class EqualityConstraint(Constraint):
         if linear_weight is not None:
             self.linear_weight = linear_weight
 
+    def __copy__(self):
+        return EqualityConstraint(self._name,
+                                  self._parent_task_name,
+                                  copy(self.expression),
+                                  copy(self.bound),
+                                  self.velocity_limit,
+                                  self.quadratic_weight,
+                                  self.linear_weight,
+                                  copy(self.lower_slack_limit),
+                                  copy(self.upper_slack_limit))
+
     def __str__(self):
         return self.name
 
     def normalized_weight(self, control_horizon: int) -> cas.Expression:
-        weight_normalized = self.quadratic_weight * (1 / (self.velocity_limit** 2 * control_horizon) )
+        weight_normalized = self.quadratic_weight * (1 / (self.velocity_limit ** 2 * control_horizon))
         return weight_normalized
 
     def capped_bound(self, dt: float, control_horizon: int) -> cas.Expression:
@@ -213,6 +237,19 @@ class DerivativeEqualityConstraint(Constraint):
         self.horizon_function = default_horizon_function
         if horizon_function is not None:
             self.horizon_function = horizon_function
+
+    def __copy__(self):
+        return DerivativeEqualityConstraint(self._name,
+                                            self._parent_task_name,
+                                            self.derivative,
+                                            copy(self.expression),
+                                            copy(self.bound),
+                                            self.quadratic_weight,
+                                            self.normalization_factor,
+                                            copy(self.lower_slack_limit),
+                                            copy(self.upper_slack_limit),
+                                            self.linear_weight,
+                                            self.horizon_function)
 
     def is_iterable(self, thing):
         if isinstance(thing, cas.ca.SX) and sum(thing.shape) == 2:

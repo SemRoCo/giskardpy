@@ -85,14 +85,6 @@ def rnd_joint_state2(draw, joint_limits):
     return {jn: draw(st.floats(ll, ul, allow_nan=False, allow_infinity=False)) for jn, (ll, ul) in muh.items()}
 
 
-
-def pr2_urdf():
-    path = get_middleware().resolve_iri('package://giskardpy/test/urdfs/pr2_with_base.urdf')
-    with open(path, 'r') as f:
-        urdf_string = f.read()
-    return urdf_string
-
-
 def pr2_without_base_urdf():
     with open('../../../../../PycharmProjects/giskardpy/test/urdfs/pr2.urdf', 'r') as f:
         urdf_string = f.read()

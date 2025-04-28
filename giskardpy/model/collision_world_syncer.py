@@ -406,7 +406,7 @@ class CollisionWorldSynchronizer:
                             link_a = god_map.world.search_for_link_name(link_a)
                             link_b = god_map.world.search_for_link_name(link_b)
                         except UnknownLinkException as e:
-                            get_middleware().logwarn(e)
+                            get_middleware().logwarn(str(e))
                             continue
                         reason_id = child.attrib['reason']
                         if link_a not in god_map.world.link_names_with_collisions \
@@ -422,7 +422,7 @@ class CollisionWorldSynchronizer:
                         try:
                             link_name = god_map.world.search_for_link_name(child.attrib['link'])
                         except UnknownLinkException as e:
-                            get_middleware().logwarn(e)
+                            get_middleware().logwarn(str(e))
                             continue
                         self.disabled_links.add(link_name)
 

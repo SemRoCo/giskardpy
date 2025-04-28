@@ -28,10 +28,17 @@ on:
         type: boolean
 
 jobs:
+  docker:
+    permissions:
+      contents: read
+      packages: write
+
+    uses: ./.github/workflows/publish_dockerfiles.yml
   # GitHub Repository-Owners can have uppercase letters.
   # Container Registry URLs need to be lowercase.
   # There is no easy way to get it to lowercase (that i found)
   to-lowercase:
+    needs: docker
     runs-on: ubuntu-latest
     outputs:
       repo_lowercase: ${{ steps.lowercase.outputs.repository }}
@@ -62,10 +69,12 @@ jobs:
         uses: actions/checkout@v4
         with:
           path: 'giskardpy'
+      - name: move pr2.urdf to temp folder from root folder
+        run: mv /root/pr2.urdf /__w/giskardpy/giskardpy/giskardpy/test/urdfs/pr2.urdf
       - name: test
         run: |
-          cd giskardpy
-          python3 -m pytest -s test/${{ matrix.tests }}.py
+          cd giskardpy/test
+          python3 -m pytest -s ${{ matrix.tests }}.py
   #    - name: Setup upterm session
   ##      if: always()
   #      if: failure()

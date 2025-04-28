@@ -43,7 +43,7 @@ def make_pose_from_parts(pose, frame_id, position, orientation):
     return pose
 
 
-def wait_for_publisher(publisher: rospy.Publisher, timeout: float = 3):
+def wait_for_publisher(publisher: rospy.Publisher, timeout: float = 1):
     time = 0
     while publisher.get_num_connections() == 0 and time < timeout:
         rospy.sleep(0.1)

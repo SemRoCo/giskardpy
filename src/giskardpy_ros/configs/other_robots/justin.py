@@ -67,6 +67,8 @@ class WorldWithJustinConfig(WorldConfig):
         self.set_joint_limits(limit_map={Derivatives.velocity: 0.2}, joint_name='torso1_joint')
         self.set_joint_limits(limit_map={Derivatives.velocity: 0.2}, joint_name='torso2_joint')
         self.set_joint_limits(limit_map={Derivatives.velocity: 0.2}, joint_name='torso3_joint')
+        self.world.register_group('left_hand', root_link_name=self.world.search_for_link_name('left_arm7'))
+        self.world.register_group('right_hand', root_link_name=self.world.search_for_link_name('right_arm7'))
 
 class JustinStandaloneInterface(StandAloneRobotInterfaceConfig):
 
@@ -133,4 +135,38 @@ class JustinCollisionAvoidanceConfig(CollisionAvoidanceConfig):
         self.drive_joint_name = drive_joint_name
 
     def setup(self):
+        self.fix_joints_for_collision_avoidance(joint_names=[
+            "left_1thumb1_joint",
+            "left_1thumb2_joint",
+            "left_1thumb3_joint",
+            "left_1thumb4_joint",
+            "left_2tip1_joint",
+            "left_2tip2_joint",
+            "left_2tip3_joint",
+            "left_2tip4_joint",
+            "left_3middle1_joint",
+            "left_3middle2_joint",
+            "left_3middle3_joint",
+            "left_3middle4_joint",
+            "left_4ring1_joint",
+            "left_4ring2_joint",
+            "left_4ring3_joint",
+            "left_4ring4_joint",
+            "right_1thumb1_joint",
+            "right_1thumb2_joint",
+            "right_1thumb3_joint",
+            "right_1thumb4_joint",
+            "right_3middle1_joint",
+            "right_3middle2_joint",
+            "right_3middle3_joint",
+            "right_3middle4_joint",
+            "right_4ring1_joint",
+            "right_4ring2_joint",
+            "right_4ring3_joint",
+            "right_4ring4_joint",
+            "right_2tip1_joint",
+            "right_2tip2_joint",
+            "right_2tip3_joint",
+            "right_2tip4_joint"
+        ])
         self.load_self_collision_matrix('package://giskardpy_ros/self_collision_matrices/justin.srdf')

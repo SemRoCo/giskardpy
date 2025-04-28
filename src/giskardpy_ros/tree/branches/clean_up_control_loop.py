@@ -2,7 +2,6 @@ from py_trees import Sequence
 
 from giskardpy_ros.tree.behaviors.append_zero_velocity import SetZeroVelocity
 from giskardpy_ros.tree.behaviors.debug_marker_publisher import DebugMarkerPublisherTrajectory
-from giskardpy_ros.tree.behaviors.delete_monitors_behaviors import DeleteMonitors
 from giskardpy_ros.tree.behaviors.goal_cleanup import GoalCleanUp
 from giskardpy_ros.tree.behaviors.log_trajectory import LogTrajPlugin
 from giskardpy_ros.tree.behaviors.plot_debug_expressions import PlotDebugExpressions
@@ -21,12 +20,11 @@ class CleanupControlLoop(Sequence):
 
     def __init__(self, name: str = 'clean up control loop'):
         super().__init__(name)
-        self.add_child(PublishFeedback())
         self.add_child(TimePlugin())
+        self.add_child(PublishFeedback())
         self.add_child(SetZeroVelocity('set zero vel 1'))
         self.add_child(LogTrajPlugin('log post processing'))
         self.add_child(GoalCleanUp('clean up goals'))
-        self.add_child(DeleteMonitors())
         self.reset_world_state = failure_is_success(ResetWorldState)()
         self.remove_reset_world_state()
 

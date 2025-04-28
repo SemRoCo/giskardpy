@@ -11,9 +11,8 @@ from giskardpy_ros.configs.iai_robots.boxy import BoxyCollisionAvoidanceConfig, 
 from giskardpy_ros.configs.iai_robots.donbot import WorldWithBoxyBaseConfig
 from giskardpy_ros.configs.giskard import Giskard
 from giskardpy.qp.qp_controller_config import QPControllerConfig
-from giskardpy.god_map import god_map
-from utils_for_tests import launch_launchfile
-from utils_for_tests import GiskardTestWrapper
+from giskardpy_ros.utils.utils_for_tests import launch_launchfile
+from giskardpy_ros.utils.utils_for_tests import GiskardTestWrapper
 
 
 class BoxyTestWrapper(GiskardTestWrapper):

@@ -6,6 +6,7 @@ from giskardpy_ros.tree.behaviors.plugin import GiskardBehavior
 
 class GoalCleanUp(GiskardBehavior):
     def update(self):
-        for goal in god_map.motion_goal_manager.motion_goals.values():
-            goal.clean_up()
+        # fixme
+        # for goal in god_map.motion_statechart_manager.motion_goals.values():
+        #     goal.clean_up()
         return Status.SUCCESS

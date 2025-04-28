@@ -1,29 +1,27 @@
-import math
 from copy import deepcopy
 from typing import Optional
 
 import numpy as np
 from numpy import pi
 import pytest
-import math
 import rospy
 from geometry_msgs.msg import PoseStamped, Point, Quaternion, Vector3Stamped, PointStamped
 from sensor_msgs.msg import JointState
 from std_srvs.srv import Trigger
-from tf.transformations import quaternion_from_matrix, quaternion_about_axis, quaternion_multiply
+from tf.transformations import quaternion_from_matrix, quaternion_about_axis
 
 import giskardpy_ros.ros1.tfwrapper as tf
 from giskard_msgs.msg import MoveGoal, GiskardError
-from giskardpy.data_types.exceptions import PreemptedException
+from giskardpy.data_types.exceptions import PreemptedException, InvalidGoalException, SetupException, \
+    GoalInitalizationException
 from giskardpy_ros.configs.behavior_tree_config import ClosedLoopBTConfig
 from giskardpy_ros.configs.giskard import Giskard
 from giskardpy_ros.configs.iai_robots.pr2 import PR2CollisionAvoidance, PR2VelocityMujocoInterface, WorldWithPR2Config
 from giskardpy.qp.qp_controller_config import QPControllerConfig, SupportedQPSolver
-from giskardpy_ros.goals.realtime_goals import CarryMyBullshit
-from giskardpy.motion_graph.tasks.task import WEIGHT_BELOW_CA
+from giskardpy.motion_statechart.tasks.task import WEIGHT_BELOW_CA
 from giskardpy_ros.tree.blackboard_utils import GiskardBlackboard
-from test_integration_pr2 import PR2TestWrapper, TestJointGoals, pocky_pose
-from giskardpy.goals.weight_scaling_goals import MaxManipulabilityLinWeight
+from test_integration_pr2 import PR2TestWrapper, TestJointGoals
+from giskardpy.motion_statechart.tasks.weight_scaling_goals import MaxManipulability
 import giskardpy_ros.ros1.msg_converter as msg_converter
 
 
@@ -87,8 +85,8 @@ class PR2TestWrapperMujoco(PR2TestWrapper):
                           robot_interface_config=PR2VelocityMujocoInterface(),
                           behavior_tree_config=ClosedLoopBTConfig(debug_mode=True),
                           qp_controller_config=QPControllerConfig(qp_solver=SupportedQPSolver.qpSWIFT,
-                                                                  mpc_dt=0.0125,
-                                                                  control_dt=0.0125))
+                                                                  control_dt=0.02,
+                                                                  mpc_dt=0.02))
         super().__init__(giskard)
 
     def reset_base(self):
@@ -255,15 +253,15 @@ class TestMoveBaseGoals:
         # zero_pose.plan_and_execute(expected_error_codes=[GiskardError.PREEMPTED], stop_after=10)
 
         zero_pose.motion_goals.add_carry_my_luggage(name='cmb',
-                                               camera_link='head_mount_kinect_rgb_optical_frame',
-                                               point_cloud_laser_topic_name='',
-                                               laser_frame_id='base_laser_link',
-                                               height_for_camera_target=1.5)
+                                                    camera_link='head_mount_kinect_rgb_optical_frame',
+                                                    point_cloud_laser_topic_name='',
+                                                    laser_frame_id='base_laser_link',
+                                                    height_for_camera_target=1.5)
         zero_pose.allow_all_collisions()
         # zero_pose.execute(expected_error_code=GiskardError.EXECUTION_ERROR,
         #                   add_local_minimum_reached=False)
         zero_pose.execute(expected_error_type=PreemptedException,
-                          stop_after=20,
+                          # stop_after=20,
                           add_local_minimum_reached=False)
 
         # zero_pose.set_json_goal('CarryMyBullshit',
@@ -274,11 +272,11 @@ class TestMoveBaseGoals:
         # zero_pose.plan_and_execute(expected_error_codes=[GiskardError.PREEMPTED], stop_after=10)
 
         zero_pose.motion_goals.add_carry_my_luggage(name='cmb',
-                                               camera_link='head_mount_kinect_rgb_optical_frame',
-                                               point_cloud_laser_topic_name='',
-                                               # laser_topic_name='/laser',
-                                               laser_frame_id='base_laser_link',
-                                               drive_back=True)
+                                                    camera_link='head_mount_kinect_rgb_optical_frame',
+                                                    point_cloud_laser_topic_name='',
+                                                    # laser_topic_name='/laser',
+                                                    laser_frame_id='base_laser_link',
+                                                    drive_back=True)
         zero_pose.allow_all_collisions()
         zero_pose.execute(add_local_minimum_reached=False)
 
@@ -410,11 +408,11 @@ class TestConstraints:
     def test_SetSeedConfiguration_execute(self, zero_pose: PR2TestWrapper):
         zero_pose.set_seed_configuration(seed_configuration=zero_pose.better_pose)
         zero_pose.set_joint_goal(zero_pose.default_pose)
-        zero_pose.execute(expected_error_code=GiskardError.GOAL_INITIALIZATION_ERROR)
+        zero_pose.execute(expected_error_type=GoalInitalizationException)
 
     def test_SetSeedConfiguration_execute2(self, zero_pose: PR2TestWrapper):
         zero_pose.set_seed_configuration(seed_configuration=zero_pose.better_pose)
-        zero_pose.execute(expected_error_code=GiskardError.CONSTRAINT_INITIALIZATION_ERROR)
+        zero_pose.execute(expected_error_type=GoalInitalizationException)
 
     def test_SetSeedConfiguration_project(self, zero_pose: PR2TestWrapper):
         zero_pose.set_seed_configuration(seed_configuration=zero_pose.better_pose)
@@ -591,7 +589,7 @@ class TestActionServerEvents:
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.set_cart_goal(goal_pose=p, tip_link='base_footprint', root_link='map')
         zero_pose.allow_all_collisions()
-        zero_pose.execute(expected_error_code=GiskardError.PREEMPTED, stop_after=1)
+        zero_pose.execute(expected_error_type=PreemptedException, stop_after=1)
 
     def test_interrupt2(self, zero_pose: PR2TestWrapper):
         p = PoseStamped()
@@ -600,15 +598,15 @@ class TestActionServerEvents:
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.set_cart_goal(goal_pose=p, tip_link='base_footprint', root_link='map')
         zero_pose.allow_all_collisions()
-        zero_pose.execute(expected_error_code=GiskardError.PREEMPTED, stop_after=6)
+        zero_pose.execute(expected_error_type=PreemptedException, stop_after=6)
 
     def test_undefined_type(self, zero_pose: PR2TestWrapper):
         zero_pose.allow_all_collisions()
-        zero_pose.send_goal(goal_type=MoveGoal.UNDEFINED, expected_error_code=GiskardError.INVALID_GOAL)
+        zero_pose.send_goal(goal_type=MoveGoal.UNDEFINED, expected_error_type=InvalidGoalException)
 
     def test_empty_goal(self, zero_pose: PR2TestWrapper):
         zero_pose.cmd_seq = []
-        zero_pose.execute(expected_error_code=GiskardError.INVALID_GOAL)
+        zero_pose.execute(expected_error_type=InvalidGoalException)
 
 
 class TestManipulability:
@@ -643,7 +641,7 @@ class TestManipulability:
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.allow_all_collisions()
         zero_pose.set_cart_goal(p, zero_pose.r_tip, 'map')
-        zero_pose.motion_goals.add_motion_goal(motion_goal_class=MaxManipulabilityLinWeight.__name__,
+        zero_pose.motion_goals.add_motion_goal(class_name=MaxManipulability.__name__,
                                                root_link='torso_lift_link',
                                                tip_link='r_gripper_tool_frame',
                                                gain=1)
@@ -660,13 +658,14 @@ class TestManipulability:
                                         goal_normal=x_goal)
         zero_pose.execute()
 
+
 class TestMonitors:
     def test_only_payload_monitors(self, zero_pose: PR2TestWrapper):
         sleep = zero_pose.monitors.add_sleep(2)
-        zero_pose.monitors.add_cancel_motion(start_condition=sleep, error_message='time up',
-                                             error_code=GiskardError.SETUP_ERROR)
+        zero_pose.monitors.add_cancel_motion(start_condition=sleep, name='cancel',
+                                             error=SetupException('time up'))
         zero_pose.allow_all_collisions()
-        zero_pose.execute(add_local_minimum_reached=False, expected_error_code=GiskardError.SETUP_ERROR)
+        zero_pose.execute(add_local_minimum_reached=False, expected_error_type=SetupException)
 
 # kernprof -lv py.test -s test/test_integration_pr2.py
 # time: [1-9][1-9]*.[1-9]* s

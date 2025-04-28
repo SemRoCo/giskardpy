@@ -7,13 +7,14 @@ from giskard_msgs.msg import MoveResult, CollisionEntry, MoveGoal, WorldResult
 from giskard_msgs.srv import DyeGroupResponse, GetGroupInfoResponse
 from giskardpy.data_types.data_types import goal_parameter
 from giskardpy_ros.python_interface.python_interface import GiskardWrapper
-from giskardpy.motion_graph.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
+from giskardpy.motion_statechart.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
 
 
 class OldGiskardWrapper(GiskardWrapper):
+    max_trajectory_length_set: bool
 
     def __init__(self, node_name: str = 'giskard'):
-        super().__init__(node_name, avoid_name_conflict=True)
+        super().__init__(node_name)
 
     def execute(self, wait: bool = True, add_default: bool = True) -> MoveResult:
         if add_default:
@@ -27,9 +28,11 @@ class OldGiskardWrapper(GiskardWrapper):
     def _create_action_goal(self) -> MoveGoal:
         if not self.motion_goals._collision_entries:
             self.motion_goals.avoid_all_collisions()
+        self.motion_goals._add_collision_entries_as_goals()
         action_goal = MoveGoal()
-        action_goal.monitors = self.monitors.get_monitors()
-        action_goal.goals = self.motion_goals.get_goals()
+        templated_and_tasks = self._quote_conditions(self.monitors.motion_graph_nodes)
+        monitors = self._quote_conditions(self.motion_goals.motion_graph_nodes)
+        action_goal.nodes = templated_and_tasks + monitors
         self.clear_motion_goals_and_monitors()
         return action_goal
 
@@ -49,15 +52,11 @@ class OldGiskardWrapper(GiskardWrapper):
         :param add_monitor: if True, adds a monitor as end_condition to check if the goal was reached.
         :param max_velocity: will be applied to all joints
         """
-        if add_monitor:
-            end_condition = self.monitors.add_joint_position(goal_state=goal_state)
-        else:
-            end_condition = ''
         self.motion_goals.add_joint_position(goal_state=goal_state,
                                              group_name=group_name,
                                              weight=weight,
                                              max_velocity=max_velocity,
-                                             end_condition=end_condition,
+                                             end_condition='',
                                              **kwargs)
 
     def set_cart_goal(self,
@@ -88,19 +87,13 @@ class OldGiskardWrapper(GiskardWrapper):
         """
         root_link = giskard_msgs.LinkName(name=root_link, group_name=root_group)
         tip_link = giskard_msgs.LinkName(name=tip_link, group_name=tip_group)
-        if add_monitor:
-            end_condition = self.monitors.add_cartesian_pose(root_link=root_link,
-                                                             tip_link=tip_link,
-                                                             goal_pose=goal_pose)
-        else:
-            end_condition = ''
         self.motion_goals.add_cartesian_pose(goal_pose=goal_pose,
                                              tip_link=tip_link,
                                              root_link=root_link,
                                              reference_linear_velocity=reference_linear_velocity,
                                              reference_angular_velocity=reference_angular_velocity,
                                              weight=weight,
-                                             end_condition=end_condition,
+                                             end_condition='',
                                              **kwargs)
 
     def set_diff_drive_base_goal(self,
@@ -129,18 +122,9 @@ class OldGiskardWrapper(GiskardWrapper):
         :param weight: default WEIGHT_ABOVE_CA
         :param add_monitor: if True, adds a monitor as end_condition to check if the goal was reached.
         """
-        monitor_name = f'{root_link}/{tip_link} pose reached'
         root_link = giskard_msgs.LinkName(name=root_link, group_name=root_group)
         tip_link = giskard_msgs.LinkName(name=tip_link, group_name=tip_group)
-        if add_monitor:
-            end_condition = self.monitors.add_cartesian_pose(name=monitor_name,
-                                                             root_link=root_link,
-                                                             tip_link=tip_link,
-                                                             position_threshold=0.02,
-                                                             goal_pose=goal_pose)
-        else:
-            end_condition = ''
-        self.motion_goals.add_diff_drive_base(end_condition=end_condition,
+        self.motion_goals.add_diff_drive_base(end_condition='',
                                               goal_pose=goal_pose,
                                               tip_link=tip_link,
                                               root_link=root_link,
@@ -176,17 +160,9 @@ class OldGiskardWrapper(GiskardWrapper):
         :param weight: default WEIGHT_ABOVE_CA
         :param add_monitor: if True, adds a monitor as end_condition to check if the goal was reached.
         """
-        monitor_name = f'{root_link}/{tip_link} pose reached'
         root_link = giskard_msgs.LinkName(name=root_link, group_name=root_group)
         tip_link = giskard_msgs.LinkName(name=tip_link, group_name=tip_group)
-        if add_monitor:
-            end_condition = self.monitors.add_cartesian_pose(name=monitor_name,
-                                                             root_link=root_link,
-                                                             tip_link=tip_link,
-                                                             goal_pose=goal_pose)
-        else:
-            end_condition = ''
-        self.motion_goals.add_cartesian_pose_straight(end_condition=end_condition,
+        self.motion_goals.add_cartesian_pose_straight(end_condition='',
                                                       goal_pose=goal_pose,
                                                       tip_link=tip_link,
                                                       root_link=root_link,
@@ -216,17 +192,9 @@ class OldGiskardWrapper(GiskardWrapper):
         :param weight:
         :param add_monitor: if True, adds a monitor as end_condition to check if the goal was reached.
         """
-        monitor_name = f'{root_link}/{tip_link} position reached'
         root_link = giskard_msgs.LinkName(name=root_link, group_name=root_group)
         tip_link = giskard_msgs.LinkName(name=tip_link, group_name=tip_group)
-        if add_monitor:
-            end_condition = self.monitors.add_cartesian_position(name=monitor_name,
-                                                                 root_link=root_link,
-                                                                 tip_link=tip_link,
-                                                                 goal_point=goal_point)
-        else:
-            end_condition = ''
-        self.motion_goals.add_cartesian_position(end_condition=end_condition,
+        self.motion_goals.add_cartesian_position(end_condition='',
                                                  goal_point=goal_point,
                                                  tip_link=tip_link,
                                                  root_link=root_link,
@@ -253,15 +221,7 @@ class OldGiskardWrapper(GiskardWrapper):
         """
         root_link = giskard_msgs.LinkName(name=root_link, group_name=root_group)
         tip_link = giskard_msgs.LinkName(name=tip_link, group_name=tip_group)
-        if add_monitor:
-            monitor_name = f'{root_link}/{tip_link} position reached'
-            end_condition = self.monitors.add_cartesian_position(name=monitor_name,
-                                                                 root_link=root_link,
-                                                                 tip_link=tip_link,
-                                                                 goal_point=goal_point)
-        else:
-            end_condition = ''
-        self.motion_goals.add_cartesian_position_straight(end_condition=end_condition,
+        self.motion_goals.add_cartesian_position_straight(end_condition='',
                                                           goal_point=goal_point,
                                                           tip_link=tip_link,
                                                           root_link=root_link,
@@ -290,17 +250,9 @@ class OldGiskardWrapper(GiskardWrapper):
         :param weight:
         :param add_monitor: if True, adds a monitor as end_condition to check if the goal was reached.
         """
-        monitor_name = f'{root_link}/{tip_link} orientation reached'
         root_link = giskard_msgs.LinkName(name=root_link, group_name=root_group)
         tip_link = giskard_msgs.LinkName(name=tip_link, group_name=tip_group)
-        if add_monitor:
-            end_condition = self.monitors.add_cartesian_orientation(name=monitor_name,
-                                                                    root_link=root_link,
-                                                                    tip_link=tip_link,
-                                                                    goal_orientation=goal_orientation)
-        else:
-            end_condition = ''
-        self.motion_goals.add_cartesian_orientation(end_condition=end_condition,
+        self.motion_goals.add_cartesian_orientation(end_condition='',
                                                     goal_orientation=goal_orientation,
                                                     tip_link=tip_link,
                                                     root_link=root_link,
@@ -317,7 +269,6 @@ class OldGiskardWrapper(GiskardWrapper):
                               root_group: str = None,
                               max_angular_velocity: Optional[float] = None,
                               weight: Optional[float] = None,
-                              add_monitor: bool = True,
                               **kwargs: goal_parameter):
         """
         This goal will use the kinematic chain between tip and root to align tip_normal with goal_normal.
@@ -333,14 +284,7 @@ class OldGiskardWrapper(GiskardWrapper):
         """
         root_link = giskard_msgs.LinkName(name=root_link, group_name=root_group)
         tip_link = giskard_msgs.LinkName(name=tip_link, group_name=tip_group)
-        if add_monitor:
-            end_condition = self.monitors.add_vectors_aligned(root_link=root_link,
-                                                              tip_link=tip_link,
-                                                              goal_normal=goal_normal,
-                                                              tip_normal=tip_normal)
-        else:
-            end_condition = ''
-        self.motion_goals.add_align_planes(end_condition=end_condition,
+        self.motion_goals.add_align_planes(end_condition='',
                                            tip_link=tip_link,
                                            tip_normal=tip_normal,
                                            root_link=root_link,
@@ -364,8 +308,7 @@ class OldGiskardWrapper(GiskardWrapper):
         If the trajectory is longer than new_length, Giskard will prempt the goal.
         :param new_length: in seconds
         """
-        self.monitors.add_max_trajectory_length(max_trajectory_length=length,
-                                                **kwargs)
+        self.monitors.add_check_trajectory_length(length=length, **kwargs)
 
     def set_limit_cartesian_velocity_goal(self,
                                           tip_link: str,
@@ -375,7 +318,6 @@ class OldGiskardWrapper(GiskardWrapper):
                                           max_linear_velocity: float = 0.1,
                                           max_angular_velocity: float = 0.5,
                                           weight: float = WEIGHT_ABOVE_CA,
-                                          hard: bool = False,
                                           **kwargs: goal_parameter):
         """
         This goal will use put a strict limit on the Cartesian velocity. This will require a lot of constraints, thus
@@ -387,7 +329,6 @@ class OldGiskardWrapper(GiskardWrapper):
         :param max_linear_velocity: m/s
         :param max_angular_velocity: rad/s
         :param weight: default WEIGHT_ABOVE_CA
-        :param hard: Turn this into a hard constraint. This make create unsolvable optimization problems
         """
         root_link = giskard_msgs.LinkName(name=root_link, group_name=root_group)
         tip_link = giskard_msgs.LinkName(name=tip_link, group_name=tip_group)
@@ -396,7 +337,7 @@ class OldGiskardWrapper(GiskardWrapper):
                                                        weight=weight,
                                                        max_linear_velocity=max_linear_velocity,
                                                        max_angular_velocity=max_angular_velocity,
-                                                       hard=hard,
+                                                       end_condition='',
                                                        **kwargs)
 
     def set_grasp_bar_goal(self,
@@ -411,7 +352,6 @@ class OldGiskardWrapper(GiskardWrapper):
                            reference_linear_velocity: Optional[float] = None,
                            reference_angular_velocity: Optional[float] = None,
                            weight: float = WEIGHT_ABOVE_CA,
-                           add_monitor: bool = True,
                            **kwargs: goal_parameter):
         """
         Like a CartesianPose but with more freedom.
@@ -432,19 +372,7 @@ class OldGiskardWrapper(GiskardWrapper):
         """
         root_link = giskard_msgs.LinkName(name=root_link, group_name=root_group)
         tip_link = giskard_msgs.LinkName(name=tip_link, group_name=tip_group)
-        end_condition = ''
-        if add_monitor:
-            monitor_name1 = self.monitors.add_distance_to_line(root_link=root_link,
-                                                               tip_link=tip_link,
-                                                               center_point=bar_center,
-                                                               line_axis=bar_axis,
-                                                               line_length=bar_length)
-            monitor_name2 = self.monitors.add_vectors_aligned(root_link=root_link,
-                                                              tip_link=tip_link,
-                                                              goal_normal=bar_axis,
-                                                              tip_normal=tip_grasp_axis)
-            end_condition = f'{monitor_name1} and {monitor_name2}'
-        self.motion_goals.add_grasp_bar(end_condition=end_condition,
+        self.motion_goals.add_grasp_bar(end_condition='',
                                         root_link=root_link,
                                         tip_link=tip_link,
                                         tip_grasp_axis=tip_grasp_axis,
@@ -506,6 +434,7 @@ class OldGiskardWrapper(GiskardWrapper):
                                                  door_handle=door_handle,
                                                  tip_group=tip_group,
                                                  tip_gripper_axis=tip_gripper_axis,
+                                                 end_condition='',
                                                  root_group=root_group,
                                                  weight=weight)
 
@@ -530,6 +459,7 @@ class OldGiskardWrapper(GiskardWrapper):
         self.motion_goals.add_pre_push_door(root_link=root_link,
                                             tip_link=tip_link,
                                             door_object=door_object,
+                                            end_condition='',
                                             door_handle=door_handle,
                                             reference_linear_velocity=reference_linear_velocity,
                                             reference_angular_velocity=reference_angular_velocity,
@@ -577,14 +507,7 @@ class OldGiskardWrapper(GiskardWrapper):
         """
         root_link = giskard_msgs.LinkName(name=root_link, group_name=root_group)
         tip_link = giskard_msgs.LinkName(name=tip_link, group_name=tip_group)
-        if add_monitor:
-            end_condition = self.monitors.add_pointing_at(goal_point=goal_point,
-                                                          tip_link=tip_link,
-                                                          pointing_axis=pointing_axis,
-                                                          root_link=root_link)
-        else:
-            end_condition = ''
-        self.motion_goals.add_pointing(end_condition=end_condition,
+        self.motion_goals.add_pointing(end_condition='',
                                        tip_link=tip_link,
                                        goal_point=goal_point,
                                        root_link=root_link,
@@ -605,7 +528,8 @@ class OldGiskardWrapper(GiskardWrapper):
             joint_list = [giskard_msgs.LinkName(name=name) for name in joint_list]
         self.motion_goals.add_avoid_joint_limits(percentage=percentage,
                                                  weight=weight,
-                                                 joint_list=joint_list)
+                                                 joint_list=joint_list,
+                                                 end_condition='')
 
     # %% collision avoidance
     def allow_collision(self,
@@ -826,8 +750,8 @@ class OldGiskardWrapper(GiskardWrapper):
         :return: WorldResult
         """
         return self.world.register_group(new_group_name=new_group_name,
-                                   root_link_name=root_link_name,
-                                   root_link_group_name=root_link_group_name)
+                                         root_link_name=root_link_name,
+                                         root_link_group_name=root_link_group_name)
 
     def clear_world(self) -> WorldResult:
         """

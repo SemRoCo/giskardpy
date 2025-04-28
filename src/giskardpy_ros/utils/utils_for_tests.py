@@ -24,17 +24,17 @@ import giskard_msgs.msg as giskard_msgs
 import giskardpy.casadi_wrapper as cas
 import giskardpy_ros.ros1.msg_converter as msg_converter
 import giskardpy_ros.ros1.tfwrapper as tf
-from giskard_msgs.msg import GiskardError, LinkName
+from giskard_msgs.msg import GiskardError
 from giskard_msgs.srv import DyeGroupResponse
 from giskardpy.data_types.data_types import KeyDefaultDict
 from giskardpy.data_types.data_types import PrefixName, Derivatives
 from giskardpy.data_types.exceptions import UnknownGroupException, DuplicateNameException, WorldException
-from giskardpy.goals.diff_drive_goals import DiffDriveTangentialToPoint, KeepHandInWorkspace
+from giskardpy.motion_statechart.tasks.diff_drive_goals import DiffDriveTangentialToPoint, KeepHandInWorkspace
 from giskardpy.god_map import god_map
 from giskardpy.middleware import get_middleware
 from giskardpy.model.collision_world_syncer import Collisions, Collision, CollisionEntry
 from giskardpy.model.joints import OneDofJoint, OmniDrive, DiffDrive, Joint
-from giskardpy.motion_graph.tasks.task import WEIGHT_ABOVE_CA
+from giskardpy.motion_statechart.tasks.task import WEIGHT_ABOVE_CA
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.qp_controller import available_solvers
 from giskardpy.qp.qp_solver_ids import SupportedQPSolver
@@ -187,25 +187,25 @@ def pr2_urdf():
 
 
 def pr2_without_base_urdf():
-    with open('urdfs/pr2.urdf', 'r') as f:
+    with open('../../../test/urdfs/pr2.urdf', 'r') as f:
         urdf_string = f.read()
     return urdf_string
 
 
 def base_bot_urdf():
-    with open('urdfs/2d_base_bot.urdf', 'r') as f:
+    with open('../../../test/urdfs/2d_base_bot.urdf', 'r') as f:
         urdf_string = f.read()
     return urdf_string
 
 
 def donbot_urdf():
-    with open('urdfs/iai_donbot.urdf', 'r') as f:
+    with open('../../../test/urdfs/iai_donbot.urdf', 'r') as f:
         urdf_string = f.read()
     return urdf_string
 
 
 def boxy_urdf():
-    with open('urdfs/boxy.urdf', 'r') as f:
+    with open('../../../test/urdfs/boxy.urdf', 'r') as f:
         urdf_string = f.read()
     return urdf_string
 
@@ -416,7 +416,8 @@ class GiskardTestWrapper(OldGiskardWrapper):
         if object_name is None:
             object_name = self.default_env_name
         if GiskardBlackboard().tree.is_standalone():
-            self.set_seed_configuration(joint_state)
+            self.monitors.add_set_seed_configuration(seed_configuration=joint_state,
+                                                     name='set kitchen state')
             self.allow_all_collisions()
             self.execute()
         else:
@@ -456,7 +457,7 @@ class GiskardTestWrapper(OldGiskardWrapper):
     #
 
     def teleport_base(self, goal_pose, group_name: Optional[str] = None):
-        done = self.monitors.add_set_seed_odometry(base_pose=goal_pose, group_name=group_name)
+        done = self.monitors.add_set_seed_odometry(base_pose=goal_pose, group_name=group_name, name='teleport base')
         self.allow_all_collisions()
         self.monitors.add_end_motion(start_condition=done)
         self.execute(add_local_minimum_reached=False)
@@ -465,13 +466,13 @@ class GiskardTestWrapper(OldGiskardWrapper):
                                    base_footprint=None):
         if isinstance(tip_link, str):
             tip_link = giskard_msgs.LinkName(name=tip_link)
-        self.motion_goals.add_motion_goal(motion_goal_class=KeepHandInWorkspace.__name__,
+        self.motion_goals.add_motion_goal(class_name=KeepHandInWorkspace.__name__,
                                           tip_link=tip_link,
                                           map_frame=map_frame,
                                           base_footprint=base_footprint)
 
     def set_diff_drive_tangential_to_point(self, goal_point: PointStamped, weight: float = WEIGHT_ABOVE_CA, **kwargs):
-        self.motion_goals.add_motion_goal(motion_goal_class=DiffDriveTangentialToPoint.__name__,
+        self.motion_goals.add_motion_goal(class_name=DiffDriveTangentialToPoint.__name__,
                                           goal_point=goal_point,
                                           weight=weight,
                                           **kwargs)
@@ -543,7 +544,7 @@ class GiskardTestWrapper(OldGiskardWrapper):
             result_exception = msg_converter.error_msg_to_exception(r.error)
             if expected_error_type is not None:
                 assert type(result_exception) == expected_error_type, \
-                    f'got: {result_exception}, ' \
+                    f'got: {type(result_exception)}, ' \
                     f'expected: {expected_error_type} | error_massage: {r.error.msg}'
             else:
                 if result_exception is not None:
@@ -920,12 +921,10 @@ class GiskardTestWrapper(OldGiskardWrapper):
 
     def move_base(self, goal_pose) -> None:
         tip = self.get_odometry_joint().child_link_name
-        monitor = self.monitors.add_cartesian_pose(goal_pose=goal_pose, tip_link=tip.short_name, root_link='map',
-                                                   name='base goal')
         self.motion_goals.add_cartesian_pose(goal_pose=goal_pose, tip_link=tip.short_name, root_link='map',
-                                             name='base goal',
-                                             end_condition=monitor)
-        self.execute()
+                                             name='base goal')
+        self.add_end_on_local_minimum()
+        self.execute(add_local_minimum_reached=False)
 
     def reset(self):
         pass

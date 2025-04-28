@@ -12,9 +12,8 @@ from giskardpy_ros.configs.behavior_tree_config import StandAloneBTConfig
 from giskardpy_ros.configs.iai_robots.donbot import WorldWithBoxyBaseConfig, DonbotCollisionAvoidanceConfig, DonbotStandaloneInterfaceConfig
 from giskardpy_ros.configs.giskard import Giskard
 from giskardpy.qp.qp_controller_config import QPControllerConfig
-from giskardpy.god_map import god_map
-from utils_for_tests import launch_launchfile
-from utils_for_tests import GiskardTestWrapper
+from giskardpy_ros.utils.utils_for_tests import launch_launchfile
+from giskardpy_ros.utils.utils_for_tests import GiskardTestWrapper
 
 # TODO roslaunch iai_donbot_sim ros_control_sim.launch
 
@@ -66,7 +65,7 @@ class DonbotTestWrapper(GiskardTestWrapper):
         giskard = Giskard(world_config=WorldWithBoxyBaseConfig(),
                           collision_avoidance_config=DonbotCollisionAvoidanceConfig(),
                           robot_interface_config=DonbotStandaloneInterfaceConfig(),
-                          behavior_tree_config=StandAloneBTConfig(),
+                          behavior_tree_config=StandAloneBTConfig(debug_mode=True),
                           qp_controller_config=QPControllerConfig())
         super().__init__(giskard)
 
@@ -230,8 +229,9 @@ class TestConstraints:
         better_pose.execute()
 
         goal_point = better_pose.compute_fk_point('map', tip)
+        goal_point.point.z -= 0.1
         better_pose.set_pointing_goal(goal_point=goal_point, tip_link=tip, pointing_axis=z,
-                                      root_link=tip)
+                                      root_link=better_pose.default_root)
         better_pose.execute()
 
     def test_open_fridge(self, kitchen_setup: DonbotTestWrapper):
@@ -323,7 +323,7 @@ class TestCartGoals:
         zero_pose.execute()
         p = PoseStamped()
         p.header.frame_id = 'camera_link'
-        p.pose.position = Point(0, 1, 0)
+        p.pose.position = Point(0, 0.8, 0)
         p.pose.orientation.w = 1
         # zero_pose.allow_self_collision()
         zero_pose.set_straight_cart_goal(goal_pose=p,

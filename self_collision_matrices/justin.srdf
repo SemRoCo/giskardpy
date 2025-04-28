@@ -1,6 +1,16 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <robot name="rollin_justin">
+  <disable_all_collisions link="head1"/>
+  <disable_all_collisions link="left_arm1"/>
+  <disable_all_collisions link="left_arm2"/>
+  <disable_all_collisions link="right_arm1"/>
+  <disable_all_collisions link="right_arm2"/>
+  <disable_all_collisions link="torso1"/>
+  <disable_all_collisions link="torso2"/>
+  <disable_all_collisions link="torso3"/>
+  <disable_all_collisions link="torso4"/>
   <disable_self_collision link1="base_link" link2="base_link" reason="Adjacent"/>
+  <disable_self_collision link1="base_link" link2="head2" reason="Unknown"/>
   <disable_self_collision link1="base_link" link2="torso1" reason="Default"/>
   <disable_self_collision link1="base_link" link2="torso2" reason="Never"/>
   <disable_self_collision link1="base_link" link2="torso3" reason="Never"/>

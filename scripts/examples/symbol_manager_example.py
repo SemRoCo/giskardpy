@@ -16,7 +16,7 @@ expr2 = cas.greater(a, b)
 print(expr2)
 # (god_map.b<god_map.a)
 
-expr_compiled = expr.compile()
+expr_compiled = expr.pre_compile()
 args = symbol_manager.resolve_symbols(expr_compiled.str_params)
 print(expr_compiled.fast_call(args))
 # [3.]

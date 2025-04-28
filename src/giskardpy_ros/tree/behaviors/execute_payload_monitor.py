@@ -3,7 +3,7 @@ from threading import Thread
 from line_profiler import profile
 from py_trees import Status
 
-from giskardpy.motion_graph.monitors.payload_monitors import PayloadMonitor
+from giskardpy.motion_statechart.monitors.payload_monitors import PayloadMonitor
 from giskardpy_ros.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.decorators import record_time
 from giskardpy_ros.tree.blackboard_utils import catch_and_raise_to_blackboard

@@ -3,15 +3,16 @@ from __future__ import annotations
 from typing import Optional, List
 
 from giskardpy.model.world_config import WorldConfig
+from giskardpy.motion_statechart.tasks.task import Task
 from giskardpy_ros.configs.behavior_tree_config import BehaviorTreeConfig, OpenLoopBTConfig
 from giskardpy.god_map import god_map
 from giskardpy.model.collision_avoidance_config import CollisionAvoidanceConfig, DisableCollisionAvoidanceConfig
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from giskardpy_ros.configs.robot_interface_config import RobotInterfaceConfig
-from giskardpy.data_types.exceptions import GiskardException, SetupException
-from giskardpy.goals.goal import Goal
-from giskardpy.motion_graph.monitors.monitors import Monitor
-from giskardpy.middleware import get_middleware, get_middleware
+from giskardpy.data_types.exceptions import SetupException
+from giskardpy.motion_statechart.goals.goal import Goal
+from giskardpy.motion_statechart.monitors.monitors import Monitor
+from giskardpy.middleware import get_middleware
 from giskardpy_ros.tree.blackboard_utils import GiskardBlackboard
 from giskardpy.utils.utils import get_all_classes_in_package
 
@@ -109,15 +110,22 @@ class Giskard:
         new_goals = get_all_classes_in_package(package_name, Goal)
         if len(new_goals) == 0:
             raise SetupException(f'No classes of type \'{Goal.__name__}\' found in {package_name}.')
-        get_middleware().loginfo(f'Made goal classes {new_goals} available Giskard.')
-        god_map.motion_goal_manager.add_goal_package_path(package_name)
+        get_middleware().loginfo(f'Made goal classes {new_goals} available.')
+        god_map.motion_statechart_manager.add_goal_package_path(package_name)
+
+    def add_task_package_name(self, package_name: str):
+        new_goals = get_all_classes_in_package(package_name, Task)
+        if len(new_goals) == 0:
+            raise SetupException(f'No classes of type \'{Goal.__name__}\' found in {package_name}.')
+        get_middleware().loginfo(f'Made task classes {new_goals} available.')
+        god_map.motion_statechart_manager.add_task_package_path(package_name)
 
     def add_monitor_package_name(self, package_name: str) -> None:
         new_monitors = get_all_classes_in_package(package_name, Monitor)
         if len(new_monitors) == 0:
             raise SetupException(f'No classes of type \'{Monitor.__name__}\' found in \'{package_name}\'.')
-        get_middleware().loginfo(f'Made Monitor classes \'{new_monitors}\' available Giskard.')
-        god_map.monitor_manager.add_monitor_package_path(package_name)
+        get_middleware().loginfo(f'Made Monitor classes \'{new_monitors}\' available.')
+        god_map.motion_statechart_manager.add_monitor_package_path(package_name)
 
     def live(self):
         """

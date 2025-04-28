@@ -3,7 +3,6 @@ from py_trees import Status
 
 from giskard_msgs.msg import MoveResult, GiskardError
 from giskardpy.data_types.exceptions import *
-from giskardpy.goals.collision_avoidance import CollisionAvoidance
 from giskardpy.god_map import god_map
 from giskardpy_ros.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.middleware import get_middleware

@@ -1,9 +1,6 @@
 import rospy
 from geometry_msgs.msg import PoseStamped
 
-from giskardpy.goals.joint_goals import JointPositionList
-from giskardpy.motion_graph.monitors import JointGoalReached
-from giskardpy.python_interface.python_interface import GiskardWrapper
 
 # %% Define goals for later
 right_arm_goal = {'r_shoulder_pan_joint': -1.7125,
@@ -59,7 +56,7 @@ right_monitor = giskard_wrapper.monitors.add_joint_position(goal_state=right_arm
 # You can use add_motion_goal to add any monitor implemented in giskardpy_ros.monitor.
 # All remaining parameters are forwarded to the __init__ function of that class.
 # All specialized add_ functions are just wrappers for add_monitor.
-left_monitor = giskard_wrapper.monitors.add_monitor(monitor_class=JointGoalReached.__name__,
+left_monitor = giskard_wrapper.monitors.add_monitor(class_name=JointGoalReached.__name__,
                                                     goal_state=left_arm_goal,
                                                     name='left pose reached',
                                                     start_condition=sleep1,
@@ -87,12 +84,12 @@ base_monitor = giskard_wrapper.monitors.add_cartesian_pose(root_link='map',
                                                            goal_pose=base_goal)
 
 # and then we define a motion goal for it.
-# The hold_condition causes the motion goal to hold as long as the condition is True.
+# The pause_condition causes the motion goal to hold as long as the condition is True.
 # In this case, the cart pose is halted if time % 2 == 1 and active if time % 2 == 0.
 giskard_wrapper.motion_goals.add_cartesian_pose(root_link='map',
                                                 tip_link='base_footprint',
                                                 goal_pose=base_goal,
-                                                hold_condition=f'not {alternator}',
+                                                pause_condition=f'not {alternator}',
                                                 end_condition=base_monitor)
 
 # %% Define when the motion should end.
@@ -112,7 +109,7 @@ giskard_wrapper.monitors.add_end_motion(start_condition=' and '.join([local_min,
 # It's good to also add a cancel condition in case something went wrong and the end motion monitor is unable to become
 # True. Currently, the only predefined specialized cancel monitor is max trajectory length.
 # Alternative you can use monitor.add_cancel_motion similar to end_motion.
-giskard_wrapper.monitors.add_max_trajectory_length(120)
+giskard_wrapper.monitors.add_check_trajectory_length(120)
 # Lastly we allow all collisions
 giskard_wrapper.motion_goals.allow_all_collisions()
 # And execute the goal.

@@ -32,7 +32,7 @@ class AsyncBehavior(GiskardBehavior, Composite):
 
     def initialise(self) -> None:
         self.looped_once = False
-        self.update_thread = Thread(target=self.loop_over_plugins, name=self.name)
+        self.update_thread = Thread(target=self.loop_over_plugins, name=f'async {self.name}')
         self.update_thread.start()
         super().initialise()
 
@@ -40,7 +40,8 @@ class AsyncBehavior(GiskardBehavior, Composite):
         return self.status == Status.RUNNING
 
     def terminate(self, new_status: Status) -> None:
-        get_middleware().loginfo(f'avg dt was {self.sleeper.avg_dt}')
+        if self.sleeper is not None:
+            get_middleware().loginfo(f'avg dt was {self.sleeper.avg_dt}')
         self.set_status(Status.FAILURE)
         try:
             self.update_thread.join()

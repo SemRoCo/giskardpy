@@ -13,7 +13,7 @@ class WorldWithPR2ConfigBlue(WorldWithPR2Config):
 
     def setup(self):
         super().setup()
-        self.set_default_color(20 / 255, 27.1 / 255, 80 / 255, 0.2)
+        # self.set_default_color(20 / 255, 27.1 / 255, 80 / 255, 0.2)
 
 
 if __name__ == '__main__':

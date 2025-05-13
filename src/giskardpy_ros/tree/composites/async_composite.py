@@ -40,7 +40,7 @@ class AsyncBehavior(GiskardBehavior, Composite):
         return self.status == Status.RUNNING
 
     def terminate(self, new_status: Status) -> None:
-        if self.sleeper is not None:
+        if hasattr(self, 'sleeper') and self.sleeper is not None:
             get_middleware().loginfo(f'avg dt was {self.sleeper.avg_dt}')
         self.set_status(Status.FAILURE)
         try:

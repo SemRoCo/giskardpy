@@ -31,7 +31,7 @@ from giskardpy.motion_statechart.tasks.pointing import Pointing
 from giskardpy.motion_statechart.goals.pre_push_door import PrePushDoor
 from giskardpy.motion_statechart.monitors.cartesian_monitors import PoseReached, PositionReached, OrientationReached, \
     PointingAt, VectorsAligned, DistanceToLine
-from giskardpy.motion_statechart.monitors.joint_monitors import JointGoalReached
+from giskardpy.motion_statechart.monitors.joint_monitors import JointGoalReached, JointPositionAbove
 from giskardpy.motion_statechart.monitors.monitors import LocalMinimumReached, TimeAbove, Alternator, CancelMotion, \
     EndMotion, TrueMonitor, FalseMonitor
 from giskardpy.motion_statechart.monitors.overwrite_state_monitors import SetOdometry, SetSeedConfiguration
@@ -1687,6 +1687,28 @@ class MonitorWrapper(MotionStatechartNodeWrapper):
         return self.add_monitor(class_name=JointGoalReached.__name__,
                                 name=name,
                                 goal_state=goal_state,
+                                threshold=threshold,
+                                start_condition=start_condition,
+                                pause_condition=pause_condition,
+                                end_condition=end_condition,
+                                reset_condition=reset_condition)
+
+    def add_joint_position_above(self,
+                                 joint_name: Union[str, giskard_msgs.LinkName],
+                                 threshold: float,
+                                 name: Optional[str] = None,
+                                 start_condition: str = '',
+                                 pause_condition: str = '',
+                                 end_condition: str = '',
+                                 reset_condition: str = '') -> str:
+        """
+        True if `joint_name` is above `threshold`.
+        """
+        if isinstance(joint_name, str):
+            joint_name = giskard_msgs.LinkName(name=joint_name)
+        return self.add_monitor(class_name=JointPositionAbove.__name__,
+                                name=name,
+                                joint_name=joint_name,
                                 threshold=threshold,
                                 start_condition=start_condition,
                                 pause_condition=pause_condition,

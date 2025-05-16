@@ -444,10 +444,11 @@ class TestEuRobin:
                                                           start_condition=right_hand_closed,
                                                           end_condition='')
         door_half_open = 'is door half open?'
-        dlr_kitchen_setup.monitors.add_joint_position(name=door_half_open,
-                                                      goal_state={door_joint: np.pi / 4},
-                                                      start_condition=handle_graped,
-                                                      end_condition=door_half_open)
+        dlr_kitchen_setup.monitors.add_joint_position_above(name=door_half_open,
+                                                            joint_name=door_joint,
+                                                            threshold=np.pi / 4,
+                                                            start_condition=handle_graped,
+                                                            end_condition=door_half_open)
 
         place_pose = PoseStamped()
         place_pose.header.frame_id = fridge
@@ -507,7 +508,7 @@ class TestEuRobin:
         dlr_kitchen_setup.motion_goals.add_justin_torso_limit(name='torso4_joint', end_condition='')
         dlr_kitchen_setup.execute(add_local_minimum_reached=False)
 
-        dlr_kitchen_setup.set_env_state({handle_joint: 0})
+        dlr_kitchen_setup.set_env_state({door_joint: 0})
 
         dlr_kitchen_setup.set_joint_goal(dlr_kitchen_setup.better_pose)
         dlr_kitchen_setup.allow_all_collisions()

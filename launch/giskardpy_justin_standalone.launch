@@ -4,17 +4,17 @@
 
     <node pkg="giskardpy_ros" type="justin_standalone.py" name="giskard" output="screen"/>
 
-    <node pkg="giskardpy_ros" type="interactive_marker.py" name="giskard_interactive_marker" output="screen">
-        <rosparam param="enable_self_collision">False</rosparam>
-        <rosparam param="marker_scale">1</rosparam>
-        <rosparam param="interactive_marker_chains">
-<!--          - [map, r_gripper_tool_frame]-->
-<!--          - [map, l_gripper_tool_frame]-->
-          - [base_footprint, torso4]
-<!--          - [map, base_footprint]-->
-<!--          - [map, high_def_frame]-->
-        </rosparam>
-    </node>
+<!--    <node pkg="giskardpy_ros" type="interactive_marker.py" name="giskard_interactive_marker" output="screen">-->
+<!--        <rosparam param="enable_self_collision">False</rosparam>-->
+<!--        <rosparam param="marker_scale">1</rosparam>-->
+<!--        <rosparam param="interactive_marker_chains">-->
+<!--&lt;!&ndash;          - [map, r_gripper_tool_frame]&ndash;&gt;-->
+<!--&lt;!&ndash;          - [map, l_gripper_tool_frame]&ndash;&gt;-->
+<!--          - [base_footprint, torso4]-->
+<!--&lt;!&ndash;          - [map, base_footprint]&ndash;&gt;-->
+<!--&lt;!&ndash;          - [map, high_def_frame]&ndash;&gt;-->
+<!--        </rosparam>-->
+<!--    </node>-->
 
     <node name="rviz" pkg="rviz" type="rviz" args="-d $(find giskardpy_ros)/launch/rviz_config/standalone.rviz" />
 

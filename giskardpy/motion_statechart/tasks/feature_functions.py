@@ -6,6 +6,8 @@ from giskardpy import casadi_wrapper as cas
 from giskardpy.data_types.data_types import PrefixName, ColorRGBA
 from giskardpy.god_map import god_map
 from giskardpy.motion_statechart.tasks.task import WEIGHT_BELOW_CA, Task
+from geometry_msgs.msg import PointStamped, Vector3Stamped
+from giskardpy.symbol_manager import symbol_manager
 
 
 class FeatureFunctionGoal(Task):
@@ -55,7 +57,8 @@ class AlignPerpendicular(FeatureFunctionGoal):
                  reference_normal: cas.Vector3,
                  name: Optional[str] = None,
                  weight: int = WEIGHT_BELOW_CA,
-                 max_vel: float = 0.2):
+                 max_vel: float = 0.2,
+                 threshold: float = 0.01,):
         super().__init__(tip_link=tip_link,
                          root_link=root_link,
                          reference_feature=reference_normal,
@@ -68,6 +71,7 @@ class AlignPerpendicular(FeatureFunctionGoal):
                                      weight=weight,
                                      task_expression=expr,
                                      name=f'{self.name}_constraint')
+        self.observation_expression = cas.less(cas.abs(0 - expr), threshold)
 
 
 class HeightGoal(FeatureFunctionGoal):
@@ -96,6 +100,8 @@ class HeightGoal(FeatureFunctionGoal):
                                        weight=weight,
                                        task_expression=expr,
                                        name=f'{self.name}_constraint')
+        self.observation_expression = cas.logic_and(cas.if_less_eq(expr, upper_limit, 1, 0),
+                                                    cas.if_greater_eq(expr, lower_limit, 1, 0))
 
 
 class DistanceGoal(FeatureFunctionGoal):
@@ -134,6 +140,8 @@ class DistanceGoal(FeatureFunctionGoal):
                                               task_expression=projected_vector[:3],
                                               names=[f'{self.name}_extra1', f'{self.name}_extra2',
                                                      f'{self.name}_extra3'])
+        self.observation_expression = cas.logic_and(cas.if_less_eq(expr, upper_limit, 1, 0),
+                                                    cas.if_greater_eq(expr, lower_limit, 1, 0))
 
 
 class AngleGoal(FeatureFunctionGoal):
@@ -161,3 +169,6 @@ class AngleGoal(FeatureFunctionGoal):
                                        weight=weight,
                                        task_expression=expr,
                                        name=f'{self.name}_constraint')
+        self.observation_expression = cas.logic_and(cas.if_less_eq(expr, upper_angle, 1, 0),
+                                                    cas.if_greater_eq(expr, lower_angle, 1, 0))
+

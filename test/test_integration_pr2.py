@@ -24,7 +24,6 @@ from giskardpy.motion_statechart.goals.collision_avoidance import CollisionAvoid
 from giskardpy.motion_statechart.tasks.goals_tests import DebugGoal, CannotResolveSymbol
 from giskardpy.motion_statechart.goals.set_prediction_horizon import SetQPSolver
 from giskardpy.motion_statechart.goals.tracebot import InsertCylinder
-from giskardpy.motion_statechart.tasks.weight_scaling_goals import MaxManipulability, BaseArmWeightScaling
 from giskardpy.god_map import god_map
 from giskardpy.middleware import get_middleware
 from giskardpy.model.utils import hacky_urdf_parser_fix
@@ -40,6 +39,9 @@ from giskardpy_ros.python_interface.old_python_interface import OldGiskardWrappe
 from giskardpy_ros.tree.blackboard_utils import GiskardBlackboard
 from giskardpy_ros.utils.utils_for_tests import compare_poses, publish_marker_vector, GiskardTestWrapper, compare_points
 from giskardpy_ros.utils.utils_for_tests import launch_launchfile
+from giskardpy.motion_statechart.tasks.feature_functions import HeightGoal, DistanceGoal
+from giskardpy.motion_statechart.goals.sequence_goal import SimpleSequenceGoal
+from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
 
 # scopes = ['module', 'class', 'function']
 pocky_pose = {'r_elbow_flex_joint': -1.29610152504,
@@ -4375,9 +4377,7 @@ class TestManipulability:
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.allow_all_collisions()
         zero_pose.set_cart_goal(p, zero_pose.r_tip, 'map')
-        zero_pose.motion_goals.add_motion_goal(class_name=MaxManipulability.__name__,
-                                               root_link='torso_lift_link',
-                                               tip_link='r_gripper_tool_frame')
+        zero_pose.motion_goals.add_maximize_manipulability(root_link='torso_lift_link', tip_link='r_gripper_tool_frame')
         zero_pose.execute()
 
     def test_manip2(self, zero_pose: PR2TestWrapper):
@@ -4388,14 +4388,10 @@ class TestManipulability:
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.allow_all_collisions()
         zero_pose.set_cart_goal(p, zero_pose.r_tip, 'map')
-        zero_pose.motion_goals.add_motion_goal(class_name=MaxManipulability.__name__,
-                                               root_link='torso_lift_link',
-                                               tip_link='r_gripper_tool_frame')
+        zero_pose.motion_goals.add_maximize_manipulability(root_link='torso_lift_link', tip_link='r_gripper_tool_frame')
         p.pose.position = Point(1, 0.1, 0)
         zero_pose.set_cart_goal(p, zero_pose.l_tip, 'map')
-        zero_pose.motion_goals.add_motion_goal(class_name=MaxManipulability.__name__,
-                                               root_link='torso_lift_link',
-                                               tip_link='l_gripper_tool_frame')
+        zero_pose.motion_goals.add_maximize_manipulability(root_link='torso_lift_link', tip_link='l_gripper_tool_frame')
         zero_pose.execute(add_local_minimum_reached=True)
 
 
@@ -4467,36 +4463,34 @@ class TestWeightScaling:
         tip_goal = PointStamped()
         tip_goal.header.frame_id = 'map'
         tip_goal.point = goal_pose.pose.position
-        zero_pose.motion_goals.add_motion_goal(class_name=BaseArmWeightScaling.__name__,
-                                               root_link='map',
-                                               tip_link='l_gripper_tool_frame',
-                                               tip_goal=tip_goal,
-                                               gain=100000,
-                                               arm_joints=[
-                                                   'torso_lift_joint',
-                                                   # 'head_pan_joint',
-                                                   # 'head_tilt_joint',
-                                                   'r_upper_arm_roll_joint',
-                                                   'r_shoulder_pan_joint',
-                                                   'r_shoulder_lift_joint',
-                                                   'r_forearm_roll_joint',
-                                                   'r_elbow_flex_joint',
-                                                   'r_wrist_flex_joint',
-                                                   'r_wrist_roll_joint',
-                                                   'l_upper_arm_roll_joint',
-                                                   'l_shoulder_pan_joint',
-                                                   'l_shoulder_lift_joint',
-                                                   'l_forearm_roll_joint',
-                                                   'l_elbow_flex_joint',
-                                                   'l_wrist_flex_joint',
-                                                   'l_wrist_roll_joint'],
-                                               base_joints=['brumbrum'])
-        zero_pose.motion_goals.add_motion_goal(class_name=MaxManipulability.__name__,
-                                               root_link='torso_lift_link',
-                                               tip_link='r_gripper_tool_frame')
-        zero_pose.motion_goals.add_motion_goal(class_name=MaxManipulability.__name__,
-                                               root_link='torso_lift_link',
-                                               tip_link='l_gripper_tool_frame')
+        zero_pose.motion_goals.add_base_arm_weight_scaling(
+            root_link='map',
+            tip_link='l_gripper_tool_frame',
+            tip_goal=tip_goal,
+            gain=100000,
+            arm_joints=[
+                'torso_lift_joint',
+                # 'head_pan_joint',
+                # 'head_tilt_joint',
+                'r_upper_arm_roll_joint',
+                'r_shoulder_pan_joint',
+                'r_shoulder_lift_joint',
+                'r_forearm_roll_joint',
+                'r_elbow_flex_joint',
+                'r_wrist_flex_joint',
+                'r_wrist_roll_joint',
+                'l_upper_arm_roll_joint',
+                'l_shoulder_pan_joint',
+                'l_shoulder_lift_joint',
+                'l_forearm_roll_joint',
+                'l_elbow_flex_joint',
+                'l_wrist_flex_joint',
+                'l_wrist_roll_joint'],
+            base_joints=['brumbrum'])
+        zero_pose.motion_goals.add_maximize_manipulability(root_link='torso_lift_link',
+                                                           tip_link='r_gripper_tool_frame')
+        zero_pose.motion_goals.add_maximize_manipulability(root_link='torso_lift_link',
+                                                           tip_link='l_gripper_tool_frame')
         zero_pose.add_default_end_motion_conditions()
         zero_pose.allow_all_collisions()
         zero_pose.execute(add_local_minimum_reached=False)
@@ -4512,12 +4506,11 @@ class TestWeightScaling:
         zero_pose.allow_all_collisions()
         zero_pose.set_cart_goal(p, zero_pose.r_tip, 'map')
         m_threshold = 0.16
-        zero_pose.motion_goals.add_motion_goal(class_name=MaxManipulability.__name__,
-                                               root_link='torso_lift_link',
-                                               tip_link=zero_pose.r_tip,
-                                               m_threshold=m_threshold)
+        zero_pose.motion_goals.add_maximize_manipulability(root_link='torso_lift_link',
+                                                           tip_link=zero_pose.r_tip,
+                                                           m_threshold=m_threshold)
         zero_pose.execute()
-        assert god_map.debug_expression_manager.evaluated_debug_expressions[f'mIndex{zero_pose.r_tip}'][
+        assert god_map.debug_expression_manager.evaluated_debug_expressions[f'mIndexpr2/{zero_pose.r_tip}'][
                    0] >= m_threshold
 
     def test_manip2(self, zero_pose: PR2TestWrapper):
@@ -4529,20 +4522,20 @@ class TestWeightScaling:
         p.pose.orientation = Quaternion(0, 0, 0, 1)
         zero_pose.allow_all_collisions()
         zero_pose.set_cart_goal(p, zero_pose.r_tip, 'map')
-        zero_pose.motion_goals.add_motion_goal(class_name=MaxManipulability.__name__,
-                                               root_link='torso_lift_link',
-                                               tip_link=zero_pose.r_tip,
-                                               m_threshold=m_threshold)
+
+        zero_pose.motion_goals.add_maximize_manipulability(root_link='torso_lift_link',
+                                                           tip_link=zero_pose.r_tip,
+                                                           m_threshold=m_threshold)
         p.pose.position = Point(1, 0.1, 0)
         zero_pose.set_cart_goal(p, zero_pose.l_tip, 'map')
-        zero_pose.motion_goals.add_motion_goal(class_name=MaxManipulability.__name__,
-                                               root_link='torso_lift_link',
-                                               tip_link=zero_pose.l_tip,
-                                               m_threshold=m_threshold)
+
+        zero_pose.motion_goals.add_maximize_manipulability(root_link='torso_lift_link',
+                                                           tip_link=zero_pose.l_tip,
+                                                           m_threshold=m_threshold)
         zero_pose.execute()
-        assert god_map.debug_expression_manager.evaluated_debug_expressions[f'mIndex{zero_pose.r_tip}'][
+        assert god_map.debug_expression_manager.evaluated_debug_expressions[f'mIndexpr2/{zero_pose.r_tip}'][
                    0] >= m_threshold
-        assert god_map.debug_expression_manager.evaluated_debug_expressions[f'mIndex{zero_pose.l_tip}'][
+        assert god_map.debug_expression_manager.evaluated_debug_expressions[f'mIndexpr2/{zero_pose.l_tip}'][
                    0] >= m_threshold
 
 
@@ -4637,6 +4630,67 @@ class TestFeatureFunctions:
                                               upper_limit=2.01)
 
         zero_pose.monitors.add_end_motion(mon)
+        zero_pose.execute(add_local_minimum_reached=False)
+
+    def test_sequence(self, zero_pose: PR2TestWrapper):
+        root_link = giskard_msgs.LinkName(name='map')
+        tip_link = giskard_msgs.LinkName(name='r_gripper_tool_frame')
+
+        #######
+        robot_feature = PointStamped()
+        robot_feature.header.frame_id = 'r_gripper_tool_frame'
+        robot_feature.point = Point(0, 0, 0)
+
+        robot_up_axis = Vector3Stamped()
+        robot_up_axis.header.frame_id = 'r_gripper_tool_frame'
+        robot_up_axis.vector.z = 1
+
+        robot_pointing_axis = Vector3Stamped()
+        robot_pointing_axis.header.frame_id = 'r_gripper_tool_frame'
+        robot_pointing_axis.vector.x = 1
+
+        # Define the world features (center and z-axis of the bowl)
+
+        world_feature2 = PointStamped()
+        world_feature2.header.frame_id = 'map'
+        world_feature2.point = Point(2, -0.2, 0.29)
+
+        world_up_axis = Vector3Stamped()
+        world_up_axis.header.frame_id = 'map'
+        world_up_axis.vector.z = 1
+
+        start_spiral = PointStamped()
+        start_spiral.header.frame_id = 'map'
+        start_spiral.point = Point(2, -0.2, 0.45)
+
+        seq = \
+            [
+                [
+                    {'class_name': DistanceGoal.__name__, 'name': 'distanceG', 'reference_point': world_feature2,
+                     'tip_point': robot_feature, 'root_link': root_link, 'tip_link': tip_link, 'lower_limit': 0.00,
+                     'upper_limit': 0.02},
+                    {'class_name': HeightGoal.__name__, 'name': 'HeightG', 'reference_point': world_feature2,
+                     'tip_point': robot_feature, 'root_link': root_link, 'tip_link': tip_link, 'lower_limit': 0.6,
+                     'upper_limit': 0.7},
+                    {'class_name': AlignPlanes.__name__, 'name': 'alignG', 'goal_normal': world_up_axis,
+                     'tip_normal': robot_up_axis, 'root_link': root_link, 'tip_link': tip_link}
+                ],
+                [
+                    {'class_name': HeightGoal.__name__, 'name': 'HeightG2', 'reference_point': world_feature2,
+                     'tip_point': robot_feature, 'root_link': root_link, 'tip_link': tip_link, 'lower_limit': 0.4,
+                     'upper_limit': 0.5},
+                    {'class_name': DistanceGoal.__name__, 'name': 'distanceG2', 'reference_point': world_feature2,
+                     'tip_point': robot_feature, 'root_link': root_link, 'tip_link': tip_link, 'lower_limit': 0.03,
+                     'upper_limit': 0.04},
+                ],
+            ]
+
+        zero_pose.motion_goals.add_motion_goal(class_name=SimpleSequenceGoal.__name__,
+                                    sequence=seq,
+                                    name='seqGoal',
+                                    )
+        zero_pose.monitors.add_end_motion('seqGoal')
+        zero_pose.monitors.add_check_trajectory_length(30)
         zero_pose.execute(add_local_minimum_reached=False)
 
 

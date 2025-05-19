@@ -245,9 +245,33 @@ def world_to_tf_message(world: WorldTree, include_prefix: bool) -> tf2_msgs.TFMe
     return tf_msg
 
 
+def apply_transformation_to_leaf_dicts(obj: Any, world: WorldTree) -> Any:
+    """
+    Recursively apply transformation to any dict that is a leaf in a list.
+    """
+    if isinstance(obj, list):
+        return [apply_transformation_to_leaf_dicts(item, world) for item in obj]
+    elif isinstance(obj, dict):
+        return ros_kwargs_to_giskard_kwargs(obj, world)
+    else:
+        return obj
+
+def process_ros_kwargs(obj: Any, world: WorldTree) -> Any:
+    if isinstance(obj, dict):
+        processed = {}
+        for key, value in obj.items():
+            if isinstance(value, list):
+                # Recursively process lists with potential leaf dicts
+                processed[key] = apply_transformation_to_leaf_dicts(value, world)
+            else:
+                processed[key] = value
+        return processed
+    return obj
+
 def json_str_to_giskard_kwargs(json_str: str, world: WorldTree) -> Dict[str, Any]:
     ros_kwargs = json_str_to_ros_kwargs(json_str)
-    return ros_kwargs_to_giskard_kwargs(ros_kwargs, world)
+    transformed_ros_kwargs = process_ros_kwargs(ros_kwargs, world)
+    return ros_kwargs_to_giskard_kwargs(transformed_ros_kwargs, world)
 
 
 def json_str_to_ros_kwargs(json_str: str) -> Dict[str, Any]:

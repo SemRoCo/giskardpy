@@ -4,11 +4,14 @@ import rospy
 from giskardpy_ros.configs.behavior_tree_config import StandAloneBTConfig
 from giskardpy_ros.configs.giskard import Giskard
 from giskardpy_ros.configs.iai_robots.pr2 import PR2CollisionAvoidance, WorldWithPR2Config
-from giskardpy.qp.qp_controller_config import QPControllerConfig
+from giskardpy.qp.qp_controller_config import QPControllerConfig, SupportedQPSolver
 from giskardpy_ros.configs.robot_interface_config import StandAloneRobotInterfaceConfig
+from giskardpy_ros.ros1.interface import ROS1Wrapper
+from giskardpy.middleware import set_middleware
 
 if __name__ == '__main__':
     rospy.init_node('giskard')
+    set_middleware(ROS1Wrapper())
     drive_joint_name = 'brumbrum'
     giskard = Giskard(world_config=WorldWithPR2Config(drive_joint_name=drive_joint_name),
                       collision_avoidance_config=PR2CollisionAvoidance(drive_joint_name=drive_joint_name),

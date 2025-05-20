@@ -86,16 +86,14 @@ jobs:
         if: github.event_name == 'pull_request'
         run: |
           REPO="${{ github.repository_owner }}/giskardpy"
-          PR_NUMBER="${{ github.event.pull_request.number }}"
           PR_TITLE="${{ github.event.pull_request.title }}"
-          PR_URL="${{ github.event.pull_request.url }}"
 
-          echo "Searching for PR related to #$PR_NUMBER in $REPO"
+          echo "Searching for PR related to $PR_TITLE in $REPO"
 
           # Find PR by matching title or linked issues
           PR_JSON=$(gh pr list --repo "$REPO" --state open \
-            --json number,body,url,mergeable | jq -r \
-            ".[] | select(.body | contains(\"#$PR_NUMBER\") or contains(\"${PR_TITLE}\") or contains(\"${PR_URL}\")) | @base64")
+            --json number,title,url,mergeable | jq -r \
+            ".[] | select(.title | contains(\"${PR_TITLE}\")) | @base64")
 
           if [[ -n "$PR_JSON" ]]; then
             PR_INFO=$(echo "$PR_JSON" | base64 --decode)

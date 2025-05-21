@@ -6,9 +6,15 @@ from giskardpy import casadi_wrapper as cas
 from giskardpy.data_types.data_types import PrefixName, ColorRGBA
 from giskardpy.god_map import god_map
 from giskardpy.motion_statechart.tasks.task import WEIGHT_BELOW_CA, Task
+from geometry_msgs.msg import PointStamped, Vector3Stamped
+from giskardpy.symbol_manager import symbol_manager
 
 
 class FeatureFunctionGoal(Task):
+    """
+    Parent class of all feature function tasks. It instantiates the controlles and reference features in the correct
+    way and sets the debug function.
+    """
     def __init__(self,
                  tip_link: PrefixName,
                  root_link: PrefixName,
@@ -48,6 +54,11 @@ class FeatureFunctionGoal(Task):
 
 
 class AlignPerpendicular(FeatureFunctionGoal):
+    """
+    Aligns the tip_normal to the reference_normal such that they are perepndicular to each other.
+    :param tip_normal: Tip normal to be controlled.
+    :param reference_normal: Reference normal to align the tip normal to.
+    """
     def __init__(self,
                  tip_link: PrefixName,
                  root_link: PrefixName,
@@ -55,7 +66,8 @@ class AlignPerpendicular(FeatureFunctionGoal):
                  reference_normal: cas.Vector3,
                  name: Optional[str] = None,
                  weight: int = WEIGHT_BELOW_CA,
-                 max_vel: float = 0.2):
+                 max_vel: float = 0.2,
+                 threshold: float = 0.01,):
         super().__init__(tip_link=tip_link,
                          root_link=root_link,
                          reference_feature=reference_normal,
@@ -68,9 +80,17 @@ class AlignPerpendicular(FeatureFunctionGoal):
                                      weight=weight,
                                      task_expression=expr,
                                      name=f'{self.name}_constraint')
+        self.observation_expression = cas.less(cas.abs(0 - expr), threshold)
 
 
 class HeightGoal(FeatureFunctionGoal):
+    """
+    Moves the tip_point to be the specified distance away from the reference_point along the z-axis of the map frame.
+    :param tip_point: Tip point to be controlled.
+    :param reference_point: Reference point to measure the distance against.
+    :param lower_limit: Lower limit to control the distance away from the reference_point.
+    :param upper_limit: Upper limit to control the distance away from the reference_point.
+    """
     def __init__(self,
                  tip_link: PrefixName,
                  root_link: PrefixName,
@@ -96,9 +116,18 @@ class HeightGoal(FeatureFunctionGoal):
                                        weight=weight,
                                        task_expression=expr,
                                        name=f'{self.name}_constraint')
+        self.observation_expression = cas.logic_and(cas.if_less_eq(expr, upper_limit, 1, 0),
+                                                    cas.if_greater_eq(expr, lower_limit, 1, 0))
 
 
 class DistanceGoal(FeatureFunctionGoal):
+    """
+       Moves the tip_point to be the specified distance away from the reference_point measured in the x-y-plane of the map frame.
+       :param tip_point: Tip point to be controlled.
+       :param reference_point: Reference point to measure the distance against.
+       :param lower_limit: Lower limit to control the distance away from the reference_point.
+       :param upper_limit: Upper limit to control the distance away from the reference_point.
+    """
     def __init__(self,
                  tip_link: PrefixName,
                  root_link: PrefixName,
@@ -134,9 +163,18 @@ class DistanceGoal(FeatureFunctionGoal):
                                               task_expression=projected_vector[:3],
                                               names=[f'{self.name}_extra1', f'{self.name}_extra2',
                                                      f'{self.name}_extra3'])
+        self.observation_expression = cas.logic_and(cas.if_less_eq(expr, upper_limit, 1, 0),
+                                                    cas.if_greater_eq(expr, lower_limit, 1, 0))
 
 
 class AngleGoal(FeatureFunctionGoal):
+    """
+    Controls the angle between the tip_vector and the reference_vector to be between lower_angle and upper_angle.
+    :param tip_vector: Tip vector to be controlled.
+    :param reference_vector: Reference vector to measure the angle against.
+    :param lower_angle: Lower limit to control the angle between the tip_vector and the reference_vector.
+    :param upper_angle: Upper limit to control the angle between the tip_vector and the reference_vector.
+    """
     def __init__(self,
                  tip_link: PrefixName,
                  root_link: PrefixName,
@@ -161,3 +199,6 @@ class AngleGoal(FeatureFunctionGoal):
                                        weight=weight,
                                        task_expression=expr,
                                        name=f'{self.name}_constraint')
+        self.observation_expression = cas.logic_and(cas.if_less_eq(expr, upper_angle, 1, 0),
+                                                    cas.if_greater_eq(expr, lower_angle, 1, 0))
+

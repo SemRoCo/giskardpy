@@ -16,6 +16,12 @@ from giskardpy.motion_statechart.tasks.task import WEIGHT_ABOVE_CA, Task
 
 
 class SimpleSequenceGoal(Goal):
+    """
+    Takes a sequence of Tasks and Goals as input and concatenates them via start and end conditions.
+    A Sequence is a list of phases where each phase represent a set of tasks and goals that should run in parallel.
+    The next phase is activated when the observation state of all tasks and goals in a phase becomes true.
+    :param sequence: Sequence of Tasks and Goals.
+    """
     def __init__(self,
                  sequence: List[List[Union[Goal, Task]]],
                  name: Optional[str] = None):

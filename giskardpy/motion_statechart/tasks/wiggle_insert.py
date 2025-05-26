@@ -64,10 +64,17 @@ class WiggleInsert(Task):
 
         # Random-Sample works better with control_dt and Random-Walk with throttling using self.dt in my testing
         if random_walk:
-            self.dt = dt  # add as parameter?
+            self.dt = dt
         else:
             self.dt = god_map.qp_controller.control_dt
         self.hz = 1 / self.dt
+
+        if random_walk:
+            vector_function = '.get_rand_walk_vector()'
+            angle_function = '.get_rand_walk_angle()'
+        else:
+            vector_function = '.get_rand_vector()'
+            angle_function = '.get_rand_angle()'
 
         # Init-Values for angular random walk
         self.current_angle = 0
@@ -92,13 +99,6 @@ class WiggleInsert(Task):
         r_P_c = god_map.world.compose_fk_expression(self.root_link, self.tip_link).to_position()
         r_P_g = god_map.world.transform(self.root_link, self.hole_point).to_position()
 
-        if random_walk:
-            vector_function = '.get_rand_walk_vector()'
-            angle_function = '.get_rand_walk_angle()'
-        else:
-            vector_function = '.get_rand_vector()'
-            angle_function = '.get_rand_angle()'
-
         rand_v = symbol_manager.get_expr(self.ref_str +
                                          vector_function,
                                          input_type_hint=np.ndarray,
@@ -116,33 +116,31 @@ class WiggleInsert(Task):
                                         angle_function,
                                         input_type_hint=float,
                                         output_type_hint=cas.Symbol)
-        frame_R_goal = cas.RotationMatrix.from_axis_angle(angle=angle,
-                                                          axis=self.hole_normal,
-                                                          reference_frame=self.hole_normal.reference_frame)
 
-        # Check if axis needs to be rotated, because from axis angle doesn't care about negative axis.
-        # Check is not really good for more complex hole_normals
-        # FIXME: better check? better way to create frame_R_goal?
-        if self.hole_normal.to_np().min() < 0:
-            R = cas.RotationMatrix.from_axis_angle(angle=np.pi,
-                                                   axis=self.v1,
-                                                   reference_frame=self.hole_normal.reference_frame)
-            frame_R_goal = frame_R_goal.dot(R)
+        tip_V_hole_normal = god_map.world.transform(self.tip_link,
+                                                    self.hole_normal)
+        tip_R_hole_normal = cas.RotationMatrix.from_axis_angle(angle=angle,
+                                                               axis=tip_V_hole_normal)
+        root_R_hole_normal = (god_map.world.compute_fk(self.root_link,
+                                                       self.tip_link)
+                              .dot(tip_R_hole_normal))
 
         c_R_r_eval = god_map.world.compose_fk_evaluated_expression(self.tip_link, self.root_link).to_rotation()
         r_T_c = god_map.world.compose_fk_expression(self.root_link, self.tip_link)
         r_R_c = r_T_c.to_rotation()
 
         self.add_rotation_goal_constraints(frame_R_current=r_R_c,
-                                           frame_R_goal=frame_R_goal,
+                                           frame_R_goal=root_R_hole_normal,
                                            current_R_frame_eval=c_R_r_eval,
                                            reference_velocity=down_velocity,
                                            weight=weight + 1)
 
         god_map.debug_expression_manager.add_debug_expression(name='r_P_g',
                                                               expression=r_P_g)
-        god_map.debug_expression_manager.add_debug_expression(name='frame_R_goal',
-                                                              expression=frame_R_goal)
+        god_map.debug_expression_manager.add_debug_expression(name='root_R_hole_normal',
+                                                              expression=root_R_hole_normal)
+        god_map.debug_expression_manager.add_debug_expression(name='tip_R_hole_normal',
+                                                              expression=tip_R_hole_normal)
 
         dist = cas.euclidean_distance(r_P_c, r_P_g)
         end = cas.less_equal(dist, threshold)

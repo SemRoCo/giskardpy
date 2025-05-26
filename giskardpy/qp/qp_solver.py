@@ -92,7 +92,8 @@ class QPSolver(ABC):
             E = cas.ca.sparsify(E.s)
             E_slack = cas.ca.sparsify(E_slack.s)
             A_nnz = 2 * (A.nnz() + A_slack.nnz())
-            A_elements = (2 * A.shape[0]) * (A.shape[1] + A_slack.shape[1])  # twice because ineq constraints are normally one sided
+            A_elements = (2 * A.shape[0]) * (
+                    A.shape[1] + A_slack.shape[1])  # twice because ineq constraints are normally one sided
             E_nnz = (E.nnz() + E_slack.nnz())
             E_elements = E.shape[0] * (E.shape[1] + E_slack.shape[1])
             if A_elements == 0:
@@ -257,6 +258,97 @@ class QPSolver(ABC):
         """
         :return: weights, g, lb, ub, E, bE, A, lbA, ubA, weight_filter, bE_filter, bA_filter
         """
+
+
+class QPVerboseFormat(QPSolver):
+    def __init__(self, weights: cas.Expression, g: cas.Expression, lb: cas.Expression, ub: cas.Expression,
+                 E: cas.Expression, E_slack: cas.Expression, bE: cas.Expression,
+                 A: cas.Expression, A_slack: cas.Expression, lbA: cas.Expression, ubA: cas.Expression):
+        """
+        min_x 0.5 x^T H x + g^T x
+        s.t.  lb <= x <= ub
+              Ex <= b
+              lbA <= Ax <= ubA
+        """
+        self.set_density(weights, E, E_slack, A, A_slack)
+        self.num_eq_constraints = bE.shape[0]
+        self.num_neq_constraints = lbA.shape[0]
+        self.num_free_variable_constraints = lb.shape[0]
+        self.num_eq_slack_variables = E_slack.shape[1]
+        self.num_neq_slack_variables = A_slack.shape[1]
+        self.num_slack_variables = self.num_eq_slack_variables + self.num_neq_slack_variables
+        self.num_non_slack_variables = self.num_free_variable_constraints - self.num_slack_variables
+
+        # self.static_lb_finite_filter = self.to_finite_filter(lb)
+        # self.static_ub_finite_filter = self.to_finite_filter(ub)
+        # these copies will be reused later to avoid reallocating the same memory all the time
+        # self.lb_finite_filter = self.static_lb_finite_filter.copy()
+        # self.ub_finite_filter = self.static_ub_finite_filter.copy()
+        # nlb_without_inf = -lb[self.static_lb_finite_filter]
+        # ub_without_inf = ub[self.static_ub_finite_filter]
+
+        # self.nlbA_finite_filter = self.to_finite_filter(lbA)
+        # self.ubA_finite_filter = self.to_finite_filter(ubA)
+        # self.lnbA_ubA_finite_filter = np.concatenate((self.nlbA_finite_filter, self.ubA_finite_filter))
+        # nlbA_without_inf = -lbA[self.nlbA_finite_filter]
+        # ubA_without_inf = ubA[self.ubA_finite_filter]
+        # nA_without_inf = -A[self.nlbA_finite_filter]
+        # nA_slack_without_inf = -A_slack[self.nlbA_finite_filter]
+        # A_without_inf = A[self.ubA_finite_filter]
+        # A_slack_without_inf = A_slack[self.ubA_finite_filter]
+        # self.nlbA_ubA_finite_filter = np.concatenate((self.nlbA_finite_filter, self.ubA_finite_filter))
+        # self.nlbA_finite_filter_size = self.nlbA_finite_filter.sum()
+        # self.len_lbA = nlbA_without_inf.shape[0]
+        # self.len_ubA = ubA_without_inf.shape[0]
+
+        combined_E = cas.hstack([E, E_slack, cas.zeros(E_slack.shape[0], A_slack.shape[1])])
+        # combined_nA = cas.hstack([nA_without_inf,
+        #                           cas.zeros(nA_slack_without_inf.shape[0], E_slack.shape[1]),
+        #                           nA_slack_without_inf])
+        combined_A = cas.hstack([A, cas.zeros(A_slack.shape[0], E_slack.shape[1]), A_slack])
+        # nA_A = cas.vstack([combined_nA, combined_A])
+        # lbA_ubA = cas.vstack([lbA, ubA])
+
+        free_symbols = set(weights.free_symbols())
+        free_symbols.update(g.free_symbols())
+        free_symbols.update(lb.free_symbols())
+        free_symbols.update(ub.free_symbols())
+        free_symbols.update(combined_E.free_symbols())
+        free_symbols.update(bE.free_symbols())
+        free_symbols.update(combined_A.free_symbols())
+        free_symbols.update(lbA.free_symbols())
+        free_symbols.update(ubA.free_symbols())
+        self.free_symbols = list(free_symbols)
+
+        self.E_f = combined_E.compile(parameters=self.free_symbols, sparse=self.sparse)
+        self.A_f = combined_A.compile(parameters=self.free_symbols, sparse=self.sparse)
+
+        self.combined_vector_f = cas.StackedCompiledFunction([weights,
+                                                              g,
+                                                              lb,
+                                                              ub,
+                                                              bE,
+                                                              lbA,
+                                                              ubA],
+                                                             parameters=self.free_symbols)
+
+        self.free_symbols_str = [str(x) for x in self.free_symbols]
+
+    def relaxed_problem_data_to_qp_format(self) -> List[np.ndarray]:
+        pass
+
+    def problem_data_to_qp_format(self) -> List[np.ndarray]:
+        pass
+
+    def evaluate_functions(self, substitutions):
+        self.A = self.A_f.fast_call(substitutions)
+        self.E = self.E_f.fast_call(substitutions)
+        self.weights, self.g, self.lb, self.ub, self.bE, self.lbA, self.ubA = self.combined_vector_f.fast_call(
+            substitutions)
+
+    def get_problem_data(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray,
+    np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        pass
 
 
 class QPSWIFTFormatter(QPSolver):

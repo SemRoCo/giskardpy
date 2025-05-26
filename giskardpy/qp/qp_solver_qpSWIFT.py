@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Optional, List
 
 if TYPE_CHECKING:
     import scipy.sparse as sp
@@ -10,7 +11,7 @@ from typing import Tuple
 import numpy as np
 
 from giskardpy.data_types.exceptions import QPSolverException, InfeasibleException
-from giskardpy.qp.qp_solver import QPSWIFTFormatter
+from giskardpy.qp.qp_solver import QPSWIFTFormatter, QPVerboseFormat
 import qpSWIFT
 
 from giskardpy.qp.qp_solver_ids import SupportedQPSolver
@@ -23,7 +24,22 @@ class QPSWIFTExitFlags(IntEnum):
     ERROR = 3  # Unknown Problem in Solver
 
 
-class QPSolverQPSwift(QPSWIFTFormatter):
+@dataclass
+class QP:
+    H: np.ndarray
+    g: np.ndarray
+    E: sp.csc_matrix
+    b: np.ndarray
+    A_box: sp.csc_matrix
+    h_box: np.ndarray
+    A: sp.csc_matrix
+    h: np.ndarray
+
+    def as_qpSWIFT_data(self):
+        return self.g, self.h_box, self.h, self.H, self.A_box, self.A, self.E, self.b
+
+
+class QPSolverQPSwift(QPVerboseFormat):
     """
     min_x 0.5 x^T P x + c^T x
     s.t.  Ax = b
@@ -52,57 +68,51 @@ class QPSolverQPSwift(QPSWIFTFormatter):
         if self.num_filtered_eq_constraints > 0:
             self.bE_filter[-len(bE_part):] = bE_part
 
-        lnbA_ubA_filter = np.ones(self.num_neq_constraints * 2, dtype=bool)
-        if len(self.bA_part) > 0:
-            l_bA = len(self.bA_part)
-            lnbA_ubA_filter[self.num_neq_constraints - l_bA:self.num_neq_constraints] = self.bA_part
-            lnbA_ubA_filter[self.num_neq_constraints * 2 - l_bA:self.num_neq_constraints * 2] = self.bA_part
-            self.bA_filter = lnbA_ubA_filter[self.nlbA_ubA_finite_filter]
-            self.nlbA_filter_half = self.bA_filter[:self.nlbA_finite_filter_size]
-            self.ubA_filter_half = self.bA_filter[self.nlbA_finite_filter_size:]
-        else:
-            self.bA_filter = np.empty(0, dtype=bool)
+        self.bA_filter = np.ones(self.A.shape[0], dtype=bool)
+        self.num_filtered_neq_constraints = np.count_nonzero(np.invert(self.bA_part))
+        if self.num_filtered_neq_constraints > 0:
+            self.bA_filter[-len(self.bA_part):] = self.bA_part
+        # if len(self.bA_part) > 0:
+        #     l_bA = len(self.bA_part)
+        #     lnbA_ubA_filter[self.num_neq_constraints - l_bA:self.num_neq_constraints] = self.bA_part
+        #     lnbA_ubA_filter[self.num_neq_constraints * 2 - l_bA:self.num_neq_constraints * 2] = self.bA_part
+        #     self.bA_filter = lnbA_ubA_filter[self.nlbA_ubA_finite_filter]
+        #     self.nlbA_filter_half = self.bA_filter[:self.nlbA_finite_filter_size]
+        #     self.ubA_filter_half = self.bA_filter[self.nlbA_finite_filter_size:]
+        # else:
+        #     self.bA_filter = np.empty(0, dtype=bool)
 
-        self.nlb_secondary_finite_filter = np.isfinite(self.nlb)
-        np.copyto(self.static_lb_finite_filter, self.lb_finite_filter)
-        self.lb_finite_filter[self.lb_finite_filter] = (self.lb_finite_filter[self.lb_finite_filter]
-                                                        & self.nlb_secondary_finite_filter)
-
-        self.ub_secondary_finite_filter = np.isfinite(self.ub)
-        np.copyto(self.static_ub_finite_filter, self.ub_finite_filter)
-        self.ub_finite_filter[self.ub_finite_filter] = (self.ub_finite_filter[self.ub_finite_filter]
-                                                        & self.ub_secondary_finite_filter)
-
-        if self.compute_nI_I:
-            self.nAi_Ai_filter = np.concatenate((self.lb_finite_filter[self.weight_filter],
-                                                 self.ub_finite_filter[self.weight_filter]))
 
     def apply_filters(self):
         self.weights = self.weights[self.weight_filter]
         self.g = self.g[self.weight_filter]
-        self.nlb = self.nlb[self.weight_filter[self.static_lb_finite_filter] & self.nlb_secondary_finite_filter]
-        self.ub = self.ub[self.weight_filter[self.static_ub_finite_filter] & self.ub_secondary_finite_filter]
+        self.lb = self.lb[self.weight_filter]
+        self.ub = self.ub[self.weight_filter]
         if self.num_filtered_eq_constraints > 0:
             self.E = self.E[self.bE_filter, :][:, self.weight_filter]
         else:
             # when no eq constraints were filtered, we can just cut off at the end, because that section is always all 0
             self.E = self.E[:, :self.weight_filter.sum()]
         self.bE = self.bE[self.bE_filter]
-        if len(self.nA_A.shape) > 1 and self.nA_A.shape[0] * self.nA_A.shape[1] > 0:
-            self.nA_A = self.nA_A[:, self.weight_filter][self.bA_filter, :]
-        self.nlbA_ubA = self.nlbA_ubA[self.bA_filter]
-        if self.compute_nI_I:
-            # for constraints, both rows and columns are filtered, so I can start with weights dims
-            # then only the rows need to be filtered for inf lb/ub
-            self.nAi_Ai = self._direct_limit_model(self.weights.shape[0], self.nAi_Ai_filter, True)
+        if len(self.A.shape) > 1 and self.A.shape[0] * self.A.shape[1] > 0:
+            self.A = self.A[:, self.weight_filter][self.bA_filter, :]
+        self.lbA = self.lbA[self.bA_filter]
+        self.ubA = self.ubA[self.bA_filter]
 
-    def solver_call(self, H: np.ndarray, g: np.ndarray, E: sp.csc_matrix, b: np.ndarray,
-                    A_box: sp.csc_matrix, h_box: np.ndarray,
-                    A: Optional[sp.csc_matrix] = None, h: Optional[np.ndarray] = None) -> np.ndarray:
-        if A is None:
-            result = qpSWIFT.run_sparse(c=g, h=h_box, P=H, G=A_box, A=E, b=b, opts=self.opts)
-        else:
-            result = qpSWIFT.run_sparse_with_box_constraints(c=g, h_box=h_box, h=h, P=H, G_box=A_box, G=A, A=E, b=b, opts=self.opts)
+    def solver_call(self, H, g, lb, ub, E, bE, A, lbA, ubA) -> np.ndarray:
+        import scipy.sparse as sp
+        result = qpSWIFT.solve_sparse(sp.diags(H), g, lb, ub, E, bE, A, lbA, ubA, options=self.opts)
+        exit_flag = result.exit_flag
+        if exit_flag != 0:
+            error_code = QPSWIFTExitFlags(exit_flag)
+            if error_code == QPSWIFTExitFlags.MAX_ITER_REACHED:
+                raise InfeasibleException(f'Failed to solve qp: {str(error_code)}')
+            raise QPSolverException(f'Failed to solve qp: {str(error_code)}')
+        return result.x
+
+    def solver_call_batch(self, qps: List[QP]) -> np.ndarray:
+        result = qpSWIFT.run_sparse_with_box_constraints_batch(len(qps),
+                                                               tuple([qp.as_qpSWIFT_data(self.opts) for qp in qps]))
         exit_flag = result['basicInfo']['ExitFlag']
         if exit_flag != 0:
             error_code = QPSWIFTExitFlags(exit_flag)
@@ -135,20 +145,6 @@ class QPSolverQPSwift(QPSWIFTFormatter):
                 raise InfeasibleException(f'Failed to solve qp: {str(error_code)}')
             raise QPSolverException(f'Failed to solve qp: {str(error_code)}')
         return result['sol']
-
-    def lb_ub_with_inf(self, nlb: np.ndarray, ub: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-        lb_with_inf = (np.ones(self.static_lb_finite_filter.shape) * -np.inf)
-        ub_with_inf = (np.ones(self.static_ub_finite_filter.shape) * np.inf)
-        combined_filter = self.weight_filter & self.static_lb_finite_filter
-        combined_filter[self.static_lb_finite_filter] &= self.nlb_secondary_finite_filter
-        lb_with_inf[combined_filter] = -nlb
-        lb_with_inf = lb_with_inf[self.weight_filter]
-
-        combined_filter = self.weight_filter & self.static_ub_finite_filter
-        combined_filter[self.static_ub_finite_filter] &= self.ub_secondary_finite_filter
-        ub_with_inf[combined_filter] = ub
-        ub_with_inf = ub_with_inf[self.weight_filter]
-        return lb_with_inf, ub_with_inf
 
     def compute_violated_constraints(self, weights: np.ndarray, nA_A: np.ndarray, nlb: np.ndarray,
                                      ub: np.ndarray, nlbA_ubA: np.ndarray):
@@ -199,9 +195,9 @@ class QPSolverQPSwift(QPSWIFTFormatter):
         ub_relaxed[upper_violations] += self.retry_added_slack
         return self.lb_filter, nlb_relaxed, self.ub_filter, ub_relaxed
 
-    def problem_data_to_qp_format(self) \
-            -> Tuple[np.array, np.ndarray, sp.csc_matrix, np.ndarray, sp.csc_matrix, np.ndarray, Optional[sp.csc_matrix], Optional[np.ndarray]]:
-        nlb_ub = np.concatenate((self.nlb, self.ub))
-        if np.prod(self.nA_A.shape) == 0:
-            return self.weights, self.g, self.E, self.bE, self.nAi_Ai, nlb_ub, None, None
-        return self.weights, self.g, self.E, self.bE, self.nAi_Ai, nlb_ub, self.nA_A, self.nlbA_ubA
+    def problem_data_to_qp_format(self):
+        # nlb_ub = np.concatenate((self.nlb, self.ub))
+        # if np.prod(self.nA_A.shape) == 0:
+        #     return self.weights, self.g, self.E, self.bE, self.nAi_Ai, nlb_ub, None, None
+        # return self.weights, self.g, self.E, self.bE, self.nAi_Ai, nlb_ub, self.nA_A, self.nlbA_ubA
+        return self.weights, self.g, self.lb, self.ub, self.E, self.bE, self.A, self.lbA, self.ubA

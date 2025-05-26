@@ -261,6 +261,8 @@ class QPSolver(ABC):
 
 
 class QPVerboseFormat(QPSolver):
+    sparse: bool = True
+
     def __init__(self, weights: cas.Expression, g: cas.Expression, lb: cas.Expression, ub: cas.Expression,
                  E: cas.Expression, E_slack: cas.Expression, bE: cas.Expression,
                  A: cas.Expression, A_slack: cas.Expression, lbA: cas.Expression, ubA: cas.Expression):

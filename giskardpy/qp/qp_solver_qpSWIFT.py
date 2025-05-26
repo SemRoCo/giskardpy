@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional, List
 
+from line_profiler.explicit_profiler import profile
+
 if TYPE_CHECKING:
     import scipy.sparse as sp
 from enum import IntEnum
@@ -56,6 +58,7 @@ class QPSolverQPSwift(QPVerboseFormat):
         # 'VERBOSE': 1  # 0 = no print; 1 = print
     }
 
+    @profile
     def update_filters(self):
         self.weight_filter = self.weights != 0
         self.weight_filter[:-self.num_slack_variables] = True
@@ -72,17 +75,8 @@ class QPSolverQPSwift(QPVerboseFormat):
         self.num_filtered_neq_constraints = np.count_nonzero(np.invert(self.bA_part))
         if self.num_filtered_neq_constraints > 0:
             self.bA_filter[-len(self.bA_part):] = self.bA_part
-        # if len(self.bA_part) > 0:
-        #     l_bA = len(self.bA_part)
-        #     lnbA_ubA_filter[self.num_neq_constraints - l_bA:self.num_neq_constraints] = self.bA_part
-        #     lnbA_ubA_filter[self.num_neq_constraints * 2 - l_bA:self.num_neq_constraints * 2] = self.bA_part
-        #     self.bA_filter = lnbA_ubA_filter[self.nlbA_ubA_finite_filter]
-        #     self.nlbA_filter_half = self.bA_filter[:self.nlbA_finite_filter_size]
-        #     self.ubA_filter_half = self.bA_filter[self.nlbA_finite_filter_size:]
-        # else:
-        #     self.bA_filter = np.empty(0, dtype=bool)
 
-
+    @profile
     def apply_filters(self):
         self.weights = self.weights[self.weight_filter]
         self.g = self.g[self.weight_filter]
@@ -99,6 +93,7 @@ class QPSolverQPSwift(QPVerboseFormat):
         self.lbA = self.lbA[self.bA_filter]
         self.ubA = self.ubA[self.bA_filter]
 
+    @profile
     def solver_call(self, H, g, lb, ub, E, bE, A, lbA, ubA) -> np.ndarray:
         result = qpSWIFT.solve_sparse_H_diag(H, g, lb, ub, E, bE, A, lbA, ubA, options=self.opts)
         exit_flag = result.exit_flag

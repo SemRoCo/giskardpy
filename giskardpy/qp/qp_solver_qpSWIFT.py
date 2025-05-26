@@ -100,8 +100,7 @@ class QPSolverQPSwift(QPVerboseFormat):
         self.ubA = self.ubA[self.bA_filter]
 
     def solver_call(self, H, g, lb, ub, E, bE, A, lbA, ubA) -> np.ndarray:
-        import scipy.sparse as sp
-        result = qpSWIFT.solve_sparse(sp.diags(H), g, lb, ub, E, bE, A, lbA, ubA, options=self.opts)
+        result = qpSWIFT.solve_sparse_H_diag(H, g, lb, ub, E, bE, A, lbA, ubA, options=self.opts)
         exit_flag = result.exit_flag
         if exit_flag != 0:
             error_code = QPSWIFTExitFlags(exit_flag)

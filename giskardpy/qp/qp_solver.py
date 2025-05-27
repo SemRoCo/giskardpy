@@ -3,6 +3,7 @@ from __future__ import annotations
 import abc
 from abc import ABC
 from collections import defaultdict
+from enum import Enum
 from functools import wraps
 from time import time
 from typing import Tuple, List, Optional, Union, Dict, TYPE_CHECKING
@@ -45,6 +46,35 @@ def record_solver_call_time(function):
         return result
 
     return wrapper
+
+
+class QPFormat(Enum):
+    Explicit = 0
+    """
+    min_x 0.5 x^T H x + g^T x
+    s.t.  lb <= x <= ub
+          Ex <= bE
+          lbA <= Ax <= ubA 
+    """
+
+    EQ_and_ONE_SIDED_INEQ = 1
+    """
+    min_x 0.5 x^T H x + g^T x
+    s.t.  Ex = bE
+          Ax <= ubA
+    """
+
+    ONE_SIDED_INEQ = 2
+    """
+    min_x 0.5 x^T H x + g^T x
+    s.t.  Ax <= ubA
+    """
+
+    TWO_SIDED_INEQ = 3
+    """
+    min_x 0.5 x^T H x + g^T x
+    s.t.  lbA <= Ax <= ubA
+    """
 
 
 class QPSolver(ABC):
@@ -280,28 +310,6 @@ class QPVerboseFormat(QPSolver):
         self.num_neq_slack_variables = A_slack.shape[1]
         self.num_slack_variables = self.num_eq_slack_variables + self.num_neq_slack_variables
         self.num_non_slack_variables = self.num_free_variable_constraints - self.num_slack_variables
-
-        # self.static_lb_finite_filter = self.to_finite_filter(lb)
-        # self.static_ub_finite_filter = self.to_finite_filter(ub)
-        # these copies will be reused later to avoid reallocating the same memory all the time
-        # self.lb_finite_filter = self.static_lb_finite_filter.copy()
-        # self.ub_finite_filter = self.static_ub_finite_filter.copy()
-        # nlb_without_inf = -lb[self.static_lb_finite_filter]
-        # ub_without_inf = ub[self.static_ub_finite_filter]
-
-        # self.nlbA_finite_filter = self.to_finite_filter(lbA)
-        # self.ubA_finite_filter = self.to_finite_filter(ubA)
-        # self.lnbA_ubA_finite_filter = np.concatenate((self.nlbA_finite_filter, self.ubA_finite_filter))
-        # nlbA_without_inf = -lbA[self.nlbA_finite_filter]
-        # ubA_without_inf = ubA[self.ubA_finite_filter]
-        # nA_without_inf = -A[self.nlbA_finite_filter]
-        # nA_slack_without_inf = -A_slack[self.nlbA_finite_filter]
-        # A_without_inf = A[self.ubA_finite_filter]
-        # A_slack_without_inf = A_slack[self.ubA_finite_filter]
-        # self.nlbA_ubA_finite_filter = np.concatenate((self.nlbA_finite_filter, self.ubA_finite_filter))
-        # self.nlbA_finite_filter_size = self.nlbA_finite_filter.sum()
-        # self.len_lbA = nlbA_without_inf.shape[0]
-        # self.len_ubA = ubA_without_inf.shape[0]
 
         combined_E = cas.hstack([E, E_slack, cas.zeros(E_slack.shape[0], A_slack.shape[1])])
         # combined_nA = cas.hstack([nA_without_inf,

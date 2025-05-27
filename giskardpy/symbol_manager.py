@@ -117,7 +117,7 @@ class SymbolManager(metaclass=SingletonMeta):
                 raise type(e)(f'No data in \'{variable_ref_str}\' ({e}), '
                               f'can\'t determine input_type_hint, please set it.')
 
-        if input_type_hint in {list, tuple, np.ndarray, cas.Point3}:
+        if input_type_hint in {list, tuple, np.ndarray, cas.Point3, float}:
             if output_type_hint == cas.TransMatrix:
                 return self._list_to_transmatrix(variable_ref_str)
             if output_type_hint == cas.Point3:
@@ -130,6 +130,8 @@ class SymbolManager(metaclass=SingletonMeta):
                 return self._list_to_rotation_matrix(variable_ref_str)
             if output_type_hint == cas.Point3:
                 return self._point3_to_point3(variable_ref_str)
+            if output_type_hint == cas.Symbol:
+                return self._float_to_symbol(variable_ref_str)
             raise ValueError(f'If input_type_hint is [list, tuple, np.ndarray], please specify output_type_hint out of'
                              f'[cas.TransMatrix, cas.Point3, cas.Vector3, cas.Quaternion, cas.RotationMatrix]')
 
@@ -198,6 +200,9 @@ class SymbolManager(metaclass=SingletonMeta):
         return cas.Point3((self.get_symbol(variable_ref_str + '.x'),
                            self.get_symbol(variable_ref_str + '.y'),
                            self.get_symbol(variable_ref_str + '.z')))
+
+    def _float_to_symbol(self, variable_ref_str: str) -> cas.Symbol:
+        return self.get_symbol(variable_ref_str)
 
     def _list_to_vector3(self, variable_ref_str: str) -> cas.Vector3:
         return cas.Vector3((self.get_symbol(variable_ref_str + '[0]'),

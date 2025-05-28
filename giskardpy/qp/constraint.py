@@ -91,7 +91,7 @@ class EqualityConstraint(Constraint):
     def __init__(self,
                  name: str,
                  parent_task_name: PrefixName,
-                 expression: cas.Expression,
+                 expression: cas.symbol_expr,
                  derivative_goal: cas.symbol_expr_float,
                  velocity_limit: cas.symbol_expr_float,
                  quadratic_weight: cas.symbol_expr_float,

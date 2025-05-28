@@ -7,19 +7,23 @@ from dataclasses import dataclass
 from enum import Enum
 from functools import wraps
 from time import time
-from typing import Tuple, List, Optional, Union, Dict, TYPE_CHECKING
-
+from typing import Tuple, List, Optional, Union, Dict, TYPE_CHECKING, DefaultDict
+import giskardpy.utils.math as giskard_math
 import numpy as np
 
 import giskardpy.casadi_wrapper as cas
 from giskardpy.data_types.data_types import Derivatives
-from giskardpy.data_types.exceptions import HardConstraintsViolatedException, InfeasibleException, QPSolverException
+from giskardpy.data_types.exceptions import HardConstraintsViolatedException, InfeasibleException, QPSolverException, \
+    VelocityLimitUnreachableException
 from giskardpy.middleware import get_middleware
 from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint, \
     DerivativeEqualityConstraint
 from giskardpy.qp.free_variable import FreeVariable
+from giskardpy.qp.pos_in_vel_limits import b_profile
 from giskardpy.qp.qp_controller import QPFormulation
 from giskardpy.qp.qp_solver_ids import SupportedQPSolver
+from giskardpy.qp.weight_gain import QuadraticWeightGain, LinearWeightGain
+from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils.decorators import memoize
 from giskardpy.utils.utils import is_running_in_pytest
 from line_profiler import profile
@@ -55,9 +59,9 @@ class ProblemDataPart(ABC):
                  sample_period: float,
                  prediction_horizon: int,
                  max_derivative: Derivatives,
-                 alpha: float,
+                 horizon_weight_gain_scalar: float,
                  qp_formulation: QPFormulation):
-        self.alpha = alpha
+        self.horizon_weight_gain_scalar = horizon_weight_gain_scalar
         self.qp_formulation = qp_formulation
         self.free_variables = free_variables
         self.equality_constraints = equality_constraints
@@ -231,7 +235,7 @@ class Weights(ProblemDataPart):
                  eq_derivative_constraints: List[DerivativeEqualityConstraint],
                  sample_period: float,
                  prediction_horizon: int, max_derivative: Derivatives,
-                 alpha: float,
+                 horizon_weight_gain_scalar: float,
                  qp_formulation: QPFormulation):
         super().__init__(free_variables=free_variables,
                          equality_constraints=equality_constraints,
@@ -241,7 +245,7 @@ class Weights(ProblemDataPart):
                          sample_period=sample_period,
                          prediction_horizon=prediction_horizon,
                          max_derivative=max_derivative,
-                         alpha=alpha,
+                         horizon_weight_gain_scalar=horizon_weight_gain_scalar,
                          qp_formulation=qp_formulation)
         self.evaluated = True
 
@@ -252,8 +256,10 @@ class Weights(ProblemDataPart):
 
     @profile
     def construct_expression(self, quadratic_weight_gains: List[QuadraticWeightGain] = None,
-                             linear_weight_gains: List[LinearWeightGain] = None) -> Union[
-        cas.Expression, Tuple[cas.Expression, cas.Expression]]:
+                             linear_weight_gains: List[LinearWeightGain] = None) \
+            -> Union[cas.Expression, Tuple[cas.Expression, cas.Expression]]:
+        quadratic_weight_gains = quadratic_weight_gains or []
+        linear_weight_gains = linear_weight_gains or []
         components = []
         components.extend(self.free_variable_weights_expression(quadratic_weight_gains=quadratic_weight_gains))
         components.append(self.equality_weight_expressions())
@@ -292,7 +298,7 @@ class Weights(ProblemDataPart):
                         if not (derivative == Derivatives.velocity or derivative == max_derivative):
                             continue
                     normalized_weight = v.normalized_weight(t, derivative, self.prediction_horizon - 3,
-                                                            alpha=self.alpha,
+                                                            alpha=self.horizon_weight_gain_scalar,
                                                             evaluated=self.evaluated)
                     weights[derivative][f't{t:03}/{v.position_name}/{derivative}'] = normalized_weight
                     for q_gain in quadratic_weight_gains:
@@ -404,7 +410,7 @@ class FreeVariableBounds(ProblemDataPart):
                  sample_period: float,
                  prediction_horizon: int,
                  max_derivative: Derivatives,
-                 alpha: float,
+                 horizon_weight_gain_scalar: float,
                  qp_formulation: QPFormulation):
         super().__init__(free_variables=free_variables,
                          equality_constraints=equality_constraints,
@@ -414,7 +420,7 @@ class FreeVariableBounds(ProblemDataPart):
                          sample_period=sample_period,
                          prediction_horizon=prediction_horizon,
                          max_derivative=max_derivative,
-                         alpha=alpha,
+                         horizon_weight_gain_scalar=horizon_weight_gain_scalar,
                          qp_formulation=qp_formulation)
         self.evaluated = True
 
@@ -570,7 +576,7 @@ class EqualityBounds(ProblemDataPart):
                  sample_period: float,
                  prediction_horizon: int,
                  max_derivative: Derivatives,
-                 alpha: float,
+                 horizon_weight_gain_scalar: float,
                  qp_formulation: QPFormulation):
         super().__init__(free_variables=free_variables,
                          equality_constraints=equality_constraints,
@@ -580,7 +586,7 @@ class EqualityBounds(ProblemDataPart):
                          sample_period=sample_period,
                          prediction_horizon=prediction_horizon,
                          max_derivative=max_derivative,
-                         alpha=alpha,
+                         horizon_weight_gain_scalar=horizon_weight_gain_scalar,
                          qp_formulation=qp_formulation)
         self.evaluated = True
 
@@ -682,9 +688,9 @@ class InequalityBounds(ProblemDataPart):
                  sample_period: float,
                  prediction_horizon: int,
                  max_derivative: Derivatives,
-                 default_limits: bool,
-                 alpha: float,
-                 qp_formulation: QPFormulation):
+                 horizon_weight_gain_scalar: float,
+                 qp_formulation: QPFormulation,
+                 default_limits: bool = False):
         super().__init__(free_variables=free_variables,
                          equality_constraints=equality_constraints,
                          inequality_constraints=inequality_constraints,
@@ -693,7 +699,7 @@ class InequalityBounds(ProblemDataPart):
                          sample_period=sample_period,
                          prediction_horizon=prediction_horizon,
                          max_derivative=max_derivative,
-                         alpha=alpha,
+                         horizon_weight_gain_scalar=horizon_weight_gain_scalar,
                          qp_formulation=qp_formulation)
         self.default_limits = default_limits
         self.evaluated = True
@@ -1470,6 +1476,7 @@ class GiskardToQPAdapter:
     max_derivative: Derivatives
     horizon_weight_gain_scalar: float
     qp_formulation: QPFormulation
+    sparse: bool
 
     """
     Takes free variables and constraints and converts them to a QP problem in the following format, depending on the
@@ -1491,24 +1498,152 @@ class GiskardToQPAdapter:
                   'max_derivative': self.max_derivative,
                   'horizon_weight_gain_scalar': self.horizon_weight_gain_scalar,
                   'qp_formulation': self.qp_formulation}
-        self.weights = Weights(**kwargs)
+        self.quadratic_weights_np_filtered = Weights(**kwargs)
         self.free_variable_bounds = FreeVariableBounds(**kwargs)
         self.equality_model = EqualityModel(**kwargs)
         self.equality_bounds = EqualityBounds(**kwargs)
         self.inequality_model = InequalityModel(**kwargs)
         self.inequality_bounds = InequalityBounds(**kwargs)
 
-        self.quadratic_weights, self.linear_weights = self.weights.construct_expression(self.quadratic_weight_gains,
-                                                                                        self.linear_weight_gains)
+        self.quadratic_weights, self.linear_weights = self.quadratic_weights_np_filtered.construct_expression()
         self.box_lower_constraints, self.box_upper_constraints = self.free_variable_bounds.construct_expression()
-        self.eq_matrix, self.eq_matrix_slack = self.equality_model.construct_expression()
+        self.eq_matrix_dofs, self.eq_matrix_slack = self.equality_model.construct_expression()
         self.eq_bounds = self.equality_bounds.construct_expression()
-        self.neq_matrix, self.neq_matrix_slack = self.inequality_model.construct_expression()
+        self.neq_matrix_dofs, self.neq_matrix_slack = self.inequality_model.construct_expression()
         self.neq_lower_bounds, self.neq_upper_bounds = self.inequality_bounds.construct_expression()
 
-    def compile_format(self,
-                       box_constraints: bool,
-                       eq_constraints: bool,
-                       lower_ineq_constraints: bool,
-                       upper_ineq_constraints: bool):
-        pass
+    @property
+    def num_eq_constraints(self) -> int:
+        return len(self.equality_constraints)
+
+    @property
+    def num_neq_constraints(self) -> int:
+        return len(self.inequality_constraints)
+
+    @property
+    def num_free_variable_constraints(self) -> int:
+        return len(self.free_variables)
+
+    @property
+    def num_eq_slack_variables(self) -> int:
+        return self.eq_matrix_slack.shape[0]
+
+    @property
+    def num_neq_slack_variables(self) -> int:
+        return self.neq_matrix_slack.shape[0]
+
+    @property
+    def num_slack_variables(self) -> int:
+        return self.num_eq_slack_variables + self.num_neq_slack_variables
+
+    @property
+    def num_non_slack_variables(self) -> int:
+        return self.num_free_variable_constraints - self.num_slack_variables
+
+    def compile_format(self):
+        self.eq_matrix = cas.hstack([self.eq_matrix_dofs,
+                                     self.eq_matrix_slack,
+                                     cas.zeros(self.num_eq_slack_variables, self.num_neq_slack_variables)])
+        self.neq_matrix = cas.hstack([self.neq_matrix_dofs,
+                                      cas.zeros(self.num_neq_slack_variables, self.num_eq_slack_variables),
+                                      self.neq_matrix_slack])
+
+        free_symbols = set(self.quadratic_weights.free_symbols())
+        free_symbols.update(self.linear_weights.free_symbols())
+        free_symbols.update(self.box_lower_constraints.free_symbols())
+        free_symbols.update(self.box_upper_constraints.free_symbols())
+        free_symbols.update(self.eq_matrix.free_symbols())
+        free_symbols.update(self.eq_bounds.free_symbols())
+        free_symbols.update(self.neq_matrix.free_symbols())
+        free_symbols.update(self.neq_lower_bounds.free_symbols())
+        free_symbols.update(self.neq_upper_bounds.free_symbols())
+        self.free_symbols = list(free_symbols)
+
+        self.eq_matrix_compiled = self.eq_matrix.compile(parameters=self.free_symbols, sparse=self.sparse)
+        self.neq_matrix_compiled = self.neq_matrix.compile(parameters=self.free_symbols, sparse=self.sparse)
+
+        self.combined_vector_f = cas.StackedCompiledFunction(expressions=[self.quadratic_weights,
+                                                                          self.linear_weights,
+                                                                          self.box_lower_constraints,
+                                                                          self.box_upper_constraints,
+                                                                          self.eq_bounds,
+                                                                          self.neq_lower_bounds,
+                                                                          self.neq_upper_bounds],
+                                                             parameters=self.free_symbols)
+
+        self.free_symbols_str = [str(x) for x in self.free_symbols]
+
+    def filter(self):
+        self.zero_quadratic_weight_filter = self.quadratic_weights_np_raw != 0
+        # don't filter dofs with 0 weight
+        self.zero_quadratic_weight_filter[:-self.num_slack_variables] = True
+        slack_part = self.zero_quadratic_weight_filter[-(self.num_eq_slack_variables + self.num_neq_slack_variables):]
+        bE_part = slack_part[:self.num_eq_slack_variables]
+        self.bA_part = slack_part[self.num_eq_slack_variables:]
+
+        self.bE_filter = np.ones(self.eq_matrix.shape[0], dtype=bool)
+        self.num_filtered_eq_constraints = np.count_nonzero(np.invert(bE_part))
+        if self.num_filtered_eq_constraints > 0:
+            self.bE_filter[-len(bE_part):] = bE_part
+
+        self.bA_filter = np.ones(self.neq_matrix.shape[0], dtype=bool)
+        self.num_filtered_neq_constraints = np.count_nonzero(np.invert(self.bA_part))
+        if self.num_filtered_neq_constraints > 0:
+            self.bA_filter[-len(self.bA_part):] = self.bA_part
+
+    @profile
+    def apply_filters(self):
+        self.quadratic_weights_np_filtered = self.quadratic_weights_np_raw[self.zero_quadratic_weight_filter]
+        self.linear_weights_np_filtered = self.linear_weights_np_raw[self.zero_quadratic_weight_filter]
+        self.box_lower_constraints_np_filtered = self.box_lower_constraints_np_raw[self.zero_quadratic_weight_filter]
+        self.box_upper_constraints_np_filtered = self.box_upper_constraints_np_raw[self.zero_quadratic_weight_filter]
+        if self.num_filtered_eq_constraints > 0:
+            self.eq_matrix_np_filtered = self.eq_matrix_np_raw[self.bE_filter, :][:, self.zero_quadratic_weight_filter]
+        else:
+            # when no eq constraints were filtered, we can just cut off at the end, because that section is always all 0
+            self.eq_matrix_np_filtered = self.eq_matrix_np_raw[:, :self.zero_quadratic_weight_filter.sum()]
+        self.eq_bounds_np_filtered = self.eq_bounds_np_raw[self.bE_filter]
+        if len(self.neq_matrix_np_raw.shape) > 1 and self.neq_matrix_np_raw.shape[0] * self.neq_matrix_np_raw.shape[1] > 0:
+            self.neq_matrix_np_filtered = self.neq_matrix_np_raw[:, self.zero_quadratic_weight_filter][self.bA_filter, :]
+        else:
+            self.neq_matrix_np_filtered = self.neq_matrix_np_raw
+        self.neq_lower_bounds_np_filtered = self.neq_lower_bounds_np_raw[self.bA_filter]
+        self.neq_upper_bounds_np_filtered = self.neq_upper_bounds_np_raw[self.bA_filter]
+
+    def evaluate(self, substitutions: np.ndarray):
+        self.eq_matrix_np_raw = self.eq_matrix_compiled.fast_call(substitutions)
+        self.neq_matrix_np_raw = self.neq_matrix_compiled.fast_call(substitutions)
+        self.quadratic_weights_np_raw, \
+            self.linear_weights_np_raw, \
+            self.box_lower_constraints_np_raw, \
+            self.box_upper_constraints_np_raw, \
+            self.eq_bounds_np_raw, \
+            self.neq_lower_bounds_np_raw, \
+            self.neq_upper_bounds_np_raw = self.combined_vector_f.fast_call(substitutions)
+
+    def problem_data_to_qp_format(self):
+        # nlb_ub = np.concatenate((self.nlb, self.ub))
+        # if np.prod(self.nA_A.shape) == 0:
+        #     return self.weights, self.linear_weights_np_filtered, self.E, self.bE, self.nAi_Ai, nlb_ub, None, None
+        # return self.weights, self.linear_weights_np_filtered, self.E, self.bE, self.nAi_Ai, nlb_ub, self.nA_A, self.nlbA_ubA
+        return (self.quadratic_weights_np_filtered,
+                self.linear_weights_np_filtered,
+                self.box_lower_constraints_np_filtered,
+                self.box_upper_constraints_np_filtered,
+                self.eq_matrix_np_filtered,
+                self.eq_bounds_np_filtered,
+                self.neq_matrix_np_filtered,
+                self.neq_lower_bounds_np_filtered,
+                self.neq_upper_bounds_np_filtered)
+
+    def pretty_print_problem(self):
+        print('QP data')
+        print(f'H (quadratic_weights): {self.quadratic_weights_np_filtered}')
+        print(f'g (linear_weights): {self.linear_weights_np_filtered})')
+        print(f'lb (box_lower_constraints): {self.box_lower_constraints_np_filtered}')
+        print(f'ub (box_upper_constraints): {self.box_upper_constraints_np_filtered}')
+        print(f'E (eq_matrix): {self.eq_matrix_np_filtered.toarray()}')
+        print(f'bE (eq_bounds): {self.eq_bounds_np_filtered}')
+        print(f'A (neq_matrix): {self.neq_matrix_np_filtered.toarray()}')
+        print(f'lbA (neq_lower_bounds): {self.neq_lower_bounds_np_filtered}')
+        print(f'ubA (neq_upper_bounds): {self.neq_upper_bounds_np_filtered}')

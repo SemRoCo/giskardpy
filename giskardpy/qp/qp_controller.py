@@ -127,12 +127,12 @@ class QPSetup:
     inequality_constraints: List[InequalityConstraint] = field(init=False)
     equality_constraints: List[EqualityConstraint] = field(init=False)
     derivative_constraints: List[DerivativeInequalityConstraint] = field(init=False)
-    weights: Weights = field(init=False)
-    free_variable_bounds: FreeVariableBounds = field(init=False)
-    equality_model: EqualityModel = field(init=False)
-    equality_bounds: EqualityBounds = field(init=False)
-    inequality_model: InequalityModel = field(init=False)
-    inequality_bounds: InequalityBounds = field(init=False)
+    # weights: Weights = field(init=False)
+    # free_variable_bounds: FreeVariableBounds = field(init=False)
+    # equality_model: EqualityModel = field(init=False)
+    # equality_bounds: EqualityBounds = field(init=False)
+    # inequality_model: InequalityModel = field(init=False)
+    # inequality_bounds: InequalityBounds = field(init=False)
 
     def init(self,
              free_variables: List[FreeVariable] = None,

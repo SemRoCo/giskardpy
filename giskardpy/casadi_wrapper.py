@@ -45,8 +45,6 @@ class CompiledFunction:
         from scipy import sparse as sp
 
         self.sparse = sparse
-        if len(expression) == 0:
-            self.sparse = False
         if parameters is None:
             parameters = expression.free_symbols()
 
@@ -54,6 +52,12 @@ class CompiledFunction:
         if len(parameters) > 0:
             parameters = [Expression(parameters).s]
 
+        if len(expression) == 0:
+            if self.sparse:
+                result = sp.csc_matrix(np.empty(expression.shape))
+                self.__call__ = lambda **kwargs: result
+                self.fast_call = lambda filtered_args: result
+                return
         if self.sparse:
             expression.s = ca.sparsify(expression.s)
             try:

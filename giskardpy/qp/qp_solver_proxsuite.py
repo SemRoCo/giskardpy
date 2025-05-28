@@ -64,7 +64,7 @@ class QPSolverProxsuite(QPSolver):
         if self.compute_nI_I:
             self._nAi_Ai_cache = {}
 
-    def default_interface_solver_call(self, H, g, lb, ub, E, bE, A, lbA, ubA) -> np.ndarray:
+    def solver_call_explicit_interface(self, H, g, lb, ub, E, bE, A, lbA, ubA) -> np.ndarray:
         A2 = np.eye(len(ub))
         if len(E) > 0:
             A2 = np.vstack((A2, E))

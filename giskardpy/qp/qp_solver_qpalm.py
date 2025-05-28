@@ -150,7 +150,7 @@ class QPSolverQPalm(QPSolver):
             raise InfeasibleException(f'Failed to solve qp: {str(QPALMInfo(solver.info.status_val))}')
         return solver.solution.x
 
-    def default_interface_solver_call(self, H, g, lb, ub, E, bE, A, lbA, ubA) -> np.ndarray:
+    def solver_call_explicit_interface(self, H, g, lb, ub, E, bE, A, lbA, ubA) -> np.ndarray:
         A2 = np.eye(len(ub))
         if len(E) > 0:
             A2 = np.vstack((A2, E))

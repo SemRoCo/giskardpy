@@ -282,9 +282,9 @@ def mpc(upper_limits: Tuple[Tuple[float, ...], ...],
         bE = np.delete(bE, [0])
         lb[ph] = 0
         ub[ph] = 0
-    result = solver.default_interface_solver_call(H=H, g=g, lb=lb, ub=ub,
-                                                  E=model, bE=bE,
-                                                  A=empty, lbA=np.array([]), ubA=np.array([]))
+    result = solver.solver_call_explicit_interface(H=H, g=g, lb=lb, ub=ub,
+                                                   E=model, bE=bE,
+                                                   A=empty, lbA=np.array([]), ubA=np.array([]))
     return result
 
 

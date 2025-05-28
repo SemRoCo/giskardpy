@@ -130,7 +130,7 @@ class QPSolverGurobi(QPSWIFTFormatter):
             raise InfeasibleException(self.STATUS_VALUE_DICT[success])
         raise QPSolverException(self.STATUS_VALUE_DICT[success])
 
-    def default_interface_solver_call(self, H, g, lb, ub, E, bE, A, lbA, ubA) -> np.ndarray:
+    def solver_call_explicit_interface(self, H, g, lb, ub, E, bE, A, lbA, ubA) -> np.ndarray:
         weights = H.diagonal()
         A = np.vstack((-A, A))
         h = np.concatenate((-lbA, ubA))

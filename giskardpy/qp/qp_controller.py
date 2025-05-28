@@ -1,75 +1,27 @@
-import abc
 import datetime
 import os
-from abc import ABC
-from collections import defaultdict
 from copy import deepcopy
 from dataclasses import dataclass, field
-from enum import IntEnum
-from typing import List, Dict, Tuple, Type, Union, Optional, DefaultDict
+from typing import List, Dict, Type, Optional
 
 import numpy as np
-
-import giskardpy.casadi_wrapper as cas
-import giskardpy.utils.math as giskard_math
 from giskardpy.data_types.data_types import Derivatives
-from giskardpy.data_types.exceptions import HardConstraintsViolatedException, QPSolverException, InfeasibleException, \
-    VelocityLimitUnreachableException
+from giskardpy.data_types.exceptions import HardConstraintsViolatedException, QPSolverException, InfeasibleException
 from giskardpy.god_map import god_map
 from giskardpy.middleware import get_middleware
 from giskardpy.qp.constraint import DerivativeEqualityConstraint
 from giskardpy.qp.constraint import InequalityConstraint, EqualityConstraint, DerivativeInequalityConstraint
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.next_command import NextCommands
-from giskardpy.qp.pos_in_vel_limits import b_profile
+from giskardpy.qp.qp_formulation import QPFormulation
 from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.qp.qp_solver_ids import SupportedQPSolver
 from giskardpy.qp.weight_gain import QuadraticWeightGain, LinearWeightGain
-from giskardpy.symbol_manager import symbol_manager
-from giskardpy.utils.decorators import memoize
-from giskardpy.utils.utils import create_path, get_all_classes_in_package, get_all_classes_in_module
+from giskardpy.utils.utils import create_path, get_all_classes_in_module
 from line_profiler import profile
 
 # used for saving pandas in the same folder every time within a run
 date_str = datetime.datetime.now().strftime('%Yy-%mm-%dd--%Hh-%Mm-%Ss')
-
-
-class QPFormulation(IntEnum):
-    no_mpc = -1
-    explicit = 0
-    implicit = 1
-    explicit_no_acc = 2
-    explicit_explicit_pos_limits = 10
-    implicit_explicit_pos_limits = 11
-    explicit_no_acc_explicit_pos_limits = 12
-    implicit_variable_dt = 21
-
-    def explicit_pos_limits(self) -> bool:
-        return 20 > self > 10
-
-    def is_dt_variable(self) -> bool:
-        return self > 20
-
-    def is_no_mpc(self) -> bool:
-        return self == self.no_mpc
-
-    def has_acc_variables(self) -> bool:
-        return self.is_explicit()
-
-    def has_jerk_variables(self) -> bool:
-        return self.is_explicit() or self.is_explicit_no_acc()
-
-    def is_mpc(self) -> bool:
-        return not self.is_no_mpc()
-
-    def is_implicit(self) -> bool:
-        return self in [self.implicit, self.implicit_explicit_pos_limits]
-
-    def is_explicit(self) -> bool:
-        return self in [self.explicit, self.explicit_explicit_pos_limits]
-
-    def is_explicit_no_acc(self) -> bool:
-        return self in [self.explicit_no_acc, self.explicit_no_acc_explicit_pos_limits]
 
 
 def save_pandas(dfs, names, path, time: float, folder_name: Optional[str] = None):
@@ -127,6 +79,7 @@ class QPSetup:
     inequality_constraints: List[InequalityConstraint] = field(init=False)
     equality_constraints: List[EqualityConstraint] = field(init=False)
     derivative_constraints: List[DerivativeInequalityConstraint] = field(init=False)
+
     # weights: Weights = field(init=False)
     # free_variable_bounds: FreeVariableBounds = field(init=False)
     # equality_model: EqualityModel = field(init=False)
@@ -212,6 +165,7 @@ class QPSetup:
         l = [x.name for x in constraints]
         duplicates = set([x for x in l if l.count(x) > 1])
         assert duplicates == set(), f'there are multiple constraints with the same name: {duplicates}'
+
 
 class QPController:
     """
@@ -570,7 +524,7 @@ class QPController:
         import pandas as pd
 
         def print_iis_matrix(row_filter: np.ndarray, column_filter: np.ndarray, matrix: pd.DataFrame,
-                              bounds: pd.DataFrame):
+                             bounds: pd.DataFrame):
             if len(row_filter) == 0:
                 return
             filtered_matrix = matrix.loc[row_filter, column_filter]
@@ -597,5 +551,3 @@ class QPController:
             print_iis_matrix(lbA_ids, b_ids, self.p_A, self.p_lbA)
             get_middleware().loginfo('  Inequality constraint upper bounds:')
             print_iis_matrix(ubA_ids, b_ids, self.p_A, self.p_ubA)
-
-

@@ -4,28 +4,22 @@ import abc
 from abc import ABC
 from collections import defaultdict
 from dataclasses import dataclass
-from enum import Enum
-from functools import wraps
-from time import time
-from typing import Tuple, List, Optional, Union, Dict, TYPE_CHECKING, DefaultDict
-import giskardpy.utils.math as giskard_math
-import numpy as np
+from typing import Tuple, List, Union, Dict, TYPE_CHECKING, DefaultDict
 
 import giskardpy.casadi_wrapper as cas
+import giskardpy.utils.math as giskard_math
+import numpy as np
 from giskardpy.data_types.data_types import Derivatives
-from giskardpy.data_types.exceptions import HardConstraintsViolatedException, InfeasibleException, QPSolverException, \
-    VelocityLimitUnreachableException
+from giskardpy.data_types.exceptions import InfeasibleException, VelocityLimitUnreachableException
 from giskardpy.middleware import get_middleware
 from giskardpy.qp.constraint import EqualityConstraint, InequalityConstraint, DerivativeInequalityConstraint, \
     DerivativeEqualityConstraint
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.pos_in_vel_limits import b_profile
-from giskardpy.qp.qp_controller import QPFormulation
-from giskardpy.qp.qp_solver_ids import SupportedQPSolver
+from giskardpy.qp.qp_formulation import QPFormulation
 from giskardpy.qp.weight_gain import QuadraticWeightGain, LinearWeightGain
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils.decorators import memoize
-from giskardpy.utils.utils import is_running_in_pytest
 from line_profiler import profile
 
 if TYPE_CHECKING:
@@ -1465,7 +1459,44 @@ class InequalityModel(ProblemDataPart):
 
 
 @dataclass
-class GiskardToQPAdapter:
+class QPData:
+    quadratic_weights: np.ndarray
+    linear_weights: np.ndarray
+
+    box_lower_constraints: np.ndarray
+    box_upper_constraints: np.ndarray
+
+    eq_matrix: Union[sp.csc_matrix, np.ndarray]
+    eq_bounds: np.ndarray
+
+    neq_matrix: Union[sp.csc_matrix, np.ndarray]
+    neq_lower_bounds: np.ndarray
+    neq_upper_bounds: np.ndarray
+
+    def pretty_print_problem(self):
+        print('QP data')
+        print(f'H (quadratic_weights): \n{np.array2string(self.quadratic_weights, max_line_width=np.inf)}')
+        print(f'g (linear_weights): \n{np.array2string(self.linear_weights, max_line_width=np.inf)})')
+
+        print(f'lb (box_lower_constraints): \n{np.array2string(self.box_lower_constraints, max_line_width=np.inf)}')
+        print(f'ub (box_upper_constraints): \n{np.array2string(self.box_upper_constraints, max_line_width=np.inf)}')
+
+        try:
+            print(f'E (eq_matrix): \n{np.array2string(self.eq_matrix.toarray(), max_line_width=np.inf)}')
+        except:
+            print(f'E (eq_matrix): \n{np.array2string(self.eq_matrix, max_line_width=np.inf)}')
+        print(f'bE (eq_bounds): \n{np.array2string(self.eq_bounds, max_line_width=np.inf)}')
+
+        try:
+            print(f'A (neq_matrix): \n{np.array2string(self.neq_matrix.toarray(), max_line_width=np.inf)}')
+        except:
+            print(f'A (neq_matrix): \n{np.array2string(self.neq_matrix, max_line_width=np.inf)}')
+        print(f'lbA (neq_lower_bounds): \n{np.array2string(self.neq_lower_bounds, max_line_width=np.inf)}')
+        print(f'ubA (neq_upper_bounds): \n{np.array2string(self.neq_upper_bounds, max_line_width=np.inf)}')
+
+
+@dataclass
+class GiskardToQPAdapter(abc.ABC):
     free_variables: List[FreeVariable]
     equality_constraints: List[EqualityConstraint]
     inequality_constraints: List[InequalityConstraint]
@@ -1483,8 +1514,10 @@ class GiskardToQPAdapter:
     class attributes:
     min_x 0.5 x^T H x + g^T x
     s.t.  lb <= x <= ub     (box constraints)
-          Ex <= bE          (equality constraints)
-          lbA <= Ax <= ubA  (lower/upper inequality constraints)
+          Edof x <= bE_dof          (equality constraints)
+          Eslack x <= bE_slack        (equality constraints)
+          lbA <= Adof x <= ubA_dof  (lower/upper inequality constraints)
+          lbA <= Aslack x <= ubA_slack  (lower/upper inequality constraints)
     """
 
     def __post_init__(self):
@@ -1498,19 +1531,30 @@ class GiskardToQPAdapter:
                   'max_derivative': self.max_derivative,
                   'horizon_weight_gain_scalar': self.horizon_weight_gain_scalar,
                   'qp_formulation': self.qp_formulation}
-        self.quadratic_weights_np_filtered = Weights(**kwargs)
-        self.free_variable_bounds = FreeVariableBounds(**kwargs)
-        self.equality_model = EqualityModel(**kwargs)
-        self.equality_bounds = EqualityBounds(**kwargs)
-        self.inequality_model = InequalityModel(**kwargs)
-        self.inequality_bounds = InequalityBounds(**kwargs)
+        weights = Weights(**kwargs)
+        free_variable_bounds = FreeVariableBounds(**kwargs)
+        equality_model = EqualityModel(**kwargs)
+        equality_bounds = EqualityBounds(**kwargs)
+        inequality_model = InequalityModel(**kwargs)
+        inequality_bounds = InequalityBounds(**kwargs)
 
-        self.quadratic_weights, self.linear_weights = self.quadratic_weights_np_filtered.construct_expression()
-        self.box_lower_constraints, self.box_upper_constraints = self.free_variable_bounds.construct_expression()
-        self.eq_matrix_dofs, self.eq_matrix_slack = self.equality_model.construct_expression()
-        self.eq_bounds = self.equality_bounds.construct_expression()
-        self.neq_matrix_dofs, self.neq_matrix_slack = self.inequality_model.construct_expression()
-        self.neq_lower_bounds, self.neq_upper_bounds = self.inequality_bounds.construct_expression()
+        quadratic_weights, linear_weights = weights.construct_expression()
+        box_lower_constraints, box_upper_constraints = free_variable_bounds.construct_expression()
+        eq_matrix_dofs, self.eq_matrix_slack = equality_model.construct_expression()
+        eq_bounds = equality_bounds.construct_expression()
+        neq_matrix_dofs, self.neq_matrix_slack = inequality_model.construct_expression()
+        neq_lower_bounds, neq_upper_bounds = inequality_bounds.construct_expression()
+        self.general_qp_to_specific_qp(quadratic_weights=quadratic_weights,
+                                       linear_weights=linear_weights,
+                                       box_lower_constraints=box_lower_constraints,
+                                       box_upper_constraints=box_upper_constraints,
+                                       eq_matrix_dofs=eq_matrix_dofs,
+                                       eq_matrix_slack=self.eq_matrix_slack,
+                                       eq_bounds=eq_bounds,
+                                       neq_matrix_dofs=neq_matrix_dofs,
+                                       neq_matrix_slack=self.neq_matrix_slack,
+                                       neq_lower_bounds=neq_lower_bounds,
+                                       neq_upper_bounds=neq_upper_bounds)
 
     @property
     def num_eq_constraints(self) -> int:
@@ -1526,11 +1570,11 @@ class GiskardToQPAdapter:
 
     @property
     def num_eq_slack_variables(self) -> int:
-        return self.eq_matrix_slack.shape[0]
+        return self.eq_matrix_slack.shape[1]
 
     @property
     def num_neq_slack_variables(self) -> int:
-        return self.neq_matrix_slack.shape[0]
+        return self.neq_matrix_slack.shape[1]
 
     @property
     def num_slack_variables(self) -> int:
@@ -1540,56 +1584,111 @@ class GiskardToQPAdapter:
     def num_non_slack_variables(self) -> int:
         return self.num_free_variable_constraints - self.num_slack_variables
 
-    def compile_format(self):
-        self.eq_matrix = cas.hstack([self.eq_matrix_dofs,
-                                     self.eq_matrix_slack,
-                                     cas.zeros(self.num_eq_slack_variables, self.num_neq_slack_variables)])
-        self.neq_matrix = cas.hstack([self.neq_matrix_dofs,
-                                      cas.zeros(self.num_neq_slack_variables, self.num_eq_slack_variables),
-                                      self.neq_matrix_slack])
+    @abc.abstractmethod
+    def general_qp_to_specific_qp(self,
+                                  quadratic_weights: cas.Expression,
+                                  linear_weights: cas.Expression,
+                                  box_lower_constraints: cas.Expression,
+                                  box_upper_constraints: cas.Expression,
+                                  eq_matrix_dofs: cas.Expression,
+                                  eq_matrix_slack: cas.Expression,
+                                  eq_bounds: cas.Expression,
+                                  neq_matrix_dofs: cas.Expression,
+                                  neq_matrix_slack: cas.Expression,
+                                  neq_lower_bounds: cas.Expression,
+                                  neq_upper_bounds: cas.Expression):
+        ...
 
-        free_symbols = set(self.quadratic_weights.free_symbols())
-        free_symbols.update(self.linear_weights.free_symbols())
-        free_symbols.update(self.box_lower_constraints.free_symbols())
-        free_symbols.update(self.box_upper_constraints.free_symbols())
-        free_symbols.update(self.eq_matrix.free_symbols())
-        free_symbols.update(self.eq_bounds.free_symbols())
-        free_symbols.update(self.neq_matrix.free_symbols())
-        free_symbols.update(self.neq_lower_bounds.free_symbols())
-        free_symbols.update(self.neq_upper_bounds.free_symbols())
+
+# @dataclass
+class GiskardToExplicitQPAdapter(GiskardToQPAdapter):
+    """
+    Takes free variables and constraints and converts them to a QP problem in the following format, depending on the
+    class attributes:
+
+    min_x 0.5 x^T H x + g^T x
+    s.t.  lb <= x <= ub     (box constraints)
+          Ex <= bE          (equality constraints)
+          lbA <= Ax <= ubA  (lower/upper inequality constraints)
+    """
+
+    quadratic_weights: cas.Expression
+    linear_weights: cas.Expression
+
+    box_lower_constraints: cas.Expression
+    box_upper_constraints: cas.Expression
+
+    eq_matrix_dofs: cas.Expression
+    eq_matrix_slack: cas.Expression
+    eq_bounds: cas.Expression
+
+    neq_matrix_dofs: cas.Expression
+    neq_matrix_slack: cas.Expression
+    neq_lower_bounds: cas.Expression
+    neq_upper_bounds: cas.Expression
+
+    def general_qp_to_specific_qp(self,
+                                  quadratic_weights: cas.Expression,
+                                  linear_weights: cas.Expression,
+                                  box_lower_constraints: cas.Expression,
+                                  box_upper_constraints: cas.Expression,
+                                  eq_matrix_dofs: cas.Expression,
+                                  eq_matrix_slack: cas.Expression,
+                                  eq_bounds: cas.Expression,
+                                  neq_matrix_dofs: cas.Expression,
+                                  neq_matrix_slack: cas.Expression,
+                                  neq_lower_bounds: cas.Expression,
+                                  neq_upper_bounds: cas.Expression):
+        eq_matrix = cas.hstack([eq_matrix_dofs,
+                                eq_matrix_slack,
+                                cas.zeros(eq_matrix_slack.shape[0], self.num_neq_slack_variables)])
+        neq_matrix = cas.hstack([neq_matrix_dofs,
+                                 cas.zeros(neq_matrix_slack.shape[0], self.num_eq_slack_variables),
+                                 neq_matrix_slack])
+
+        free_symbols = set(quadratic_weights.free_symbols())
+        free_symbols.update(linear_weights.free_symbols())
+        free_symbols.update(box_lower_constraints.free_symbols())
+        free_symbols.update(box_upper_constraints.free_symbols())
+        free_symbols.update(eq_matrix.free_symbols())
+        free_symbols.update(eq_bounds.free_symbols())
+        free_symbols.update(neq_matrix.free_symbols())
+        free_symbols.update(neq_lower_bounds.free_symbols())
+        free_symbols.update(neq_upper_bounds.free_symbols())
         self.free_symbols = list(free_symbols)
 
-        self.eq_matrix_compiled = self.eq_matrix.compile(parameters=self.free_symbols, sparse=self.sparse)
-        self.neq_matrix_compiled = self.neq_matrix.compile(parameters=self.free_symbols, sparse=self.sparse)
+        self.eq_matrix_compiled = eq_matrix.compile(parameters=self.free_symbols, sparse=self.sparse)
+        self.neq_matrix_compiled = neq_matrix.compile(parameters=self.free_symbols, sparse=self.sparse)
 
-        self.combined_vector_f = cas.StackedCompiledFunction(expressions=[self.quadratic_weights,
-                                                                          self.linear_weights,
-                                                                          self.box_lower_constraints,
-                                                                          self.box_upper_constraints,
-                                                                          self.eq_bounds,
-                                                                          self.neq_lower_bounds,
-                                                                          self.neq_upper_bounds],
+        self.combined_vector_f = cas.StackedCompiledFunction(expressions=[quadratic_weights,
+                                                                          linear_weights,
+                                                                          box_lower_constraints,
+                                                                          box_upper_constraints,
+                                                                          eq_bounds,
+                                                                          neq_lower_bounds,
+                                                                          neq_upper_bounds],
                                                              parameters=self.free_symbols)
 
         self.free_symbols_str = [str(x) for x in self.free_symbols]
 
-    def filter(self):
+        self.bE_filter = np.ones(eq_matrix.shape[0], dtype=bool)
+        self.bA_filter = np.ones(neq_matrix.shape[0], dtype=bool)
+
+    def create_filters(self):
         self.zero_quadratic_weight_filter = self.quadratic_weights_np_raw != 0
         # don't filter dofs with 0 weight
         self.zero_quadratic_weight_filter[:-self.num_slack_variables] = True
         slack_part = self.zero_quadratic_weight_filter[-(self.num_eq_slack_variables + self.num_neq_slack_variables):]
         bE_part = slack_part[:self.num_eq_slack_variables]
-        self.bA_part = slack_part[self.num_eq_slack_variables:]
+        bA_part = slack_part[self.num_eq_slack_variables:]
 
-        self.bE_filter = np.ones(self.eq_matrix.shape[0], dtype=bool)
-        self.num_filtered_eq_constraints = np.count_nonzero(np.invert(bE_part))
-        if self.num_filtered_eq_constraints > 0:
+        self.bE_filter.fill(True)
+        if len(bE_part) > 0:
             self.bE_filter[-len(bE_part):] = bE_part
 
-        self.bA_filter = np.ones(self.neq_matrix.shape[0], dtype=bool)
-        self.num_filtered_neq_constraints = np.count_nonzero(np.invert(self.bA_part))
-        if self.num_filtered_neq_constraints > 0:
-            self.bA_filter[-len(self.bA_part):] = self.bA_part
+        self.bA_filter.fill(True)
+        if len(bA_part) > 0:
+            self.bA_filter[-len(bA_part):] = bA_part
 
     @profile
     def apply_filters(self):
@@ -1597,14 +1696,16 @@ class GiskardToQPAdapter:
         self.linear_weights_np_filtered = self.linear_weights_np_raw[self.zero_quadratic_weight_filter]
         self.box_lower_constraints_np_filtered = self.box_lower_constraints_np_raw[self.zero_quadratic_weight_filter]
         self.box_upper_constraints_np_filtered = self.box_upper_constraints_np_raw[self.zero_quadratic_weight_filter]
-        if self.num_filtered_eq_constraints > 0:
-            self.eq_matrix_np_filtered = self.eq_matrix_np_raw[self.bE_filter, :][:, self.zero_quadratic_weight_filter]
-        else:
-            # when no eq constraints were filtered, we can just cut off at the end, because that section is always all 0
-            self.eq_matrix_np_filtered = self.eq_matrix_np_raw[:, :self.zero_quadratic_weight_filter.sum()]
+        # if self.num_filtered_eq_constraints > 0:
+        self.eq_matrix_np_filtered = self.eq_matrix_np_raw[self.bE_filter, :][:, self.zero_quadratic_weight_filter]
+        # else:
+        # when no eq constraints were filtered, we can just cut off at the end, because that section is always all 0
+        # self.eq_matrix_np_filtered = self.eq_matrix_np_raw[:, :self.zero_quadratic_weight_filter.sum()]
         self.eq_bounds_np_filtered = self.eq_bounds_np_raw[self.bE_filter]
-        if len(self.neq_matrix_np_raw.shape) > 1 and self.neq_matrix_np_raw.shape[0] * self.neq_matrix_np_raw.shape[1] > 0:
-            self.neq_matrix_np_filtered = self.neq_matrix_np_raw[:, self.zero_quadratic_weight_filter][self.bA_filter, :]
+        if (len(self.neq_matrix_np_raw.shape) > 1
+                and self.neq_matrix_np_raw.shape[0] * self.neq_matrix_np_raw.shape[1] > 0):
+            self.neq_matrix_np_filtered = self.neq_matrix_np_raw[:, self.zero_quadratic_weight_filter][self.bA_filter,
+                                          :]
         else:
             self.neq_matrix_np_filtered = self.neq_matrix_np_raw
         self.neq_lower_bounds_np_filtered = self.neq_lower_bounds_np_raw[self.bA_filter]
@@ -1621,29 +1722,13 @@ class GiskardToQPAdapter:
             self.neq_lower_bounds_np_raw, \
             self.neq_upper_bounds_np_raw = self.combined_vector_f.fast_call(substitutions)
 
-    def problem_data_to_qp_format(self):
-        # nlb_ub = np.concatenate((self.nlb, self.ub))
-        # if np.prod(self.nA_A.shape) == 0:
-        #     return self.weights, self.linear_weights_np_filtered, self.E, self.bE, self.nAi_Ai, nlb_ub, None, None
-        # return self.weights, self.linear_weights_np_filtered, self.E, self.bE, self.nAi_Ai, nlb_ub, self.nA_A, self.nlbA_ubA
-        return (self.quadratic_weights_np_filtered,
-                self.linear_weights_np_filtered,
-                self.box_lower_constraints_np_filtered,
-                self.box_upper_constraints_np_filtered,
-                self.eq_matrix_np_filtered,
-                self.eq_bounds_np_filtered,
-                self.neq_matrix_np_filtered,
-                self.neq_lower_bounds_np_filtered,
-                self.neq_upper_bounds_np_filtered)
-
-    def pretty_print_problem(self):
-        print('QP data')
-        print(f'H (quadratic_weights): {self.quadratic_weights_np_filtered}')
-        print(f'g (linear_weights): {self.linear_weights_np_filtered})')
-        print(f'lb (box_lower_constraints): {self.box_lower_constraints_np_filtered}')
-        print(f'ub (box_upper_constraints): {self.box_upper_constraints_np_filtered}')
-        print(f'E (eq_matrix): {self.eq_matrix_np_filtered.toarray()}')
-        print(f'bE (eq_bounds): {self.eq_bounds_np_filtered}')
-        print(f'A (neq_matrix): {self.neq_matrix_np_filtered.toarray()}')
-        print(f'lbA (neq_lower_bounds): {self.neq_lower_bounds_np_filtered}')
-        print(f'ubA (neq_upper_bounds): {self.neq_upper_bounds_np_filtered}')
+    def problem_data_to_qp_format(self) -> QPData:
+        return QPData(quadratic_weights=self.quadratic_weights_np_filtered,
+                      linear_weights=self.linear_weights_np_filtered,
+                      box_lower_constraints=self.box_lower_constraints_np_filtered,
+                      box_upper_constraints=self.box_upper_constraints_np_filtered,
+                      eq_matrix=self.eq_matrix_np_filtered,
+                      eq_bounds=self.eq_bounds_np_filtered,
+                      neq_matrix=self.neq_matrix_np_filtered,
+                      neq_lower_bounds=self.neq_lower_bounds_np_filtered,
+                      neq_upper_bounds=self.neq_upper_bounds_np_filtered)

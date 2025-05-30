@@ -7,16 +7,18 @@ from typing import TYPE_CHECKING, Type
 import numpy as np
 
 from giskardpy.qp.qp_adapter import QPData, GiskardToQPAdapter
+from giskardpy.qp.qp_solver_ids import SupportedQPSolver
 
 if TYPE_CHECKING:
     pass
 
 
 class QPSolver(ABC):
+    solver_id: SupportedQPSolver
     required_adapter_type: Type[GiskardToQPAdapter]
 
     @abc.abstractmethod
-    def solver_call(self, *args, **kwargs) -> np.ndarray:
+    def solver_call(self, qp_data: QPData) -> np.ndarray:
         ...
 
     @abc.abstractmethod

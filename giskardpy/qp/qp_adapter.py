@@ -1487,7 +1487,7 @@ class GiskardToQPAdapter(abc.ABC):
     max_derivative: Derivatives
     horizon_weight_gain_scalar: float
     qp_formulation: QPFormulation
-    sparse: bool
+    sparse: bool = True
 
     compute_nI_I: bool = True
     _nAi_Ai_cache: dict = field(default_factory=dict)

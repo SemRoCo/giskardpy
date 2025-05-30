@@ -55,12 +55,3 @@ class QPControllerConfig:
                                              retries_with_relaxed_constraints=self.__retries_with_relaxed_constraints,
                                              retry_added_slack=self.__added_slack,
                                              retry_weight_factor=self.__weight_factor)
-        god_map.qp_controller2 = QPController(mpc_dt=self.__mpc_dt,
-                                              control_dt=self.control_dt,
-                                              prediction_horizon=self.__prediction_horizon,
-                                              qp_formulation=self.__qp_formulation,
-                                              solver_id=self.__qp_solver,
-                                              max_derivative=self.__max_derivative,
-                                              retries_with_relaxed_constraints=self.__retries_with_relaxed_constraints,
-                                              retry_added_slack=self.__added_slack,
-                                              retry_weight_factor=self.__weight_factor)

@@ -4,7 +4,7 @@ import abc
 from abc import ABC
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Tuple, List, Union, Dict, TYPE_CHECKING, DefaultDict
+from typing import Tuple, List, Union, Dict, TYPE_CHECKING, DefaultDict, Optional
 
 import giskardpy.casadi_wrapper as cas
 import giskardpy.utils.math as giskard_math
@@ -1466,26 +1466,44 @@ class QPData:
     neq_lower_bounds: np.ndarray = field(default=None)
     neq_upper_bounds: np.ndarray = field(default=None)
 
+    @property
+    def sparse_hessian(self) -> sp.csc_matrix:
+        import scipy.sparse as sp
+        return sp.diags(self.quadratic_weights)
+
+    @property
+    def dense_hessian(self) -> np.ndarray:
+        return np.diag(self.quadratic_weights)
+
     def pretty_print_problem(self):
         print('QP data')
-        print(f'H (quadratic_weights): \n{np.array2string(self.quadratic_weights, max_line_width=np.inf)}')
-        print(f'g (linear_weights): \n{np.array2string(self.linear_weights, max_line_width=np.inf)})')
+        if self.quadratic_weights is not None:
+            print(f'H (quadratic_weights): \n{np.array2string(self.quadratic_weights, max_line_width=np.inf)}')
+        if self.linear_weights is not None:
+            print(f'g (linear_weights): \n{np.array2string(self.linear_weights, max_line_width=np.inf)})')
 
-        print(f'lb (box_lower_constraints): \n{np.array2string(self.box_lower_constraints, max_line_width=np.inf)}')
-        print(f'ub (box_upper_constraints): \n{np.array2string(self.box_upper_constraints, max_line_width=np.inf)}')
+        if self.box_lower_constraints is not None:
+            print(f'lb (box_lower_constraints): \n{np.array2string(self.box_lower_constraints, max_line_width=np.inf)}')
+        if self.box_upper_constraints is not None:
+            print(f'ub (box_upper_constraints): \n{np.array2string(self.box_upper_constraints, max_line_width=np.inf)}')
 
-        try:
-            print(f'E (eq_matrix): \n{np.array2string(self.eq_matrix.toarray(), max_line_width=np.inf)}')
-        except:
-            print(f'E (eq_matrix): \n{np.array2string(self.eq_matrix, max_line_width=np.inf)}')
-        print(f'bE (eq_bounds): \n{np.array2string(self.eq_bounds, max_line_width=np.inf)}')
+        if self.eq_matrix is not None:
+            try:
+                print(f'E (eq_matrix): \n{np.array2string(self.eq_matrix.toarray(), max_line_width=np.inf)}')
+            except:
+                print(f'E (eq_matrix): \n{np.array2string(self.eq_matrix, max_line_width=np.inf)}')
+        if self.eq_bounds is not None:
+            print(f'bE (eq_bounds): \n{np.array2string(self.eq_bounds, max_line_width=np.inf)}')
 
-        try:
-            print(f'A (neq_matrix): \n{np.array2string(self.neq_matrix.toarray(), max_line_width=np.inf)}')
-        except:
-            print(f'A (neq_matrix): \n{np.array2string(self.neq_matrix, max_line_width=np.inf)}')
-        print(f'lbA (neq_lower_bounds): \n{np.array2string(self.neq_lower_bounds, max_line_width=np.inf)}')
-        print(f'ubA (neq_upper_bounds): \n{np.array2string(self.neq_upper_bounds, max_line_width=np.inf)}')
+        if self.neq_matrix is not None:
+            try:
+                print(f'A (neq_matrix): \n{np.array2string(self.neq_matrix.toarray(), max_line_width=np.inf)}')
+            except:
+                print(f'A (neq_matrix): \n{np.array2string(self.neq_matrix, max_line_width=np.inf)}')
+        if self.neq_lower_bounds is not None:
+            print(f'lbA (neq_lower_bounds): \n{np.array2string(self.neq_lower_bounds, max_line_width=np.inf)}')
+        if self.neq_upper_bounds is not None:
+            print(f'ubA (neq_upper_bounds): \n{np.array2string(self.neq_upper_bounds, max_line_width=np.inf)}')
 
 
 @dataclass
@@ -1501,6 +1519,9 @@ class GiskardToQPAdapter(abc.ABC):
     horizon_weight_gain_scalar: float
     qp_formulation: QPFormulation
     sparse: bool
+
+    compute_nI_I: bool = True
+    _nAi_Ai_cache: dict = field(default_factory=dict)
 
     """
     Takes free variables and constraints and converts them to a QP problem in the following format, depending on the
@@ -1549,6 +1570,9 @@ class GiskardToQPAdapter(abc.ABC):
                                        neq_lower_bounds=neq_lower_bounds,
                                        neq_upper_bounds=neq_upper_bounds)
 
+    def __hash__(self):
+        return hash(id(self))
+
     @property
     def num_eq_constraints(self) -> int:
         return len(self.equality_constraints)
@@ -1595,6 +1619,52 @@ class GiskardToQPAdapter(abc.ABC):
     @abc.abstractmethod
     def evaluate(self, symbol_manager: SymbolManager):
         ...
+
+    @profile
+    def _direct_limit_model(self, dimensions_after_zero_filter: int,
+                            Ai_inf_filter: Optional[np.ndarray] = None, two_sided: bool = False) \
+            -> Union[np.ndarray, sp.csc_matrix]:
+        """
+        These models are often identical, yet the computation is expensive. Caching to the rescue
+        """
+        if Ai_inf_filter is None:
+            key = hash(dimensions_after_zero_filter)
+        else:
+            key = hash((dimensions_after_zero_filter, Ai_inf_filter.tobytes()))
+        if key not in self._nAi_Ai_cache:
+            nI_I = self._cached_eyes(dimensions_after_zero_filter, two_sided)
+            if Ai_inf_filter is None:
+                self._nAi_Ai_cache[key] = nI_I
+            else:
+                self._nAi_Ai_cache[key] = nI_I[Ai_inf_filter]
+        return self._nAi_Ai_cache[key]
+
+    @memoize
+    def _cached_eyes(self, dimensions: int, two_sided: bool = False) -> Union[np.ndarray, sp.csc_matrix]:
+        if self.sparse:
+            from scipy import sparse as sp
+            if two_sided:
+                data = np.ones(dimensions, dtype=float)
+                row_indices = np.arange(dimensions)
+                col_indices = np.arange(dimensions + 1)
+                return sp.csc_matrix((data, row_indices, col_indices))
+            else:
+                d2 = dimensions * 2
+                data = np.ones(d2, dtype=float)
+                data[::2] *= -1
+                r1 = np.arange(dimensions)
+                r2 = np.arange(dimensions, d2)
+                row_indices = np.empty((d2,), dtype=int)
+                row_indices[0::2] = r1
+                row_indices[1::2] = r2
+                col_indices = np.arange(0, d2 + 1, 2)
+                return sp.csc_matrix((data, row_indices, col_indices))
+        else:
+            I = np.eye(dimensions)
+            if two_sided:
+                return I
+            else:
+                return np.concatenate([-I, I])
 
 
 # @dataclass
@@ -1752,5 +1822,193 @@ class GiskardToExplicitQPAdapter(GiskardToQPAdapter):
                                      zero_quadratic_weight_filter=zero_quadratic_weight_filter,
                                      bE_filter=bE_filter,
                                      bA_filter=bA_filter)
+
+        return qp_data
+
+
+class GiskardToTwoSidedNeqQPAdapter(GiskardToQPAdapter):
+    """
+    Takes free variables and constraints and converts them to a QP problem in the following format, depending on the
+    class attributes:
+
+    min_x 0.5 x^T H x + g^T x
+    s.t.  lbA <= Ax <= ubA
+    """
+
+    quadratic_weights: cas.Expression
+    linear_weights: cas.Expression
+
+    box_lower_constraints: cas.Expression
+    box_upper_constraints: cas.Expression
+
+    eq_matrix_dofs: cas.Expression
+    eq_matrix_slack: cas.Expression
+    eq_bounds: cas.Expression
+
+    neq_matrix_dofs: cas.Expression
+    neq_matrix_slack: cas.Expression
+    neq_lower_bounds: cas.Expression
+    neq_upper_bounds: cas.Expression
+
+    b_bE_bA_filter: np.ndarray
+    b_zero_inf_filter_view: np.ndarray
+    bE_filter_view: np.ndarray
+    bA_filter_view: np.ndarray
+    bE_bA_filter: np.ndarray
+
+    def general_qp_to_specific_qp(self,
+                                  quadratic_weights: cas.Expression,
+                                  linear_weights: cas.Expression,
+                                  box_lower_constraints: cas.Expression,
+                                  box_upper_constraints: cas.Expression,
+                                  eq_matrix_dofs: cas.Expression,
+                                  eq_matrix_slack: cas.Expression,
+                                  eq_bounds: cas.Expression,
+                                  neq_matrix_dofs: cas.Expression,
+                                  neq_matrix_slack: cas.Expression,
+                                  neq_lower_bounds: cas.Expression,
+                                  neq_upper_bounds: cas.Expression):
+        if len(neq_matrix_dofs) == 0:
+            constraint_matrix = cas.hstack([eq_matrix_dofs, eq_matrix_slack])
+        else:
+            eq_matrix = cas.hstack([eq_matrix_dofs,
+                                    eq_matrix_slack,
+                                    cas.zeros(eq_matrix_dofs.shape[0], neq_matrix_slack.shape[1])])
+            neq_matrix = cas.hstack([neq_matrix_dofs,
+                                     cas.zeros(neq_matrix_dofs.shape[0], eq_matrix_slack.shape[1]),
+                                     neq_matrix_slack])
+            constraint_matrix = cas.vstack([eq_matrix, neq_matrix])
+
+        free_symbols = set(quadratic_weights.free_symbols())
+        free_symbols.update(constraint_matrix.free_symbols())
+        free_symbols.update(box_lower_constraints.free_symbols())
+        free_symbols.update(box_upper_constraints.free_symbols())
+        free_symbols.update(eq_bounds.free_symbols())
+        free_symbols.update(neq_lower_bounds.free_symbols())
+        free_symbols.update(neq_upper_bounds.free_symbols())
+        free_symbols = list(free_symbols)
+        self.free_symbols = free_symbols
+
+        len_lb_be_lba_end = (quadratic_weights.shape[0]
+                             + box_lower_constraints.shape[0]
+                             + eq_bounds.shape[0]
+                             + neq_lower_bounds.shape[0])
+        len_ub_be_uba_end = (len_lb_be_lba_end
+                             + box_upper_constraints.shape[0]
+                             + eq_bounds.shape[0]
+                             + neq_upper_bounds.shape[0])
+
+        self.combined_vector_f = cas.StackedCompiledFunction(expressions=[quadratic_weights,
+                                                                          box_lower_constraints,
+                                                                          eq_bounds,
+                                                                          neq_lower_bounds,
+                                                                          box_upper_constraints,
+                                                                          eq_bounds,
+                                                                          neq_upper_bounds,
+                                                                          linear_weights],
+                                                             parameters=free_symbols,
+                                                             additional_views=[
+                                                                 slice(quadratic_weights.shape[0], len_lb_be_lba_end),
+                                                                 slice(len_lb_be_lba_end, len_ub_be_uba_end)])
+
+        self.neq_matrix_compiled = constraint_matrix.compile(parameters=free_symbols, sparse=self.sparse)
+
+        self.free_symbols_str = [str(x) for x in free_symbols]
+
+        self.b_bE_bA_filter = np.ones(box_lower_constraints.shape[0] + eq_bounds.shape[0] + neq_lower_bounds.shape[0],
+                                      dtype=bool)
+        self.b_zero_inf_filter_view = self.b_bE_bA_filter[:box_lower_constraints.shape[0]]
+        self.bE_filter_view = self.b_bE_bA_filter[
+                              box_lower_constraints.shape[0]:box_lower_constraints.shape[0] + eq_bounds.shape[0]]
+        self.bA_filter_view = self.b_bE_bA_filter[box_lower_constraints.shape[0] + eq_bounds.shape[0]:]
+        self.bE_bA_filter = self.b_bE_bA_filter[box_lower_constraints.shape[0]:]
+
+        if self.compute_nI_I:
+            self._nAi_Ai_cache = {}
+
+    def create_filters(self,
+                       quadratic_weights_np_raw: np.ndarray,
+                       box_lower_constraints_np_raw: np.ndarray,
+                       box_upper_constraints_np_raw: np.ndarray,
+                       num_slack_variables: int,
+                       num_eq_slack_variables: int,
+                       num_neq_slack_variables: int) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        self.b_bE_bA_filter.fill(True)
+
+        zero_quadratic_weight_filter: np.ndarray = quadratic_weights_np_raw != 0
+        zero_quadratic_weight_filter[:-num_slack_variables] = True
+
+        slack_part = zero_quadratic_weight_filter[-(num_eq_slack_variables + num_neq_slack_variables):]
+        bE_part = slack_part[:num_eq_slack_variables]
+        if len(bE_part) > 0:
+            self.bE_filter_view[-len(bE_part):] = bE_part
+
+        bA_part = slack_part[num_eq_slack_variables:]
+        if len(bA_part) > 0:
+            self.bA_filter_view[-len(bA_part):] = bA_part
+
+        b_finite_filter = np.isfinite(box_lower_constraints_np_raw) | np.isfinite(box_upper_constraints_np_raw)
+        self.b_zero_inf_filter_view[::] = zero_quadratic_weight_filter & b_finite_filter
+        Ai_inf_filter = b_finite_filter[zero_quadratic_weight_filter]
+        return zero_quadratic_weight_filter, Ai_inf_filter, self.bE_bA_filter, self.b_bE_bA_filter
+
+
+
+
+    @profile
+    def apply_filters(self,
+                      qp_data_raw: QPData,
+                      zero_quadratic_weight_filter: np.ndarray,
+                      Ai_inf_filter: np.ndarray,
+                      bE_bA_filter: np.ndarray,
+                      b_bE_bA_filter: np.ndarray) -> QPData:
+        from scipy import sparse as sp
+        qp_data_filtered = QPData()
+        qp_data_filtered.quadratic_weights = qp_data_raw.quadratic_weights[zero_quadratic_weight_filter]
+        qp_data_filtered.linear_weights = qp_data_raw.linear_weights[zero_quadratic_weight_filter]
+        qp_data_filtered.neq_lower_bounds = qp_data_raw.neq_lower_bounds[b_bE_bA_filter]
+        qp_data_filtered.neq_upper_bounds = qp_data_raw.neq_upper_bounds[b_bE_bA_filter]
+        qp_data_filtered.neq_matrix = qp_data_raw.neq_matrix[:, zero_quadratic_weight_filter][bE_bA_filter, :]
+
+        box_matrix = self._direct_limit_model(qp_data_filtered.quadratic_weights.shape[0],
+                                              Ai_inf_filter,
+                                              two_sided=True)
+        qp_data_filtered.neq_matrix = sp.vstack((box_matrix, qp_data_filtered.neq_matrix))
+
+        return qp_data_filtered
+
+    def evaluate(self, symbol_manager: SymbolManager):
+        substitutions = symbol_manager.resolve_symbols(self.free_symbols_str)
+
+        neq_matrix = self.neq_matrix_compiled.fast_call(substitutions)
+        quadratic_weights_np_raw, \
+            box_lower_constraints_np_raw, \
+            _, \
+            _, \
+            box_upper_constraints_np_raw, \
+            _, \
+            _, \
+            linear_weights_np_raw, \
+            box_eq_neq_lower_bounds_np_raw, \
+            box_eq_neq_upper_bounds_np_raw = self.combined_vector_f.fast_call(substitutions)
+        qp_data_raw = QPData(quadratic_weights=quadratic_weights_np_raw,
+                             linear_weights=linear_weights_np_raw,
+                             neq_matrix=neq_matrix,
+                             neq_lower_bounds=box_eq_neq_lower_bounds_np_raw,
+                             neq_upper_bounds=box_eq_neq_upper_bounds_np_raw)
+
+        zero_quadratic_weight_filter, Ai_inf_filter, bE_bA_filter, b_bE_bA_filter = self.create_filters(
+            quadratic_weights_np_raw=quadratic_weights_np_raw,
+            box_lower_constraints_np_raw=box_lower_constraints_np_raw,
+            box_upper_constraints_np_raw=box_upper_constraints_np_raw,
+            num_slack_variables=self.num_slack_variables,
+            num_eq_slack_variables=self.num_eq_slack_variables,
+            num_neq_slack_variables=self.num_neq_slack_variables)
+
+        qp_data = self.apply_filters(qp_data_raw=qp_data_raw,
+                                     zero_quadratic_weight_filter=zero_quadratic_weight_filter,
+                                     Ai_inf_filter=Ai_inf_filter,
+                                     bE_bA_filter=bE_bA_filter,
+                                     b_bE_bA_filter=b_bE_bA_filter)
 
         return qp_data

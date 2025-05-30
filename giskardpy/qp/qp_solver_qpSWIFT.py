@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, List
 
-from giskardpy.qp.qp_formatter import QPData
+from giskardpy.qp.qp_adapter import QPData, GiskardToExplicitQPAdapter
 
 if TYPE_CHECKING:
     pass
@@ -24,7 +24,6 @@ class QPSWIFTExitFlags(IntEnum):
     ERROR = 3  # Unknown Problem in Solver
 
 
-
 class QPSolverQPSwift(QPSolver):
     """
     min_x 0.5 x^T P x + c^T x
@@ -32,6 +31,7 @@ class QPSolverQPSwift(QPSolver):
           Gx <= h
     """
     solver_id = SupportedQPSolver.qpSWIFT
+    required_adapter_type = GiskardToExplicitQPAdapter
 
     opts = {
         'OUTPUT': 1,  # 0 = sol; 1 = sol + basicInfo; 2 = sol + basicInfo + advInfo
@@ -44,7 +44,7 @@ class QPSolverQPSwift(QPSolver):
 
     def solver_call_batch(self, qps: List[QPData]) -> np.ndarray:
         result = qpSWIFT.solve_sparse_H_diag_batch(len(qps),
-                                                               tuple([qp.as_qpSWIFT_data(self.opts) for qp in qps]))
+                                                   tuple([qp.as_qpSWIFT_data(self.opts) for qp in qps]))
         exit_flag = result['basicInfo']['ExitFlag']
         if exit_flag != 0:
             error_code = QPSWIFTExitFlags(exit_flag)
@@ -54,10 +54,11 @@ class QPSolverQPSwift(QPSolver):
         return result['sol']
 
     def solver_call_explicit_interface(self, qp_data: QPData) -> np.ndarray:
-        result = qpSWIFT.solve_sparse_H_diag(H=qp_data.quadratic_weights,g=qp_data.linear_weights,
+        result = qpSWIFT.solve_sparse_H_diag(H=qp_data.quadratic_weights, g=qp_data.linear_weights,
                                              lb=qp_data.box_lower_constraints, ub=qp_data.box_upper_constraints,
                                              E=qp_data.eq_matrix, b=qp_data.eq_bounds,
-                                             A=qp_data.neq_matrix, lbA=qp_data.neq_lower_bounds, ubA=qp_data.neq_upper_bounds,
+                                             A=qp_data.neq_matrix, lbA=qp_data.neq_lower_bounds,
+                                             ubA=qp_data.neq_upper_bounds,
                                              options=self.opts)
         exit_flag = result.exit_flag
         if exit_flag != 0:

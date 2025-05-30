@@ -2,20 +2,19 @@ from __future__ import annotations
 
 import abc
 from abc import ABC
-from functools import wraps
-from time import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Type
 
 import numpy as np
-from giskardpy.middleware import get_middleware
-from giskardpy.qp.qp_formatter import QPData
-from giskardpy.utils.utils import is_running_in_pytest
+
+from giskardpy.qp.qp_adapter import QPData, GiskardToQPAdapter
 
 if TYPE_CHECKING:
     pass
 
 
 class QPSolver(ABC):
+    required_adapter_type: Type[GiskardToQPAdapter]
+
     @abc.abstractmethod
     def solver_call(self, *args, **kwargs) -> np.ndarray:
         ...

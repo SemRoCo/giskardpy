@@ -37,7 +37,6 @@ class QPSolverQPalm(QPSolver):
     settings.eps_rel = 1e-8
     settings.nonconvex = False
 
-
     def solver_call(self, qp_data: QPData) -> np.ndarray:
         data = qpalm.Data(qp_data.neq_matrix.shape[1], qp_data.neq_matrix.shape[0])
 

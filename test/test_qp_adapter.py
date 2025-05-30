@@ -81,28 +81,31 @@ def test_explicit_qp_format(fake_world: FakeWorld):
                                              quadratic_weight=0))
 
     solvers = [QPSolverQPSwift(), QPSolverQPalm()]
+    formulations = [QPFormulation(), QPFormulation.Implicit()]
+    last_result = None
     for qp_solver in solvers:
-        adapter = qp_solver.required_adapter_type(free_variables=fake_world.dofs,
-                                                  equality_constraints=eq_constraints,
-                                                  inequality_constraints=[],
-                                                  derivative_constraints=[],
-                                                  eq_derivative_constraints=[],
-                                                  mpc_dt=0.05,
-                                                  prediction_horizon=prediction_horizon,
-                                                  max_derivative=Derivatives.jerk,
-                                                  horizon_weight_gain_scalar=0.1,
-                                                  qp_formulation=QPFormulation.explicit_no_acc,
-                                                  sparse=True)
+        for formulation in formulations:
+            adapter = qp_solver.required_adapter_type(free_variables=fake_world.dofs,
+                                                      equality_constraints=eq_constraints,
+                                                      inequality_constraints=[],
+                                                      derivative_constraints=[],
+                                                      eq_derivative_constraints=[],
+                                                      mpc_dt=0.05,
+                                                      prediction_horizon=prediction_horizon,
+                                                      max_derivative=Derivatives.jerk,
+                                                      horizon_weight_gain_scalar=0.1,
+                                                      qp_formulation=formulation,
+                                                      sparse=True)
 
-        qp_data = adapter.evaluate(symbol_manager)
-        assert len(qp_data.quadratic_weights) == ((prediction_horizon - 2) * len(fake_world.dofs)
-                                                  + (prediction_horizon) * len(fake_world.dofs) + len(
-                    eq_constraints) - 1)
-        result = qp_solver.solver_call(qp_data)
-        assert np.isclose(result[0], 0.075, atol=1e-3)
-        assert np.isclose(result[1], -0.075, atol=1e-3)
-        assert result[-2] > 0
-        assert result[-1] < 0
+            qp_data = adapter.evaluate(symbol_manager)
+            result = qp_solver.solver_call(qp_data)
+            if last_result is not None:
+                assert np.allclose(result[:len(fake_world.dofs)], last_result[:len(fake_world.dofs)], atol=1e-3)
+            last_result = result
+            assert np.isclose(result[0], 0.075, atol=1e-3)
+            assert np.isclose(result[1], -0.075, atol=1e-3)
+            assert result[-2] > 0
+            assert result[-1] < 0
 
 
 def test_explicit_qp_format_neq(fake_world: FakeWorld):
@@ -136,27 +139,30 @@ def test_explicit_qp_format_neq(fake_world: FakeWorld):
                                                 quadratic_weight=0))
 
     solvers = [QPSolverQPSwift(), QPSolverQPalm()]
+    formulations = [QPFormulation(), QPFormulation.Implicit()]
+    last_result = None
     for qp_solver in solvers:
-        adapter = qp_solver.required_adapter_type(free_variables=fake_world.dofs,
-                                                  equality_constraints=[],
-                                                  inequality_constraints=neq_constraints,
-                                                  derivative_constraints=[],
-                                                  eq_derivative_constraints=[],
-                                                  mpc_dt=0.05,
-                                                  prediction_horizon=prediction_horizon,
-                                                  max_derivative=Derivatives.jerk,
-                                                  horizon_weight_gain_scalar=0.1,
-                                                  qp_formulation=QPFormulation.explicit_no_acc,
-                                                  sparse=True)
+        for formulation in formulations:
+            adapter = qp_solver.required_adapter_type(free_variables=fake_world.dofs,
+                                                      equality_constraints=[],
+                                                      inequality_constraints=neq_constraints,
+                                                      derivative_constraints=[],
+                                                      eq_derivative_constraints=[],
+                                                      mpc_dt=0.05,
+                                                      prediction_horizon=prediction_horizon,
+                                                      max_derivative=Derivatives.jerk,
+                                                      horizon_weight_gain_scalar=0.1,
+                                                      qp_formulation=formulation,
+                                                      sparse=True)
 
-        qp_data = adapter.evaluate(symbol_manager)
-        assert len(qp_data.quadratic_weights) == ((prediction_horizon - 2) * len(fake_world.dofs)
-                                                  + (prediction_horizon) * len(fake_world.dofs)
-                                                  + len(neq_constraints) - 1)
-        result = qp_solver.solver_call(qp_data)
-        assert np.isclose(result[0], -0.075, atol=1.e-3)
-        assert np.isclose(result[1], -0.075, atol=1.e-3)
-        assert np.isclose(result[2], 0.075, atol=1.e-3)
-        assert result[-3] < 0
-        assert result[-2] < 0
-        assert result[-1] > 0
+            qp_data = adapter.evaluate(symbol_manager)
+            result = qp_solver.solver_call(qp_data)
+            if last_result is not None:
+                assert np.allclose(result[:len(fake_world.dofs)], last_result[:len(fake_world.dofs)], atol=1e-3)
+            last_result = result
+            assert np.isclose(result[0], -0.075, atol=1.e-3)
+            assert np.isclose(result[1], -0.075, atol=1.e-3)
+            assert np.isclose(result[2], 0.075, atol=1.e-3)
+            assert result[-3] < 0
+            assert result[-2] < 0
+            assert result[-1] > 0

@@ -71,7 +71,7 @@ class QPSetup:
     control_dt: float
     prediction_horizon: int
     max_derivative: Derivatives = Derivatives.jerk
-    qp_formulation: QPFormulation = QPFormulation.explicit_no_acc
+    qp_formulation: QPFormulation = field(default_factory=QPFormulation)
     horizon_weight_gain_scalar: float = 0.1
     verbose: bool = True
 
@@ -185,15 +185,16 @@ class QPController:
                  retries_with_relaxed_constraints: int = 5,
                  retry_added_slack: float = 100,
                  retry_weight_factor: float = 100,
-                 qp_formulation: QPFormulation = QPFormulation.explicit_no_acc,
+                 qp_formulation: Optional[QPFormulation] = None,
                  horizon_weight_gain_scalar: float = 0.1,
                  verbose: bool = True):
+
         if control_dt is None:
             control_dt = mpc_dt
         self.control_dt = control_dt
         self.double_qp = double_qp
         self.horizon_weight_gain_scalar = horizon_weight_gain_scalar
-        self.qp_formulation = qp_formulation
+        self.qp_formulation = qp_formulation or QPFormulation()
         self.mpc_dt = mpc_dt
         self.max_derivative = max_derivative
         self.prediction_horizon = prediction_horizon
@@ -202,7 +203,7 @@ class QPController:
         self.retry_weight_factor = retry_weight_factor
         self.verbose = verbose
         self.set_qp_solver(solver_id)
-        if self.qp_formulation.is_no_mpc():
+        if not self.qp_formulation.is_mpc:
             self.prediction_horizon = 1
             self.max_derivative = Derivatives.velocity
 
@@ -339,7 +340,7 @@ class QPController:
             if self.qp_formulation.is_implicit():
                 return NextCommands.from_xdot_implicit(self.free_variables, self.xdot_full, self.order,
                                                        self.prediction_horizon, god_map.world, self.mpc_dt)
-            elif self.qp_formulation.is_explicit() or self.qp_formulation.is_no_mpc():
+            elif self.qp_formulation.is_explicit() or not self.qp_formulation.is_mpc:
                 return NextCommands.from_xdot(self.free_variables, self.xdot_full, self.order, self.prediction_horizon)
             else:
                 return NextCommands.from_xdot_explicit_no_acc(self.free_variables, self.xdot_full, self.order,

@@ -18,7 +18,7 @@ class QPControllerConfig:
                  control_dt: Optional[float] = None,
                  max_trajectory_length: Optional[float] = 30,
                  retries_with_relaxed_constraints: int = 5,
-                 qp_formulation: QPFormulation = QPFormulation.explicit_no_acc,
+                 qp_formulation: Optional[QPFormulation] = None,
                  added_slack: float = 100,
                  weight_factor: float = 100):
         """
@@ -40,7 +40,7 @@ class QPControllerConfig:
         self.__max_trajectory_length = max_trajectory_length
         self.__retries_with_relaxed_constraints = retries_with_relaxed_constraints
         self.__added_slack = added_slack
-        self.__qp_formulation = qp_formulation
+        self.__qp_formulation = qp_formulation or QPFormulation()
         self.__weight_factor = weight_factor
         self.__endless_mode = self.__max_trajectory_length is None
         self.set_defaults()

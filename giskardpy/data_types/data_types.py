@@ -130,7 +130,7 @@ class Derivatives(IntEnum):
     pop = 6
 
     @classmethod
-    def range(cls, start: Derivatives, stop: Derivatives, step: int = 1):
+    def range(cls, start: Union[Derivatives, int], stop: Union[Derivatives, int], step: int = 1):
         """
         Includes stop!
         """

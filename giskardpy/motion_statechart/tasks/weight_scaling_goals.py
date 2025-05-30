@@ -101,9 +101,9 @@ class MaxManipulability(Task):
                 v = self.get_free_variable(symbol)
                 if t < god_map.qp_controller.prediction_horizon - 2:
                     gains[Derivatives.velocity][v] = cas.if_greater(m, m_threshold, 0, trace * m * -gain)
-                if god_map.qp_controller.qp_formulation.has_acc_variables() and t < god_map.qp_controller.prediction_horizon - 1:
+                if god_map.qp_controller.qp_formulation.has_explicit_acc_variables() and t < god_map.qp_controller.prediction_horizon - 1:
                     gains[Derivatives.acceleration][v] = cas.if_greater(m, m_threshold, 0, trace * m * -gain)
-                if god_map.qp_controller.qp_formulation.has_jerk_variables():
+                if god_map.qp_controller.qp_formulation.has_explicit_jerk_variables:
                     gains[Derivatives.jerk][v] = cas.if_greater(m, m_threshold, 0, trace * m * -gain)
             list_gains.append(gains)
         self.add_linear_weight_gain(name, gains=list_gains)

@@ -122,6 +122,22 @@ class FreeVariable:
         except KeyError:
             raise KeyError(f'Free variable {self} doesn\'t have symbol for derivative of order {derivative}')
 
+    @property
+    def position_symbol(self) -> cas.Symbol:
+        return self.get_symbol(Derivatives.position)
+
+    @property
+    def velocity_symbol(self) -> cas.Symbol:
+        return self.get_symbol(Derivatives.velocity)
+
+    @property
+    def acceleration_symbol(self) -> cas.Symbol:
+        return self.get_symbol(Derivatives.acceleration)
+
+    @property
+    def jerk_symbol(self) -> cas.Symbol:
+        return self.get_symbol(Derivatives.jerk)
+
     def reset_cache(self):
         for method_name in dir(self):
             try:

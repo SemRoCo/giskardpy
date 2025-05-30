@@ -91,11 +91,7 @@ def test_explicit_qp_format(fake_world: FakeWorld):
                                          qp_formulation=QPFormulation.explicit_no_acc,
                                          sparse=True)
 
-    data = symbol_manager.resolve_symbols(adapter.free_symbols_str)
-    adapter.evaluate(data)
-    adapter.create_filters()
-    adapter.apply_filters()
-    qp_data = adapter.problem_data_to_qp_format()
+    qp_data = adapter.evaluate(symbol_manager)
     qp_data.pretty_print_problem()
     assert len(qp_data.quadratic_weights) == ((prediction_horizon - 2) * len(fake_world.dofs)
                                               + (prediction_horizon) * len(fake_world.dofs) + len(eq_constraints) - 1)
@@ -112,26 +108,26 @@ def test_explicit_qp_format_neq(fake_world: FakeWorld):
     neq_constraints = []
     neq_constraints.append(InequalityConstraint('neq1', PrefixName(''),
                                                 expression=fake_world.dofs[0].get_symbol(Derivatives.position),
-                                                lower_error=-0.1,
-                                                upper_error=0.1,
+                                                lower_error=-0.2,
+                                                upper_error=-0.1,
                                                 velocity_limit=1,
                                                 quadratic_weight=WEIGHT_BELOW_CA))
     neq_constraints.append(InequalityConstraint('neq2', PrefixName(''),
-                                                expression=fake_world.dofs[0].get_symbol(Derivatives.position),
+                                                expression=fake_world.dofs[1].get_symbol(Derivatives.position),
                                                 lower_error=-np.inf,
-                                                upper_error=0.1,
+                                                upper_error=-0.1,
                                                 velocity_limit=1,
                                                 quadratic_weight=WEIGHT_BELOW_CA))
 
     neq_constraints.append(InequalityConstraint('neq3', PrefixName(''),
-                                                expression=fake_world.dofs[0].get_symbol(Derivatives.position),
-                                                lower_error=-0.1,
+                                                expression=fake_world.dofs[2].get_symbol(Derivatives.position),
+                                                lower_error=0.1,
                                                 upper_error=np.inf,
                                                 velocity_limit=1,
                                                 quadratic_weight=WEIGHT_BELOW_CA))
 
     neq_constraints.append(InequalityConstraint('neq4', PrefixName(''),
-                                                expression=fake_world.dofs[0].get_symbol(Derivatives.position),
+                                                expression=fake_world.dofs[2].get_symbol(Derivatives.position),
                                                 lower_error=-0.1,
                                                 upper_error=np.inf,
                                                 velocity_limit=1,
@@ -149,11 +145,15 @@ def test_explicit_qp_format_neq(fake_world: FakeWorld):
                                          qp_formulation=QPFormulation.explicit_no_acc,
                                          sparse=True)
 
-    data = symbol_manager.resolve_symbols(adapter.free_symbols_str)
-    adapter.evaluate(data)
-    adapter.create_filters()
-    adapter.apply_filters()
-    qp_data = adapter.problem_data_to_qp_format()
+    qp_data = adapter.evaluate(symbol_manager)
     qp_data.pretty_print_problem()
     assert len(qp_data.quadratic_weights) == ((prediction_horizon - 2) * len(fake_world.dofs)
                                               + (prediction_horizon) * len(fake_world.dofs) + len(neq_constraints) - 1)
+    qp_solver = QPSolverQPSwift()
+    result = qp_solver.solver_call(qp_data)
+    assert np.isclose(result[0], -0.075)
+    assert np.isclose(result[1], -0.075)
+    assert np.isclose(result[2], 0.075)
+    assert result[-3] < 0
+    assert result[-2] < 0
+    assert result[-1] > 0

@@ -1648,21 +1648,6 @@ class GiskardToExplicitQPAdapter(GiskardToQPAdapter):
           lbA <= Ax <= ubA  (lower/upper inequality constraints)
     """
 
-    quadratic_weights: cas.Expression
-    linear_weights: cas.Expression
-
-    box_lower_constraints: cas.Expression
-    box_upper_constraints: cas.Expression
-
-    eq_matrix_dofs: cas.Expression
-    eq_matrix_slack: cas.Expression
-    eq_bounds: cas.Expression
-
-    neq_matrix_dofs: cas.Expression
-    neq_matrix_slack: cas.Expression
-    neq_lower_bounds: cas.Expression
-    neq_upper_bounds: cas.Expression
-
     bE_filter: np.ndarray
     bA_filter: np.ndarray
 
@@ -1713,6 +1698,7 @@ class GiskardToExplicitQPAdapter(GiskardToQPAdapter):
         self.bE_filter = np.ones(eq_matrix.shape[0], dtype=bool)
         self.bA_filter = np.ones(neq_matrix.shape[0], dtype=bool)
 
+    @profile
     def create_filters(self,
                        quadratic_weights_np_raw: np.ndarray,
                        num_slack_variables: int,
@@ -1761,6 +1747,7 @@ class GiskardToExplicitQPAdapter(GiskardToQPAdapter):
         qp_data_filtered.neq_upper_bounds = qp_data_raw.neq_upper_bounds[bA_filter]
         return qp_data_filtered
 
+    @profile
     def evaluate(self, symbol_manager: SymbolManager):
         substitutions = symbol_manager.resolve_symbols(self.free_symbols_str)
 
@@ -1805,21 +1792,6 @@ class GiskardToTwoSidedNeqQPAdapter(GiskardToQPAdapter):
     min_x 0.5 x^T H x + g^T x
     s.t.  lbA <= Ax <= ubA
     """
-
-    quadratic_weights: cas.Expression
-    linear_weights: cas.Expression
-
-    box_lower_constraints: cas.Expression
-    box_upper_constraints: cas.Expression
-
-    eq_matrix_dofs: cas.Expression
-    eq_matrix_slack: cas.Expression
-    eq_bounds: cas.Expression
-
-    neq_matrix_dofs: cas.Expression
-    neq_matrix_slack: cas.Expression
-    neq_lower_bounds: cas.Expression
-    neq_upper_bounds: cas.Expression
 
     b_bE_bA_filter: np.ndarray
     b_zero_inf_filter_view: np.ndarray
@@ -1922,9 +1894,6 @@ class GiskardToTwoSidedNeqQPAdapter(GiskardToQPAdapter):
         self.b_zero_inf_filter_view[::] = zero_quadratic_weight_filter & b_finite_filter
         Ai_inf_filter = b_finite_filter[zero_quadratic_weight_filter]
         return zero_quadratic_weight_filter, Ai_inf_filter, self.bE_bA_filter, self.b_bE_bA_filter
-
-
-
 
     @profile
     def apply_filters(self,

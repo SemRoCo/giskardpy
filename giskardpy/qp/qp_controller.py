@@ -67,108 +67,6 @@ def detect_solvers():
 detect_solvers()
 
 
-@dataclass
-class QPSetup:
-    mpc_dt: float
-    control_dt: float
-    prediction_horizon: int
-    max_derivative: Derivatives = Derivatives.jerk
-    qp_formulation: QPFormulation = field(default_factory=QPFormulation)
-    horizon_weight_gain_scalar: float = 0.1
-    verbose: bool = True
-
-    free_variables: List[FreeVariable] = field(init=False)
-    inequality_constraints: List[InequalityConstraint] = field(init=False)
-    equality_constraints: List[EqualityConstraint] = field(init=False)
-    derivative_constraints: List[DerivativeInequalityConstraint] = field(init=False)
-
-    # weights: Weights = field(init=False)
-    # free_variable_bounds: FreeVariableBounds = field(init=False)
-    # equality_model: EqualityModel = field(init=False)
-    # equality_bounds: EqualityBounds = field(init=False)
-    # inequality_model: InequalityModel = field(init=False)
-    # inequality_bounds: InequalityBounds = field(init=False)
-
-    def init(self,
-             free_variables: List[FreeVariable] = None,
-             equality_constraints: List[EqualityConstraint] = None,
-             inequality_constraints: List[InequalityConstraint] = None,
-             derivative_constraints: List[DerivativeInequalityConstraint] = None,
-             eq_derivative_constraints: List[DerivativeEqualityConstraint] = None,
-             quadratic_weight_gains: List[QuadraticWeightGain] = None,
-             linear_weight_gains: List[LinearWeightGain] = None):
-        self.reset()
-        if free_variables is not None:
-            self.add_free_variables(free_variables)
-        if inequality_constraints is not None:
-            self.add_inequality_constraints(inequality_constraints)
-        if equality_constraints is not None:
-            self.add_equality_constraints(equality_constraints)
-        if derivative_constraints is not None:
-            self.add_derivative_constraints(derivative_constraints)
-        if eq_derivative_constraints is not None:
-            self.add_eq_derivative_constraints(eq_derivative_constraints)
-        if quadratic_weight_gains is not None:
-            self.add_quadratic_weight_gains(quadratic_weight_gains)
-        if linear_weight_gains is not None:
-            self.add_linear_weight_gains(linear_weight_gains)
-
-    def reset(self):
-        self.free_variables = []
-        self.equality_constraints = []
-        self.inequality_constraints = []
-        self.derivative_constraints = []
-        self.eq_derivative_constraints = []
-        self.quadratic_weight_gains = []
-        self.linear_weight_gains = []
-        self.xdot_full = None
-
-    def add_free_variables(self, free_variables: list):
-        if len(free_variables) == 0:
-            raise QPSolverException('Cannot solve qp with no free variables')
-        self.free_variables.extend(list(sorted(free_variables, key=lambda x: x.position_name)))
-        l = [x.position_name for x in free_variables]
-        duplicates = set([x for x in l if l.count(x) > 1])
-        self.order = Derivatives(min(self.prediction_horizon, self.max_derivative))
-        assert duplicates == set(), f'there are free variables with the same name: {duplicates}'
-
-    def add_inequality_constraints(self, constraints: List[InequalityConstraint]):
-        self.inequality_constraints.extend(list(sorted(constraints, key=lambda x: x.name)))
-        l = [x.name for x in constraints]
-        duplicates = set([x for x in l if l.count(x) > 1])
-        assert duplicates == set(), f'there are multiple constraints with the same name: {duplicates}'
-
-    def add_equality_constraints(self, constraints: List[EqualityConstraint]):
-        self.equality_constraints.extend(list(sorted(constraints, key=lambda x: x.name)))
-        l = [x.name for x in constraints]
-        duplicates = set([x for x in l if l.count(x) > 1])
-        assert duplicates == set(), f'there are multiple constraints with the same name: {duplicates}'
-
-    def add_quadratic_weight_gains(self, gains: List[QuadraticWeightGain]):
-        self.quadratic_weight_gains.extend(list(sorted(gains, key=lambda x: x.name)))
-        l = [x.name for x in gains]
-        duplicates = set([x for x in l if l.count(x) > 1])
-        assert duplicates == set(), f'there are multiple quadratic weight gains with the same name: {duplicates}'
-
-    def add_linear_weight_gains(self, gains: List[LinearWeightGain]):
-        self.linear_weight_gains.extend(list(sorted(gains, key=lambda x: x.name)))
-        l = [x.name for x in gains]
-        duplicates = set([x for x in l if l.count(x) > 1])
-        assert duplicates == set(), f'there are multiple linear weight gains with the same name: {duplicates}'
-
-    def add_derivative_constraints(self, constraints: List[DerivativeInequalityConstraint]):
-        self.derivative_constraints.extend(list(sorted(constraints, key=lambda x: x.name)))
-        l = [x.name for x in constraints]
-        duplicates = set([x for x in l if l.count(x) > 1])
-        assert duplicates == set(), f'there are multiple constraints with the same name: {duplicates}'
-
-    def add_eq_derivative_constraints(self, constraints: List[DerivativeEqualityConstraint]):
-        self.eq_derivative_constraints.extend(list(sorted(constraints, key=lambda x: x.name)))
-        l = [x.name for x in constraints]
-        duplicates = set([x for x in l if l.count(x) > 1])
-        assert duplicates == set(), f'there are multiple constraints with the same name: {duplicates}'
-
-
 class QPController:
     """
     Wraps around QP Solver. Builds the required matrices from constraints.
@@ -285,9 +183,9 @@ class QPController:
                 qp_formulation=self.qp_formulation))
 
         get_middleware().loginfo('Done compiling controller:')
-            # get_middleware().loginfo(f'  #free variables: {self.num_free_variables}')
-            # get_middleware().loginfo(f'  #equality constraints: {self.num_eq_constraints}')
-            # get_middleware().loginfo(f'  #inequality constraints: {self.num_ineq_constraints}')
+        # get_middleware().loginfo(f'  #free variables: {self.num_free_variables}')
+        # get_middleware().loginfo(f'  #equality constraints: {self.num_eq_constraints}')
+        # get_middleware().loginfo(f'  #inequality constraints: {self.num_ineq_constraints}')
 
     def save_all_pandas(self, folder_name: Optional[str] = None):
         self._create_debug_pandas(self.qp_solver)
@@ -329,7 +227,8 @@ class QPController:
                 return NextCommands.from_xdot_implicit(self.free_variables, self.xdot_full, self.max_derivative,
                                                        self.prediction_horizon, god_map.world, self.mpc_dt)
             elif self.qp_formulation.is_explicit or not self.qp_formulation.is_mpc:
-                return NextCommands.from_xdot(self.free_variables, self.xdot_full, self.max_derivative, self.prediction_horizon)
+                return NextCommands.from_xdot(self.free_variables, self.xdot_full, self.max_derivative,
+                                              self.prediction_horizon)
             else:
                 return NextCommands.from_xdot_explicit_no_acc(self.free_variables, self.xdot_full, self.max_derivative,
                                                               self.prediction_horizon, god_map.world,

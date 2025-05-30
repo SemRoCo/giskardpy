@@ -3,6 +3,7 @@ from typing import Tuple, Union, Dict, Type, Optional, List
 import numpy as np
 
 from giskardpy.data_types.data_types import Derivatives
+from giskardpy.qp.qp_adapter import QPData
 from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.qp.qp_solver_qpalm import QPSolverQPalm
 from giskardpy.utils.decorators import memoize
@@ -244,11 +245,11 @@ def mpc(upper_limits: Tuple[Tuple[float, ...], ...],
         solver_class: Optional[Type[QPSolver]] = None,
         link_to_current_vel: bool = True) -> np.ndarray:
     if solver_class is None:
-        solver = QPSolverQPalm.empty()
+        solver = QPSolverQPalm()
         # solver = QPSolverQPSwift.empty()
         # solver = QPSolverGurobi.empty()
     else:
-        solver = solver_class.empty()
+        solver = solver_class()
     max_d = len(upper_limits)
     lb = []
     ub = []
@@ -269,7 +270,6 @@ def mpc(upper_limits: Tuple[Tuple[float, ...], ...],
     w[:ph] = q_weight[0]
     w[ph:ph * 2] = q_weight[1]
     w[-ph:] = q_weight[2]
-    H = np.diag(w)
     g = np.zeros(len(lb))
     g[:ph] = lin_weight[0]
     g[ph:ph * 2] = lin_weight[1]
@@ -282,9 +282,16 @@ def mpc(upper_limits: Tuple[Tuple[float, ...], ...],
         bE = np.delete(bE, [0])
         lb[ph] = 0
         ub[ph] = 0
-    result = solver.solver_call_explicit_interface(H=H, g=g, lb=lb, ub=ub,
-                                                   E=model, bE=bE,
-                                                   A=empty, lbA=np.array([]), ubA=np.array([]))
+    qp_data = QPData(quadratic_weights=w,
+                     linear_weights=g,
+                     box_lower_constraints=lb,
+                     box_upper_constraints=ub,
+                     eq_matrix=model,
+                     eq_bounds=bE,
+                     neq_matrix=empty,
+                     neq_lower_bounds=np.array([]),
+                     neq_upper_bounds=np.array([]))
+    result = solver.solver_call_explicit_interface(qp_data)
     return result
 
 

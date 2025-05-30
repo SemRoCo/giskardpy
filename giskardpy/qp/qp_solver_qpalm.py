@@ -54,11 +54,19 @@ class QPSolverQPalm(QPSolver):
         return solver.solution.x
 
     def solver_call_explicit_interface(self, qp_data: QPData) -> np.ndarray:
-        A2 = np.eye(len(ub))
-        if len(E) > 0:
-            A2 = np.vstack((A2, E))
-        if len(A) > 0:
-            A2 = np.vstack((A2, A))
-        lbA = np.concatenate((lb, bE, lbA))
-        ubA = np.concatenate((ub, bE, ubA))
-        return self.solver_call(H, g, A2, lbA, ubA)
+        qp_data_qpalm = QPData()
+        A2 = np.eye(len(qp_data.box_upper_constraints))
+        if len(qp_data.eq_matrix) > 0:
+            A2 = np.vstack((A2, qp_data.eq_matrix))
+        if len(qp_data.neq_matrix) > 0:
+            A2 = np.vstack((A2, qp_data.neq_matrix))
+        qp_data_qpalm.quadratic_weights = qp_data.quadratic_weights
+        qp_data_qpalm.linear_weights = qp_data.linear_weights
+        qp_data_qpalm.neq_matrix = A2
+        qp_data_qpalm.neq_lower_bounds = np.concatenate((qp_data.box_lower_constraints,
+                                                         qp_data.eq_bounds,
+                                                         qp_data.neq_lower_bounds))
+        qp_data_qpalm.neq_upper_bounds = np.concatenate((qp_data.box_upper_constraints,
+                                                         qp_data.eq_bounds,
+                                                         qp_data.neq_upper_bounds))
+        return self.solver_call(qp_data_qpalm)

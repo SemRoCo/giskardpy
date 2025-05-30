@@ -47,21 +47,21 @@ def fake_world():
                              upper_limits=upper_limits,
                              quadratic_weights=quadratic_weights))
 
-    # upper_limits = deepcopy(upper_limits)
-    # lower_limits = deepcopy(lower_limits)
-    # upper_limits[Derivatives.position] = 1
-    # lower_limits[Derivatives.position] = -0.5
-    # dofs.append(FreeVariable(PrefixName('d'),
-    #                          lower_limits=lower_limits,
-    #                          upper_limits=upper_limits,
-    #                          quadratic_weights=quadratic_weights))
+    upper_limits = deepcopy(upper_limits)
+    lower_limits = deepcopy(lower_limits)
+    upper_limits[Derivatives.position] = 1
+    lower_limits[Derivatives.position] = -0.5
+    dofs.append(FreeVariable(PrefixName('d'),
+                             lower_limits=lower_limits,
+                             upper_limits=upper_limits,
+                             quadratic_weights=quadratic_weights))
 
     god_map.world = FakeWorld(dofs)
     return god_map.world
 
 
 def test_explicit_qp_format(fake_world: FakeWorld):
-    prediction_horizon = 5
+    prediction_horizon = 10
     eq_constraints = []
     eq_constraints.append(EqualityConstraint('eq1', PrefixName(''),
                                              expression=fake_world.dofs[0].get_symbol(Derivatives.position),
@@ -106,7 +106,7 @@ def test_explicit_qp_format(fake_world: FakeWorld):
 
 
 def test_explicit_qp_format_neq(fake_world: FakeWorld):
-    prediction_horizon = 5
+    prediction_horizon = 10
     neq_constraints = []
     neq_constraints.append(InequalityConstraint('neq1', PrefixName(''),
                                                 expression=fake_world.dofs[0].get_symbol(Derivatives.position),

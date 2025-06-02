@@ -3,10 +3,12 @@ from __future__ import annotations
 from collections import defaultdict, deque, OrderedDict
 from copy import deepcopy
 from enum import IntEnum, Enum
-from typing import Optional, Generic, TypeVar, Dict, Union
+from typing import Optional, Generic, TypeVar, Dict, Union, List
 
 import numpy as np
 import giskardpy.casadi_wrapper as cas
+from collections.abc import MutableMapping
+
 
 class PrefixName:
     primary_separator = '/'
@@ -123,9 +125,6 @@ class Derivatives(IntEnum):
     velocity = 1
     acceleration = 2
     jerk = 3
-    snap = 4
-    crackle = 5
-    pop = 6
 
     @classmethod
     def range(cls, start: Union[Derivatives, int], stop: Union[Derivatives, int], step: int = 1):
@@ -176,124 +175,142 @@ class FIFOSet(set):
         self._data_queue.remove(item)
 
 
-class _JointState:
-    def __init__(self,
-                 position: float = 0,
-                 velocity: float = 0,
-                 acceleration: float = 0,
-                 jerk: float = 0,
-                 snap: float = 0,
-                 crackle: float = 0,
-                 pop: float = 0):
-        self.state: np.ndarray = [position, velocity, acceleration, jerk, snap, crackle, pop]
+class JointStateView:
+    def __init__(self, data: np.ndarray):
+        self.data = data
 
-    def __getitem__(self, derivative):
-        return self.state[derivative]
+    def __getitem__(self, item: Derivatives) -> float:
+        return self.data[item]
 
-    def __setitem__(self, derivative, value):
-        self.state[derivative] = value
+    def __setitem__(self, key: Derivatives, value: float) -> None:
+        self.data[key] = value
 
     @property
     def position(self) -> float:
-        return self.state[Derivatives.position]
+        return self.data[Derivatives.position]
 
     @position.setter
     def position(self, value: float):
-        self.state[Derivatives.position] = value
+        self.data[Derivatives.position] = value
 
     @property
     def velocity(self) -> float:
-        return self.state[Derivatives.velocity]
+        return self.data[Derivatives.velocity]
 
     @velocity.setter
     def velocity(self, value: float):
-        self.state[Derivatives.velocity] = value
+        self.data[Derivatives.velocity] = value
 
     @property
     def acceleration(self) -> float:
-        return self.state[Derivatives.acceleration]
+        return self.data[Derivatives.acceleration]
 
     @acceleration.setter
     def acceleration(self, value: float):
-        self.state[Derivatives.acceleration] = value
+        self.data[Derivatives.acceleration] = value
 
     @property
     def jerk(self) -> float:
-        return self.state[Derivatives.jerk]
+        return self.data[Derivatives.jerk]
 
     @jerk.setter
     def jerk(self, value: float):
-        self.state[Derivatives.jerk] = value
-
-    @property
-    def snap(self) -> float:
-        return self.state[Derivatives.snap]
-
-    @snap.setter
-    def snap(self, value: float):
-        self.state[Derivatives.snap] = value
-
-    @property
-    def crackle(self) -> float:
-        return self.state[Derivatives.crackle]
-
-    @crackle.setter
-    def crackle(self, value: float):
-        self.state[Derivatives.crackle] = value
-
-    @property
-    def pop(self) -> float:
-        return self.state[Derivatives.pop]
-
-    @pop.setter
-    def pop(self, value: float):
-        self.state[Derivatives.pop] = value
-
-    def set_derivative(self, d: Derivatives, item: float):
-        self.state[d] = item
-
-    def __str__(self):
-        return f'{self.position}'
-
-    def __repr__(self):
-        return str(self)
-
-    def __deepcopy__(self, memodict=None):
-        return _JointState(*self.state)
+        self.data[Derivatives.jerk] = value
 
 
-K = TypeVar('K', bound=PrefixName)
-V = TypeVar('V', bound=_JointState)
+class JointStates(MutableMapping):
+    # 4 rows (pos, vel, acc, jerk), columns are joints
+    data: np.ndarray
 
+    # list of joint names in column order
+    _names: List[PrefixName]
 
-class JointStates(defaultdict, Dict[K, V], Generic[K, V]):
-    def __init__(self, *args, **kwargs):
-        super().__init__(_JointState, *args, **kwargs)
+    # maps joint_name -> column index
+    _index: Dict[PrefixName, int]
 
-    def __setitem__(self, key: PrefixName, value: _JointState):
-        if not isinstance(key, PrefixName):
-            if isinstance(key, str):
-                key = PrefixName.from_string(key, set_none_if_no_slash=True)
-            else:
-                raise KeyError(f'{key} is not of type {PrefixName}')
-        super().__setitem__(key, value)
+    def __init__(self):
+        self.data = np.zeros((4, 0), dtype=float)
+        self._names = []
+        self._index = {}
 
-    def __deepcopy__(self, memodict={}):
-        new_js = JointStates()
-        for joint_name, joint_state in self.items():
-            new_js[joint_name] = deepcopy(joint_state)
-        return new_js
+    def _add_joint(self, name: PrefixName) -> None:
+        idx = len(self._names)
+        self._names.append(name)
+        self._index[name] = idx
+        # append a zero column
+        new_col = np.zeros((4, 1), dtype=float)
+        if self.data.shape[1] == 0:
+            self.data = new_col
+        else:
+            self.data = np.hstack((self.data, new_col))
+
+    def __getitem__(self, name: PrefixName) -> JointStateView:
+        if name not in self._index:
+            self._add_joint(name)
+        idx = self._index[name]
+        # return the column view (shape (4,))
+        return JointStateView(self.data[:, idx])
+
+    def __setitem__(self, name: PrefixName, value: np.ndarray) -> None:
+        arr = np.asarray(value, dtype=float)
+        if arr.shape != (4,):
+            raise ValueError(f"Value for '{name}' must be length-4 array (pos, vel, acc, jerk).")
+        if name not in self._index:
+            self._add_joint(name)
+        idx = self._index[name]
+        self.data[:, idx] = arr
+
+    def __delitem__(self, name: PrefixName) -> None:
+        if name not in self._index:
+            raise KeyError(name)
+        idx = self._index.pop(name)
+        self._names.pop(idx)
+        # remove column from data
+        self.data = np.delete(self.data, idx, axis=1)
+        # rebuild indices
+        for i, nm in enumerate(self._names):
+            self._index[nm] = i
+
+    def __iter__(self) -> iter:
+        return iter(self._names)
+
+    def __len__(self) -> int:
+        return len(self._names)
+
+    def keys(self) -> List[PrefixName]:
+        return self._names
+
+    def items(self) -> List[tuple[PrefixName, np.ndarray]]:
+        return [(name, self.data[:, self._index[name]].copy()) for name in self._names]
+
+    def values(self) -> List[np.ndarray]:
+        return [self.data[:, self._index[name]].copy() for name in self._names]
+
+    def __contains__(self, name: PrefixName) -> bool:
+        return name in self._index
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}({{ " + ", ".join(f"{n}: {list(self.data[:, i])}"
+                                                            for i, n in enumerate(self._names)) + " })"
 
     def to_position_dict(self) -> Dict[PrefixName, float]:
-        return OrderedDict((k, v.position) for k, v in sorted(self.items()))
+        return {joint_name: self[joint_name].position for joint_name in self._names}
 
-    def pretty_print(self):
-        for joint_name, joint_state in sorted(self.items()):
-            print(f'{joint_name}:')
-            print(f'\tposition: {joint_state.position}')
-            print(f'\tvelocity: {joint_state.velocity}')
-            print(f'\tacceleration: {joint_state.acceleration}')
-            print(f'\tjerk: {joint_state.jerk}')
+    @property
+    def positions(self) -> np.ndarray:
+        return self.data[0, :]
+
+    @property
+    def velocities(self) -> np.ndarray:
+        return self.data[1, :]
+
+    @property
+    def accelerations(self) -> np.ndarray:
+        return self.data[2, :]
+
+    @property
+    def jerks(self) -> np.ndarray:
+        return self.data[3, :]
 
 
 class ExecutionMode(IntEnum):

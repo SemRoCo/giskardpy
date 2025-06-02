@@ -54,7 +54,7 @@ class NextCommands:
         self = cls()
         self.free_variable_data = {}
         offset = len(free_variables)
-        last_state = np.array([world.state[v.name].state[1:max_derivative+1] for v in free_variables])
+        last_state = np.array([world.state[v.name].data[1:max_derivative+1] for v in free_variables])
         joint_derivative_filter_ = joint_derivative_filter(offset, prediction_horizon, Derivatives.velocity)
         self.free_variable_data = {
             free_variable.name: [float(xdot[joint_derivative_filter_ + i]),
@@ -70,7 +70,7 @@ class NextCommands:
         self = cls()
         self.free_variable_data = {}
         offset = len(free_variables)
-        last_state = np.array([world.state[v.name].state[1:max_derivative+1] for v in free_variables])
+        last_state = np.array([world.state[v.name].data[1:max_derivative+1] for v in free_variables])
         joint_derivative_filter_ = joint_derivative_filter(offset, prediction_horizon, Derivatives.jerk)[:2]
         self.free_variable_data = {
             free_variable.name: [float(xdot[joint_derivative_filter_ + i][0]),

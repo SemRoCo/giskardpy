@@ -8,28 +8,26 @@ from copy import deepcopy
 from functools import cached_property, wraps
 from itertools import combinations
 from typing import Dict, Union, Tuple, Set, Optional, List, Callable, Sequence, Type, overload
-from xml.etree.ElementTree import ParseError
-
-import numpy as np
-import urdf_parser_py.urdf as up
 
 import giskardpy.utils.math as mymath
+import numpy as np
+import urdf_parser_py.urdf as up
 from giskardpy import casadi_wrapper as cas
 from giskardpy.casadi_wrapper import CompiledFunction
 from giskardpy.data_types.data_types import JointStates, ColorRGBA
+from giskardpy.data_types.data_types import PrefixName, Derivatives, derivative_map
 from giskardpy.data_types.exceptions import DuplicateNameException, UnknownGroupException, UnknownLinkException, \
     WorldException, UnknownJointException, CorruptURDFException
+from giskardpy.middleware import get_middleware
 from giskardpy.model.joints import Joint, FixedJoint, PrismaticJoint, RevoluteJoint, OmniDrive, DiffDrive, \
     VirtualFreeVariables, MovableJoint, Joint6DOF, OneDofJoint
 from giskardpy.model.links import Link
 from giskardpy.model.utils import hacky_urdf_parser_fix, robot_name_from_urdf_string
-from giskardpy.data_types.data_types import PrefixName, Derivatives, derivative_map
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.next_command import NextCommands
 from giskardpy.symbol_manager import symbol_manager
-from giskardpy.middleware import get_middleware
-from giskardpy.utils.utils import suppress_stderr, clear_cached_properties
 from giskardpy.utils.decorators import memoize, copy_memoize, clear_memo
+from giskardpy.utils.utils import suppress_stderr, clear_cached_properties
 from line_profiler import profile
 
 
@@ -584,11 +582,14 @@ class WorldTree(WorldTreeInterface):
                                                         evaluated=True)
             initial_value = min(max(0, lower_limit), upper_limit)
             self.state[name].position = initial_value
+        else:
+            self.state[name].position = 0
         self.free_variables[name] = free_variable
         return free_variable
 
     @modifies_world
     def add_virtual_free_variable(self, name: PrefixName) -> FreeVariable:
+        self.state[name].position = 0
         free_variable = FreeVariable(name=name,
                                      lower_limits={},
                                      upper_limits={},
@@ -1202,7 +1203,7 @@ class WorldTree(WorldTreeInterface):
 
     @profile
     def compute_all_collision_fks(self):
-        return self._fk_computer.compiled_collision_fks.fast_call(self._fk_computer.subs)
+        return self._fk_computer.compiled_collision_fks.fast_call(self.state.positions)
 
     @profile
     def init_all_fks(self):
@@ -1210,7 +1211,6 @@ class WorldTree(WorldTreeInterface):
             idx_start: Dict[PrefixName, int]
             compiled_collision_fks: CompiledFunction
             compiled_all_fks: CompiledFunction
-            str_params: List[str]
             fks: np.ndarray
             fks_exprs: Dict[PrefixName, cas.TransMatrix]
 
@@ -1237,11 +1237,7 @@ class WorldTree(WorldTreeInterface):
                         continue
                     collision_fks.append(self.fks_exprs[link_name])
                 collision_fks = cas.vstack(collision_fks)
-                params = set()
-                params.update(all_fks.free_symbols())
-                params.update(collision_fks.free_symbols())
-                params = list(params)
-                self.str_params = [str(v) for v in params]
+                params = self.world.get_state_position_symbols()
                 self.compiled_all_fks = all_fks.compile(parameters=params)
                 self.compiled_collision_fks = collision_fks.compile(parameters=params)
                 self.compiled_tf = tf.compile(parameters=params)
@@ -1250,11 +1246,10 @@ class WorldTree(WorldTreeInterface):
             @profile
             def recompute(self):
                 self.compute_fk_np.memo.clear()
-                self.subs = symbol_manager.resolve_symbols(self.compiled_all_fks.params)
-                self.fks = self.compiled_all_fks.fast_call(self.subs)
+                self.fks = self.compiled_all_fks.fast_call(self.world.state.positions)
 
             def compute_tf(self):
-                return self.compiled_tf.fast_call(self.subs)
+                return self.compiled_tf.fast_call(self.world.state.positions)
 
             @memoize
             @profile
@@ -1403,6 +1398,10 @@ class WorldTree(WorldTreeInterface):
                                                                        default=False,
                                                                        evaluated=True)
         return limits
+
+    def get_state_position_symbols(self) -> List[cas.Symbol]:
+        free_variables = {**self.free_variables, **self.virtual_free_variables}
+        return [free_variables[v_name].position_symbol for v_name in self.state]
 
     def is_joint_prismatic(self, joint_name: PrefixName) -> bool:
         return isinstance(self.joints[joint_name], PrismaticJoint)

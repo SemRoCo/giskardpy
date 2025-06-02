@@ -538,6 +538,7 @@ class MotionGoalWrapper:
         :param reference_angular_velocity: rad/s
         :param weight: None = use default weight
         """
+        print("GOAL POSE", goal_pose)
         self.add_motion_goal(motion_goal_class=CartesianPose.__name__,
                              goal_pose=goal_pose,
                              tip_link=tip_link,

@@ -24,7 +24,7 @@ class MotionGraphNodeStateManager(Generic[T]):
     life_cycle_history: List[np.ndarray]
     observation_state: np.ndarray
 
-    substitution_values: Dict[str, Dict[str, float]]  # node name -> (old_symbol, value)
+    substitution_values: Dict[str, Dict[cas.Symbol, float]]  # node name -> (old_symbol, value)
 
     def __init__(self, god_map_path: str):
         self.nodes = []
@@ -112,8 +112,6 @@ class MotionGraphNodeStateManager(Generic[T]):
     def update_substitution_values(self, node_name: str, keys: Optional[List[cas.Symbol]] = None) -> None:
         if keys is None:
             keys = list(self.substitution_values[node_name].keys())
-        else:
-            keys = [str(s) for s in keys]
         values = symbol_manager.resolve_symbols(keys)
         self.substitution_values[node_name] = {key: value for key, value in zip(keys, values)}
 

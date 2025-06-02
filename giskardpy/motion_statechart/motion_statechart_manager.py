@@ -353,7 +353,7 @@ class MotionStatechartManager:
     @profile
     def evaluate_node_states(self) -> bool:
         # %% update observation state
-        obs_args = symbol_manager.resolve_symbols(self.observation_state_updater.str_params)
+        obs_args = symbol_manager.resolve_symbols(self.observation_state_updater.params)
 
         next_state, done, exception = self.evaluate_payload_monitors()
 
@@ -366,7 +366,7 @@ class MotionStatechartManager:
             self.monitor_state.observation_state[self.payload_monitor_filter] = next_state
 
         # %% update life cycle state
-        args = symbol_manager.resolve_symbols(self.life_cycle_updater.str_params)
+        args = symbol_manager.resolve_symbols(self.life_cycle_updater.params)
         life_cycle_result = self.life_cycle_updater.fast_call(args)
         self.task_state.life_cycle_state = life_cycle_result[0]
         self.monitor_state.life_cycle_state = life_cycle_result[1]

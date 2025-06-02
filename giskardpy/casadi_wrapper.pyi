@@ -25,6 +25,7 @@ class StackedCompiledFunction:
     compiled_f: CompiledFunction
     split_out_view: List[np.ndarray]
     str_params: List[str]
+    params: List[Symbol]
 
     def __init__(self, expressions: List[Expression], parameters: Optional[List[str]] = None,
                  additional_views: Optional[List[slice]] = None): ...
@@ -34,6 +35,7 @@ class StackedCompiledFunction:
 
 class CompiledFunction:
     str_params: List[str]
+    params: List[Symbol]
     compiled_f: ca.Function
     buf: ca.FunctionBuffer
     f_eval: functools.partial

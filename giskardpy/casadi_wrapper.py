@@ -9,6 +9,7 @@ from typing import Union, TypeVar
 
 import casadi as ca
 import numpy as np
+from line_profiler.explicit_profiler import profile
 
 builtin_max = builtins.max
 builtin_min = builtins.min
@@ -23,6 +24,7 @@ class StackedCompiledFunction:
         combined_expression = vstack(expressions)
         self.compiled_f = combined_expression.compile(parameters=parameters)
         self.str_params = self.compiled_f.str_params
+        self.params = self.compiled_f.params
         slices = []
         start = 0
         for expression in expressions[:-1]:
@@ -34,7 +36,6 @@ class StackedCompiledFunction:
             for expression_slice in additional_views:
                 self.split_out_view.append(self.compiled_f.out[expression_slice])
 
-    
     def fast_call(self, filtered_args):
         self.compiled_f.fast_call(filtered_args)
         return self.split_out_view
@@ -47,6 +48,7 @@ class CompiledFunction:
         self.sparse = sparse
         if parameters is None:
             parameters = expression.free_symbols()
+        self.params = parameters
 
         self.str_params = [str(x) for x in parameters]
         if len(parameters) > 0:
@@ -66,7 +68,8 @@ class CompiledFunction:
                 self.compiled_f = ca.Function('f', parameters, expression.s)
             self.buf, self.f_eval = self.compiled_f.buffer()
             self.csc_indices, self.csc_indptr = expression.s.sparsity().get_ccs()
-            self.out = sp.csc_matrix((np.zeros(expression.s.nnz()), self.csc_indptr, self.csc_indices))
+            self.out = sp.csc_matrix((np.zeros(expression.s.nnz()), self.csc_indptr, self.csc_indices),
+                                     shape=expression.shape)
             self.buf.set_res(0, memoryview(self.out.data))
         else:
             try:
@@ -320,7 +323,7 @@ class Symbol(Symbol_):
 
 
 class Expression(Symbol_):
-    
+
     def __init__(self, data=None):
         if data is None:
             data = []
@@ -530,7 +533,7 @@ class GeometricType:
 
 
 class TransMatrix(Symbol_, GeometricType):
-    
+
     def __init__(self, data=None, reference_frame=None, child_frame=None, sanity_check=True):
         self.reference_frame = reference_frame
         self.child_frame = child_frame
@@ -591,7 +594,6 @@ class TransMatrix(Symbol_, GeometricType):
             a_T_b[2, 3] = point.z
         return a_T_b
 
-    
     def dot(self, other):
         if isinstance(other, (Vector3, Point3, RotationMatrix, TransMatrix)):
             result = ca.mtimes(self.s, other.s)
@@ -610,7 +612,6 @@ class TransMatrix(Symbol_, GeometricType):
                 return result
         raise _operation_type_error(self, 'dot', other)
 
-    
     def inverse(self):
         inv = TransMatrix(child_frame=self.reference_frame, reference_frame=self.child_frame)
         inv[:3, :3] = self[:3, :3].T
@@ -618,7 +619,6 @@ class TransMatrix(Symbol_, GeometricType):
         return inv
 
     @classmethod
-    
     def from_xyz_rpy(cls, x=None, y=None, z=None, roll=None, pitch=None, yaw=None, reference_frame=None,
                      child_frame=None):
         p = Point3.from_xyz(x, y, z)
@@ -647,7 +647,7 @@ class TransMatrix(Symbol_, GeometricType):
 
 
 class RotationMatrix(Symbol_, GeometricType):
-    
+
     def __init__(self, data=None, reference_frame=None, child_frame=None, sanity_check=True):
         self.reference_frame = reference_frame
         self.child_frame = child_frame
@@ -678,7 +678,6 @@ class RotationMatrix(Symbol_, GeometricType):
             self[3, 3] = 1
 
     @classmethod
-    
     def from_axis_angle(cls, axis, angle, reference_frame=None):
         """
         Conversion of unit axis and angle to 4x4 rotation matrix according to:
@@ -794,7 +793,6 @@ class RotationMatrix(Symbol_, GeometricType):
         return R
 
     @classmethod
-    
     def from_rpy(cls, roll=None, pitch=None, yaw=None, reference_frame=None):
         """
         Conversion of roll, pitch, yaw to 4x4 rotation matrix according to:
@@ -868,7 +866,7 @@ class RotationMatrix(Symbol_, GeometricType):
 
 
 class Point3(Symbol_, GeometricType):
-    
+
     def __init__(self, data=None, reference_frame=None):
         self.reference_frame = reference_frame
         if data is None:
@@ -1024,7 +1022,7 @@ class Point3(Symbol_, GeometricType):
 
 
 class Vector3(Symbol_, GeometricType):
-    
+
     def __init__(self, data=None, reference_frame=None):
         point = Point3(data, reference_frame=reference_frame)
         self.s = point.s
@@ -1387,7 +1385,6 @@ def diag(args):
         return Expression(ca.diag(Expression(args).s))
 
 
-
 def jacobian(expressions, symbols):
     expressions = Expression(expressions)
     return Expression(ca.jacobian(expressions.s, Expression(symbols).s))
@@ -1622,7 +1619,7 @@ def logic_all(args):
     return Expression(ca.logic_all(args.s))
 
 
-def logic_or(*args, simplify = True):
+def logic_or(*args, simplify=True):
     assert len(args) >= 2, 'and must be called with at least 2 arguments'
     # if there is any True, return True
     if simplify and [x for x in args if is_true_symbol(x)]:
@@ -1716,7 +1713,6 @@ def if_eq(a, b, if_result, else_result):
     return if_else(ca.eq(a, b), if_result, else_result)
 
 
-
 def if_eq_cases(a, b_result_cases, else_result):
     """
     if a == b_result_cases[0][0]:
@@ -1758,7 +1754,6 @@ def if_eq_cases_grouped(a, b_result_cases, else_result):
     return Expression(result)
 
 
-
 def if_cases(cases, else_result):
     """
     if cases[0][0]:
@@ -1776,7 +1771,6 @@ def if_cases(cases, else_result):
         case_result = _to_sx(cases[i][1])
         result = ca.if_else(case, case_result, result)
     return Expression(result)
-
 
 
 def if_less_eq_cases(a, b_result_cases, else_result):
@@ -1943,7 +1937,6 @@ def normalize_angle(angle):
     """
     a = normalize_angle_positive(angle)
     return if_greater(a, ca.pi, a - 2.0 * ca.pi, a)
-
 
 
 def shortest_angular_distance(from_angle, to_angle):
@@ -2142,7 +2135,7 @@ def project_to_cone(frame_V_current, frame_V_cone_axis, cone_theta):
     project_on_cone_boundary = if_less(a=norm_v_perp, b=1e-8,
                                        if_result=norm_v * cos(cone_theta) * frame_V_cone_axis_norm,
                                        else_result=s * (cos(cone_theta) * frame_V_cone_axis_norm + sin(cone_theta) * (
-                                                   v_perp / norm_v_perp)))
+                                               v_perp / norm_v_perp)))
 
     return if_greater_eq(a=beta, b=norm_v * np.cos(cone_theta),
                          if_result=frame_V_current,

@@ -1,222 +1,103 @@
-from typing import Dict, Callable, Type, Optional, overload, Union
-from giskardpy.data_types.exceptions import GiskardException
+from typing import Dict, Callable, Type, Optional, overload, Union, Iterable, Tuple, List
+
 import numpy as np
 
 import giskardpy.casadi_wrapper as cas
-from giskardpy.utils.singleton import SingletonMeta
 from giskardpy.god_map import god_map
+from giskardpy.utils.singleton import SingletonMeta
+
+Provider = Union[float, Callable[[], float]]
 
 
 class SymbolManager(metaclass=SingletonMeta):
-    symbol_str_to_lambda: Dict[str, Callable[[], float]]
-    symbol_str_to_symbol: Dict[str, cas.Symbol]
+    """
+    Singleton because I don't want multiple symbols with the same name to refer to different objects.
+    TODO usually called registry
+    Manages the association of symbolic variables with their providers and facilitates operations on them.
+
+    The `SymbolManager` class is a tool for managing symbolic variables and their associated value providers.
+    It allows the registration of various mathematical entities such as points, vectors, quaternions, and
+    provides methods for resolving these symbols to their numeric values. The class also supports the
+    evaluation of expressions involving these symbols.
+
+    The purpose of this class is to abstract the management of symbolic variables and enable their seamless
+    use in mathematical and symbolic computations.
+    """
+    symbol_to_lambda: Dict[cas.Symbol, Callable[[], float]]
+    """
+    A dictionary mapping symbolic variables (`cas.Symbol`) to callable functions that provide numeric values for those symbols.
+    """
 
     def __init__(self):
-        self.symbol_str_to_lambda = {}
-        self.symbol_str_to_symbol = {}
-        self.last_hash = -1
+        self.symbol_to_provider = {}
+        self.time = self.register_symbol('time', lambda: god_map.time)
 
-    def get_symbol(self, symbol_reference: str) -> cas.Symbol:
-        """
-        Returns a symbol reference to the input parameter. If the symbol doesn't exist yet, it will be created.
-        :param symbol_reference: e.g. 'god_map.motion_statechart_manager.monitors[0]'
-        :return: symbol reference
-        """
-        if symbol_reference not in self.symbol_str_to_lambda:
-            lambda_expr = eval(f'lambda: {symbol_reference}')
-            self.symbol_str_to_lambda[symbol_reference] = lambda_expr
-            self.symbol_str_to_symbol[symbol_reference] = cas.Symbol(symbol_reference)
-        return self.symbol_str_to_symbol[symbol_reference]
+    def has_symbol(self, symbol_name: str) -> bool:
+        return [s for s in self.symbol_to_provider if str(s) == symbol_name] != []
 
-    def resolve_symbols(self, symbols):
+    def register_symbol(self, symbol_name: str, provider: Provider) -> cas.Symbol:
+        if self.has_symbol(symbol_name):
+            symbol = self.get_symbol(symbol_name)
+        else:
+            symbol = cas.Symbol(symbol_name)
+        self.symbol_to_provider[symbol] = provider
+        return symbol
+
+    def get_symbol(self, symbol_name: str) -> cas.Symbol:
+        return next(s for s in self.symbol_to_provider if str(s) == symbol_name)
+
+    def register_point3(self, name: str, provider: Callable[[], np.ndarray]) -> cas.Point3:
+        sx, sy, sz = cas.Symbol(f'{name}.x'), cas.Symbol(f'{name}.y'), cas.Symbol(f'{name}.z')
+        p = cas.Point3([sx, sy, sz])
+        self.register_symbol(sx, lambda: provider()[0])
+        self.register_symbol(sy, lambda: provider()[1])
+        self.register_symbol(sz, lambda: provider()[2])
+        return p
+
+    def register_vector3(self, name: str, provider: Callable[[], np.ndarray]) -> cas.Vector3:
+        sx, sy, sz = cas.Symbol(f'{name}.x'), cas.Symbol(f'{name}.y'), cas.Symbol(f'{name}.z')
+        v = cas.Vector3([sx, sy, sz])
+        self.register_symbol(sx, lambda: provider()[0])
+        self.register_symbol(sy, lambda: provider()[1])
+        self.register_symbol(sz, lambda: provider()[2])
+        return v
+
+    def register_quaternion(self, name: str, provider: Callable[[], Tuple[float, float, float, float]]) \
+            -> cas.Quaternion:
+        sw, sx, sy, sz = cas.Symbol(f'{name}.w'), cas.Symbol(f'{name}.x'), cas.Symbol(f'{name}.y'), cas.Symbol(
+            f'{name}.z')
+        q = cas.Quaternion((sx, sy, sz, sw))
+        self.register_symbol(sx, lambda: provider()[0])
+        self.register_symbol(sy, lambda: provider()[1])
+        self.register_symbol(sz, lambda: provider()[2])
+        self.register_symbol(sw, lambda: provider()[3])
+        return q
+
+    def resolve_symbols(self, symbols: List[cas.Symbol]) -> np.ndarray:
         try:
-            return np.array([self.symbol_str_to_lambda[s]() for s in symbols], dtype=float)
+            return np.array([self.symbol_to_provider[s]() for s in symbols], dtype=float)
         except Exception as e:
             for s in symbols:
                 try:
-                    np.array([self.symbol_str_to_lambda[s]()])
+                    np.array([self.symbol_to_provider[s]()])
                 except Exception as e2:
-                    raise GiskardException(f'Cannot resolve {s} ({e2.__class__.__name__}: {str(e2)})')
+                    raise KeyError(f'Cannot resolve {s} ({e2.__class__.__name__}: {str(e2)})')
             raise e
 
-    def compile_resolve_symbols(self, symbols):
-        self.c = eval('lambda: np.array([' + ', '.join(symbols) + '])')
-
-    def resolve_symbols2(self):
-        return self.c()
-
-    def resolve_symbols3(self, symbols):
-        h = hash(tuple(symbols))
-        if h != self.last_hash:
-            self.compile_resolve_symbols(symbols)
-            self.last_hash = h
-        return self.resolve_symbols2()
+    def resolve_expr(self, expr: cas.CompiledFunction):
+        return expr.fast_call(self.resolve_symbols(expr.params))
 
     def evaluate_expr(self, expr: cas.Expression):
         if isinstance(expr, (int, float)):
             return expr
         f = expr.compile()
-        if len(f.str_params) == 0:
+        if len(f.params) == 0:
             return expr.to_np()
-        result = f.fast_call(self.resolve_symbols(f.str_params))
+        result = f.fast_call(self.resolve_symbols(f.params))
         if len(result) == 1:
             return result[0]
         else:
             return result
-
-    @overload
-    def get_expr(self,
-                 expr: str,
-                 input_type_hint: Optional[Union[list, tuple, np.ndarray]] = None,
-                 output_type_hint: Type[cas.Point3] = None) -> cas.Point3:
-        ...
-
-    @overload
-    def get_expr(self,
-                 expr: str,
-                 input_type_hint: Optional[Union[list, tuple, np.ndarray]] = None,
-                 output_type_hint: Type[cas.Vector3] = None) -> cas.Vector3:
-        ...
-
-    @overload
-    def get_expr(self,
-                 expr: str,
-                 input_type_hint: Optional[Union[list, tuple, np.ndarray]] = None,
-                 output_type_hint: Type[cas.Quaternion] = None) -> cas.Quaternion:
-        ...
-
-    @overload
-    def get_expr(self,
-                 expr: str,
-                 input_type_hint: Optional[Union[list, tuple, np.ndarray]] = None,
-                 output_type_hint: Type[cas.RotationMatrix] = None) -> cas.RotationMatrix:
-        ...
-
-    @overload
-    def get_expr(self,
-                 expr: str,
-                 input_type_hint: Optional[Union[list, tuple, np.ndarray]] = None,
-                 output_type_hint: Type[cas.TransMatrix] = None) -> cas.TransMatrix:
-        ...
-
-    def get_expr(self, variable_ref_str, input_type_hint=None, output_type_hint=None):
-        """
-
-        :param variable_ref_str: A string expression referring to a variable (on the god_map), e.g. 'god_map.time'
-        :param input_type_hint: Use this to specify the type of the input. If None, this function will try to evaluate
-                                expr and use its type.
-        :param output_type_hint: when input_type_hint is a list, typle or numpy array, set the output type.
-                                    will be ignored if input_type_hint is a ROS message.
-        :return:
-        """
-        if input_type_hint is None:
-            try:
-                data = eval(variable_ref_str)
-                input_type_hint = type(data)
-            except Exception as e:
-                raise type(e)(f'No data in \'{variable_ref_str}\' ({e}), '
-                              f'can\'t determine input_type_hint, please set it.')
-
-        if input_type_hint in {list, tuple, np.ndarray, cas.Point3}:
-            if output_type_hint == cas.TransMatrix:
-                return self._list_to_transmatrix(variable_ref_str)
-            if output_type_hint == cas.Point3:
-                return self._list_to_point3(variable_ref_str)
-            if output_type_hint == cas.Vector3:
-                return self._list_to_vector3(variable_ref_str)
-            if output_type_hint == cas.Quaternion:
-                return self._list_to_quaternion(variable_ref_str)
-            if output_type_hint == cas.RotationMatrix:
-                return self._list_to_rotation_matrix(variable_ref_str)
-            if output_type_hint == cas.Point3:
-                return self._point3_to_point3(variable_ref_str)
-            raise ValueError(f'If input_type_hint is [list, tuple, np.ndarray], please specify output_type_hint out of'
-                             f'[cas.TransMatrix, cas.Point3, cas.Vector3, cas.Quaternion, cas.RotationMatrix]')
-
-        raise NotImplementedError(f'to_expr not implemented for type {input_type_hint}.')
-
-    def _list_to_transmatrix(self, variable_ref_str: str) -> cas.TransMatrix:
-        return cas.TransMatrix(
-            [
-                [
-                    self.get_symbol(variable_ref_str + '[0, 0]'),
-                    self.get_symbol(variable_ref_str + '[0, 1]'),
-                    self.get_symbol(variable_ref_str + '[0, 2]'),
-                    self.get_symbol(variable_ref_str + '[0, 3]')
-                ],
-                [
-                    self.get_symbol(variable_ref_str + '[1, 0]'),
-                    self.get_symbol(variable_ref_str + '[1, 1]'),
-                    self.get_symbol(variable_ref_str + '[1, 2]'),
-                    self.get_symbol(variable_ref_str + '[1, 3]')
-                ],
-                [
-                    self.get_symbol(variable_ref_str + '[2, 0]'),
-                    self.get_symbol(variable_ref_str + '[2, 1]'),
-                    self.get_symbol(variable_ref_str + '[2, 2]'),
-                    self.get_symbol(variable_ref_str + '[2, 3]')
-                ],
-                [
-                    0, 0, 0, 1
-                ],
-            ]
-        )
-
-    def _list_to_rotation_matrix(self, variable_ref_str: str) -> cas.RotationMatrix:
-        return cas.RotationMatrix(
-            [
-                [
-                    self.get_symbol(variable_ref_str + '[0, 0]'),
-                    self.get_symbol(variable_ref_str + '[0, 1]'),
-                    self.get_symbol(variable_ref_str + '[0, 2]'),
-                    0
-                ],
-                [
-                    self.get_symbol(variable_ref_str + '[1, 0]'),
-                    self.get_symbol(variable_ref_str + '[1, 1]'),
-                    self.get_symbol(variable_ref_str + '[1, 2]'),
-                    0
-                ],
-                [
-                    self.get_symbol(variable_ref_str + '[2, 0]'),
-                    self.get_symbol(variable_ref_str + '[2, 1]'),
-                    self.get_symbol(variable_ref_str + '[2, 2]'),
-                    0
-                ],
-                [
-                    0, 0, 0, 1
-                ],
-            ]
-        )
-
-    def _list_to_point3(self, variable_ref_str: str) -> cas.Point3:
-        return cas.Point3((self.get_symbol(variable_ref_str + '[0]'),
-                           self.get_symbol(variable_ref_str + '[1]'),
-                           self.get_symbol(variable_ref_str + '[2]')))
-
-    def _point3_to_point3(self, variable_ref_str: str) -> cas.Point3:
-        return cas.Point3((self.get_symbol(variable_ref_str + '.x'),
-                           self.get_symbol(variable_ref_str + '.y'),
-                           self.get_symbol(variable_ref_str + '.z')))
-
-    def _list_to_vector3(self, variable_ref_str: str) -> cas.Vector3:
-        return cas.Vector3((self.get_symbol(variable_ref_str + '[0]'),
-                            self.get_symbol(variable_ref_str + '[1]'),
-                            self.get_symbol(variable_ref_str + '[2]')))
-
-    def _list_to_quaternion(self, variable_ref_str: str) -> cas.Quaternion:
-        return cas.Quaternion((self.get_symbol(variable_ref_str + '[0]'),
-                               self.get_symbol(variable_ref_str + '[1]'),
-                               self.get_symbol(variable_ref_str + '[2]'),
-                               self.get_symbol(variable_ref_str + '[3]')))
-
-    @property
-    def time(self):
-        return self.get_symbol('god_map.time')
-
-    @property
-    def hack(self):
-        return self.get_symbol('god_map.hack')
 
 
 symbol_manager = SymbolManager()

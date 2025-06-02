@@ -1749,7 +1749,7 @@ class GiskardToExplicitQPAdapter(GiskardToQPAdapter):
 
     @profile
     def evaluate(self, symbol_manager: SymbolManager):
-        substitutions = symbol_manager.resolve_symbols(self.free_symbols_str)
+        substitutions = symbol_manager.resolve_symbols(self.free_symbols)
 
         eq_matrix_np_raw = self.eq_matrix_compiled.fast_call(substitutions)
         neq_matrix_np_raw = self.neq_matrix_compiled.fast_call(substitutions)
@@ -1918,7 +1918,7 @@ class GiskardToTwoSidedNeqQPAdapter(GiskardToQPAdapter):
         return qp_data_filtered
 
     def evaluate(self, symbol_manager: SymbolManager):
-        substitutions = symbol_manager.resolve_symbols(self.free_symbols_str)
+        substitutions = symbol_manager.resolve_symbols(self.free_symbols)
 
         neq_matrix = self.neq_matrix_compiled.fast_call(substitutions)
         quadratic_weights_np_raw, \

@@ -42,13 +42,18 @@ class Task(MotionStatechartNode):
         self.quadratic_gains = []
         self.linear_weight_gains = []
 
+        symbols_name = f'{self.name}_observation_state'
+        self.obs_symbol = symbol_manager.register_symbol(symbols_name, lambda n=self.name: god_map.motion_statechart_manager.task_state.get_observation_state(n))
+
+        symbols_name = f'{self.name}_life_cycle_state'
+        self.life_symbol = symbol_manager.register_symbol(symbols_name, lambda n=self.name: god_map.motion_statechart_manager.task_state.get_life_cycle_state(n))
+
     def get_observation_state_expression(self):
-        return symbol_manager.get_symbol(
-            f'god_map.motion_statechart_manager.task_state.get_observation_state(\'{self.name}\')')
+        return self.obs_symbol
 
     def get_life_cycle_state_expression(self):
-        return symbol_manager.get_symbol(
-            f'god_map.motion_statechart_manager.task_state.get_life_cycle_state(\'{self.name}\')')
+        return self.life_symbol
+
 
     @property
     def ref_str(self) -> str:

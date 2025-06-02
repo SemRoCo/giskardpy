@@ -1,4 +1,5 @@
 import math
+import time
 import unittest
 from datetime import timedelta
 
@@ -723,6 +724,30 @@ class TestQuaternion(unittest.TestCase):
 
 
 class TestCASWrapper(unittest.TestCase):
+    def test_compiled_function(self):
+        a, b, c, d, e = cas.create_symbols(['a', 'b', 'c', 'd', 'e'])
+        expr = cas.Expression([a, b, c, d, e]*1000 + [0] * 1)
+
+        # Test sparse=True version
+        expr_f = expr.compile(sparse=True)
+        params = np.array([1., 2, 3, 4, 5])
+        start_time = time.perf_counter()
+        for _ in range(1000):
+            sparse_result = expr_f.fast_call(params)
+        sparse_time = time.perf_counter() - start_time
+        sparse_result = sparse_result.toarray().T
+
+        # Test sparse=False version  
+        expr_f = expr.compile(sparse=False)
+        start_time = time.perf_counter()
+        for _ in range(1000):
+            dense_result = expr_f.fast_call(params)
+        dense_time = time.perf_counter() - start_time
+        assert np.allclose(sparse_result, dense_result)
+        print('')
+        print(f"Sparse timing: {sparse_time:.3f}s")
+        print(f"Dense timing: {dense_time:.3f}s")
+
     @given(st.booleans())
     def test_empty_compiled_function(self, sparse):
         if sparse:

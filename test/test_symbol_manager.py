@@ -8,6 +8,13 @@ from giskardpy.symbol_manager import symbol_manager
 
 
 class TestSymbolManager(unittest.TestCase):
+    def test_register_symbol(self):
+        symbol1 = symbol_manager.register_symbol('test', lambda: 1)
+        symbol2 = symbol_manager.register_symbol('test', lambda: 1)
+        assert id(symbol1) == id(symbol2)
+        symbol2 = symbol_manager.get_symbol('test')
+        assert id(symbol1) == id(symbol2)
+
     def test_to_expr_point3(self):
         god_map.array = np.array([1, 2, 3, 0])
 

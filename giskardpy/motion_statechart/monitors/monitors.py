@@ -23,18 +23,17 @@ class Monitor(MotionStatechartNode):
                  plot: bool = True):
         super().__init__(name=name,
                          plot=plot)
+        symbol_name = f'{self.name}_observation_state'
+        self.obs_symbol = symbol_manager.register_symbol(symbol_name,
+                                         lambda name=self.name: god_map.motion_statechart_manager.monitor_state.get_observation_state(name))
+        symbol_name = f'{self.name}_life_cycle_state'
+        self.life_symbol = symbol_manager.register_symbol(symbol_name, lambda name=self.name: god_map.motion_statechart_manager.monitor_state.get_life_cycle_state(name))
 
     def get_observation_state_expression(self) -> cas.Symbol:
-        return symbol_manager.get_symbol(f'god_map'
-                                         f'.motion_statechart_manager'
-                                         f'.monitor_state'
-                                         f'.get_observation_state(\'{self.name}\')')
+        return self.obs_symbol
 
     def get_life_cycle_state_expression(self) -> cas.Symbol:
-        return symbol_manager.get_symbol(f'god_map'
-                                         f'.motion_statechart_manager'
-                                         f'.monitor_state'
-                                         f'.get_life_cycle_state(\'{self.name}\')')
+        return self.life_symbol
 
 
 # class ConditionWrapper(Monitor):

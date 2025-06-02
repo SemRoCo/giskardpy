@@ -1250,7 +1250,7 @@ class WorldTree(WorldTreeInterface):
             @profile
             def recompute(self):
                 self.compute_fk_np.memo.clear()
-                self.subs = symbol_manager.resolve_symbols(self.compiled_all_fks.str_params)
+                self.subs = symbol_manager.resolve_symbols(self.compiled_all_fks.params)
                 self.fks = self.compiled_all_fks.fast_call(self.subs)
 
             def compute_tf(self):

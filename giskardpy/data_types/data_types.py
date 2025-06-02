@@ -15,12 +15,10 @@ class PrefixName:
     def __init__(self, name: str, prefix: Optional[Union[str, PrefixName]] = None):
         prefix = prefix or ''
         if isinstance(prefix, PrefixName):
-            self.prefix = prefix.prefix
-            old_suffix = prefix.short_name
-            self.short_name = f'{old_suffix}{self.secondary_separator}{name}'
+            self.prefix = prefix.long_name
         else:
-            self.short_name = name
             self.prefix = prefix
+        self.short_name = name
         if self.prefix:
             self.long_name = f'{self.prefix}{self.primary_separator}{self.short_name}'
         else:

@@ -5,6 +5,7 @@ import numpy as np
 
 import giskardpy.casadi_wrapper as cas
 from giskardpy.data_types.data_types import Derivatives, PrefixName
+from giskardpy.god_map import god_map
 from giskardpy.symbol_manager import symbol_manager
 from giskardpy.utils.decorators import memoize
 from line_profiler import profile
@@ -100,7 +101,8 @@ class FreeVariable:
         self._symbols = {}
         self.name = name
         for derivative in Derivatives:
-            self._symbols[derivative] = symbol_manager.get_symbol(f'god_map.world.state[\'{name}\'][{derivative}]')
+            symbol_name = f'{self.name}_{derivative.name}'
+            self._symbols[derivative] = symbol_manager.register_symbol(symbol_name, lambda n=name, d=derivative: god_map.world.state[n][d])
         self.position_name = str(self._symbols[Derivatives.position])
         self.default_lower_limits = lower_limits
         self.default_upper_limits = upper_limits

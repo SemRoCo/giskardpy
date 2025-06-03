@@ -26,7 +26,6 @@ class WiggleInsert(Task):
                  angular_momentum_factor: float = 0.9,
                  center_pull_strength_angle: float = 0.1,
                  center_pull_strength_vector: float = 0.25,
-                 dt: float = 0.05,
                  weight: float = WEIGHT_ABOVE_CA,
                  name: Optional[str] = None,
                  plot: bool = True):
@@ -48,9 +47,6 @@ class WiggleInsert(Task):
                                                                         starting angle
         :param center_pull_strength_vector: (only when random_walk=True) Forces translation movement faster back towards
                                                                          hole_point
-        :param dt: (only when random_walk=True) Determines how often a update for angle and point is preformed
-        :param name:
-        :param plot:
         """
         if hole_normal is None:
             hole_normal = cas.Vector3().from_xyz(0, 0, -1, god_map.world.root_link_name)
@@ -64,7 +60,7 @@ class WiggleInsert(Task):
 
         # Random-Sample works better with control_dt and Random-Walk with throttling using self.dt in my testing
         if random_walk:
-            self.dt = dt
+            self.dt = god_map.qp_controller.control_dt
         else:
             self.dt = god_map.qp_controller.control_dt
         self.hz = 1 / self.dt
@@ -104,10 +100,10 @@ class WiggleInsert(Task):
                                          input_type_hint=np.ndarray,
                                          output_type_hint=cas.Vector3)
 
-        r_P_g = r_P_g + rand_v
+        r_P_g_rand = r_P_g + rand_v
 
         self.add_point_goal_constraints(frame_P_current=r_P_c,
-                                        frame_P_goal=r_P_g,
+                                        frame_P_goal=r_P_g_rand,
                                         reference_velocity=down_velocity,
                                         weight=weight,
                                         name=f'{name}_point_goal')
@@ -117,13 +113,10 @@ class WiggleInsert(Task):
                                         input_type_hint=float,
                                         output_type_hint=cas.Symbol)
 
-        tip_V_hole_normal = god_map.world.transform(self.tip_link,
-                                                    self.hole_normal)
+        tip_V_hole_normal = god_map.world.transform(self.tip_link, self.hole_normal)
         tip_R_hole_normal = cas.RotationMatrix.from_axis_angle(angle=angle,
                                                                axis=tip_V_hole_normal)
-        root_R_hole_normal = (god_map.world.compute_fk(self.root_link,
-                                                       self.tip_link)
-                              .dot(tip_R_hole_normal))
+        root_R_hole_normal = god_map.world.compute_fk(self.root_link, self.tip_link).dot(tip_R_hole_normal)
 
         c_R_r_eval = god_map.world.compose_fk_evaluated_expression(self.tip_link, self.root_link).to_rotation()
         r_T_c = god_map.world.compose_fk_expression(self.root_link, self.tip_link)
@@ -137,6 +130,8 @@ class WiggleInsert(Task):
 
         god_map.debug_expression_manager.add_debug_expression(name='r_P_g',
                                                               expression=r_P_g)
+        god_map.debug_expression_manager.add_debug_expression(name='r_P_g_rand',
+                                                              expression=r_P_g_rand)
         god_map.debug_expression_manager.add_debug_expression(name='root_R_hole_normal',
                                                               expression=root_R_hole_normal)
         god_map.debug_expression_manager.add_debug_expression(name='tip_R_hole_normal',

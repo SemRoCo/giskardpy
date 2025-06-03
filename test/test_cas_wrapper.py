@@ -726,7 +726,7 @@ class TestQuaternion(unittest.TestCase):
 class TestCASWrapper(unittest.TestCase):
     def test_compiled_function(self):
         a, b, c, d, e = cas.create_symbols(['a', 'b', 'c', 'd', 'e'])
-        expr = cas.Expression([a, b, c, d, e]*1000 + [0] * 1)
+        expr = cas.Expression([a, b, c, d, e] * 1000 + [0] * 1)
 
         # Test sparse=True version
         expr_f = expr.compile(sparse=True)
@@ -747,6 +747,15 @@ class TestCASWrapper(unittest.TestCase):
         print('')
         print(f"Sparse timing: {sparse_time:.3f}s")
         print(f"Dense timing: {dense_time:.3f}s")
+
+    def test_matrix_arg(self):
+        symbols = cas.create_symbols(10)
+        symbols2 = cas.create_symbols(10)
+        expr = cas.sum(cas.Expression(symbols)) * cas.sum(cas.Expression(symbols2))
+        expr_f = expr.compile(parameters=[symbols, symbols2])
+        params = np.arange(len(symbols), dtype=float)
+        params2 = np.arange(len(symbols), dtype=float)
+        assert np.isclose(expr_f.fast_call(params, params2), np.sum(params) * np.sum(params2))
 
     @given(st.booleans())
     def test_empty_compiled_function(self, sparse):
@@ -1626,7 +1635,6 @@ class TestCASWrapper(unittest.TestCase):
         actual = cas.compile_and_execute(lambda a: cas.if_eq_cases(a, b_result_cases, 0), [a])
         expected = float(reference(a, b_result_cases, 0))
         self.assertAlmostEqual(actual, expected)
-
 
     @given(float_no_nan_no_inf())
     def test_if_eq_cases_grouped(self, a):

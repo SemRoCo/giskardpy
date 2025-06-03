@@ -9,5 +9,5 @@ def preload_matplotlib():
     from pkg_resources import resource_filename
 
 # Start preloading in the background
-if 'GITHUB_WORKFLOW' not in os.environ:
-    threading.Thread(target=preload_matplotlib, daemon=True).start()
+# if 'GITHUB_WORKFLOW' not in os.environ and not bool(getattr(__import__('sys').gettrace(), '__call__', None)):
+#     threading.Thread(target=preload_matplotlib, daemon=True).start()

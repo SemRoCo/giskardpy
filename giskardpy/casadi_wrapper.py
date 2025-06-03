@@ -23,7 +23,6 @@ class StackedCompiledFunction:
     def __init__(self, expressions, parameters=None, additional_views=None):
         combined_expression = vstack(expressions)
         self.compiled_f = combined_expression.compile(parameters=parameters)
-        self.str_params = self.compiled_f.str_params
         self.params = self.compiled_f.params
         slices = []
         start = 0
@@ -48,11 +47,13 @@ class CompiledFunction:
         self.sparse = sparse
         if parameters is None:
             parameters = expression.free_symbols()
+        if not isinstance(parameters[0], list):
+            parameters = [parameters]
+
         self.params = parameters
 
-        self.str_params = [str(x) for x in parameters]
         if len(parameters) > 0:
-            parameters = [Expression(parameters).s]
+            parameters = [Expression(p).s for p in parameters]
 
         if len(expression) == 0:
             if self.sparse:
@@ -83,7 +84,7 @@ class CompiledFunction:
                 shape = expression.shape
             self.out = np.zeros(shape, order='F')
             self.buf.set_res(0, memoryview(self.out))
-        if len(self.str_params) == 0:
+        if len(self.params) == 0:
             self.f_eval()
             if self.sparse:
                 result = self.out.toarray()
@@ -93,16 +94,20 @@ class CompiledFunction:
             self.fast_call = lambda filtered_args: result
 
     def __call__(self, **kwargs):
-        filtered_args = [kwargs[k] for k in self.str_params]
-        filtered_args = np.array(filtered_args, dtype=float)
+        args = []
+        for params in self.params:
+            for param in params:
+                args.append(kwargs[str(param)])
+        filtered_args = np.array(args, dtype=float)
         return self.fast_call(filtered_args)
-
     
-    def fast_call(self, filtered_args):
+    def fast_call(self, *args):
         """
-        :param filtered_args: parameter values in the same order as in self.str_params
+        :param args: parameter values in the same order as was used during the creation
         """
-        self.buf.set_arg(0, memoryview(filtered_args))
+        for arg_idx, arg in enumerate(args):
+            assert arg.dtype == np.float64
+            self.buf.set_arg(arg_idx, memoryview(arg))
         self.f_eval()
         return self.out
 
@@ -1419,6 +1424,8 @@ def free_symbols(expression):
 
 
 def create_symbols(names):
+    if isinstance(names, int):
+        names = [f's_{i}' for i in range(names)]
     return [Symbol(x) for x in names]
 
 

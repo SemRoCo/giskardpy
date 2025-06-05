@@ -1399,6 +1399,14 @@ class WorldTree(WorldTreeInterface):
                                                                        evaluated=True)
         return limits
 
+    def get_state_symbols(self) -> List[cas.Symbol]:
+        free_variables = {**self.free_variables, **self.virtual_free_variables}
+        positions = [free_variables[v_name].position_symbol for v_name in self.state]
+        velocities = [free_variables[v_name].velocity_symbol for v_name in self.state]
+        accelerations = [free_variables[v_name].acceleration_symbol for v_name in self.state]
+        jerks = [free_variables[v_name].jerk_symbol for v_name in self.state]
+        return positions + velocities + accelerations + jerks
+
     def get_state_position_symbols(self) -> List[cas.Symbol]:
         free_variables = {**self.free_variables, **self.virtual_free_variables}
         return [free_variables[v_name].position_symbol for v_name in self.state]

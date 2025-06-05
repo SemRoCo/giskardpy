@@ -35,8 +35,8 @@ class StackedCompiledFunction:
             for expression_slice in additional_views:
                 self.split_out_view.append(self.compiled_f.out[expression_slice])
 
-    def fast_call(self, filtered_args):
-        self.compiled_f.fast_call(filtered_args)
+    def fast_call(self, *args):
+        self.compiled_f.fast_call(*args)
         return self.split_out_view
 
 
@@ -47,7 +47,7 @@ class CompiledFunction:
         self.sparse = sparse
         if parameters is None:
             parameters = expression.free_symbols()
-        if not isinstance(parameters[0], list):
+        if parameters and not isinstance(parameters[0], list):
             parameters = [parameters]
 
         self.params = parameters
@@ -59,7 +59,7 @@ class CompiledFunction:
             if self.sparse:
                 result = sp.csc_matrix(np.empty(expression.shape))
                 self.__call__ = lambda **kwargs: result
-                self.fast_call = lambda filtered_args: result
+                self.fast_call = lambda *args: result
                 return
         if self.sparse:
             expression.s = ca.sparsify(expression.s)
@@ -91,7 +91,7 @@ class CompiledFunction:
             else:
                 result = self.out
             self.__call__ = lambda **kwargs: result
-            self.fast_call = lambda filtered_args: result
+            self.fast_call = lambda *args: result
 
     def __call__(self, **kwargs):
         args = []

@@ -27,10 +27,12 @@ class StackedCompiledFunction:
     str_params: List[str]
     params: List[Symbol]
 
-    def __init__(self, expressions: List[Expression], parameters: Optional[List[str]] = None,
+    def __init__(self,
+                 expressions: List[Expression],
+                 parameters: Optional[Union[List[Symbol], List[List[Symbol]]]] = None,
                  additional_views: Optional[List[slice]] = None): ...
 
-    def fast_call(self, filtered_args: np.ndarray) -> np.ndarray: ...
+    def fast_call(self, *args: np.ndarray) -> np.ndarray: ...
 
 
 class CompiledFunction:

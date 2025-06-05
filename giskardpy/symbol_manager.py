@@ -73,9 +73,12 @@ class SymbolManager(metaclass=SingletonMeta):
         self.register_symbol(sw, lambda: provider()[3])
         return q
 
-    def resolve_symbols(self, symbols: List[cas.Symbol]) -> np.ndarray:
+    def resolve_symbols(self, symbols: List[List[cas.Symbol]]) -> List[np.ndarray]:
         try:
-            return np.array([self.symbol_to_provider[s]() for s in symbols], dtype=float)
+            result = []
+            for param in symbols:
+                result.append(np.array([self.symbol_to_provider[s]() for s in param], dtype=float))
+            return result
         except Exception as e:
             for s in symbols:
                 try:
@@ -85,7 +88,7 @@ class SymbolManager(metaclass=SingletonMeta):
             raise e
 
     def resolve_expr(self, expr: cas.CompiledFunction):
-        return expr.fast_call(self.resolve_symbols(expr.params))
+        return expr.fast_call(*self.resolve_symbols(expr.params))
 
     def evaluate_expr(self, expr: cas.Expression):
         if isinstance(expr, (int, float)):
@@ -93,7 +96,7 @@ class SymbolManager(metaclass=SingletonMeta):
         f = expr.compile()
         if len(f.params) == 0:
             return expr.to_np()
-        result = f.fast_call(self.resolve_symbols(f.params))
+        result = f.fast_call(*self.resolve_symbols(f.params))
         if len(result) == 1:
             return result[0]
         else:

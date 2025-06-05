@@ -1477,6 +1477,7 @@ class QPData:
 
 @dataclass
 class GiskardToQPAdapter(abc.ABC):
+    world_state_symbols: List[cas.Symbol]
     free_variables: List[FreeVariable]
     equality_constraints: List[EqualityConstraint]
     inequality_constraints: List[InequalityConstraint]
@@ -1586,7 +1587,7 @@ class GiskardToQPAdapter(abc.ABC):
         ...
 
     @abc.abstractmethod
-    def evaluate(self, symbol_manager: SymbolManager):
+    def evaluate(self, world_state: np.ndarray, symbol_manager: SymbolManager):
         ...
 
     @profile
@@ -1650,6 +1651,7 @@ class GiskardToExplicitQPAdapter(GiskardToQPAdapter):
 
     bE_filter: np.ndarray
     bA_filter: np.ndarray
+    aux_symbols: List[cas.Symbol]
 
     def general_qp_to_specific_qp(self,
                                   quadratic_weights: cas.Expression,
@@ -1679,7 +1681,12 @@ class GiskardToExplicitQPAdapter(GiskardToQPAdapter):
         free_symbols.update(neq_matrix.free_symbols())
         free_symbols.update(neq_lower_bounds.free_symbols())
         free_symbols.update(neq_upper_bounds.free_symbols())
-        self.free_symbols = list(free_symbols)
+        for s in self.world_state_symbols:
+            if s.s in free_symbols:
+                free_symbols.remove(s.s)
+        self.aux_symbols = list(free_symbols)
+
+        self.free_symbols = [self.world_state_symbols, self.aux_symbols]
 
         self.eq_matrix_compiled = eq_matrix.compile(parameters=self.free_symbols, sparse=self.sparse)
         self.neq_matrix_compiled = neq_matrix.compile(parameters=self.free_symbols, sparse=self.sparse)
@@ -1692,8 +1699,6 @@ class GiskardToExplicitQPAdapter(GiskardToQPAdapter):
                                                                           neq_lower_bounds,
                                                                           neq_upper_bounds],
                                                              parameters=self.free_symbols)
-
-        self.free_symbols_str = [str(x) for x in self.free_symbols]
 
         self.bE_filter = np.ones(eq_matrix.shape[0], dtype=bool)
         self.bA_filter = np.ones(neq_matrix.shape[0], dtype=bool)
@@ -1748,18 +1753,19 @@ class GiskardToExplicitQPAdapter(GiskardToQPAdapter):
         return qp_data_filtered
 
     @profile
-    def evaluate(self, symbol_manager: SymbolManager):
-        substitutions = symbol_manager.resolve_symbols(self.free_symbols)
+    def evaluate(self, world_state: np.ndarray, symbol_manager: SymbolManager):
+        aux_substitutions = symbol_manager.resolve_symbols([self.aux_symbols])
 
-        eq_matrix_np_raw = self.eq_matrix_compiled.fast_call(substitutions)
-        neq_matrix_np_raw = self.neq_matrix_compiled.fast_call(substitutions)
+        eq_matrix_np_raw = self.eq_matrix_compiled.fast_call(world_state, *aux_substitutions)
+        neq_matrix_np_raw = self.neq_matrix_compiled.fast_call(world_state, *aux_substitutions)
         quadratic_weights_np_raw, \
             linear_weights_np_raw, \
             box_lower_constraints_np_raw, \
             box_upper_constraints_np_raw, \
             eq_bounds_np_raw, \
             neq_lower_bounds_np_raw, \
-            neq_upper_bounds_np_raw = self.combined_vector_f.fast_call(substitutions)
+            neq_upper_bounds_np_raw = self.combined_vector_f.fast_call(world_state, *aux_substitutions)
+
         qp_data_raw = QPData(quadratic_weights=quadratic_weights_np_raw,
                              linear_weights=linear_weights_np_raw,
                              box_lower_constraints=box_lower_constraints_np_raw,

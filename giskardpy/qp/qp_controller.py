@@ -171,6 +171,7 @@ class QPController:
         self.qp_adapters = []
         for _ in range(num_adapters):
             self.qp_adapters.append(self.qp_solver.required_adapter_type(
+                world_state_symbols=god_map.world.get_state_symbols(),
                 free_variables=free_variables,
                 equality_constraints=equality_constraints,
                 inequality_constraints=inequality_constraints,
@@ -218,9 +219,9 @@ class QPController:
             # 4. return
             if self.qp_formulation.double_qp:
                 for adapter in self.qp_adapters:
-                    qp_data = adapter.evaluate(symbol_manager)
+                    qp_data = adapter.evaluate(god_map.world.state.data, symbol_manager)
             else:
-                qp_data = self.qp_adapters[0].evaluate(symbol_manager)
+                qp_data = self.qp_adapters[0].evaluate(god_map.world.state.data, symbol_manager)
             self.xdot_full = self.qp_solver.solver_call(qp_data)
             # self._create_debug_pandas(self.qp_solver)
             if self.qp_formulation.is_implicit:

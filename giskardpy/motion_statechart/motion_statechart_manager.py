@@ -357,7 +357,7 @@ class MotionStatechartManager:
 
         next_state, done, exception = self.evaluate_payload_monitors()
 
-        obs_result = self.observation_state_updater.fast_call(obs_args)
+        obs_result = self.observation_state_updater.fast_call(*obs_args)
         self.task_state.observation_state = obs_result[0]
         self.monitor_state.observation_state = obs_result[1]
         self.goal_state.observation_state = obs_result[2]
@@ -367,7 +367,7 @@ class MotionStatechartManager:
 
         # %% update life cycle state
         args = symbol_manager.resolve_symbols(self.life_cycle_updater.params)
-        life_cycle_result = self.life_cycle_updater.fast_call(args)
+        life_cycle_result = self.life_cycle_updater.fast_call(*args)
         self.task_state.life_cycle_state = life_cycle_result[0]
         self.monitor_state.life_cycle_state = life_cycle_result[1]
         self.goal_state.life_cycle_state = life_cycle_result[2]

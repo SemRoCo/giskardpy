@@ -2,9 +2,12 @@ from __future__ import division
 
 from typing import Optional
 
-from giskardpy.goals.cartesian_goals import CartesianPose
-from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
-from giskardpy.goals.joint_goals import JointPosition
+from giskardpy.goals.cartesian_goals import CartesianPosition, CartesianOrientation
+from giskardpy.goals.goal import Goal
+from giskardpy.motion_graph.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
+from giskardpy.goals.joint_goals import JointPositionList
+from giskardpy.god_map import god_map
+import giskardpy.casadi_wrapper as cas
 
 
 class Open(Goal):
@@ -15,7 +18,11 @@ class Open(Goal):
                  environment_group: Optional[str] = None,
                  goal_joint_state: Optional[float] = None,
                  max_velocity: float = 100,
-                 weight: float = WEIGHT_ABOVE_CA):
+                 weight: float = WEIGHT_ABOVE_CA,
+                 name: Optional[str] = None,
+                 start_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 end_condition: cas.Expression = cas.FalseSymbol):
         """
         Open a container in an environment.
         Only works with the environment was added as urdf.
@@ -28,36 +35,59 @@ class Open(Goal):
         :param goal_joint_state: goal state for the container. default is maximum joint state.
         :param weight:
         """
-        super().__init__()
         self.weight = weight
-        self.tip_link = self.world.search_for_link_name(tip_link, tip_group)
-        self.handle_link = self.world.search_for_link_name(environment_link, environment_group)
-        self.joint_name = self.world.get_movable_parent_joint(self.handle_link)
-        self.handle_T_tip = self.world.compute_fk_pose(self.handle_link, self.tip_link)
+        self.tip_link = god_map.world.search_for_link_name(tip_link, tip_group)
+        self.handle_link = god_map.world.search_for_link_name(environment_link, environment_group)
+        self.joint_name = god_map.world.get_movable_parent_joint(self.handle_link)
+        self.handle_T_tip = god_map.world.compute_fk_pose(self.handle_link, self.tip_link)
+        if name is None:
+            name = f'{self.__class__.__name__}'
+        super().__init__(name)
 
-        _, max_position = self.world.get_joint_position_limits(self.joint_name)
+        _, max_position = god_map.world.get_joint_position_limits(self.joint_name)
         if goal_joint_state is None:
             goal_joint_state = max_position
         else:
             goal_joint_state = min(max_position, goal_joint_state)
 
-        self.add_constraints_of_goal(CartesianPose(root_link=environment_link,
-                                                   root_group=environment_group,
-                                                   tip_link=tip_link,
-                                                   tip_group=tip_group,
-                                                   goal_pose=self.handle_T_tip,
-                                                   weight=self.weight))
-        self.add_constraints_of_goal(JointPosition(joint_name=self.joint_name.short_name,
-                                                   group_name=self.joint_name.prefix,
-                                                   goal=goal_joint_state,
-                                                   max_velocity=max_velocity,
-                                                   weight=WEIGHT_BELOW_CA))
+        if not cas.is_true(start_condition):
+            handle_T_tip = god_map.world.compose_fk_expression(self.handle_link, self.tip_link)
+            handle_T_tip = god_map.monitor_manager.register_expression_updater(handle_T_tip,
+                                                                               start_condition)
+        else:
+            handle_T_tip = cas.TransMatrix(god_map.world.compute_fk_pose(self.handle_link, self.tip_link))
 
-    def make_constraints(self):
-        pass
+        # %% position
+        r_P_c = god_map.world.compose_fk_expression(self.handle_link, self.tip_link).to_position()
+        task = self.create_and_add_task('position')
+        task.add_point_goal_constraints(frame_P_goal=handle_T_tip.to_position(),
+                                        frame_P_current=r_P_c,
+                                        reference_velocity=CartesianPosition.default_reference_velocity,
+                                        weight=self.weight)
 
-    def __str__(self):
-        return f'{super().__str__()}/{self.tip_link}/{self.handle_link}'
+        # %% orientation
+        r_R_c = god_map.world.compose_fk_expression(self.handle_link, self.tip_link).to_rotation()
+        c_R_r_eval = god_map.world.compose_fk_evaluated_expression(self.tip_link, self.handle_link).to_rotation()
+
+        task = self.create_and_add_task('orientation')
+        task.add_rotation_goal_constraints(frame_R_current=r_R_c,
+                                           frame_R_goal=handle_T_tip.to_rotation(),
+                                           current_R_frame_eval=c_R_r_eval,
+                                           reference_velocity=CartesianOrientation.default_reference_velocity,
+                                           weight=self.weight)
+
+        self.connect_monitors_to_all_tasks(start_condition=start_condition,
+                                           hold_condition=hold_condition,
+                                           end_condition=end_condition)
+
+        goal_state = {self.joint_name.short_name: goal_joint_state}
+        self.add_constraints_of_goal(JointPositionList(goal_state=goal_state,
+                                                       max_velocity=max_velocity,
+                                                       weight=WEIGHT_BELOW_CA,
+                                                       start_condition=start_condition,
+                                                       hold_condition=hold_condition,
+                                                       end_condition=end_condition,
+                                                       name=f'{self.name}/{self.joint_name.short_name}'))
 
 
 class Close(Goal):
@@ -67,16 +97,22 @@ class Close(Goal):
                  tip_group: Optional[str] = None,
                  environment_group: Optional[str] = None,
                  goal_joint_state: Optional[float] = None,
-                 weight: float = WEIGHT_ABOVE_CA):
+                 weight: float = WEIGHT_ABOVE_CA,
+                 name: Optional[str] = None,
+                 start_condition: cas.Expression = cas.TrueSymbol,
+                 hold_condition: cas.Expression = cas.FalseSymbol,
+                 end_condition: cas.Expression = cas.FalseSymbol):
         """
         Same as Open, but will use minimum value as default for goal_joint_state
         """
-        super().__init__()
         self.tip_link = tip_link
         self.environment_link = environment_link
-        handle_link = self.world.search_for_link_name(environment_link, environment_group)
-        joint_name = self.world.get_movable_parent_joint(handle_link)
-        min_position, _ = self.world.get_joint_position_limits(joint_name)
+        if name is None:
+            name = f'{self.__class__.__name__}'
+        super().__init__(name)
+        handle_link = god_map.world.search_for_link_name(environment_link, environment_group)
+        joint_name = god_map.world.get_movable_parent_joint(handle_link)
+        min_position, _ = god_map.world.get_joint_position_limits(joint_name)
         if goal_joint_state is None:
             goal_joint_state = min_position
         else:
@@ -86,10 +122,7 @@ class Close(Goal):
                                           environment_link=environment_link,
                                           environment_group=environment_group,
                                           goal_joint_state=goal_joint_state,
-                                          weight=weight))
-
-    def make_constraints(self):
-        pass
-
-    def __str__(self):
-        return f'{super().__str__()}/{self.tip_link}/{self.environment_link}'
+                                          weight=weight,
+                                          start_condition=start_condition,
+                                          hold_condition=hold_condition,
+                                          end_condition=end_condition))

@@ -3,7 +3,7 @@ import numpy as np
 from giskardpy.configs.collision_avoidance_config import CollisionAvoidanceConfig
 from giskardpy.configs.robot_interface_config import RobotInterfaceConfig, StandAloneRobotInterfaceConfig
 from giskardpy.configs.world_config import WorldConfig
-from giskardpy.my_types import Derivatives
+from giskardpy.data_types import Derivatives
 
 
 class WorldWithBoxyBaseConfig(WorldConfig):
@@ -83,9 +83,7 @@ class DonbotJointTrajInterfaceConfig(RobotInterfaceConfig):
                                            tf_parent_frame=self.map_name,
                                            tf_child_frame=root_link_name.short_name)
         self.sync_joint_state_topic('/joint_states')
-        self.add_follow_joint_trajectory_server(namespace='/whole_body_controller/base/follow_joint_trajectory',
-                                                state_topic='/whole_body_controller/base/state',
+        self.add_follow_joint_trajectory_server(namespace='/whole_body_controller/base',
                                                 fill_velocity_values=True)
-        self.add_follow_joint_trajectory_server(namespace='/scaled_pos_joint_traj_controller/follow_joint_trajectory',
-                                                state_topic='/scaled_pos_joint_traj_controller/state',
+        self.add_follow_joint_trajectory_server(namespace='/scaled_pos_joint_traj_controller',
                                                 fill_velocity_values=True)

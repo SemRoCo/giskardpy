@@ -1,7 +1,9 @@
 from geometry_msgs.msg import PointStamped
-import giskardpy.casadi_wrapper as w
-from giskardpy.goals.goal import Goal, WEIGHT_ABOVE_CA, WEIGHT_BELOW_CA
-from giskardpy.my_types import PrefixName
+import giskardpy.casadi_wrapper as cas
+from giskardpy.goals.goal import Goal
+from giskardpy.motion_graph.tasks.task import WEIGHT_BELOW_CA, WEIGHT_ABOVE_CA
+from giskardpy.god_map import god_map
+from giskardpy.data_types import PrefixName
 
 
 class PR2CasterConstraints(Goal):
@@ -24,16 +26,16 @@ class PR2CasterConstraints(Goal):
 class Caster(Goal):
     def __init__(self, joint_name: str, velocity_limit: float = 1):
         super().__init__()
-        self.joint_name = self.world.search_for_joint_name(joint_name)
+        self.joint_name = god_map.world.search_for_joint_name(joint_name)
         self.velocity_limit = velocity_limit
 
     def make_constraints(self):
-        joint = self.world.get_joint(self.joint_name)
+        joint = god_map.world.get_joint(self.joint_name)
         link_name = joint.child_link_name
-        bf_T_caster = self.get_fk(PrefixName('base_footprint', 'pr2'), link_name)
-        bf_V_x = w.Vector3((1, 0, 0))
-        bf_V_caster_x = bf_T_caster.dot(w.Vector3((1, 0, 0)))
-        yaw = w.angle_between_vector(bf_V_x, bf_V_caster_x)
+        bf_T_caster = god_map.world.compose_fk_expression(PrefixName('base_footprint', 'pr2'), link_name)
+        bf_V_x = cas.Vector3((1, 0, 0))
+        bf_V_caster_x = bf_T_caster.dot(cas.Vector3((1, 0, 0)))
+        yaw = cas.angle_between_vector(bf_V_x, bf_V_caster_x)
         # bf_R_caster = bf_T_caster.to_rotation()
         # yaw = bf_R_caster.to_angle(lambda axis: axis[2])
         # roll, pitch, yaw = bf_R_caster.to_rpy()
@@ -41,7 +43,7 @@ class Caster(Goal):
         # axis.scale(angle)
         self.add_debug_expr('angle', yaw)
         # self.add_debug_expr('axis', axis)
-        # self.add_debug_expr('angle_vel', w.total_derivative(angle, self.joint_velocity_symbols, self.joint_acceleration_symbols))
+        # self.add_debug_expr('angle_vel', cas.total_derivative(angle, self.joint_velocity_symbols, self.joint_acceleration_symbols))
         # self.add_velocity_constraint(lower_velocity_limit=-1000,
         #                              upper_velocity_limit=1000,
         #                              weight=0.01,
@@ -81,22 +83,22 @@ class Circle(Goal):
 
     def __init__(self, center: PointStamped, radius: float, tip_link: str, scale: float):
         super().__init__()
-        self.center = self.transform_msg(self.world.root_link_name, center)
+        self.center = self.transform_msg(god_map.world.root_link_name, center)
         self.radius = radius
         self.scale = scale
-        self.tip_link_name = self.world.get_link_name(tip_link)
+        self.tip_link_name = god_map.world.get_link_name(tip_link)
 
     def make_constraints(self):
-        map_T_bf = self.get_fk(self.world.root_link_name, self.tip_link_name)
+        map_T_bf = god_map.world.compose_fk_expression(god_map.world.root_link_name, self.tip_link_name)
         t = self.traj_time_in_seconds() * self.scale
-        t = w.min(t, 30 * self.scale)
-        x = w.cos(t) * self.radius
-        y = w.sin(t) * self.radius
-        map_P_center = w.Point3(self.center)
-        map_T_center = w.TransMatrix.from_point_rotation_matrix(map_P_center)
-        center_V_center_to_bf_goal = w.Vector3((-x, -y, 0))
+        t = cas.min(t, 30 * self.scale)
+        x = cas.cos(t) * self.radius
+        y = cas.sin(t) * self.radius
+        map_P_center = cas.Point3(self.center)
+        map_T_center = cas.TransMatrix.from_point_rotation_matrix(map_P_center)
+        center_V_center_to_bf_goal = cas.Vector3((-x, -y, 0))
         map_V_bf_to_center = map_T_center.dot(center_V_center_to_bf_goal)
-        bf_V_y = w.Vector3((0, 1, 0))
+        bf_V_y = cas.Vector3((0, 1, 0))
         map_V_y = map_T_bf.dot(bf_V_y)
         map_V_y.vis_frame = self.tip_link_name
         map_V_bf_to_center.vis_frame = self.tip_link_name
@@ -110,7 +112,7 @@ class Circle(Goal):
                                          weight=WEIGHT_ABOVE_CA,
                                          name='orientation')
 
-        center_P_bf_goal = w.Point3((x, y, 0))
+        center_P_bf_goal = cas.Point3((x, y, 0))
         map_P_bf_goal = map_T_center.dot(center_P_bf_goal)
         map_P_bf = map_T_bf.to_position()
         # self.add_debug_expr('map_P_bf_goal', map_P_bf_goal)
@@ -128,22 +130,22 @@ class Wave(Goal):
 
     def __init__(self, center: PointStamped, radius: float, tip_link: str, scale: float):
         super().__init__()
-        self.center = self.transform_msg(self.world.root_link_name, center)
+        self.center = self.transform_msg(god_map.world.root_link_name, center)
         self.radius = radius
         self.scale = scale
-        self.tip_link_name = self.world.get_link_name(tip_link)
+        self.tip_link_name = god_map.world.get_link_name(tip_link)
 
     def make_constraints(self):
-        map_T_bf = self.get_fk(self.world.root_link_name, self.tip_link_name)
+        map_T_bf = god_map.world.compose_fk_expression(god_map.world.root_link_name, self.tip_link_name)
         t = self.traj_time_in_seconds() * self.scale
-        t = w.min(t, 30 * self.scale)
-        x = w.sin(t) * self.radius
-        # y = w.sin(t) * self.radius
-        map_P_center = w.Point3(self.center)
-        map_T_center = w.TransMatrix.from_point_rotation_matrix(map_P_center)
-        # center_V_center_to_bf_goal = w.Vector3((-x, 0, 0))
+        t = cas.min(t, 30 * self.scale)
+        x = cas.sin(t) * self.radius
+        # y = cas.sin(t) * self.radius
+        map_P_center = cas.Point3(self.center)
+        map_T_center = cas.TransMatrix.from_point_rotation_matrix(map_P_center)
+        # center_V_center_to_bf_goal = cas.Vector3((-x, 0, 0))
         # map_V_bf_to_center = map_T_center.dot(center_V_center_to_bf_goal)
-        # bf_V_y = w.Vector3((0, 1, 0))
+        # bf_V_y = cas.Vector3((0, 1, 0))
         # map_V_y = map_T_bf.dot(bf_V_y)
         # map_V_y.vis_frame = self.tip_link_name
         # map_V_bf_to_center.vis_frame = self.tip_link_name
@@ -157,7 +159,7 @@ class Wave(Goal):
         #                                  weight=WEIGHT_ABOVE_CA,
         #                                  name='orientation')
 
-        center_P_bf_goal = w.Point3((x, 0, 0))
+        center_P_bf_goal = cas.Point3((x, 0, 0))
         map_P_bf_goal = map_T_center.dot(center_P_bf_goal)
         map_P_bf = map_T_bf.to_position()
         # self.add_debug_expr('map_P_bf_goal', map_P_bf_goal)

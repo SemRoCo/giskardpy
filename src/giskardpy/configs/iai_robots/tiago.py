@@ -58,18 +58,12 @@ class TiagoJointTrajServerIAIInterface(RobotInterfaceConfig):
         self.sync_joint_state_topic('/tiago/joint_states')
         self.sync_odometry_topic(odometry_topic='/tiago/base_footprint',
                                  joint_name=self.drive_joint_name)
-        self.add_follow_joint_trajectory_server(namespace='/tiago/arm_left_controller/follow_joint_trajectory',
-                                                state_topic='/tiago/arm_left_controller/state')
-        self.add_follow_joint_trajectory_server(namespace='/tiago/arm_right_controller/follow_joint_trajectory',
-                                                state_topic='/tiago/arm_right_controller/state')
-        self.add_follow_joint_trajectory_server(namespace='/tiago/head_controller/follow_joint_trajectory',
-                                                state_topic='/tiago/head_controller/state')
-        self.add_follow_joint_trajectory_server(namespace='/tiago/left_gripper_controller/follow_joint_trajectory',
-                                                state_topic='/tiago/left_gripper_controller/state')
-        self.add_follow_joint_trajectory_server(namespace='/tiago/right_gripper_controller/follow_joint_trajectory',
-                                                state_topic='/tiago/right_gripper_controller/state')
-        self.add_follow_joint_trajectory_server(namespace='/tiago/torso_controller/follow_joint_trajectory',
-                                                state_topic='/tiago/torso_controller/state')
+        self.add_follow_joint_trajectory_server(namespace='/tiago/arm_left_controller')
+        self.add_follow_joint_trajectory_server(namespace='/tiago/arm_right_controller')
+        self.add_follow_joint_trajectory_server(namespace='/tiago/head_controller')
+        self.add_follow_joint_trajectory_server(namespace='/tiago/left_gripper_controller')
+        self.add_follow_joint_trajectory_server(namespace='/tiago/right_gripper_controller')
+        self.add_follow_joint_trajectory_server(namespace='/tiago/torso_controller')
         self.add_base_cmd_velocity(cmd_vel_topic='/tiago/cmd_vel',
                                    joint_name=self.drive_joint_name)
 

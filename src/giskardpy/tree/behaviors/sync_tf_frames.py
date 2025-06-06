@@ -2,8 +2,9 @@ from typing import List, Tuple, Dict, Optional
 import giskardpy.casadi_wrapper as w
 from py_trees import Status
 
+from giskardpy.god_map import god_map
 from giskardpy.model.joints import Joint6DOF
-from giskardpy.my_types import PrefixName
+from giskardpy.data_types import PrefixName
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.math import compare_poses
 from giskardpy.utils.tfwrapper import lookup_pose, msg_to_homogeneous_matrix
@@ -25,7 +26,7 @@ class SyncTfFrames(GiskardBehavior):
         if joint_name in self.joint_map:
             raise AttributeError(f'Joint \'{joint_name}\' is already being tracking with a tf frame: '
                                  f'\'{self.joint_map[joint_name][0]}\'<-\'{self.joint_map[joint_name][1]}\'')
-        joint = self.world.joints[joint_name]
+        joint = god_map.world.joints[joint_name]
         if not isinstance(joint, Joint6DOF):
             raise AttributeError(f'Can only sync Joint6DOF with tf but \'{joint_name}\' is of type \'{type(joint)}\'.')
         self.joint_map[joint_name] = (tf_parent_frame, tf_child_frame)
@@ -34,10 +35,9 @@ class SyncTfFrames(GiskardBehavior):
     @record_time
     @profile
     def update(self):
-        with self.god_map:
-            for joint_name, (tf_parent_frame, tf_child_frame) in self.joint_map.items():
-                joint: Joint6DOF = self.world.joints[joint_name]
-                parent_T_child = lookup_pose(tf_parent_frame, tf_child_frame)
-                joint.update_transform(parent_T_child.pose)
+        for joint_name, (tf_parent_frame, tf_child_frame) in self.joint_map.items():
+            joint: Joint6DOF = god_map.world.joints[joint_name]
+            parent_T_child = lookup_pose(tf_parent_frame, tf_child_frame)
+            joint.update_transform(parent_T_child.pose)
 
         return Status.SUCCESS

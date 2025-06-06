@@ -2,7 +2,7 @@ from copy import deepcopy
 
 from py_trees import Status
 
-from giskardpy import identifier
+from giskardpy.god_map import god_map
 from giskardpy.tree.behaviors.plugin import GiskardBehavior
 from giskardpy.utils.decorators import record_time
 
@@ -11,9 +11,6 @@ class LogTrajPlugin(GiskardBehavior):
     @record_time
     @profile
     def update(self):
-        current_js = deepcopy(self.world.state)
-        time = self.god_map.get_data(identifier.time)
-        trajectory = self.god_map.get_data(identifier.trajectory)
-        trajectory.set(time, current_js)
-        self.god_map.set_data(identifier.trajectory, trajectory)
-        return Status.RUNNING
+        current_js = deepcopy(god_map.world.state)
+        god_map.trajectory.set(god_map.control_cycle_counter, current_js)
+        return Status.SUCCESS

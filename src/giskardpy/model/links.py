@@ -11,11 +11,11 @@ from tf.transformations import euler_matrix
 from visualization_msgs.msg import Marker, MarkerArray
 
 from giskard_msgs.msg import WorldBody
-from giskardpy.exceptions import CorruptShapeException
+from giskardpy.exceptions import CorruptShapeException, CorruptMeshException
 from giskardpy.model.utils import cube_volume, cube_surface, sphere_volume, cylinder_volume, cylinder_surface
-from giskardpy.my_types import PrefixName
-from giskardpy.my_types import my_string
-from giskardpy.utils.tfwrapper import np_to_pose
+from giskardpy.data_types import PrefixName
+from giskardpy.data_types import my_string
+from giskardpy.utils.tfwrapper import np_to_pose, homo_matrix_to_pose
 from giskardpy.utils.utils import resolve_ros_iris, get_file_hash
 from giskardpy.utils.decorators import memoize, copy_memoize
 import giskardpy.casadi_wrapper as w
@@ -91,6 +91,8 @@ class LinkGeometry:
             else:
                 raise CorruptShapeException(f'Primitive shape of type {msg.shape.type} not supported.')
         elif msg.type == msg.MESH_BODY:
+            if msg.scale.x == 0 or msg.scale.y == 0 or msg.scale.z == 0:
+                raise CorruptShapeException(f'Scale of mesh contains 0: {msg.scale}')
             geometry = MeshGeometry(link_T_geometry=np.eye(4),
                                     file_name=msg.mesh,
                                     scale=[msg.scale.x, msg.scale.y, msg.scale.z],
@@ -102,6 +104,7 @@ class LinkGeometry:
     def as_visualization_marker(self, *args, **kwargs) -> Marker:
         marker = Marker()
         marker.color = self.color
+        marker.pose = homo_matrix_to_pose(self.link_T_geometry.evaluate())
         return marker
 
     def is_big(self, volume_threshold: float = 1.001e-6, surface_threshold: float = 0.00061) -> bool:
@@ -114,7 +117,7 @@ class MeshGeometry(LinkGeometry):
         self._file_name_ros_iris = file_name
         self.set_collision_file_name(self.file_name_absolute)
         if not os.path.isfile(resolve_ros_iris(file_name)):
-            raise CorruptShapeException(f'Can\'t find file {file_name}')
+            raise CorruptMeshException(f'Can\'t find file {file_name}')
         if scale is None:
             self.scale = [1, 1, 1]
         else:
@@ -297,10 +300,21 @@ class Link:
                 collision.color = color
 
     @memoize
-    def collision_visualization_markers(self, *args, **kwargs):
+    def collision_visualization_markers(self, *args, **kwargs) -> MarkerArray:
         markers = MarkerArray()
         for collision in self.collisions:
             marker = collision.as_visualization_marker(*args, **kwargs)
+            markers.markers.append(marker)
+        return markers
+
+    @memoize
+    def visuals_visualization_markers(self) -> MarkerArray:
+        markers = MarkerArray()
+        for visual in self.visuals:
+            marker = visual.as_visualization_marker(use_decomposed_meshes=False)
+            if isinstance(visual, MeshGeometry):
+                marker.mesh_use_embedded_materials = True
+                marker.color = ColorRGBA()
             markers.markers.append(marker)
         return markers
 

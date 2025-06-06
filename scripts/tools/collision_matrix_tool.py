@@ -17,13 +17,20 @@ import os
 
 from std_msgs.msg import ColorRGBA
 
-from giskardpy import identifier
+from giskardpy.configs.behavior_tree_config import BehaviorTreeConfig, StandAloneBTConfig
+from giskardpy.configs.collision_avoidance_config import CollisionAvoidanceConfig, _BPBCollisionAvoidanceConfig
+from giskardpy.configs.giskard import Giskard
+from giskardpy.configs.qp_controller_config import QPControllerConfig
+from giskardpy.configs.robot_interface_config import RobotInterfaceConfig, StandAloneRobotInterfaceConfig
+from giskardpy.configs.world_config import WorldConfig, EmptyWorld
+from giskardpy.god_map import god_map
 from giskardpy.model.better_pybullet_syncer import BetterPyBulletSyncer
 from giskardpy.model.collision_world_syncer import DisableCollisionReason
 from giskardpy.model.ros_msg_visualization import ROSMsgVisualization
 from giskardpy.model.utils import robot_name_from_urdf_string
 from giskardpy.model.world import WorldTree
-from giskardpy.my_types import PrefixName
+from giskardpy.data_types import PrefixName
+from giskardpy.tree.control_modes import ControlModes
 from giskardpy.utils.utils import resolve_ros_iris
 
 reason_color_map = {
@@ -77,14 +84,11 @@ class ReasonCheckBox(QCheckBox):
 class Table(QTableWidget):
     _reasons: Dict[Tuple[PrefixName, PrefixName], DisableCollisionReason]
     _disabled_links: Set[PrefixName]
-    world: WorldTree
 
-    def __init__(self, world: WorldTree, collision_scene: BetterPyBulletSyncer):
+    def __init__(self):
         super().__init__()
         self.cellClicked.connect(self.table_item_callback)
-        self.world = world
         self._disabled_links = set()
-        self.collision_scene = collision_scene
         self.ros_visualizer = ROSMsgVisualization('map')
 
     def update_disabled_links(self, link_names: Set[PrefixName]):
@@ -92,11 +96,11 @@ class Table(QTableWidget):
         self.update_table()
 
     def disable_link(self, link_name: str):
-        link_name = self.world.search_for_link_name(link_name)
+        link_name = god_map.world.search_for_link_name(link_name)
         self._disabled_links.add(link_name)
 
     def enable_link(self, link_name: str):
-        link_name = self.world.search_for_link_name(link_name)
+        link_name = god_map.world.search_for_link_name(link_name)
         self._disabled_links.discard(link_name)
 
     def get_widget(self, row, column):
@@ -122,8 +126,8 @@ class Table(QTableWidget):
         return tuple(sorted((link1, link2)))
 
     def update_reason(self, link1: str, link2: str, new_reason: Optional[DisableCollisionReason]):
-        link1 = self.world.search_for_link_name(link1)
-        link2 = self.world.search_for_link_name(link2)
+        link1 = god_map.world.search_for_link_name(link1)
+        link2 = god_map.world.search_for_link_name(link2)
         key = self.sort_links(link1, link2)
         if new_reason is None:
             if key in self._reasons:
@@ -149,41 +153,41 @@ class Table(QTableWidget):
 
     def table_item_callback(self, row, column):
         self.ros_visualizer.clear_marker()
-        self.collision_scene.sync()
-        for link_name in self.world.link_names_with_collisions:
-            self.world.links[link_name].dye_collisions(self.world.default_link_color)
-        link1 = self.world.search_for_link_name(self.link_names[row])
-        link2 = self.world.search_for_link_name(self.link_names[column])
+        god_map.collision_scene.sync()
+        for link_name in god_map.world.link_names_with_collisions:
+            god_map.world.links[link_name].dye_collisions(god_map.world.default_link_color)
+        link1 = god_map.world.search_for_link_name(self.link_names[row])
+        link2 = god_map.world.search_for_link_name(self.link_names[column])
         key = self.sort_links(link1, link2)
         reason = self.reasons.get(key, None)
         color = reason_color_map[reason]
         color_msg = ColorRGBA(color[0] / 255, color[1] / 255, color[2] / 255, 1)
-        self.world.links[link1].dye_collisions(color_msg)
-        self.world.links[link2].dye_collisions(color_msg)
-        self.world.reset_cache()
+        god_map.world.links[link1].dye_collisions(color_msg)
+        god_map.world.links[link2].dye_collisions(color_msg)
+        god_map.world.reset_cache()
         self.ros_visualizer.publish_markers()
 
     def dye_disabled_links(self, disabled_color: Optional[ColorRGBA] = None):
         if disabled_color is None:
             disabled_color = ColorRGBA(1, 0, 0, 1)
         self.ros_visualizer.clear_marker()
-        self.collision_scene.sync()
-        for link_name in self.world.link_names_with_collisions:
+        god_map.collision_scene.sync()
+        for link_name in god_map.world.link_names_with_collisions:
             if link_name.short_name in self.enabled_link_names:
-                self.world.links[link_name].dye_collisions(self.world.default_link_color)
+                god_map.world.links[link_name].dye_collisions(god_map.world.default_link_color)
             else:
-                self.world.links[link_name].dye_collisions(disabled_color)
-        self.world.reset_cache()
+                god_map.world.links[link_name].dye_collisions(disabled_color)
+        god_map.world.reset_cache()
         self.ros_visualizer.publish_markers()
 
     @property
     def link_names(self) -> List[str]:
-        return list(sorted(x.short_name for x in self.world.link_names_with_collisions))
+        return list(sorted(x.short_name for x in god_map.world.link_names_with_collisions))
 
     @property
     def enabled_link_names(self) -> List[str]:
         return list(
-            sorted(x.short_name for x in self.world.link_names_with_collisions if x not in self._disabled_links))
+            sorted(x.short_name for x in god_map.world.link_names_with_collisions if x not in self._disabled_links))
 
     @property
     def disabled_link_prefix_names(self) -> List[PrefixName]:
@@ -444,13 +448,21 @@ class Application(QMainWindow):
 
     def __init__(self):
         super().__init__()
+        self.giskard = Giskard(world_config=EmptyWorld(),
+                               robot_interface_config=StandAloneRobotInterfaceConfig([]),
+                               collision_avoidance_config=_BPBCollisionAvoidanceConfig(),
+                               behavior_tree_config=StandAloneBTConfig(),
+                               qp_controller_config=QPControllerConfig())
+        with god_map.world.modify_world():
+            god_map.world_config.setup()
+        god_map.collision_avoidance_config.setup()
         self.timer = QTimer()
         self.timer.start(1000)  # Time in milliseconds
         self.timer.timeout.connect(lambda: None)
         self.__srdf_path = None
-        self.world = WorldTree.empty_world()
-        self.world.default_link_color = ColorRGBA(0.5, 0.5, 0.5, 0.75)
-        self.collision_scene = BetterPyBulletSyncer.empty()
+        # god_map.world = WorldTree.empty_world()
+        # god_map.world.default_link_color = ColorRGBA(0.5, 0.5, 0.5, 0.75)
+        # god_map.collision_scene = BetterPyBulletSyncer.empty()
         self.df = pd.DataFrame()
         self.initUI()
 
@@ -464,7 +476,7 @@ class Application(QMainWindow):
 
         self.progress = MyProgressBar(self)
 
-        self.table = Table(self.world, self.collision_scene)
+        self.table = Table()
 
         layout = QVBoxLayout()
         layout.addLayout(self._urdf_box_layout())
@@ -541,10 +553,10 @@ class Application(QMainWindow):
         dialog = ComputeSelfCollisionMatrixParameterDialog(self)
         if dialog.exec_() == QDialog.Accepted:
             parameters = dialog.get_parameter_map()
-            reasons = self.collision_scene.compute_self_collision_matrix(self.group_name,
-                                                                         save_to_tmp=False,
-                                                                         progress_callback=self.progress.set_progress,
-                                                                         **parameters)
+            reasons = god_map.collision_scene.compute_self_collision_matrix(self.group_name,
+                                                                            save_to_tmp=False,
+                                                                            progress_callback=self.progress.set_progress,
+                                                                            **parameters)
             self.table.update_table(reasons)
             self.progress.set_progress(100, 'Done checking collisions')
         else:
@@ -566,16 +578,16 @@ class Application(QMainWindow):
                 QMessageBox.critical(self, 'Error', f'Parameter not found: \n{robot_description}')
 
     def load_urdf(self, urdf: str, progress_str: str):
-        self.world._clear()
+        god_map.world._clear()
         self.urdf_progress.set_progress(0, f'Loading {progress_str}')
         group_name = robot_name_from_urdf_string(urdf)
         self.urdf_progress.set_progress(10, f'Parsing {progress_str}')
-        self.world.add_urdf(urdf, group_name)
-        self.world.god_map.set_data(identifier.controlled_joints, self.world.movable_joint_names)
+        god_map.world.add_urdf(urdf, group_name)
+        god_map.controlled_joints = god_map.world.movable_joint_names
         self.urdf_progress.set_progress(50, f'Applying vhacd to concave meshes of {progress_str}')
-        self.collision_scene.sync()
+        god_map.collision_scene.sync()
         self.urdf_progress.set_progress(80, f'Updating table {progress_str}')
-        reasons = {(link_name, link_name): DisableCollisionReason.Adjacent for link_name in self.world.link_names}
+        reasons = {(link_name, link_name): DisableCollisionReason.Adjacent for link_name in god_map.world.link_names}
         self.table.update_table(reasons)
         self.set_tmp_srdf_path()
         self.enable_srdf_buttons()
@@ -602,8 +614,9 @@ class Application(QMainWindow):
             return
         try:
             if os.path.isfile(srdf_file):
-                reasons, disabled_links = self.collision_scene.load_self_collision_matrix_from_srdf(srdf_file,
-                                                                                                    self.group_name)
+                god_map.collision_scene.load_self_collision_matrix_from_srdf(srdf_file, self.group_name)
+                reasons = god_map.collision_scene.self_collision_matrix
+                disabled_links = god_map.collision_scene.disabled_links
                 self.table.update_disabled_links(disabled_links)
                 self.table.update_table(reasons)
                 self.progress.set_progress(100, f'Loaded {srdf_file}')
@@ -633,7 +646,7 @@ class Application(QMainWindow):
 
     @property
     def group_name(self):
-        return list(self.world.group_names)[0]
+        return list(god_map.world.group_names)[0]
 
     def get_srdf_path_with_dialog(self, save: bool) -> str:
         options = QFileDialog.Options()
@@ -665,10 +678,10 @@ class Application(QMainWindow):
     def save_srdf(self):
         srdf_path = self.get_srdf_path_with_dialog(True)
         if srdf_path is not None:
-            self.collision_scene.save_self_collision_matrix(self.world.groups[self.group_name],
-                                                            self.table.reasons,
-                                                            self.table.disabled_link_prefix_names,
-                                                            file_name=srdf_path)
+            god_map.collision_scene.save_self_collision_matrix(god_map.world.groups[self.group_name],
+                                                               self.table.reasons,
+                                                               self.table.disabled_link_prefix_names,
+                                                               file_name=srdf_path)
             self.progress.set_progress(100, f'Saved {self.__srdf_path}')
 
 
@@ -684,4 +697,4 @@ if __name__ == '__main__':
     app = QApplication(sys.argv)
     window = Application()
     window.show()
-    exit(app.exec_())
+    sys.exit(app.exec_())

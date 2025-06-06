@@ -15,7 +15,7 @@ class WiggleInsert(Task):
     def __init__(self, *,
                  root_link: PrefixName,
                  tip_link: PrefixName,
-                 hole_point: cas.TransMatrix,
+                 hole_point: cas.Point3,
                  noise_translation: float,
                  noise_angle: float,
                  down_velocity: float,
@@ -52,7 +52,6 @@ class WiggleInsert(Task):
             hole_normal = cas.Vector3().from_xyz(0, 0, -1, god_map.world.root_link_name)
         self.root_link = root_link
         self.tip_link = tip_link
-        self.hole_point = hole_point
         self.hole_normal = hole_normal
         self.noise_translation = noise_translation
         self.noise_angle = noise_angle
@@ -93,7 +92,7 @@ class WiggleInsert(Task):
         self.v2 = cas.Vector3().from_xyz(*v2, reference_frame=hole_normal.reference_frame)
 
         r_P_c = god_map.world.compose_fk_expression(self.root_link, self.tip_link).to_position()
-        r_P_g = god_map.world.transform(self.root_link, self.hole_point).to_position()
+        r_P_g = god_map.world.transform(self.root_link, hole_point)
 
         rand_v = symbol_manager.get_expr(self.ref_str +
                                          vector_function,

@@ -13,7 +13,7 @@ from giskardpy.qp.constraint import DerivativeEqualityConstraint
 from giskardpy.qp.constraint import InequalityConstraint, EqualityConstraint, DerivativeInequalityConstraint
 from giskardpy.qp.free_variable import FreeVariable
 from giskardpy.qp.next_command import NextCommands
-from giskardpy.qp.qp_adapter import GiskardToExplicitQPAdapter, GiskardToQPAdapter
+from giskardpy.qp.qp_adapter import GiskardToExplicitQPAdapter, GiskardToQPAdapter, QPData
 from giskardpy.qp.qp_formulation import QPFormulation
 from giskardpy.qp.qp_solver import QPSolver
 from giskardpy.qp.qp_solver_ids import SupportedQPSolver
@@ -337,70 +337,72 @@ class QPController:
         plt.savefig(file_name)
 
     @profile
-    def _create_debug_pandas(self, qp_solver: QPSolver):
+    def _create_debug_pandas(self) -> None:
         import pandas as pd
-        weights, g, lb, ub, E, bE, A, lbA, ubA, weight_filter, bE_filter, bA_filter = qp_solver.get_problem_data()
-        self.free_variable_names = self.free_variable_bounds.names[weight_filter]
-        self.equality_constr_names = self.equality_bounds.names[bE_filter]
-        self.inequality_constr_names = self.inequality_bounds.names[bA_filter]
-        num_vel_constr = len(self.derivative_constraints) * (self.prediction_horizon - 2)
-        num_eq_vel_constr = len(self.eq_derivative_constraints) * (self.prediction_horizon - 2)
-        num_neq_constr = len(self.inequality_constraints)
-        num_eq_constr = len(self.equality_constraints)
+        adapter = self.qp_adapters[0]
+        qp_data: QPData = adapter.qp_data_raw
+        free_variable_names = adapter.free_variable_bounds.names
+        equality_constr_names = adapter.equality_bounds.names
+        inequality_constr_names = adapter.inequality_bounds.names
+        num_vel_constr = len(adapter.derivative_constraints) * (adapter.prediction_horizon - 2)
+        num_eq_vel_constr = len(adapter.eq_derivative_constraints) * (adapter.prediction_horizon - 2)
+        num_neq_constr = len(adapter.inequality_constraints)
+        num_eq_constr = len(adapter.equality_constraints)
         num_constr = num_vel_constr + num_neq_constr + num_eq_constr + num_eq_vel_constr
 
-        self.p_weights = pd.DataFrame(weights, self.free_variable_names, ['data'], dtype=float)
-        self.p_g = pd.DataFrame(g, self.free_variable_names, ['data'], dtype=float)
-        self.p_lb = pd.DataFrame(lb, self.free_variable_names, ['data'], dtype=float)
-        self.p_ub = pd.DataFrame(ub, self.free_variable_names, ['data'], dtype=float)
-        self.p_b = pd.DataFrame({'lb': lb, 'ub': ub}, self.free_variable_names, dtype=float)
-        if len(bE) > 0:
-            self.p_bE_raw = pd.DataFrame(bE, self.equality_constr_names, ['data'], dtype=float)
+        self.p_weights = pd.DataFrame(qp_data.quadratic_weights, free_variable_names, ['data'], dtype=float)
+        self.p_g = pd.DataFrame(qp_data.linear_weights, free_variable_names, ['data'], dtype=float)
+        self.p_lb = pd.DataFrame(qp_data.box_lower_constraints, free_variable_names, ['data'], dtype=float)
+        self.p_ub = pd.DataFrame(qp_data.box_upper_constraints, free_variable_names, ['data'], dtype=float)
+        self.p_b = pd.DataFrame({'lb': qp_data.box_lower_constraints, 'ub': qp_data.box_upper_constraints},
+                                free_variable_names, dtype=float)
+        if len(qp_data.eq_bounds) > 0:
+            self.p_bE_raw = pd.DataFrame(qp_data.eq_bounds, equality_constr_names, ['data'], dtype=float)
             self.p_bE = deepcopy(self.p_bE_raw)
-            self.p_bE[len(self.equality_bounds.names_derivative_links):] /= self.mpc_dt
+            self.p_bE[len(adapter.equality_bounds.names_derivative_links):] /= self.mpc_dt
         else:
             self.p_bE = pd.DataFrame()
-        if len(lbA) > 0:
-            self.p_lbA_raw = pd.DataFrame(lbA, self.inequality_constr_names, ['data'], dtype=float)
+        if len(qp_data.neq_lower_bounds) > 0:
+            self.p_lbA_raw = pd.DataFrame(qp_data.neq_lower_bounds, inequality_constr_names, ['data'], dtype=float)
             self.p_lbA = deepcopy(self.p_lbA_raw)
-            self.p_lbA /= self.mpc_dt
+            self.p_lbA /= adapter.mpc_dt
 
-            self.p_ubA_raw = pd.DataFrame(ubA, self.inequality_constr_names, ['data'], dtype=float)
+            self.p_ubA_raw = pd.DataFrame(qp_data.neq_upper_bounds, inequality_constr_names, ['data'], dtype=float)
             self.p_ubA = deepcopy(self.p_ubA_raw)
-            self.p_ubA /= self.mpc_dt
+            self.p_ubA /= adapter.mpc_dt
 
-            self.p_bA_raw = pd.DataFrame({'lbA': lbA, 'ubA': ubA}, self.inequality_constr_names, dtype=float)
+            self.p_bA_raw = pd.DataFrame({'lbA': qp_data.neq_lower_bounds, 'ubA': qp_data.neq_upper_bounds}, inequality_constr_names, dtype=float)
             self.p_bA = deepcopy(self.p_bA_raw)
-            self.p_bA /= self.mpc_dt
+            self.p_bA /= adapter.mpc_dt
         else:
             self.p_lbA = pd.DataFrame()
             self.p_ubA = pd.DataFrame()
         # remove sample period factor
-        if len(E) > 0:
-            self.p_E = pd.DataFrame(E, self.equality_constr_names, self.free_variable_names, dtype=float)
+        if len(qp_data.dense_eq_matrix) > 0:
+            self.p_E = pd.DataFrame(qp_data.dense_eq_matrix, equality_constr_names, free_variable_names, dtype=float)
         else:
             self.p_E = pd.DataFrame()
-        if len(A) > 0:
-            self.p_A = pd.DataFrame(A, self.inequality_constr_names, self.free_variable_names, dtype=float)
+        if len(qp_data.dense_neq_matrix) > 0:
+            self.p_A = pd.DataFrame(qp_data.dense_neq_matrix, inequality_constr_names, free_variable_names, dtype=float)
         else:
             self.p_A = pd.DataFrame()
         self.p_xdot = None
         if self.xdot_full is not None:
-            self.p_xdot = pd.DataFrame(self.xdot_full, self.free_variable_names, ['data'], dtype=float)
+            self.p_xdot = pd.DataFrame(self.xdot_full, free_variable_names, ['data'], dtype=float)
             self.p_b['xdot'] = self.p_xdot
             self.p_b = self.p_b[['lb', 'xdot', 'ub']]
             self.p_pure_xdot = deepcopy(self.p_xdot)
             self.p_pure_xdot[-num_constr:] = 0
             # self.p_Ax = pd.DataFrame(self.p_A.dot(self.p_xdot), self.inequality_constr_names, ['data'], dtype=float)
             if len(self.p_A) > 0:
-                self.p_Ax = pd.DataFrame(self.p_A.dot(self.p_pure_xdot), self.inequality_constr_names,
+                self.p_Ax = pd.DataFrame(self.p_A.dot(self.p_pure_xdot), inequality_constr_names,
                                          ['data'], dtype=float)
             else:
                 self.p_Ax = pd.DataFrame()
             # self.p_Ax_without_slack = deepcopy(self.p_Ax_without_slack_raw)
             # self.p_Ax_without_slack[-num_constr:] /= self.sample_period
             if len(self.p_E) > 0:
-                self.p_Ex = pd.DataFrame(self.p_E.dot(self.p_pure_xdot), self.equality_constr_names,
+                self.p_Ex = pd.DataFrame(self.p_E.dot(self.p_pure_xdot), equality_constr_names,
                                          ['data'], dtype=float)
             else:
                 self.p_Ex = pd.DataFrame()

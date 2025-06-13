@@ -1290,8 +1290,8 @@ class WorldTree(WorldTreeInterface):
 
     @profile
     def compose_fk_evaluated_expression(self, root: PrefixName, tip: PrefixName) -> cas.TransMatrix:
-        result: cas.TransMatrix = symbol_manager.get_expr(f'god_map.world.compute_fk_np(\'{root}\', \'{tip}\')',
-                                                          output_type_hint=cas.TransMatrix)
+        result = symbol_manager.register_transformation_matrix(f'fk_{root}-{tip}',
+                                                               provider=lambda r=root, t=tip: self.compute_fk_np(root, tip))
         result.reference_frame = root
         result.child_frame = tip
         return result
@@ -1574,10 +1574,6 @@ class WorldBranch(WorldTreeInterface):
     def base_pose(self) -> cas.TransMatrix:
         return self.world.compute_fk(self.world.root_link_name, self.root_link_name)
 
-    @property
-    def state(self) -> JointStates:
-        return JointStates({j: self.world.state[j] for j in self.joints if j in self.world.state})
-
     def reset_cache(self):
         super().reset_cache()
         try:
@@ -1612,6 +1608,10 @@ class WorldBranch(WorldTreeInterface):
             return joints
 
         return helper(self.root_link)
+
+    @property
+    def free_variables(self) -> List[FreeVariable]:
+        return list({j.free_variables for j in self.joints.values() if hasattr(j, 'free_variables')})
 
     @cached_property
     def groups(self) -> Dict[str, WorldBranch]:

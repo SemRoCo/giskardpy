@@ -1,6 +1,7 @@
 from typing import Dict, Callable, Type, Optional, overload, Union, Iterable, Tuple, List
 
 import numpy as np
+from line_profiler.explicit_profiler import profile
 
 import giskardpy.casadi_wrapper as cas
 from giskardpy.god_map import god_map
@@ -32,53 +33,66 @@ class SymbolManager(metaclass=SingletonMeta):
         self.symbol_to_provider = {}
         self.time = self.register_symbol('time', lambda: god_map.time)
 
-    def has_symbol(self, symbol_name: str) -> bool:
-        return [s for s in self.symbol_to_provider if str(s) == symbol_name] != []
+    def has_symbol(self, name: str) -> bool:
+        return [s for s in self.symbol_to_provider if str(s) == name] != []
 
-    def register_symbol(self, symbol_name: str, provider: Provider) -> cas.Symbol:
-        if self.has_symbol(symbol_name):
-            symbol = self.get_symbol(symbol_name)
+    def register_symbol(self, name: str, provider: Provider) -> cas.Symbol:
+        if self.has_symbol(name):
+            symbol = self.get_symbol(name)
         else:
-            symbol = cas.Symbol(symbol_name)
+            symbol = cas.Symbol(name)
         self.symbol_to_provider[symbol] = provider
         return symbol
 
-    def get_symbol(self, symbol_name: str) -> cas.Symbol:
-        return next(s for s in self.symbol_to_provider if str(s) == symbol_name)
+    def get_symbol(self, name: str) -> cas.Symbol:
+        return next(s for s in self.symbol_to_provider if str(s) == name)
 
-    def register_point3(self, name: str, provider: Callable[[], np.ndarray]) -> cas.Point3:
-        sx, sy, sz = cas.Symbol(f'{name}.x'), cas.Symbol(f'{name}.y'), cas.Symbol(f'{name}.z')
+    def register_point3(self, name: str, provider: Callable[[], Tuple[float, float, float]]) -> cas.Point3:
+        sx = self.register_symbol(f'{name}.x', lambda: provider()[0])
+        sy = self.register_symbol(f'{name}.y', lambda: provider()[1])
+        sz = self.register_symbol(f'{name}.z', lambda: provider()[2])
         p = cas.Point3([sx, sy, sz])
-        self.register_symbol(sx, lambda: provider()[0])
-        self.register_symbol(sy, lambda: provider()[1])
-        self.register_symbol(sz, lambda: provider()[2])
         return p
 
-    def register_vector3(self, name: str, provider: Callable[[], np.ndarray]) -> cas.Vector3:
-        sx, sy, sz = cas.Symbol(f'{name}.x'), cas.Symbol(f'{name}.y'), cas.Symbol(f'{name}.z')
+    def register_vector3(self, name: str, provider: Callable[[], Tuple[float, float, float]]) -> cas.Vector3:
+        sx = self.register_symbol(f'{name}.x', lambda: provider()[0])
+        sy = self.register_symbol(f'{name}.y', lambda: provider()[1])
+        sz = self.register_symbol(f'{name}.z', lambda: provider()[2])
         v = cas.Vector3([sx, sy, sz])
-        self.register_symbol(sx, lambda: provider()[0])
-        self.register_symbol(sy, lambda: provider()[1])
-        self.register_symbol(sz, lambda: provider()[2])
         return v
 
     def register_quaternion(self, name: str, provider: Callable[[], Tuple[float, float, float, float]]) \
             -> cas.Quaternion:
-        sw, sx, sy, sz = cas.Symbol(f'{name}.w'), cas.Symbol(f'{name}.x'), cas.Symbol(f'{name}.y'), cas.Symbol(
-            f'{name}.z')
+        sx = self.register_symbol(f'{name}.x', lambda: provider()[0])
+        sy = self.register_symbol(f'{name}.y', lambda: provider()[1])
+        sz = self.register_symbol(f'{name}.z', lambda: provider()[2])
+        sw = self.register_symbol(f'{name}.w', lambda: provider()[3])
         q = cas.Quaternion((sx, sy, sz, sw))
-        self.register_symbol(sx, lambda: provider()[0])
-        self.register_symbol(sy, lambda: provider()[1])
-        self.register_symbol(sz, lambda: provider()[2])
-        self.register_symbol(sw, lambda: provider()[3])
         return q
 
-    def resolve_symbols(self, symbols: List[List[cas.Symbol]]) -> List[np.ndarray]:
+    def register_transformation_matrix(self, name: str,
+                                       provider: Callable[[], Tuple[Tuple[float, float, float, float],
+                                                                    Tuple[float, float, float, float],
+                                                                    Tuple[float, float, float, float]]]) \
+            -> cas.TransMatrix:
+        symbols = []
+        for row in range(3):
+            symbols.append([])
+            for col in range(4):
+                symbols[row].append(self.register_symbol(f'{name}[{row},{col}]',
+                                                         lambda r=row, c=col: provider()[r][c]))
+        symbols.append([0,0,0,1])
+        root_T_tip = cas.TransMatrix(symbols)
+        return root_T_tip
+
+    # @profile
+    def resolve_symbols(self, symbols: Union[List[cas.Symbol], List[List[cas.Symbol]]]) \
+            -> Union[np.ndarray, List[np.ndarray]]:
         try:
-            result = []
-            for param in symbols:
-                result.append(np.array([self.symbol_to_provider[s]() for s in param], dtype=float))
-            return result
+            if isinstance(symbols[0], list):
+                return [np.array([self.symbol_to_provider[s]() for s in param], dtype=float) for param in symbols]
+            else:
+                return np.array([self.symbol_to_provider[s]() for s in symbols], dtype=float)
         except Exception as e:
             for s in symbols:
                 try:

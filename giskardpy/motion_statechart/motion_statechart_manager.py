@@ -213,25 +213,31 @@ class MotionStatechartManager:
         monitor_life_cycle_expr, monitor_obs_expr = self.compile_node_state_updater(self.monitor_state)
         goal_life_cycle_expr, goal_obs_expr = self.compile_node_state_updater(self.goal_state)
 
-        params = list(set(self.task_state.get_life_cycle_state_symbols()
-                          + self.monitor_state.get_life_cycle_state_symbols()
-                          + self.goal_state.get_life_cycle_state_symbols()
-                          + god_map.motion_statechart_manager.get_observation_state_symbols()))
         self.life_cycle_updater = cas.StackedCompiledFunction(
             expressions=[task_life_cycle_expr,
                          monitor_life_cycle_expr,
                          goal_life_cycle_expr],
-            parameters=params)
+            parameters=[self.task_state.get_life_cycle_state_symbols(),
+                        self.monitor_state.get_life_cycle_state_symbols(),
+                        self.goal_state.get_life_cycle_state_symbols(),
+                        self.task_state.get_observation_state_symbols(),
+                        self.monitor_state.get_observation_state_symbols(),
+                        self.goal_state.get_observation_state_symbols()])
 
-        params = list(set(task_obs_expr.free_symbols()
-                          + monitor_obs_expr.free_symbols()
-                          + goal_obs_expr.free_symbols()))
+        params = set(task_obs_expr.free_symbols()
+                     + monitor_obs_expr.free_symbols()
+                     + goal_obs_expr.free_symbols())
+
+        for s in god_map.world.get_state_symbols():
+            if s.s in params:
+                params.remove(s.s)
+        self.aux_symbols = list(params)
 
         self.observation_state_updater = cas.StackedCompiledFunction(
             expressions=[task_obs_expr,
                          monitor_obs_expr,
                          goal_obs_expr],
-            parameters=params)
+            parameters=[god_map.world.get_state_symbols(), self.aux_symbols])
 
         self.initialize_states()
 
@@ -353,11 +359,12 @@ class MotionStatechartManager:
     @profile
     def evaluate_node_states(self) -> bool:
         # %% update observation state
-        obs_args = symbol_manager.resolve_symbols(self.observation_state_updater.params)
+        obs_aux_args = symbol_manager.resolve_symbols(self.aux_symbols)
+        asdf = symbol_manager.resolve_symbols(self.observation_state_updater.params[1])
 
         next_state, done, exception = self.evaluate_payload_monitors()
 
-        obs_result = self.observation_state_updater.fast_call(*obs_args)
+        obs_result = self.observation_state_updater.fast_call(god_map.world.state.data, obs_aux_args)
         self.task_state.observation_state = obs_result[0]
         self.monitor_state.observation_state = obs_result[1]
         self.goal_state.observation_state = obs_result[2]
@@ -366,8 +373,12 @@ class MotionStatechartManager:
             self.monitor_state.observation_state[self.payload_monitor_filter] = next_state
 
         # %% update life cycle state
-        args = symbol_manager.resolve_symbols(self.life_cycle_updater.params)
-        life_cycle_result = self.life_cycle_updater.fast_call(*args)
+        life_cycle_result = self.life_cycle_updater.fast_call(self.task_state.life_cycle_state,
+                                                              self.monitor_state.life_cycle_state,
+                                                              self.goal_state.life_cycle_state,
+                                                              self.task_state.observation_state,
+                                                              self.monitor_state.observation_state,
+                                                              self.goal_state.observation_state)
         self.task_state.life_cycle_state = life_cycle_result[0]
         self.monitor_state.life_cycle_state = life_cycle_result[1]
         self.goal_state.life_cycle_state = life_cycle_result[2]

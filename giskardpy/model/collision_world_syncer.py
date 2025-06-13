@@ -136,7 +136,7 @@ class Collision:
 
 
 class SortedCollisionResults:
-    data: list
+    data: List[Collision]
     default_result = Collision(link_a='',
                                link_b='',
                                contact_distance=100,
@@ -157,11 +157,11 @@ class SortedCollisionResults:
 
         self.key = sort
 
-    def add(self, element):
+    def add(self, element: Collision):
         self.data.append(element)
         self.data = list(sorted(self.data, key=self.key))
 
-    def __getitem__(self, item):
+    def __getitem__(self, item: int) -> Collision:
         try:
             return self.data[item]
         except (KeyError, IndexError) as e:

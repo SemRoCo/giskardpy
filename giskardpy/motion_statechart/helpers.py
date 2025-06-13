@@ -57,9 +57,13 @@ class MotionGraphNodeStateManager(Generic[T]):
     def get_life_cycle_state_symbols(self) -> List[cas.Symbol]:
         return [node.get_life_cycle_state_expression() for node in self.nodes]
 
+    def get_observation_state_symbols(self) -> List[cas.Symbol]:
+        return [node.get_observation_state_expression() for node in self.nodes]
+
     def get_observation_state_symbol_map(self) -> Dict[str, cas.Symbol]:
         return {node.name: node.get_observation_state_expression() for node in self.nodes}
 
+    @profile
     def get_observation_state(self, key: str) -> float:
         idx = self.key_to_idx[key]
         return self.observation_state[idx]
@@ -103,7 +107,7 @@ class MotionGraphNodeStateManager(Generic[T]):
         new_symbols = []
         for i, symbol in enumerate(expression.free_symbols()):
             old_symbols.append(symbol)
-            new_symbols.append(self.get_substitution_key(node.name, str(symbol)))
+            new_symbols.append(self.get_substitution_key(node.name, symbol))
         new_expression = cas.substitute(expression, old_symbols, new_symbols)
         self.update_substitution_values(node.name, old_symbols)
         return new_expression
@@ -112,13 +116,13 @@ class MotionGraphNodeStateManager(Generic[T]):
     def update_substitution_values(self, node_name: str, keys: Optional[List[cas.Symbol]] = None) -> None:
         if keys is None:
             keys = list(self.substitution_values[node_name].keys())
-        values = symbol_manager.resolve_symbols(keys)
+        values = symbol_manager.resolve_symbols([keys])[0]
         self.substitution_values[node_name] = {key: value for key, value in zip(keys, values)}
 
     @profile
-    def get_substitution_key(self, node_name: str, original_symbol: str) -> cas.Symbol:
-        return symbol_manager.get_symbol(
-            f'{self.god_map_path}.substitution_values["{node_name}"]["{original_symbol}"]')
+    def get_substitution_key(self, node_name: str, original_symbol: cas.Symbol) -> cas.Symbol:
+        return symbol_manager.register_symbol(name=f'subs {node_name} {original_symbol}',
+                                              provider=lambda :self.substitution_values[node_name][original_symbol])
 
     def trigger_update_triggers(self):
         prev_life_cycle_state = self.life_cycle_history[-2]

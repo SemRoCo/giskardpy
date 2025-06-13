@@ -3,7 +3,7 @@ from copy import deepcopy
 from typing import Dict, Optional, List
 import giskardpy.casadi_wrapper as cas
 from giskardpy.motion_statechart.goals.goal import Goal
-from giskardpy.model.collision_world_syncer import CollisionEntry
+from giskardpy.model.collision_world_syncer import CollisionEntry, Collision
 from giskardpy.motion_statechart.monitors.monitors import Monitor
 from giskardpy.motion_statechart.tasks.task import WEIGHT_ABOVE_CA, WEIGHT_COLLISION_AVOIDANCE, Task
 from giskardpy.god_map import god_map
@@ -62,8 +62,8 @@ class ExternalCA(Goal):
         direct_children = set(god_map.world.get_directly_controlled_child_links_with_collisions(parent_joint))
         b_result_cases = {(k[1].__hash__(), v) for k, v in self.soft_thresholds.items() if k[0] in direct_children}
         soft_threshold = cas.if_eq_cases(a=actual_link_b_hash,
-                                                 b_result_cases=b_result_cases,
-                                                 else_result=soft_threshold)
+                                         b_result_cases=b_result_cases,
+                                         else_result=soft_threshold)
 
         hard_threshold = cas.min(self.hard_threshold, soft_threshold / 2)
         lower_limit = soft_threshold - actual_distance
@@ -111,29 +111,33 @@ class ExternalCA(Goal):
                                        lower_slack_limit=-float('inf'),
                                        upper_slack_limit=upper_slack)
 
+    def get_external_collision(self, n, i) -> Collision:
+        return god_map.closest_point.get_external_collisions(n)[i]
+
+    @property
+    def symbol_name_prefix(self) -> str:
+        return f'external_collision({self.link_name})[{self.idx}]'
+
     def map_V_n_symbol(self):
-        expr = f'god_map.closest_point.get_external_collisions(\'{self.link_name}\')[{self.idx}].map_V_n'
-        return symbol_manager.get_expr(expr, output_type_hint=cas.Vector3)
+        return symbol_manager.register_vector3(name=f'{self.symbol_name_prefix}.map_V_n',
+                                               provider=lambda n=self.link_name, i=self.idx: self.get_external_collision(n, i).map_V_n)
 
     def get_closest_point_on_a_in_a(self):
-        expr = f'god_map.closest_point.get_external_collisions(\'{self.link_name}\')[{self.idx}].new_a_P_pa'
-        return symbol_manager.get_expr(expr, output_type_hint=cas.Point3)
-
-    def map_P_a_symbol(self):
-        expr = f'god_map.closest_point.get_external_collisions(\'{self.link_name}\')[{self.idx}].new_map_P_pa'
-        return symbol_manager.get_expr(expr, output_type_hint=cas.Point3)
+        return symbol_manager.register_point3(name=f'{self.symbol_name_prefix}.new_a_P_pa',
+                                              provider=lambda n=self.link_name, i=self.idx: self.get_external_collision(n, i).new_a_P_pa)
 
     def get_actual_distance(self):
-        expr = f'god_map.closest_point.get_external_collisions(\'{self.link_name}\')[{self.idx}].contact_distance'
-        return symbol_manager.get_symbol(expr)
+        return symbol_manager.register_symbol(name=f'{self.symbol_name_prefix}.contact_distance',
+                                              provider=lambda n=self.link_name, i=self.idx: self.get_external_collision(n, i).contact_distance)
 
     def get_link_b_hash(self):
-        expr = f'god_map.closest_point.get_external_collisions(\'{self.link_name}\')[{self.idx}].link_b_hash'
-        return symbol_manager.get_symbol(expr)
+        return symbol_manager.register_symbol(name=f'{self.symbol_name_prefix}.link_b_hash',
+                                              provider=lambda n=self.link_name, i=self.idx: self.get_external_collision(n, i).link_b_hash)
 
     def get_number_of_external_collisions(self):
-        expr = f'god_map.closest_point.get_number_of_external_collisions(\'{self.link_name}\')'
-        return symbol_manager.get_symbol(expr)
+        return symbol_manager.register_symbol(name=f'{self.link_name}.num_collisions',
+                                              provider=lambda: god_map.closest_point.get_number_of_external_collisions(
+                                                  self.link_name))
 
 
 class SelfCA(Goal):
@@ -147,10 +151,7 @@ class SelfCA(Goal):
                  soft_threshold: float = 0.05,
                  idx: float = 0,
                  num_repeller: int = 1,
-                 name_prefix: Optional[str] = None,
-                 start_condition: cas.Expression = cas.BinaryTrue,
-                 pause_condition: cas.Expression = cas.BinaryFalse,
-                 end_condition: cas.Expression = cas.BinaryFalse):
+                 name_prefix: Optional[str] = None):
         self.link_a = link_a
         self.link_b = link_b
         self.max_velocity = max_velocity
@@ -220,26 +221,33 @@ class SelfCA(Goal):
                                        lower_slack_limit=-float('inf'),
                                        upper_slack_limit=upper_slack)
 
+    def get_self_collision(self) -> Collision:
+        return god_map.closest_point.get_self_collisions(self.link_a, self.link_b)[self.idx]
+
+    @property
+    def symbol_name_prefix(self) -> str:
+        return f'self_collision({self.link_a}, {self.link_b})[{self.idx}]'
+
     def get_contact_normal_in_b(self):
-        expr = f'god_map.closest_point.get_self_collisions(\'{self.link_a}\', \'{self.link_b}\')[{self.idx}].new_b_V_n'
-        return symbol_manager.get_expr(expr, output_type_hint=cas.Vector3)
+        return symbol_manager.register_vector3(name=f'{self.symbol_name_prefix}.new_b_V_n',
+                                               provider=lambda: self.get_self_collision().new_b_V_n)
 
     def get_position_on_a_in_a(self):
-        expr = f'god_map.closest_point.get_self_collisions(\'{self.link_a}\', \'{self.link_b}\')[{self.idx}].new_a_P_pa'
-        return symbol_manager.get_expr(expr, output_type_hint=cas.Point3)
+        return symbol_manager.register_point3(name=f'{self.symbol_name_prefix}.new_a_P_pa',
+                                               provider=lambda: self.get_self_collision().new_a_P_pa)
 
     def get_b_T_pb(self) -> cas.TransMatrix:
-        expr = f'god_map.closest_point.get_self_collisions(\'{self.link_a}\', \'{self.link_b}\')[{self.idx}].new_b_P_pb'
-        p = symbol_manager.get_expr(expr, output_type_hint=cas.Point3)
+        p = symbol_manager.register_point3(name=f'{self.symbol_name_prefix}.new_b_P_pb',
+                                               provider=lambda: self.get_self_collision().new_b_P_pb)
         return cas.TransMatrix.from_xyz_rpy(x=p.x, y=p.y, z=p.z)
 
     def get_actual_distance(self):
-        expr = f'god_map.closest_point.get_self_collisions(\'{self.link_a}\', \'{self.link_b}\')[{self.idx}].contact_distance'
-        return symbol_manager.get_symbol(expr)
+        return symbol_manager.register_symbol(name=f'{self.symbol_name_prefix}.contact_distance',
+                                               provider=lambda: self.get_self_collision().contact_distance)
 
     def get_number_of_self_collisions(self):
-        expr = f'god_map.closest_point.get_number_of_self_collisions(\'{self.link_a}\', \'{self.link_b}\')'
-        return symbol_manager.get_symbol(expr)
+        return symbol_manager.register_symbol(name=f'{self.link_a},{self.link_b}.get_number_of_self_collisions',
+                                               provider=lambda: god_map.closest_point.get_number_of_self_collisions(self.link_a, self.link_b))
 
 
 class CollisionAvoidanceHint(Goal):
@@ -464,10 +472,7 @@ class CollisionAvoidance(Goal):
                                  hard_threshold=hard_threshold,
                                  soft_threshold=soft_threshold,
                                  idx=i,
-                                 num_repeller=number_of_repeller,
-                                 start_condition=self.start_condition,
-                                 pause_condition=self.pause_condition,
-                                 end_condition=self.end_condition)
+                                 num_repeller=number_of_repeller)
                 self.add_goal(ca_goal)
                 num_constr += 1
         get_middleware().loginfo(f'Adding {num_constr} self collision avoidance constraints.')

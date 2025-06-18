@@ -26,14 +26,16 @@ class Goal(MotionStatechartNode):
         self.tasks = []
         self.monitors = []
         self.goals = []
+        self.obs_symbol = symbol_manager.register_symbol_provider(name=f'{self.name}.observation_state',
+                                                                  provider=lambda n=self.name: god_map.motion_statechart_manager.goal_state.get_observation_state(n))
+        self.life_cycle_symbol = symbol_manager.register_symbol_provider(name=f'{self.name}.life_cycle_state',
+                                                                         provider=lambda n=self.name: god_map.motion_statechart_manager.goal_state.get_life_cycle_state(n))
 
-    def get_observation_state_expression(self):
-        return symbol_manager.register_symbol(name=f'{self.name}.observation_state',
-                                              provider=lambda n=self.name: god_map.motion_statechart_manager.goal_state.get_observation_state(n))
+    def get_observation_state_expression(self) -> cas.Symbol:
+        return self.obs_symbol
 
-    def get_life_cycle_state_expression(self):
-        return symbol_manager.register_symbol(name=f'{self.name}.life_cycle_state',
-                                              provider=lambda n=self.name: god_map.motion_statechart_manager.goal_state.get_life_cycle_state(n))
+    def get_life_cycle_state_expression(self) -> cas.Symbol:
+        return self.life_cycle_symbol
 
     def has_tasks(self) -> bool:
         return len(self.tasks) > 0

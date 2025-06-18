@@ -26,10 +26,10 @@ class Monitor(MotionStatechartNode):
         super().__init__(name=name,
                          plot=plot)
         symbol_name = f'{self.name}_observation_state'
-        self.obs_symbol = symbol_manager.register_symbol(symbol_name,
-                                                         lambda name=self.name: god_map.motion_statechart_manager.monitor_state.get_observation_state(name))
+        self.obs_symbol = symbol_manager.register_symbol_provider(symbol_name,
+                                                                  lambda name=self.name: god_map.motion_statechart_manager.monitor_state.get_observation_state(name))
         symbol_name = f'{self.name}_life_cycle_state'
-        self.life_symbol = symbol_manager.register_symbol(symbol_name, lambda name=self.name: god_map.motion_statechart_manager.monitor_state.get_life_cycle_state(name))
+        self.life_symbol = symbol_manager.register_symbol_provider(symbol_name, lambda name=self.name: god_map.motion_statechart_manager.monitor_state.get_life_cycle_state(name))
 
     def get_observation_state_expression(self) -> cas.Symbol:
         return self.obs_symbol

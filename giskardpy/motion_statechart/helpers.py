@@ -121,8 +121,8 @@ class MotionGraphNodeStateManager(Generic[T]):
 
     @profile
     def get_substitution_key(self, node_name: str, original_symbol: cas.Symbol) -> cas.Symbol:
-        return symbol_manager.register_symbol(name=f'subs {node_name} {original_symbol}',
-                                              provider=lambda :self.substitution_values[node_name][original_symbol])
+        return symbol_manager.register_symbol_provider(name=f'subs {node_name} {original_symbol}',
+                                                       provider=lambda :self.substitution_values[node_name][original_symbol])
 
     def trigger_update_triggers(self):
         prev_life_cycle_state = self.life_cycle_history[-2]

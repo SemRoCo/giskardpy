@@ -24,49 +24,42 @@ class SymbolManager(metaclass=SingletonMeta):
     The purpose of this class is to abstract the management of symbolic variables and enable their seamless
     use in mathematical and symbolic computations.
     """
-    symbol_to_lambda: Dict[cas.Symbol, Callable[[], float]]
+    symbol_to_provider: Dict[cas.Symbol, Callable[[], float]]
     """
     A dictionary mapping symbolic variables (`cas.Symbol`) to callable functions that provide numeric values for those symbols.
     """
 
     def __init__(self):
         self.symbol_to_provider = {}
-        self.time = self.register_symbol('time', lambda: god_map.time)
+        self.time = self.register_symbol_provider('time', lambda: god_map.time)
 
-    def has_symbol(self, name: str) -> bool:
-        return [s for s in self.symbol_to_provider if str(s) == name] != []
-
-    def register_symbol(self, name: str, provider: Provider) -> cas.Symbol:
-        if self.has_symbol(name):
-            symbol = self.get_symbol(name)
-        else:
-            symbol = cas.Symbol(name)
+    @profile
+    def register_symbol_provider(self, name: str, provider: Provider) -> cas.Symbol:
+        symbol = cas.Symbol(name)
         self.symbol_to_provider[symbol] = provider
         return symbol
 
-    def get_symbol(self, name: str) -> cas.Symbol:
-        return next(s for s in self.symbol_to_provider if str(s) == name)
-
+    @profile
     def register_point3(self, name: str, provider: Callable[[], Tuple[float, float, float]]) -> cas.Point3:
-        sx = self.register_symbol(f'{name}.x', lambda: provider()[0])
-        sy = self.register_symbol(f'{name}.y', lambda: provider()[1])
-        sz = self.register_symbol(f'{name}.z', lambda: provider()[2])
+        sx = self.register_symbol_provider(f'{name}.x', lambda: provider()[0])
+        sy = self.register_symbol_provider(f'{name}.y', lambda: provider()[1])
+        sz = self.register_symbol_provider(f'{name}.z', lambda: provider()[2])
         p = cas.Point3([sx, sy, sz])
         return p
 
     def register_vector3(self, name: str, provider: Callable[[], Tuple[float, float, float]]) -> cas.Vector3:
-        sx = self.register_symbol(f'{name}.x', lambda: provider()[0])
-        sy = self.register_symbol(f'{name}.y', lambda: provider()[1])
-        sz = self.register_symbol(f'{name}.z', lambda: provider()[2])
+        sx = self.register_symbol_provider(f'{name}.x', lambda: provider()[0])
+        sy = self.register_symbol_provider(f'{name}.y', lambda: provider()[1])
+        sz = self.register_symbol_provider(f'{name}.z', lambda: provider()[2])
         v = cas.Vector3([sx, sy, sz])
         return v
 
     def register_quaternion(self, name: str, provider: Callable[[], Tuple[float, float, float, float]]) \
             -> cas.Quaternion:
-        sx = self.register_symbol(f'{name}.x', lambda: provider()[0])
-        sy = self.register_symbol(f'{name}.y', lambda: provider()[1])
-        sz = self.register_symbol(f'{name}.z', lambda: provider()[2])
-        sw = self.register_symbol(f'{name}.w', lambda: provider()[3])
+        sx = self.register_symbol_provider(f'{name}.x', lambda: provider()[0])
+        sy = self.register_symbol_provider(f'{name}.y', lambda: provider()[1])
+        sz = self.register_symbol_provider(f'{name}.z', lambda: provider()[2])
+        sw = self.register_symbol_provider(f'{name}.w', lambda: provider()[3])
         q = cas.Quaternion((sx, sy, sz, sw))
         return q
 
@@ -79,8 +72,8 @@ class SymbolManager(metaclass=SingletonMeta):
         for row in range(3):
             symbols.append([])
             for col in range(4):
-                symbols[row].append(self.register_symbol(f'{name}[{row},{col}]',
-                                                         lambda r=row, c=col: provider()[r][c]))
+                symbols[row].append(self.register_symbol_provider(f'{name}[{row},{col}]',
+                                                                  lambda r=row, c=col: provider()[r][c]))
         symbols.append([0,0,0,1])
         root_T_tip = cas.TransMatrix(symbols)
         return root_T_tip

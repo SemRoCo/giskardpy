@@ -104,13 +104,13 @@ class CompiledFunction:
                 args.append(kwargs[str(param)])
         filtered_args = np.array(args, dtype=float)
         return self.fast_call(filtered_args)
-    
+
+    @profile
     def fast_call(self, *args):
         """
         :param args: parameter values in the same order as was used during the creation
         """
         for arg_idx, arg in enumerate(args):
-            assert arg.dtype == np.float64
             self.buf.set_arg(arg_idx, memoryview(arg))
         self.f_eval()
         return self.out

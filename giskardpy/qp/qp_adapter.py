@@ -1723,8 +1723,8 @@ class GiskardToExplicitQPAdapter(GiskardToQPAdapter):
         free_symbols.update(neq_lower_bounds.free_symbols())
         free_symbols.update(neq_upper_bounds.free_symbols())
         for s in self.world_state_symbols:
-            if s.s in free_symbols:
-                free_symbols.remove(s.s)
+            if s in free_symbols:
+                free_symbols.remove(s)
         self.aux_symbols = list(free_symbols)
 
         self.free_symbols = [self.world_state_symbols, self.aux_symbols]

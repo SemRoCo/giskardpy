@@ -80,6 +80,9 @@ class Symbol_:
 
 
 class Symbol(Symbol_):
+    _registry: Dict[str, Symbol]
+    name: str
+
     def __init__(self, name: str): ...
 
     @overload

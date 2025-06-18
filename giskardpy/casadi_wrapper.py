@@ -5,11 +5,15 @@ import math
 from collections import defaultdict
 from copy import copy
 from enum import IntEnum
-from typing import Union, TypeVar
+from typing import Union, TypeVar, TYPE_CHECKING
 
 import casadi as ca
 import numpy as np
 from line_profiler.explicit_profiler import profile
+
+
+if TYPE_CHECKING:
+    from giskardpy.symbol_manager import SymbolManager
 
 builtin_max = builtins.max
 builtin_min = builtins.min
@@ -170,8 +174,19 @@ class Symbol_:
 
 
 class Symbol(Symbol_):
-    def __init__(self, name: str):
-        self.s: ca.SX = ca.SX.sym(name)
+    _registry = {}
+
+    def __new__(cls, name: str):
+        """
+        Multiton design pattern prevents two symbol instances with the same name.
+        """
+        if name in cls._registry:
+            return cls._registry[name]
+        instance = super().__new__(cls)
+        instance.s = ca.SX.sym(name)
+        instance.name = name
+        cls._registry[name] = instance
+        return instance
 
     def __add__(self, other):
         if isinstance(other, (int, float)):
@@ -324,7 +339,7 @@ class Symbol(Symbol_):
         raise _operation_type_error(other, '**', self)
 
     def __hash__(self):
-        return self.s.__hash__()
+        return hash(self.name)
 
 
 class Expression(Symbol_):
@@ -1420,7 +1435,7 @@ def equivalent(expression1, expression2):
 
 def free_symbols(expression):
     expression = _to_sx(expression)
-    return ca.symvar(expression)
+    return [Symbol._registry[str(s)] for s in ca.symvar(expression)]
 
 
 def create_symbols(names):

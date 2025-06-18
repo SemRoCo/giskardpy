@@ -85,7 +85,7 @@ class SymbolManager(metaclass=SingletonMeta):
         root_T_tip = cas.TransMatrix(symbols)
         return root_T_tip
 
-    # @profile
+    @profile
     def resolve_symbols(self, symbols: Union[List[cas.Symbol], List[List[cas.Symbol]]]) \
             -> Union[np.ndarray, List[np.ndarray]]:
         try:

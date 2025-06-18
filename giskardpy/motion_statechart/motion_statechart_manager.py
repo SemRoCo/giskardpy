@@ -1,4 +1,5 @@
 import ast
+import itertools
 from collections import OrderedDict
 from functools import cached_property
 from itertools import chain
@@ -228,16 +229,29 @@ class MotionStatechartManager:
                      + monitor_obs_expr.free_symbols()
                      + goal_obs_expr.free_symbols())
 
-        for s in god_map.world.get_state_symbols():
-            if s.s in params:
-                params.remove(s.s)
+        for s in itertools.chain(god_map.world.get_state_symbols(),
+                                 self.task_state.get_life_cycle_state_symbols(),
+                                 self.monitor_state.get_life_cycle_state_symbols(),
+                                 self.goal_state.get_life_cycle_state_symbols(),
+                                 self.task_state.get_observation_state_symbols(),
+                                 self.monitor_state.get_observation_state_symbols(),
+                                 self.goal_state.get_observation_state_symbols()):
+            if s in params:
+                params.remove(s)
         self.aux_symbols = list(params)
 
         self.observation_state_updater = cas.StackedCompiledFunction(
             expressions=[task_obs_expr,
                          monitor_obs_expr,
                          goal_obs_expr],
-            parameters=[god_map.world.get_state_symbols(), self.aux_symbols])
+            parameters=[god_map.world.get_state_symbols(),
+                        self.task_state.get_life_cycle_state_symbols(),
+                        self.monitor_state.get_life_cycle_state_symbols(),
+                        self.goal_state.get_life_cycle_state_symbols(),
+                        self.task_state.get_observation_state_symbols(),
+                        self.monitor_state.get_observation_state_symbols(),
+                        self.goal_state.get_observation_state_symbols(),
+                        self.aux_symbols])
 
         self.initialize_states()
 
@@ -360,11 +374,17 @@ class MotionStatechartManager:
     def evaluate_node_states(self) -> bool:
         # %% update observation state
         obs_aux_args = symbol_manager.resolve_symbols(self.aux_symbols)
-        asdf = symbol_manager.resolve_symbols(self.observation_state_updater.params[1])
 
         next_state, done, exception = self.evaluate_payload_monitors()
 
-        obs_result = self.observation_state_updater.fast_call(god_map.world.state.data, obs_aux_args)
+        obs_result = self.observation_state_updater.fast_call(god_map.world.state.data,
+                                                              self.task_state.life_cycle_state,
+                                                              self.monitor_state.life_cycle_state,
+                                                              self.goal_state.life_cycle_state,
+                                                              self.task_state.observation_state,
+                                                              self.monitor_state.observation_state,
+                                                              self.goal_state.observation_state,
+                                                              obs_aux_args)
         self.task_state.observation_state = obs_result[0]
         self.monitor_state.observation_state = obs_result[1]
         self.goal_state.observation_state = obs_result[2]

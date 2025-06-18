@@ -110,6 +110,9 @@ class LocalMinimumReached(Monitor):
         condition_list = []
         traj_length_in_sec = symbol_manager.time
         condition_list.append(cas.greater(traj_length_in_sec, 1))
+        if len(god_map.free_variables) == 0:
+            self.observation_expression = cas.BinaryTrue
+            return
         for free_variable in god_map.free_variables:
             free_variable_name = free_variable.name
             velocity_limit = symbol_manager.evaluate_expr(free_variable.get_upper_limit(Derivatives.velocity))

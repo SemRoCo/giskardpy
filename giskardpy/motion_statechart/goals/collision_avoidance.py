@@ -112,19 +112,19 @@ class ExternalCA(Goal):
                                        upper_slack_limit=upper_slack)
 
     def map_V_n_symbol(self):
-        return god_map.collision_scene.get_map_V_n_symbol(self.link_name, self.idx)
+        return god_map.collision_scene.external_map_V_n_symbol(self.link_name, self.idx)
 
     def get_closest_point_on_a_in_a(self):
-        return god_map.collision_scene.get_closest_point_on_a_in_a(self.link_name, self.idx)
+        return god_map.collision_scene.external_new_a_P_pa_symbol(self.link_name, self.idx)
 
     def get_actual_distance(self):
-        return god_map.collision_scene.get_actual_distance(self.link_name, self.idx)
+        return god_map.collision_scene.external_contact_distance_symbol(self.link_name, self.idx)
 
     def get_link_b_hash(self):
-        return god_map.collision_scene.get_link_b_hash(self.link_name, self.idx)
+        return god_map.collision_scene.external_link_b_hash_symbol(self.link_name, self.idx)
 
     def get_number_of_external_collisions(self):
-        return god_map.collision_scene.get_number_of_external_collisions(self.link_name)
+        return god_map.collision_scene.external_number_of_collisions_symbol(self.link_name)
 
 
 class SelfCA(Goal):
@@ -208,34 +208,21 @@ class SelfCA(Goal):
                                        lower_slack_limit=-float('inf'),
                                        upper_slack_limit=upper_slack)
 
-    def get_self_collision(self) -> Collision:
-        return god_map.closest_point.get_self_collisions(self.link_a, self.link_b)[self.idx]
-
-    @property
-    def symbol_name_prefix(self) -> str:
-        return f'self_collision({self.link_a}, {self.link_b})[{self.idx}]'
-
     def get_contact_normal_in_b(self):
-        return symbol_manager.register_vector3(name=f'{self.symbol_name_prefix}.new_b_V_n',
-                                               provider=lambda: self.get_self_collision().new_b_V_n)
+        return god_map.collision_scene.self_new_b_V_n_symbol(self.link_a, self.link_b, self.idx)
 
     def get_position_on_a_in_a(self):
-        return symbol_manager.register_point3(name=f'{self.symbol_name_prefix}.new_a_P_pa',
-                                              provider=lambda: self.get_self_collision().new_a_P_pa)
+        return god_map.collision_scene.self_new_a_P_pa_symbol(self.link_a, self.link_b, self.idx)
 
     def get_b_T_pb(self) -> cas.TransMatrix:
-        p = symbol_manager.register_point3(name=f'{self.symbol_name_prefix}.new_b_P_pb',
-                                           provider=lambda: self.get_self_collision().new_b_P_pb)
+        p = god_map.collision_scene.self_new_b_P_pb_symbol(self.link_a, self.link_b, self.idx)
         return cas.TransMatrix.from_xyz_rpy(x=p.x, y=p.y, z=p.z)
 
     def get_actual_distance(self):
-        return symbol_manager.register_symbol_provider(name=f'{self.symbol_name_prefix}.contact_distance',
-                                                       provider=lambda: self.get_self_collision().contact_distance)
+        return god_map.collision_scene.self_contact_distance_symbol(self.link_a, self.link_b, self.idx)
 
     def get_number_of_self_collisions(self):
-        return symbol_manager.register_symbol_provider(name=f'{self.link_a},{self.link_b}.get_number_of_self_collisions',
-                                                       provider=lambda: god_map.closest_point.get_number_of_self_collisions(
-                                                  self.link_a, self.link_b))
+        return god_map.collision_scene.self_number_of_collisions_symbol(self.link_a, self.link_b)
 
 
 class CollisionAvoidanceHint(Goal):

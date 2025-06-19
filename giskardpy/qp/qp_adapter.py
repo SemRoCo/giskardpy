@@ -1522,6 +1522,9 @@ class GiskardToQPAdapter(abc.ABC):
     world_state_symbols: List[cas.Symbol]
     task_life_cycle_symbols: List[cas.Symbol]
     goal_life_cycle_symbols: List[cas.Symbol]
+    external_collision_symbols: List[cas.Symbol]
+    self_collision_symbols: List[cas.Symbol]
+
     free_variables: List[FreeVariable]
     equality_constraints: List[EqualityConstraint]
     inequality_constraints: List[InequalityConstraint]
@@ -1635,6 +1638,8 @@ class GiskardToQPAdapter(abc.ABC):
                  world_state: np.ndarray,
                  task_life_cycle_state: np.ndarray,
                  goal_life_cycle_state: np.ndarray,
+                 external_collision_data: np.ndarray,
+                 self_collision_data: np.ndarray,
                  symbol_manager: SymbolManager):
         ...
 
@@ -1731,7 +1736,9 @@ class GiskardToExplicitQPAdapter(GiskardToQPAdapter):
         free_symbols.update(neq_upper_bounds.free_symbols())
         for s in itertools.chain(self.world_state_symbols,
                                  self.task_life_cycle_symbols,
-                                 self.goal_life_cycle_symbols):
+                                 self.goal_life_cycle_symbols,
+                                 self.external_collision_symbols,
+                                 self.self_collision_symbols):
             if s in free_symbols:
                 free_symbols.remove(s)
         self.aux_symbols = list(free_symbols)
@@ -1739,6 +1746,8 @@ class GiskardToExplicitQPAdapter(GiskardToQPAdapter):
         self.free_symbols = [self.world_state_symbols,
                              self.task_life_cycle_symbols,
                              self.goal_life_cycle_symbols,
+                             self.external_collision_symbols,
+                             self.self_collision_symbols,
                              self.aux_symbols]
 
         self.eq_matrix_compiled = eq_matrix.compile(parameters=self.free_symbols, sparse=self.sparse)
@@ -1783,16 +1792,22 @@ class GiskardToExplicitQPAdapter(GiskardToQPAdapter):
                  world_state: np.ndarray,
                  task_life_cycle_state: np.ndarray,
                  goal_life_cycle_state: np.ndarray,
+                 external_collision_data: np.ndarray,
+                 self_collision_data: np.ndarray,
                  symbol_manager: SymbolManager):
         aux_substitutions = symbol_manager.resolve_symbols([self.aux_symbols])
 
         eq_matrix_np_raw = self.eq_matrix_compiled.fast_call(world_state,
                                                              task_life_cycle_state,
                                                              goal_life_cycle_state,
+                                                             external_collision_data,
+                                                             self_collision_data,
                                                              *aux_substitutions)
         neq_matrix_np_raw = self.neq_matrix_compiled.fast_call(world_state,
                                                                task_life_cycle_state,
                                                                goal_life_cycle_state,
+                                                               external_collision_data,
+                                                               self_collision_data,
                                                                *aux_substitutions)
         quadratic_weights_np_raw, \
             linear_weights_np_raw, \
@@ -1803,17 +1818,19 @@ class GiskardToExplicitQPAdapter(GiskardToQPAdapter):
             neq_upper_bounds_np_raw = self.combined_vector_f.fast_call(world_state,
                                                                        task_life_cycle_state,
                                                                        goal_life_cycle_state,
+                                                                       external_collision_data,
+                                                                       self_collision_data,
                                                                        *aux_substitutions)
 
         self.qp_data_raw = QPData(quadratic_weights=quadratic_weights_np_raw,
-                             linear_weights=linear_weights_np_raw,
-                             box_lower_constraints=box_lower_constraints_np_raw,
-                             box_upper_constraints=box_upper_constraints_np_raw,
-                             eq_matrix=eq_matrix_np_raw,
-                             eq_bounds=eq_bounds_np_raw,
-                             neq_matrix=neq_matrix_np_raw,
-                             neq_lower_bounds=neq_lower_bounds_np_raw,
-                             neq_upper_bounds=neq_upper_bounds_np_raw)
+                                  linear_weights=linear_weights_np_raw,
+                                  box_lower_constraints=box_lower_constraints_np_raw,
+                                  box_upper_constraints=box_upper_constraints_np_raw,
+                                  eq_matrix=eq_matrix_np_raw,
+                                  eq_bounds=eq_bounds_np_raw,
+                                  neq_matrix=neq_matrix_np_raw,
+                                  neq_lower_bounds=neq_lower_bounds_np_raw,
+                                  neq_upper_bounds=neq_upper_bounds_np_raw)
 
         zero_quadratic_weight_filter, bE_filter, bA_filter = self.create_filters(
             quadratic_weights_np_raw=quadratic_weights_np_raw,

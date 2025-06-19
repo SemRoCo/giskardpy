@@ -35,6 +35,7 @@ class ExternalCA(Goal):
         self.idx = idx
         name = f'{name_prefix}/{self.__class__.__name__}/{self.link_name}/{self.idx}'
         super().__init__(name=name, plot=False)
+        god_map.collision_scene.monitor_link_for_external(link_name, idx)
         self.root = god_map.world.root_link_name
         self.robot_name = robot_name
         self.control_horizon = god_map.qp_controller.prediction_horizon - (
@@ -150,6 +151,7 @@ class SelfCA(Goal):
             raise Exception(f'Links {self.link_a} and {self.link_b} have different prefix.')
         name = f'{name_prefix}/{self.__class__.__name__}/{self.link_a}/{self.link_b}/{self.idx}'
         super().__init__(name=name, plot=False)
+        god_map.collision_scene.monitor_link_for_self(link_a, link_b, idx)
         self.root = god_map.world.root_link_name
         self.robot_name = robot_name
         self.control_horizon = god_map.qp_controller.prediction_horizon - (

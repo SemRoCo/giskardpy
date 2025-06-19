@@ -174,6 +174,8 @@ class QPController:
                 world_state_symbols=god_map.world.get_state_symbols(),
                 task_life_cycle_symbols=god_map.motion_statechart_manager.task_state.get_life_cycle_state_symbols(),
                 goal_life_cycle_symbols=god_map.motion_statechart_manager.goal_state.get_life_cycle_state_symbols(),
+                external_collision_symbols=god_map.collision_scene.get_external_collision_symbol(),
+                self_collision_symbols=god_map.collision_scene.get_self_collision_symbol(),
                 free_variables=free_variables,
                 equality_constraints=equality_constraints,
                 inequality_constraints=inequality_constraints,
@@ -221,6 +223,8 @@ class QPController:
                 qp_data = self.qp_adapters[0].evaluate(god_map.world.state.data,
                                                        god_map.motion_statechart_manager.task_state.life_cycle_state,
                                                        god_map.motion_statechart_manager.goal_state.life_cycle_state,
+                                                       god_map.collision_scene.get_external_collision_data(),
+                                                       god_map.collision_scene.get_self_collision_data(),
                                                        symbol_manager)
             self.xdot_full = self.qp_solver.solver_call(qp_data)
             # self._create_debug_pandas(self.qp_solver)
@@ -236,7 +240,7 @@ class QPController:
                                                               self.mpc_dt)
         except InfeasibleException as e_original:
             self.xdot_full = None
-            self._create_debug_pandas(self.qp_solver)
+            self._create_debug_pandas()
             self._has_nan()
             self._print_iis()
             if isinstance(e_original, HardConstraintsViolatedException):
@@ -371,7 +375,8 @@ class QPController:
             self.p_ubA = deepcopy(self.p_ubA_raw)
             self.p_ubA /= adapter.mpc_dt
 
-            self.p_bA_raw = pd.DataFrame({'lbA': qp_data.neq_lower_bounds, 'ubA': qp_data.neq_upper_bounds}, inequality_constr_names, dtype=float)
+            self.p_bA_raw = pd.DataFrame({'lbA': qp_data.neq_lower_bounds, 'ubA': qp_data.neq_upper_bounds},
+                                         inequality_constr_names, dtype=float)
             self.p_bA = deepcopy(self.p_bA_raw)
             self.p_bA /= adapter.mpc_dt
         else:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import abc
+import itertools
 from abc import ABC
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -1519,6 +1520,8 @@ class QPData:
 @dataclass
 class GiskardToQPAdapter(abc.ABC):
     world_state_symbols: List[cas.Symbol]
+    task_life_cycle_symbols: List[cas.Symbol]
+    goal_life_cycle_symbols: List[cas.Symbol]
     free_variables: List[FreeVariable]
     equality_constraints: List[EqualityConstraint]
     inequality_constraints: List[InequalityConstraint]
@@ -1628,7 +1631,11 @@ class GiskardToQPAdapter(abc.ABC):
         ...
 
     @abc.abstractmethod
-    def evaluate(self, world_state: np.ndarray, symbol_manager: SymbolManager):
+    def evaluate(self,
+                 world_state: np.ndarray,
+                 task_life_cycle_state: np.ndarray,
+                 goal_life_cycle_state: np.ndarray,
+                 symbol_manager: SymbolManager):
         ...
 
     @profile
@@ -1722,12 +1729,17 @@ class GiskardToExplicitQPAdapter(GiskardToQPAdapter):
         free_symbols.update(neq_matrix.free_symbols())
         free_symbols.update(neq_lower_bounds.free_symbols())
         free_symbols.update(neq_upper_bounds.free_symbols())
-        for s in self.world_state_symbols:
+        for s in itertools.chain(self.world_state_symbols,
+                                 self.task_life_cycle_symbols,
+                                 self.goal_life_cycle_symbols):
             if s in free_symbols:
                 free_symbols.remove(s)
         self.aux_symbols = list(free_symbols)
 
-        self.free_symbols = [self.world_state_symbols, self.aux_symbols]
+        self.free_symbols = [self.world_state_symbols,
+                             self.task_life_cycle_symbols,
+                             self.goal_life_cycle_symbols,
+                             self.aux_symbols]
 
         self.eq_matrix_compiled = eq_matrix.compile(parameters=self.free_symbols, sparse=self.sparse)
         self.neq_matrix_compiled = neq_matrix.compile(parameters=self.free_symbols, sparse=self.sparse)
@@ -1767,18 +1779,31 @@ class GiskardToExplicitQPAdapter(GiskardToQPAdapter):
         return zero_quadratic_weight_filter, self.bE_filter, self.bA_filter
 
     @profile
-    def evaluate(self, world_state: np.ndarray, symbol_manager: SymbolManager):
+    def evaluate(self,
+                 world_state: np.ndarray,
+                 task_life_cycle_state: np.ndarray,
+                 goal_life_cycle_state: np.ndarray,
+                 symbol_manager: SymbolManager):
         aux_substitutions = symbol_manager.resolve_symbols([self.aux_symbols])
 
-        eq_matrix_np_raw = self.eq_matrix_compiled.fast_call(world_state, *aux_substitutions)
-        neq_matrix_np_raw = self.neq_matrix_compiled.fast_call(world_state, *aux_substitutions)
+        eq_matrix_np_raw = self.eq_matrix_compiled.fast_call(world_state,
+                                                             task_life_cycle_state,
+                                                             goal_life_cycle_state,
+                                                             *aux_substitutions)
+        neq_matrix_np_raw = self.neq_matrix_compiled.fast_call(world_state,
+                                                               task_life_cycle_state,
+                                                               goal_life_cycle_state,
+                                                               *aux_substitutions)
         quadratic_weights_np_raw, \
             linear_weights_np_raw, \
             box_lower_constraints_np_raw, \
             box_upper_constraints_np_raw, \
             eq_bounds_np_raw, \
             neq_lower_bounds_np_raw, \
-            neq_upper_bounds_np_raw = self.combined_vector_f.fast_call(world_state, *aux_substitutions)
+            neq_upper_bounds_np_raw = self.combined_vector_f.fast_call(world_state,
+                                                                       task_life_cycle_state,
+                                                                       goal_life_cycle_state,
+                                                                       *aux_substitutions)
 
         self.qp_data_raw = QPData(quadratic_weights=quadratic_weights_np_raw,
                              linear_weights=linear_weights_np_raw,

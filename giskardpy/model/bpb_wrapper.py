@@ -21,42 +21,17 @@ if not hasattr(pb, '__version__') or pb.__version__ != '1.0.0':
 class BPCollisionWrapper(Collision):
     def __init__(self, pb_collision: pb.Collision):
         self.pb_collision = pb_collision
-        self.link_a = self.pb_collision.obj_a.name
-        self.link_b = self.pb_collision.obj_b.name
+        super().__init__(link_a=self.pb_collision.obj_a.name,
+                         link_b=self.pb_collision.obj_b.name,
+                         contact_distance=self.pb_collision.contact_distance,
+                         map_P_pa=self.pb_collision.map_P_pa,
+                         map_P_pb=self.pb_collision.map_P_pb,
+                         map_V_n=self.pb_collision.world_V_n,
+                         a_P_pa=self.pb_collision.a_P_pa,
+                         b_P_pb=self.pb_collision.b_P_pb)
         self.original_link_a = self.link_a
         self.original_link_b = self.link_b
         self.is_external = None
-        self.new_a_P_pa = None
-        self.new_b_P_pb = None
-        self.new_b_V_n = None
-
-    @property
-    def map_P_pa(self):
-        return self.pb_collision.map_P_pa
-
-    @property
-    def map_P_pb(self):
-        return self.pb_collision.map_P_pb
-
-    @property
-    def map_V_n(self):
-        return self.pb_collision.world_V_n
-
-    @property
-    def a_P_pa(self):
-        return self.pb_collision.a_P_pa
-
-    @property
-    def b_P_pb(self):
-        return self.pb_collision.b_P_pb
-
-    @property
-    def contact_distance(self):
-        return self.pb_collision.contact_distance
-
-    @property
-    def link_b_hash(self):
-        return self.link_b.__hash__()
 
 
 def create_cube_shape(extents: Tuple[float, float, float]) -> pb.BoxShape:

@@ -749,8 +749,9 @@ class TestCASWrapper(unittest.TestCase):
         print(f"Dense timing: {dense_time:.3f}s")
 
     def test_matrix_arg(self):
-        symbols = cas.create_symbols(10)
-        symbols2 = cas.create_symbols(10)
+        symbols = cas.create_symbols(100)
+        symbols2 = symbols[:50]
+        symbols = symbols[50:]
         expr = cas.sum(cas.Expression(symbols)) * cas.sum(cas.Expression(symbols2))
         expr_f = expr.compile(parameters=[symbols, symbols2])
         params = np.arange(len(symbols), dtype=float)

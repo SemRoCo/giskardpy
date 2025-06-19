@@ -172,6 +172,8 @@ class QPController:
         for _ in range(num_adapters):
             self.qp_adapters.append(self.qp_solver.required_adapter_type(
                 world_state_symbols=god_map.world.get_state_symbols(),
+                task_life_cycle_symbols=god_map.motion_statechart_manager.task_state.get_life_cycle_state_symbols(),
+                goal_life_cycle_symbols=god_map.motion_statechart_manager.goal_state.get_life_cycle_state_symbols(),
                 free_variables=free_variables,
                 equality_constraints=equality_constraints,
                 inequality_constraints=inequality_constraints,
@@ -212,16 +214,14 @@ class QPController:
         Uses substitutions for each symbol to compute the next commands for each joint.
         """
         try:
-            # todo
-            # 1. get qp data(s)
-            # 2. solve qp(s)
-            # 3. decide solution
-            # 4. return
             if self.qp_formulation.double_qp:
                 for adapter in self.qp_adapters:
                     qp_data = adapter.evaluate(god_map.world.state.data, symbol_manager)
             else:
-                qp_data = self.qp_adapters[0].evaluate(god_map.world.state.data, symbol_manager)
+                qp_data = self.qp_adapters[0].evaluate(god_map.world.state.data,
+                                                       god_map.motion_statechart_manager.task_state.life_cycle_state,
+                                                       god_map.motion_statechart_manager.goal_state.life_cycle_state,
+                                                       symbol_manager)
             self.xdot_full = self.qp_solver.solver_call(qp_data)
             # self._create_debug_pandas(self.qp_solver)
             if self.qp_formulation.is_implicit:

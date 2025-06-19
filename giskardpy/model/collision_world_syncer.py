@@ -6,6 +6,7 @@ from itertools import product, combinations_with_replacement, combinations
 from typing import List, Dict, Optional, Tuple, Iterable, Set, DefaultDict, Callable
 
 import numpy as np
+from giskardpy.symbol_manager import symbol_manager
 from lxml import etree
 
 from giskardpy.data_types.data_types import Derivatives, PrefixName
@@ -15,6 +16,7 @@ from giskardpy.middleware import get_middleware
 from giskardpy.model.world import WorldBranch
 from giskardpy.qp.free_variable import FreeVariable
 from line_profiler import profile
+import giskardpy.casadi_wrapper as cas
 
 np.random.seed(1337)
 
@@ -81,48 +83,131 @@ class CollisionAvoidanceGroupThresholds:
 
 
 class Collision:
+    contact_distance_idx: int = 0
+    hash_idx: int = 1
+    map_P_pa_idx: int = 2
+    map_P_pb_idx: int = 6
+    map_V_n_idx: int = 10
+    a_P_pa_idx: int = 14
+    b_P_pb_idx: int = 18
+    new_a_P_pa_idx: int = 22
+    new_b_P_pb_idx: int = 26
+    new_b_V_n_idx: int = 30
+    data: np.ndarray
+
     def __init__(self, link_a, link_b, contact_distance,
                  map_P_pa=None, map_P_pb=None, map_V_n=None,
                  a_P_pa=None, b_P_pb=None):
-        self.contact_distance = contact_distance
-        self.link_a = link_a
-        self.original_link_a = link_a
-        self.link_b = link_b
-        self.link_b_hash = self.link_b.__hash__()
-        self.original_link_b = link_b
         self.is_external = None
+        self.original_link_a = link_a
+        self.link_a = link_a
+        self.link_b = link_b
+        self.original_link_b = link_b
 
-        self.map_P_pa = self.__point_to_4d(map_P_pa)
-        self.map_P_pb = self.__point_to_4d(map_P_pb)
-        self.map_V_n = self.__vector_to_4d(map_V_n)
-        self.a_P_pa = self.__point_to_4d(a_P_pa)
-        self.b_P_pb = self.__point_to_4d(b_P_pb)
+        self.data = np.array([contact_distance,
+                              self.link_b.__hash__(), #hash
+                              0, 0, 0, 1,  # map_P_pa
+                              0, 0, 0, 1,  # map_P_pb
+                              0, 0, 0, 0,  # map_V_n
+                              0, 0, 0, 1,  # a_P_pa
+                              0, 0, 0, 1,  # b_P_pb
+                              0, 0, 0, 1,  # new_a_P_pa
+                              0, 0, 0, 1,  # new_b_p_pb
+                              0, 0, 0, 0],  # new_b_V_n
+                             dtype=float)
 
-        self.new_a_P_pa = None
-        self.new_b_P_pb = None
-        self.new_b_V_n = None
+        if map_P_pb is not None:
+            self.map_P_pa = map_P_pa
+        if map_P_pb is not None:
+            self.map_P_pb = map_P_pb
+        if map_V_n is not None:
+            self.map_V_n = map_V_n
+        if a_P_pa is not None:
+            self.a_P_pa = a_P_pa
+        if b_P_pb is not None:
+            self.b_P_pb = b_P_pb
+
+    @property
+    def contact_distance(self) -> float:
+        return self.data[self.contact_distance_idx]
+
+    @contact_distance.setter
+    def contact_distance(self, value: float):
+        self.data[self.contact_distance_idx] = value
+
+    @property
+    def link_b_hash(self) -> float:
+        return self.data[self.hash_idx]
+
+    @property
+    def map_P_pa(self) -> np.ndarray:
+        return self.data[self.map_P_pa_idx:self.map_P_pa_idx + 4]
+
+    @map_P_pa.setter
+    def map_P_pa(self, value: np.ndarray):
+        self.data[self.map_P_pa_idx:self.map_P_pa_idx + 3] = value[:3]
+
+    @property
+    def map_P_pb(self) -> np.ndarray:
+        return self.data[self.map_P_pb_idx:self.map_P_pb_idx + 4]
+
+    @map_P_pb.setter
+    def map_P_pb(self, value: np.ndarray):
+        self.data[self.map_P_pb_idx:self.map_P_pb_idx + 3] = value[:3]
+
+    @property
+    def map_V_n(self) -> np.ndarray:
+        return self.data[self.map_V_n_idx:self.map_V_n_idx + 4]
+
+    @map_V_n.setter
+    def map_V_n(self, value: np.ndarray):
+        self.data[self.map_V_n_idx:self.map_V_n_idx + 3] = value[:3]
+
+    @property
+    def a_P_pa(self) -> np.ndarray:
+        return self.data[self.a_P_pa_idx:self.a_P_pa_idx + 4]
+
+    @a_P_pa.setter
+    def a_P_pa(self, value: np.ndarray):
+        self.data[self.a_P_pa_idx:self.a_P_pa_idx + 3] = value[:3]
+
+    @property
+    def b_P_pb(self) -> np.ndarray:
+        return self.data[self.b_P_pb_idx:self.b_P_pb_idx + 4]
+
+    @b_P_pb.setter
+    def b_P_pb(self, value: np.ndarray):
+        self.data[self.b_P_pb_idx:self.b_P_pb_idx + 3] = value[:3]
+
+    @property
+    def new_a_P_pa(self):
+        return self.data[self.new_a_P_pa_idx: self.new_a_P_pa_idx + 4]
+
+    @new_a_P_pa.setter
+    def new_a_P_pa(self, value: np.ndarray):
+        self.data[self.new_a_P_pa_idx: self.new_a_P_pa_idx + 3] = value[:3]
+
+    @property
+    def new_b_P_pb(self):
+        return self.data[self.new_b_P_pb_idx: self.new_b_P_pb_idx + 4]
+
+    @new_b_P_pb.setter
+    def new_b_P_pb(self, value: np.ndarray):
+        self.data[self.new_b_P_pb_idx: self.new_b_P_pb_idx + 3] = value[:3]
+
+    @property
+    def new_b_V_n(self):
+        return self.data[self.new_b_V_n_idx: self.new_b_V_n_idx + 4]
+
+    @new_b_V_n.setter
+    def new_b_V_n(self, value: np.ndarray):
+        self.data[self.new_b_V_n_idx: self.new_b_V_n_idx + 3] = value[:3]
 
     def __str__(self):
         return f'{self.original_link_a}|-|{self.original_link_b}: {self.contact_distance}'
 
     def __repr__(self):
         return str(self)
-
-    def __point_to_4d(self, point):
-        if point is None:
-            return point
-        point = np.array(point)
-        if len(point) == 3:
-            return np.append(point, 1)
-        return point
-
-    def __vector_to_4d(self, vector):
-        if vector is None:
-            return vector
-        vector = np.array(vector)
-        if len(vector) == 3:
-            return np.append(vector, 0)
-        return vector
 
     def reverse(self):
         return Collision(link_a=self.original_link_b,
@@ -285,6 +370,15 @@ class Collisions:
     @profile
     def get_number_of_external_collisions(self, joint_name):
         return self.number_of_external_collisions[joint_name]
+
+    def get_map_V_n_symbol(self, link_name, idx) -> cas.Symbol:
+        s = symbol_manager.register_vector3(name=f'external_collision({link_name})[{idx}].map_V_n',
+                                            provider=lambda n=link_name,
+                                                            i=idx: self.get_external_collisions(n)[i].map_V_n)
+        return s
+
+    def get_external_data(self):
+        pass
 
     # 
     def get_self_collisions(self, link_a: PrefixName, link_b: PrefixName) -> SortedCollisionResults:

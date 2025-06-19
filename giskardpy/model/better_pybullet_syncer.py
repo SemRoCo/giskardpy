@@ -47,10 +47,10 @@ class BetterPyBulletSyncer(CollisionWorldSynchronizer):
         """
         :param collision_list_sizes: max number of collisions
         """
-        # god_map.collision_scene.sync()
         query = self.cut_off_distances_to_query(self.collision_matrix, buffer=buffer)
         result: List[bpb.Collision] = self.kw.get_closest_filtered_map_batch(query)
-        return self.bpb_result_to_collisions(result, collision_list_sizes)
+        self.closest_points = self.bpb_result_to_collisions(result, collision_list_sizes)
+        return self.closest_points
 
     @profile
     def find_colliding_combinations(self, link_combinations: Iterable[Tuple[PrefixName, PrefixName]],

@@ -111,37 +111,20 @@ class ExternalCA(Goal):
                                        lower_slack_limit=-float('inf'),
                                        upper_slack_limit=upper_slack)
 
-    def get_external_collision(self, n, i) -> Collision:
-        return god_map.closest_point.get_external_collisions(n)[i]
-
-    @property
-    def symbol_name_prefix(self) -> str:
-        return f'external_collision({self.link_name})[{self.idx}]'
-
     def map_V_n_symbol(self):
-        return symbol_manager.register_vector3(name=f'{self.symbol_name_prefix}.map_V_n',
-                                               provider=lambda n=self.link_name,
-                                                               i=self.idx: self.get_external_collision(n, i).map_V_n)
+        return god_map.collision_scene.get_map_V_n_symbol(self.link_name, self.idx)
 
     def get_closest_point_on_a_in_a(self):
-        return symbol_manager.register_point3(name=f'{self.symbol_name_prefix}.new_a_P_pa',
-                                              provider=lambda n=self.link_name, i=self.idx: self.get_external_collision(
-                                                  n, i).new_a_P_pa)
+        return god_map.collision_scene.get_closest_point_on_a_in_a(self.link_name, self.idx)
 
     def get_actual_distance(self):
-        return symbol_manager.register_symbol_provider(name=f'{self.symbol_name_prefix}.contact_distance',
-                                                       provider=lambda n=self.link_name, i=self.idx: self.get_external_collision(
-                                                  n, i).contact_distance)
+        return god_map.collision_scene.get_actual_distance(self.link_name, self.idx)
 
     def get_link_b_hash(self):
-        return symbol_manager.register_symbol_provider(name=f'{self.symbol_name_prefix}.link_b_hash',
-                                                       provider=lambda n=self.link_name, i=self.idx: self.get_external_collision(
-                                                  n, i).link_b_hash)
+        return god_map.collision_scene.get_link_b_hash(self.link_name, self.idx)
 
     def get_number_of_external_collisions(self):
-        return symbol_manager.register_symbol_provider(name=f'{self.link_name}.num_collisions',
-                                                       provider=lambda: god_map.closest_point.get_number_of_external_collisions(
-                                                  self.link_name))
+        return god_map.collision_scene.get_number_of_external_collisions(self.link_name)
 
 
 class SelfCA(Goal):

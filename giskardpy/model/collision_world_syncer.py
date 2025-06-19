@@ -83,16 +83,20 @@ class CollisionAvoidanceGroupThresholds:
 
 
 class Collision:
-    contact_distance_idx: int = 0
-    hash_idx: int = 1
-    map_P_pa_idx: int = 2
-    map_P_pb_idx: int = 6
-    map_V_n_idx: int = 10
-    a_P_pa_idx: int = 14
-    b_P_pb_idx: int = 18
-    new_a_P_pa_idx: int = 22
-    new_b_P_pb_idx: int = 26
-    new_b_V_n_idx: int = 30
+    hash_idx: int = 0
+    map_V_n_idx: int = 1
+
+    contact_distance_idx: int = 5
+    new_a_P_pa_idx: int = 6
+
+    new_b_V_n_idx: int = 10
+    new_b_P_pb_idx: int = 14
+
+    map_P_pa_idx: int = 18
+    map_P_pb_idx: int = 22
+    a_P_pa_idx: int = 26
+    b_P_pb_idx: int = 30
+
     data: np.ndarray
 
     def __init__(self, link_a, link_b, contact_distance,
@@ -104,17 +108,22 @@ class Collision:
         self.link_b = link_b
         self.original_link_b = link_b
 
-        self.data = np.array([contact_distance,
-                              self.link_b.__hash__(), #hash
-                              0, 0, 0, 1,  # map_P_pa
-                              0, 0, 0, 1,  # map_P_pb
-                              0, 0, 0, 0,  # map_V_n
-                              0, 0, 0, 1,  # a_P_pa
-                              0, 0, 0, 1,  # b_P_pb
-                              0, 0, 0, 1,  # new_a_P_pa
-                              0, 0, 0, 1,  # new_b_p_pb
-                              0, 0, 0, 0],  # new_b_V_n
-                             dtype=float)
+        self.data = np.array([
+            self.link_b.__hash__(),  # hash
+            0, 0, 1, 0,  # map_V_n
+
+            contact_distance,
+            0, 0, 0, 1,  # new_a_P_pa
+
+            0, 0, 1, 0,  # new_b_V_n
+            0, 0, 0, 1,  # new_b_P_pb
+
+            0, 0, 0, 1,  # map_P_pa
+            0, 0, 0, 1,  # map_P_pb
+            0, 0, 0, 1,  # a_P_pa
+            0, 0, 0, 1,  # b_P_pb
+        ],
+            dtype=float)
 
         if map_P_pb is not None:
             self.map_P_pa = map_P_pa
@@ -126,6 +135,18 @@ class Collision:
             self.a_P_pa = a_P_pa
         if b_P_pb is not None:
             self.b_P_pb = b_P_pb
+
+    @property
+    def external_data(self) -> np.ndarray:
+        return self.data[:self.new_b_V_n_idx]
+
+    @property
+    def self_data(self) -> np.ndarray:
+        return self.data[self.contact_distance_idx:self.map_P_pa_idx]
+
+    @property
+    def external_and_self_data(self) -> np.ndarray:
+        return self.data[:self.map_P_pa_idx]
 
     @property
     def contact_distance(self) -> float:
@@ -224,15 +245,7 @@ class SortedCollisionResults:
     data: List[Collision]
     default_result = Collision(link_a='',
                                link_b='',
-                               contact_distance=100,
-                               map_P_pa=[0, 0, 0, 1],
-                               map_P_pb=[0, 0, 0, 1],
-                               map_V_n=[0, 0, 1, 0],
-                               a_P_pa=[0, 0, 0, 1],
-                               b_P_pb=[0, 0, 0, 1])
-    default_result.new_a_P_pa = [0, 0, 0, 1]
-    default_result.new_b_P_pb = [0, 0, 0, 1]
-    default_result.new_b_V_n = [0, 0, 1, 0]
+                               contact_distance=100)
 
     def __init__(self):
         self.data = []
@@ -255,6 +268,8 @@ class SortedCollisionResults:
 
 class Collisions:
     all_collisions: Set[Collision]
+    self_collision: Dict[Tuple[PrefixName, PrefixName], SortedCollisionResults]
+    external_collision: Dict[PrefixName, SortedCollisionResults]
 
     @profile
     def __init__(self, collision_list_size):
@@ -371,14 +386,12 @@ class Collisions:
     def get_number_of_external_collisions(self, joint_name):
         return self.number_of_external_collisions[joint_name]
 
-    def get_map_V_n_symbol(self, link_name, idx) -> cas.Symbol:
-        s = symbol_manager.register_vector3(name=f'external_collision({link_name})[{idx}].map_V_n',
-                                            provider=lambda n=link_name,
-                                                            i=idx: self.get_external_collisions(n)[i].map_V_n)
-        return s
-
-    def get_external_data(self):
-        pass
+    def get_external_data(self, links: Dict[PrefixName, int]) -> np.ndarray:
+        data = []
+        for link_a, max_idx in links.items():
+            for idx in range(max_idx):
+                data.append(self.external_collision[link_a][idx].data)
+        return np.concatenate(data)
 
     # 
     def get_self_collisions(self, link_a: PrefixName, link_b: PrefixName) -> SortedCollisionResults:
@@ -419,6 +432,7 @@ class CollisionWorldSynchronizer:
     srdf_moveit_disable_collisions = 'disable_collisions'
     collision_checker_id = CollisionCheckerLib.none
     _fixed_joints: Tuple[PrefixName, ...]
+    closest_points: Collisions
 
     def __init__(self):
         self.self_collision_matrix = {}
@@ -1063,3 +1077,30 @@ class CollisionWorldSynchronizer:
 
     def get_map_T_geometry(self, link_name: PrefixName, collision_id: int = 0) -> np.ndarray:
         return god_map.world.compute_fk_with_collision_offset_np(god_map.world.root_link_name, link_name, collision_id)
+
+    def get_map_V_n_symbol(self, link_name: PrefixName, idx: int) -> cas.Symbol:
+        provider = lambda n=link_name, i=idx: self.closest_points.get_external_collisions(n)[i].map_V_n
+        s = symbol_manager.register_vector3(name=f'closest_point({link_name})[{idx}].map_V_n',
+                                            provider=provider)
+        return s
+
+    def get_closest_point_on_a_in_a(self, link_name: PrefixName, idx: int) -> cas.Symbol:
+        provider = lambda n=link_name, i=idx: self.closest_points.get_external_collisions(n)[i].new_a_P_pa
+        s = symbol_manager.register_point3(name=f'closest_point({link_name})[{idx}].new_a_P_pa',
+                                           provider=provider)
+        return s
+
+    def get_actual_distance(self, link_name: PrefixName, idx: int) -> cas.Symbol:
+        provider = lambda n=link_name, i=idx: self.closest_points.get_external_collisions(n)[i].contact_distance
+        return symbol_manager.register_symbol_provider(name=f'closest_point({link_name})[{idx}].contact_distance',
+                                                       provider=provider)
+
+    def get_link_b_hash(self, link_name: PrefixName, idx: int) -> cas.Symbol:
+        provider = lambda n=link_name, i=idx: self.closest_points.get_external_collisions(n)[i].link_b_hash
+        return symbol_manager.register_symbol_provider(name=f'closest_point({link_name})[{idx}].link_b_hash',
+                                                       provider=provider)
+
+    def get_number_of_external_collisions(self, link_name: PrefixName) -> cas.Symbol:
+        provider = lambda n=link_name: self.closest_points.get_number_of_external_collisions(n)
+        return symbol_manager.register_symbol_provider(name=f'len(closest_point({link_name}))',
+                                                       provider=provider)

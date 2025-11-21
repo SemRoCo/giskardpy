@@ -19,6 +19,7 @@ from typing_extensions import (
 )
 
 import semantic_digital_twin.spatial_types.spatial_types as cas
+from giskardpy.data_types.exceptions import InvalidGoalException
 from giskardpy.motion_statechart.context import BuildContext, ExecutionContext
 from giskardpy.motion_statechart.data_types import (
     LifeCycleValues,
@@ -657,6 +658,10 @@ class Goal(MotionStatechartNode):
         Adds a node to this goal and the motion statechart this goal belongs to.
         Should be used in expand().
         """
+        if isinstance(node, EndMotion):
+            raise InvalidGoalException(
+                "EndMotion cannot be added as a child of a Goal. Place EndMotion at the MotionStatechart top level"
+            )
         self.nodes.append(node)
         node.parent_node = self
         self.motion_statechart.add_node(node)

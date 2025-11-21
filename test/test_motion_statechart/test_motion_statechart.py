@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 import semantic_digital_twin.spatial_types.spatial_types as cas
+from giskardpy.data_types.exceptions import InvalidGoalException
 from giskardpy.executor import Executor
 from giskardpy.model.collision_matrix_manager import CollisionRequest
 from giskardpy.model.collision_world_syncer import CollisionCheckerLib
@@ -1293,3 +1294,11 @@ def test_counting():
 
     actual = time.time() - current_time
     assert np.isclose(actual, seconds * 2, rtol=0.01)
+
+def test_goal_cannot_have_endmotion_add_node():
+    msc = MotionStatechart()
+    goal = TestGoal()
+    msc.add_node(goal)
+    with pytest.raises(InvalidGoalException):
+        goal.add_node(EndMotion())
+

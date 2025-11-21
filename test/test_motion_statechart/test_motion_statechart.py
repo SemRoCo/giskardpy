@@ -16,7 +16,8 @@ from giskardpy.motion_statechart.data_types import (
     ObservationStateValues,
 )
 from giskardpy.motion_statechart.exceptions import NotInMotionStatechartError, InvalidSelfReferenceInStartCondition, \
-    InvalidVariableInCondition
+    InvalidVariableInCondition, NodeAlreadyInMotionStatechartError, NodeAlreadyHasParentGoalError, \
+    DuplicateNodeInGoalError
 from giskardpy.motion_statechart.goals.collision_avoidance import (
     CollisionAvoidance,
 )
@@ -1377,3 +1378,36 @@ def test_end_condition_requires_observation_variables():
     err = excinfo.value
     assert err.condition_type == "end"
     assert str(err.variable_name) == str(n1.life_cycle_variable.name)
+
+def test_node_cannot_be_in_two_motion_statecharts():
+    msc1 = MotionStatechart()
+    msc2 = MotionStatechart()
+    node = ConstTrueNode()
+
+    msc1.add_node(node)
+    with pytest.raises(NodeAlreadyInMotionStatechartError):
+        msc2.add_node(node)
+
+
+def test_node_cannot_be_in_two_goals():
+    msc = MotionStatechart()
+    g1, g2 = TestGoal(), TestGoal()
+    n = ConstTrueNode()
+
+    msc.add_node(g1)
+    msc.add_node(g2)
+
+    g1.add_node(n)
+    with pytest.raises(NodeAlreadyHasParentGoalError):
+        g2.add_node(n)
+
+
+def test_duplicate_node_in_goal_is_rejected():
+    msc = MotionStatechart()
+    g = TestGoal()
+    n = ConstTrueNode()
+
+    msc.add_node(g)
+    g.add_node(n)
+    with pytest.raises(DuplicateNodeInGoalError):
+        g.add_node(n)

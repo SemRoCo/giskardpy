@@ -27,7 +27,12 @@ from giskardpy.motion_statechart.data_types import (
     TransitionKind,
 )
 from giskardpy.motion_statechart.exceptions import (
-    NotInMotionStatechartError, InvalidSelfReferenceInStartCondition, InvalidVariableInCondition,
+    NotInMotionStatechartError,
+    InvalidSelfReferenceInStartCondition,
+    InvalidVariableInCondition,
+    NodeAlreadyHasParentGoalError,
+    DuplicateNodeInGoalError,
+    NodeAlreadyInMotionStatechartError,
 )
 from giskardpy.motion_statechart.plotters.plot_specs import NodePlotSpec
 from giskardpy.qp.constraint_collection import ConstraintCollection
@@ -673,6 +678,32 @@ class Goal(MotionStatechartNode):
             raise InvalidGoalException(
                 "EndMotion cannot be added as a child of a Goal. Place EndMotion at the MotionStatechart top level"
             )
+        # Prevent duplicate insertion into the same goal
+        if node in self.nodes:
+            raise DuplicateNodeInGoalError(
+                node_name=node.unique_name if node.index is not None else node.name,
+                goal_name=self.unique_name if self.index is not None else self.name,
+            )
+
+        # Prevent cross-goal reuse of the same node instance
+        if node.parent_node is not None and node.parent_node is not self:
+            raise NodeAlreadyHasParentGoalError(
+                node_name=node.unique_name if node.index is not None else node.name,
+                current_parent=node.parent_node.unique_name,
+                target_parent=self.unique_name if self.index is not None else self.name,
+            )
+
+        # Ensure node’s motion statechart matches the goal’s MSC (or is unassigned)
+        if (
+            node._motion_statechart is not None
+            and node._motion_statechart is not self.motion_statechart
+        ):
+            raise NodeAlreadyInMotionStatechartError(
+                node_name=node.unique_name if node.index is not None else node.name,
+                current_msc=str(node._motion_statechart),
+                target_msc=str(self.motion_statechart),
+            )
+
         self.nodes.append(node)
         node.parent_node = self
         self.motion_statechart.add_node(node)

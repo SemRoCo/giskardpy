@@ -16,6 +16,9 @@ from giskardpy.motion_statechart.data_types import (
     ObservationStateValues,
 )
 from giskardpy.motion_statechart.exceptions import NodeNotFoundError
+from giskardpy.motion_statechart.exceptions import (
+    NodeAlreadyInMotionStatechartError,
+)
 from giskardpy.motion_statechart.graph_node import (
     MotionStatechartNode,
     TrinaryCondition,
@@ -427,6 +430,16 @@ class MotionStatechart(SubclassJSONSerializer):
         """
         Adds a node to the motion statechart and finalizes the initialization of the node.
         """
+        # Prevent adding a node that already belongs to a different motion statechart
+        if node._motion_statechart is not None and node._motion_statechart is not self:
+            raise NodeAlreadyInMotionStatechartError(
+                node_name=node.unique_name if node.index is not None else node.name,
+                current_msc=str(node._motion_statechart),
+                target_msc=str(self),
+            )
+        if node._motion_statechart is self:
+            return
+
         node.motion_statechart = self
         node.index = self.rx_graph.add_node(node)
         node._post_add_to_motion_statechart()

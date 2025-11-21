@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 import semantic_digital_twin.spatial_types.spatial_types as cas
-from giskardpy.data_types.exceptions import InvalidGoalException
+from giskardpy.data_types.exceptions import InvalidGoalException, NoQPControllerConfigException
 from giskardpy.executor import Executor
 from giskardpy.model.collision_matrix_manager import CollisionRequest
 from giskardpy.model.collision_world_syncer import CollisionCheckerLib
@@ -1411,3 +1411,31 @@ def test_duplicate_node_in_goal_is_rejected():
     g.add_node(n)
     with pytest.raises(DuplicateNodeInGoalError):
         g.add_node(n)
+
+def test_compile_without_qp_controller_when_no_constraints():
+    msc = MotionStatechart()
+    msc.add_node(ConstTrueNode())  # observation only, no constraints
+    exe = Executor(world=World(), controller_config=None)
+
+    #should compile fine and not create a qp_controller
+    exe.compile(msc)
+    assert exe.qp_controller is None
+
+def test_compile_raises_when_constraints_present_but_no_qp_config(pr2_world):
+    msc = MotionStatechart()
+    joint_goal = JointPositionList(
+        goal_state=JointState.from_str_dict(
+            {
+                "head_pan_joint": 0.041880780651479044,
+                "head_tilt_joint": -0.37,
+            },
+            world=pr2_world,
+        ),
+    )
+    msc.add_node(joint_goal)
+
+    exe = Executor(world=pr2_world, controller_config=None)
+
+    # should raise because constraints exist but no controller config was provided
+    with pytest.raises(NoQPControllerConfigException):
+        exe.compile(msc)

@@ -15,7 +15,8 @@ from giskardpy.motion_statechart.data_types import (
     LifeCycleValues,
     ObservationStateValues,
 )
-from giskardpy.motion_statechart.exceptions import NotInMotionStatechartError, InvalidSelfReferenceInStartCondition
+from giskardpy.motion_statechart.exceptions import NotInMotionStatechartError, InvalidSelfReferenceInStartCondition, \
+    InvalidVariableInCondition
 from giskardpy.motion_statechart.goals.collision_avoidance import (
     CollisionAvoidance,
 )
@@ -1308,3 +1309,71 @@ def test_start_condition_cannot_reference_self():
     msc.add_node(goal)
     with pytest.raises(InvalidSelfReferenceInStartCondition):
         goal.start_condition = goal.observation_variable > 0
+
+def test_start_condition_requires_observation_variables():
+    msc = MotionStatechart()
+    n1 = ConstTrueNode()
+    n2 = ConstTrueNode()
+    n3 = ConstTrueNode()
+    msc.add_node(n1)
+    msc.add_node(n2)
+    msc.add_node(n3)
+
+    # Valid: only observation variables
+    n3.start_condition = cas.trinary_logic_and(
+        n1.observation_variable, n2.observation_variable
+    )
+
+    # Invalid: includes a LifeCycleVariable
+    with pytest.raises(InvalidVariableInCondition) as excinfo:
+        n3.start_condition = cas.trinary_logic_and(
+            n1.observation_variable, n1.life_cycle_variable
+        )
+    err = excinfo.value
+    assert err.condition_type == "start"
+    # Sanity: the offending variable name is the lifecycle variable's name
+    assert str(err.variable_name) == str(n1.life_cycle_variable.name)
+
+
+def test_pause_condition_requires_observation_variables():
+    msc = MotionStatechart()
+    n1 = ConstTrueNode()
+    n2 = ConstTrueNode()
+    msc.add_node(n1)
+    msc.add_node(n2)
+
+    # Valid: only observation variables
+    n2.pause_condition = cas.trinary_logic_or(
+        n1.observation_variable, cas.trinary_logic_not(n2.observation_variable)
+    )
+
+    # Invalid: includes a LifeCycleVariable
+    with pytest.raises(InvalidVariableInCondition) as excinfo:
+        n2.pause_condition = cas.trinary_logic_and(
+            n1.observation_variable, n1.life_cycle_variable
+        )
+    err = excinfo.value
+    assert err.condition_type == "pause"
+    assert str(err.variable_name) == str(n1.life_cycle_variable.name)
+
+
+def test_end_condition_requires_observation_variables():
+    msc = MotionStatechart()
+    n1 = ConstTrueNode()
+    n2 = ConstTrueNode()
+    msc.add_node(n1)
+    msc.add_node(n2)
+
+    # Valid: only observation variables
+    n2.end_condition = cas.trinary_logic_and(
+        n1.observation_variable, n2.observation_variable
+    )
+
+    # Invalid: includes a LifeCycleVariable
+    with pytest.raises(InvalidVariableInCondition) as excinfo:
+        n2.end_condition = cas.trinary_logic_and(
+            n1.observation_variable, n1.life_cycle_variable
+        )
+    err = excinfo.value
+    assert err.condition_type == "end"
+    assert str(err.variable_name) == str(n1.life_cycle_variable.name)

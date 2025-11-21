@@ -27,7 +27,7 @@ from giskardpy.motion_statechart.data_types import (
     TransitionKind,
 )
 from giskardpy.motion_statechart.exceptions import (
-    NotInMotionStatechartError, InvalidSelfReferenceInStartCondition,
+    NotInMotionStatechartError, InvalidSelfReferenceInStartCondition, InvalidVariableInCondition,
 )
 from giskardpy.motion_statechart.plotters.plot_specs import NodePlotSpec
 from giskardpy.qp.constraint_collection import ConstraintCollection
@@ -516,6 +516,7 @@ class MotionStatechartNode(SubclassJSONSerializer):
         for var in expression.free_variables():
             if isinstance(var, ObservationVariable) and var.motion_statechart_node is self:
                 raise InvalidSelfReferenceInStartCondition(self.name)
+        self._check_condition_for_observation_variable(expression, "start")
         self._start_condition.update_expression(expression, self)
 
     @property
@@ -526,6 +527,7 @@ class MotionStatechartNode(SubclassJSONSerializer):
     def pause_condition(self, expression: cas.Expression) -> None:
         if self._pause_condition is None:
             raise NotInMotionStatechartError(self.name)
+        self._check_condition_for_observation_variable(expression, "pause")
         self._pause_condition.update_expression(expression, self)
 
     @property
@@ -536,6 +538,7 @@ class MotionStatechartNode(SubclassJSONSerializer):
     def end_condition(self, expression: cas.Expression) -> None:
         if self._end_condition is None:
             raise NotInMotionStatechartError(self.name)
+        self._check_condition_for_observation_variable(expression, "end")
         self._end_condition.update_expression(expression, self)
 
     @property
@@ -547,6 +550,11 @@ class MotionStatechartNode(SubclassJSONSerializer):
         if self._reset_condition is None:
             raise NotInMotionStatechartError(self.name)
         self._reset_condition.update_expression(expression, self)
+
+    def _check_condition_for_observation_variable(self, expression: cas.Expression, condition_type: str):
+        for var in expression.free_variables():
+            if not isinstance(var, ObservationVariable):
+                raise InvalidVariableInCondition(self.name, var.name, condition_type)
 
     def to_json(self) -> Dict[str, Any]:
         json_data = super().to_json()

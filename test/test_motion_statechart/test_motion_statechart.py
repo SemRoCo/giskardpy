@@ -15,7 +15,7 @@ from giskardpy.motion_statechart.data_types import (
     LifeCycleValues,
     ObservationStateValues,
 )
-from giskardpy.motion_statechart.exceptions import NotInMotionStatechartError
+from giskardpy.motion_statechart.exceptions import NotInMotionStatechartError, InvalidSelfReferenceInStartCondition
 from giskardpy.motion_statechart.goals.collision_avoidance import (
     CollisionAvoidance,
 )
@@ -1302,3 +1302,9 @@ def test_goal_cannot_have_endmotion_add_node():
     with pytest.raises(InvalidGoalException):
         goal.add_node(EndMotion())
 
+def test_start_condition_cannot_reference_self():
+    msc = MotionStatechart()
+    goal = TestGoal()
+    msc.add_node(goal)
+    with pytest.raises(InvalidSelfReferenceInStartCondition):
+        goal.start_condition = goal.observation_variable > 0

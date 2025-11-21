@@ -27,7 +27,7 @@ from giskardpy.motion_statechart.data_types import (
     TransitionKind,
 )
 from giskardpy.motion_statechart.exceptions import (
-    NotInMotionStatechartError,
+    NotInMotionStatechartError, InvalidSelfReferenceInStartCondition,
 )
 from giskardpy.motion_statechart.plotters.plot_specs import NodePlotSpec
 from giskardpy.qp.constraint_collection import ConstraintCollection
@@ -513,6 +513,9 @@ class MotionStatechartNode(SubclassJSONSerializer):
     def start_condition(self, expression: cas.Expression) -> None:
         if self._start_condition is None:
             raise NotInMotionStatechartError(self.name)
+        for var in expression.free_variables():
+            if isinstance(var, ObservationVariable) and var.motion_statechart_node is self:
+                raise InvalidSelfReferenceInStartCondition(self.name)
         self._start_condition.update_expression(expression, self)
 
     @property

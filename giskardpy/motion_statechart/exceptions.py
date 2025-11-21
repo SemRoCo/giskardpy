@@ -23,3 +23,12 @@ class NotInMotionStatechartError(MotionStatechartError):
         super().__init__(
             f"Operation can't be performed because node '{self.name}' does not belong to a MotionStatechart."
         )
+
+@dataclass
+class InvalidSelfReferenceInStartCondition(MotionStatechartError):
+    node_name: str
+
+    def __post_init__(self):
+        super().__init__(
+            f"Start condition of node '{self.node_name}' must not reference the node itself."
+        )

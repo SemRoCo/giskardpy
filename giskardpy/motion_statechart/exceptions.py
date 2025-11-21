@@ -47,7 +47,6 @@ class InvalidVariableInCondition(MotionStatechartError):
         )
 
 
-# New ownership/duplication errors
 @dataclass
 class NodeAlreadyInMotionStatechartError(MotionStatechartError):
     node_name: str

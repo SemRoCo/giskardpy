@@ -130,3 +130,10 @@ class DerivativeEqualityConstraint(DerivativeConstraint):
     bound: cas.ScalarData
     lower_slack_limit: cas.ScalarData
     upper_slack_limit: cas.ScalarData
+
+
+@dataclass
+class ODEConstraint(DerivativeConstraint):
+    ode_function: cas.SymbolicScalar
+    lower_slack_limit: cas.ScalarData
+    upper_slack_limit: cas.ScalarData

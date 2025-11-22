@@ -17,6 +17,7 @@ from giskardpy.qp.constraint import (
     DerivativeInequalityConstraint,
     DerivativeEqualityConstraint,
     BaseConstraint,
+    ODEConstraint,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types.derivatives import Derivatives
@@ -51,6 +52,10 @@ class ConstraintCollection:
             c for c in self.constraints if isinstance(c, DerivativeEqualityConstraint)
         ]
 
+    @property
+    def ode_constraints(self) -> List[ODEConstraint]:
+        return [c for c in self.constraints if isinstance(c, ODEConstraint)]
+
     def merge(self, name_prefix: str, other: ConstraintCollection):
         for constraint in other.constraints:
             constraint.name = f"{name_prefix}/{constraint.name}"
@@ -67,7 +72,10 @@ class ConstraintCollection:
             names.add(c.name)
 
     def get_all_float_variable_names(self) -> Set[PrefixedName]:
-        return {v.name for c in self.constraints for v in c.expression.free_variables()}
+        names = {v.name for c in self.constraints for v in c.expression.free_variables()}
+        for c in self.ode_constraints:
+            names.update({v.name for v in c.ode_function.free_variables()})
+        return names
 
     def link_to_motion_statechart_node(self, node: MotionStatechartNode):
         for constraint in self.constraints:
@@ -487,3 +495,33 @@ class ConstraintCollection:
             name=name,
             velocity_limit=max_velocity,
         )
+
+    def add_ode_constraint(
+        self,
+        target_variable: cas.SymbolicScalar,
+        ode_function: cas.SymbolicScalar,
+        weight: cas.ScalarData,
+        name: Optional[str] = None,
+        lower_slack_limit: cas.ScalarData = -Large_Number,
+        upper_slack_limit: cas.ScalarData = Large_Number,
+    ):
+        """
+        Adds a constraint of the form d(target_variable)/dt = ode_function.
+        """
+        name = name or ""
+        constraint = ODEConstraint(
+            name=name,
+            derivative=Derivatives.velocity,
+            expression=target_variable,
+            ode_function=ode_function,
+            quadratic_weight=weight,
+            normalization_factor=1.0,  # Assuming 1.0 for now, could be an argument
+            lower_slack_limit=lower_slack_limit,
+            upper_slack_limit=upper_slack_limit,
+            linear_weight=0,
+        )
+        if constraint.name in self.constraints:
+            raise DuplicateNameException(
+                f"Constraint named {constraint.name} already exists."
+            )
+        self.constraints.append(constraint)

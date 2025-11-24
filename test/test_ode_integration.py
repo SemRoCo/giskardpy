@@ -124,7 +124,7 @@ class TestODEIntegration(unittest.TestCase):
         print(current_h)
         self.assertAlmostEqual(current_h, np.exp(-0.5 * 20 * dt), delta=0.05)
 
-    def test_mixed_constraints(self):
+    def create_initial_world(self):
         # 1. Setup World with 2 DOFs
         world = World()
         with world.modify_world():
@@ -137,7 +137,7 @@ class TestODEIntegration(unittest.TestCase):
                 name=PrefixedName("rev_joint"), lower_limits=ll_rev, upper_limits=ul_rev
             )
             world.add_degree_of_freedom(rev_dof)
-            
+
             # Prismatic DOF
             ul_pris = DerivativeMap()
             ul_pris.velocity = 0.2
@@ -147,11 +147,11 @@ class TestODEIntegration(unittest.TestCase):
                 name=PrefixedName("pris_joint"), lower_limits=ll_pris, upper_limits=ul_pris
             )
             world.add_degree_of_freedom(pris_dof)
-            
+
             ground = Body(name=PrefixedName("ground"))
             root = Body(name=PrefixedName("root"))
             child = Body(name=PrefixedName("child"))
-            
+
             # Revolute Connection (World -> Root)
             rev_conn = RevoluteConnection(
                 parent=ground,
@@ -161,7 +161,7 @@ class TestODEIntegration(unittest.TestCase):
                 name=PrefixedName("rev_conn")
             )
             world.add_connection(rev_conn)
-            
+
             # Prismatic Connection (Root -> Child)
             pris_conn = PrismaticConnection(
                 parent=root,
@@ -171,10 +171,16 @@ class TestODEIntegration(unittest.TestCase):
                 name=PrefixedName("pris_conn")
             )
             world.add_connection(pris_conn)
-        
+
         # Set initial positions
         world.state[rev_dof.name].position = 0.0
         world.state[pris_dof.name].position = 1.0
+        return world, pris_dof, rev_dof, pris_conn
+
+    def test_mixed_constraints(self):
+        plot = True
+        # 1. Setup World with 2 DOFs
+        world, pris_dof, rev_dof, pris_conn = self.create_initial_world()
         
         # 2. Define ODE for Prismatic: p_dot = -0.5 * p * sigmoid(r - 0.5)
         # Decay only happens if revolute joint > 0.5
@@ -184,7 +190,7 @@ class TestODEIntegration(unittest.TestCase):
         # Smooth switch (sigmoid) to make it differentiable for QP
         # 1 / (1 + exp(-k*(x - threshold)))
         switch = 1.0 / (1.0 + cas.exp(-10 * (r_sym - 0.2)))
-        ode_function = -0.5 * p_sym * switch
+        ode_function = -0.5 * p_sym * cas.if_greater(r_sym, 0.2, 1.0, 0.0)
         
         # 3. Setup Motion Statechart
         msc = MotionStatechart()
@@ -236,8 +242,6 @@ class TestODEIntegration(unittest.TestCase):
         times = []
         t = 0.0
         
-        import matplotlib.pyplot as plt
-        
         while t < 10.0:
             kin_sim.tick()
             
@@ -250,18 +254,104 @@ class TestODEIntegration(unittest.TestCase):
             t += dt
             
         print(f"Final state: p={p_vals[-1]:.4f}, r={r_vals[-1]:.4f}")
-        
-        # Plotting
-        plt.figure()
-        plt.plot(times, p_vals, label='Prismatic (p)')
-        plt.plot(times, r_vals, label='Revolute (r)')
-        plt.xlabel('Time (s)')
-        plt.ylabel('Position')
-        plt.title('Mixed Constraint Test: ODE + Joint Position')
-        plt.legend()
-        plt.grid(True)
-        plt.savefig('mixed_constraints_plot.png')
-        print("Plot saved to mixed_constraints_plot.png")
+        self.assertAlmostEqual(current_p, 0.4, places=1,
+                               msg=f"Expected {0.4}, got {current_p}")
+        self.assertLess(current_r, 0.2, msg=f"Expected r < 0.2, got {current_r}")
+
+
+        if plot:
+            import matplotlib
+            matplotlib.use("Agg")
+            import matplotlib.pyplot as plt
+            # Plotting
+            plt.figure()
+            plt.plot(times, p_vals, label='Prismatic (p)')
+            plt.plot(times, r_vals, label='Revolute (r)')
+            plt.xlabel('Time (s)')
+            plt.ylabel('Position')
+            plt.title('Mixed Constraint Test: ODE + Joint Position')
+            plt.legend()
+            plt.grid(True)
+            plt.savefig('mixed_constraints_plot.png')
+            print("Plot saved to mixed_constraints_plot.png")
+
+    def test_mixed_constraints2(self):
+        # 1. Setup World with 2 DOFs
+        world, pris_dof, rev_dof, pris_conn = self.create_initial_world()
+
+        # 2. Define ODE for Prismatic: p_dot = -0.5 * p * sigmoid(r - 0.5)
+        # Decay only happens if revolute joint > 0.5
+        p_sym = pris_dof.variables.position
+        r_sym = rev_dof.variables.position
+
+        ode_function = -0.5 * p_sym * cas.if_greater(r_sym, 0.2, 1.0, 0.0)
+
+        # 3. Setup Motion Statechart
+        msc = MotionStatechart()
+
+        # ODE Task on Prismatic
+        ode_task = ODETask(
+            name="decay_task",
+            target_variable=p_sym,
+            ode_function=ode_function,
+            # weight=100.0
+        )
+        msc.add_node(ode_task)
+
+        # Joint Position Task for Prismatic
+        # Target = 0.5 * initial = 0.5
+        # The solver should figure out that it needs to increase r (revolute)
+        # to enable the decay of p (prismatic) towards 0.5
+        pris_target = {pris_conn: 0.4}
+        pos_task = JointPositionList(
+            name="pos_task",
+            goal_state=pris_target,
+            # weight=1.0
+        )
+        msc.add_node(pos_task)
+
+        # End condition
+        end = EndMotion()
+        msc.add_node(end)
+
+        ode_task.start_condition = cas.TrinaryTrue
+        pos_task.start_condition = cas.TrinaryTrue
+        end.start_condition = pos_task.observation_variable
+
+        # 4. Execution
+        config = QPControllerConfig.create_default_with_50hz()
+        kin_sim = Executor(world=world, controller_config=config)
+        kin_sim.compile(motion_statechart=msc)
+
+        # Tick and verify
+        dt = config.mpc_dt
+
+        # Set initial positions
+        world.state[rev_dof.name].position = 0.0
+        world.state[pris_dof.name].position = 1.0
+
+        # Data collection
+        p_vals = []
+        r_vals = []
+        times = []
+        t = 0.0
+
+        while t < 10.0:
+            kin_sim.tick()
+
+            current_p = world.state[pris_dof.name].position
+            current_r = world.state[rev_dof.name].position
+
+            p_vals.append(current_p)
+            r_vals.append(current_r)
+            times.append(t)
+            t += dt
+
+        print(f"Final state: p={p_vals[-1]:.4f}, r={r_vals[-1]:.4f}")
+        self.assertAlmostEqual(current_p, 1.0, places=2,
+                               msg=f"Expected {0.4}, got {current_p}")
+        self.assertLess(current_r, 0.2, msg=f"Expected r < 0.2, got {current_r}")
+        self.assertGreater(current_r, 0.0, msg=f"Expected r > 0.0, got {current_r}")
             
 if __name__ == '__main__':
     unittest.main()

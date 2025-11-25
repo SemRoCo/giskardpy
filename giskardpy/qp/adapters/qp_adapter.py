@@ -1829,6 +1829,10 @@ class GiskardToQPAdapter:
         ode_matrix_dofs, ode_matrix_slack = self.ode_model.construct_expression()
         ode_bounds = self.ode_bounds.construct_expression()
         
+        # Ideas: right now ode constraints and position constraints on the target variable are conflicting. Currently balanced with weights.
+        # Main goal -> constrain the position of the target variable, define an ode for how the target variable can evolve depending on the current world state and possible robot actuations.
+        #              Giskard then figures out robot actuations that let the target variable evolve towards its position goal.
+        # Suggestions: Should the position constraint on the target variable become a part of the ode constraint to better handle the conflicts?
         if len(ode_matrix_dofs) > 0:
             if len(eq_matrix_dofs) > 0:
                 # Both have constraints, stack them

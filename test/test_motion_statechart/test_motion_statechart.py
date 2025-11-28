@@ -6,7 +6,7 @@ import pytest
 import time
 
 import semantic_digital_twin.spatial_types.spatial_types as cas
-from giskardpy.data_types.exceptions import InvalidGoalException, NoQPControllerConfigException
+from giskardpy.data_types.exceptions import NoQPControllerConfigException
 from giskardpy.executor import Executor
 from giskardpy.model.collision_matrix_manager import CollisionRequest
 from giskardpy.model.collision_world_syncer import CollisionCheckerLib
@@ -23,6 +23,7 @@ from giskardpy.motion_statechart.exceptions import (
     NodeAlreadyHasParentGoalError,
     DuplicateNodeInGoalError,
     InvalidConditionError,
+    InvalidGoalException,
 )
 from giskardpy.motion_statechart.goals.collision_avoidance import (
     CollisionAvoidance,
@@ -1793,7 +1794,7 @@ def test_start_condition_requires_observation_variables():
             n1.observation_variable, n1.life_cycle_variable
         )
     err = excinfo.value
-    assert err.condition_type == "start"
+    assert err.condition_type == "START"
     # Sanity: the offending variable name is the lifecycle variable's name
     assert str(err.variable_name) == str(n1.life_cycle_variable.name)
 
@@ -1816,7 +1817,7 @@ def test_pause_condition_requires_observation_variables():
             n1.observation_variable, n1.life_cycle_variable
         )
     err = excinfo.value
-    assert err.condition_type == "pause"
+    assert err.condition_type == "PAUSE"
     assert str(err.variable_name) == str(n1.life_cycle_variable.name)
 
 
@@ -1838,7 +1839,7 @@ def test_end_condition_requires_observation_variables():
             n1.observation_variable, n1.life_cycle_variable
         )
     err = excinfo.value
-    assert err.condition_type == "end"
+    assert err.condition_type == "END"
     assert str(err.variable_name) == str(n1.life_cycle_variable.name)
 
 def test_node_cannot_be_in_two_motion_statecharts():

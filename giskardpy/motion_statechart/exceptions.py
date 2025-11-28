@@ -119,3 +119,6 @@ class DuplicateNodeInGoalError(MotionStatechartError):
         super().__init__(
             f"Node '{self.node_name}' is already part of goal '{self.goal_name}'."
         )
+
+class InvalidGoalException(MotionStatechartError):
+    pass

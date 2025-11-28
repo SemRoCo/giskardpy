@@ -22,7 +22,6 @@ from typing_extensions import (
 )
 
 import semantic_digital_twin.spatial_types.spatial_types as cas
-from giskardpy.data_types.exceptions import InvalidGoalException
 from giskardpy.motion_statechart.context import BuildContext, ExecutionContext
 from giskardpy.motion_statechart.data_types import (
     LifeCycleValues,
@@ -37,6 +36,7 @@ from giskardpy.motion_statechart.exceptions import (
     NodeAlreadyHasParentGoalError,
     DuplicateNodeInGoalError,
     NodeAlreadyInMotionStatechartError,
+    InvalidGoalException
 )
 from giskardpy.motion_statechart.plotters.plot_specs import NodePlotSpec
 from giskardpy.qp.constraint_collection import ConstraintCollection
@@ -108,8 +108,14 @@ class TrinaryCondition(SubclassJSONSerializer):
     ) -> None:
         if not isinstance(new_expression, (cas.FloatVariable, cas.Expression)):
             raise InvalidConditionError(new_expression)
+        for var in new_expression.free_variables():
+            if not isinstance(var, ObservationVariable):
+                raise InvalidVariableInCondition(self.owner.name, var.name, self.kind.name)
+            elif self.kind.name == TransitionKind.START and var.motion_statechart_node is self.owner:
+                raise InvalidSelfReferenceInStartCondition(child.unique_name)
         self.expression = new_expression
         self._child = child
+
 
     @property
     def node_dependencies(self) -> List[MotionStatechartNode]:
@@ -524,10 +530,6 @@ class MotionStatechartNode(SubclassJSONSerializer):
     def start_condition(self, expression: cas.Expression) -> None:
         if self._start_condition is None:
             raise NotInMotionStatechartError(self.name)
-        for var in expression.free_variables():
-            if isinstance(var, ObservationVariable) and var.motion_statechart_node is self:
-                raise InvalidSelfReferenceInStartCondition(self.name)
-        self._check_condition_for_observation_variable(expression, "start")
         self._start_condition.update_expression(expression, self)
 
     @property
@@ -538,7 +540,6 @@ class MotionStatechartNode(SubclassJSONSerializer):
     def pause_condition(self, expression: cas.Expression) -> None:
         if self._pause_condition is None:
             raise NotInMotionStatechartError(self.name)
-        self._check_condition_for_observation_variable(expression, "pause")
         self._pause_condition.update_expression(expression, self)
 
     @property
@@ -549,7 +550,6 @@ class MotionStatechartNode(SubclassJSONSerializer):
     def end_condition(self, expression: cas.Expression) -> None:
         if self._end_condition is None:
             raise NotInMotionStatechartError(self.name)
-        self._check_condition_for_observation_variable(expression, "end")
         self._end_condition.update_expression(expression, self)
 
     @property
@@ -562,10 +562,6 @@ class MotionStatechartNode(SubclassJSONSerializer):
             raise NotInMotionStatechartError(self.name)
         self._reset_condition.update_expression(expression, self)
 
-    def _check_condition_for_observation_variable(self, expression: cas.Expression, condition_type: str):
-        for var in expression.free_variables():
-            if not isinstance(var, ObservationVariable):
-                raise InvalidVariableInCondition(self.name, var.name, condition_type)
 
     def to_json(self) -> Dict[str, Any]:
         json_data = super().to_json()
@@ -661,36 +657,30 @@ class Goal(MotionStatechartNode):
         Adds a node to this goal and the motion statechart this goal belongs to.
         Should be used in expand().
         """
-        if node not in self.nodes:
-            self.nodes.append(node)
         if isinstance(node, EndMotion):
             raise InvalidGoalException(
                 "EndMotion cannot be added as a child of a Goal. Place EndMotion at the MotionStatechart top level"
             )
+        # Validate motion statechart back-reference
+        msc = node._motion_statechart
+        if msc is not None and msc is not self.motion_statechart:
+            raise NodeAlreadyInMotionStatechartError(
+                node_name=node.unique_name,
+                current_msc=str(msc),
+                target_msc=str(self.motion_statechart),
+            )
+
         # Prevent duplicate insertion into the same goal
         if node in self.nodes:
-            raise DuplicateNodeInGoalError(
-                node_name=node.unique_name if node.index is not None else node.name,
-                goal_name=self.unique_name if self.index is not None else self.name,
-            )
+            raise DuplicateNodeInGoalError(node_name=node.name, goal_name=self.name)
 
         # Prevent cross-goal reuse of the same node instance
-        if node.parent_node is not None and node.parent_node is not self:
+        parent = node.parent_node
+        if parent is not None and parent is not self:
             raise NodeAlreadyHasParentGoalError(
-                node_name=node.unique_name if node.index is not None else node.name,
-                current_parent=node.parent_node.unique_name,
-                target_parent=self.unique_name if self.index is not None else self.name,
-            )
-
-        # Ensure node’s motion statechart matches the goal’s MSC (or is unassigned)
-        if (
-            node._motion_statechart is not None
-            and node._motion_statechart is not self.motion_statechart
-        ):
-            raise NodeAlreadyInMotionStatechartError(
-                node_name=node.unique_name if node.index is not None else node.name,
-                current_msc=str(node._motion_statechart),
-                target_msc=str(self.motion_statechart),
+                node_name=node.unique_name,
+                current_parent=parent.unique_name,
+                target_parent=self.unique_name,
             )
 
         self.nodes.append(node)

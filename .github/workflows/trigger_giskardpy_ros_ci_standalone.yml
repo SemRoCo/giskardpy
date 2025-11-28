@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        branch: ["ros1-noetic-main", "ros2-jazzy-main"]
+        branch: ["ros2-jazzy-main"]
     steps:
       # Triggers ci_standalone workflow of giskardpy_ros repo. Needs setup secret token to work
       - name: Trigger workflow in giskardpy_ros

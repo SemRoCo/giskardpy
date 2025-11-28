@@ -15,10 +15,12 @@ from giskardpy.motion_statechart.data_types import (
     LifeCycleValues,
     ObservationStateValues,
 )
-from giskardpy.motion_statechart.exceptions import NodeNotFoundError
 from giskardpy.motion_statechart.exceptions import (
+    EmptyMotionStatechartError,
+    NodeNotFoundError,
     NodeAlreadyInMotionStatechartError,
 )
+
 from giskardpy.motion_statechart.graph_node import (
     MotionStatechartNode,
     TrinaryCondition,
@@ -32,7 +34,6 @@ from giskardpy.motion_statechart.graph_node import (
 from giskardpy.motion_statechart.graph_node import Task
 from giskardpy.motion_statechart.plotters.graphviz import MotionStatechartGraphviz
 from giskardpy.qp.constraint_collection import ConstraintCollection
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 
 
 @dataclass(repr=False, eq=False)
@@ -355,10 +356,6 @@ class MotionStatechart(SubclassJSONSerializer):
     Combined representation of the life cycle state of the motion statechart, to enable an efficient tick().
     """
 
-    control_cycle_counter: int = field(default=0, init=False)
-    """
-    Increases by 1 each time tick() is called.
-    """
     history: StateHistory = field(default_factory=StateHistory, init=False)
     """
     The history of how the state of the motion statechart changed over time.
@@ -374,16 +371,8 @@ class MotionStatechart(SubclassJSONSerializer):
         This is useful if only the structure of the motion statechart is needed, for example, for visualization.
         """
         motion_statechart_copy = MotionStatechart()
-        self._create_structure_copy(self.top_level_nodes, motion_statechart_copy)
-        return motion_statechart_copy
-
-    def _create_structure_copy(
-        self, nodes: List[MotionStatechartNode], destination: MotionStatechart | Goal
-    ):
-        """
-        Creates a structure copy of a node and adds it to the destination.
-        """
-        for node in nodes:
+        # copy nodes in order to make sure index is correct
+        for node in self.nodes:
             match node:
                 case Goal():
                     node_copy = Goal(name=node.name)
@@ -391,14 +380,24 @@ class MotionStatechart(SubclassJSONSerializer):
                     node_copy = Task(name=node.name)
                 case _:
                     node_copy = MotionStatechartNode(name=node.name)
-            destination.add_node(node_copy)
-            node_copy.index = node.index
+            motion_statechart_copy.add_node(node_copy)
+        # link parent/child
+        for node in self.get_nodes_by_type(Goal):
+            goal_copy: Goal = motion_statechart_copy.get_node_by_index(node.index)
+            for child_node in node.nodes:
+                child_node_copy = motion_statechart_copy.get_node_by_index(
+                    child_node.index
+                )
+                child_node_copy.parent_node_index = node.index
+                goal_copy.nodes.append(child_node_copy)
+        # copy conditions
+        for node in self.nodes:
+            node_copy = motion_statechart_copy.get_node_by_index(node.index)
             node_copy.start_condition = node.start_condition
             node_copy.pause_condition = node.pause_condition
             node_copy.end_condition = node.end_condition
             node_copy.reset_condition = node.reset_condition
-            if isinstance(node, Goal):
-                self._create_structure_copy(node.nodes, node_copy)
+        return motion_statechart_copy
 
     @property
     def nodes(self) -> List[MotionStatechartNode]:
@@ -446,6 +445,10 @@ class MotionStatechart(SubclassJSONSerializer):
         self.life_cycle_state.grow()
         self.observation_state.grow()
 
+    def add_nodes(self, nodes: List[MotionStatechartNode]):
+        for node in nodes:
+            self.add_node(node)
+
     def get_node_by_index(self, index: int) -> MotionStatechartNode:
         return self.rx_graph.get_node_data(index)
 
@@ -470,9 +473,9 @@ class MotionStatechart(SubclassJSONSerializer):
         self, node: MotionStatechartNode, context: BuildContext
     ):
         if isinstance(node, Goal):
-            node.build(context=context)
             for child_node in node.nodes:
                 self._build_and_apply_artifacts(child_node, context=context)
+            node.build(context=context)
         artifacts = node.build(context=context)
         node._constraint_collection = artifacts.constraints
         node._constraint_collection.link_to_motion_statechart_node(node)
@@ -494,6 +497,7 @@ class MotionStatechart(SubclassJSONSerializer):
 
         :param context: The build context required to execute the compilation process.
         """
+        self.sanity_check()
         self._expand_goals(context=context)
         self._apply_goal_conditions_to_their_children()
         self._build_nodes(context=context)
@@ -502,7 +506,7 @@ class MotionStatechart(SubclassJSONSerializer):
         self.life_cycle_state.compile()
         self.history.append(
             next_item=StateHistoryItem(
-                control_cycle=self.control_cycle_counter,
+                control_cycle=0,
                 life_cycle_state=self.life_cycle_state,
                 observation_state=self.observation_state,
             )
@@ -588,13 +592,12 @@ class MotionStatechart(SubclassJSONSerializer):
         First the observation state is updated, then the life cycle state is updated.
         :param context: The context required to execute the tick.
         """
-        self.control_cycle_counter += 1
         self._update_observation_state(context)
         self._update_life_cycle_state(context.to_execution_context())
         self._raise_if_cancel_motion()
         self.history.append(
             next_item=StateHistoryItem(
-                control_cycle=self.control_cycle_counter,
+                control_cycle=context.control_cycle_variable.evaluate(),
                 life_cycle_state=self.life_cycle_state,
                 observation_state=self.observation_state,
             )
@@ -646,6 +649,16 @@ class MotionStatechart(SubclassJSONSerializer):
             )
             transition.owner._set_transition(transition)
         for node in motion_statechart.nodes:
-            if node.parent_node is not None:
-                node.parent_node.nodes.append(node)
+            if node.parent_node_index is not None:
+                parent_node = motion_statechart.get_node_by_index(
+                    node.parent_node_index
+                )
+                parent_node.nodes.append(node)
         return motion_statechart
+
+    def sanity_check(self):
+        """
+        Executes a sanity check on the motion statechart to ensure that it is valid.
+        """
+        if len(self.nodes) == 0:
+            raise EmptyMotionStatechartError()

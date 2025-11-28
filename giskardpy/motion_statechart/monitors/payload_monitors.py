@@ -58,6 +58,26 @@ class CountSeconds(MotionStatechartNode):
         self._start_time = time.time()
 
 
+@dataclass(repr=False, eq=False)
+class CountTicks(MotionStatechartNode):
+    """
+    This node counts 'threshold'-many ticks and then turns True.
+    Only counts while in state RUNNING.
+    """
+
+    ticks: int = field(kw_only=True)
+    counter: int = field(init=False)
+
+    def on_tick(self, context: ExecutionContext) -> Optional[ObservationStateValues]:
+        self.counter += 1
+        if self.counter >= self.ticks:
+            return ObservationStateValues.TRUE
+        return ObservationStateValues.FALSE
+
+    def on_start(self, context: ExecutionContext):
+        self.counter = 0
+
+
 @dataclass
 class Pulse(MotionStatechartNode):
     """

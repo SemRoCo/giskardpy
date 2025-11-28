@@ -227,7 +227,6 @@ class ExternalCollisionAvoidance(Goal):
     buffer_zone_distance: float = field(init=False)
     violated_distance: float = field(init=False)
     _main_body: Body = field(init=False)
-    # _plot: bool = field(default=False, init=False)
 
     def __post_init__(self):
         super().__post_init__()
@@ -476,7 +475,7 @@ class CollisionAvoidance(Goal):
                     )
                 for idx in range(max_avoided_bodies):
                     self.add_node(
-                        ExternalCollisionAvoidance(
+                        node := ExternalCollisionAvoidance(
                             name=PrefixedName(
                                 f"{connection.name}/{idx}", str(self.name)
                             ),
@@ -485,6 +484,7 @@ class CollisionAvoidance(Goal):
                             max_avoided_bodies=max_avoided_bodies,
                         )
                     )
+                    node.plot_specs.visible = False
 
         # get_middleware().loginfo(f'Adding {num_constrains} external collision avoidance constraints.')
 
@@ -540,6 +540,7 @@ class CollisionAvoidance(Goal):
                 max_avoided_bodies=1,
                 buffer_zone_distance=counter[link_a, link_b],
             )
+            ca_goal.plot_specs.visible = False
             self.add_node(ca_goal)
             num_constr += 1
         get_middleware().loginfo(

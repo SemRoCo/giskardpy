@@ -1,10 +1,8 @@
 from dataclasses import dataclass, field, InitVar
 
-import numpy as np
 from typing_extensions import Optional
 
 from giskardpy.data_types.exceptions import (
-    EmptyProblemException,
     NoQPControllerConfigException,
 )
 from giskardpy.model.better_pybullet_syncer import BulletCollisionDetector
@@ -19,6 +17,7 @@ from giskardpy.motion_statechart.auxilary_variable_manager import (
 )
 from giskardpy.motion_statechart.context import BuildContext
 from giskardpy.motion_statechart.motion_statechart import MotionStatechart
+from giskardpy.qp.exceptions import EmptyProblemException
 from giskardpy.qp.qp_controller import QPController
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -30,28 +29,58 @@ from semantic_digital_twin.world import World
 
 @dataclass
 class Executor:
+    """
+    Represents the main execution entity that manages motion statecharts, collision
+    scenes, and control cycles for the robot's operations.
+
+    :ivar tmp_folder: Temporary folder path used for auxiliary operations during execution.
+    :type tmp_folder: str
+    :ivar motion_statechart: The motion statechart describing the robot's motion logic.
+    :type motion_statechart: MotionStatechart
+    :ivar collision_scene: The collision scene synchronizer for managing robot collision states.
+    :type collision_scene: Optional[CollisionWorldSynchronizer]
+    :ivar auxiliary_variable_manager: Manages auxiliary symbolic variables for execution contexts.
+    :type auxiliary_variable_manager: AuxiliaryVariableManager
+    :ivar qp_controller: Optional quadratic programming controller used for motion control.
+    :type qp_controller: Optional[QPController]
+    :ivar control_cycles: Tracks the number of control cycles elapsed during execution.
+    :type control_cycles: int
+    """
+
     world: World
+    """The world object containing the state and entities of the robot's environment."""
     controller_config: Optional[QPControllerConfig] = None
+    """Optional configuration for the QP Controller. Is only needed when constraints are present in the motion statechart."""
     collision_checker: InitVar[CollisionCheckerLib] = field(
         default=CollisionCheckerLib.none
     )
+    """Library used for collision checking. Can be set to Bullet or None."""
     tmp_folder: str = field(default="/tmp/")
+    """Path to safe temporary files."""
 
     # %% init False
     motion_statechart: MotionStatechart = field(init=False)
+    """The motion statechart describing the robot's motion logic."""
     collision_scene: Optional[CollisionWorldSynchronizer] = field(
         default=None, init=False
     )
+    """The collision scene synchronizer for managing robot collision states."""
     auxiliary_variable_manager: AuxiliaryVariableManager = field(
         default_factory=AuxiliaryVariableManager, init=False
     )
+    """Manages auxiliary symbolic variables for execution contexts."""
     qp_controller: Optional[QPController] = field(default=None, init=False)
+    """Optional quadratic programming controller used for motion control."""
 
-    _control_cycles: int = field(init=False)
+    control_cycles: int = field(init=False)
+    """Tracks the number of control cycles elapsed during execution."""
     _control_cycles_variable: AuxiliaryVariable = field(init=False)
+    """Auxiliary variable linked to the control_cycles attribute."""
 
     _time: float = field(init=False)
+    """The time that has passed since the execution started."""
     _time_variable: AuxiliaryVariable = field(init=False)
+    """Auxiliary variable representing the current time in seconds since the start of the simulation."""
 
     def __post_init__(self, collision_checker: CollisionCheckerLib):
         if collision_checker == CollisionCheckerLib.bpb:
@@ -70,13 +99,13 @@ class Executor:
     def _create_control_cycles_variable(self):
         self._control_cycles_variable = (
             self.auxiliary_variable_manager.create_float_variable(
-                PrefixedName("control_cycles"), lambda: self._control_cycles
+                PrefixedName("control_cycles"), lambda: self.control_cycles
             )
         )
 
     def compile(self, motion_statechart: MotionStatechart):
         self.motion_statechart = motion_statechart
-        self._control_cycles = -1
+        self.control_cycles = 0
         self._create_control_cycles_variable()
         self.motion_statechart.compile(self.build_context)
         self._compile_qp_controller(self.controller_config)
@@ -92,7 +121,7 @@ class Executor:
         )
 
     def tick(self):
-        self._control_cycles += 1
+        self.control_cycles += 1
         self.collision_scene.sync()
         self.collision_scene.check_collisions()
         self.motion_statechart.tick(self.build_context)
@@ -149,6 +178,4 @@ class Executor:
             auxiliary_variables=self.auxiliary_variable_manager.variables,
         )
         if self.qp_controller.has_not_free_variables():
-            raise EmptyProblemException(
-                "Tried to compile a QPController without free variables."
-            )
+            raise EmptyProblemException()

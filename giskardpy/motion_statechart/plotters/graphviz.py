@@ -44,7 +44,6 @@ from giskardpy.motion_statechart.plotters.styles import (
 )
 
 if TYPE_CHECKING:
-
     from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 
 
@@ -219,18 +218,32 @@ class MotionStatechartGraphviz:
         self.graph.write_pdf(file_name)
         print(f"Saved task graph at {file_name}.")
 
+    def _is_visible_in_hierarchy(self, node: MotionStatechartNode) -> bool:
+        """Return False if the node or any of its ancestors is marked invisible in plot specs."""
+        current = node
+        while current is not None:
+            if not current.plot_specs.visible:
+                return False
+            current = current.parent_node
+        return True
+
     def _add_nodes(
         self,
         parent_cluster: Union[pydot.Graph, pydot.Cluster],
         nodes: List[MotionStatechartNode],
     ):
         for i, node in enumerate(nodes):
+            # Skip invisible nodes entirely. If a Goal is invisible, skip its children as well.
+            if not self._is_visible_in_hierarchy(node):
+                continue
+
             if isinstance(node, Goal):
                 goal_cluster = self._add_cluster(node, parent_cluster)
                 self._add_node(
                     graph=goal_cluster,
                     node=node,
                 )
+                # Recurse only into visible children; _add_nodes applies visibility filtering
                 self._add_nodes(goal_cluster, node.nodes)
 
             self._add_node(
@@ -267,6 +280,13 @@ class MotionStatechartGraphviz:
                 parent_node_index
             )
             child_node = self.motion_statechart.rx_graph.get_node_data(child_node_index)
+
+            # Skip edges if either endpoint (or one of its ancestors) is invisible
+            if not self._is_visible_in_hierarchy(parent_node):
+                continue
+            if not self._is_visible_in_hierarchy(child_node):
+                continue
+
             if not self._are_nodes_in_same_cluster(parent_node, child_node):
                 continue
             spec = TRANSITION_SPECS.get(transition.kind)

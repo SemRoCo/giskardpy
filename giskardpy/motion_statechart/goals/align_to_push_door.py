@@ -3,7 +3,7 @@ from dataclasses import dataclass
 import numpy as np
 
 import semantic_digital_twin.spatial_types.spatial_types as cas
-from giskardpy.data_types.exceptions import GoalInitalizationException
+from giskardpy.motion_statechart.exceptions import GoalInitalizationException
 from giskardpy.motion_statechart.data_types import DefaultWeights
 from giskardpy.motion_statechart.graph_node import Goal
 from giskardpy.motion_statechart.graph_node import Task

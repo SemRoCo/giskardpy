@@ -11,13 +11,13 @@ import pandas as pd
 from line_profiler import profile
 
 import semantic_digital_twin.spatial_types.spatial_types as cas
-from giskardpy.data_types.exceptions import (
-    HardConstraintsViolatedException,
-    InfeasibleException,
-)
 from giskardpy.middleware import get_middleware
 from giskardpy.qp.adapters.qp_adapter import GiskardToQPAdapter
 from giskardpy.qp.constraint_collection import ConstraintCollection
+from giskardpy.qp.exceptions import (
+    HardConstraintsViolatedException,
+    InfeasibleException,
+)
 from giskardpy.qp.solvers.qp_solver import QPSolver
 from giskardpy.utils.utils import create_path
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom

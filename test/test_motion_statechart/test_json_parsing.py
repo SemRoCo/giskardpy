@@ -1,6 +1,7 @@
 import json
 
 import numpy as np
+import pytest
 
 from giskardpy.executor import Executor
 from giskardpy.model.collision_matrix_manager import (
@@ -12,7 +13,15 @@ from giskardpy.motion_statechart.data_types import (
     LifeCycleValues,
     ObservationStateValues,
 )
-from giskardpy.motion_statechart.graph_node import TrinaryCondition, EndMotion
+from giskardpy.motion_statechart.exceptions import (
+    NodeNotFoundError,
+)
+from giskardpy.motion_statechart.goals.templates import Sequence
+from giskardpy.motion_statechart.graph_node import (
+    TrinaryCondition,
+    EndMotion,
+    CancelMotion,
+)
 from giskardpy.motion_statechart.motion_statechart import (
     MotionStatechart,
     LifeCycleState,
@@ -292,17 +301,15 @@ def test_compressed_copy_can_be_plotted(pr2_world: World):
 
 def test_nested_goals():
     msc = MotionStatechart()
-
-    node1 = ConstTrueNode()
-    msc.add_node(node1)
-
-    outer = TestNestedGoal()
-    msc.add_node(outer)
-    outer.start_condition = node1.observation_variable
-
-    end = EndMotion()
-    msc.add_node(end)
-    end.start_condition = outer.observation_variable
+    msc.add_node(
+        sequence := Sequence(
+            [
+                ConstTrueNode(),
+                TestNestedGoal(),
+            ]
+        )
+    )
+    msc.add_node(EndMotion.when_true(sequence))
 
     msc._expand_goals(BuildContext.empty())
     json_data = msc.create_structure_copy().to_json()
@@ -311,7 +318,32 @@ def test_nested_goals():
 
     msc_copy = MotionStatechart.from_json(new_json_data)
     msc_copy._add_transitions()
+    msc_copy.draw("muh.pdf")
 
     for node in msc.nodes:
-        assert node.index == msc_copy.get_node_by_index(node.index).index
-    msc_copy.draw("muh.pdf")
+        node_copy = msc_copy.get_node_by_index(node.index)
+        assert node.index == node_copy.index
+        if node.parent_node_index is not None:
+            assert node.parent_node.unique_name == node_copy.parent_node.unique_name
+        else:
+            assert node_copy.parent_node_index is None
+
+
+def test_cancel_motion():
+    msc = MotionStatechart()
+    msc.add_node(node := ConstTrueNode())
+    msc.add_node(CancelMotion.when_true(node, exception=NodeNotFoundError(name="muh")))
+
+    json_data = msc.to_json()
+    json_str = json.dumps(json_data)
+    new_json_data = json.loads(json_str)
+    msc_copy = MotionStatechart.from_json(new_json_data)
+
+    kin_sim = Executor(
+        world=World(),
+    )
+
+    kin_sim.compile(motion_statechart=msc_copy)
+
+    with pytest.raises(Exception):
+        kin_sim.tick_until_end()

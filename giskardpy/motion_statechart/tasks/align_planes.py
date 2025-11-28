@@ -6,14 +6,18 @@ from giskardpy.motion_statechart.context import BuildContext
 from giskardpy.motion_statechart.data_types import DefaultWeights
 from giskardpy.motion_statechart.graph_node import Task, NodeArtifacts, DebugExpression
 from semantic_digital_twin.world_description.geometry import Color
-from semantic_digital_twin.world_description.world_entity import KinematicStructureEntity
+from semantic_digital_twin.world_description.world_entity import (
+    KinematicStructureEntity,
+)
 
-@dataclass
+
+@dataclass(eq=False, repr=False)
 class AlignPlanes(Task):
     """
     Will orient the tip plane to align with the goal plane.
     The planes are represented as normal vectors.
     """
+
     root_link: KinematicStructureEntity = field(kw_only=True)
     """root link of the kinematic chain."""
     tip_link: KinematicStructureEntity = field(kw_only=True)
@@ -24,15 +28,15 @@ class AlignPlanes(Task):
     tip_normal: cas.Vector3 = field(kw_only=True)
     """normal vector of the tip plane."""
 
-    threshold: float = field(default = 0.01, kw_only=True)
-    reference_velocity: float = field(default = 0.5, kw_only=True)
+    threshold: float = field(default=0.01, kw_only=True)
+    reference_velocity: float = field(default=0.5, kw_only=True)
     weight: float = field(default=DefaultWeights.WEIGHT_ABOVE_CA, kw_only=True)
 
     def build(self, context: BuildContext) -> NodeArtifacts:
         artifacts = NodeArtifacts()
 
         tip_V_tip_normal = context.world.transform(
-             target_frame=self.tip_link, spatial_object=self.tip_normal
+            target_frame=self.tip_link, spatial_object=self.tip_normal
         )
         tip_V_tip_normal.scale(1)
         root_V_root_normal = context.world.transform(

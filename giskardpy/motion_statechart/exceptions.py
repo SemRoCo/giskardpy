@@ -1,10 +1,21 @@
 from dataclasses import dataclass
 
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from krrood.adapters.json_serializer import JSON_TYPE_NAME, JSONSerializableTypeRegistry
+from krrood.utils import get_full_class_name
+from typing_extensions import Any, Dict
 
 
 class MotionStatechartError(Exception):
     pass
+
+
+class GoalInitalizationException(MotionStatechartError):
+    pass
+
+
+class EmptyMotionStatechartError(MotionStatechartError):
+    def __init__(self):
+        super().__init__("MotionStatechart is empty.")
 
 
 @dataclass
@@ -26,6 +37,34 @@ class NotInMotionStatechartError(MotionStatechartError):
 
 
 @dataclass
+class InvalidConditionError(MotionStatechartError):
+    expression: Any
+
+    def __post_init__(self):
+        super().__init__(
+            f"Invalid condition: {self.expression}. Did you forget '.observation_variable'?"
+        )
+
+
+def serialize_exception(obj: Exception) -> Dict[str, Any]:
+
+    return {
+        JSON_TYPE_NAME: get_full_class_name(type(obj)),
+        "value": str(obj),
+    }
+
+
+def deserialize_exception(data: Dict[str, Any]) -> Exception:
+
+    return Exception(data["value"])
+
+
+JSONSerializableTypeRegistry().register(
+    Exception, serialize_exception, deserialize_exception
+)
+
+
+@dataclass
 class InvalidSelfReferenceInStartCondition(MotionStatechartError):
     node_name: str
 
@@ -38,7 +77,7 @@ class InvalidSelfReferenceInStartCondition(MotionStatechartError):
 @dataclass
 class InvalidVariableInCondition(MotionStatechartError):
     node_name: str
-    variable_name: PrefixedName
+    variable_name: str
     condition_type: str
 
     def __post_init__(self):

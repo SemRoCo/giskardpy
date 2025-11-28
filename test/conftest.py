@@ -1,7 +1,10 @@
 import os
+import threading
+import time
 from dataclasses import dataclass
 
 import pytest
+from semantic_digital_twin.utils import rclpy_installed
 from typing_extensions import Self
 
 from semantic_digital_twin.adapters.urdf import URDFParser
@@ -21,6 +24,40 @@ from semantic_digital_twin.world_description.world_entity import (
     Body,
     CollisionCheckingConfig,
 )
+
+
+@pytest.fixture(scope="function")
+def rclpy_node():
+    """
+    You can use this fixture if you want to use the marker visualizer of semDT and need a ros node.
+    """
+    if not rclpy_installed():
+        pytest.skip("ROS not installed")
+    import rclpy
+    from rclpy.executors import SingleThreadedExecutor
+
+    rclpy.init()
+    node = rclpy.create_node("test_node")
+
+    executor = SingleThreadedExecutor()
+    executor.add_node(node)
+
+    thread = threading.Thread(target=executor.spin, daemon=True, name="rclpy-executor")
+    thread.start()
+    time.sleep(0.1)
+    try:
+        yield node
+    finally:
+        # Stop executor cleanly and wait for the thread to exit
+        executor.shutdown()
+        thread.join(timeout=2.0)
+
+        # Remove the node from the executor and destroy it
+        # (executor.shutdown() takes care of spinning; add_node is safe to keep as-is)
+        node.destroy_node()
+
+        # Shut down the ROS client library
+        rclpy.shutdown()
 
 
 @pytest.fixture

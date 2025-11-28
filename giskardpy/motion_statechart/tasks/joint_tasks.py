@@ -5,11 +5,10 @@ from krrood.adapters.json_serializer import SubclassJSONSerializer
 from typing_extensions import Self
 
 import semantic_digital_twin.spatial_types.spatial_types as cas
-from giskardpy.data_types.exceptions import GoalInitalizationException
+from giskardpy.motion_statechart.exceptions import GoalInitalizationException
 from giskardpy.motion_statechart.context import BuildContext
 from giskardpy.motion_statechart.data_types import DefaultWeights
 from giskardpy.motion_statechart.graph_node import NodeArtifacts
-from giskardpy.motion_statechart.monitors.joint_monitors import JointGoalReached
 from giskardpy.motion_statechart.graph_node import Task
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types.derivatives import Derivatives
@@ -375,21 +374,6 @@ class JointVelocity(Task):
                 velocity_limit=max_velocity,
                 name=str(connection.name),
             )
-
-
-@dataclass
-class UnlimitedJointGoal(Task):
-    connection: ActiveConnection1DOF = field(kw_only=True)
-    goal_position: float = field(kw_only=True)
-
-    def __post_init__(self):
-        connection_symbol = self.connection.dof.variables.position
-        self.add_position_constraint(
-            expr_current=connection_symbol,
-            expr_goal=self.goal_position,
-            reference_velocity=2,
-            weight=DefaultWeights.WEIGHT_BELOW_CA,
-        )
 
 
 @dataclass

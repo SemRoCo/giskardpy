@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import itertools
 from typing import Tuple, TYPE_CHECKING
 
 import numpy as np
@@ -62,31 +61,12 @@ class GiskardToTwoSidedNeqQPAdapter(GiskardToQPAdapter):
             )
             constraint_matrix = cas.vstack([eq_matrix, neq_matrix])
 
-        free_symbols = set(quadratic_weights.free_variables())
-        free_symbols.update(constraint_matrix.free_variables())
-        free_symbols.update(box_lower_constraints.free_variables())
-        free_symbols.update(box_upper_constraints.free_variables())
-        free_symbols.update(eq_bounds.free_variables())
-        free_symbols.update(neq_lower_bounds.free_variables())
-        free_symbols.update(neq_upper_bounds.free_variables())
-        for s in itertools.chain(
-            self.world_state_symbols,
-            self.task_life_cycle_symbols,
-            self.goal_life_cycle_symbols,
-            self.external_collision_symbols,
-            self.self_collision_symbols,
-        ):
-            if s in free_symbols:
-                free_symbols.remove(s)
-        self.aux_symbols = list(free_symbols)
-
         self.free_symbols = [
             self.world_state_symbols,
-            self.task_life_cycle_symbols,
-            self.goal_life_cycle_symbols,
+            self.life_cycle_symbols,
             self.external_collision_symbols,
             self.self_collision_symbols,
-            self.aux_symbols,
+            self.auxiliary_variables,
         ]
 
         len_lb_be_lba_end = (
@@ -113,7 +93,7 @@ class GiskardToTwoSidedNeqQPAdapter(GiskardToQPAdapter):
                 neq_upper_bounds,
                 linear_weights,
             ],
-            parameters=self.free_symbols,
+            variable_parameters=self.free_symbols,
             additional_views=[
                 slice(quadratic_weights.shape[0], len_lb_be_lba_end),
                 slice(len_lb_be_lba_end, len_ub_be_uba_end),
@@ -123,8 +103,6 @@ class GiskardToTwoSidedNeqQPAdapter(GiskardToQPAdapter):
         self.neq_matrix_compiled = constraint_matrix.compile(
             parameters=self.free_symbols, sparse=self.sparse
         )
-
-        self.free_symbols_str = [str(x) for x in free_symbols]
 
         self.b_bE_bA_filter = np.ones(
             box_lower_constraints.shape[0]
@@ -220,22 +198,19 @@ class GiskardToTwoSidedNeqQPAdapter(GiskardToQPAdapter):
     def evaluate(
         self,
         world_state: np.ndarray,
-        task_life_cycle_state: np.ndarray,
-        goal_life_cycle_state: np.ndarray,
+        life_cycle_state: np.ndarray,
         external_collision_data: np.ndarray,
         self_collision_data: np.ndarray,
-        symbol_manager,
+        auxiliary_variables: np.ndarray,
     ) -> QPData:
-        aux_substitutions = symbol_manager.resolve_symbols([self.aux_symbols])
-
-        neq_matrix = self.neq_matrix_compiled.fast_call(
+        args = [
             world_state,
-            task_life_cycle_state,
-            goal_life_cycle_state,
+            life_cycle_state,
             external_collision_data,
             self_collision_data,
-            *aux_substitutions,
-        )
+            auxiliary_variables,
+        ]
+        neq_matrix = self.neq_matrix_compiled(*args)
         (
             quadratic_weights_np_raw,
             box_lower_constraints_np_raw,
@@ -247,14 +222,7 @@ class GiskardToTwoSidedNeqQPAdapter(GiskardToQPAdapter):
             linear_weights_np_raw,
             box_eq_neq_lower_bounds_np_raw,
             box_eq_neq_upper_bounds_np_raw,
-        ) = self.combined_vector_f.fast_call(
-            world_state,
-            task_life_cycle_state,
-            goal_life_cycle_state,
-            external_collision_data,
-            self_collision_data,
-            *aux_substitutions,
-        )
+        ) = self.combined_vector_f(*args)
         self.qp_data_raw = QPData(
             quadratic_weights=quadratic_weights_np_raw,
             linear_weights=linear_weights_np_raw,
@@ -274,7 +242,7 @@ class GiskardToTwoSidedNeqQPAdapter(GiskardToQPAdapter):
             )
         )
 
-        self.apply_filters(
+        self.qp_data_raw.filtered = self.apply_filters(
             qp_data_raw=self.qp_data_raw,
             zero_quadratic_weight_filter=zero_quadratic_weight_filter,
             Ai_inf_filter=Ai_inf_filter,

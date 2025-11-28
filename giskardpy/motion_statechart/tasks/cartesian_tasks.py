@@ -189,7 +189,7 @@ class CartesianOrientation(Task):
         return artifacts
 
 
-@dataclass
+@dataclass(eq=False, repr=False)
 class CartesianPose(Task):
     """
     This goal will use the kinematic chain between root and tip link to move tip_link into the 6D goal_pose.

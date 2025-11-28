@@ -7,10 +7,10 @@ from typing_extensions import List, Optional, Union, TYPE_CHECKING, Set
 
 import semantic_digital_twin.spatial_types.spatial_types as cas
 from giskardpy.data_types.exceptions import (
-    GoalInitalizationException,
     DuplicateNameException,
 )
 from giskardpy.motion_statechart.data_types import LifeCycleValues, DefaultWeights
+from giskardpy.motion_statechart.exceptions import GoalInitalizationException
 from giskardpy.qp.constraint import (
     EqualityConstraint,
     InequalityConstraint,

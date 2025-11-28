@@ -1,4 +1,5 @@
 import os
+import tempfile
 from typing import List, Tuple, Optional
 
 import giskardpy_bullet_bindings as pb
@@ -17,6 +18,7 @@ from semantic_digital_twin.world_description.geometry import (
     Cylinder,
     Mesh,
     Scale,
+    TriangleMesh,
 )
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -81,6 +83,16 @@ def create_shape_from_geometry(geometry: Shape, tmp_folder: str) -> pb.Collision
     elif isinstance(geometry, Cylinder):
         shape = create_cylinder_shape(
             diameter=geometry.width, height=geometry.height, tmp_folder=tmp_folder
+        )
+    elif isinstance(geometry, TriangleMesh):
+        f = tempfile.NamedTemporaryFile(delete=False, suffix=".obj")
+        with open(f.name, "w") as fd:
+            fd.write(trimesh.exchange.obj.export_obj(geometry.mesh))
+        shape = load_convex_mesh_shape(
+            pkg_filename=f.name,
+            tmp_folder=tmp_folder,
+            single_shape=False,
+            scale=geometry.scale,
         )
     elif isinstance(geometry, Mesh):
         shape = load_convex_mesh_shape(

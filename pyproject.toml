@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.pyrefly]
+project-includes = ["**/*"]
+project-excludes = ["**/*venv/**/*"]
+
+[project]
+name = "giskardpy"
+authors = [
+    { name="Simon Stelter", email="stelter@uni-bremen.de" },
+
+]
+description = "A qp-based motion controller for robotic systems."
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Operating System :: OS Independent",
+]
+keywords=["robotics"]
+dynamic = ["version", "dependencies"]
+license = { text = "LGPL-3.0-only" }
+
+[project.urls]
+"Source" = 'https://github.com/SemRoCo/giskardpy'
+"Bug Tracker" = 'https://github.com/SemRoCo/giskardpy/issues'
+
+[tool.setuptools.packages.find]
+where = ["."]  # list of folders that contain the packages (["."] by default)
+include = ["giskardpy*"]
+
+[tool.setuptools.dynamic]
+version = {attr = "giskardpy.__version__"}
+dependencies = {file = "requirements.txt"}

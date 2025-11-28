@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     pass
 
 
-@dataclass(frozen=True)
+@dataclass
 class NodePlotSpec:
     visible: bool = True
     style: str = "filled, rounded"

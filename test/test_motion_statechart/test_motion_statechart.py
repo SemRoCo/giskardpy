@@ -1,12 +1,11 @@
 import json
-import time
 from dataclasses import dataclass
 
 import numpy as np
 import pytest
+import time
 
 import semantic_digital_twin.spatial_types.spatial_types as cas
-from trimesh.geometry import vector_angle
 from giskardpy.data_types.exceptions import InvalidGoalException, NoQPControllerConfigException
 from giskardpy.executor import Executor
 from giskardpy.model.collision_matrix_manager import CollisionRequest
@@ -16,19 +15,26 @@ from giskardpy.motion_statechart.data_types import (
     LifeCycleValues,
     ObservationStateValues,
 )
-from giskardpy.motion_statechart.exceptions import (NotInMotionStatechartError, InvalidSelfReferenceInStartCondition, \
+from giskardpy.motion_statechart.exceptions import (
+    NotInMotionStatechartError,
+    InvalidSelfReferenceInStartCondition,
     InvalidVariableInCondition,
     NodeAlreadyInMotionStatechartError,
     NodeAlreadyHasParentGoalError,
-    DuplicateNodeInGoalError)
+    DuplicateNodeInGoalError,
+    InvalidConditionError,
+)
 from giskardpy.motion_statechart.goals.collision_avoidance import (
     CollisionAvoidance,
 )
+from giskardpy.motion_statechart.goals.open_close import Open, Close
+from giskardpy.motion_statechart.goals.templates import Sequence, Parallel
 from giskardpy.motion_statechart.graph_node import (
     EndMotion,
     CancelMotion,
 )
 from giskardpy.motion_statechart.graph_node import ThreadPayloadMonitor
+from giskardpy.motion_statechart.monitors.joint_monitors import JointPositionReached
 from giskardpy.motion_statechart.monitors.monitors import LocalMinimumReached
 from giskardpy.motion_statechart.monitors.overwrite_state_monitors import (
     SetSeedConfiguration,
@@ -38,6 +44,7 @@ from giskardpy.motion_statechart.monitors.payload_monitors import (
     Print,
     Pulse,
     CountSeconds,
+    CountTicks,
 )
 from giskardpy.motion_statechart.motion_statechart import (
     MotionStatechart,
@@ -54,13 +61,24 @@ from giskardpy.motion_statechart.test_nodes.test_nodes import (
     ConstTrueNode,
     TestGoal,
     TestNestedGoal,
+    ConstFalseNode,
 )
+from giskardpy.qp.exceptions import HardConstraintsViolatedException
 from giskardpy.qp.qp_controller_config import QPControllerConfig
+from giskardpy.utils.math import angle_between_vector
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     KinematicStructureEntityKwargsTracker,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types import TransformationMatrix
+from semantic_digital_twin.semantic_annotations.factories import (
+    DoorFactory,
+    SemanticPositionDescription,
+    HandleFactory,
+    HorizontalSemanticDirection,
+    VerticalSemanticDirection,
+)
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Handle
+from semantic_digital_twin.spatial_types import TransformationMatrix, Vector3
 from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.spatial_types.spatial_types import (
     trinary_logic_and,
@@ -70,11 +88,12 @@ from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     RevoluteConnection,
     ActiveConnection1DOF,
+    FixedConnection,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
+from semantic_digital_twin.world_description.geometry import Cylinder
+from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
-
-from giskardpy.utils.math import angle_between_vector
 
 
 def test_condition_to_str():
@@ -126,11 +145,6 @@ def test_all_conditions_with_goals():
 
 @pytest.mark.skip(reason="not implemented yet")
 def test_all_conditions_with_nodes():
-    pass
-
-
-@pytest.mark.skip(reason="not implemented yet")
-def test_arrange_in_sequence():
     pass
 
 
@@ -234,6 +248,32 @@ def test_motion_statechart():
         ObservationStateValues.UNKNOWN,
         ObservationStateValues.TRUE,
     ]
+
+
+def test_sequence_goal():
+    msc = MotionStatechart()
+    node = Sequence(
+        nodes=[
+            ConstTrueNode(),
+            ConstTrueNode(),
+            ConstTrueNode(),
+            ConstTrueNode(),
+        ]
+    )
+    msc.add_node(node)
+    msc.add_node(EndMotion.when_true(node))
+
+    kin_sim = Executor(world=World())
+    kin_sim.compile(motion_statechart=msc)
+    kin_sim.tick_until_end()
+    msc.draw("muh.pdf")
+    assert kin_sim.control_cycles == 7
+    assert msc.nodes[0].life_cycle_state == LifeCycleValues.RUNNING
+    assert msc.nodes[1].life_cycle_state == LifeCycleValues.RUNNING
+    assert msc.nodes[2].life_cycle_state == LifeCycleValues.DONE
+    assert msc.nodes[3].life_cycle_state == LifeCycleValues.DONE
+    assert msc.nodes[4].life_cycle_state == LifeCycleValues.DONE
+    assert msc.nodes[5].life_cycle_state == LifeCycleValues.DONE
 
 
 def test_print():
@@ -345,6 +385,29 @@ def test_cancel_motion():
     kin_sim.tick()  # second tick, cancel goes into running
     with pytest.raises(Exception):
         kin_sim.tick()  # third tick, cancel goes true and triggers
+    msc.draw("muh.pdf")
+
+
+def test_draw_with_invisible_node():
+    msc = MotionStatechart()
+    msc.add_nodes(
+        [
+            sequence := Sequence(
+                nodes=[s1n1 := ConstTrueNode(), s1n2 := ConstTrueNode()]
+            ),
+            sequence2 := Sequence(
+                nodes=[s2n1 := ConstTrueNode(), s2n2 := ConstTrueNode()]
+            ),
+        ]
+    )
+    msc.add_node(EndMotion.when_all_true(msc.nodes))
+
+    sequence.plot_specs.visible = False
+    s1n2.plot_specs.visible = False
+    s2n2.plot_specs.visible = False
+
+    kin_sim = Executor(world=World())
+    kin_sim.compile(motion_statechart=msc)
     msc.draw("muh.pdf")
 
 
@@ -1138,6 +1201,7 @@ def test_pointing(pr2_world: World):
     kin_sim.compile(motion_statechart=msc)
     kin_sim.tick_until_end()
 
+
 def test_align_planes(pr2_world: World):
     tip = pr2_world.get_kinematic_structure_entity_by_name("r_gripper_tool_frame")
     root = pr2_world.get_kinematic_structure_entity_by_name("odom_combined")
@@ -1148,10 +1212,7 @@ def test_align_planes(pr2_world: World):
     tip_normal = cas.Vector3.Y(reference_frame=tip)
 
     align_planes = AlignPlanes(
-        root_link=root,
-        tip_link=tip,
-        goal_normal=goal_normal,
-        tip_normal=tip_normal
+        root_link=root, tip_link=tip, goal_normal=goal_normal, tip_normal=tip_normal
     )
     msc.add_node(align_planes)
 
@@ -1184,9 +1245,10 @@ def test_align_planes(pr2_world: World):
 
     angle = angle_between_vector(v_tip, v_goal)
 
-    assert angle <= align_planes.threshold, (
-        f"AlignPlanes failed: final angle {angle:.6f} rad > threshold {align_planes.threshold:.6f} rad"
-    )
+    assert (
+        angle <= align_planes.threshold
+    ), f"AlignPlanes failed: final angle {angle:.6f} rad > threshold {align_planes.threshold:.6f} rad"
+
 
 def test_transition_triggers():
     msc = MotionStatechart()
@@ -1250,60 +1312,6 @@ def test_transition_triggers():
     assert changer.state == "on_reset"
 
 
-def test_collision_avoidance(box_bot_world):
-    msc = MotionStatechart()
-
-    root = box_bot_world.root
-    tip = box_bot_world.get_kinematic_structure_entity_by_name("bot")
-
-    target_pose = TransformationMatrix.from_xyz_quaternion(
-        1, reference_frame=box_bot_world.root
-    )
-    cart_goal = CartesianPose(
-        root_link=root,
-        tip_link=tip,
-        goal_pose=target_pose,
-    )
-    msc.add_node(cart_goal)
-
-    collision_avoidance = CollisionAvoidance(
-        collision_entries=[CollisionRequest.avoid_all_collision()],
-    )
-    msc.add_node(collision_avoidance)
-
-    local_min = LocalMinimumReached()
-    msc.add_node(local_min)
-
-    end = EndMotion()
-    msc.add_node(end)
-    end.start_condition = local_min.observation_variable
-
-    json_data = msc.to_json()
-    json_str = json.dumps(json_data)
-    new_json_data = json.loads(json_str)
-
-    tracker = KinematicStructureEntityKwargsTracker.from_world(box_bot_world)
-    kwargs = tracker.create_kwargs()
-    msc_copy = MotionStatechart.from_json(new_json_data, **kwargs)
-
-    kin_sim = Executor(
-        world=box_bot_world,
-        controller_config=QPControllerConfig.create_default_with_50hz(),
-        collision_checker=CollisionCheckerLib.bpb,
-    )
-    kin_sim.compile(motion_statechart=msc)
-
-    msc_copy.draw("muh.pdf")
-    kin_sim.tick_until_end(500)
-    kin_sim.collision_scene.check_collisions()
-    contact_distance = (
-        kin_sim.collision_scene.closest_points.external_collisions[tip]
-        .data[0]
-        .contact_distance
-    )
-    assert contact_distance > 0.049
-
-
 def test_not_not_in_motion_statechart():
     node = ConstTrueNode()
     with pytest.raises(NotInMotionStatechartError):
@@ -1351,6 +1359,405 @@ def test_counting():
 
     actual = time.time() - current_time
     assert np.isclose(actual, seconds * 2, rtol=0.01)
+
+
+def test_count_ticks():
+    msc = MotionStatechart()
+    msc.add_node(counter := CountTicks(ticks=3))
+    msc.add_node(EndMotion.when_true(counter))
+    kin_sim = Executor(world=World())
+    kin_sim.compile(motion_statechart=msc)
+    kin_sim.tick_until_end()
+    # ending tacks 2 ticks, one to turn EndMotion to Running and one more to turn it to true
+    assert kin_sim.control_cycles == 3 + 2
+
+
+def test_InvalidConditionError():
+    msc = MotionStatechart()
+    node = ConstTrueNode()
+    msc.add_node(node)
+    with pytest.raises(InvalidConditionError):
+        node.end_condition = node
+
+
+class TestEndMotion:
+    def test_end_motion_when_all_done1(self):
+        msc = MotionStatechart()
+        msc.add_nodes(
+            [
+                ConstTrueNode(),
+                ConstTrueNode(),
+            ]
+        )
+        end = EndMotion.when_all_true(msc.nodes)
+        msc.add_node(end)
+
+        kin_sim = Executor(
+            world=World(),
+        )
+        kin_sim.compile(motion_statechart=msc)
+        kin_sim.tick_until_end()
+        msc.draw("muh.pdf")
+        assert end.life_cycle_state == LifeCycleValues.RUNNING
+
+    def test_end_motion_when_all_done2(self):
+        msc = MotionStatechart()
+        msc.add_nodes(
+            [
+                ConstTrueNode(),
+                ConstFalseNode(),
+            ]
+        )
+        end = EndMotion.when_all_true(msc.nodes)
+        msc.add_node(end)
+
+        kin_sim = Executor(
+            world=World(),
+        )
+        kin_sim.compile(motion_statechart=msc)
+        with pytest.raises(TimeoutError):
+            kin_sim.tick_until_end()
+        msc.draw("muh.pdf")
+        assert end.life_cycle_state == LifeCycleValues.NOT_STARTED
+
+    def test_end_motion_when_any_done1(self):
+        msc = MotionStatechart()
+        msc.add_nodes(
+            [
+                ConstTrueNode(),
+                ConstFalseNode(),
+            ]
+        )
+        end = EndMotion.when_any_true(msc.nodes)
+        msc.add_node(end)
+
+        kin_sim = Executor(
+            world=World(),
+        )
+        kin_sim.compile(motion_statechart=msc)
+        kin_sim.tick_until_end()
+        msc.draw("muh.pdf")
+        assert end.life_cycle_state == LifeCycleValues.RUNNING
+
+    def test_end_motion_when_any_done2(self):
+        msc = MotionStatechart()
+        msc.add_nodes(
+            [
+                ConstFalseNode(),
+                ConstFalseNode(),
+            ]
+        )
+        end = EndMotion.when_any_true(msc.nodes)
+        msc.add_node(end)
+
+        kin_sim = Executor(
+            world=World(),
+        )
+        kin_sim.compile(motion_statechart=msc)
+        with pytest.raises(TimeoutError):
+            kin_sim.tick_until_end()
+        msc.draw("muh.pdf")
+        assert end.life_cycle_state == LifeCycleValues.NOT_STARTED
+
+
+class TestParallel:
+    def test_parallel(self):
+        msc = MotionStatechart()
+        msc.add_nodes(
+            [
+                parallel := Parallel([CountTicks(ticks=3), CountTicks(ticks=5)]),
+            ]
+        )
+        msc.add_node(EndMotion.when_true(parallel))
+
+        kin_sim = Executor(
+            world=World(),
+        )
+        kin_sim.compile(motion_statechart=msc)
+        kin_sim.tick_until_end()
+        # 5 (longest ticker) + 1 (for parallel to turn True) + 2 (for end to trigger)
+        assert kin_sim.control_cycles == 8
+
+    def test_parallel_with_tasks(self, pr2_world: World):
+        map = pr2_world.root
+        r_tip = pr2_world.get_kinematic_structure_entity_by_name("r_gripper_tool_frame")
+        msc = MotionStatechart()
+        msc.add_node(
+            parallel := Parallel(
+                [
+                    AlignPlanes(
+                        root_link=map,
+                        tip_link=r_tip,
+                        tip_normal=Vector3.X(reference_frame=r_tip),
+                        goal_normal=Vector3.X(reference_frame=map),
+                    ),
+                    AlignPlanes(
+                        root_link=map,
+                        tip_link=r_tip,
+                        tip_normal=Vector3.Y(reference_frame=r_tip),
+                        goal_normal=Vector3.Z(reference_frame=map),
+                    ),
+                ]
+            )
+        )
+        msc.add_node(EndMotion.when_true(parallel))
+
+        kin_sim = Executor(
+            world=pr2_world,
+            controller_config=QPControllerConfig.create_default_with_50hz(),
+        )
+        kin_sim.compile(motion_statechart=msc)
+        kin_sim.tick_until_end()
+
+
+class TestOpenClose:
+    def test_open(self, pr2_world):
+        factory = DoorFactory(
+            name=PrefixedName("door"),
+            handle_factory=HandleFactory(name=PrefixedName("handle")),
+            semantic_position=SemanticPositionDescription(
+                horizontal_direction_chain=[
+                    HorizontalSemanticDirection.RIGHT,
+                    HorizontalSemanticDirection.FULLY_CENTER,
+                ],
+                vertical_direction_chain=[VerticalSemanticDirection.FULLY_CENTER],
+            ),
+        )
+        door_world = factory.create()
+        with pr2_world.modify_world():
+            lower_limits = DerivativeMap()
+            lower_limits.position = -np.pi / 2
+            lower_limits.velocity = -1
+            upper_limits = DerivativeMap()
+            upper_limits.position = np.pi / 2
+            upper_limits.velocity = 1
+            dof = DegreeOfFreedom(
+                lower_limits=lower_limits,
+                upper_limits=upper_limits,
+                name=PrefixedName("hinge"),
+            )
+            pr2_world.add_degree_of_freedom(dof)
+            root_T_door = RevoluteConnection(
+                dof_name=dof.name,
+                parent=pr2_world.root,
+                child=door_world.root,
+                axis=-cas.Vector3.Z(),
+                parent_T_connection_expression=TransformationMatrix.from_xyz_rpy(
+                    x=1.5, z=1, yaw=np.pi, reference_frame=pr2_world.root
+                ),
+            )
+            pr2_world.merge_world(door_world, root_connection=root_T_door)
+
+        r_tip = pr2_world.get_body_by_name("r_gripper_tool_frame")
+        handle = pr2_world.get_semantic_annotations_by_type(Handle)[0].body
+        open_goal = 1
+        close_goal = -1
+
+        msc = MotionStatechart()
+        msc.add_nodes(
+            [
+                Sequence(
+                    [
+                        CartesianPose(
+                            root_link=pr2_world.root,
+                            tip_link=r_tip,
+                            goal_pose=TransformationMatrix.from_xyz_rpy(
+                                yaw=np.pi, reference_frame=handle
+                            ),
+                        ),
+                        Parallel(
+                            [
+                                Open(
+                                    tip_link=r_tip,
+                                    environment_link=handle,
+                                    goal_joint_state=open_goal,
+                                ),
+                                opened := JointPositionReached(
+                                    connection=root_T_door,
+                                    position=open_goal,
+                                    name="opened",
+                                ),
+                            ]
+                        ),
+                        Parallel(
+                            [
+                                Close(
+                                    tip_link=r_tip,
+                                    environment_link=handle,
+                                    goal_joint_state=close_goal,
+                                ),
+                                closed := JointPositionReached(
+                                    connection=root_T_door,
+                                    position=close_goal,
+                                    name="closed",
+                                ),
+                            ]
+                        ),
+                    ]
+                ),
+            ]
+        )
+        msc.add_node(EndMotion.when_true(msc.nodes[0]))
+
+        kin_sim = Executor(
+            world=pr2_world,
+            controller_config=QPControllerConfig.create_default_with_50hz(),
+        )
+        kin_sim.compile(motion_statechart=msc)
+        kin_sim.tick_until_end()
+        msc.draw("muh.pdf")
+
+        assert opened.observation_state == ObservationStateValues.TRUE
+        assert closed.observation_state == ObservationStateValues.TRUE
+
+
+class TestCollisionAvoidance:
+    def test_collision_avoidance(self, box_bot_world: World):
+        tip = box_bot_world.get_kinematic_structure_entity_by_name("bot")
+
+        msc = MotionStatechart()
+        msc.add_nodes(
+            [
+                CartesianPose(
+                    root_link=box_bot_world.root,
+                    tip_link=tip,
+                    goal_pose=TransformationMatrix.from_xyz_rpy(
+                        x=1, reference_frame=box_bot_world.root
+                    ),
+                ),
+                CollisionAvoidance(
+                    collision_entries=[CollisionRequest.avoid_all_collision()],
+                ),
+                local_min := LocalMinimumReached(),
+            ]
+        )
+        msc.add_node(EndMotion.when_true(local_min))
+
+        json_data = msc.to_json()
+        json_str = json.dumps(json_data)
+        new_json_data = json.loads(json_str)
+
+        tracker = KinematicStructureEntityKwargsTracker.from_world(box_bot_world)
+        kwargs = tracker.create_kwargs()
+        msc_copy = MotionStatechart.from_json(new_json_data, **kwargs)
+
+        kin_sim = Executor(
+            world=box_bot_world,
+            controller_config=QPControllerConfig.create_default_with_50hz(),
+            collision_checker=CollisionCheckerLib.bpb,
+        )
+        kin_sim.compile(motion_statechart=msc_copy)
+
+        msc_copy.draw("muh.pdf")
+        kin_sim.tick_until_end(500)
+        kin_sim.collision_scene.check_collisions()
+        contact_distance = (
+            kin_sim.collision_scene.closest_points.external_collisions[tip]
+            .data[0]
+            .contact_distance
+        )
+        assert contact_distance > 0.049
+
+    def test_hard_constraints_violated(self, box_bot_world: World):
+        root = box_bot_world.root
+        with box_bot_world.modify_world():
+            env2 = Body(
+                name=PrefixedName("environment2"),
+                collision=ShapeCollection(shapes=[Cylinder(width=0.5, height=0.1)]),
+            )
+            env_connection = FixedConnection(
+                parent=root,
+                child=env2,
+                parent_T_connection_expression=TransformationMatrix.from_xyz_rpy(0.75),
+            )
+            box_bot_world.add_connection(env_connection)
+
+            env3 = Body(
+                name=PrefixedName("environment3"),
+                collision=ShapeCollection(shapes=[Cylinder(width=0.5, height=0.1)]),
+            )
+            env_connection = FixedConnection(
+                parent=root,
+                child=env3,
+                parent_T_connection_expression=TransformationMatrix.from_xyz_rpy(1.25),
+            )
+            box_bot_world.add_connection(env_connection)
+            env4 = Body(
+                name=PrefixedName("environment4"),
+                collision=ShapeCollection(shapes=[Cylinder(width=0.5, height=0.1)]),
+            )
+            env_connection = FixedConnection(
+                parent=root,
+                child=env4,
+                parent_T_connection_expression=TransformationMatrix.from_xyz_rpy(
+                    x=1, y=-0.25
+                ),
+            )
+            box_bot_world.add_connection(env_connection)
+            env5 = Body(
+                name=PrefixedName("environment5"),
+                collision=ShapeCollection(shapes=[Cylinder(width=0.5, height=0.1)]),
+            )
+            env_connection = FixedConnection(
+                parent=root,
+                child=env5,
+                parent_T_connection_expression=TransformationMatrix.from_xyz_rpy(
+                    x=1, y=0.25
+                ),
+            )
+            box_bot_world.add_connection(env_connection)
+
+        tip = box_bot_world.get_kinematic_structure_entity_by_name("bot")
+
+        msc = MotionStatechart()
+        msc.add_node(
+            Sequence(
+                [
+                    SetOdometry(
+                        base_pose=TransformationMatrix.from_xyz_rpy(
+                            x=1, reference_frame=box_bot_world.root
+                        )
+                    ),
+                    Parallel(
+                        [
+                            CartesianPose(
+                                root_link=box_bot_world.root,
+                                tip_link=tip,
+                                goal_pose=TransformationMatrix.from_xyz_rpy(
+                                    x=1, reference_frame=box_bot_world.root
+                                ),
+                            ),
+                            CollisionAvoidance(
+                                collision_entries=[
+                                    CollisionRequest.avoid_all_collision()
+                                ],
+                            ),
+                        ]
+                    ),
+                ]
+            )
+        )
+        msc.add_node(local_min := LocalMinimumReached())
+        msc.add_node(EndMotion.when_true(local_min))
+
+        json_data = msc.to_json()
+        json_str = json.dumps(json_data)
+        new_json_data = json.loads(json_str)
+
+        tracker = KinematicStructureEntityKwargsTracker.from_world(box_bot_world)
+        kwargs = tracker.create_kwargs()
+        msc_copy = MotionStatechart.from_json(new_json_data, **kwargs)
+
+        kin_sim = Executor(
+            world=box_bot_world,
+            controller_config=QPControllerConfig.create_default_with_50hz(),
+            collision_checker=CollisionCheckerLib.bpb,
+        )
+        kin_sim.compile(motion_statechart=msc_copy)
+
+        msc_copy.draw("muh.pdf")
+        with pytest.raises(HardConstraintsViolatedException):
+            kin_sim.tick_until_end()
 
 def test_goal_cannot_have_endmotion_add_node():
     msc = MotionStatechart()

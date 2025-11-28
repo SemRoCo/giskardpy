@@ -4,7 +4,7 @@ from dataclasses import field, dataclass
 from typing import Optional, Type, Tuple
 
 import semantic_digital_twin.spatial_types.spatial_types as cas
-from giskardpy.data_types.exceptions import GoalInitalizationException
+from giskardpy.motion_statechart.exceptions import GoalInitalizationException
 from giskardpy.motion_statechart.context import BuildContext, ExecutionContext
 from giskardpy.motion_statechart.graph_node import (
     MotionStatechartNode,
@@ -17,7 +17,7 @@ from semantic_digital_twin.world_description.connections import (
 from semantic_digital_twin.world_description.world_entity import Connection
 
 
-@dataclass
+@dataclass(eq=False, repr=False)
 class SetSeedConfiguration(MotionStatechartNode):
     """
     Overwrite the configuration of the world to allow starting the planning from a different state.
@@ -37,7 +37,7 @@ class SetSeedConfiguration(MotionStatechartNode):
             connection.position = value
 
 
-@dataclass
+@dataclass(eq=False, repr=False)
 class SetOdometry(MotionStatechartNode):
     base_pose: cas.TransformationMatrix = field(kw_only=True)
     _odom_joints: Tuple[Type[Connection], ...] = field(default=(OmniDrive,), init=False)

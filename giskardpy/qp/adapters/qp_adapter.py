@@ -10,7 +10,7 @@ import numpy as np
 from line_profiler import profile
 
 import semantic_digital_twin.spatial_types.spatial_types as cas
-from giskardpy.data_types.exceptions import (
+from giskardpy.qp.exceptions import (
     InfeasibleException,
     VelocityLimitUnreachableException,
 )

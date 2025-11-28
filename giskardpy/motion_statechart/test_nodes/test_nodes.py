@@ -8,7 +8,6 @@ from giskardpy.motion_statechart.graph_node import (
     Goal,
     NodeArtifacts,
 )
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 
 
 @dataclass(eq=False, repr=False)
@@ -18,7 +17,7 @@ class ConstTrueNode(MotionStatechartNode):
 
 
 @dataclass(eq=False, repr=False)
-class FalseMonitor(MotionStatechartNode):
+class ConstFalseNode(MotionStatechartNode):
     def build(self, context: BuildContext) -> NodeArtifacts:
         return NodeArtifacts(observation=cas.TrinaryFalse)
 
@@ -49,9 +48,9 @@ class TestGoal(Goal):
     sub_node2: ConstTrueNode = field(init=False)
 
     def expand(self, context: BuildContext) -> None:
-        self.sub_node1 = ConstTrueNode(name=PrefixedName("sub muh1"))
+        self.sub_node1 = ConstTrueNode(name="sub muh1")
         self.add_node(self.sub_node1)
-        self.sub_node2 = ConstTrueNode(name=PrefixedName("sub muh2"))
+        self.sub_node2 = ConstTrueNode(name="sub muh2")
         self.add_node(self.sub_node2)
         self.sub_node1.end_condition = self.sub_node1.observation_variable
         self.sub_node2.start_condition = self.sub_node1.observation_variable
@@ -67,7 +66,7 @@ class TestNestedGoal(Goal):
     inner: TestGoal = field(init=False)
 
     def expand(self, context: BuildContext) -> None:
-        self.inner = TestGoal(name=PrefixedName("inner"))
+        self.inner = TestGoal(name="inner")
         self.add_node(self.inner)
 
     def build(self, context: BuildContext) -> NodeArtifacts:

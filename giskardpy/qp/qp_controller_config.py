@@ -6,8 +6,8 @@ from typing import Optional, Dict, Type
 
 import numpy as np
 
-from giskardpy.data_types.exceptions import QPSolverException
 from giskardpy.middleware import get_middleware
+from giskardpy.qp.exceptions import QPSolverException
 from giskardpy.qp.qp_formulation import QPFormulation
 from giskardpy.qp.solvers.qp_solver import QPSolver
 from giskardpy.qp.solvers.qp_solver_ids import SupportedQPSolver

@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from typing import Optional
 
 import semantic_digital_twin.spatial_types.spatial_types as cas
 from semantic_digital_twin.spatial_types.derivatives import Derivatives
@@ -137,3 +138,5 @@ class ODEConstraint(DerivativeConstraint):
     ode_function: cas.SymbolicScalar
     lower_slack_limit: cas.ScalarData
     upper_slack_limit: cas.ScalarData
+    goal_value: Optional[cas.ScalarData] = None
+    goal_gain: cas.ScalarData = 1.0

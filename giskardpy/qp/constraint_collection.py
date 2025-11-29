@@ -504,21 +504,45 @@ class ConstraintCollection:
         name: Optional[str] = None,
         lower_slack_limit: cas.ScalarData = -Large_Number,
         upper_slack_limit: cas.ScalarData = Large_Number,
+        goal_value: Optional[cas.ScalarData] = None,
+        goal_gain: cas.ScalarData = 1.0,
     ):
         """
         Adds a constraint of the form d(target_variable)/dt = ode_function.
+        
+        If goal_value is provided, adds goal-seeking behavior:
+            d(target_variable)/dt = ode_function + goal_gain * (goal_value - target_variable)
+        
+        Args:
+            target_variable: The variable whose derivative is being constrained
+            ode_function: The ODE right-hand side (RHS) defining the dynamics
+            weight: Quadratic penalty weight for constraint violation
+            name: Optional constraint name
+            lower_slack_limit: Lower bound for slack variable
+            upper_slack_limit: Upper bound for slack variable
+            goal_value: Optional target value for goal-seeking behavior
+            goal_gain: Proportional gain for goal-seeking (default: 1.0)
         """
         name = name or ""
+        
+        # Modify ODE function to include goal-seeking term if goal is provided
+        effective_ode_function = ode_function
+        if goal_value is not None:
+            # Add proportional term: gain * (goal - current)
+            effective_ode_function = ode_function + goal_gain * (goal_value - target_variable)
+        
         constraint = ODEConstraint(
             name=name,
             derivative=Derivatives.velocity,
             expression=target_variable,
-            ode_function=ode_function,
+            ode_function=effective_ode_function,
             quadratic_weight=weight,
             normalization_factor=1.0,  # Assuming 1.0 for now, could be an argument
             lower_slack_limit=lower_slack_limit,
             upper_slack_limit=upper_slack_limit,
             linear_weight=0,
+            goal_value=goal_value,
+            goal_gain=goal_gain,
         )
         if constraint.name in self.constraints:
             raise DuplicateNameException(

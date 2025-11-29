@@ -351,6 +351,200 @@ class TestODEIntegration(unittest.TestCase):
                                msg=f"Expected {0.4}, got {current_p}")
         self.assertLess(current_r, 0.2, msg=f"Expected r < 0.2, got {current_r}")
         self.assertGreaterEqual(current_r, 0.0, msg=f"Expected r > 0.0, got {current_r}")
+    
+    def test_goal_integrated_pour(self):
+        """
+        Demonstrates realistic pouring physics with geometric gap model.
+        
+        Problem: Control liquid level (p=h) by tilting cup (r=α).
+        Physics: Weir discharge through geometric gap d(h,α) = L(h)·sin(α - φ(h))
+        Goal: Reach target h = 0.4
+        
+        Key insight: Geometry creates NATURAL feedback - no goal in ODE needed!
+        As h → target, gap → 0, discharge → 0, pouring stops automatically.
+        
+        Giskard's job: Find α(t) trajectory that minimizes ||h - h_ref ||
+        subject to realistic physics h_dot = -Q(h,α)/A_t
+        """
+        # 1. Setup World
+        world, pris_dof, rev_dof, pris_conn = self.create_initial_world()
+        
+        # Get symbolic variables
+        p_sym = pris_dof.variables.position
+        r_sym = rev_dof.variables.position
+        
+        # 2. Implement realistic pouring physics (geometric gap model)
+        # Based on the physical model with cup geometry and weir discharge
+        
+        # Cup geometry parameters
+        A_cup = 0.3  # Cup height [m]
+        r_cup = 0.05  # Cup radius [m]
+        
+        # Discharge parameters (liquid - weir overflow)
+        g = 9.81  # Gravity [m/s²]
+        C_w = 0.55  # Weir discharge coefficient
+        b = 2 * r_cup  # Weir width (cup diameter)
+        A_t = 2 * r_cup * 0.10  # Cross-sectional area for h_dot calculation
+        
+        # Geometry functions
+        # L(h) = distance from rotation axis to liquid surface corner
+        # φ(h) = angle offset due to liquid level
+        def L_func(h):
+            return cas.sqrt((A_cup - h)**2 + r_cup**2)
+        
+        def phi_func(h):
+            return cas.atan2((A_cup - h), r_cup)
+        
+        # Gap function: vertical distance liquid can spill
+        # d(h, α) = L(h) * sin(α - φ(h))
+        # When α < φ: d < 0 (cup tilted but not enough to pour)
+        # When α > φ: d > 0 (liquid can spill by amount d)
+        L_h = L_func(p_sym)
+        phi_h = phi_func(p_sym)
+        gap = L_h * cas.sin(r_sym - phi_h)
+        
+        # Effective gap (only positive part - can't pour upward!)
+        # Using max(gap, 0) via smooth approximation for differentiability
+        tau_smooth = 0.001
+        gap_effective = tau_smooth * cas.log(1.0 + cas.exp(gap / tau_smooth))
+        
+        # Weir discharge equation: Q = (2/3) * C_w * b * sqrt(2*g) * d^1.5
+        Q_discharge = (2.0/3.0) * C_w * b * cas.sqrt(2.0*g) * gap_effective**1.5
+        
+        # Plant dynamics: h_dot = -Q / A_t + Q_refill
+        # Add constant refill rate to create a continuous control problem
+        # Without this, Giskard can find trivial solution (don't move)
+        Q_refill = 0.0002  # m³/s continuous refill rate
+        ode_physics = -Q_discharge / A_t + Q_refill
+        
+        # Now the system has:
+        # - Refill: constantly adding liquid (disturbance)
+        # - Pour: controlled by tilt angle α
+        # - Equilibrium: Q_discharge(h,α) = Q_refill * A_t
+        # Giskard must find α to balance refill rate and maintain h = h_ref
+        
+        # 3. Setup Motion Statechart
+        msc = MotionStatechart()
+        
+        # Create ODE task (pure physics, NO goal integration)
+        @dataclass(eq=False, repr=False)
+        class PhysicsODETask(Task):
+            target_variable: cas.FloatVariable = field(kw_only=True)
+            ode_function: cas.SymbolicScalar = field(kw_only=True)
+            weight: float = 1.0
+            
+            def build(self, context: BuildContext) -> NodeArtifacts:
+                cc = ConstraintCollection()
+                cc.add_ode_constraint(
+                    target_variable=self.target_variable,
+                    ode_function=self.ode_function,
+                    weight=self.weight,
+                    # NO goal_value! Pure physics.
+                    name=f"{self.name}_ode"
+                )
+                return NodeArtifacts(constraints=cc)
+        
+        ode_task = PhysicsODETask(
+            name="pour_physics",
+            target_variable=p_sym,
+            ode_function=ode_physics,
+            weight=10000.0  # High weight - physics must be respected
+        )
+        msc.add_node(ode_task)
+        
+        # Add position constraint on p to guide toward goal
+        # This provides the OBJECTIVE: minimize ||h - h_ref||
+        # Physics (ODE) provides the CONSTRAINT: how h can evolve
+        pris_target = {pris_conn: 0.4}
+        goal_task = JointPositionList(
+            name="goal_task",
+            goal_state=pris_target,
+            weight=1000.0  # Strong guidance - but ODE still dominates (10000)
+        )
+        msc.add_node(goal_task)
+        
+        # Remove bias task - let Giskard figure out r naturally
+        # The goal constraint on h will drive the optimization
+        
+        # End condition
+        end = EndMotion()
+        msc.add_node(end)
+        end.start_condition = ode_task.observation_variable
+        
+        # Start conditions
+        ode_task.start_condition = cas.TrinaryTrue
+        goal_task.start_condition = cas.TrinaryTrue
+        
+        # 4. Execution
+        config = QPControllerConfig.create_default_with_50hz()
+        kin_sim = Executor(world=world, controller_config=config)
+        kin_sim.compile(motion_statechart=msc)
+        
+        # Set initial positions: slightly overfull, upright
+        # Start above goal to force pouring behavior
+        world.state[rev_dof.name].position = 0.0  # upright
+        world.state[pris_dof.name].position = 0.6  # above goal (0.4)
+        
+        # Tick for 20 seconds to see full pouring dynamics
+        dt = config.mpc_dt
+        p_vals = []
+        r_vals = []
+        times = []
+        t = 0.0
+        
+        max_time = 20.0
+        while t < max_time:
+            kin_sim.tick()
+            
+            current_p = world.state[pris_dof.name].position
+            current_r = world.state[rev_dof.name].position
+            
+            p_vals.append(current_p)
+            r_vals.append(current_r)
+            times.append(t)
+            t += dt
+            
+        
+        final_p = world.state[pris_dof.name].position
+        final_r = world.state[rev_dof.name].position
+        
+        goal_value = 0.4  # Define goal for assertions
+        print(f"Final state: p={final_p:.4f}, r={final_r:.4f}")
+        print(f"Goal: p={goal_value}, Error: {abs(final_p - goal_value):.4f}")
+        print(f"Max tilt: r_max={max(r_vals):.4f}, Min tilt: r_min={min(r_vals):.4f}")
+        print(f"Tilt range: [{min(r_vals):.4f}, {max(r_vals):.4f}]")
+        print(f"p range: [{min(p_vals):.4f}, {max(p_vals):.4f}]")
+        
+        # Generate visualization
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8))
+        
+        # Plot 1: State evolution
+        ax1.plot(times, p_vals, label='Liquid level (p)', linewidth=2)
+        ax1.plot(times, r_vals, label='Tilt angle (r)', linewidth=2)
+        ax1.axhline(y=goal_value, color='r', linestyle='--', label=f'Goal (p={goal_value})')
+        ax1.axhline(y=0.2, color='gray', linestyle=':', label='Threshold (r=0.2)')
+        ax1.set_xlabel('Time (s)')
+        ax1.set_ylabel('Position')
+        ax1.set_title('Goal-Integrated ODE: Pouring Water Control')
+        ax1.legend()
+        ax1.grid(True, alpha=0.3)
+        
+        # Plot 2: Decay rate vs time
+        p_dot = np.diff(p_vals) / dt
+        ax2.plot(times[:-1], p_dot, label='dp/dt', linewidth=2, color='purple')
+        ax2.set_xlabel('Time (s)')
+        ax2.set_ylabel('Decay Rate (dp/dt)')
+        ax2.set_title('ODE Dynamics')
+        ax2.legend()
+        ax2.grid(True, alpha=0.3)
+        
+        plt.tight_layout()
+        plt.savefig('goal_integrated_pour.png')
+        print("Plot saved to goal_integrated_pour.png")
             
 if __name__ == '__main__':
     unittest.main()

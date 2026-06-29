@@ -2,6 +2,8 @@
 
 [The current version is available here](https://github.com/cram2/cognitive_robot_abstract_machine/tree/main/giskardpy)
 
+Old README below
+
 # Giskardpy
 Giskardpy is an open source library for implementing motion control frameworks.
 It uses constraint and optimization based task space control to control the whole body of mobile manipulators.
